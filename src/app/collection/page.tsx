@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { supabase } from '../../lib/supabaseClient'
+import { getStoredSession, getAuthenticatedClient } from '../../lib/directAuth'
 
 type Card = {
   id: string
@@ -185,13 +185,19 @@ function CollectionPageContent() {
       setError(null) // Clear any previous errors
 
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        // Check for stored session from direct auth
+        const session = getStoredSession()
 
-        if (!user) {
+        if (!session || !session.user) {
           setError('❌ You must be logged in to see your collection.')
           setLoading(false)
           return
         }
+
+        const user = session.user
+
+        // Get authenticated Supabase client with our access token
+        const supabase = getAuthenticatedClient()
 
         let query = supabase
           .from('cards')

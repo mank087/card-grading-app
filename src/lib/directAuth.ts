@@ -103,3 +103,23 @@ export function signOut() {
     localStorage.removeItem('supabase.auth.token')
   }
 }
+
+// Get authenticated Supabase client with stored session
+export function getAuthenticatedClient() {
+  const session = getStoredSession()
+
+  // Import createClient dynamically to avoid module issues
+  const { createClient } = require('@supabase/supabase-js')
+
+  return createClient(
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
+    {
+      global: {
+        headers: session?.access_token ? {
+          Authorization: `Bearer ${session.access_token}`
+        } : {}
+      }
+    }
+  )
+}
