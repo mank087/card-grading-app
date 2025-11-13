@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '../../lib/supabaseClient'
+import { signInWithPassword, signUp, getStoredSession } from '../../lib/directAuth'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -13,23 +13,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Check if user is already signed in
-    const checkUser = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        router.push('/collection')
-      }
+    const session = getStoredSession()
+    if (session && session.user) {
+      router.push('/collection')
     }
-
-    checkUser()
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        router.push('/collection')
-      }
-    })
-
-    return () => subscription.unsubscribe()
   }, [router])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,28 +26,24 @@ export default function LoginPage() {
 
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: undefined
-          }
-        })
-        if (error) throw error
-        alert('Check your email for the confirmation link!')
+        const result = await signUp(email, password)
+        if (result.error) {
+          setError(result.error)
+        } else {
+          alert('Account created! Check your email for the confirmation link.')
+        }
       } else {
-        console.log('Attempting login with:', { email, urlLength: email.length })
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        })
-        console.log('Login response data:', data)
-        console.log('Login response error:', error)
-        if (error) throw error
+        const result = await signInWithPassword(email, password)
+        if (result.error) {
+          setError(result.error)
+        } else if (result.user) {
+          // Success! Redirect to collection
+          router.push('/collection')
+        }
       }
     } catch (error: any) {
-      console.error('Full auth error:', error)
-      setError(error.message || error.toString() || 'An error occurred')
+      console.error('Auth error:', error)
+      setError(error.message || 'An error occurred')
     } finally {
       setLoading(false)
     }
