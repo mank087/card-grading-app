@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { compressImage, formatFileSize, getOptimalCompressionSettings } from '@/lib/imageCompression'
@@ -104,7 +104,7 @@ const CARD_TYPES = {
 
 type CardType = keyof typeof CARD_TYPES;
 
-export default function UniversalUploadPage() {
+function UniversalUploadPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -524,5 +524,14 @@ export default function UniversalUploadPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+// Wrap in Suspense for Next.js 15 useSearchParams() requirement
+export default function UniversalUploadPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading upload page...</div>}>
+      <UniversalUploadPageContent />
+    </Suspense>
   )
 }
