@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
+import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
 import { compressImage, formatFileSize, getOptimalCompressionSettings } from '@/lib/imageCompression'
 import CardAnalysisAnimation from './sports/CardAnalysisAnimation'
 
@@ -224,16 +225,15 @@ function UniversalUploadPageContent() {
       return
     }
 
-    // Get logged-in user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser()
+    // Get logged-in user from stored session
+    const session = getStoredSession()
 
-    if (userError || !user) {
+    if (!session || !session.user) {
       setStatus('❌ You must be logged in to upload')
       return
     }
+
+    const user = session.user
 
     try {
       setIsUploading(true)
