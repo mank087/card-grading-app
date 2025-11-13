@@ -306,3 +306,4 @@ For technical issues, see:
 ---
 
 **Built with ❤️ using Next.js, TypeScript, and OpenAI GPT-4o Vision**
+# Force rebuild with environment variables
