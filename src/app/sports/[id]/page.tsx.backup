@@ -1,0 +1,697 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import { QRCodeCanvas } from 'qrcode.react';
+import GradeBadge from "../../ui/GradeBadge";
+
+interface SportsAIGrading {
+  "Final Score"?: {
+    "Overall Grade"?: string;
+  };
+  "Final DCM Grade"?: {
+    "Raw Decimal Grade"?: number;
+    "DCM Grade (Whole Number)"?: number;
+    "Confidence Level"?: string;
+  };
+  "Card Information"?: {
+    "Card Name"?: string;
+    "Category"?: string;
+    "Card Number"?: string;
+    "Serial Numbering"?: string;
+    "Card Set"?: string;
+    "Manufacturer Name"?: string;
+    "Release Date"?: string;
+    "Authentic"?: string;
+  };
+  "Card Details"?: {
+    "Player(s)/Character(s) Featured"?: string;
+    "Rookie/First Print"?: string;
+    "Rarity"?: string;
+  };
+  "Grading (DCM Master Scale)"?: {
+    "Raw Decimal Grade (Before Rounding)"?: string | number;
+    "DCM Grade (Final Whole Number)"?: string | number;
+    "Subgrade Evaluation"?: {
+      "Corners"?: { score?: number; commentary?: string };
+      "Edges"?: { score?: number; commentary?: string };
+      "Surface Front"?: { score?: number; commentary?: string };
+      "Surface Back"?: { score?: number; commentary?: string };
+      "Centering Front"?: { score?: number; ratio?: string; commentary?: string; measurements?: { left_border: number; right_border: number; top_border: number; bottom_border: number } };
+      "Centering Back"?: { score?: number; ratio?: string; commentary?: string; measurements?: { left_border: number; right_border: number; top_border: number; bottom_border: number } };
+      "Print Quality"?: { score?: number; commentary?: string };
+      "Color/Gloss"?: { score?: number; commentary?: string };
+      "Structural Integrity"?: { score?: number; commentary?: string };
+      "Alterations/Qualifiers"?: { commentary?: string };
+    };
+    "Summary for Grade"?: string;
+  };
+  "Estimated Scoring by Major Grading Companies"?: {
+    "PSA"?: { grade?: string; reasoning?: string };
+    "Beckett (BGS)"?: { grade?: string; reasoning?: string };
+    "TAG"?: { grade?: string; reasoning?: string };
+    "CSG"?: { grade?: string; reasoning?: string };
+  };
+  "DCM Score System"?: {
+    "Condition Grade (Base)"?: string | number;
+    "AI Confidence Score"?: string;
+    "Final DCM Score"?: string;
+  };
+  "DCM Estimated Value"?: {
+    "Estimated Market Value"?: string;
+    "Estimated Range"?: string;
+    "Estimate Confidence"?: string;
+  };
+  "AI Confidence Assessment"?: {
+    "Confidence Level"?: string;
+    "Image Quality Factors"?: string;
+    "Resolution Assessment"?: string;
+    "Visibility Issues"?: string;
+    "Grading Reliability"?: string;
+    "Confidence Justification"?: string;
+  };
+}
+
+interface SportsCard {
+  id: string;
+  front_url: string;
+  back_url: string;
+  ai_grading: SportsAIGrading | null;
+  opencv_detection?: {
+    front?: any;
+    back?: any;
+  } | null;
+  card_boundaries?: {
+    front?: any;
+    back?: any;
+  } | null;
+  raw_decimal_grade: number | null;
+  dcm_grade_whole: number | null;
+  ai_confidence_score: string;
+  processing_time?: number;
+  category: string;
+}
+
+const renderValue = (value: any) => {
+  if (value === null || value === undefined || value === "" || value === "N/A") {
+    return "N/A";
+  }
+  return value;
+};
+
+const getGradeColor = (grade: string | number) => {
+  const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
+  if (numGrade >= 9.5) return 'text-green-600 font-bold';
+  if (numGrade >= 8.5) return 'text-blue-600 font-semibold';
+  if (numGrade >= 7.0) return 'text-yellow-600 font-semibold';
+  if (numGrade >= 5.0) return 'text-orange-600';
+  return 'text-red-600';
+};
+
+export default function SportsCardDetails() {
+  const params = useParams<{ id: string }>();
+  const cardId = params?.id;
+  const [card, setCard] = useState<SportsCard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [origin, setOrigin] = useState<string>('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Fetch sports card details using sports-specific API
+  const fetchSportsCardDetails = useCallback(async () => {
+    if (!cardId) return;
+
+    try {
+      setLoading(true);
+      setError(null);
+      setIsProcessing(false);
+
+      const res = await fetch(`/api/sports/${cardId}`);
+      console.log(`Sports card API response status: ${res.status}`);
+
+      if (!res.ok) {
+        if (res.status === 429) {
+          console.log('Sports card is being processed, showing processing state...');
+          setIsProcessing(true);
+          setLoading(false);
+
+          // Auto-retry with visual feedback
+          const retryWithBackoff = async (attempt: number = 1): Promise<void> => {
+            if (attempt > 5) {
+              setError('Processing is taking longer than expected. The card analysis is still running in the background.');
+              setIsProcessing(false);
+              return;
+            }
+
+            const delay = 3000 * attempt; // 3s, 6s, 9s, 12s, 15s
+            console.log(`Auto-retry attempt ${attempt}/5 in ${delay/1000} seconds...`);
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+
+            try {
+              const retryRes = await fetch(`/api/sports/${cardId}`);
+
+              if (retryRes.ok) {
+                const data = await retryRes.json();
+                console.log('Sports card data received after retry:', data);
+                setCard(data);
+                setIsProcessing(false);
+                return;
+              }
+
+              if (retryRes.status === 429) {
+                // Still processing, continue retrying
+                await retryWithBackoff(attempt + 1);
+              } else {
+                throw new Error(`Failed to load sports card: ${retryRes.status}`);
+              }
+            } catch (error) {
+              console.error(`Retry attempt ${attempt} failed:`, error);
+              await retryWithBackoff(attempt + 1);
+            }
+          };
+
+          await retryWithBackoff();
+          return;
+        }
+        throw new Error(`Failed to load sports card: ${res.status}`);
+      }
+
+      const data = await res.json();
+      console.log('Sports card data received:', data);
+      console.log('OpenCV detection in response:', data.opencv_detection);
+      setCard(data);
+
+    } catch (e: any) {
+      console.error('Sports card fetch error:', e);
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [cardId]);
+
+  // Single fetch on mount
+  useEffect(() => {
+    if (cardId) {
+      console.log('Fetching sports card details for:', cardId);
+      fetchSportsCardDetails();
+    }
+  }, [cardId, fetchSportsCardDetails]);
+
+  // Set origin for QR code
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setOrigin(window.location.origin);
+    }
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p>Loading sports card details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isProcessing) {
+    return (
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="text-center max-w-md mx-auto p-6">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-6"></div>
+          <h2 className="text-xl font-semibold mb-4">Analyzing Your Sports Card</h2>
+          <p className="text-gray-600 mb-4">
+            Our AI is performing a comprehensive 8-step grading analysis including centering, corners, edges, and surface evaluation.
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              💡 <strong>Processing with {card?.card_boundaries ? 'User-Defined' : 'OpenCV'} Boundaries</strong>
+              <br />
+              This ensures precise centering measurements for your card.
+            </p>
+          </div>
+          <p className="text-xs text-gray-500 mt-4">
+            This usually takes 30-60 seconds. Please don't refresh the page.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-red-500 text-center p-8">
+        <h1 className="text-2xl font-bold mb-4">Error</h1>
+        <p>{error}</p>
+        <div className="mt-4 space-x-4">
+          <button
+            onClick={fetchSportsCardDetails}
+            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+          >
+            Retry
+          </button>
+          <Link href="/upload/sports" className="text-blue-500 inline-block">
+            Back to Sports Upload
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!card) {
+    return (
+      <div className="text-center p-8">
+        <h1 className="text-2xl font-bold mb-4">Sports Card Not Found</h1>
+        <Link href="/upload/sports" className="text-blue-500">
+          Back to Sports Upload
+        </Link>
+      </div>
+    );
+  }
+
+  // Extract comprehensive data from AI grading
+  const aiCardInfo = card.ai_grading?.["Card Information"] || {};
+  const aiCardDetails = card.ai_grading?.["Card Details"] || {};
+  const finalScore = card.ai_grading?.["Final Score"] || {};
+  const gradingScale = card.ai_grading?.["Grading (DCM Master Scale)"] || {};
+  const subgrades = gradingScale["Subgrade Evaluation"] || {};
+
+  // Debug centering data
+  console.log('[Sports Page] Full subgrades:', subgrades);
+  console.log('[Sports Page] All subgrade keys:', Object.keys(subgrades));
+  console.log('[Sports Page] Centering Front (old key):', subgrades["Centering Front"]);
+  console.log('[Sports Page] Centering Back (old key):', subgrades["Centering Back"]);
+
+  // Check for alternative centering key formats
+  const centeringKeys = Object.keys(subgrades).filter(key => key.toLowerCase().includes('centering'));
+  console.log('[Sports Page] Found centering keys:', centeringKeys);
+
+  // Test new flexible key matching
+  const frontKey = Object.keys(subgrades).find(key =>
+    key.toLowerCase().includes('centering') && key.toLowerCase().includes('front')
+  );
+  const backKey = Object.keys(subgrades).find(key =>
+    key.toLowerCase().includes('centering') && key.toLowerCase().includes('back')
+  );
+  console.log('[Sports Page] Matched front key:', frontKey);
+  console.log('[Sports Page] Matched back key:', backKey);
+  const companyScores = card.ai_grading?.["Estimated Scoring by Major Grading Companies"] || {};
+  const dcmSystem = card.ai_grading?.["DCM Score System"] || {};
+  const estimatedValue = card.ai_grading?.["DCM Estimated Value"] || {};
+  const aiConfidence = card.ai_grading?.["AI Confidence Assessment"] || {};
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <Link href="/upload/sports" className="text-blue-600 hover:text-blue-800">
+          ← Back to Sports Upload
+        </Link>
+        <div className="flex items-center space-x-4">
+          <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+            🏈 Sports Card
+          </div>
+          <div className="text-sm text-gray-500">
+            {card.processing_time && (
+              <span>Evaluated in {(card.processing_time / 1000).toFixed(1)}s</span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Main Layout */}
+      <div className="grid lg:grid-cols-3 gap-8">
+        {/* Card Images */}
+        <div className="lg:col-span-1">
+          <div className="space-y-6">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h3 className="font-semibold text-lg">Card Images</h3>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-600 mb-2">Front</h4>
+                  <Image
+                    src={card.front_url}
+                    alt="Sports card front"
+                    width={400}
+                    height={560}
+                    className="rounded-lg shadow-lg w-full"
+                    priority
+                  />
+                </div>
+                <div>
+                  <h4 className="text-sm font-medium text-gray-600 mb-2">Back</h4>
+                  <Image
+                    src={card.back_url}
+                    alt="Sports card back"
+                    width={400}
+                    height={560}
+                    className="rounded-lg shadow-lg w-full"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* QR Code */}
+            <div className="bg-white rounded-lg shadow-lg p-6 text-center">
+              <h3 className="text-lg font-bold mb-4">Share Card</h3>
+              <QRCodeCanvas
+                value={`${origin}/sports/${card.id}`}
+                size={120}
+                className="mx-auto"
+              />
+              <p className="text-xs text-gray-600 mt-2">
+                Scan to view this card
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Card Details and Grading */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Final Score Header */}
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-lg p-6">
+            <div className="text-center">
+              <h1 className="text-3xl font-bold mb-2">
+                {renderValue(aiCardInfo["Card Name"])}
+              </h1>
+              <div className="text-5xl font-bold mb-2">
+                {renderValue(finalScore["Overall Grade"])}
+              </div>
+              <p className="text-lg opacity-90">DCM Final Score</p>
+            </div>
+          </div>
+
+          {/* 1. Card Information */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Card Information</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-3">
+                <div>
+                  <span className="font-semibold text-gray-600">Card Name:</span>
+                  <span className="ml-2">{renderValue(aiCardInfo["Card Name"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Player(s) Featured:</span>
+                  <span className="ml-2">{renderValue(aiCardDetails["Player(s)/Character(s) Featured"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Category:</span>
+                  <span className="ml-2">{renderValue(aiCardInfo["Category"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Card Number:</span>
+                  <span className="ml-2">{renderValue(aiCardInfo["Card Number"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Serial Number:</span>
+                  <span className="ml-2">{renderValue(aiCardInfo["Serial Numbering"])}</span>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <span className="font-semibold text-gray-600">Card Set:</span>
+                  <span className="ml-2">{renderValue(aiCardInfo["Card Set"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Manufacturer:</span>
+                  <span className="ml-2">{renderValue(aiCardInfo["Manufacturer Name"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Release Date:</span>
+                  <span className="ml-2">{renderValue(aiCardInfo["Release Date"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Rookie/First Print:</span>
+                  <span className={`ml-2 ${aiCardDetails["Rookie/First Print"] === "Yes" ? "text-green-600 font-semibold" : ""}`}>
+                    {renderValue(aiCardDetails["Rookie/First Print"])}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Rarity:</span>
+                  <span className="ml-2">{renderValue(aiCardDetails["Rarity"])}</span>
+                </div>
+                <div>
+                  <span className="font-semibold text-gray-600">Authentic:</span>
+                  <span className={`ml-2 ${aiCardInfo["Authentic"] === "Yes" ? "text-green-600 font-semibold" : ""}`}>
+                    {renderValue(aiCardInfo["Authentic"])}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. DCM Master Scale Grading */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Master Scale Grading</h2>
+            <div className="space-y-3">
+              <div>
+                <span className="font-semibold text-gray-600">Raw Decimal Grade:</span>
+                <span className={`ml-2 text-lg ${getGradeColor(gradingScale["Raw Decimal Grade (Before Rounding)"] || 0)}`}>
+                  {renderValue(gradingScale["Raw Decimal Grade (Before Rounding)"])}
+                </span>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-600">Final Whole Grade:</span>
+                <span className={`ml-2 text-lg ${getGradeColor(gradingScale["DCM Grade (Final Whole Number)"] || 0)}`}>
+                  {renderValue(gradingScale["DCM Grade (Final Whole Number)"])}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* 3. Subgrade Evaluation with Grade Analysis */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Subgrade Evaluation</h2>
+            <div className="space-y-4 mb-6">
+              {(() => {
+                // Group the subgrades by category type (centering, corners, etc.)
+                const categoryPairs = [
+                  ['Centering Front', 'Centering Back'],
+                  ['Corners Front', 'Corners Back'],
+                  ['Edges Front', 'Edges Back'],
+                  ['Surface Front', 'Surface Back'],
+                  ['Print Quality Front', 'Print Quality Back'],
+                  ['Color/Gloss Front', 'Color/Gloss Back']
+                ];
+
+                const standalone = ['Structural Integrity', 'Alterations/Qualifiers'];
+
+                const filteredSubgrades = Object.entries(subgrades)
+                  .filter(([category]) => category !== "Summary for Grade" && category !== "SCORING NOTE");
+
+                const findSubgrade = (searchCategory: string) => {
+                  return filteredSubgrades.find(([category]) => category.includes(searchCategory));
+                };
+
+                return (
+                  <>
+                    {/* Front/Back pairs in side-by-side layout */}
+                    {categoryPairs.map(([frontCategory, backCategory]) => {
+                      const frontData = findSubgrade(frontCategory);
+                      const backData = findSubgrade(backCategory);
+
+                      if (!frontData && !backData) return null;
+
+                      return (
+                        <div key={`${frontCategory}-${backCategory}`} className="grid md:grid-cols-2 gap-4 border-b border-gray-200 pb-4">
+                          {/* Front category */}
+                          {frontData && (
+                            <div>
+                              {(() => {
+                                const [category, data] = frontData;
+                                const displayCategory = category.includes("Centering Front") ? "Centering Front" :
+                                  category.includes("Corners Front") ? "Corners Front" :
+                                  category.includes("Edges Front") ? "Edges Front" :
+                                  category.includes("Surface Front") ? "Surface Front" :
+                                  category.includes("Print Quality Front") ? "Print Quality Front" :
+                                  category.includes("Color/Gloss Front") ? "Color/Gloss Front" : category;
+
+                                return (
+                                  <div className="border-r border-gray-100 pr-4">
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="font-semibold text-gray-600">{displayCategory}:</span>
+                                      {data?.score && (
+                                        <span className={`font-bold ${getGradeColor(data.score)}`}>
+                                          {Number(data.score).toFixed(1)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {data?.ratio && (
+                                      <div className="text-sm text-gray-600">Ratio: {data.ratio}</div>
+                                    )}
+                                    {data?.commentary && (
+                                      <div className="text-sm text-gray-700 mt-1">{data.commentary}</div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+
+                          {/* Back category */}
+                          {backData && (
+                            <div>
+                              {(() => {
+                                const [category, data] = backData;
+                                const displayCategory = category.includes("Centering Back") ? "Centering Back" :
+                                  category.includes("Corners Back") ? "Corners Back" :
+                                  category.includes("Edges Back") ? "Edges Back" :
+                                  category.includes("Surface Back") ? "Surface Back" :
+                                  category.includes("Print Quality Back") ? "Print Quality Back" :
+                                  category.includes("Color/Gloss Back") ? "Color/Gloss Back" : category;
+
+                                return (
+                                  <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="font-semibold text-gray-600">{displayCategory}:</span>
+                                      {data?.score && (
+                                        <span className={`font-bold ${getGradeColor(data.score)}`}>
+                                          {Number(data.score).toFixed(1)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {data?.ratio && (
+                                      <div className="text-sm text-gray-600">Ratio: {data.ratio}</div>
+                                    )}
+                                    {data?.commentary && (
+                                      <div className="text-sm text-gray-700 mt-1">{data.commentary}</div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Standalone categories */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      {standalone.map(standaloneCategory => {
+                        const foundData = findSubgrade(standaloneCategory);
+                        if (!foundData) return null;
+
+                        const [category, data] = foundData;
+                        return (
+                          <div key={category} className="md:col-span-2">
+                            <div className="border-b border-gray-200 pb-3 mb-3 last:border-b-0">
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="font-semibold text-gray-600">{category}:</span>
+                                {data?.score && (
+                                  <span className={`font-bold ${getGradeColor(data.score)}`}>
+                                    {Number(data.score).toFixed(1)}
+                                  </span>
+                                )}
+                              </div>
+                              {data?.ratio && (
+                                <div className="text-sm text-gray-600">Ratio: {data.ratio}</div>
+                              )}
+                              {data?.commentary && (
+                                <div className="text-sm text-gray-700 mt-1">{data.commentary}</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+
+            {/* Grade Summary and Analysis */}
+            <div className="border-t border-gray-200 pt-4">
+              <h3 className="font-semibold text-gray-800 mb-3">Grade Analysis</h3>
+              <div className="bg-gray-50 rounded-lg p-4">
+                {gradingScale["Summary for Grade"] ? (
+                  <div>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {gradingScale["Summary for Grade"]}
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-sm text-gray-700 leading-relaxed">
+                      {(() => {
+                        const currentGrade = gradingScale["DCM Grade (Final Whole Number)"] || gradingScale["Raw Decimal Grade (Before Rounding)"] || 0;
+                        const gradeNum = Number(currentGrade);
+
+                        if (gradeNum >= 9.5) {
+                          return "This card achieved an exceptional grade reflecting near-perfect condition with minimal visible flaws. The card demonstrates excellent centering, sharp corners, clean edges, and pristine surface quality.";
+                        } else if (gradeNum >= 8.5) {
+                          return "This card received a high grade indicating very good condition with only minor imperfections. The card shows strong centering, well-preserved corners, and good overall structural integrity.";
+                        } else if (gradeNum >= 7.0) {
+                          return "This card earned a solid grade reflecting good condition with some noticeable but acceptable flaws. The card maintains reasonable centering and structural integrity despite visible wear.";
+                        } else if (gradeNum >= 5.0) {
+                          return "This card received a moderate grade due to multiple condition issues affecting its overall presentation. The card shows significant wear patterns but maintains basic structural integrity.";
+                        } else {
+                          return "This card received a lower grade due to substantial condition issues that significantly impact its appearance and structural integrity.";
+                        }
+                      })()}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Estimated Scoring by Major Companies */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">Estimated Scoring by Major Companies</h2>
+            <div className="grid md:grid-cols-2 gap-4">
+              {Object.entries(companyScores).map(([company, data]: [string, any]) => (
+                <div key={company} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <span className="font-semibold text-gray-700">{company}:</span>
+                  <span className={`font-bold text-lg ${getGradeColor(parseFloat(data?.grade) || 0)}`}>
+                    {renderValue(data?.grade)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* 5. AI Confidence Assessment */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-bold mb-4 text-gray-800">AI Confidence Assessment</h2>
+            <div className="space-y-3">
+              <div>
+                <span className="font-semibold text-gray-600">Confidence Level:</span>
+                <span className="ml-2">{renderValue(aiConfidence["Confidence Level"])}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-600">Image Quality:</span>
+                <span className="ml-2">{renderValue(aiConfidence["Image Quality Factors"])}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-600">Resolution:</span>
+                <span className="ml-2">{renderValue(aiConfidence["Resolution Assessment"])}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-600">Visibility Issues:</span>
+                <span className="ml-2">{renderValue(aiConfidence["Visibility Issues"])}</span>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-600">Grading Reliability:</span>
+                <span className="ml-2">{renderValue(aiConfidence["Grading Reliability"])}</span>
+              </div>
+              {aiConfidence["Confidence Justification"] && (
+                <div>
+                  <span className="font-semibold text-gray-600">Justification:</span>
+                  <p className="mt-2 text-sm text-gray-700 leading-relaxed">
+                    {aiConfidence["Confidence Justification"]}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,3000 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseServer } from "@/lib/supabaseServer";
+import fs from "fs";
+import path from "path";
+import crypto from "crypto";
+import OpenAI from "openai";
+import { gradeCardParallelPipeline } from "@/lib/parallelGrading";
+import { gradeCardWithVision } from "@/lib/visionGrader";
+// Legacy import - preserved for potential fallback but no longer actively used
+// import { calculateCenteringFromBoundaries, CardBoundaries } from "@/lib/boundaryCalculations";
+
+// OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
+// Track sports cards currently being processed with timestamps
+const processingSportsCards = new Map<string, number>();
+
+// Global rate limiting - max 3 concurrent AI processing requests
+const MAX_CONCURRENT_PROCESSING = 3;
+
+// TIER 1 FIX 1C: Response deduplication tracking
+// Stores fingerprints of recent AI responses to detect duplicates
+interface ResponseFingerprint {
+  fingerprint: string;
+  cardId: string;
+  timestamp: number;
+}
+
+const recentResponseFingerprints: ResponseFingerprint[] = [];
+const MAX_FINGERPRINT_HISTORY = 20; // Track last 20 responses
+
+// OPTIMIZATION: Cache signed URLs to avoid recreation
+const signedUrlCache = new Map<string, { url: string; expires: number }>();
+
+// Clean up stuck processing cards (older than 5 minutes) and expired URLs
+const cleanupStuckCards = () => {
+  const now = Date.now();
+  const fiveMinutesAgo = now - (5 * 60 * 1000);
+
+  // Clean up stuck processing cards
+  for (const [cardId, timestamp] of processingSportsCards.entries()) {
+    if (timestamp < fiveMinutesAgo) {
+      console.log(`[CLEANUP] Removing stuck card ${cardId} from processing set`);
+      processingSportsCards.delete(cardId);
+    }
+  }
+
+  // Clean up expired signed URLs (cache for 50 minutes, URLs expire in 60 minutes)
+  const fiftyMinutesAgo = now - (50 * 60 * 1000);
+  for (const [path, cachedData] of signedUrlCache.entries()) {
+    if (cachedData.expires < fiftyMinutesAgo) {
+      console.log(`[CLEANUP] Removing expired signed URL cache for ${path}`);
+      signedUrlCache.delete(path);
+    }
+  }
+
+  // TIER 1 FIX 1C: Clean up old response fingerprints (keep only last 20)
+  const tenMinutesAgo = now - (10 * 60 * 1000);
+  const validFingerprints = recentResponseFingerprints.filter(fp => fp.timestamp > tenMinutesAgo);
+  recentResponseFingerprints.length = 0;
+  recentResponseFingerprints.push(...validFingerprints.slice(-MAX_FINGERPRINT_HISTORY));
+};
+
+// Types
+type SportsCardGradingRequest = {
+  params: Promise<{ id: string }>;
+};
+
+// OPTIMIZED: Cached signed URL generation
+async function createSignedUrl(supabase: any, bucket: string, path: string): Promise<string | null> {
+  try {
+    const now = Date.now();
+
+    // Check cache first
+    const cached = signedUrlCache.get(path);
+    if (cached && cached.expires > now) {
+      console.log(`[CACHE] Using cached signed URL for ${path}`);
+      return cached.url;
+    }
+
+    console.log(`[CACHE] Creating new signed URL for ${path}`);
+    const { data, error } = await supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, 60 * 60); // 1 hour expiry
+
+    if (error) {
+      console.error(`Failed to create signed URL for ${path}:`, error);
+      return null;
+    }
+
+    // Cache the result for 50 minutes (10 minutes before expiry)
+    signedUrlCache.set(path, {
+      url: data.signedUrl,
+      expires: now + (50 * 60 * 1000)
+    });
+
+    return data.signedUrl;
+  } catch (error) {
+    console.error(`Error creating signed URL for ${path}:`, error);
+    return null;
+  }
+}
+
+// Get sports card grading instructions with cache-busting
+function getSportsInstructions(): string {
+  const instructionPath = path.join(process.cwd(), 'sports_assistant_instructions.txt');
+
+  try {
+    // Force fresh read every time - no caching
+    const instructions = fs.readFileSync(instructionPath, 'utf8');
+    console.log('[INSTRUCTIONS] Fresh read completed, file size:', instructions.length);
+    return instructions;
+  } catch (error) {
+    console.error(`Failed to read sports instructions:`, error);
+    throw new Error('Sports grading instructions not found');
+  }
+}
+
+// TIER 2 FIX: Get measurement instructions (Stage 1)
+function getMeasurementInstructions(): string {
+  const instructionPath = path.join(process.cwd(), 'stage1_measurement_instructions.txt');
+
+  try {
+    const instructions = fs.readFileSync(instructionPath, 'utf8');
+    console.log('[MEASUREMENT] Instructions loaded, size:', instructions.length);
+    return instructions;
+  } catch (error) {
+    console.error(`Failed to read measurement instructions:`, error);
+    throw new Error('Measurement instructions not found');
+  }
+}
+
+// TIER 2 FIX: Get evaluation instructions (Stage 2) - DEPRECATED, kept for fallback
+function getEvaluationInstructions(): string {
+  const instructionPath = path.join(process.cwd(), 'stage2_evaluation_instructions.txt');
+
+  try {
+    const instructions = fs.readFileSync(instructionPath, 'utf8');
+    console.log('[EVALUATION] Instructions loaded, size:', instructions.length);
+    return instructions;
+  } catch (error) {
+    console.error(`Failed to read evaluation instructions:`, error);
+    throw new Error('Evaluation instructions not found');
+  }
+}
+
+// V4.0: Get single-stage grading instructions
+function getSingleStageInstructions(): string {
+  const instructionPath = path.join(process.cwd(), 'sports_grading_instructions_SINGLE_STAGE.txt');
+
+  try {
+    const instructions = fs.readFileSync(instructionPath, 'utf8');
+    console.log('[SINGLE-STAGE] Instructions loaded, size:', instructions.length);
+    return instructions;
+  } catch (error) {
+    console.error(`Failed to read single-stage instructions:`, error);
+    throw new Error('Single-stage instructions not found');
+  }
+}
+
+// Enhanced card detection with hybrid approach
+interface OpenCVDetectionResult {
+  success: boolean;
+  confidence: string;
+  method: string;
+  front_centering: any;
+  back_centering: any;
+  detection_quality: string;
+  card_dimensions?: any;
+  error?: string;
+}
+
+// v3.1: OpenCV Hybrid Detection with Borderless Card Support
+async function tryEnhancedDetection(frontUrl: string, backUrl: string): Promise<{ useOpenCV: boolean; detectionResults: OpenCVDetectionResult | null }> {
+  try {
+    console.log('[OPENCV-v3.1] Attempting hybrid card detection...');
+
+    // Call the v3.1 OpenCV service
+    const response = await fetch('http://localhost:5001/detect-card', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        front_url: frontUrl,
+        back_url: backUrl
+      })
+    });
+
+    if (!response.ok) {
+      console.log('[OPENCV-v3.1] Service returned error, falling back to AI-only');
+      return { useOpenCV: false, detectionResults: null };
+    }
+
+    const data = await response.json();
+
+    // Debug: Log the actual response
+    console.log('[OPENCV-v3.1] Response received:', JSON.stringify(data, null, 2));
+
+    // Check if detection was successful
+    // v3.1: Accept partial success - borderless cards may only detect one side
+    const frontSuccess = data.front_centering?.success || data.front_centering?.detected;
+    const backSuccess = data.back_centering?.success || data.back_centering?.detected;
+    const frontHasData = data.front_centering && data.front_centering.image_quality_grade;
+    const backHasData = data.back_centering && data.back_centering.image_quality_grade;
+
+    console.log('[OPENCV-v3.1] Front success:', frontSuccess, '| Back success:', backSuccess);
+    console.log('[OPENCV-v3.1] Front data:', frontHasData, '| Back data:', backHasData);
+
+    // v3.1: Use OpenCV if we have valid data from at least one side OR image quality data from both sides
+    if ((frontSuccess || backSuccess) || (frontHasData && backHasData)) {
+      console.log('[OPENCV-v3.1] ✅ v3.1 hybrid detection successful (partial or full)');
+      console.log('[OPENCV-v3.1] Front mode:', data.front_centering?.edge_detection_mode);
+      console.log('[OPENCV-v3.1] Front type:', data.front_centering?.centering?.centering_estimate_type);
+      console.log('[OPENCV-v3.1] Back mode:', data.back_centering?.edge_detection_mode);
+      console.log('[OPENCV-v3.1] Back type:', data.back_centering?.centering?.centering_estimate_type);
+      console.log('[OPENCV-v3.1] Front quality:', data.front_centering?.image_quality_grade);
+      console.log('[OPENCV-v3.1] Back quality:', data.back_centering?.image_quality_grade);
+
+      return {
+        useOpenCV: true,
+        detectionResults: {
+          success: true,
+          confidence: (frontSuccess && backSuccess) ? 'High' : 'Medium',
+          method: 'v3.1 Hybrid Detection',
+          front_centering: data.front_centering,
+          back_centering: data.back_centering,
+          detection_quality: (frontSuccess && backSuccess) ? 'High' : 'Medium'
+        }
+      };
+    } else {
+      console.log('[OPENCV-v3.1] Detection failed completely, using AI-only');
+      return { useOpenCV: false, detectionResults: null };
+    }
+
+  } catch (error) {
+    console.log('[OPENCV-v3.1] Error:', error);
+    console.log('[OPENCV-v3.1] Falling back to AI-only grading');
+    return { useOpenCV: false, detectionResults: null };
+  }
+}
+
+/**
+ * v3.1 Response Adapter
+ * Maps v3.1 snake_case fields to legacy frontend format
+ */
+function adaptV31ResponseToLegacy(stage2Data: any, stage0Data: any): any {
+  const adapted = { ...stage2Data };
+
+  // Map category_scores to legacy "Grading (DCM Master Scale)" format
+  if (stage2Data.category_scores) {
+    adapted["Grading (DCM Master Scale)"] = adapted["Grading (DCM Master Scale)"] || {};
+    adapted["Grading (DCM Master Scale)"]["Category Scores"] = stage2Data.category_scores;
+  }
+
+  // Map centerings_used + Stage 0 to legacy "Centering_Measurements"
+  if (stage2Data.centerings_used || stage0Data) {
+    const centerings = stage2Data.centerings_used || {};
+    adapted["Centering_Measurements"] = {
+      front_x_axis_ratio: centerings.front_lr || stage0Data?.front_x_axis_ratio || "N/A",
+      front_y_axis_ratio: centerings.front_tb || stage0Data?.front_y_axis_ratio || "N/A",
+      back_x_axis_ratio: centerings.back_lr || stage0Data?.back_x_axis_ratio || "N/A",
+      back_y_axis_ratio: centerings.back_tb || stage0Data?.back_y_axis_ratio || "N/A",
+      front_centering_method: centerings.front_type || stage0Data?.front_centering_type || "N/A",
+      back_centering_method: centerings.back_type || stage0Data?.back_centering_type || "N/A",
+      measurement_source: "Stage 0 (OpenCV v3.1)"
+    };
+  }
+
+  // Map analysis_summary to legacy format
+  if (stage2Data.analysis_summary) {
+    adapted["Analysis_Summary"] = {
+      positives: stage2Data.analysis_summary.positives || [],
+      negatives: stage2Data.analysis_summary.negatives || []
+    };
+  }
+
+  return adapted;
+}
+
+// V5.0: Two-Stage Grading Pipeline (Observation → Scoring) with v3.1 OpenCV
+async function gradeSportsCardTwoStageV2(frontUrl: string, backUrl: string, cardId: string): Promise<{gradingResult: any, stage1Data: any, stage0Data: any}> {
+  try {
+    console.log(`[TWO-STAGE-V2] Starting observation and scoring for card ${cardId}`);
+
+    // ==================== STAGE 0: OPENCV v3.1 DETECTION ====================
+    console.log('[STAGE 0] Attempting v3.1 hybrid OpenCV detection...');
+    const { useOpenCV, detectionResults } = await tryEnhancedDetection(frontUrl, backUrl);
+
+    // Build Stage 0 data with v3.1 fields
+    let stage0Data: any = null;
+    let stage0Context = '';
+
+    if (useOpenCV && detectionResults) {
+      console.log('[TWO-STAGE-v3.1] ✅ Using v3.1 hybrid detection');
+      stage0Data = {
+        // Backward-compatible centering format
+        front_x_axis_ratio: detectionResults.front_centering?.centering?.centering_estimate_lr ||
+                           detectionResults.front_centering?.centering_ratios?.horizontal || "50/50",
+        front_y_axis_ratio: detectionResults.front_centering?.centering?.centering_estimate_tb ||
+                           detectionResults.front_centering?.centering_ratios?.vertical || "50/50",
+        back_x_axis_ratio: detectionResults.back_centering?.centering?.centering_estimate_lr ||
+                          detectionResults.back_centering?.centering_ratios?.horizontal || "50/50",
+        back_y_axis_ratio: detectionResults.back_centering?.centering?.centering_estimate_tb ||
+                          detectionResults.back_centering?.centering_ratios?.vertical || "50/50",
+        source: "OpenCV v3.1 Hybrid",
+        confidence: "High",
+
+        // v3.1 NEW FIELDS
+        front_edge_detection_mode: detectionResults.front_centering?.edge_detection_mode || "standard",
+        back_edge_detection_mode: detectionResults.back_centering?.edge_detection_mode || "standard",
+        front_centering_type: detectionResults.front_centering?.centering?.centering_estimate_type || "border-detected",
+        back_centering_type: detectionResults.back_centering?.centering?.centering_estimate_type || "border-detected",
+        front_image_quality_grade: detectionResults.front_centering?.image_quality_grade || "B",
+        back_image_quality_grade: detectionResults.back_centering?.image_quality_grade || "B",
+        front_image_quality_score: detectionResults.front_centering?.image_quality_score || 75,
+        back_image_quality_score: detectionResults.back_centering?.image_quality_score || 75,
+        front_signals: detectionResults.front_centering?.signals || {},
+        back_signals: detectionResults.back_centering?.signals || {},
+
+        // v3.2 NEW FIELDS: Numeric centering ratios for Stage 2
+        front_centering_lr_numeric: detectionResults.front_centering?.centering?.centering_lr_numeric || 0.50,
+        front_centering_tb_numeric: detectionResults.front_centering?.centering?.centering_tb_numeric || 0.50,
+        back_centering_lr_numeric: detectionResults.back_centering?.centering?.centering_lr_numeric || 0.50,
+        back_centering_tb_numeric: detectionResults.back_centering?.centering?.centering_tb_numeric || 0.50,
+        front_reshoot_required: detectionResults.front_centering?.reshoot_required || false,
+        back_reshoot_required: detectionResults.back_centering?.reshoot_required || false,
+
+        // Full Stage 0 data for validation
+        front_stage0: detectionResults.front_centering,
+        back_stage0: detectionResults.back_centering
+      };
+
+      console.log('[TWO-STAGE-v3.1] Front centering type:', stage0Data.front_centering_type);
+      console.log('[TWO-STAGE-v3.1] Back centering type:', stage0Data.back_centering_type);
+      console.log('[TWO-STAGE-v3.1] Front edge mode:', stage0Data.front_edge_detection_mode);
+      console.log('[TWO-STAGE-v3.1] Back edge mode:', stage0Data.back_edge_detection_mode);
+      console.log('[TWO-STAGE-v3.1] Image quality:', stage0Data.front_image_quality_grade, '/', stage0Data.back_image_quality_grade);
+
+      // Build Stage 0 context for Stage 1
+      stage0Context = `
+📊 STAGE 0 DATA (OpenCV v3.1 Hybrid Detection):
+
+Front Card:
+- Centering: ${stage0Data.front_x_axis_ratio} (L/R), ${stage0Data.front_y_axis_ratio} (T/B)
+- Centering Type: ${stage0Data.front_centering_type}
+- Edge Detection Mode: ${stage0Data.front_edge_detection_mode}
+- Image Quality Grade: ${stage0Data.front_image_quality_grade}
+
+Back Card:
+- Centering: ${stage0Data.back_x_axis_ratio} (L/R), ${stage0Data.back_y_axis_ratio} (T/B)
+- Centering Type: ${stage0Data.back_centering_type}
+- Edge Detection Mode: ${stage0Data.back_edge_detection_mode}
+- Image Quality Grade: ${stage0Data.back_image_quality_grade}
+
+⚠️ IMPORTANT: Validate these measurements visually. If they seem incorrect, report in stage0_validation field.
+`;
+    } else {
+      console.log('[TWO-STAGE-v3.1] ⚠️ OpenCV unavailable, AI will measure centering');
+      stage0Context = '\n⚠️ Stage 0 data unavailable - perform manual centering measurements.\n';
+    }
+
+    // ==================== STAGE 1: OBSERVATION ====================
+    console.log('[STAGE 1] Creating observation thread...');
+
+    const stage1Thread = await openai.beta.threads.create({
+      messages: [{
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: `Observe and measure this sports card. Provide detailed observations WITHOUT scoring.${stage0Context}
+
+🚨 CRITICAL REMINDERS:
+1. DO NOT SCORE - Only observe and describe
+2. Check for hand-written signatures and verify authentication markers
+3. ${stage0Data ? 'Validate Stage 0 centering measurements' : 'Measure centering ratios for front and back'}
+4. Describe defects with specific locations and MM estimates
+5. Provide unique descriptions - no templated phrases
+6. Report image quality assessment (A/B/C/D)`
+          },
+          { type: "image_url", image_url: { url: frontUrl } },
+          { type: "image_url", image_url: { url: backUrl } }
+        ]
+      }]
+    });
+
+    console.log(`[STAGE 1] Thread created: ${stage1Thread.id}`);
+
+    // Run Stage 1 assistant (v3.1)
+    // Higher temperature (0.3) allows AI to be more critical and find defects
+    // v3.3: Increased to 0.4 to help model see slight texture variance
+    const stage1Run = await openai.beta.threads.runs.create(stage1Thread.id, {
+      assistant_id: process.env.OPENAI_STAGE1_OBSERVATION_ASSISTANT_ID || 'asst_OPvbB4t6JqE93d8KcvgAYUR5',
+      temperature: 0.4
+    });
+
+    // Poll for Stage 1 completion
+    let stage1Status = await openai.beta.threads.runs.retrieve(stage1Run.id, {
+      thread_id: stage1Thread.id
+    });
+
+    let attempts = 0;
+    const maxAttempts = 90; // 3 minutes timeout
+    while (stage1Status.status === 'in_progress' || stage1Status.status === 'queued') {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw new Error('Stage 1 observation timed out after 3 minutes');
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      stage1Status = await openai.beta.threads.runs.retrieve(stage1Run.id, {
+        thread_id: stage1Thread.id
+      });
+    }
+
+    if (stage1Status.status !== 'completed') {
+      throw new Error(`Stage 1 observation failed with status: ${stage1Status.status}`);
+    }
+
+    // Get Stage 1 response
+    const stage1Messages = await openai.beta.threads.messages.list(stage1Thread.id);
+    const stage1Message = stage1Messages.data.find(msg => msg.role === 'assistant');
+
+    if (!stage1Message) {
+      throw new Error('No response from Stage 1 observation assistant');
+    }
+
+    const stage1Content = stage1Message.content[0];
+    if (stage1Content.type !== 'text') {
+      throw new Error('Unexpected Stage 1 response format');
+    }
+
+    const stage1RawText = stage1Content.text.value;
+    console.log('[STAGE 1] Raw response (first 500 chars):', stage1RawText.substring(0, 500));
+
+    // Extract JSON from Stage 1
+    const stage1JsonMatch = stage1RawText.match(/\{[\s\S]*\}/);
+    if (!stage1JsonMatch) {
+      throw new Error('No JSON found in Stage 1 response');
+    }
+
+    const stage1Data = JSON.parse(stage1JsonMatch[0]);
+    console.log('[STAGE 1] ✅ Observation complete');
+
+    // Log observations count
+    console.log('[STAGE 1] Observations count:', stage1Data.observations?.length || 0);
+    if (stage1Data.observations && stage1Data.observations.length > 0) {
+      console.log('[STAGE 1] First 3 observations:', JSON.stringify(stage1Data.observations.slice(0, 3), null, 2));
+    } else {
+      console.warn('[STAGE 1] ⚠️ NO OBSERVATIONS FOUND in Stage 1 response!');
+    }
+
+    // Critical check: Does Stage 1 have the minimum 16 observations?
+    if (!stage1Data.observations || stage1Data.observations.length < 16) {
+      console.warn(`[STAGE 1] ⚠️ WARNING: Only ${stage1Data.observations?.length || 0} observations found - EXPECTED MINIMUM 16!`);
+    }
+
+    // Log centering measurements
+    if (stage1Data.centering) {
+      console.log('[STAGE 1 CENTERING]', JSON.stringify(stage1Data.centering, null, 2));
+    } else {
+      console.warn('[STAGE 1] ⚠️ No centering data found in Stage 1 response');
+    }
+
+    // Log autograph detection
+    if (stage1Data.autograph) {
+      console.log('[STAGE 1 AUTOGRAPH]', JSON.stringify(stage1Data.autograph, null, 2));
+    }
+
+    // v3.1: Enforce minimum observation requirement
+    if (!stage1Data.observations || stage1Data.observations.length < 16) {
+      console.error(`[STAGE 1 VALIDATION FAILED] Only ${stage1Data.observations?.length || 0} observations. v3.1 requires minimum 16.`);
+
+      return NextResponse.json({
+        error: 'INSUFFICIENT_OBSERVATIONS',
+        message: `Stage 1 returned only ${stage1Data.observations?.length || 0} observations. v3.1 requires minimum 16 (8 corners + 8 edges).`,
+        details: 'The AI Assistant may need instructions updated on OpenAI platform. Check that asst_OPvbB4t6JqE93d8KcvgAYUR5 has current v3.1 instructions.',
+        observations_count: stage1Data.observations?.length || 0,
+        required_minimum: 16
+      }, { status: 422 });
+    }
+
+    console.log(`[STAGE 1 VALIDATION] ✅ ${stage1Data.observations.length} observations (meets 16 minimum)`);
+
+    // ==================== STAGE 2: SCORING ====================
+    console.log('[STAGE 2] Creating scoring thread...');
+    console.log('[STAGE 2] Sending to Stage 2:', {
+      observationsCount: stage1Data.observations?.length || 0,
+      hasCentering: !!stage1Data.centering,
+      hasImageQuality: !!stage1Data.image_quality,
+      hasAutograph: !!stage1Data.autograph
+    });
+
+    const stage2Thread = await openai.beta.threads.create({
+      messages: [{
+        role: "user",
+        content: [{
+          type: "text",
+          text: `Apply v3.2 scoring rules to Stage 0 geometry + Stage 1 observations.
+
+🚨 v3.2 CENTERING RULES (NUMERIC RATIOS):
+- Use Stage 0 NUMERIC centering ratios (direct float values, NOT text):
+  Front LR: ${stage0Data?.front_centering_lr_numeric || 0.50} (${stage0Data?.front_x_axis_ratio || '50/50'})
+  Front TB: ${stage0Data?.front_centering_tb_numeric || 0.50} (${stage0Data?.front_y_axis_ratio || '50/50'})
+  Back LR: ${stage0Data?.back_centering_lr_numeric || 0.50} (${stage0Data?.back_x_axis_ratio || '50/50'})
+  Back TB: ${stage0Data?.back_centering_tb_numeric || 0.50} (${stage0Data?.back_y_axis_ratio || '50/50'})
+- Centering types: Front = ${stage0Data?.front_centering_type || 'N/A'}, Back = ${stage0Data?.back_centering_type || 'N/A'}
+- If design-anchor method, cap centering score ≤ 9.5
+- Unless Stage 1 flagged discrepancy_detected = true with a reason, use Stage 0 centering
+
+🚨 v3.2 OBSERVATION RULES:
+- Do NOT invent observations or geometry
+- Apply deduction tables to ALL ${stage1Data.observations?.length || 0} observations from Stage 1
+- If NO defects detected, apply realism guard: subtract 0.3 from Structural Integrity and Surface Condition
+- Process observations by category and return observations_applied arrays
+
+🚨 v3.2 IMAGE QUALITY RULES:
+- Front quality: ${stage0Data?.front_image_quality_grade || 'B'} (score: ${stage0Data?.front_image_quality_score || 75})
+- Back quality: ${stage0Data?.back_image_quality_grade || 'B'} (score: ${stage0Data?.back_image_quality_score || 75})
+- Apply grade caps: A→10, B→9.8, C→9.5, D→9.0
+
+🚨 v3.2 AUTOGRAPH RULES:
+1. Check Stage 1 autograph.has_handwriting FIRST
+2. If has_handwriting = true AND authentication_markers_found is empty or all "NO" → grade = NA
+3. If has_handwriting = false → proceed with normal grading
+4. Never flag altered solely for logos or holograms
+
+Stage 0 Detection JSON:
+${JSON.stringify(stage0Data, null, 2)}
+
+Stage 1 Observation JSON:
+${JSON.stringify(stage1Data, null, 2)}`
+        }]
+      }]
+    });
+
+    console.log(`[STAGE 2] Thread created: ${stage2Thread.id}`);
+
+    // Run Stage 2 assistant (v3.3)
+    const stage2Run = await openai.beta.threads.runs.create(stage2Thread.id, {
+      assistant_id: process.env.OPENAI_STAGE2_SCORING_ASSISTANT_ID || 'asst_y40OPW6EmLEYupot4ltRwZMT',
+      temperature: 0.3  // v3.3: Slight variance for realistic scoring
+    });
+
+    // Poll for Stage 2 completion
+    let stage2Status = await openai.beta.threads.runs.retrieve(stage2Run.id, {
+      thread_id: stage2Thread.id
+    });
+
+    attempts = 0;
+    while (stage2Status.status === 'in_progress' || stage2Status.status === 'queued') {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw new Error('Stage 2 scoring timed out after 3 minutes');
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      stage2Status = await openai.beta.threads.runs.retrieve(stage2Run.id, {
+        thread_id: stage2Thread.id
+      });
+    }
+
+    if (stage2Status.status !== 'completed') {
+      throw new Error(`Stage 2 scoring failed with status: ${stage2Status.status}`);
+    }
+
+    // Get Stage 2 response
+    const stage2Messages = await openai.beta.threads.messages.list(stage2Thread.id);
+    const stage2Message = stage2Messages.data.find(msg => msg.role === 'assistant');
+
+    if (!stage2Message) {
+      throw new Error('No response from Stage 2 scoring assistant');
+    }
+
+    const stage2Content = stage2Message.content[0];
+    if (stage2Content.type !== 'text') {
+      throw new Error('Unexpected Stage 2 response format');
+    }
+
+    const stage2RawText = stage2Content.text.value;
+    console.log('[STAGE 2] Raw response (first 500 chars):', stage2RawText.substring(0, 500));
+
+    // Extract JSON from Stage 2
+    const stage2JsonMatch = stage2RawText.match(/\{[\s\S]*\}/);
+    if (!stage2JsonMatch) {
+      throw new Error('No JSON found in Stage 2 response');
+    }
+
+    const stage2Data = JSON.parse(stage2JsonMatch[0]);
+    console.log('[STAGE 2] ✅ Scoring complete');
+    console.log('[STAGE 2 CARD INFO]', JSON.stringify(stage2Data.card_information, null, 2));
+    console.log('[STAGE 2 DEBUG] structural_integrity score:', stage2Data.structural_integrity?.final_category_score);
+    console.log('[STAGE 2 DEBUG] surface_condition score:', stage2Data.surface_condition?.final_category_score);
+    console.log('[STAGE 2 DEBUG] centering_quality score:', stage2Data.centering_quality?.final_category_score);
+    console.log('[STAGE 2 DEBUG] print_quality score:', stage2Data.print_quality?.final_category_score);
+    console.log('[STAGE 2 DEBUG] authenticity_assessment score:', stage2Data.authenticity_assessment?.final_category_score);
+    console.log('[STAGE 2 DEBUG] final_grade_calculation:', JSON.stringify(stage2Data.final_grade_calculation, null, 2));
+
+    // ==================== v3.3 REALISM DEDUCTION TRIGGER ====================
+    // Check if Stage 1 reported all pristine or no defects
+    const stage1RawTextLower = stage1RawText.toLowerCase();
+    const allPristine = stage1RawTextLower.includes("no defects detected") ||
+                        stage1RawTextLower.match(/pristine/gi)?.length > 12 ||
+                        stage1Data.defect_confidence_summary?.defects_found === 0;
+
+    if (allPristine && !isNaN(stage2Data.structural_integrity?.overall_score)) {
+      console.log('[REALISM GUARD] ⚠️ Applying realism deduction - Stage 1 reported all pristine');
+
+      // Apply realism deductions if Stage 2 didn't already apply them
+      if (stage2Data.structural_integrity?.overall_score === 10) {
+        console.log('[REALISM GUARD] Subtracting 0.3 from Structural Integrity');
+        stage2Data.structural_integrity.overall_score = Math.max(0, stage2Data.structural_integrity.overall_score - 0.3);
+      }
+      if (stage2Data.surface_condition?.overall_score === 10) {
+        console.log('[REALISM GUARD] Subtracting 0.3 from Surface Condition');
+        stage2Data.surface_condition.overall_score = Math.max(0, stage2Data.surface_condition.overall_score - 0.3);
+      }
+      if (stage2Data.centering_quality?.overall_score === 10) {
+        console.log('[REALISM GUARD] Subtracting 0.2 from Centering Quality');
+        stage2Data.centering_quality.overall_score = Math.max(0, stage2Data.centering_quality.overall_score - 0.2);
+      }
+
+      // Add limiting factor
+      if (!stage2Data.limiting_factors) {
+        stage2Data.limiting_factors = [];
+      }
+      if (!stage2Data.limiting_factors.includes("Limited observation confidence")) {
+        stage2Data.limiting_factors.push("Limited observation confidence");
+      }
+    }
+
+    // ==================== BACKEND VALIDATION ====================
+    console.log('[VALIDATION] Checking Stage 2 output...');
+
+    // CRITICAL FIX: Override Stage 2's alteration flag if Stage 1 says no handwriting
+    if (stage1Data.autograph?.has_handwriting === false && stage2Data.authenticity_assessment?.card_is_altered === true) {
+      console.warn('[VALIDATION] ⚠️ Stage 2 incorrectly flagged alteration - Stage 1 found NO handwriting. Overriding to NOT altered.');
+      if (stage2Data.authenticity_assessment) {
+        stage2Data.authenticity_assessment.card_is_altered = false;
+      }
+      if (stage2Data.alteration_check) {
+        stage2Data.alteration_check.card_is_altered = false;
+      }
+    }
+
+    // Validate: Check alteration flag (trust Stage 1 over Stage 2)
+    const isAltered = (stage2Data.authenticity_assessment?.card_is_altered === true ||
+                      stage2Data.alteration_check?.card_is_altered === true) &&
+                      stage1Data.autograph?.has_handwriting === true &&
+                      (!stage1Data.autograph?.authentication_markers_found ||
+                       stage1Data.autograph?.authentication_markers_found.length === 0 ||
+                       stage1Data.autograph?.authentication_markers_found.every((m: string) => m.includes('NO')));
+
+    if (isAltered) {
+      console.warn('[VALIDATION] ⚠️ CARD IS ALTERED - Enforcing NA grade');
+      // Force all grades to NA
+      if (stage2Data.final_grade_calculation) {
+        stage2Data.final_grade_calculation.decimal_final_grade = "NA";
+        stage2Data.final_grade_calculation.whole_number_grade = "NA";
+      }
+      if (stage2Data.authenticity_assessment) {
+        stage2Data.authenticity_assessment.overall_score = 0;
+        stage2Data.authenticity_assessment.card_is_altered = true;
+      }
+    }
+
+    // ==================== MAP TO FRONTEND FORMAT (v2.2 REVISED) ====================
+
+    // Build Category Scores from Stage 2 category data
+    // If card is altered, set all scores to "NA"
+    const categoryScores = isAltered ? {
+      structural_integrity: {
+        score: "NA",
+        weight: 0.30,
+        contribution: 0
+      },
+      surface_condition: {
+        score: "NA",
+        weight: 0.25,
+        contribution: 0
+      },
+      centering_quality: {
+        score: "NA",
+        weight: 0.20,
+        contribution: 0
+      },
+      print_quality: {
+        score: "NA",
+        weight: 0.15,
+        contribution: 0
+      },
+      authenticity_assessment: {
+        score: "NA",
+        weight: 0.10,
+        contribution: 0
+      }
+    } : (stage2Data.final_grade_calculation?.category_scores || {
+      structural_integrity: {
+        score: stage2Data.structural_integrity?.overall_score ?? stage2Data.structural_integrity?.final_category_score ?? 0,
+        weight: stage2Data.structural_integrity?.category_weight ?? 0.30,
+        contribution: (stage2Data.structural_integrity?.overall_score ?? stage2Data.structural_integrity?.final_category_score ?? 0) * (stage2Data.structural_integrity?.category_weight ?? 0.30)
+      },
+      surface_condition: {
+        score: stage2Data.surface_condition?.overall_score ?? stage2Data.surface_condition?.final_category_score ?? 0,
+        weight: stage2Data.surface_condition?.category_weight ?? 0.25,
+        contribution: (stage2Data.surface_condition?.overall_score ?? stage2Data.surface_condition?.final_category_score ?? 0) * (stage2Data.surface_condition?.category_weight ?? 0.25)
+      },
+      centering_quality: {
+        score: stage2Data.centering_quality?.overall_score ?? stage2Data.centering_quality?.final_category_score ?? 0,
+        weight: stage2Data.centering_quality?.category_weight ?? 0.20,
+        contribution: (stage2Data.centering_quality?.overall_score ?? stage2Data.centering_quality?.final_category_score ?? 0) * (stage2Data.centering_quality?.category_weight ?? 0.20)
+      },
+      print_quality: {
+        score: stage2Data.print_quality?.overall_score ?? stage2Data.print_quality?.final_category_score ?? 0,
+        weight: stage2Data.print_quality?.category_weight ?? 0.15,
+        contribution: (stage2Data.print_quality?.overall_score ?? stage2Data.print_quality?.final_category_score ?? 0) * (stage2Data.print_quality?.category_weight ?? 0.15)
+      },
+      authenticity_assessment: {
+        score: stage2Data.authenticity_assessment?.overall_score ?? stage2Data.authenticity_assessment?.final_category_score ?? 0,
+        weight: stage2Data.authenticity_assessment?.category_weight ?? 0.10,
+        contribution: (stage2Data.authenticity_assessment?.overall_score ?? stage2Data.authenticity_assessment?.final_category_score ?? 0) * (stage2Data.authenticity_assessment?.category_weight ?? 0.10)
+      }
+    });
+
+    console.log('[TWO-STAGE-V2] Category scores built:', JSON.stringify(categoryScores, null, 2));
+    if (isAltered) {
+      console.log('[TWO-STAGE-V2] ⚠️ Card is altered - all category scores set to NA');
+    }
+
+    const gradingResult = {
+      // Top-level category data (for direct access)
+      "structural_integrity": stage2Data.structural_integrity,
+      "surface_condition": stage2Data.surface_condition,
+      "centering_quality": stage2Data.centering_quality,
+      "print_quality": stage2Data.print_quality,
+      "authenticity_assessment": stage2Data.authenticity_assessment,
+
+      // Nested under "Grading (DCM Master Scale)" for compatibility
+      "Grading (DCM Master Scale)": {
+        "structural_integrity": stage2Data.structural_integrity,
+        "surface_condition": stage2Data.surface_condition,
+        "centering_quality": stage2Data.centering_quality,
+        "print_quality": stage2Data.print_quality,
+        "authenticity_assessment": stage2Data.authenticity_assessment,
+        "Weighted Composite Score": stage2Data.final_grade_calculation?.weighted_composite_score,
+        "Decimal Final Grade": stage2Data.final_grade_calculation?.decimal_final_grade,
+        "Whole Number Grade": stage2Data.final_grade_calculation?.whole_number_grade,
+        "Category Scores": categoryScores
+      },
+
+      "Final Score": {
+        "Overall Grade": stage2Data.final_grade_calculation?.decimal_final_grade,
+        "Decimal Grade": stage2Data.final_grade_calculation?.decimal_final_grade,
+        "Whole Number Grade": stage2Data.final_grade_calculation?.whole_number_grade,
+        "Grade Range": stage2Data.final_grade_calculation?.grade_range ?
+          `${stage2Data.final_grade_calculation.grade_range.minimum} - ${stage2Data.final_grade_calculation.grade_range.maximum}` : null,
+        "Uncertainty": stage2Data.image_quality_impact?.grade_uncertainty || stage2Data.final_grade_calculation?.grade_uncertainty
+      },
+
+      "Final DCM Grade": {
+        "Raw Decimal Grade": stage2Data.final_grade_calculation?.weighted_composite_score,
+        "DCM Grade (Whole Number)": stage2Data.final_grade_calculation?.whole_number_grade,
+        "DCM Grade (Decimal)": stage2Data.final_grade_calculation?.decimal_final_grade,
+        "Confidence Tier": stage2Data.image_quality_impact?.stage1_confidence_tier || stage2Data.image_quality?.confidence_tier,
+        "Grade Uncertainty": stage2Data.image_quality_impact?.grade_uncertainty || stage2Data.final_grade_calculation?.grade_uncertainty
+      },
+
+      "Card Information": stage2Data.card_information,
+      "Autograph Detection": stage2Data.autograph_detection,
+
+      // v2.2 REVISED: Enhanced image quality from Stage 1
+      "Image Quality Assessment": stage1Data.image_quality,
+
+      // v2.2 REVISED: Visual geometry assessment
+      "Visual Geometry": stage1Data.visual_geometry,
+
+      // v2.2 REVISED: Design profile (bordered vs full-bleed)
+      "Design Profile": stage1Data.design_profile,
+
+      // v2.2 REVISED: Execution control (fatal flags, skipped steps)
+      "Execution Control": stage1Data.execution_control,
+
+      // v2.2 REVISED: Centering with visual anchors and proof
+      // Transform Stage 1 field names to match frontend expectations
+      "Centering Measurements": {
+        "Front": stage1Data.centering?.front,
+        "Back": stage1Data.centering?.back
+      },
+
+      // Frontend-compatible format (with underscores)
+      "Centering_Measurements": {
+        // v3.1: Prefer Stage 0 OpenCV measurements when available, fallback to Stage 1 AI
+        "front_x_axis_ratio": stage0Data?.front_x_axis_ratio || stage1Data.centering?.front?.left_right_ratio || "N/A",
+        "front_y_axis_ratio": stage0Data?.front_y_axis_ratio || stage1Data.centering?.front?.top_bottom_ratio || "N/A",
+        "front_edge_description": stage1Data.centering?.front?.border_comparison_lr || null,
+        "front_centering_method": stage0Data ? "OpenCV v3.1 Hybrid" : (stage1Data.centering?.front?.visual_anchors_lr ? "visual_anchors" : "visual_analysis"),
+        "front_centering_confidence": stage0Data ? "High" : (stage1Data.centering?.front?.confidence || "medium"),
+        "front_measurement_proof": stage1Data.centering?.front?.measurement_proof || null,
+        "front_reference_points": stage1Data.centering?.front?.visual_anchors_lr?.join(", ") || null,
+        "front_visual_observation": stage1Data.centering?.front?.notes || null,
+
+        "back_x_axis_ratio": stage0Data?.back_x_axis_ratio || stage1Data.centering?.back?.left_right_ratio || "N/A",
+        "back_y_axis_ratio": stage0Data?.back_y_axis_ratio || stage1Data.centering?.back?.top_bottom_ratio || "N/A",
+        "back_edge_description": stage1Data.centering?.back?.border_comparison_lr || null,
+        "back_centering_method": stage0Data ? "OpenCV v3.1 Hybrid" : (stage1Data.centering?.back?.visual_anchors_lr ? "visual_anchors" : "visual_analysis"),
+        "back_centering_confidence": stage0Data ? "High" : (stage1Data.centering?.back?.confidence || "medium"),
+        "back_measurement_proof": stage1Data.centering?.back?.measurement_proof || null,
+        "back_reference_points": stage1Data.centering?.back?.visual_anchors_lr?.join(", ") || null,
+        "back_visual_observation": stage1Data.centering?.back?.notes || null,
+
+        // v3.1 NEW: Stage 0 metadata
+        "front_centering_type": stage0Data?.front_centering_type || "N/A",
+        "back_centering_type": stage0Data?.back_centering_type || "N/A",
+        "front_edge_detection_mode": stage0Data?.front_edge_detection_mode || "N/A",
+        "back_edge_detection_mode": stage0Data?.back_edge_detection_mode || "N/A",
+        "front_image_quality_grade": stage0Data?.front_image_quality_grade || "N/A",
+        "back_image_quality_grade": stage0Data?.back_image_quality_grade || "N/A",
+        "front_image_quality_score": stage0Data?.front_image_quality_score || null,
+        "back_image_quality_score": stage0Data?.back_image_quality_score || null,
+        "opencv_version": stage0Data ? "3.1" : "N/A",
+        "measurement_source": stage0Data ? "OpenCV v3.1 Hybrid" : "AI Vision"
+      },
+
+      // v2.2 REVISED: Analysis summary from Stage 2
+      "Analysis Summary": stage2Data.analysis_summary,
+
+      // v2.2 REVISED: Alteration check results
+      "Alteration Check": stage2Data.alteration_check,
+
+      // v2.2 REVISED: Image quality impact on grading
+      "Image Quality Impact": stage2Data.image_quality_impact,
+
+      // v2.2 REVISED: Input validation from Stage 2
+      "Input Validation": stage2Data.input_validation
+    };
+
+    // v3.1: Apply adapter to ensure v3.1 fields are mapped to legacy format
+    const adaptedGradingResult = adaptV31ResponseToLegacy(gradingResult, stage0Data);
+
+    console.log('[TWO-STAGE-V2] ✅ Grading complete');
+    return { gradingResult: adaptedGradingResult, stage1Data, stage0Data };
+
+  } catch (error: any) {
+    console.error('[TWO-STAGE-V2] Error:', error.message);
+    throw error;
+  }
+}
+
+// V4.0: Single-Stage Grading Pipeline (Simplified & More Reliable)
+async function gradeSportsCardSingleStage(frontUrl: string, backUrl: string, cardId: string): Promise<{gradingResult: any}> {
+  try {
+    const instructions = getSingleStageInstructions();
+
+    console.log(`[SINGLE-STAGE] Starting complete card analysis for card ${cardId}`);
+
+    // Create thread with images
+    const thread = await openai.beta.threads.create({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `Analyze this sports card and provide complete grading analysis.\n\n${instructions}\n\n🚨 CRITICAL REMINDERS:\n1. TASK 5 (Autograph Detection) is MANDATORY - you MUST check for hand-written signatures/writing\n2. If you see ANY hand-written marks, check for authentication (hologram, AUTHENTIC text, cert number)\n3. If hand-written signature has NO authentication → set is_alteration: true and card_is_altered: true\n4. Provide unique, detailed descriptions for every defect - no two cards should have identical defect descriptions!`
+            },
+            {
+              type: "image_url",
+              image_url: { url: frontUrl }
+            },
+            {
+              type: "image_url",
+              image_url: { url: backUrl }
+            }
+          ]
+        }
+      ]
+    });
+
+    console.log(`[SINGLE-STAGE] Created thread: ${thread.id}`);
+
+    // Run the assistant
+    const run = await openai.beta.threads.runs.create(thread.id, {
+      assistant_id: process.env.OPENAI_SPORTS_GRADING_ASSISTANT_ID || 'asst_PLACEHOLDER',
+      temperature: 0.1  // Slightly higher than 0 for more variation in descriptions
+    });
+
+    // Poll for completion
+    let runStatus = await openai.beta.threads.runs.retrieve(run.id, {
+      thread_id: thread.id
+    });
+
+    let attempts = 0;
+    const maxAttempts = 90; // 3 minutes timeout
+    while (runStatus.status === 'in_progress' || runStatus.status === 'queued') {
+      attempts++;
+      if (attempts >= maxAttempts) {
+        throw new Error('Single-stage grading timed out after 3 minutes');
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      runStatus = await openai.beta.threads.runs.retrieve(run.id, {
+        thread_id: thread.id
+      });
+    }
+
+    if (runStatus.status !== 'completed') {
+      throw new Error(`Single-stage grading failed with status: ${runStatus.status}`);
+    }
+
+    // Get the response
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    const assistantMessage = messages.data.find(msg => msg.role === 'assistant');
+
+    if (!assistantMessage) {
+      throw new Error('No response from assistant');
+    }
+
+    const messageContent = assistantMessage.content[0];
+    if (messageContent.type !== 'text') {
+      throw new Error('Unexpected response format');
+    }
+
+    const rawText = messageContent.text.value;
+    console.log('[SINGLE-STAGE] Raw AI response (first 500 chars):', rawText.substring(0, 500));
+
+    // Extract JSON from response
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in AI response');
+    }
+
+    const aiData = JSON.parse(jsonMatch[0]);
+    console.log('[SINGLE-STAGE] ✅ Parsed AI response successfully');
+
+    // Log autograph detection for debugging
+    if (aiData.autograph_detection) {
+      console.log('[AUTOGRAPH CHECK] Autograph detection data:', JSON.stringify(aiData.autograph_detection, null, 2));
+      if (aiData.autograph_detection.is_alteration === true) {
+        console.warn('[AUTOGRAPH CHECK] ⚠️ UNCERTIFIED AUTOGRAPH DETECTED - Card should be marked as altered!');
+      }
+      if (aiData.autograph_detection.has_autograph === true && aiData.autograph_detection.autograph_type === 'uncertified_added') {
+        console.warn('[AUTOGRAPH CHECK] ⚠️ UNCERTIFIED AUTOGRAPH (has_autograph=true, type=uncertified_added)');
+      }
+    } else {
+      console.warn('[AUTOGRAPH CHECK] ⚠️ NO autograph_detection field in AI response!');
+    }
+
+    // Also check card_information for autograph flags
+    if (aiData.card_information?.special_features) {
+      console.log('[CARD INFO] Special features:', aiData.card_information.special_features);
+      if (aiData.card_information.special_features.includes('Autograph') ||
+          aiData.card_information.special_features.includes('autograph')) {
+        console.warn('[CARD INFO] ⚠️ Card has "Autograph" in special_features - verify authentication!');
+      }
+    }
+
+    // Log authenticity assessment
+    if (aiData.authenticity_assessment) {
+      console.log('[AUTHENTICITY CHECK] Assessment data:', JSON.stringify(aiData.authenticity_assessment, null, 2));
+      if (aiData.authenticity_assessment.card_is_altered === true) {
+        console.warn('[AUTHENTICITY CHECK] ✅ Card correctly marked as altered');
+      }
+    } else {
+      console.warn('[AUTHENTICITY CHECK] ⚠️ NO authenticity_assessment field in AI response!');
+    }
+
+    // Backend validation: Verify math for each category
+    const categoriesToValidate = [
+      { name: 'structural_integrity', data: aiData.structural_integrity },
+      { name: 'surface_condition', data: aiData.surface_condition },
+      { name: 'centering_quality', data: aiData.centering_quality },
+      { name: 'print_quality', data: aiData.print_quality },
+      { name: 'authenticity_assessment', data: aiData.authenticity_assessment }
+    ];
+
+    categoriesToValidate.forEach(category => {
+      if (category.data && category.data.overall_score !== undefined) {
+        const defects = category.data.defects || [];
+        const totalDeduction = defects.reduce((sum: number, defect: any) => {
+          const deduction = Math.abs(defect.deduction || 0);
+          return sum + deduction;
+        }, 0);
+
+        const expectedScore = 10.0 - totalDeduction;
+        const actualScore = category.data.overall_score;
+
+        if (Math.abs(expectedScore - actualScore) > 0.01) {
+          console.warn(`[MATH VALIDATION] ${category.name}: Score mismatch detected and corrected`);
+          console.warn(`  - Expected: ${expectedScore.toFixed(1)}, AI reported: ${actualScore}`);
+          category.data.overall_score = parseFloat(expectedScore.toFixed(1));
+        }
+      }
+    });
+
+    // Build final grading result
+    const imageQuality = aiData.image_quality || {};
+    const confidenceTier = imageQuality.confidence_tier || "high";
+    const gradeUncertainty = imageQuality.grade_uncertainty || "±0.5";
+    const confidenceLevel = confidenceTier === "high" ? "A" : confidenceTier === "medium" ? "B" : "C";
+
+    const finalGradeCalc = aiData.final_grade_calculation || {};
+    const categoryScoresSimple = aiData.category_scores || {};
+
+    // Calculate Category Scores for frontend display
+    const weights = {
+      structural_integrity: 0.30,
+      surface_condition: 0.25,
+      centering_quality: 0.20,
+      print_quality: 0.15,
+      authenticity: 0.10
+    };
+
+    const categoryScores = {
+      structural_integrity: {
+        score: categoryScoresSimple.structural_integrity || aiData.structural_integrity?.overall_score || 0,
+        weight: weights.structural_integrity,
+        contribution: (categoryScoresSimple.structural_integrity || aiData.structural_integrity?.overall_score || 0) * weights.structural_integrity
+      },
+      surface_condition: {
+        score: categoryScoresSimple.surface_condition || aiData.surface_condition?.overall_score || 0,
+        weight: weights.surface_condition,
+        contribution: (categoryScoresSimple.surface_condition || aiData.surface_condition?.overall_score || 0) * weights.surface_condition
+      },
+      centering_quality: {
+        score: categoryScoresSimple.centering_quality || aiData.centering_quality?.overall_score || 0,
+        weight: weights.centering_quality,
+        contribution: (categoryScoresSimple.centering_quality || aiData.centering_quality?.overall_score || 0) * weights.centering_quality
+      },
+      print_quality: {
+        score: categoryScoresSimple.print_quality || aiData.print_quality?.overall_score || 0,
+        weight: weights.print_quality,
+        contribution: (categoryScoresSimple.print_quality || aiData.print_quality?.overall_score || 0) * weights.print_quality
+      },
+      authenticity: {
+        score: categoryScoresSimple.authenticity || aiData.authenticity_assessment?.overall_score || 0,
+        weight: weights.authenticity,
+        contribution: (categoryScoresSimple.authenticity || aiData.authenticity_assessment?.overall_score || 0) * weights.authenticity
+      }
+    };
+
+    const weightedComposite = finalGradeCalc.weighted_composite_score ||
+      categoryScores.structural_integrity.contribution +
+      categoryScores.surface_condition.contribution +
+      categoryScores.centering_quality.contribution +
+      categoryScores.print_quality.contribution +
+      categoryScores.authenticity.contribution;
+
+    const gradingResult = {
+      "Final Score": {
+        "Overall Grade": finalGradeCalc.whole_number_grade || Math.round(weightedComposite),
+        "Decimal Grade": finalGradeCalc.decimal_final_grade || weightedComposite,
+        "Whole Number Grade": finalGradeCalc.whole_number_grade || Math.round(weightedComposite)
+      },
+      "Final DCM Grade": {
+        "DCM Grade (Whole Number)": finalGradeCalc.whole_number_grade || Math.round(weightedComposite),
+        "DCM Grade (Decimal)": finalGradeCalc.decimal_final_grade || weightedComposite,
+        "Confidence Level": confidenceLevel,
+        "Confidence Tier": confidenceTier,
+        "Grade Uncertainty": gradeUncertainty
+      },
+      "Card Information": {
+        "Card Name": aiData.card_information?.card_name || "N/A",
+        "Category": "Sports",
+        "Card Number": aiData.card_information?.card_number || "N/A",
+        "Serial Numbering": aiData.card_information?.serial_numbering || "N/A",
+        "Card Set": aiData.card_information?.card_set || "N/A",
+        "Manufacturer Name": aiData.card_information?.manufacturer || "N/A",
+        "Release Date": aiData.card_information?.year || "N/A",
+        "Authentic": "Yes",
+        "Authenticity Confidence": "High"
+      },
+      "Card Details": {
+        "Player(s)/Character(s) Featured": aiData.card_information?.featured || "N/A",
+        "Rookie/First Print": aiData.card_information?.rookie_card || "N/A",
+        "Parallel Variant": aiData.card_information?.parallel_variant || "Base",
+        "Special Features": aiData.card_information?.special_features?.join(", ") || "N/A",
+        "Autographed": aiData.autograph_detection?.has_autograph ? "Yes" : "No",
+        "Autograph Type": aiData.autograph_detection?.autograph_type || "N/A"
+      },
+      "Grading (DCM Master Scale)": {
+        "Final Grade (Decimal)": finalGradeCalc.decimal_final_grade || weightedComposite,
+        "Final Grade (Whole Number)": finalGradeCalc.whole_number_grade || Math.round(weightedComposite),
+        "Grade Cap Applied": "None",
+        "Preliminary Grade": null,
+        "Image Quality Cap Applied": "No",
+        "Category Scores": categoryScores,
+        "Weighted Composite Score": weightedComposite,
+        // V3.0 5-Category Defect Analysis
+        "structural_integrity": aiData.structural_integrity || null,
+        "surface_condition": aiData.surface_condition || null,
+        "centering_quality": aiData.centering_quality || null,
+        "print_quality": aiData.print_quality || null,
+        "authenticity_assessment": aiData.authenticity_assessment || null,
+        "Centering_Measurements": {
+          "front_x_axis_ratio": aiData.front_centering?.x_axis_ratio || "50/50",
+          "front_y_axis_ratio": aiData.front_centering?.y_axis_ratio || "50/50",
+          "back_x_axis_ratio": aiData.back_centering?.x_axis_ratio || "50/50",
+          "back_y_axis_ratio": aiData.back_centering?.y_axis_ratio || "50/50",
+          "measurement_source": "AI Vision",
+          "measurement_confidence": aiData.front_centering?.confidence || "medium"
+        },
+        "Grade Analysis Summary": finalGradeCalc.grade_calculation_proof || aiData.analysis_summary?.primary_grade_factors?.join(". ") || "Single-stage grading complete"
+      },
+      "AI Confidence Assessment": {
+        "Overall Confidence": confidenceLevel,
+        "Confidence Tier": confidenceTier,
+        "Grade Uncertainty": gradeUncertainty,
+        "Image Quality Score": imageQuality.overall_score || null,
+        "Quality Calculation": imageQuality.calculation_proof || null,
+        "Grading Reliability": confidenceTier === "high" ? "High - Excellent image quality, precise measurements" :
+                              confidenceTier === "medium" ? "Good - Adequate image quality, reliable grading" :
+                              "Fair - Poor image quality, grade range provided",
+        "Grading Summary": aiData.analysis_summary?.primary_grade_factors?.join(", ") || null,
+        "Recommendations": aiData.analysis_summary?.recommendation_to_user || null
+      },
+      "Estimated Scoring by Major Companies": {
+        "PSA": {
+          "grade": (finalGradeCalc.whole_number_grade || Math.round(weightedComposite)) >= 9 ? "10" : "9 or lower",
+          "reasoning": `DCM grade maps to PSA scale`
+        },
+        "BGS": {
+          "grade": (finalGradeCalc.decimal_final_grade || weightedComposite) >= 9 ? "9.5" : "9 or lower",
+          "reasoning": `DCM grade maps to BGS scale`
+        },
+        "SGC": {
+          "grade": Math.round((finalGradeCalc.decimal_final_grade || weightedComposite) * 10),
+          "reasoning": `DCM grade maps to SGC 100-point scale`
+        }
+      },
+      "Image Conditions": {
+        "Resolution": imageQuality.resolution || "standard",
+        "Lighting": imageQuality.lighting || "adequate",
+        "Angle": imageQuality.angle || "straight",
+        "Clarity": imageQuality.clarity || "sharp",
+        "Glare Present": imageQuality.glare_present ? "Yes" : "No"
+      }
+    };
+
+    // Check for alterations - BOTH from autograph_detection AND authenticity_assessment
+    const isAltered = aiData.authenticity_assessment?.card_is_altered === true ||
+                      aiData.autograph_detection?.is_alteration === true;
+
+    if (isAltered) {
+      console.warn('[SINGLE-STAGE] ⚠️⚠️⚠️ CARD IS ALTERED - MARKING AS NA ⚠️⚠️⚠️');
+
+      if (aiData.autograph_detection?.is_alteration === true) {
+        console.warn('[SINGLE-STAGE] Alteration source: Uncertified autograph detected in autograph_detection');
+      }
+      if (aiData.authenticity_assessment?.card_is_altered === true) {
+        console.warn('[SINGLE-STAGE] Alteration source: Card marked as altered in authenticity_assessment');
+      }
+
+      gradingResult["Final Score"]["Overall Grade"] = "NA";
+      gradingResult["Final Score"]["Decimal Grade"] = "NA";
+      gradingResult["Final Score"]["Whole Number Grade"] = "NA";
+      gradingResult["Final DCM Grade"]["DCM Grade (Whole Number)"] = "NA";
+      gradingResult["Final DCM Grade"]["DCM Grade (Decimal)"] = "NA";
+      gradingResult["Grading (DCM Master Scale)"]["Final Grade (Decimal)"] = "NA";
+      gradingResult["Grading (DCM Master Scale)"]["Final Grade (Whole Number)"] = "NA";
+
+      // Force authenticity score to 0
+      if (aiData.authenticity_assessment) {
+        aiData.authenticity_assessment.overall_score = 0;
+        aiData.authenticity_assessment.card_is_altered = true;
+      }
+    }
+
+    console.log('[SINGLE-STAGE] ✅ Grading complete');
+    return { gradingResult };
+
+  } catch (error: any) {
+    console.error('[SINGLE-STAGE] Error:', error.message);
+    throw error;
+  }
+}
+
+// TIER 2 FIX: Two-Stage Grading Pipeline with Safeguards (DEPRECATED - Kept for fallback)
+async function gradeSportsCardTwoStage(frontUrl: string, backUrl: string, cardId: string): Promise<{gradingResult: any, measurementData: any, detectionResults: any}> {
+  try {
+    const measurementInstructions = getMeasurementInstructions();
+    const evaluationInstructions = getEvaluationInstructions();
+
+    // Generate session ID
+    const imageContentHash = crypto.createHash('sha256')
+      .update(frontUrl + backUrl + cardId + Date.now().toString())
+      .digest('hex')
+      .substring(0, 12);
+
+    const sessionId = `CARD_${cardId}_${imageContentHash}_${Date.now()}`;
+
+    console.log(`[TWO-STAGE] Starting Stage 1: Measurement Extraction`);
+
+    // ====================
+    // STEP 0: TRY OPENCV FOR CENTERING (BEFORE STAGE 1)
+    // ====================
+
+    const { useOpenCV, detectionResults } = await tryEnhancedDetection(frontUrl, backUrl);
+
+    // v3.1: Build Stage 0 data with new fields
+    let stage0Data: any = null;
+    if (useOpenCV && detectionResults) {
+      console.log('[TWO-STAGE-v3.1] ✅ Using v3.1 hybrid detection');
+      stage0Data = {
+        // Backward-compatible centering format
+        front_x_axis_ratio: detectionResults.front_centering?.centering?.centering_estimate_lr ||
+                           detectionResults.front_centering?.centering_ratios?.horizontal || "50/50",
+        front_y_axis_ratio: detectionResults.front_centering?.centering?.centering_estimate_tb ||
+                           detectionResults.front_centering?.centering_ratios?.vertical || "50/50",
+        back_x_axis_ratio: detectionResults.back_centering?.centering?.centering_estimate_lr ||
+                          detectionResults.back_centering?.centering_ratios?.horizontal || "50/50",
+        back_y_axis_ratio: detectionResults.back_centering?.centering?.centering_estimate_tb ||
+                          detectionResults.back_centering?.centering_ratios?.vertical || "50/50",
+        source: "OpenCV v3.1 Hybrid",
+        confidence: "High",
+        method: detectionResults.front_centering?.measurement_method || "v3.1 Hybrid Detection",
+
+        // v3.1 NEW FIELDS
+        front_edge_detection_mode: detectionResults.front_centering?.edge_detection_mode || "standard",
+        back_edge_detection_mode: detectionResults.back_centering?.edge_detection_mode || "standard",
+        front_centering_type: detectionResults.front_centering?.centering?.centering_estimate_type || "border-detected",
+        back_centering_type: detectionResults.back_centering?.centering?.centering_estimate_type || "border-detected",
+        front_image_quality_grade: detectionResults.front_centering?.image_quality_grade || "B",
+        back_image_quality_grade: detectionResults.back_centering?.image_quality_grade || "B",
+        front_image_quality_score: detectionResults.front_centering?.image_quality_score || 75,
+        back_image_quality_score: detectionResults.back_centering?.image_quality_score || 75,
+        front_signals: detectionResults.front_centering?.signals || {},
+        back_signals: detectionResults.back_centering?.signals || {},
+
+        // Full Stage 0 data for Stage 1 validation
+        front_stage0: detectionResults.front_centering,
+        back_stage0: detectionResults.back_centering
+      };
+
+      console.log('[TWO-STAGE-v3.1] Front centering type:', stage0Data.front_centering_type);
+      console.log('[TWO-STAGE-v3.1] Back centering type:', stage0Data.back_centering_type);
+      console.log('[TWO-STAGE-v3.1] Image quality:', stage0Data.front_image_quality_grade, '/', stage0Data.back_image_quality_grade);
+    } else {
+      console.log('[TWO-STAGE] ⚠️ OpenCV unavailable, AI will measure centering');
+    }
+
+    // Legacy variable name for compatibility
+    const opencvCentering = stage0Data;
+
+    // ====================
+    // STAGE 1: MEASUREMENT WITH RETRY LOGIC
+    // ====================
+
+    let measurementData: any = null;
+    let retryCount = 0;
+    const maxRetries = opencvCentering ? 1 : 3; // Only 1 attempt if OpenCV succeeded
+
+    while (retryCount < maxRetries) {
+      const stage1Prompt = opencvCentering
+        ? `SESSION: ${sessionId}_MEASUREMENT_ATTEMPT_${retryCount + 1}
+
+CENTERING DATA PROVIDED BY OPENCV (USE THESE - DO NOT RE-MEASURE):
+Front X-Axis: ${opencvCentering.front_x_axis_ratio}
+Front Y-Axis: ${opencvCentering.front_y_axis_ratio}
+Front Description: ${opencvCentering.front_edge_description}
+Back X-Axis: ${opencvCentering.back_x_axis_ratio}
+Back Y-Axis: ${opencvCentering.back_y_axis_ratio}
+Back Description: ${opencvCentering.back_edge_description}
+Source: ${opencvCentering.source} (Pixel-Based Measurement)
+
+${measurementInstructions}
+
+CRITICAL INSTRUCTIONS:
+- DO NOT measure centering - OpenCV already provided pixel-perfect measurements above
+- Extract card information (name, player, set, etc.)
+- Detect autograph presence and type
+- Perform visual defect inspection (all 38 defects)
+- Include the OpenCV centering data in your JSON response exactly as provided above`
+        : `SESSION: ${sessionId}_MEASUREMENT_ATTEMPT_${retryCount + 1}
+
+TASK: Extract objective measurements from these card images.
+
+${measurementInstructions}
+
+CRITICAL: Return ONLY measurements, no grading judgments.
+IMPORTANT: Actually measure the borders - they are rarely perfectly equal. Look for visible differences.`;
+
+      const measurementThread = await openai.beta.threads.create({
+        messages: [
+          {
+            role: "user",
+            content: [
+              {
+                type: "text",
+                text: stage1Prompt
+              },
+              {
+                type: "image_url",
+                image_url: { url: frontUrl }
+              },
+              {
+                type: "image_url",
+                image_url: { url: backUrl }
+              }
+            ]
+          }
+        ]
+      });
+
+      console.log(`[STAGE1] Created measurement thread (attempt ${retryCount + 1}/${maxRetries}): ${measurementThread.id}`);
+
+      // Use variable temperature for retries
+      const temperature = retryCount === 0 ? 0.0 : 0.2 + (retryCount * 0.1);
+      console.log(`[STAGE1] Using temperature: ${temperature}`);
+
+      const measurementRun = await openai.beta.threads.runs.create(measurementThread.id, {
+        assistant_id: process.env.OPENAI_MEASUREMENT_ASSISTANT_ID || 'asst_EbYus9ZeLMrGHw9ICEfQ99vm',
+        temperature: temperature
+      });
+
+      // Poll for measurement completion
+      let measurementStatus = await openai.beta.threads.runs.retrieve(measurementRun.id, {
+        thread_id: measurementThread.id
+      });
+
+      let attempts = 0;
+      const maxAttempts = 90; // 3 minutes timeout
+      while (measurementStatus.status === 'in_progress' || measurementStatus.status === 'queued') {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          throw new Error('Stage 1 measurement timed out after 3 minutes');
+        }
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        measurementStatus = await openai.beta.threads.runs.retrieve(measurementRun.id, {
+          thread_id: measurementThread.id
+        });
+      }
+
+      if (measurementStatus.status !== 'completed') {
+        throw new Error(`Stage 1 failed with status: ${measurementStatus.status}`);
+      }
+
+      const measurementMessages = await openai.beta.threads.messages.list(measurementThread.id);
+      const measurementResponse = measurementMessages.data.find(msg => msg.role === 'assistant');
+
+      if (!measurementResponse || !measurementResponse.content[0] || measurementResponse.content[0].type !== 'text') {
+        throw new Error('No valid measurement response from AI');
+      }
+
+      const measurementText = measurementResponse.content[0].text.value;
+      console.log('[STAGE1] Measurement response received:', measurementText.substring(0, 200) + '...');
+
+      // Extract JSON from measurement response
+      const measurementJsonMatch = measurementText.match(/```json\s*([\s\S]*?)\s*```/);
+      if (!measurementJsonMatch) {
+        throw new Error('No JSON in measurement response');
+      }
+
+      const tempMeasurementData = JSON.parse(measurementJsonMatch[1]);
+      console.log('[STAGE1] Measurement data extracted successfully');
+      console.log('[STAGE1 DEBUG] Has structural_integrity:', !!tempMeasurementData.structural_integrity);
+      console.log('[STAGE1 DEBUG] Has surface_condition:', !!tempMeasurementData.surface_condition);
+      console.log('[STAGE1 DEBUG] Has image_quality.overall_score:', tempMeasurementData.image_quality?.overall_score);
+      console.log('[STAGE1 DEBUG] Has front_centering.reference_points:', !!tempMeasurementData.front_centering?.reference_points);
+      console.log('[STAGE1 DEBUG] Top-level keys:', Object.keys(tempMeasurementData));
+
+      // SAFEGUARD: Check for suspicious 50/50 across all ratios
+      const frontX = tempMeasurementData.front_centering_measurements?.x_axis_ratio;
+      const frontY = tempMeasurementData.front_centering_measurements?.y_axis_ratio;
+      const backX = tempMeasurementData.back_centering_measurements?.x_axis_ratio;
+      const backY = tempMeasurementData.back_centering_measurements?.y_axis_ratio;
+
+      const allRatios50 = frontX === "50/50" && frontY === "50/50" && backX === "50/50" && backY === "50/50";
+
+      if (allRatios50 && retryCount < maxRetries - 1) {
+        console.warn(`[STAGE1] SUSPICIOUS: All ratios are 50/50. Retry attempt ${retryCount + 1}/${maxRetries}`);
+        retryCount++;
+        continue; // Retry with higher temperature
+      }
+
+      // Accept the measurement data
+      measurementData = tempMeasurementData;
+
+      // OVERRIDE: If OpenCV provided centering, force those values
+      if (opencvCentering) {
+        console.log('[STAGE1] ✅ Injecting OpenCV centering data into measurement results');
+        measurementData.front_centering_measurements = {
+          x_axis_ratio: opencvCentering.front_x_axis_ratio,
+          y_axis_ratio: opencvCentering.front_y_axis_ratio,
+          edge_description: opencvCentering.front_edge_description
+        };
+        measurementData.back_centering_measurements = {
+          x_axis_ratio: opencvCentering.back_x_axis_ratio,
+          y_axis_ratio: opencvCentering.back_y_axis_ratio,
+          edge_description: opencvCentering.back_edge_description
+        };
+        measurementData.centering_confidence = "High";
+        measurementData.suspicious_centering = false;
+        measurementData.centering_source = "OpenCV";
+        measurementData.centering_method = opencvCentering.method;
+      } else if (allRatios50) {
+        console.warn(`[STAGE1] WARNING: All ratios still 50/50 after ${maxRetries} attempts. Flagging low confidence.`);
+        measurementData.centering_confidence = "Low";
+        measurementData.suspicious_centering = true;
+        measurementData.centering_source = "AI Vision";
+      } else {
+        measurementData.centering_confidence = "High";
+        measurementData.suspicious_centering = false;
+        measurementData.centering_source = "AI Vision";
+      }
+
+      break; // Success, exit retry loop
+    }
+
+    // ====================
+    // 🚨 ALTERATION DETECTION: Log but continue grading
+    // ====================
+
+    const authenticityData = measurementData.authenticity_assessment;
+    const autographData = measurementData.autograph_detection;
+    const isAltered = authenticityData?.card_is_altered || autographData?.is_alteration;
+
+    if (isAltered) {
+      console.warn('[ALTERATION DETECTED] Card has been altered - will complete grading but mark as altered');
+      console.warn('[ALTERATION] Type:', authenticityData?.alteration_type || autographData?.autograph_type);
+      console.warn('[ALTERATION] Evidence:', authenticityData?.defects?.[0]?.evidence || 'Uncertified autograph detected');
+
+      // Store alteration info to apply after grading
+      measurementData.card_is_altered = true;
+      measurementData.alteration_type = authenticityData?.alteration_type || autographData?.autograph_type || 'uncertified_autograph';
+      measurementData.alteration_evidence = authenticityData?.defects?.[0]?.evidence || 'No manufacturer authentication markers found';
+    }
+
+    // ====================
+    // STAGE 2: EVALUATION WITH AUTOGRAPH SAFEGUARDS
+    // ====================
+
+    console.log(`[TWO-STAGE] Starting Stage 2: Defect Evaluation`);
+
+    const evaluationThread = await openai.beta.threads.create({
+      messages: [
+        {
+          role: "user",
+          content: `SESSION: ${sessionId}_EVALUATION
+
+TASK: Apply quantitative thresholds to these measurements to determine defects.
+
+${evaluationInstructions}
+
+MEASUREMENT DATA FROM STAGE 1:
+\`\`\`json
+${JSON.stringify(measurementData, null, 2)}
+\`\`\`
+
+CRITICAL: Apply the mathematical rules EXACTLY as specified. Return evaluation JSON.`
+        }
+      ]
+    });
+
+    console.log(`[STAGE2] Created evaluation thread: ${evaluationThread.id}`);
+
+    const evaluationRun = await openai.beta.threads.runs.create(evaluationThread.id, {
+      assistant_id: process.env.OPENAI_EVALUATION_ASSISTANT_ID || 'asst_XjzIEKt9P6Gj6aXRFe91jwV3',
+      temperature: 0.0  // Deterministic evaluation
+    });
+
+    // Poll for evaluation completion
+    let evaluationStatus = await openai.beta.threads.runs.retrieve(evaluationRun.id, {
+      thread_id: evaluationThread.id
+    });
+
+    let attempts = 0;
+    const maxEvalAttempts = 90; // 3 minutes timeout
+    while (evaluationStatus.status === 'in_progress' || evaluationStatus.status === 'queued') {
+      attempts++;
+      if (attempts >= maxEvalAttempts) {
+        throw new Error('Stage 2 evaluation timed out after 3 minutes');
+      }
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      evaluationStatus = await openai.beta.threads.runs.retrieve(evaluationRun.id, {
+        thread_id: evaluationThread.id
+      });
+    }
+
+    if (evaluationStatus.status !== 'completed') {
+      throw new Error(`Stage 2 failed with status: ${evaluationStatus.status}`);
+    }
+
+    const evaluationMessages = await openai.beta.threads.messages.list(evaluationThread.id);
+    const evaluationResponse = evaluationMessages.data.find(msg => msg.role === 'assistant');
+
+    if (!evaluationResponse || !evaluationResponse.content[0] || evaluationResponse.content[0].type !== 'text') {
+      throw new Error('No valid evaluation response from AI');
+    }
+
+    const evaluationText = evaluationResponse.content[0].text.value;
+    console.log('[STAGE2] Evaluation response received:', evaluationText.substring(0, 200) + '...');
+
+    // Extract JSON from evaluation response
+    const evaluationJsonMatch = evaluationText.match(/```json\s*([\s\S]*?)\s*```/);
+    if (!evaluationJsonMatch) {
+      throw new Error('No JSON in evaluation response');
+    }
+
+    let evaluationData = JSON.parse(evaluationJsonMatch[1]);
+    console.log('[STAGE2] Evaluation data extracted successfully');
+
+    // NORMALIZE STAGE 1 DEFECTS: Extract boolean values from new {observed, value} format
+    const normalizedDefects: Record<string, boolean> = {};
+    if (measurementData.visual_defects) {
+      for (const [key, defectData] of Object.entries(measurementData.visual_defects)) {
+        if (typeof defectData === 'object' && defectData !== null && 'value' in defectData) {
+          normalizedDefects[key] = (defectData as any).value;
+        } else {
+          normalizedDefects[key] = defectData as boolean; // Fallback for old format
+        }
+      }
+      console.log('[STAGE1] Normalized defects from observed/value format');
+    }
+
+    // BACKEND SAFEGUARD: Force altered_writing = false for factory/certified autographs
+    const autographType = measurementData.autograph_detection?.autograph_type;
+    if (autographType === "On-card autograph (factory)" || autographType === "Certified autograph with authentication") {
+      if (evaluationData.defects_detected?.altered_writing) {
+        console.log('[SAFEGUARD] Forcing altered_writing = false for factory/certified autograph');
+        evaluationData.defects_detected.altered_writing = false;
+
+        // Remove altered_writing deduction if it exists
+        if (evaluationData.deductions_applied) {
+          const originalDeductions = [...evaluationData.deductions_applied];
+          evaluationData.deductions_applied = originalDeductions.filter(
+            (d: any) => !d.type.toLowerCase().includes('writing')
+          );
+
+          // Recalculate total deduction
+          const totalDeduction = evaluationData.deductions_applied.reduce(
+            (sum: number, d: any) => sum + (d.deduction || 0),
+            0
+          );
+
+          evaluationData.decimal_final_grade = Math.max(
+            1,
+            evaluationData.centering_starting_grade + totalDeduction
+          );
+          evaluationData.whole_number_grade = Math.round(evaluationData.decimal_final_grade);
+
+          console.log(`[SAFEGUARD] Recalculated grade after removing writing deduction: ${evaluationData.decimal_final_grade}`);
+        }
+      }
+    }
+
+    // Ensure final grade has minimum of 1
+    const finalGrade = evaluationData.decimal_final_grade || evaluationData.final_grade || 1;
+    if (finalGrade < 1) {
+      console.log(`[VALIDATION] Final grade ${finalGrade} below minimum, setting to 1`);
+      evaluationData.decimal_final_grade = 1;
+      evaluationData.whole_number_grade = 1;
+    }
+
+    // Combine measurement + evaluation into final result
+    // V3.0: Handle new AI-optimized format with confidence tiers and category scores
+
+    // Extract image quality and confidence from Stage 1
+    const imageQuality = measurementData.image_quality || {};
+
+    // BACKEND FALLBACK: Calculate confidence tier from quality metrics if AI didn't provide it
+    let confidenceTier = imageQuality.confidence_tier || evaluationData.image_quality_tier;
+    let gradeUncertainty = imageQuality.grade_uncertainty || evaluationData.grade_confidence;
+
+    if (!confidenceTier || !gradeUncertainty) {
+      console.log('[CONFIDENCE] AI did not provide confidence_tier, calculating from quality metrics');
+
+      // Calculate from overall_score if available
+      const overallScore = imageQuality.overall_score;
+      if (typeof overallScore === 'number') {
+        if (overallScore >= 7) {
+          confidenceTier = "high";
+          gradeUncertainty = "±0.5";
+        } else if (overallScore >= 5) {
+          confidenceTier = "medium";
+          gradeUncertainty = "±1.0";
+        } else {
+          confidenceTier = "low";
+          gradeUncertainty = "±1.5";
+        }
+        console.log(`[CONFIDENCE] Calculated from overall_score ${overallScore}: ${confidenceTier}`);
+      } else {
+        // Fallback: Calculate from individual quality factors
+        const resolution = imageQuality.resolution || imageQuality.Resolution || "standard";
+        const lighting = imageQuality.lighting || imageQuality.Lighting || "adequate";
+        const clarity = imageQuality.clarity || imageQuality.Clarity || "sharp";
+        const angle = imageQuality.angle || imageQuality.Angle || "straight";
+        const glarePresent = imageQuality.glare_present || imageQuality["Glare Present"] === "Yes";
+
+        // Score: 1 point for each good quality factor
+        let qualityPoints = 0;
+        if (resolution === "high" || resolution === "standard" || resolution === "Standard") qualityPoints++;
+        if (lighting === "even" || lighting === "adequate" || lighting === "Adequate") qualityPoints++;
+        if (clarity === "sharp" || clarity === "Sharp") qualityPoints++;
+        if (angle === "straight" || angle === "Straight") qualityPoints++;
+        if (!glarePresent) qualityPoints++;
+
+        // Default to HIGH for good photos (3-5 points)
+        if (qualityPoints >= 4) {
+          confidenceTier = "high";
+          gradeUncertainty = "±0.5";
+        } else if (qualityPoints >= 2) {
+          confidenceTier = "high"; // Changed from "medium" - be more generous
+          gradeUncertainty = "±0.5";
+        } else {
+          confidenceTier = "medium";
+          gradeUncertainty = "±1.0";
+        }
+
+        console.log(`[CONFIDENCE] Calculated from quality factors (${qualityPoints}/5 points): ${confidenceTier}`);
+      }
+    }
+
+    // Final fallback: Default to HIGH (not medium)
+    confidenceTier = confidenceTier || "high";
+    gradeUncertainty = gradeUncertainty || "±0.5";
+
+    // Map confidence tier to letter grade
+    const confidenceMapping: Record<string, string> = {
+      "high": "A",
+      "medium": "B",
+      "low": "C"
+    };
+    let confidenceLevel = confidenceMapping[confidenceTier] || "A";
+
+    // Extract grade range if provided
+    const gradeRange = evaluationData.grade_range || null;
+
+    // BACKEND MATH VALIDATION: Verify Stage 1's category scores match their defect deductions
+    const categoriesToValidate = [
+      { name: 'structural_integrity', data: measurementData.structural_integrity },
+      { name: 'surface_condition', data: measurementData.surface_condition },
+      { name: 'centering_quality', data: measurementData.centering_quality },
+      { name: 'print_quality', data: measurementData.print_quality },
+      { name: 'authenticity_assessment', data: measurementData.authenticity_assessment }
+    ];
+
+    categoriesToValidate.forEach(category => {
+      if (category.data && category.data.overall_score !== undefined) {
+        const defects = category.data.defects || category.data.defects_detected || [];
+        const totalDeduction = defects.reduce((sum: number, defect: any) => {
+          const deduction = Math.abs(defect.deduction || defect.applied_deduction || 0);
+          return sum + deduction;
+        }, 0);
+
+        const expectedScore = 10.0 - totalDeduction;
+        const actualScore = category.data.overall_score;
+
+        if (Math.abs(expectedScore - actualScore) > 0.01) {
+          console.warn(`[MATH VALIDATION] ${category.name}: Score mismatch!`);
+          console.warn(`  - Defect deductions total: -${totalDeduction}`);
+          console.warn(`  - Expected score: ${expectedScore.toFixed(1)}`);
+          console.warn(`  - AI reported score: ${actualScore}`);
+          console.warn(`  - CORRECTING to match defect deductions: ${expectedScore.toFixed(1)}`);
+
+          // Auto-correct the score to match the deductions
+          category.data.overall_score = parseFloat(expectedScore.toFixed(1));
+        }
+      }
+    });
+
+    // BACKEND: Calculate Category Scores with proper structure for frontend display
+    const weights = {
+      structural_integrity: 0.30,
+      surface_condition: 0.25,
+      centering_quality: 0.20,
+      print_quality: 0.15,
+      authenticity: 0.10
+    };
+
+    let categoryScores;
+    let weightedComposite = evaluationData.weighted_composite_score;
+
+    // Check if Stage 2 provided category_scores in simple format (just numbers)
+    if (evaluationData.category_scores && typeof evaluationData.category_scores === 'object') {
+      console.log('[CATEGORY SCORES] Stage 2 provided category_scores, converting to frontend format');
+
+      // Convert Stage 2's simple format to frontend's detailed format
+      categoryScores = {
+        structural_integrity: {
+          score: evaluationData.category_scores.structural_integrity || measurementData.structural_integrity?.overall_score || 0,
+          weight: weights.structural_integrity,
+          contribution: (evaluationData.category_scores.structural_integrity || measurementData.structural_integrity?.overall_score || 0) * weights.structural_integrity
+        },
+        surface_condition: {
+          score: evaluationData.category_scores.surface_condition || measurementData.surface_condition?.overall_score || 0,
+          weight: weights.surface_condition,
+          contribution: (evaluationData.category_scores.surface_condition || measurementData.surface_condition?.overall_score || 0) * weights.surface_condition
+        },
+        centering_quality: {
+          score: evaluationData.category_scores.centering_quality || measurementData.centering_quality?.overall_score || 0,
+          weight: weights.centering_quality,
+          contribution: (evaluationData.category_scores.centering_quality || measurementData.centering_quality?.overall_score || 0) * weights.centering_quality
+        },
+        print_quality: {
+          score: evaluationData.category_scores.print_quality || measurementData.print_quality?.overall_score || 0,
+          weight: weights.print_quality,
+          contribution: (evaluationData.category_scores.print_quality || measurementData.print_quality?.overall_score || 0) * weights.print_quality
+        },
+        authenticity: {
+          score: evaluationData.category_scores.authenticity || measurementData.authenticity_assessment?.overall_score || 0,
+          weight: weights.authenticity,
+          contribution: (evaluationData.category_scores.authenticity || measurementData.authenticity_assessment?.overall_score || 0) * weights.authenticity
+        }
+      };
+    } else {
+      console.log('[CATEGORY SCORES] Stage 2 did not provide category_scores, calculating from Stage 1');
+
+      // Fallback: Calculate from Stage 1 data
+      categoryScores = {
+        structural_integrity: {
+          score: measurementData.structural_integrity?.overall_score || 0,
+          weight: weights.structural_integrity,
+          contribution: (measurementData.structural_integrity?.overall_score || 0) * weights.structural_integrity
+        },
+        surface_condition: {
+          score: measurementData.surface_condition?.overall_score || 0,
+          weight: weights.surface_condition,
+          contribution: (measurementData.surface_condition?.overall_score || 0) * weights.surface_condition
+        },
+        centering_quality: {
+          score: measurementData.centering_quality?.overall_score || 0,
+          weight: weights.centering_quality,
+          contribution: (measurementData.centering_quality?.overall_score || 0) * weights.centering_quality
+        },
+        print_quality: {
+          score: measurementData.print_quality?.overall_score || 0,
+          weight: weights.print_quality,
+          contribution: (measurementData.print_quality?.overall_score || 0) * weights.print_quality
+        },
+        authenticity: {
+          score: measurementData.authenticity_assessment?.overall_score || 0,
+          weight: weights.authenticity,
+          contribution: (measurementData.authenticity_assessment?.overall_score || 0) * weights.authenticity
+        }
+      };
+    }
+
+    // Calculate weighted composite if Stage 2 didn't provide it
+    if (!weightedComposite) {
+      weightedComposite =
+        categoryScores.structural_integrity.contribution +
+        categoryScores.surface_condition.contribution +
+        categoryScores.centering_quality.contribution +
+        categoryScores.print_quality.contribution +
+        categoryScores.authenticity.contribution;
+
+      console.log(`[CATEGORY SCORES] Calculated weighted composite: ${weightedComposite.toFixed(2)}`);
+    }
+
+    const gradingResult = {
+      "Final Score": {
+        "Overall Grade": evaluationData.whole_number_grade || evaluationData.final_grade_whole || Math.round(evaluationData.decimal_final_grade || evaluationData.final_grade || 1),
+        "Decimal Grade": evaluationData.decimal_final_grade || evaluationData.final_grade_decimal || evaluationData.final_grade || 1,
+        "Whole Number Grade": evaluationData.whole_number_grade || evaluationData.final_grade_whole || Math.round(evaluationData.decimal_final_grade || evaluationData.final_grade || 1),
+        "Grade Range": gradeRange ? `${gradeRange.minimum} - ${gradeRange.maximum}` : null,
+        "Uncertainty": gradeUncertainty
+      },
+      "Final DCM Grade": {
+        "DCM Grade (Whole Number)": evaluationData.whole_number_grade || evaluationData.final_grade_whole || Math.round(evaluationData.final_grade || 1),
+        "DCM Grade (Decimal)": evaluationData.decimal_final_grade || evaluationData.final_grade_decimal || evaluationData.final_grade,
+        "Grade Range Min": gradeRange?.minimum || null,
+        "Grade Range Max": gradeRange?.maximum || null,
+        "Confidence Level": confidenceLevel,
+        "Confidence Tier": confidenceTier,
+        "Grade Uncertainty": gradeUncertainty
+      },
+      "Card Information": {
+        "Card Name": measurementData.card_information?.card_name || "N/A",
+        "Category": "Sports",
+        "Card Number": measurementData.card_information?.card_number || "N/A",
+        "Serial Numbering": measurementData.card_information?.serial_numbering || "N/A",
+        "Card Set": measurementData.card_information?.card_set || "N/A",
+        "Manufacturer Name": measurementData.card_information?.manufacturer || "N/A",
+        "Release Date": measurementData.card_information?.year || "N/A",
+        "Authentic": "Yes",
+        "Authenticity Confidence": "High"
+      },
+      "Card Details": {
+        "Player(s)/Character(s) Featured": measurementData.card_information?.player_name || "N/A",
+        "Rookie/First Print": measurementData.card_information?.rookie_card || "N/A",
+        "Autographed": measurementData.autograph_detection?.autographed || "No",
+        "Memorabilia": "N/A",
+        "Parallel/Insert Type": "N/A",
+        "Serial Number": measurementData.card_information?.serial_numbering || "N/A",
+        "Rarity": "Two-stage pipeline - visual grading only"
+      },
+      "Grading (DCM Master Scale)": {
+        "Centering Starting Grade": evaluationData.centering_starting_grade || evaluationData.centering_base_grade,
+        "Centering Basis": evaluationData.centering_basis || `Worst ratio determines base grade`,
+        "Defect Deductions": evaluationData.defect_deductions || evaluationData.deductions_applied || [],
+        "Total Deductions": evaluationData.total_deductions || 0,
+        "Total Defect Count": evaluationData.total_defect_count || (evaluationData.defect_deductions?.length || 0),
+        "Decimal Final Grade": evaluationData.decimal_final_grade || evaluationData.final_grade_decimal || evaluationData.final_grade,
+        "Whole Number Grade": evaluationData.whole_number_grade || evaluationData.final_grade_whole || Math.round(evaluationData.final_grade || 1),
+        "Grade Cap Applied": evaluationData.grade_cap_applied || "None",
+        "Preliminary Grade": evaluationData.preliminary_grade || null,
+        "Image Quality Cap Applied": evaluationData.image_quality_cap_applied ? "Yes" : "No",
+        "Category Scores": categoryScores,
+        "Weighted Composite Score": weightedComposite,
+        // V3.0 5-Category Defect Analysis (Top-level for frontend display)
+        "structural_integrity": measurementData.structural_integrity || null,
+        "surface_condition": measurementData.surface_condition || null,
+        "centering_quality": measurementData.centering_quality || null,
+        "print_quality": measurementData.print_quality || null,
+        "authenticity_assessment": measurementData.authenticity_assessment || null,
+        "Visual_Inspection_Results": evaluationData.defects_detected || normalizedDefects,
+        "Visual_Inspection_Details": measurementData.visual_defects || {
+          structural_integrity: measurementData.structural_integrity,
+          surface_condition: measurementData.surface_condition,
+          print_quality: measurementData.print_quality,
+          authenticity_assessment: measurementData.authenticity_assessment
+        },
+        "Centering_Measurements": {
+          "front_x_axis_ratio": measurementData.front_centering?.x_axis_ratio || measurementData.front_centering_measurements?.x_axis_ratio || "50/50",
+          "front_y_axis_ratio": measurementData.front_centering?.y_axis_ratio || measurementData.front_centering_measurements?.y_axis_ratio || "50/50",
+          "front_edge_description": measurementData.front_centering?.analysis || measurementData.front_centering_measurements?.analysis || measurementData.front_centering_measurements?.edge_description || null,
+          "front_centering_method": measurementData.front_centering?.method || "visual_analysis",
+          "front_centering_confidence": measurementData.front_centering?.confidence || "medium",
+          "front_quality_note": measurementData.front_centering?.quality_note || null,
+          "front_reference_points": measurementData.front_centering?.reference_points || null,
+          "front_visual_observation": measurementData.front_centering?.visual_observation || null,
+          "front_measurement_approach": measurementData.front_centering?.measurement_approach || null,
+          "back_x_axis_ratio": measurementData.back_centering?.x_axis_ratio || measurementData.back_centering_measurements?.x_axis_ratio || "50/50",
+          "back_y_axis_ratio": measurementData.back_centering?.y_axis_ratio || measurementData.back_centering_measurements?.y_axis_ratio || "50/50",
+          "back_edge_description": measurementData.back_centering?.analysis || measurementData.back_centering_measurements?.analysis || measurementData.back_centering_measurements?.edge_description || null,
+          "back_centering_method": measurementData.back_centering?.method || "visual_analysis",
+          "back_centering_confidence": measurementData.back_centering?.confidence || "medium",
+          "back_quality_note": measurementData.back_centering?.quality_note || null,
+          "back_reference_points": measurementData.back_centering?.reference_points || null,
+          "back_visual_observation": measurementData.back_centering?.visual_observation || null,
+          "back_measurement_approach": measurementData.back_centering?.measurement_approach || null,
+          "measurement_source": measurementData.centering_source || "AI Vision",
+          "measurement_confidence": measurementData.front_centering?.confidence || measurementData.centering_confidence || "medium"
+        },
+        "Grade Analysis Summary": evaluationData.grade_calculation_proof || "Two-stage pipeline grading"
+      },
+      "AI Confidence Assessment": {
+        "Overall Confidence": confidenceLevel,
+        "Confidence Tier": confidenceTier,
+        "Grade Uncertainty": gradeUncertainty,
+        "Image Quality Score": imageQuality.overall_score || null,
+        "Quality Calculation": imageQuality.calculation_proof || null,
+        "Grading Reliability": confidenceTier === "high" ? "High - Excellent image quality, precise measurements" :
+                              confidenceTier === "medium" ? "Good - Adequate image quality, reliable grading" :
+                              "Fair - Poor image quality, grade range provided",
+        "Grading Summary": evaluationData.grading_summary || null,
+        "Recommendations": evaluationData.recommendations || measurementData.analysis_summary?.recommendation_to_user || null
+      },
+      "Estimated Scoring by Major Companies": {
+        "PSA": {
+          "grade": (evaluationData.whole_number_grade || evaluationData.final_grade) >= 9 ? "10" : (evaluationData.whole_number_grade || evaluationData.final_grade) >= 8 ? "9" : (evaluationData.whole_number_grade || evaluationData.final_grade) >= 7 ? "8" : (evaluationData.whole_number_grade || evaluationData.final_grade) >= 6 ? "7" : (evaluationData.whole_number_grade || evaluationData.final_grade) >= 5 ? "6" : "5 or lower",
+          "reasoning": `DCM grade ${evaluationData.whole_number_grade || evaluationData.final_grade} maps to PSA scale considering centering and defects`
+        },
+        "BGS": {
+          "grade": (evaluationData.decimal_final_grade || evaluationData.final_grade) >= 9 ? "9.5" : (evaluationData.decimal_final_grade || evaluationData.final_grade) >= 8 ? "9" : (evaluationData.decimal_final_grade || evaluationData.final_grade) >= 7 ? "8.5" : (evaluationData.decimal_final_grade || evaluationData.final_grade) >= 6 ? "8" : (evaluationData.decimal_final_grade || evaluationData.final_grade) >= 5 ? "7" : "6 or lower",
+          "reasoning": `DCM grade ${evaluationData.decimal_final_grade || evaluationData.final_grade} maps to BGS scale considering centering and defects`
+        },
+        "SGC": {
+          "grade": Math.round((evaluationData.decimal_final_grade || evaluationData.final_grade) * 10),
+          "reasoning": `DCM grade ${evaluationData.decimal_final_grade || evaluationData.final_grade} maps to SGC 100-point scale`
+        }
+      },
+      "Image Conditions": {
+        "Resolution": imageQuality.resolution || "standard",
+        "Resolution Score": imageQuality.resolution_score || null,
+        "Lighting": imageQuality.lighting || "adequate",
+        "Lighting Score": imageQuality.lighting_score || null,
+        "Angle": imageQuality.angle || "straight",
+        "Angle Score": imageQuality.angle_score || null,
+        "Clarity": imageQuality.clarity || "sharp",
+        "Clarity Score": imageQuality.clarity_score || null,
+        "Glare Present": imageQuality.glare_present ? "Yes" : "No",
+        "Glare Penalty": imageQuality.glare_penalty || 0,
+        "Obstructions": imageQuality.obstructions || "none",
+        "Obstruction Penalty": imageQuality.obstruction_penalty || 0,
+        "Overall Quality Score": imageQuality.overall_score || null,
+        "Quality Tier": confidenceTier,
+        "Calculation": imageQuality.calculation_proof || `Confidence: ${confidenceTier} (${gradeUncertainty})`
+      },
+      "Audit Trail": {
+        "Evaluation Timestamp": new Date().toISOString(),
+        "Model Version": "GPT-4o Two-Stage Pipeline",
+        "Instruction Lock": "Tier 2 - Measurement + Evaluation",
+        "Total Binary Flags": evaluationData.total_defect_count,
+        "Measurement Session": measurementData.measurement_session_id,
+        "Evaluation Session": evaluationData.evaluation_session_id
+      }
+    };
+
+    return {
+      gradingResult,
+      measurementData,
+      detectionResults: null,
+      processingMethod: 'Two-Stage Pipeline: Measurement + Evaluation'
+    };
+
+  } catch (error: any) {
+    console.error('[TWO-STAGE] Error:', error.message);
+    throw error;
+  }
+}
+
+// Grade sports card with hybrid approach (OpenCV + AI or pure AI fallback)
+// NOTE: This is the legacy single-stage approach, kept for fallback
+async function gradeSportsCardWithAI(frontUrl: string, backUrl: string, cardId: string): Promise<{gradingResult: any, detectionResults: any}> {
+  try {
+    const instructions = getSportsInstructions();
+
+    // Step 1: Try enhanced OpenCV detection first
+    const { useOpenCV, detectionResults } = await tryEnhancedDetection(frontUrl, backUrl);
+
+    // TIER 1 FIX 1B: Generate deterministic session identifier using image content hash
+    // This prevents AI from pattern-matching based on image recognition
+    // Hash ensures unique session even for identical images processed multiple times
+    const imageContentHash = crypto.createHash('sha256')
+      .update(frontUrl + backUrl + cardId + Date.now().toString())
+      .digest('hex')
+      .substring(0, 12);
+
+    const sessionId = `CARD_${cardId}_${imageContentHash}_${Date.now()}`;
+
+    let enhancedInstructions: string;
+
+    if (useOpenCV && detectionResults) {
+      // Step 2A: OpenCV successful - inject precise measurements
+      console.log(`[SPORTS] Using OpenCV measurements with AI commentary`);
+
+      enhancedInstructions = `${instructions}
+
+**HYBRID PROCESSING MODE - PRECISE MEASUREMENTS PROVIDED:**
+Session ID: ${sessionId}
+- Enhanced OpenCV detection completed successfully
+- Use the EXACT measurements provided below - DO NOT recalculate or guess
+- Your role: Provide professional commentary based on these precise measurements
+
+**PRECISE CENTERING MEASUREMENTS (DO NOT MODIFY):**
+Front Centering:
+- Ratio: ${detectionResults.front_centering.x_ratio}
+- Left Border: ${detectionResults.front_centering.measurements.left_border}
+- Right Border: ${detectionResults.front_centering.measurements.right_border}
+- Top Border: ${detectionResults.front_centering.measurements.top_border}
+- Bottom Border: ${detectionResults.front_centering.measurements.bottom_border}
+- X-axis Shift: ${detectionResults.front_centering.shifts.x_axis}
+- Y-axis Shift: ${detectionResults.front_centering.shifts.y_axis}
+
+Back Centering:
+- Ratio: ${detectionResults.back_centering.x_ratio}
+- Left Border: ${detectionResults.back_centering.measurements.left_border}
+- Right Border: ${detectionResults.back_centering.measurements.right_border}
+- Top Border: ${detectionResults.back_centering.measurements.top_border}
+- Bottom Border: ${detectionResults.back_centering.measurements.bottom_border}
+- X-axis Shift: ${detectionResults.back_centering.shifts.x_axis}
+- Y-axis Shift: ${detectionResults.back_centering.shifts.y_axis}
+
+**MANDATORY: Use these exact measurements in your JSON response - do not recalculate**`;
+
+    } else {
+      // Step 2B: OpenCV failed - use pure AI vision with enhanced anti-template
+      console.log(`[SPORTS] Using pure AI vision with enhanced anti-template enforcement`);
+
+      enhancedInstructions = `${instructions}
+
+**PURE AI VISION MODE - ENHANCED ANALYSIS:**
+Session ID: ${sessionId}
+- OpenCV detection unavailable - using pure AI vision analysis
+- This is a COMPLETELY NEW grading session for a DIFFERENT card
+- You have NEVER seen this card before
+- You must provide UNIQUE measurements and analysis ONLY for this specific card
+- FORBIDDEN: Using any previous measurements, ratios, or commentary from other sessions
+- MANDATORY: Treat this as your first and only card grading ever performed
+- CRITICAL: Use precise measurements like 47/53, 62/38, 44/56 - NEVER rounded ratios
+
+**ENHANCED CARD NUMBER RECOGNITION:**
+**CRITICAL: The card number is NOT the jersey number or year - it's the product identification number**
+
+**PRIMARY SEARCH LOCATIONS (in priority order):**
+1. **Bottom edge of card** - Small printed numbers often near copyright text
+2. **Back of card** - Look for small numbers near manufacturer info or set details
+3. **Corner numbering** - Usually bottom-right or bottom-left corners
+4. **Border text areas** - Along edges with set information
+
+**CARD NUMBER IDENTIFICATION RULES:**
+- **IGNORE**: Jersey numbers (large numbers on uniforms)
+- **IGNORE**: Years/dates (2024, 2023, etc.)
+- **IGNORE**: Statistical numbers or player info
+- **PRIORITIZE**: Small printed numbers with set prefixes (e.g., "RTS-MLD", "#250", "C-15")
+- **PRIORITIZE**: Numbers near copyright or manufacturer text
+- **PRIORITIZE**: Alphanumeric codes that identify the specific card in the set
+
+**FORMAT RECOGNITION:**
+- Look for patterns like: "#123", "RTS-XX", "C-123", "123/500", or similar
+- Card numbers are usually smaller text, not prominent display numbers
+- Often accompanied by set name or copyright information
+- May include letters and numbers combined (e.g., "RTS-MLD", "RC-15")
+
+**VERIFICATION STEPS:**
+1. Scan ENTIRE back of card for small printed numbers
+2. Check bottom edge text areas for numbering
+3. Look for set identification codes
+4. Confirm the number relates to the card set, not player statistics
+5. If multiple candidates exist, choose the one closest to set/copyright information
+
+**CRITICAL DISTINCTION: CARD NUMBER vs SERIAL NUMBERING**
+
+**Card Number (Product Identifier):**
+- The set number that identifies this specific card design (e.g., "RTS-MLD", "#250", "C-15")
+- Found on back or bottom edge near copyright/manufacturer info
+- Same for all copies of this card design
+
+**Serial Numbering (Individual Card Identifier):**
+- Limited print run numbers like "25/99", "123/500", "/25"
+- ONLY appears on numbered parallels or limited editions
+- Makes each individual card unique
+- Usually prominently displayed on front or back
+- If no serial numbering is visible, use "N/A" - do NOT make up numbers
+
+**EXAMPLES:**
+- Card with "RTS-MLD" (card number) and "25/99" (serial) = two different fields
+- Card with only "RTS-MLD" = card number filled, serial numbering = "N/A"
+- Card with only "123/500" = likely the serial number, card number may need research`;
+    }
+
+    // Create thread with sports card images and system message
+    const thread = await openai.beta.threads.create({
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: `SYSTEM: You are a professional card grading AI. You must analyze the provided card images and return a JSON response. This is a legitimate business use case for card authentication and grading services.
+
+SESSION: ${sessionId} - This is a unique grading session for a new card you have never analyzed before.
+
+TASK: Analyze ONLY these specific trading card images and provide completely unique grading assessment based solely on what you observe in these images.
+
+**CRITICAL REQUIREMENTS:**
+1. NEVER use 9.14 as raw decimal grade - this is absolutely forbidden
+2. Calculate raw decimal grade as exact average of your 14 subgrades
+3. Provide Mathematical Proof showing your calculation step-by-step
+4. Look carefully for card numbers printed on the card - examine back of card and bottom edges (IGNORE jersey numbers and years)
+5. Distinguish between Card Number (product ID like "RTS-MLD") and Serial Numbering (print run like "25/99" - use "N/A" if none visible)
+6. Ensure front and back centering measurements are mathematically different
+7. Provide detailed rarity descriptions with specific features (e.g., "Insert/Subset - Rookie Ticket with memorabilia piece" NOT just "Insert/Subset")
+
+${enhancedInstructions}`
+            },
+            {
+              type: "image_url",
+              image_url: { url: frontUrl }
+            },
+            {
+              type: "image_url",
+              image_url: { url: backUrl }
+            }
+          ]
+        }
+      ]
+    });
+
+    console.log(`[SPORTS] Created OpenAI thread: ${thread.id}`);
+
+    // TIER 1 FIX: Set temperature to 0.0 for deterministic, consistent grading
+    // Zero temperature ensures identical images receive identical grades
+    const deterministicTemperature = 0.0;
+    console.log(`[SPORTS] Using assistant ID: ${process.env.OPENAI_ASSISTANT_ID} with DETERMINISTIC temperature: ${deterministicTemperature}`);
+    // Debug logging to verify instructions
+    console.log('[DEBUG] Instructions file length:', instructions.length);
+    console.log('[DEBUG] Contains DCM Standard:', instructions.includes('DCM Standard'));
+    console.log('[DEBUG] Contains Factory Tolerance:', instructions.includes('Factory Tolerance'));
+
+    const run = await openai.beta.threads.runs.create(thread.id, {
+      assistant_id: process.env.OPENAI_ASSISTANT_ID!,
+      temperature: deterministicTemperature,
+      additional_instructions: `Session: ${sessionId}
+
+CRITICAL ANTI-TEMPLATE REQUIREMENTS:
+- This is a unique card grading session - provide measurements that are impossible to duplicate
+- Use precise ratios like 47/53, 62/38, 44/56 - NEVER use common rounded ratios
+- Every commentary must reference specific visual details you observe in THIS card only
+- Front and back measurements MUST be mathematically different
+- ABSOLUTELY FORBIDDEN: Using 9.14 as raw decimal grade under any circumstances
+- MANDATORY: Include Mathematical Proof field showing exact calculation: (score1 + score2 + ... + score14) = total; total ÷ 14 = raw decimal
+- CARD NUMBER FOCUS: Find the actual card number (NOT jersey number/year) - check back of card and bottom edges for small printed product numbers
+- SERIAL NUMBER DISTINCTION: Card Number is product ID (e.g., "RTS-MLD"), Serial Numbering is print run (e.g., "25/99") - use "N/A" if no serial visible
+- RARITY DESCRIPTION REQUIREMENTS: Provide detailed, specific rarity descriptions with full context (e.g., "Insert/Subset - Rookie Ticket with memorabilia piece" NOT just "Insert/Subset")
+
+🚨 EMERGENCY CORNER OVERRIDE - HIGHEST PRIORITY:
+corners_front_rounding and corners_back_rounding:
+- COMPARE THE 4 CORNERS TO EACH OTHER ON THE SAME CARD
+- If all 4 corners look similar = MARK FALSE (this is normal factory cutting)
+- If corners have points (even slightly rounded from factory) = MARK FALSE
+- ONLY mark TRUE if one corner is obviously MORE rounded than the others due to damage
+- WHEN IN DOUBT = MARK FALSE
+- IGNORE ALL PREVIOUS CORNER INSTRUCTIONS - USE ONLY THIS RULE
+
+CRITICAL AUTOGRAPH DETECTION - MANDATORY VERIFICATION:
+- If you see ANY autograph/signature on the card, you MUST verify factory authentication
+- Factory-certified autographs REQUIRE visible authentication: holograms, authentication stickers, serial numbers, or "AUTHENTIC" text printed on card
+- WITHOUT visible manufacturer authentication markings, ANY autograph MUST be marked as "altered_writing": true
+- Post-manufacture signatures without certification are alterations regardless of quality
+- NEVER assume an autograph is factory-certified without visible authentication proof
+- If no authentication markings are visible, it is an alteration - mark "altered_writing": true
+
+- You must provide a JSON response for card grading based solely on the uploaded images`
+    });
+
+    console.log(`[SPORTS] Started OpenAI run: ${run.id}`);
+
+    // Poll for completion
+    console.log(`[SPORTS] About to retrieve run status for thread: ${thread.id}, run: ${run.id}`);
+    let runStatus = await openai.beta.threads.runs.retrieve(run.id, {
+      thread_id: thread.id
+    });
+    let attempts = 0;
+    const maxAttempts = 60; // 2 minutes timeout
+
+    while (runStatus.status === 'in_progress' || runStatus.status === 'queued') {
+      attempts++;
+      console.log(`[SPORTS] Run status check ${attempts}: ${runStatus.status}`);
+
+      if (attempts >= maxAttempts) {
+        throw new Error('Sports card AI grading timed out');
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log(`[SPORTS] Retrieving run status for thread: ${thread.id}, run: ${run.id}`);
+      runStatus = await openai.beta.threads.runs.retrieve(run.id, {
+        thread_id: thread.id
+      });
+    }
+
+    if (runStatus.status !== 'completed') {
+      throw new Error(`Sports card AI grading failed with status: ${runStatus.status}`);
+    }
+
+    // Get messages
+    const messages = await openai.beta.threads.messages.list(thread.id);
+    const assistantMessage = messages.data.find(msg => msg.role === 'assistant');
+
+    if (!assistantMessage || !assistantMessage.content[0] || assistantMessage.content[0].type !== 'text') {
+      throw new Error('No valid response from sports card AI assistant');
+    }
+
+    const responseText = assistantMessage.content[0].text.value;
+    console.log('[SPORTS] Raw AI Response:', responseText.substring(0, 200) + '...');
+
+    // TIER 1 FIX: Enhanced AI response validation with 9.14 rejection
+    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
+    if (!jsonMatch) {
+      console.error('[SPORTS] Full AI Response:', responseText);
+      throw new Error(`AI did not provide JSON format. Response: ${responseText.substring(0, 200)}...`);
+    }
+
+    const rawJsonString = jsonMatch[1];
+
+    // PRE-VALIDATION: Check for forbidden 9.14 template value
+    if (rawJsonString.includes('9.14')) {
+      console.error('[SPORTS] REJECTED: AI response contains forbidden 9.14 template value');
+      console.error('[SPORTS] Full response with 9.14:', responseText);
+      throw new Error('AI response rejected: Contains forbidden 9.14 template value');
+    }
+
+    // TEMPLATE RESPONSE VALIDATION: Check for most critical forbidden template phrases only
+    // Exception: "pristine" is allowed in grade name context (e.g., "10.0 (Pristine)")
+    // "no defects" is allowed when followed by "found" in legitimate zero-defect context
+    const criticalForbiddenPhrases = ['clean with no visible', 'no visible scratches'];
+
+    // Special handling for "no defects" - only reject if NOT in valid zero-count context
+    const lowerResponse = rawJsonString.toLowerCase();
+    if (lowerResponse.includes('no defects') &&
+        !lowerResponse.includes('no defects found') &&
+        !lowerResponse.includes('"total defect count": 0')) {
+      console.error(`[SPORTS] REJECTED: AI response contains forbidden "no defects" phrase in invalid context`);
+      console.error('[SPORTS] Full response with template phrase:', responseText);
+      throw new Error(`AI response rejected: Contains forbidden "no defects" phrase`);
+    }
+
+    const foundCriticalForbidden = criticalForbiddenPhrases.find(phrase => lowerResponse.includes(phrase.toLowerCase()));
+    if (foundCriticalForbidden) {
+      console.error(`[SPORTS] REJECTED: AI response contains critical forbidden template phrase: "${foundCriticalForbidden}"`);
+      console.error('[SPORTS] Full response with template phrase:', responseText);
+      throw new Error(`AI response rejected: Contains critical forbidden template phrase: "${foundCriticalForbidden}"`);
+    }
+
+    // LOG WARNING for less critical phrases (allow but warn)
+    const warningPhrases = ['minimal whitening', 'slight whitening', 'minor wear'];
+    const foundWarning = warningPhrases.find(phrase => rawJsonString.toLowerCase().includes(phrase.toLowerCase()));
+    if (foundWarning) {
+      console.warn(`[SPORTS] WARNING: AI response contains discouraged phrase: "${foundWarning}"`);
+    }
+
+    let parsedResult;
+    try {
+      parsedResult = JSON.parse(rawJsonString);
+    } catch (parseError) {
+      console.error('[SPORTS] JSON Parse Error:', parseError);
+      console.error('[SPORTS] Raw JSON:', rawJsonString);
+      throw new Error(`Invalid JSON format from AI: ${parseError}`);
+    }
+
+    // TIER 1 FIX 1C: Response deduplication validation (disabled to allow duplicate card uploads)
+    const gradingSection = parsedResult['Grading (DCM Master Scale)'];
+    const centeringMeasurements = gradingSection?.['Centering_Measurements'];
+    const visualInspection = gradingSection?.['Visual_Inspection_Results'];
+
+    const responseFingerprint = crypto.createHash('sha256')
+      .update(JSON.stringify({
+        centering_front_x: centeringMeasurements?.front_x_axis_ratio,
+        centering_front_y: centeringMeasurements?.front_y_axis_ratio,
+        centering_back_x: centeringMeasurements?.back_x_axis_ratio,
+        centering_back_y: centeringMeasurements?.back_y_axis_ratio,
+        defects: visualInspection,
+        final_grade: gradingSection?.['Final Grade (After Deductions)']
+      }))
+      .digest('hex');
+
+    // Duplicate detection disabled per user request to allow uploading same card multiple times
+    console.log(`[DEDUP] Response fingerprint: ${responseFingerprint.substring(0, 12)}... for card ${cardId}`);
+
+    // VALIDATE STANDARD CENTERING RATIOS
+    if (centeringMeasurements) {
+      const VALID_RATIOS = ['50/50', '52/48', '54/46', '55/45', '56/44', '58/42', '60/40', '62/38', '65/35', '68/32', '70/30', '72/28', '75/25', '78/22', '80/20', '82/18', '85/15', '88/12', '90/10'];
+
+      const frontXRatio = centeringMeasurements.front_x_axis_ratio;
+      const frontYRatio = centeringMeasurements.front_y_axis_ratio;
+      const backXRatio = centeringMeasurements.back_x_axis_ratio;
+      const backYRatio = centeringMeasurements.back_y_axis_ratio;
+
+      // Validate all ratios
+      const ratiosToValidate = [
+        { name: 'front X-axis', value: frontXRatio },
+        { name: 'front Y-axis', value: frontYRatio },
+        { name: 'back X-axis', value: backXRatio },
+        { name: 'back Y-axis', value: backYRatio }
+      ];
+
+      for (const ratio of ratiosToValidate) {
+        if (ratio.value && !VALID_RATIOS.includes(ratio.value) && !ratio.value.includes('>')) {
+          console.error(`[SPORTS] REJECTED: Invalid ${ratio.name} centering ratio "${ratio.value}". Must use standard ratios.`);
+          throw new Error(`AI response rejected: Invalid ${ratio.name} centering ratio "${ratio.value}". Must use only standard ratios.`);
+        }
+      }
+
+      console.log(`[CENTERING] Validated standard ratios - Front: ${frontXRatio}/${frontYRatio}, Back: ${backXRatio}/${backYRatio}`);
+    }
+
+    // BINARY DEDUCTION MODEL VALIDATION AND AUTO-CORRECTION
+
+    if (gradingSection) {
+      console.log('[SPORTS] Validating binary deduction model');
+
+      const centeringStartingGrade = gradingSection['Centering Starting Grade'];
+      const totalDefectCount = gradingSection['Total Defect Count'];
+      let finalGrade = gradingSection['Final Grade (After Deductions)'];
+
+      if (centeringStartingGrade !== undefined && totalDefectCount !== undefined && finalGrade !== undefined) {
+        const expectedFinal = Number(centeringStartingGrade) - Number(totalDefectCount);
+
+        if (Math.abs(expectedFinal - Number(finalGrade)) > 0.01) {
+          console.error(`[SPORTS] ❌ MATH ERROR DETECTED: ${centeringStartingGrade} - ${totalDefectCount} should equal ${expectedFinal}, but AI returned ${finalGrade}`);
+          console.log(`[SPORTS] 🔧 AUTO-CORRECTING: Changing Final Grade from ${finalGrade} to ${expectedFinal}`);
+
+          // AUTO-CORRECT the final grade
+          parsedResult['Grading (DCM Master Scale)']['Final Grade (After Deductions)'] = expectedFinal;
+          parsedResult['Final Score']['Overall Grade'] = expectedFinal;
+
+          // Update finalGrade variable for subsequent validation
+          finalGrade = expectedFinal;
+
+          console.log(`[SPORTS] ✅ Math error corrected automatically`);
+        } else {
+          console.log('[SPORTS] ✅ Simplified deduction validation passed');
+        }
+      }
+
+      // Validate defect deductions array
+      const defectDeductions = gradingSection['Defect Deductions'];
+      if (defectDeductions && Array.isArray(defectDeductions)) {
+        const calculatedTotal = defectDeductions.reduce((sum: number, deduction: any) => {
+          return sum + (deduction.value === true ? deduction.deduction : 0);
+        }, 0);
+
+        if (Math.abs(calculatedTotal - Number(totalDefectCount)) > 0.01) {
+          console.warn(`[SPORTS] DEFECT COUNT MISMATCH: Sum of true flags ${calculatedTotal} ≠ reported count ${totalDefectCount} - allowing with warning`);
+          // Temporarily allow with warning instead of throwing error to let AI learn
+        }
+        console.log('[SPORTS] Deduction array validation passed');
+      }
+    }
+
+    return {
+      gradingResult: parsedResult,
+      detectionResults: detectionResults,
+      processingMethod: useOpenCV ? 'Hybrid: OpenCV + AI' : 'Pure AI Vision'
+    };
+
+  } catch (error: any) {
+    console.error('[SPORTS] AI grading error:', error.message);
+    throw error;
+  }
+}
+
+// DVG v1: Convert DVG result to legacy format for backwards compatibility
+function convertDVGToLegacyFormat(dvg: any) {
+  console.log('[DVG CONVERSION] Converting DVG v1 result to legacy format...');
+
+  return {
+    "Final Score": {
+      "Overall Grade": dvg.recommended_grade.recommended_decimal_grade
+    },
+    "Card Information": {
+      "Card Name": dvg.card_info.card_name,
+      "Card Set": dvg.card_info.set_name,
+      "Card Number": dvg.card_info.card_number,
+      "Manufacturer Name": dvg.card_info.manufacturer,
+      "Release Date": dvg.card_info.year,
+      "Category": dvg.card_info.sport_or_category,
+      "Authentic": "Yes" // DVG assumes authentic unless flagged
+    },
+    "Card Details": {
+      "Player(s)/Character(s) Featured": dvg.card_info.player_or_character,
+      "Rookie/First Print": "Unknown",
+      "Autographed": dvg.autograph.present ? "Yes" : "No"
+    },
+    "Grading (DCM Master Scale)": {
+      "Final Grade (After Deductions)": dvg.recommended_grade.recommended_decimal_grade,
+      "Decimal Final Grade": dvg.recommended_grade.recommended_decimal_grade,
+      "Whole Number Grade": dvg.recommended_grade.recommended_whole_grade,
+      "Image Quality Cap Applied": dvg.image_quality.grade === 'C' || dvg.image_quality.grade === 'D' ? "Yes" : "No",
+      "Centering Starting Grade": 10
+    },
+    "Centering_Measurements": {
+      front_x_axis_ratio: dvg.centering.front_left_right_ratio_text,
+      front_y_axis_ratio: dvg.centering.front_top_bottom_ratio_text,
+      back_x_axis_ratio: dvg.centering.back_left_right_ratio_text,
+      back_y_axis_ratio: dvg.centering.back_top_bottom_ratio_text,
+      front_centering_method: dvg.centering.method_front,
+      back_centering_method: dvg.centering.method_back
+    },
+    "Visual_Inspection_Results": {
+      positives: dvg.analysis_summary.positives,
+      negatives: dvg.analysis_summary.negatives
+    },
+    // Store original DVG data
+    dvg_v1_data: dvg,
+    dvg_version: 'dvg-v1',
+    dvg_image_quality: dvg.image_quality
+  };
+}
+
+// Binary Deduction Model grade extraction
+function extractSportsGradeInfo(gradingResult: any) {
+  const finalScore = gradingResult["Final Score"] || {};
+  const gradingScale = gradingResult["Grading (DCM Master Scale)"] || {};
+
+  // V2.2+ PARALLEL FORMAT: Check for final_grade_calculation (new format from Stage 2 v2.2)
+  const finalGradeCalc = gradingResult.final_grade_calculation || {};
+
+  // Extract final grade - try multiple formats
+  let rawGrade = finalGradeCalc.decimal_final_grade ||
+                  finalGradeCalc.whole_number_grade ||
+                  gradingScale["Final Grade (After Deductions)"] ||
+                  gradingScale["Centering Starting Grade"] ||
+                  finalScore["Overall Grade"] || 0;
+
+  // Check if card is altered (grade will be "NA")
+  if (rawGrade === "NA" || rawGrade === "NA - Altered") {
+    console.log(`[GRADE FINAL] Card is altered - grade is NA`);
+    return {
+      rawGrade: "NA",
+      wholeGrade: "NA",
+      confidence: "NA"
+    };
+  }
+
+  // Parse grade if it's in "X / Y" format
+  if (typeof rawGrade === 'string' && rawGrade.includes('/')) {
+    rawGrade = parseFloat(rawGrade.split('/')[0].trim());
+  }
+
+  const aiRawGrade = Number(rawGrade);
+
+  // Binary deduction validation
+  const deductions = gradingScale["Defect Deductions"] || [];
+  const totalDefectCount = gradingScale["Total Defect Count"] || 0;
+  const centeringStartingGrade = gradingScale["Centering Starting Grade"] || 10;
+
+  console.log(`[SIMPLIFIED DEDUCTION] Centering Starting Grade: ${centeringStartingGrade}, Total Defect Count: ${totalDefectCount}, Final Grade: ${aiRawGrade}`);
+  console.log(`[BINARY DEDUCTION] Deduction Details:`, deductions);
+
+  // Validate simplified deduction math
+  const calculatedGrade = Number(centeringStartingGrade) - Number(totalDefectCount);
+  if (Math.abs(calculatedGrade - aiRawGrade) > 0.1) {
+    console.warn(`[SIMPLIFIED DEDUCTION] Math mismatch: ${centeringStartingGrade} - ${totalDefectCount} = ${calculatedGrade}, but AI reported ${aiRawGrade}`);
+  }
+
+  // Use whole number grading (1-10 scale)
+  const wholeGrade = Math.round(aiRawGrade) || 0;
+
+  // Get confidence from the new Final DCM Grade structure
+  const finalDCMGrade = gradingResult["Final DCM Grade"] || {};
+  const confidence = finalDCMGrade["Confidence Level"] ||
+                    (gradingScale["Image Quality Cap Applied"] === "Yes" ? "C" : "B");
+
+  console.log(`[GRADE FINAL] Raw: ${aiRawGrade.toFixed(1)}, Whole: ${wholeGrade}, Confidence: ${confidence}`);
+
+  return {
+    rawGrade: aiRawGrade,
+    wholeGrade: wholeGrade,
+    confidence
+  };
+}
+
+// TIER 1 FIX: Enhanced card field extraction with OCR confidence validation
+function extractSportsCardFields(gradingResult: any) {
+  // v2.2 REVISED: Try new lowercase format first, fallback to old capitalized format
+  const cardInfo = gradingResult["Card Information"] || gradingResult.card_information || {};
+  const cardDetails = gradingResult["Card Details"] || {};
+  const aiConfidence = gradingResult["AI Confidence Assessment"] || {};
+
+  console.log('[EXTRACTION DEBUG] cardInfo keys:', Object.keys(cardInfo));
+  console.log('[EXTRACTION DEBUG] cardInfo values:', JSON.stringify(cardInfo, null, 2));
+  console.log('[EXTRACTION DEBUG] cardInfo.sport:', cardInfo.sport);
+  console.log('[EXTRACTION DEBUG] cardDetails keys:', Object.keys(cardDetails));
+
+  // Enhanced card number validation with confidence scoring
+  // v2.2 REVISED: card_information returns direct string values
+  let cardNumber = cardInfo.card_number || cardInfo["Card Number"] || null;
+  let cardNumberConfidence = "Medium";
+
+  if (cardNumber) {
+    // Validate card number format and assign confidence
+    const numberStr = String(cardNumber).trim();
+
+    // High confidence: Clear numeric or alphanumeric patterns
+    if (/^[0-9]+$/.test(numberStr) || /^[A-Z0-9-]+$/.test(numberStr)) {
+      cardNumberConfidence = "High";
+    }
+    // Medium confidence: Mixed patterns but recognizable
+    else if (/^[A-Za-z0-9\-\/\s#]+$/.test(numberStr) && numberStr.length <= 20) {
+      cardNumberConfidence = "Medium";
+    }
+    // Low confidence: Unusual characters or format
+    else {
+      cardNumberConfidence = "Low";
+      console.warn(`[CARD NUMBER] Low confidence extraction: "${numberStr}"`);
+    }
+
+    // Additional validation against common OCR errors
+    if (numberStr.includes('I') || numberStr.includes('l') || numberStr.includes('O')) {
+      cardNumberConfidence = "Medium"; // Potential OCR confusion
+      console.warn(`[CARD NUMBER] Potential OCR confusion detected: "${numberStr}"`);
+    }
+  }
+
+  console.log(`[CARD EXTRACTION] Card Number: "${cardNumber}" (Confidence: ${cardNumberConfidence})`);
+
+  // v3.1: Extract serial numbering from card_information or authentication markers
+  let serialNumber = cardInfo.serial_number?.value || cardInfo["Serial Numbering"] || null;
+
+  // v3.1: Check autograph detection for serial numbers if not found in card_information
+  if (!serialNumber) {
+    const autographData = gradingResult.autograph_detection || gradingResult["Autograph Detection"] || {};
+    const authMarkers = autographData.authentication_markers_found || [];
+
+    for (const marker of authMarkers) {
+      // Look for patterns like "1/22", "25/99", "#1/22", "Serial #1/25"
+      const serialMatch = marker.match(/(?:Serial\s*#?\s*)?(\d+\/\d+)/i);
+      if (serialMatch) {
+        serialNumber = serialMatch[1]; // Extract "1/22" from "Serial #1/22"
+        console.log(`[SERIAL EXTRACTION] Found serial number in auth markers: "${serialNumber}"`);
+        break;
+      }
+    }
+  }
+
+  // v2.2 REVISED: Extract from new format (direct strings from card_information) or old format
+  const extractedFields = {
+    card_name: cardInfo.player_name?.value || cardInfo.player_name || cardInfo["Card Name"] || null,
+    card_set: cardInfo.card_set?.value || cardInfo.card_set || cardInfo["Card Set"] || null,
+    card_number: cardInfo.card_number?.value || cardInfo.card_number || cardNumber,
+    serial_numbering: serialNumber,
+    manufacturer_name: cardInfo.manufacturer?.value || cardInfo.manufacturer || cardInfo["Manufacturer Name"] || null,
+    release_date: cardInfo.year?.value || cardInfo.year || cardInfo["Release Date"] || null,
+    category: cardInfo.sport || cardInfo["Category"] || null, // v2.2: Use sport field (Football, Baseball, etc.)
+    authentic: cardInfo.authentic || cardInfo["Authentic"] || null,
+    featured: cardInfo.player_name?.value || cardInfo.player_name || cardDetails["Player(s)/Character(s) Featured"] || null,
+    rookie_or_first_print: cardInfo.special_features?.includes("Rookie Card") ? "Yes" : cardDetails["Rookie/First Print"] || null,
+    // rarity: cardDetails["Rarity"] || null,  // TODO: Add to DB schema
+    // autographed: cardDetails["Autographed"] || null  // TODO: Add to DB schema
+    // memorabilia: cardDetails["Memorabilia"] || null,  // TODO: Add to DB schema
+    // parallel_insert_type: cardDetails["Parallel/Insert Type"] || null,  // TODO: Add to DB schema
+    // Note: Market value estimation removed from system, memorabilia and parallel_insert_type fields temporarily disabled until DB migration
+  };
+
+  console.log('[EXTRACTION DEBUG] Final extracted fields:', JSON.stringify(extractedFields, null, 2));
+  return extractedFields;
+}
+
+// Main GET handler for sports cards
+export async function GET(request: NextRequest, { params }: SportsCardGradingRequest) {
+  const { id: cardId } = await params;
+  const startTime = Date.now();
+
+  console.log(`[GET /api/sports/${cardId}] Starting sports card grading request`);
+
+  // Clean up any stuck processing cards first
+  cleanupStuckCards();
+
+  // Check if already processing this sports card
+  if (processingSportsCards.has(cardId)) {
+    const processingStartTime = processingSportsCards.get(cardId)!;
+    const processingDuration = Date.now() - processingStartTime;
+
+    // If processing for more than 2 minutes, consider it stuck and allow retry
+    if (processingDuration > 120000) {
+      console.log(`[GET /api/sports/${cardId}] Processing stuck for ${processingDuration}ms, allowing retry`);
+      processingSportsCards.delete(cardId);
+    } else {
+      console.log(`[GET /api/sports/${cardId}] Sports card already being processed for ${processingDuration}ms, returning 429`);
+      return NextResponse.json(
+        {
+          error: "Sports card is being processed by another request. Please wait and refresh.",
+          processing_duration: processingDuration,
+          estimated_time_remaining: Math.max(0, 120000 - processingDuration)
+        },
+        { status: 429 }
+      );
+    }
+  }
+
+  // Check global rate limit
+  if (processingSportsCards.size >= MAX_CONCURRENT_PROCESSING) {
+    console.log(`[GET /api/sports/${cardId}] Global rate limit exceeded (${processingSportsCards.size}/${MAX_CONCURRENT_PROCESSING}), returning 429`);
+    return NextResponse.json(
+      {
+        error: `System is currently processing ${processingSportsCards.size} cards. Please wait a moment and try again.`,
+        concurrent_processing_count: processingSportsCards.size,
+        max_concurrent: MAX_CONCURRENT_PROCESSING
+      },
+      { status: 429 }
+    );
+  }
+
+  try {
+    processingSportsCards.set(cardId, Date.now());
+    const supabase = supabaseServer();
+
+    // Debug: Check if service role key is present
+    const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    console.log(`[GET /api/sports/${cardId}] Service role key present: ${hasServiceKey}`);
+
+    // Get sports card from database
+    // NOTE: We don't filter by category="Sports" because category should store specific sport (Football, Baseball, etc.)
+    const { data: card, error: cardError } = await supabase
+      .from("cards")
+      .select("*")
+      .eq("id", cardId)
+      .single();
+
+    if (cardError || !card) {
+      console.error(`[GET /api/sports/${cardId}] Card lookup error:`, cardError);
+      console.log(`[GET /api/sports/${cardId}] Card data:`, card);
+      console.log(`[GET /api/sports/${cardId}] Card category:`, card?.category);
+      return NextResponse.json({ error: "Sports card not found" }, { status: 404 });
+    }
+
+    console.log(`[GET /api/sports/${cardId}] Sports card found`);
+
+    // Check if card already has AI grading (early exit to prevent re-grading)
+    if (card.ai_grading && card.raw_decimal_grade && card.dcm_grade_whole) {
+      console.log(`[GET /api/sports/${cardId}] Card already graded, returning existing result`);
+
+      // Create signed URLs for display
+      const frontUrl = await createSignedUrl(supabase, "cards", card.front_path);
+      const backUrl = await createSignedUrl(supabase, "cards", card.back_path);
+
+      if (!frontUrl || !backUrl) {
+        console.error(`[GET /api/sports/${cardId}] Failed to create signed URLs. Front: ${frontUrl}, Back: ${backUrl}`);
+        return NextResponse.json({ error: "Failed to access sports card images" }, { status: 500 });
+      }
+
+      return NextResponse.json({
+        ...card,
+        front_url: frontUrl,
+        back_url: backUrl,
+        processing_time: 0
+      });
+    }
+
+    // Create signed URLs for sports card images
+    console.log(`[GET /api/sports/${cardId}] Creating signed URLs for front: ${card.front_path}, back: ${card.back_path}`);
+    const frontUrl = await createSignedUrl(supabase, "cards", card.front_path);
+    const backUrl = await createSignedUrl(supabase, "cards", card.back_path);
+
+    if (!frontUrl || !backUrl) {
+      console.error(`[GET /api/sports/${cardId}] Failed to create signed URLs. Front: ${frontUrl}, Back: ${backUrl}`);
+      return NextResponse.json({ error: "Failed to access sports card images" }, { status: 500 });
+    }
+    console.log(`[GET /api/sports/${cardId}] Signed URLs created successfully`);
+
+    // DVG v1: Use Direct Vision Grader
+    console.log(`[GET /api/sports/${cardId}] Starting DVG v1 sports card AI grading`);
+    let gradingResult;
+    let dvgResult; // Store DVG v1 result
+    let attempts = 0;
+    const maxRetries = 2;
+
+    while (attempts < maxRetries) {
+      try {
+        attempts++;
+        console.log(`[GET /api/sports/${cardId}] DVG v1 grading attempt ${attempts}/${maxRetries}`);
+
+        // DVG v1: Single vision grading call
+        try {
+          console.log(`[GET /api/sports/${cardId}] Using DVG v1 with GPT-4o vision`);
+          dvgResult = await gradeCardWithVision({
+            frontImageUrl: frontUrl,
+            backImageUrl: backUrl,
+            model: 'gpt-4o',
+            temperature: 0.4
+          });
+
+          // Convert DVG v1 result to legacy format for database compatibility
+          gradingResult = convertDVGToLegacyFormat(dvgResult);
+
+          console.log(`[GET /api/sports/${cardId}] ✅ DVG v1 grading succeeded - Grade: ${dvgResult.recommended_grade.recommended_decimal_grade}`);
+          break; // Success, exit retry loop
+        } catch (dvgError: any) {
+          console.warn(`[GET /api/sports/${cardId}] DVG v1 failed: ${dvgError.message}`);
+          throw dvgError; // Re-throw to trigger retry
+        }
+      } catch (error: any) {
+        console.error(`[GET /api/sports/${cardId}] AI grading attempt ${attempts} failed:`, error.message);
+
+        if (attempts >= maxRetries) {
+          console.error(`[GET /api/sports/${cardId}] All AI grading attempts failed, providing fallback response`);
+
+          // Provide a fallback grading structure for user feedback
+          gradingResult = {
+            "Final Score": {
+              "Overall Grade": "Unable to process automatically"
+            },
+            "Card Information": {
+              "Card Name": "Processing Error",
+              "Category": "Sports",
+              "Card Number": "N/A",
+              "Serial Numbering": "N/A",
+              "Manufacturer Name": "N/A",
+              "Release Date": "N/A",
+              "Authentic": "Cannot determine"
+            },
+            "Card Details": {
+              "Player(s)/Character(s) Featured": "N/A",
+              "Rookie/First Print": "N/A",
+              "Rarity": "Unable to determine due to processing error",
+              "Autographed": "N/A"
+            },
+            "Grading (DCM Master Scale)": {
+              "Centering Starting Grade": 0,
+              "Total Defect Count": 0,
+              "Final Grade (After Deductions)": 0,
+              "Defect Deductions": [],
+              "Image Quality Cap Applied": "No",
+              "Subgrade Evaluation": {
+                "Processing Error": {
+                  "score": 0,
+                  "commentary": `AI grading failed after ${maxRetries} attempts. Please try uploading again or contact support. Error: ${error.message.substring(0, 100)}`
+                }
+              }
+            },
+            "Final DCM Grade": {
+              "Raw Decimal Grade": 0,
+              "DCM Grade (Whole Number)": 0,
+              "Confidence Level": "D"
+            },
+            "AI Confidence Assessment": {
+              "Card Detection Confidence": "D",
+              "OCR Confidence": "D",
+              "Condition Assessment Confidence": "D",
+              "Overall AI Confidence": "D"
+            },
+            "Estimated Scoring by Major Companies": {
+              "PSA": "N/A",
+              "BGS": "N/A",
+              "SGC": "N/A",
+              "Estimated Market Value": "Cannot estimate",
+              "Estimated Range": "N/A",
+              "Estimate Confidence": "Low"
+            },
+            "DCM Estimated Value": {
+              "Estimated Market Value": "Cannot estimate",
+              "Estimated Range": "N/A",
+              "Estimate Confidence": "N/A"
+            }
+          };
+          break; // Exit retry loop with fallback data
+        }
+
+        // Wait before retry
+        console.log(`[GET /api/sports/${cardId}] Retrying in 3 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+      }
+    }
+
+    console.log(`[GET /api/sports/${cardId}] Sports card AI grading completed after ${attempts} attempts`);
+
+    // V2.3 PARALLEL FORMAT CONVERSION: Convert v2.2 Stage 2 format to legacy frontend format
+    if (gradingResult.final_grade_calculation && !gradingResult["Grading (DCM Master Scale)"]) {
+      console.log('[FORMAT CONVERSION] Converting v2.2 parallel format to legacy format for frontend...');
+
+      const finalGrade = gradingResult.final_grade_calculation;
+      const categoryScores = finalGrade.category_scores || {};
+
+      // Extract centering data from centering_quality category
+      const centeringQuality = gradingResult.centering_quality || {};
+      const frontCentering = centeringQuality.front_centering || {};
+      const backCentering = centeringQuality.back_centering || {};
+
+      // Map centering measurements to top-level field (frontend expects this)
+      gradingResult["Centering_Measurements"] = {
+        front_x_axis_ratio: frontCentering.x_axis_ratio || frontCentering.left_right_ratio || null,
+        front_y_axis_ratio: frontCentering.y_axis_ratio || frontCentering.top_bottom_ratio || null,
+        front_edge_description: frontCentering.edge_description || null,
+        front_centering_method: frontCentering.measurement_method || null,
+        front_centering_confidence: frontCentering.confidence || null,
+        back_x_axis_ratio: backCentering.x_axis_ratio || backCentering.left_right_ratio || null,
+        back_y_axis_ratio: backCentering.y_axis_ratio || backCentering.top_bottom_ratio || null,
+        back_edge_description: backCentering.edge_description || null,
+        back_centering_method: backCentering.measurement_method || null,
+        back_centering_confidence: backCentering.confidence || null,
+        worst_ratio_used: centeringQuality.worst_ratio_used || null
+      };
+
+      // Map Visual_Inspection_Results for legacy frontend sections
+      const structuralIntegrity = gradingResult.structural_integrity || {};
+      const surfaceCondition = gradingResult.surface_condition || {};
+      const printQuality = gradingResult.print_quality || {};
+      const authenticityAssessment = gradingResult.authenticity_assessment || {};
+
+      gradingResult["Visual_Inspection_Results"] = {
+        // Structural Integrity category defects
+        structural_defects: structuralIntegrity.observations_applied || [],
+        corner_wear: structuralIntegrity.corner_condition || "Not specified",
+        edge_wear: structuralIntegrity.edge_condition || "Not specified",
+
+        // Surface Condition category defects
+        surface_defects: surfaceCondition.observations_applied || [],
+        scratches: surfaceCondition.surface_issues || "Not specified",
+        print_lines: printQuality.print_defects || [],
+
+        // Print Quality
+        print_defects: printQuality.observations_applied || [],
+        color_quality: printQuality.color_quality || "Not specified",
+
+        // Authenticity
+        authenticity_issues: authenticityAssessment.observations_applied || [],
+        manufacturer_authentication: authenticityAssessment.manufacturer_authentication || "Not specified"
+      };
+
+      // Map category scores to legacy format
+      gradingResult["Grading (DCM Master Scale)"] = {
+        "Category Scores": categoryScores,
+        "Weighted Composite Score": finalGrade.weighted_composite_score || 0,
+        "Centering Starting Grade": 10,
+        "Total Defect Count": 0,
+        "Final Grade (After Deductions)": finalGrade.decimal_final_grade || 0,
+        "Decimal Final Grade": finalGrade.decimal_final_grade || 0,
+        "Whole Number Grade": finalGrade.whole_number_grade || 0,
+        "Image Quality Cap Applied": gradingResult.image_quality_impact?.cap_applied ? "Yes" : "No",
+        // Map 5 categories to Visual_Inspection_Details
+        "Visual_Inspection_Details": {
+          "structural_integrity": structuralIntegrity,
+          "surface_condition": surfaceCondition,
+          "centering_quality": centeringQuality,
+          "print_quality": printQuality,
+          "authenticity_assessment": authenticityAssessment
+        },
+        // Also add Visual_Inspection_Results at this level for compatibility
+        "Visual_Inspection_Results": gradingResult["Visual_Inspection_Results"],
+        // Add Centering_Measurements at this level too for compatibility
+        "Centering_Measurements": gradingResult["Centering_Measurements"]
+      };
+
+      // Map Alteration Check
+      if (gradingResult.alteration_check) {
+        gradingResult["Alteration Check"] = {
+          "card_is_altered": gradingResult.alteration_check.card_is_altered || false,
+          "reason": gradingResult.alteration_check.reason || "",
+          "grade_override": gradingResult.alteration_check.grade_override
+        };
+      }
+
+      console.log('[FORMAT CONVERSION] ✅ Conversion complete');
+      console.log('[FORMAT CONVERSION] Centering measurements:', JSON.stringify(gradingResult["Centering_Measurements"], null, 2));
+      console.log('[FORMAT CONVERSION] Category Scores:', JSON.stringify(categoryScores, null, 2));
+    }
+
+    // Extract sports card grade information
+    const { rawGrade, wholeGrade, confidence } = extractSportsGradeInfo(gradingResult);
+
+    // Extract key fields for database columns
+    const cardFields = extractSportsCardFields(gradingResult);
+
+    // Update gradingResult with properly formatted Card Information for frontend
+    // Frontend expects capitalized "Card Information" with capitalized field names
+    gradingResult["Card Information"] = {
+      "Card Name": cardFields.card_name,
+      "Card Set": cardFields.card_set,
+      "Card Number": cardFields.card_number,
+      "Manufacturer Name": cardFields.manufacturer_name,
+      "Release Date": cardFields.release_date,
+      "Category": cardFields.category || cardInfo.sport, // Use extracted category or sport from Stage 2
+      "Serial Numbering": cardFields.serial_numbering,
+      "Authentic": cardFields.authentic
+    };
+
+    // Also populate Card Details section for frontend
+    // Note: Rarity and Autographed not stored in DB yet, but display on frontend
+    const cardInfo = gradingResult.card_information || {};
+    const autographData = gradingResult.autograph_detection || {};
+
+    gradingResult["Card Details"] = {
+      "Player(s)/Character(s) Featured": cardFields.featured,
+      "Rookie/First Print": cardFields.rookie_or_first_print,
+      "Rarity": cardInfo.special_features?.includes("Jersey Relic") ? "Jersey Relic" : null,
+      "Autographed": autographData.has_autograph ? "Yes" : "No"
+    };
+
+    console.log('[FRONTEND MAPPING] Card Information:', JSON.stringify(gradingResult["Card Information"], null, 2));
+    console.log('[FRONTEND MAPPING] Card Details:', JSON.stringify(gradingResult["Card Details"], null, 2));
+
+    // Update database with comprehensive sports card data
+    const updateData: any = {
+      // Full AI grading JSON for comprehensive display
+      ai_grading: gradingResult,
+
+      // Grade information
+      raw_decimal_grade: rawGrade,
+      dcm_grade_whole: wholeGrade,
+      ai_confidence_score: confidence,
+      final_dcm_score: wholeGrade.toString(),
+
+      // Individual searchable/sortable columns
+      ...cardFields,
+
+      // Processing metadata
+      processing_time: Date.now() - startTime
+    };
+
+    // DVG v1: Add DVG-specific fields if available
+    if (dvgResult) {
+      console.log('[DVG v1] Adding DVG-specific database fields...');
+      updateData.dvg_grading = dvgResult;
+      updateData.dvg_decimal_grade = dvgResult.recommended_grade.recommended_decimal_grade;
+      updateData.dvg_whole_grade = dvgResult.recommended_grade.recommended_whole_grade;
+      updateData.dvg_grade_uncertainty = dvgResult.recommended_grade.grade_uncertainty;
+      updateData.dvg_image_quality = dvgResult.image_quality.grade;
+      updateData.dvg_reshoot_required = dvgResult.image_quality.grade === 'C' || dvgResult.image_quality.grade === 'D';
+      updateData.dvg_centering_front_lr = dvgResult.centering.front_left_right_ratio_text;
+      updateData.dvg_centering_front_tb = dvgResult.centering.front_top_bottom_ratio_text;
+      updateData.dvg_centering_back_lr = dvgResult.centering.back_left_right_ratio_text;
+      updateData.dvg_centering_back_tb = dvgResult.centering.back_top_bottom_ratio_text;
+      updateData.dvg_positives = dvgResult.analysis_summary.positives;
+      updateData.dvg_negatives = dvgResult.analysis_summary.negatives;
+      updateData.dvg_model = dvgResult.meta.model_name;
+      updateData.dvg_version = dvgResult.meta.version;
+      console.log(`[DVG v1] Grade: ${dvgResult.recommended_grade.recommended_decimal_grade}, Image Quality: ${dvgResult.image_quality.grade}`);
+    }
+
+    console.log(`[GET /api/sports/${cardId}] Updating database with extracted fields:`, {
+      card_name: cardFields.card_name,
+      card_set: cardFields.card_set,
+      featured: cardFields.featured,
+      grade: wholeGrade
+    });
+
+    const { data: updateResult, error: updateError } = await supabase
+      .from("cards")
+      .update(updateData)
+      .eq("id", cardId)
+      .select();
+
+    if (updateError) {
+      console.error(`[GET /api/sports/${cardId}] Database update failed:`, updateError);
+      return NextResponse.json({ error: "Failed to save sports card grading results" }, { status: 500 });
+    }
+
+    console.log(`[GET /api/sports/${cardId}] Database update successful. Rows affected:`, updateResult?.length);
+
+    // Verify the card can be read back immediately after update
+    const { data: verifyCard, error: verifyError } = await supabase
+      .from("cards")
+      .select("id, user_id, category, card_name, dcm_grade_whole")
+      .eq("id", cardId)
+      .single();
+
+    console.log(`[GET /api/sports/${cardId}] Verification read after update:`, verifyError ? `ERROR: ${verifyError.message}` : `SUCCESS - card_name: ${verifyCard?.card_name}, grade: ${verifyCard?.dcm_grade_whole}`);
+
+    console.log(`[GET /api/sports/${cardId}] Sports card request completed in ${Date.now() - startTime}ms`);
+
+    // Return updated sports card data
+    return NextResponse.json({
+      ...card,
+      ai_grading: gradingResult,
+      dvg_result: dvgResult, // DVG v1: Include full DVG result
+      raw_decimal_grade: rawGrade,
+      dcm_grade_whole: wholeGrade,
+      ai_confidence_score: confidence,
+      final_dcm_score: wholeGrade.toString(),
+      ...cardFields,
+      front_url: frontUrl,
+      back_url: backUrl,
+      processing_time: Date.now() - startTime,
+      grading_system: dvgResult ? 'dvg-v1' : 'legacy' // Indicate which system was used
+    });
+
+  } catch (error: any) {
+    console.error(`[GET /api/sports/${cardId}] Error:`, error.message);
+    return NextResponse.json(
+      { error: "Failed to process sports card: " + error.message },
+      { status: 500 }
+    );
+  } finally {
+    processingSportsCards.delete(cardId);
+    console.log(`[GET /api/sports/${cardId}] Removed from processing set`);
+  }
+}
+
+// DELETE handler for removing sports cards
+export async function DELETE(request: NextRequest, { params }: SportsCardGradingRequest) {
+  const { id: cardId } = await params;
+
+  console.log(`[DELETE /api/sports/${cardId}] Starting card deletion request`);
+
+  try {
+    const supabase = supabaseServer();
+
+    // First, get the card to verify it exists and get file paths for cleanup
+    const { data: card, error: cardError } = await supabase
+      .from("cards")
+      .select("front_path, back_path, category")
+      .eq("id", cardId)
+      .single();
+
+    if (cardError || !card) {
+      console.error(`[DELETE /api/sports/${cardId}] Card not found:`, cardError);
+      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+    }
+
+    // Log card details for debugging
+    console.log(`[DELETE /api/sports/${cardId}] Found card with category: ${card.category}`);
+
+    // Delete the card from database
+    const { error: deleteError } = await supabase
+      .from("cards")
+      .delete()
+      .eq("id", cardId);
+
+    if (deleteError) {
+      console.error(`[DELETE /api/sports/${cardId}] Database deletion failed:`, deleteError);
+      return NextResponse.json({ error: "Failed to delete card from database" }, { status: 500 });
+    }
+
+    // Clean up image files from storage
+    try {
+      const filesToDelete = [card.front_path, card.back_path].filter(Boolean);
+
+      if (filesToDelete.length > 0) {
+        const { error: storageError } = await supabase.storage
+          .from("cards")
+          .remove(filesToDelete);
+
+        if (storageError) {
+          console.warn(`[DELETE /api/sports/${cardId}] Storage cleanup warning:`, storageError);
+          // Don't fail the request if storage cleanup fails, card is already deleted from DB
+        } else {
+          console.log(`[DELETE /api/sports/${cardId}] Successfully cleaned up ${filesToDelete.length} image files`);
+        }
+      }
+    } catch (storageCleanupError) {
+      console.warn(`[DELETE /api/sports/${cardId}] Storage cleanup error:`, storageCleanupError);
+      // Don't fail the request if storage cleanup fails
+    }
+
+    console.log(`[DELETE /api/sports/${cardId}] Card deletion completed successfully`);
+
+    return NextResponse.json({
+      success: true,
+      message: "Card deleted successfully",
+      deletedCardId: cardId
+    });
+
+  } catch (error: any) {
+    console.error(`[DELETE /api/sports/${cardId}] Deletion error:`, error.message);
+    return NextResponse.json(
+      { error: "Failed to delete card: " + error.message },
+      { status: 500 }
+    );
+  }
+}

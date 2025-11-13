@@ -1,0 +1,726 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { supabase } from '../../lib/supabaseClient'
+
+type Card = {
+  id: string
+  serial: string
+  front_path: string
+  back_path: string
+  card_name?: string
+  featured?: string  // 🎯 Player/character name
+  category?: string
+  card_set?: string
+  manufacturer_name?: string  // 🎯 Manufacturer
+  release_date?: string  // 🎯 Year
+  card_number?: string  // 🎯 Card number
+  grade_numeric?: number
+  ai_confidence_score?: string
+  ai_grading?: any
+  dcm_grade_whole?: number
+  dvg_image_quality?: string
+  created_at?: string
+  visibility?: 'public' | 'private'
+  // 🎯 PRIMARY: Conversational AI grading (2025-10-21)
+  conversational_decimal_grade?: number | null
+  conversational_whole_grade?: number | null
+  conversational_image_confidence?: string | null
+  conversational_card_info?: any  // JSON field containing card details
+  dvg_decimal_grade?: number | null
+}
+
+// 🎯 Helper: Strip markdown formatting from text
+const stripMarkdown = (text: string | null | undefined): string | null => {
+  if (!text) return null;
+  return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '');
+};
+
+// 🎯 Helper: Build card info object (matches detail page logic from line 1999)
+const getCardInfo = (card: Card) => {
+  const dvgGrading = card.ai_grading || {};
+  return {
+    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
+    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading.card_info?.player_or_character,
+    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name,
+    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
+    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
+    card_number: stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
+    serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || dvgGrading.card_info?.serial_number,
+    rookie_or_first: card.conversational_card_info?.rookie_or_first || dvgGrading.card_info?.rookie_or_first,
+    subset: stripMarkdown(card.conversational_card_info?.subset) || dvgGrading.card_info?.subset,
+    autographed: card.conversational_card_info?.autographed || false,
+  };
+};
+
+// 🎯 Helper functions - Use cardInfo object (maintained for sorting compatibility)
+const getCardName = (card: Card) => {
+  return getCardInfo(card).card_name || 'Unknown Card';
+};
+
+const getPlayerName = (card: Card) => {
+  const cardInfo = getCardInfo(card);
+  return cardInfo.player_or_character || cardInfo.card_name || 'Unknown Player';
+};
+
+const getCardSet = (card: Card) => {
+  return getCardInfo(card).set_name || 'Unknown Set';
+};
+
+const getManufacturer = (card: Card) => {
+  return getCardInfo(card).manufacturer || 'Unknown';
+};
+
+const getYear = (card: Card) => {
+  return getCardInfo(card).year || 'N/A';
+};
+
+const getCardGrade = (card: Card) => {
+  // 🎯 PRIMARY: Use conversational AI grade if available (rounds to whole number for collection display)
+  if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
+    return Math.round(card.conversational_decimal_grade);
+  }
+  // FALLBACK: DVG v1 grade
+  if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
+    return Math.round(card.dvg_decimal_grade);
+  }
+  // LEGACY: Old grade fields
+  if (card.dcm_grade_whole) return card.dcm_grade_whole;
+  if (card.grade_numeric) return card.grade_numeric;
+  return null;
+};
+
+const getGradeSource = (card: Card): 'conversational' | 'structured' | null => {
+  // Determine which grading system was used
+  if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
+    return 'conversational';
+  }
+  if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
+    return 'structured';
+  }
+  return null;
+};
+
+const getImageQualityGrade = (card: Card) => {
+  // Match the exact logic from the detail page (line 2267, 3508)
+  // 🎯 PRIMARY: Try conversational AI confidence first (current system)
+  if (card.conversational_image_confidence) {
+    return card.conversational_image_confidence;
+  }
+  // Try database column (for DVG v1 graded cards)
+  if (card.dvg_image_quality) {
+    return card.dvg_image_quality;
+  }
+  // Try DVG v1 format in ai_grading JSON
+  if (card.ai_grading?.image_quality?.grade) {
+    return card.ai_grading.image_quality.grade;
+  }
+  // Try old ai_confidence_score column
+  if (card.ai_confidence_score) {
+    return card.ai_confidence_score;
+  }
+  // Try old format in AI Confidence Assessment
+  if (card.ai_grading?.["AI Confidence Assessment"]?.["Confidence Level"]) {
+    const confidence = card.ai_grading["AI Confidence Assessment"]["Confidence Level"];
+    // Map old confidence levels to letter grades
+    if (confidence === "High") return "A";
+    if (confidence === "Medium") return "B";
+    if (confidence === "Low") return "C";
+    if (confidence === "Very Low") return "D";
+  }
+  return null; // Return null if no confidence data available
+};
+
+
+const getCardLink = (card: Card) => {
+  // Route to category-specific pages
+  const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
+
+  // Sports cards → /sports/[id]
+  if (card.category && sportCategories.includes(card.category)) {
+    return `/sports/${card.id}`;
+  }
+
+  // Pokemon cards → /pokemon/[id] (uses conversational grading v4.2)
+  if (card.category === 'Pokemon') {
+    return `/pokemon/${card.id}`;
+  }
+
+  // MTG cards → /mtg/[id]
+  if (card.category === 'MTG') {
+    return `/mtg/${card.id}`;
+  }
+
+  // Lorcana cards → /lorcana/[id]
+  if (card.category === 'Lorcana') {
+    return `/lorcana/${card.id}`;
+  }
+
+  // Other cards → /other/[id]
+  if (card.category === 'Other') {
+    return `/other/${card.id}`;
+  }
+
+  // Default to general card page for other types
+  return `/card/${card.id}`;
+};
+
+export default function CollectionPage() {
+  const [cards, setCards] = useState<Card[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
+  const [sortColumn, setSortColumn] = useState<string | null>(null)
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const searchParams = useSearchParams()
+  const searchQuery = searchParams?.get('search')
+
+
+  useEffect(() => {
+    const fetchCards = async () => {
+      setLoading(true) // Ensure loading state is true before fetch
+      setError(null) // Clear any previous errors
+
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (!user) {
+          setError('❌ You must be logged in to see your collection.')
+          setLoading(false)
+          return
+        }
+
+        let query = supabase
+          .from('cards')
+          .select('id, serial, front_path, back_path, card_name, featured, category, card_set, manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score, ai_grading, dcm_grade_whole, dvg_image_quality, created_at, visibility, conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence, conversational_card_info, dvg_decimal_grade')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+
+        // Apply search filter if provided
+        if (searchQuery) {
+          query = query.or(`serial.ilike.%${searchQuery}%,card_name.ilike.%${searchQuery}%`)
+        }
+
+        const { data, error } = await query
+
+        if (error) {
+          throw new Error('Failed to load cards.')
+        }
+
+        setCards(data || [])
+      } catch (err) {
+        console.error(err)
+        setError('Failed to load cards. Please try again later.')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchCards()
+  }, [searchQuery]) // Re-run when search query changes
+
+  // Handle column sorting
+  const handleSort = (column: string) => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc')
+    } else {
+      // Set new column and default to ascending
+      setSortColumn(column)
+      setSortDirection('asc')
+    }
+  }
+
+  // Sort cards based on current sort settings
+  const sortedCards = [...cards].sort((a, b) => {
+    if (!sortColumn) return 0
+
+    let aValue: any
+    let bValue: any
+
+    switch (sortColumn) {
+      case 'name':
+        aValue = getPlayerName(a).toLowerCase()
+        bValue = getPlayerName(b).toLowerCase()
+        break
+      case 'manufacturer':
+        aValue = (getManufacturer(a) || '').toLowerCase()
+        bValue = (getManufacturer(b) || '').toLowerCase()
+        break
+      case 'series':
+        aValue = getCardSet(a).toLowerCase()
+        bValue = getCardSet(b).toLowerCase()
+        break
+      case 'year':
+        aValue = getYear(a) || ''
+        bValue = getYear(b) || ''
+        break
+      case 'grade':
+        aValue = getCardGrade(a) || 0
+        bValue = getCardGrade(b) || 0
+        break
+      case 'date':
+        aValue = a.created_at || ''
+        bValue = b.created_at || ''
+        break
+      case 'visibility':
+        aValue = a.visibility || 'private'
+        bValue = b.visibility || 'private'
+        break
+      default:
+        return 0
+    }
+
+    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1
+    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1
+    return 0
+  })
+
+  // Filter cards by selected category
+  const filteredCards = sortedCards.filter(card => {
+    if (selectedCategory === 'all') return true;
+    if (selectedCategory === 'Sports') {
+      // Include all sport categories
+      return ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+    }
+    return card.category === selectedCategory;
+  })
+
+  if (loading) return <p className="p-6 text-center">Loading your collection...</p>
+  if (error) return <p className="p-6 text-center text-red-600">{error}</p>
+  if (cards.length === 0) return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
+
+  return (
+    <main className="flex min-h-screen flex-col items-center p-8">
+      <div className="w-full max-w-6xl">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold">My Collection</h1>
+            {searchQuery && (
+              <p className="text-gray-600 mt-2">
+                Search results for: "{searchQuery}"
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            {/* View Toggle */}
+            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'grid'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Grid view"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="List view"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+            </div>
+            <div className="text-sm text-gray-500">
+              {cards.length} card{cards.length !== 1 ? 's' : ''} found
+            </div>
+          </div>
+        </div>
+
+        {/* Category Filter Tabs */}
+        <div className="mb-6 flex flex-wrap gap-2">
+          {[
+            { id: 'all', label: 'All Cards', icon: '🎴' },
+            { id: 'Sports', label: 'Sports', icon: '⚾' },
+            { id: 'Pokemon', label: 'Pokemon', icon: '⚡' },
+            { id: 'MTG', label: 'Magic', icon: '🎴' },
+            { id: 'Lorcana', label: 'Lorcana', icon: '✨' },
+            { id: 'Other', label: 'Other', icon: '🃏' }
+          ].map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={`px-4 py-2 rounded-lg font-medium transition-all ${
+                selectedCategory === category.id
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              <span className="mr-2">{category.icon}</span>
+              {category.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Grid View */}
+        {viewMode === 'grid' && (
+          <>
+            {filteredCards.length === 0 ? (
+              <p className="p-6 text-center text-gray-600">
+                {selectedCategory === 'all'
+                  ? 'You have not uploaded any cards yet.'
+                  : `You have no ${selectedCategory} cards in your collection.`}
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {filteredCards.map((card) => {
+              // Get card info (matches detail page line 1999)
+              const cardInfo = getCardInfo(card);
+
+              // Build player/card name for display (matches detail page line 2188)
+              const displayName = cardInfo.player_or_character || cardInfo.card_name || "Unknown Player";
+
+              // Build special features string (matches detail page line 2223-2230)
+              const features: string[] = [];
+              if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
+              if (cardInfo.autographed) features.push('Auto');
+              const serialNum = cardInfo.serial_number;
+              if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+                features.push(serialNum);
+              }
+              const specialFeatures = features.length > 0 ? features.join(' ') : '';
+
+              // Build full card details text (matches detail page line 2233-2241)
+              const parts = [
+                cardInfo.subset,
+                cardInfo.set_name || "Unknown Set",
+                specialFeatures,
+                cardInfo.card_number,
+                cardInfo.year || "N/A"
+              ].filter(p => p && p.trim() !== '');
+              const cardDetails = parts.join(' - ');
+
+              // Dynamic sizing for player name (shorter name = larger font)
+              const playerNameSize = displayName.length > 30
+                ? 'text-[0.65rem]'
+                : displayName.length > 20
+                ? 'text-xs'
+                : 'text-sm';
+
+              // Dynamic sizing for card details
+              const detailsSize = cardDetails.length > 40
+                ? 'text-[0.5rem]'
+                : cardDetails.length > 30
+                ? 'text-[0.55rem]'
+                : 'text-[0.625rem]';
+
+              return (
+                <div key={card.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
+                  {/* Professional Label (PSA-Style) - ABOVE IMAGE */}
+                  <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg p-3">
+                    <div className="flex items-center justify-between gap-1.5">
+                      {/* Left: DCM Logo */}
+                      <div className="flex-shrink-0 -ml-1">
+                        <img
+                          src="/DCM-logo.png"
+                          alt="DCM"
+                          className="h-9 w-auto"
+                        />
+                      </div>
+
+                      {/* Center: Card Information */}
+                      <div className="flex-1 min-w-0 mx-1">
+                        <div
+                          className={`font-bold text-gray-900 leading-tight overflow-hidden ${playerNameSize}`}
+                          style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical'
+                          }}
+                          title={displayName}
+                        >
+                          {displayName}
+                        </div>
+                        <div
+                          className={`text-gray-700 leading-tight mt-1 overflow-hidden ${detailsSize}`}
+                          style={{
+                            display: '-webkit-box',
+                            WebkitLineClamp: 1,
+                            WebkitBoxOrient: 'vertical'
+                          }}
+                        >
+                          {cardDetails}
+                        </div>
+                        <div className="text-gray-500 font-mono truncate text-[0.5rem] mt-0.5">
+                          {card.serial}
+                        </div>
+                      </div>
+
+                      {/* Right: Grade Display */}
+                      <div className="text-center flex-shrink-0">
+                        <div className="font-bold text-purple-700 text-3xl leading-none">
+                          {getCardGrade(card) || '?'}
+                        </div>
+                        {getImageQualityGrade(card) && (
+                          <>
+                            <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+                            <div className="font-semibold text-purple-600 text-base">
+                              {getImageQualityGrade(card)}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Card Image */}
+                  <div className="aspect-[3/4] relative">
+                    <CardThumbnail path={card.front_path} />
+
+                    {/* Visibility Badge */}
+                    <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 ${
+                      card.visibility === 'public'
+                        ? 'bg-green-100 text-green-800 border-green-500'
+                        : 'bg-gray-100 text-gray-800 border-gray-400'
+                    }`} title={card.visibility === 'public' ? 'This card is public (anyone can view)' : 'This card is private (only you can view)'}>
+                      {card.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                    </div>
+                  </div>
+
+                  {/* View Details Button */}
+                  <div className="p-3">
+                    <Link
+                      href={getCardLink(card)}
+                      className="inline-block w-full text-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    >
+                      View Details
+                    </Link>
+                  </div>
+                </div>
+              );
+                })}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* List View */}
+        {viewMode === 'list' && (
+          <>
+            {filteredCards.length === 0 ? (
+              <p className="p-6 text-center text-gray-600">
+                {selectedCategory === 'all'
+                  ? 'You have not uploaded any cards yet.'
+                  : `You have no ${selectedCategory} cards in your collection.`}
+              </p>
+            ) : (
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th
+                      onClick={() => handleSort('name')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        Card Name
+                        {sortColumn === 'name' && (
+                          <span className="text-indigo-600">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('manufacturer')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        Manufacturer
+                        {sortColumn === 'manufacturer' && (
+                          <span className="text-indigo-600">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('series')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        Series
+                        {sortColumn === 'series' && (
+                          <span className="text-indigo-600">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('year')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        Year
+                        {sortColumn === 'year' && (
+                          <span className="text-indigo-600">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('grade')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        Grade
+                        {sortColumn === 'grade' && (
+                          <span className="text-indigo-600">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('date')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        Graded Date
+                        {sortColumn === 'date' && (
+                          <span className="text-indigo-600">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th
+                      onClick={() => handleSort('visibility')}
+                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    >
+                      <div className="flex items-center gap-1">
+                        Visibility
+                        {sortColumn === 'visibility' && (
+                          <span className="text-indigo-600">
+                            {sortDirection === 'asc' ? '▲' : '▼'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredCards.map((card) => (
+                    <tr key={card.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="text-sm font-medium text-gray-900">
+                            {getPlayerName(card)}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {getManufacturer(card) || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {getCardSet(card)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {getYear(card) || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {getCardGrade(card) || '-'}
+                          {getGradeSource(card) && (
+                            <span className="text-xs ml-1" title={getGradeSource(card) === 'conversational' ? 'AI Visual Assessment' : 'Structured Analysis'}>
+                              {getGradeSource(card) === 'conversational' ? '🤖' : '🔢'}
+                            </span>
+                          )}
+                          {getImageQualityGrade(card) && (
+                            <span className="text-xs text-gray-500 ml-1">
+                              / {getImageQualityGrade(card)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {card.created_at ? new Date(card.created_at).toLocaleDateString() : '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                          card.visibility === 'public'
+                            ? 'bg-green-100 text-green-800 border-green-500'
+                            : 'bg-gray-100 text-gray-800 border-gray-400'
+                        }`}>
+                          {card.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <Link
+                          href={getCardLink(card)}
+                          className="text-purple-600 hover:text-purple-800 font-medium"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+            )}
+          </>
+        )}
+      </div>
+    </main>
+  )
+}
+
+function CardThumbnail({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadImage = async () => {
+      setLoading(true)
+      const { data } = await supabase
+        .storage
+        .from('cards')
+        .createSignedUrl(path, 60 * 60) // 1 hour
+      
+      setUrl(data?.signedUrl || null)
+      setLoading(false)
+    }
+
+    loadImage()
+  }, [path])
+
+  if (loading || !url) {
+    return (
+      <div className="w-40 h-56 border grid place-items-center text-sm text-gray-500 bg-gray-100 animate-pulse">
+        Loading…
+      </div>
+    )
+  }
+
+  return <img src={url} alt="Card" className="w-full h-full object-cover" />
+}

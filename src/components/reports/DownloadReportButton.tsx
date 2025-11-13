@@ -1,0 +1,512 @@
+'use client';
+
+import React from 'react';
+import { pdf } from '@react-pdf/renderer';
+import { CardGradingReport, ReportCardData } from './CardGradingReport';
+import { supabase } from '../../lib/supabaseClient';
+import QRCode from 'qrcode';
+
+/**
+ * Download Report Button Component
+ * Generates and downloads a PDF grading report for a card
+ */
+
+interface DownloadReportButtonProps {
+  card: any; // Card data from database
+  variant?: 'default' | 'compact';
+}
+
+export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
+  card,
+  variant = 'default'
+}) => {
+  const [isGenerating, setIsGenerating] = React.useState(false);
+
+  /**
+   * Extract centering summary from card data
+   */
+  const extractCenteringSummary = (card: any): { front: string; back: string; combined: string } => {
+    const frontSummary = card.conversational_corners_edges_surface?.front_centering?.summary || '';
+    const backSummary = card.conversational_corners_edges_surface?.back_centering?.summary || '';
+
+    const combined = frontSummary && backSummary
+      ? `Front: ${frontSummary} Back: ${backSummary}`
+      : frontSummary || backSummary || 'Centering analysis not available.';
+
+    return {
+      front: frontSummary || 'Centering analysis not available.',
+      back: backSummary || 'Centering analysis not available.',
+      combined
+    };
+  };
+
+  /**
+   * Extract corners summary from card data
+   */
+  const extractCornersSummary = (card: any): { front: string; back: string; combined: string } => {
+    const frontSummary = card.conversational_corners_edges_surface?.front_corners?.summary || '';
+    const backSummary = card.conversational_corners_edges_surface?.back_corners?.summary || '';
+
+    const combined = frontSummary && backSummary
+      ? `Front: ${frontSummary} Back: ${backSummary}`
+      : frontSummary || backSummary || 'Corner analysis not available.';
+
+    return {
+      front: frontSummary || 'Corner analysis not available.',
+      back: backSummary || 'Corner analysis not available.',
+      combined
+    };
+  };
+
+  /**
+   * Extract edges summary from card data
+   */
+  const extractEdgesSummary = (card: any): { front: string; back: string; combined: string } => {
+    const frontSummary = card.conversational_corners_edges_surface?.front_edges?.summary || '';
+    const backSummary = card.conversational_corners_edges_surface?.back_edges?.summary || '';
+
+    const combined = frontSummary && backSummary
+      ? `Front: ${frontSummary} Back: ${backSummary}`
+      : frontSummary || backSummary || 'Edge analysis not available.';
+
+    return {
+      front: frontSummary || 'Edge analysis not available.',
+      back: backSummary || 'Edge analysis not available.',
+      combined
+    };
+  };
+
+  /**
+   * Extract surface summary from card data
+   */
+  const extractSurfaceSummary = (card: any): { front: string; back: string; combined: string } => {
+    const frontSummary = card.conversational_corners_edges_surface?.front_surface?.summary || '';
+    const backSummary = card.conversational_corners_edges_surface?.back_surface?.summary || '';
+
+    const combined = frontSummary && backSummary
+      ? `Front: ${frontSummary} Back: ${backSummary}`
+      : frontSummary || backSummary || 'Surface analysis not available.';
+
+    return {
+      front: frontSummary || 'Surface analysis not available.',
+      back: backSummary || 'Surface analysis not available.',
+      combined
+    };
+  };
+
+  /**
+   * Extract image quality description
+   */
+  const extractImageQuality = (card: any): string => {
+    const confidence = card.conversational_image_confidence || 'N/A';
+
+    const qualityMap: { [key: string]: string } = {
+      'A': 'Excellent - High confidence in grade accuracy',
+      'B': 'Good - Moderate confidence in grade accuracy',
+      'C': 'Fair - Lower confidence due to image limitations',
+      'D': 'Poor - Significant image quality issues affecting analysis',
+    };
+
+    return qualityMap[confidence] || 'Quality assessment not available';
+  };
+
+  /**
+   * Generate QR code with DCM logo in center as base64 data URL
+   */
+  const generateQRCode = async (url: string): Promise<string> => {
+    try {
+      // Generate QR code to canvas
+      const canvas = document.createElement('canvas');
+      await QRCode.toCanvas(canvas, url, {
+        width: 150,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF',
+        },
+        errorCorrectionLevel: 'H', // High error correction for logo overlay
+      });
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Failed to get canvas context');
+      }
+
+      // Load and draw DCM logo in center
+      const logo = new Image();
+      logo.crossOrigin = 'anonymous';
+
+      return new Promise((resolve, reject) => {
+        logo.onload = () => {
+          // Calculate logo size (about 20% of QR code size)
+          const logoSize = canvas.width * 0.2;
+          const logoX = (canvas.width - logoSize) / 2;
+          const logoY = (canvas.height - logoSize) / 2;
+
+          // Draw white background circle for logo
+          ctx.fillStyle = '#FFFFFF';
+          ctx.beginPath();
+          ctx.arc(canvas.width / 2, canvas.height / 2, logoSize * 0.6, 0, 2 * Math.PI);
+          ctx.fill();
+
+          // Draw logo
+          ctx.drawImage(logo, logoX, logoY, logoSize, logoSize);
+
+          // Convert to base64
+          const qrDataUrl = canvas.toDataURL('image/png');
+          resolve(qrDataUrl);
+        };
+
+        logo.onerror = () => {
+          // If logo fails to load, return QR code without logo
+          console.warn('[DOWNLOAD REPORT] Failed to load logo for QR code, using plain QR');
+          resolve(canvas.toDataURL('image/png'));
+        };
+
+        logo.src = '/DCM-logo.png';
+      });
+    } catch (error) {
+      console.error('[DOWNLOAD REPORT] Failed to generate QR code:', error);
+      return '';
+    }
+  };
+
+  /**
+   * Convert image URL to base64 JPEG data URL for react-pdf
+   * Converts WEBP and other formats to JPEG since react-pdf doesn't support WEBP
+   */
+  const imageToBase64 = async (url: string): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
+
+        ctx.drawImage(img, 0, 0);
+
+        // Convert to JPEG format (react-pdf compatible)
+        const base64 = canvas.toDataURL('image/jpeg', 0.95);
+        resolve(base64);
+      };
+
+      img.onerror = () => {
+        reject(new Error('Failed to load image'));
+      };
+
+      img.src = url;
+    });
+  };
+
+  /**
+   * Handle PDF generation and download
+   */
+  const handleDownload = async () => {
+    try {
+      setIsGenerating(true);
+
+      console.log('[DOWNLOAD REPORT] Card object keys:', Object.keys(card));
+      console.log('[DOWNLOAD REPORT] Card image fields:', {
+        front_url: card.front_url,
+        back_url: card.back_url,
+        front_path: card.front_path,
+        back_path: card.back_path,
+      });
+
+      // Use existing signed URLs if available, otherwise generate new ones
+      let frontImageUrl = card.front_url;
+      let backImageUrl = card.back_url;
+
+      if (!frontImageUrl || !backImageUrl) {
+        console.log('[DOWNLOAD REPORT] No signed URLs found, generating from storage paths...');
+
+        if (!card.front_path || !card.back_path) {
+          console.error('[DOWNLOAD REPORT] ERROR: Missing storage paths!', {
+            front_path: card.front_path,
+            back_path: card.back_path,
+          });
+          throw new Error('Card images not found. Missing both URLs and storage paths.');
+        }
+
+        const { data: frontUrlData } = await supabase
+          .storage
+          .from('cards')
+          .createSignedUrl(card.front_path, 60 * 60); // 1 hour expiry
+
+        const { data: backUrlData } = await supabase
+          .storage
+          .from('cards')
+          .createSignedUrl(card.back_path, 60 * 60); // 1 hour expiry
+
+        if (!frontUrlData?.signedUrl || !backUrlData?.signedUrl) {
+          throw new Error('Failed to generate signed URLs for card images');
+        }
+
+        frontImageUrl = frontUrlData.signedUrl;
+        backImageUrl = backUrlData.signedUrl;
+      } else {
+        console.log('[DOWNLOAD REPORT] Using existing signed URLs from card data');
+      }
+
+      // Convert images to base64 for react-pdf compatibility
+      console.log('[DOWNLOAD REPORT] Converting images to base64...');
+      let frontImageBase64: string;
+      let backImageBase64: string;
+
+      try {
+        frontImageBase64 = await imageToBase64(frontImageUrl);
+        console.log('[DOWNLOAD REPORT] Front image converted to base64');
+      } catch (error) {
+        console.error('[DOWNLOAD REPORT] Failed to convert front image:', error);
+        throw new Error('Failed to load front card image. Please try again.');
+      }
+
+      try {
+        backImageBase64 = await imageToBase64(backImageUrl);
+        console.log('[DOWNLOAD REPORT] Back image converted to base64');
+      } catch (error) {
+        console.error('[DOWNLOAD REPORT] Failed to convert back image:', error);
+        throw new Error('Failed to load back card image. Please try again.');
+      }
+
+      console.log('[DOWNLOAD REPORT] All images converted successfully');
+
+      // Generate QR code for the card URL
+      const cardUrl = `${window.location.origin}/sports/${card.id}`;
+      console.log('[DOWNLOAD REPORT] Generating QR code for URL:', cardUrl);
+      const qrCodeDataUrl = await generateQRCode(cardUrl);
+      console.log('[DOWNLOAD REPORT] QR code generated');
+
+      // Extract card info
+      const cardInfo = card.conversational_card_info || {};
+
+      // Helper: Extract English name from bilingual format for PDF (react-pdf doesn't support Japanese fonts)
+      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
+        if (!text) return null;
+
+        // Check if text contains Japanese characters and bilingual format
+        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+        if (!hasJapanese) return text; // Already English-only
+
+        // Extract English from "Japanese (English)" format
+        const parts = text.split(/[/()（）]/);
+        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
+
+        return englishPart ? englishPart.trim() : text;
+      };
+
+      // Build card details string (matches detail page format)
+      // Extract English-only names for PDF compatibility
+      const playerOrCharacter = extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name);
+      // Handle "null" string and actual null values, then fall back to set_era
+      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
+                      (card.card_set && card.card_set !== 'null') ? card.card_set :
+                      cardInfo.set_era || 'Unknown Set';
+      const setName = extractEnglishForPDF(setNameRaw);
+      const year = cardInfo.year || card.release_date?.match(/\d{4}/)?.[0] || 'N/A';
+      const cardNumber = cardInfo.card_number || card.card_number;
+      const subset = cardInfo.subset || card.subset;
+
+      // Build special features
+      const features: string[] = [];
+      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
+      if (cardInfo.autographed) features.push('Auto');
+      const serialNum = cardInfo.serial_number;
+      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+        features.push(serialNum);
+      }
+      const specialFeatures = features.length > 0 ? features.join(' ') : '';
+
+      // Build full card details: set - features - number - year (no duplicate card name/subset)
+      const parts = [
+        setName,
+        specialFeatures,
+        cardNumber,
+        year
+      ].filter(p => p && p.trim() !== '' && p !== 'N/A');
+      const cardDetails = parts.join(' - ');
+
+      // Transform card data for report
+      const reportData: ReportCardData = {
+        cardName: extractEnglishForPDF(cardInfo.card_name || card.card_name) || 'Unknown Card',
+        playerName: playerOrCharacter || 'Unknown Player',
+        setName: setName || 'Unknown Set',
+        year: year,
+        manufacturer: cardInfo.manufacturer || card.manufacturer_name || 'N/A',
+        cardNumber: cardNumber || 'N/A',
+        sport: cardInfo.sport_or_category || card.sport || 'N/A',
+        frontImageUrl: frontImageBase64,
+        backImageUrl: backImageBase64,
+        grade: card.conversational_decimal_grade || 0,
+        conditionLabel: card.conversational_condition_label || 'N/A',
+        gradeRange: (() => {
+          // Extract just the uncertainty value (e.g., "10.0 ± 0.25" → "0.25")
+          const uncertaintyStr = card.conversational_grade_uncertainty || '±0.25';
+          const match = uncertaintyStr.match(/±\s*([\d.]+)/);
+          const uncertaintyValue = match ? match[1] : '0.25';
+          return `${card.conversational_decimal_grade || 0} ± ${uncertaintyValue}`;
+        })(),
+        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
+        cardDetails: cardDetails,
+        cardUrl: cardUrl,
+        qrCodeDataUrl: qrCodeDataUrl,
+        professionalGrades: {
+          psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
+          bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',
+          sgc: card.estimated_professional_grades?.SGC?.numeric_score || 'N/A',
+          cgc: card.estimated_professional_grades?.CGC?.numeric_score || 'N/A',
+        },
+        subgrades: {
+          centering: {
+            score: card.conversational_weighted_sub_scores?.centering ||
+                   card.conversational_sub_scores?.centering?.weighted || 0,
+            frontScore: card.conversational_sub_scores?.centering?.front || 0,
+            backScore: card.conversational_sub_scores?.centering?.back || 0,
+            summary: extractCenteringSummary(card).combined,
+            frontSummary: extractCenteringSummary(card).front,
+            backSummary: extractCenteringSummary(card).back,
+          },
+          corners: {
+            score: card.conversational_weighted_sub_scores?.corners ||
+                   card.conversational_sub_scores?.corners?.weighted || 0,
+            frontScore: card.conversational_sub_scores?.corners?.front || 0,
+            backScore: card.conversational_sub_scores?.corners?.back || 0,
+            summary: extractCornersSummary(card).combined,
+            frontSummary: extractCornersSummary(card).front,
+            backSummary: extractCornersSummary(card).back,
+          },
+          edges: {
+            score: card.conversational_weighted_sub_scores?.edges ||
+                   card.conversational_sub_scores?.edges?.weighted || 0,
+            frontScore: card.conversational_sub_scores?.edges?.front || 0,
+            backScore: card.conversational_sub_scores?.edges?.back || 0,
+            summary: extractEdgesSummary(card).combined,
+            frontSummary: extractEdgesSummary(card).front,
+            backSummary: extractEdgesSummary(card).back,
+          },
+          surface: {
+            score: card.conversational_weighted_sub_scores?.surface ||
+                   card.conversational_sub_scores?.surface?.weighted || 0,
+            frontScore: card.conversational_sub_scores?.surface?.front || 0,
+            backScore: card.conversational_sub_scores?.surface?.back || 0,
+            summary: extractSurfaceSummary(card).combined,
+            frontSummary: extractSurfaceSummary(card).front,
+            backSummary: extractSurfaceSummary(card).back,
+          },
+        },
+        specialFeatures: {
+          rookie: cardInfo.rookie_or_first === 'Yes' || cardInfo.rookie_or_first === true || card.rookie_card,
+          autographed: cardInfo.autographed === true || card.autograph_type,
+          serialNumbered: cardInfo.serial_number || card.serial_numbering || undefined,
+          subset: cardInfo.subset || card.subset || undefined,
+        },
+        aiConfidence: card.conversational_image_confidence || 'N/A',
+        imageQuality: extractImageQuality(card),
+        overallSummary: card.conversational_final_grade_summary || undefined,
+        generatedDate: new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }),
+        reportId: card.id.substring(0, 8).toUpperCase(),
+      };
+
+      console.log('[DOWNLOAD REPORT] Generating PDF with data:', {
+        ...reportData,
+        frontImageUrl: frontImageBase64 ? `Base64 (${frontImageBase64.substring(0, 30)}...)` : 'MISSING',
+        backImageUrl: backImageBase64 ? `Base64 (${backImageBase64.substring(0, 30)}...)` : 'MISSING',
+      });
+
+      // Generate PDF
+      const blob = await pdf(<CardGradingReport cardData={reportData} />).toBlob();
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Generate filename using label details, serial, and report ID
+      const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const playerNameClean = sanitize(reportData.playerName);
+      const cardDetailsClean = sanitize(reportData.cardDetails);
+      const serialClean = sanitize(reportData.serial);
+      const reportIdClean = reportData.reportId;
+
+      // Combine: DCM Report - PlayerName - CardDetails - Serial - ReportID
+      const filenameParts = [playerNameClean, cardDetailsClean, serialClean, reportIdClean].filter(p => p);
+      const filename = `DCM-Report-${filenameParts.join('-')}.pdf`;
+
+      link.download = filename;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup
+      URL.revokeObjectURL(url);
+
+      console.log('[DOWNLOAD REPORT] ✅ PDF generated successfully');
+
+    } catch (error) {
+      console.error('[DOWNLOAD REPORT] ❌ Error generating report:', error);
+      alert('Failed to generate report. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // Compact variant (smaller button)
+  if (variant === 'compact') {
+    return (
+      <button
+        onClick={handleDownload}
+        disabled={isGenerating}
+        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-medium"
+        title="Download PDF Report"
+      >
+        {isGenerating ? (
+          <>
+            <span className="animate-spin">⏳</span>
+            <span>Generating...</span>
+          </>
+        ) : (
+          <>
+            <span>📄</span>
+            <span>Download Report</span>
+          </>
+        )}
+      </button>
+    );
+  }
+
+  // Default variant (larger button)
+  return (
+    <button
+      onClick={handleDownload}
+      disabled={isGenerating}
+      className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
+      title="Download PDF Grading Report"
+    >
+      {isGenerating ? (
+        <>
+          <span className="animate-spin text-xl">⏳</span>
+          <span>Generating Report...</span>
+        </>
+      ) : (
+        <>
+          <span className="text-xl">📄</span>
+          <span>Download Grading Report</span>
+        </>
+      )}
+    </button>
+  );
+};

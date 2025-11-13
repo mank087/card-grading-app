@@ -1,0 +1,140 @@
+'use client'
+
+import { useState } from 'react'
+import { supabase } from '../../../lib/supabaseClient'
+import { useRouter } from 'next/navigation'
+
+export default function SportsUploadPage() {
+  const [frontFile, setFrontFile] = useState<File | null>(null)
+  const [backFile, setBackFile] = useState<File | null>(null)
+  const [status, setStatus] = useState('')
+  const router = useRouter()
+
+  const handleUpload = async () => {
+    if (!frontFile || !backFile) {
+      setStatus('❌ Please select both front and back images')
+      return
+    }
+
+    // Get logged-in user
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser()
+
+    if (userError || !user) {
+      setStatus('❌ You must be logged in to upload')
+      return
+    }
+
+    try {
+      setStatus('⏳ Uploading sports card...')
+
+      // Create unique ID for this card
+      const cardId = crypto.randomUUID()
+
+      // Build full storage paths
+      const frontPath = `${user.id}/${cardId}/front.jpg`
+      const backPath = `${user.id}/${cardId}/back.jpg`
+
+      // Upload front
+      const { error: frontError } = await supabase.storage
+        .from('cards')
+        .upload(frontPath, frontFile)
+
+      if (frontError) throw frontError
+
+      // Upload back
+      const { error: backError } = await supabase.storage
+        .from('cards')
+        .upload(backPath, backFile)
+
+      if (backError) throw backError
+
+      // Save record in DB with sports category
+      const { error: dbError } = await supabase.from('cards').insert({
+        id: cardId,
+        user_id: user.id,
+        serial: `SPORTS-${Math.random().toString(36).slice(2, 8)}`,
+        front_path: frontPath,
+        back_path: backPath,
+        category: 'Sports',
+        is_public: true,
+      })
+
+      if (dbError) throw dbError
+
+      setStatus('✅ Sports card uploaded successfully!')
+      setTimeout(() => router.push(`/sports/${cardId}`), 1000)
+    } catch (err: any) {
+      console.error(err)
+      setStatus(`❌ Upload failed: ${err.message}`)
+    }
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-8 pt-20">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Sports Card</h1>
+        <p className="text-gray-600">Upload your sports card for professional AI grading with precise visual analysis</p>
+      </div>
+
+      <div className="w-full max-w-md space-y-6 bg-white p-6 rounded-lg shadow-lg">
+        <div className="text-center">
+          <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+            🏈 Sports Cards
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Front Image:
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setFrontFile(e.target.files?.[0] || null)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          {frontFile && (
+            <p className="text-sm text-green-600 mt-1">✓ {frontFile.name}</p>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Back Image:
+          </label>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setBackFile(e.target.files?.[0] || null)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+          {backFile && (
+            <p className="text-sm text-green-600 mt-1">✓ {backFile.name}</p>
+          )}
+        </div>
+
+        <button
+          onClick={handleUpload}
+          disabled={!frontFile || !backFile}
+          className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+        >
+          Upload Sports Card
+        </button>
+
+        {status && (
+          <div className="text-center">
+            <p className="text-sm mt-4 p-3 rounded-md bg-gray-50">{status}</p>
+          </div>
+        )}
+
+        <div className="text-center text-xs text-gray-500">
+          <p>Enhanced with AI + OpenCV collaboration for precise card detection</p>
+          <p>Supported: Football, Basketball, Baseball, Hockey, Soccer & more</p>
+        </div>
+      </div>
+    </main>
+  )
+}

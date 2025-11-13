@@ -1,0 +1,1581 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
+import Script from "next/script";
+import { QRCodeCanvas } from 'qrcode.react';
+import GradeBadge from "../../ui/GradeBadge";
+import ImageZoomModal from "./ImageZoomModal";
+import ReactMarkdown from 'react-markdown';
+import {
+  generateFacebookShareUrl,
+  generateTwitterShareUrl,
+  handleInstagramShare,
+  copyCardUrl,
+  openSocialShare,
+  showShareSuccess,
+  type CardSharingData
+} from "@/lib/socialUtils";
+import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
+import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS } from '@/types/card';
+import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
+
+interface SportsAIGrading {
+  "Final Score"?: {
+    "Overall Grade"?: string;
+  };
+  "Final Score"?: {
+    "Overall Grade"?: number;
+    "Decimal Grade"?: number;
+    "Whole Number Grade"?: number;
+    "Grade Range"?: string;
+    "Uncertainty"?: string;
+  };
+  "Final DCM Grade"?: {
+    "Raw Decimal Grade"?: number;
+    "DCM Grade (Whole Number)"?: number;
+    "DCM Grade (Decimal)"?: number;
+    "Grade Range Min"?: number;
+    "Grade Range Max"?: number;
+    "Confidence Level"?: string;
+    "Confidence Tier"?: string;
+    "Grade Uncertainty"?: string;
+  };
+  "Card Information"?: {
+    "Card Name"?: string;
+    "Category"?: string;
+    "Card Number"?: string;
+    "Serial Numbering"?: string;
+    "Card Set"?: string;
+    "Manufacturer Name"?: string;
+    "Release Date"?: string;
+    "Authentic"?: string;
+  };
+  "Card Details"?: {
+    "Player(s)/Character(s) Featured"?: string;
+    "Rookie/First Print"?: string;
+    "Rarity"?: string;
+  };
+  "Grading (DCM Master Scale)"?: {
+    "Centering Starting Grade"?: number;
+    "Centering Basis"?: string;
+    "Total Defect Count"?: number;
+    "Total Deductions"?: number;
+    "Final Grade (After Deductions)"?: number;
+    "Decimal Final Grade"?: number;
+    "Whole Number Grade"?: number;
+    "Preliminary Grade"?: number;
+    "Grade Cap Applied"?: string;
+    "Image Quality Cap Applied"?: string;
+    "Category Scores"?: Record<string, {score: number; weight: number; contribution?: number}>;
+    "Weighted Composite Score"?: number;
+    "Defect Deductions"?: Array<{
+      category?: string;
+      type?: string;
+      defect?: string;
+      defect_type?: string;
+      severity?: string;
+      confidence?: string;
+      base_deduction?: number;
+      confidence_multiplier?: number;
+      applied_deduction?: number;
+      deduction?: number;
+      value?: boolean;
+    }>;
+    "Visual_Inspection_Details"?: Record<string, any>;
+    // V3.0 5-Category Defect Structure
+    structural_integrity?: {
+      overall_score?: number;
+      confidence?: string;
+      defects_detected?: Array<{
+        type?: string;
+        defect_type?: string;
+        severity?: string;
+        confidence?: string;
+        evidence?: string;
+        deduction?: number;
+        applied_deduction?: number;
+        confidence_multiplier?: number;
+      }>;
+      pristine_elements?: string[];
+      uncertain_areas?: string[];
+    };
+    surface_condition?: {
+      overall_score?: number;
+      confidence?: string;
+      defects?: Array<{
+        type?: string;
+        defect_type?: string;
+        severity?: string;
+        confidence?: string;
+        evidence?: string;
+        deduction?: number;
+        applied_deduction?: number;
+        confidence_multiplier?: number;
+      }>;
+      front_assessment?: any;
+      back_assessment?: any;
+      pristine_elements?: string[];
+      uncertain_areas?: string[];
+    };
+    centering_quality?: {
+      front_ratio_worst?: string;
+      back_ratio_worst?: string;
+      worst_overall?: string;
+      estimated_deduction?: number;
+      note?: string;
+      overall_score?: number;
+      confidence?: string;
+      pristine_elements?: string[];
+      uncertain_areas?: string[];
+    };
+    print_quality?: {
+      overall_score?: number;
+      confidence?: string;
+      defects?: Array<{
+        type?: string;
+        defect_type?: string;
+        severity?: string;
+        confidence?: string;
+        evidence?: string;
+        location?: string;
+        deduction?: number;
+        applied_deduction?: number;
+        confidence_multiplier?: number;
+      }>;
+      print_characteristics?: any;
+      pristine_elements?: string[];
+      uncertain_areas?: string[];
+    };
+    authenticity_assessment?: {
+      overall_score?: number;
+      confidence?: string;
+      alterations_detected?: any[];
+      checked_for?: string[];
+      authentication_markers?: string[];
+      pristine_elements?: string[];
+      uncertain_areas?: string[];
+    };
+    "Centering_Measurements"?: {
+      front_x_axis_ratio?: string;
+      front_y_axis_ratio?: string;
+      front_edge_description?: string;
+      front_centering_method?: string;
+      front_centering_confidence?: string;
+      front_quality_note?: string | null;
+      front_reference_points?: string | null;
+      front_visual_observation?: string | null;
+      front_measurement_approach?: string | null;
+      back_x_axis_ratio?: string;
+      back_y_axis_ratio?: string;
+      back_edge_description?: string;
+      back_centering_method?: string;
+      back_centering_confidence?: string;
+      back_quality_note?: string | null;
+      back_reference_points?: string | null;
+      back_visual_observation?: string | null;
+      back_measurement_approach?: string | null;
+      measurement_source?: string;
+      measurement_confidence?: string;
+    };
+    "Grade Analysis Summary"?: string;
+  };
+  "DCM Score System"?: {
+    "Condition Grade (Base)"?: string | number;
+    "AI Confidence Score"?: string;
+    "Final DCM Score"?: string;
+  };
+  "AI Confidence Assessment"?: {
+    "Overall Confidence"?: string;
+    "Confidence Tier"?: string;
+    "Grade Uncertainty"?: string;
+    "Image Quality Score"?: number | string | null;
+    "Quality Calculation"?: string | null;
+    "Grading Reliability"?: string;
+    "Grading Summary"?: any;
+    "Recommendations"?: string[] | string | null;
+  };
+  "Image Conditions"?: {
+    "Resolution"?: string;
+    "Resolution Score"?: number | null;
+    "Lighting"?: string;
+    "Lighting Score"?: number | null;
+    "Angle"?: string;
+    "Angle Score"?: number | null;
+    "Clarity"?: string;
+    "Clarity Score"?: number | null;
+    "Glare Present"?: string;
+    "Glare Penalty"?: number;
+    "Obstructions"?: string;
+    "Obstruction Penalty"?: number;
+    "Overall Quality Score"?: number | string | null;
+    "Quality Tier"?: string;
+    "Calculation"?: string;
+  };
+  "Card Detection Assessment"?: {
+    "Detection Confidence"?: string;
+    "Detected Aspect Ratio"?: string;
+    "Aspect Ratio Validation"?: string;
+    "Card Boundary Quality"?: string;
+    "Detection Factors"?: string;
+    "Detection Impact on Grading"?: string;
+    "Fallback Methods Used"?: string;
+  };
+  "Image Conditions"?: {
+    "Resolution"?: string;
+    "Angle Deviation"?: string;
+    "Perspective Distortion"?: string;
+    "Obstructions"?: string[];
+    "Quality Tier"?: string;
+    "Impact on Grading"?: string;
+  };
+
+  // v2.2 REVISED - New Fields
+  "Visual Geometry"?: {
+    front?: {
+      card_orientation?: string;
+      rotation_estimate?: string;
+      perspective_distortion?: string;
+      all_corners_visible?: boolean;
+      corners_description?: string;
+    };
+    back?: {
+      card_orientation?: string;
+      rotation_estimate?: string;
+      perspective_distortion?: string;
+      all_corners_visible?: boolean;
+      corners_description?: string;
+    };
+  };
+
+  "Design Profile"?: {
+    front?: string;
+    back?: string;
+    border_characteristics?: {
+      front?: string;
+      back?: string;
+    };
+    anchor_strategy?: string;
+  };
+
+  "Execution Control"?: {
+    all_steps_completed?: boolean;
+    skipped_steps?: string[];
+    fatal_flags?: string[];
+  };
+
+  "Image Quality Impact"?: {
+    stage1_confidence_tier?: string;
+    grade_uncertainty?: string;
+    uncertainty_reason?: string;
+    fatal_flags_impact?: string[];
+    recommended_action?: string;
+  };
+
+  "Alteration Check"?: {
+    performed?: boolean;
+    card_is_altered?: boolean;
+    reason?: string;
+    grade_override?: string | null;
+  };
+
+  "Input Validation"?: {
+    stage1_data_received?: boolean;
+    fatal_flags_from_stage1?: string[];
+    skipped_steps_from_stage1?: string[];
+    observations_count?: number;
+    pristine_count?: number;
+  };
+
+  "Centering Measurements"?: {
+    Front?: {
+      visual_anchors_lr?: string[];
+      visual_anchors_tb?: string[];
+      border_comparison_lr?: string;
+      border_comparison_tb?: string;
+      left_right_ratio?: string;
+      top_bottom_ratio?: string;
+      worst_ratio?: string;
+      measurement_proof?: string;
+      discrepancy_detected?: boolean;
+      confidence?: string;
+      notes?: string;
+    };
+    Back?: {
+      visual_anchors_lr?: string[];
+      visual_anchors_tb?: string[];
+      border_comparison_lr?: string;
+      border_comparison_tb?: string;
+      left_right_ratio?: string;
+      top_bottom_ratio?: string;
+      worst_ratio?: string;
+      measurement_proof?: string;
+      discrepancy_detected?: boolean;
+      confidence?: string;
+      notes?: string;
+    };
+  };
+
+  "Analysis Summary"?: {
+    primary_grade_factors?: string[];
+    limiting_factors?: string[];
+    image_quality_notes?: string;
+    recommended_grade_range?: string;
+    confidence_statement?: string;
+  };
+}
+
+interface SportsCard {
+  id: string;
+  serial: string;
+  front_url: string;
+  back_url: string;
+  email?: string;
+  user_email?: string;
+  ai_grading: SportsAIGrading | null;
+  stage1_observations?: {
+    observations?: Array<{
+      id: string;
+      location: string;
+      type: string;
+      description: string;
+      estimated_size_mm?: number;
+      visibility?: string;
+      how_distinguished_from_glare?: string;
+      confidence?: string;
+    }>;
+    image_quality?: {
+      resolution?: string;
+      lighting?: string;
+      angle?: string;
+      clarity?: string;
+      glare_present?: boolean;
+      obstructions?: string;
+      overall_score?: number;
+      confidence_tier?: string;
+    };
+    autograph?: {
+      has_handwriting?: boolean;
+      signature_location?: string;
+      authentication_markers_found?: string[];
+      authentication_type?: string;
+    };
+    front_centering?: {
+      x_axis_ratio?: string;
+      y_axis_ratio?: string;
+      analysis?: string;
+    };
+    back_centering?: {
+      x_axis_ratio?: string;
+      y_axis_ratio?: string;
+      analysis?: string;
+    };
+    card_information?: {
+      player_name?: string;
+      card_set?: string;
+      card_year?: string;
+      manufacturer?: string;
+    };
+    pristine_observations?: string[];
+  } | null;
+  opencv_detection?: {
+    front?: any;
+    back?: any;
+  } | null;
+  card_boundaries?: {
+    front?: any;
+    back?: any;
+  } | null;
+  raw_decimal_grade: number | null;
+  dcm_grade_whole: number | null;
+  ai_confidence_score: string;
+  processing_time?: number;
+  category: string;
+  // Professional grading slab detection
+  slab_detected?: boolean;
+  slab_company?: string | null;
+  slab_grade?: string | null;
+  slab_grade_description?: string | null;
+  slab_cert_number?: string | null;
+  slab_serial?: string | null;
+  slab_subgrades?: {
+    centering?: number;
+    corners?: number;
+    edges?: number;
+    surface?: number;
+  } | null;
+  slab_metadata?: {
+    grade_date?: string;
+    population?: string;
+    label_type?: string;
+    label_color?: string;
+  } | null;
+  slab_confidence?: string | null;
+  slab_notes?: string | null;
+  ai_vs_slab_comparison?: string | null;
+
+  // PRIMARY: Conversational AI grading v3.2 (2025-10-22)
+  conversational_grading?: string | null;
+  conversational_decimal_grade?: number | null;
+  conversational_whole_grade?: number | null;
+  conversational_grade_uncertainty?: string | null;
+  conversational_sub_scores?: {
+    centering: { front: number; back: number; weighted: number };
+    corners: { front: number; back: number; weighted: number };
+    edges: { front: number; back: number; weighted: number };
+    surface: { front: number; back: number; weighted: number };
+  } | null;
+  conversational_weighted_summary?: {
+    front_weight: number;
+    back_weight: number;
+    weighted_total: number;
+    grade_cap_reason: string | null;
+  } | null;
+  // v3.2 NEW fields
+  conversational_condition_label?: string | null;
+  conversational_image_confidence?: string | null;
+  conversational_validation_checklist?: {
+    autograph_verified: boolean;
+    handwritten_markings: boolean;
+    structural_damage: boolean;
+    both_sides_present: boolean;
+    confidence_letter: string;
+    condition_label_assigned: boolean;
+    all_steps_completed: boolean;
+  } | null;
+  conversational_front_summary?: string | null;
+  conversational_back_summary?: string | null;
+  conversational_card_info?: any;
+  conversational_meta?: {
+    prompt_version: string;
+    evaluated_at_utc: string | null;
+  } | null;
+  // v3.2 Centering ratios (from API response)
+  conversational_centering_ratios?: {
+    front_lr: string | null;
+    front_tb: string | null;
+    back_lr: string | null;
+    back_tb: string | null;
+  } | null;
+
+  // Professional grading company estimates (deterministic mapper)
+  estimated_professional_grades?: {
+    PSA: {
+      estimated_grade: string;
+      numeric_score: number;
+      confidence: 'high' | 'medium' | 'low';
+      notes: string;
+    };
+    BGS: {
+      estimated_grade: string;
+      numeric_score: number;
+      confidence: 'high' | 'medium' | 'low';
+      notes: string;
+    };
+    SGC?: {
+      estimated_grade: string;
+      numeric_score: number;
+      confidence: 'high' | 'medium' | 'low';
+      notes: string;
+    };
+    TAG?: {
+      estimated_grade: string;
+      numeric_score: number;
+      confidence: 'high' | 'medium' | 'low';
+      notes: string;
+    };
+    CGC?: {
+      estimated_grade: string;
+      numeric_score: number;
+      confidence: 'high' | 'medium' | 'low';
+      notes: string;
+    };
+    CSG?: {
+      estimated_grade: string;
+      numeric_score: number;
+      confidence: 'high' | 'medium' | 'low';
+      notes: string;
+    };
+  } | null;
+
+  // v3.3 New fields for explicit defect tracking
+  defects_front?: CardDefects | null;
+  defects_back?: CardDefects | null;
+
+  // eBay links (new columns 2025-10-28)
+  ebay_url?: string | null;
+
+  // v3.3 New fields for enhanced card details
+  card_name?: string | null;
+  card_set?: string | null;
+  card_number?: string | null;
+  set_year?: number | null;
+  manufacturer_name?: string | null;
+  category?: string;
+  featured?: string | null;
+  rookie_card?: boolean | null;
+  rarity_tier?: string | null;
+  subset?: string | null;
+  language?: string | null;
+
+  // Visibility fields
+  is_public?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export default function LorcanaCardDetails() {
+  const params = useParams();
+  const router = useRouter();
+  const id = params?.id as string;
+
+  const [card, setCard] = useState<SportsCard | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [showQR, setShowQR] = useState(false);
+  const [showShareSuccess, setShowShareSuccess] = useState(false);
+  const [shareMethod, setShareMethod] = useState('');
+  const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'front' | 'back'>('front');
+
+  // Fetch card data
+  useEffect(() => {
+    if (!id) return;
+
+    const fetchCard = async () => {
+      try {
+        const response = await fetch(`/api/lorcana/${id}`);
+        if (!response.ok) {
+          throw new Error('Card not found');
+        }
+        const data = await response.json();
+        setCard(data);
+      } catch (error) {
+        console.error('Error fetching card:', error);
+        router.push('/lorcana');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCard();
+  }, [id, router]);
+
+  const handleShare = useCallback((method: string) => {
+    if (!card) return;
+
+    const url = window.location.href;
+    const cardSharingData: CardSharingData = {
+      url,
+      cardName: card.card_name || 'Lorcana Card',
+      category: 'Lorcana',
+      grade: card.conversational_decimal_grade || card.raw_decimal_grade,
+      serial: card.serial
+    };
+
+    switch(method) {
+      case 'facebook':
+        openSocialShare(generateFacebookShareUrl(cardSharingData));
+        break;
+      case 'twitter':
+        openSocialShare(generateTwitterShareUrl(cardSharingData));
+        break;
+      case 'instagram':
+        handleInstagramShare(cardSharingData, () => {
+          setShareMethod('Instagram');
+          setShowShareSuccess(true);
+          setTimeout(() => setShowShareSuccess(false), 3000);
+        });
+        break;
+      case 'copy':
+        copyCardUrl(cardSharingData, () => {
+          setShareMethod('Link');
+          setShowShareSuccess(true);
+          setTimeout(() => setShowShareSuccess(false), 3000);
+        });
+        break;
+      case 'qr':
+        setShowQR(!showQR);
+        break;
+    }
+  }, [card, showQR]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading card details...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!card) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-800 mb-4">Card Not Found</h1>
+          <Link href="/lorcana" className="text-blue-600 hover:underline">
+            Return to Upload
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if this is a professionally graded slab
+  const isSlabCard = card.slab_detected === true && card.slab_company && card.slab_grade;
+
+  // DVG V1 JSON parsing (if available)
+  const dvgGrading = (() => {
+    try {
+      if (typeof card.conversational_grading === 'string') {
+        return JSON.parse(card.conversational_grading);
+      }
+      return card.conversational_grading || {};
+    } catch {
+      return {};
+    }
+  })();
+
+  // Professional grades are stored as a separate column (two-stage system)
+  const professionalGrades = card.estimated_professional_grades || null;
+
+  // Card info - Use top-level database fields (populated by conversational AI)
+  // Helper: Strip markdown formatting from text
+  const stripMarkdown = (text: any): string | null => {
+    if (!text) return null;
+    // Convert to string if not already
+    const str = typeof text === 'string' ? text : String(text);
+    // Handle "null" string (AI sometimes returns this)
+    if (str === 'null') return null;
+    // Remove **bold** formatting
+    return str.replace(/\*\*/g, '').trim();
+  };
+
+  // Helper: Extract English name from bilingual format for marketplace searches
+  const extractEnglishForSearch = (text: any): string | null => {
+    if (!text) return null;
+    // Convert to string if not already
+    const str = typeof text === 'string' ? text : String(text);
+
+    // Check if text contains Japanese characters and bilingual format
+    const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(str);
+
+    if (hasJapanese && str.includes('/')) {
+      // Extract English part (everything after the /)
+      const parts = str.split('/');
+      return parts[1]?.trim() || str;
+    }
+
+    return str;
+  };
+
+  const cardInfo = {
+    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
+    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading.card_info?.player_or_character,
+    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name,
+    set_era: stripMarkdown(card.conversational_card_info?.set_era) || dvgGrading.card_info?.set_era,
+    year: stripMarkdown(card.conversational_card_info?.year) || card.set_year || dvgGrading.card_info?.year,
+    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
+    card_number: stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
+    sport_or_category: stripMarkdown(card.conversational_card_info?.sport_or_category) || card.category || dvgGrading.card_info?.sport_or_category,
+    serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || dvgGrading.card_info?.serial_number,
+    rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
+    subset: stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset,
+    rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || dvgGrading.card_info?.rarity_tier,
+    autographed: card.conversational_card_info?.autographed === true,
+    memorabilia: card.conversational_card_info?.memorabilia === true,
+    card_front_text: card.conversational_card_info?.card_front_text || dvgGrading.card_info?.card_front_text,
+    card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text,
+
+    // LORCANA-SPECIFIC FIELDS - Complete mapping
+    ink_color: stripMarkdown(card.conversational_card_info?.ink_color) || card.ink_color || null,
+    lorcana_card_type: stripMarkdown(card.conversational_card_info?.lorcana_card_type) || card.lorcana_card_type || null,
+    character_version: stripMarkdown(card.conversational_card_info?.character_version) || card.character_version || null,
+    inkwell: card.conversational_card_info?.inkwell !== undefined ? card.conversational_card_info.inkwell : (card.inkwell || false),
+    ink_cost: stripMarkdown(card.conversational_card_info?.ink_cost) || card.ink_cost || null,
+    strength: stripMarkdown(card.conversational_card_info?.strength) || card.strength || null,
+    willpower: stripMarkdown(card.conversational_card_info?.willpower) || card.willpower || null,
+    lore_value: stripMarkdown(card.conversational_card_info?.lore_value) || card.lore_value || null,
+    move_cost: stripMarkdown(card.conversational_card_info?.move_cost) || card.move_cost || null,
+    quest_value: stripMarkdown(card.conversational_card_info?.quest_value) || card.quest_value || null,
+    classifications: card.conversational_card_info?.classifications || card.classifications || null,
+    abilities: card.conversational_card_info?.abilities || card.abilities || null,
+    flavor_text: stripMarkdown(card.conversational_card_info?.flavor_text) || card.flavor_text || null,
+    is_enchanted: card.conversational_card_info?.is_enchanted !== undefined ? card.conversational_card_info.is_enchanted : (card.is_enchanted || false),
+    is_foil: card.conversational_card_info?.is_foil !== undefined ? card.conversational_card_info.is_foil : (card.is_foil || false),
+    expansion_code: stripMarkdown(card.conversational_card_info?.expansion_code) || card.expansion_code || null,
+    artist_name: stripMarkdown(card.conversational_card_info?.artist_name) || card.artist_name || null,
+    franchise: stripMarkdown(card.conversational_card_info?.franchise) || card.franchise || 'Disney',
+    is_promo: card.conversational_card_info?.is_promo !== undefined ? card.conversational_card_info.is_promo : (card.is_promo || false),
+  };
+
+  // Helper: Get ink color badge styling
+  const getInkColorBadge = (inkColor: string | null) => {
+    if (!inkColor) return null;
+
+    const colorMap: {[key: string]: {emoji: string, bg: string, text: string, name: string}} = {
+      'Amber': {emoji: '🟡', bg: 'bg-yellow-100', text: 'text-yellow-800', name: 'Amber'},
+      'Amethyst': {emoji: '🟣', bg: 'bg-purple-100', text: 'text-purple-800', name: 'Amethyst'},
+      'Emerald': {emoji: '🟢', bg: 'bg-green-100', text: 'text-green-800', name: 'Emerald'},
+      'Ruby': {emoji: '🔴', bg: 'bg-red-100', text: 'text-red-800', name: 'Ruby'},
+      'Sapphire': {emoji: '🔵', bg: 'bg-blue-100', text: 'text-blue-800', name: 'Sapphire'},
+      'Steel': {emoji: '⚫', bg: 'bg-gray-100', text: 'text-gray-800', name: 'Steel'},
+    };
+
+    const colorInfo = colorMap[inkColor] || {emoji: '⚪', bg: 'bg-gray-100', text: 'text-gray-800', name: inkColor};
+
+    return (
+      <span className={`px-3 py-1 rounded-lg text-sm font-bold ${colorInfo.bg} ${colorInfo.text}`}>
+        {colorInfo.emoji} {colorInfo.name}
+      </span>
+    );
+  };
+
+  // Determine primary display grade
+  const decimalGrade = card.conversational_decimal_grade ?? card.raw_decimal_grade;
+  const wholeGrade = card.conversational_whole_grade ?? card.dcm_grade_whole;
+
+  // Recommended professional grade (BGS as default)
+  const recommendedGrade = (() => {
+    if (professionalGrades?.BGS) {
+      return {
+        company: 'BGS',
+        recommended_grade: professionalGrades.BGS.estimated_grade,
+        recommended_whole_grade: professionalGrades.BGS.numeric_score,
+        confidence: professionalGrades.BGS.confidence,
+        notes: professionalGrades.BGS.notes
+      };
+    }
+    return { company: null, recommended_grade: null, recommended_whole_grade: null, confidence: null, notes: null };
+  })();
+
+  // Format date helper
+  const formatGradedDate = (dateString: string | undefined) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // eBay condition mapping
+  const ebayCondition: EbayCondition | null = decimalGrade !== null && decimalGrade !== undefined
+    ? mapToEbayCondition(decimalGrade)
+    : null;
+
+  const ebayConditionColor = ebayCondition ? getEbayConditionColor(ebayCondition) : 'gray';
+  const ebayConditionDesc = ebayCondition ? getEbayConditionDescription(ebayCondition) : null;
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+      {/* Breadcrumb Navigation */}
+      <div className="bg-white border-b sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex items-center space-x-2 text-sm">
+            <Link href="/" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              Home
+            </Link>
+            <span className="text-gray-400">/</span>
+            <Link href="/lorcana" className="text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              Lorcana
+            </Link>
+            <span className="text-gray-400">/</span>
+            <span className="text-gray-600 truncate max-w-xs">
+              {cardInfo.card_name || `Card ${card.serial}`}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* LEFT COLUMN - Card Images */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-20">
+              {/* Card Images */}
+              <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                {/* Tab Headers */}
+                <div className="flex border-b">
+                  <button
+                    onClick={() => setActiveTab('front')}
+                    className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                      activeTab === 'front'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Front
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('back')}
+                    className={`flex-1 py-3 text-sm font-semibold transition-colors ${
+                      activeTab === 'back'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Back
+                  </button>
+                </div>
+
+                {/* Image Display */}
+                <div className="relative bg-gray-100 aspect-[2.5/3.5]">
+                  <Image
+                    src={activeTab === 'front' ? card.front_url : card.back_url}
+                    alt={`${cardInfo.card_name || 'Card'} - ${activeTab}`}
+                    fill
+                    className="object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => setZoomImage(activeTab === 'front' ? card.front_url : card.back_url)}
+                  />
+                  <button
+                    onClick={() => setZoomImage(activeTab === 'front' ? card.front_url : card.back_url)}
+                    className="absolute top-2 right-2 bg-black/60 hover:bg-black/80 text-white p-2 rounded-lg transition-colors"
+                    title="Zoom image"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+
+              {/* Share Options */}
+              <div className="bg-white rounded-lg shadow-lg p-4 mt-4">
+                <h3 className="font-semibold text-gray-800 mb-3">Share This Card</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    onClick={() => handleShare('facebook')}
+                    className="flex flex-col items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors"
+                  >
+                    <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                    </svg>
+                    <span className="text-xs mt-1 text-gray-700">Facebook</span>
+                  </button>
+                  <button
+                    onClick={() => handleShare('twitter')}
+                    className="flex flex-col items-center p-3 bg-sky-50 rounded-lg hover:bg-sky-100 transition-colors"
+                  >
+                    <svg className="w-6 h-6 text-sky-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>
+                    </svg>
+                    <span className="text-xs mt-1 text-gray-700">Twitter</span>
+                  </button>
+                  <button
+                    onClick={() => handleShare('copy')}
+                    className="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs mt-1 text-gray-700">Copy Link</span>
+                  </button>
+                </div>
+                {showShareSuccess && (
+                  <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg text-center">
+                    <p className="text-sm text-green-700 font-medium">{shareMethod} link copied!</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Download Report Button */}
+              <div className="mt-4">
+                <DownloadReportButton cardData={card} />
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN - Card Details & Grading */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Professional Slab Banner (if detected) */}
+            {isSlabCard && (
+              <div className="bg-gradient-to-r from-yellow-400 via-yellow-500 to-amber-500 rounded-lg shadow-xl p-6 border-2 border-yellow-600">
+                <div className="flex items-start space-x-4">
+                  <div className="flex-shrink-0">
+                    <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center shadow-lg">
+                      <svg className="w-10 h-10 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <h2 className="text-2xl font-bold text-white mb-2">
+                      Professionally Graded Slab Detected
+                    </h2>
+                    <div className="grid grid-cols-2 gap-4 text-white">
+                      <div>
+                        <p className="text-sm opacity-90">Grading Company</p>
+                        <p className="text-lg font-bold">{card.slab_company}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm opacity-90">Grade</p>
+                        <p className="text-lg font-bold">{card.slab_grade}</p>
+                      </div>
+                      {card.slab_cert_number && (
+                        <div>
+                          <p className="text-sm opacity-90">Cert Number</p>
+                          <p className="text-lg font-bold">{card.slab_cert_number}</p>
+                        </div>
+                      )}
+                      {card.slab_confidence && (
+                        <div>
+                          <p className="text-sm opacity-90">Detection Confidence</p>
+                          <p className="text-lg font-bold capitalize">{card.slab_confidence}</p>
+                        </div>
+                      )}
+                    </div>
+                    {card.slab_grade_description && (
+                      <p className="mt-3 text-sm text-white/90 italic">{card.slab_grade_description}</p>
+                    )}
+                    {card.slab_notes && (
+                      <p className="mt-2 text-sm text-white/80">{card.slab_notes}</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subgrades (if available) */}
+                {card.slab_subgrades && (
+                  <div className="mt-4 pt-4 border-t border-yellow-400/30">
+                    <h3 className="text-white font-semibold mb-2">Subgrades</h3>
+                    <div className="grid grid-cols-4 gap-3">
+                      {card.slab_subgrades.centering && (
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 text-center">
+                          <p className="text-xs text-white/80">Centering</p>
+                          <p className="text-lg font-bold text-white">{card.slab_subgrades.centering}</p>
+                        </div>
+                      )}
+                      {card.slab_subgrades.corners && (
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 text-center">
+                          <p className="text-xs text-white/80">Corners</p>
+                          <p className="text-lg font-bold text-white">{card.slab_subgrades.corners}</p>
+                        </div>
+                      )}
+                      {card.slab_subgrades.edges && (
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 text-center">
+                          <p className="text-xs text-white/80">Edges</p>
+                          <p className="text-lg font-bold text-white">{card.slab_subgrades.edges}</p>
+                        </div>
+                      )}
+                      {card.slab_subgrades.surface && (
+                        <div className="bg-white/20 backdrop-blur-sm rounded-lg p-2 text-center">
+                          <p className="text-xs text-white/80">Surface</p>
+                          <p className="text-lg font-bold text-white">{card.slab_subgrades.surface}</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* DCM Grade */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <div className="text-center mb-6">
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  DCM Grade
+                </h1>
+                <div className="flex items-center justify-center space-x-4">
+                  {decimalGrade !== null && decimalGrade !== undefined ? (
+                    <>
+                      <div className="text-6xl font-bold text-blue-600">
+                        {decimalGrade.toFixed(1)}
+                      </div>
+                      <div className="text-left">
+                        <div className="text-2xl font-semibold text-gray-700">
+                          / 10
+                        </div>
+                        {card.conversational_condition_label && (
+                          <div className="text-sm text-gray-600 mt-1">
+                            {card.conversational_condition_label}
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-2xl text-gray-500">Grade Not Available</div>
+                  )}
+                </div>
+
+                {/* Grade Uncertainty */}
+                {card.conversational_grade_uncertainty && (
+                  <div className="mt-4 inline-block px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      <span className="font-semibold">Uncertainty:</span> {card.conversational_grade_uncertainty}
+                    </p>
+                  </div>
+                )}
+
+                {/* Image Confidence */}
+                {card.conversational_image_confidence && (
+                  <div className="mt-2 inline-block px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <span className="font-semibold">Image Quality:</span> {card.conversational_image_confidence}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Sub-Scores */}
+              {card.conversational_sub_scores && (
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Sub-Scores Breakdown</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {['centering', 'corners', 'edges', 'surface'].map((category) => {
+                      const scores = card.conversational_sub_scores?.[category as keyof typeof card.conversational_sub_scores];
+                      if (!scores) return null;
+                      return (
+                        <div key={category} className="bg-gray-50 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-gray-600 uppercase mb-2">
+                            {category}
+                          </p>
+                          <div className="space-y-1 text-sm">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Front:</span>
+                              <span className="font-semibold text-gray-900">{scores.front.toFixed(1)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Back:</span>
+                              <span className="font-semibold text-gray-900">{scores.back.toFixed(1)}</span>
+                            </div>
+                            <div className="flex justify-between pt-1 border-t border-gray-200">
+                              <span className="text-gray-700 font-medium">Weighted:</span>
+                              <span className="font-bold text-blue-600">{scores.weighted.toFixed(1)}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Professional Grade Estimates */}
+              {professionalGrades && (
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Estimated Professional Grades</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {Object.entries(professionalGrades).map(([company, grade]) => (
+                      <div key={company} className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
+                        <h4 className="font-bold text-gray-900 mb-1">{company}</h4>
+                        <p className="text-2xl font-bold text-blue-600 mb-1">{grade.estimated_grade}</p>
+                        <p className="text-xs text-gray-600 capitalize mb-2">
+                          {grade.confidence} confidence
+                        </p>
+                        <p className="text-xs text-gray-700">{grade.notes}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* eBay Condition Mapping */}
+              {ebayCondition && ebayConditionDesc && (
+                <div className="mt-6 pt-6 border-t">
+                  <h3 className="text-lg font-bold text-gray-800 mb-3">eBay Condition Equivalent</h3>
+                  <div className={`bg-${ebayConditionColor}-50 border-2 border-${ebayConditionColor}-200 rounded-lg p-4`}>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className={`text-lg font-bold text-${ebayConditionColor}-900`}>
+                        {ebayCondition}
+                      </span>
+                      <span className="text-sm text-gray-600">
+                        Based on DCM {decimalGrade?.toFixed(1)}
+                      </span>
+                    </div>
+                    <p className={`text-sm text-${ebayConditionColor}-800`}>
+                      {ebayConditionDesc}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Card Information */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-xl font-bold mb-4 text-gray-800">Card Information</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Card Name */}
+                {(cardInfo.card_name || card.card_name) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Card Name</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {cardInfo.card_name || card.card_name}
+                    </p>
+                  </div>
+                )}
+
+                {/* Character Version */}
+                {(cardInfo.character_version || card.character_version) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Version</p>
+                    <p className="text-lg text-gray-900">
+                      {cardInfo.character_version || card.character_version}
+                    </p>
+                  </div>
+                )}
+
+                {/* Ink Color */}
+                {(cardInfo.ink_color || card.ink_color) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Ink Color</p>
+                    <div>
+                      {getInkColorBadge(cardInfo.ink_color || card.ink_color)}
+                    </div>
+                  </div>
+                )}
+
+                {/* Card Type */}
+                {(cardInfo.lorcana_card_type || card.lorcana_card_type) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Type</p>
+                    <p className="text-lg font-bold text-gray-900">
+                      {cardInfo.lorcana_card_type || card.lorcana_card_type}
+                    </p>
+                  </div>
+                )}
+
+                {/* Ink Cost */}
+                {(cardInfo.ink_cost || card.ink_cost) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Ink Cost</p>
+                    <p className="text-lg font-bold text-purple-700 font-mono">
+                      {cardInfo.ink_cost || card.ink_cost}
+                    </p>
+                  </div>
+                )}
+
+                {/* Inkwell Badge */}
+                {(cardInfo.inkwell || card.inkwell) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Inkwell</p>
+                    <span className="inline-block px-3 py-1 bg-blue-100 text-blue-800 rounded-lg text-sm font-bold">
+                      💧 Inkable
+                    </span>
+                  </div>
+                )}
+
+                {/* Character Stats */}
+                {((cardInfo.strength || card.strength) || (cardInfo.willpower || card.willpower) || (cardInfo.lore_value || card.lore_value)) && (
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-semibold text-gray-600 mb-2">Character Stats</p>
+                    <div className="flex gap-4">
+                      {(cardInfo.strength || card.strength) && (
+                        <div className="bg-red-50 rounded-lg px-4 py-2">
+                          <p className="text-xs text-red-600 font-semibold">⚔️ Strength</p>
+                          <p className="text-xl font-bold text-red-700">
+                            {cardInfo.strength || card.strength}
+                          </p>
+                        </div>
+                      )}
+                      {(cardInfo.willpower || card.willpower) && (
+                        <div className="bg-blue-50 rounded-lg px-4 py-2">
+                          <p className="text-xs text-blue-600 font-semibold">🛡️ Willpower</p>
+                          <p className="text-xl font-bold text-blue-700">
+                            {cardInfo.willpower || card.willpower}
+                          </p>
+                        </div>
+                      )}
+                      {(cardInfo.lore_value || card.lore_value) && (
+                        <div className="bg-yellow-50 rounded-lg px-4 py-2">
+                          <p className="text-xs text-yellow-600 font-semibold">⭐ Lore</p>
+                          <p className="text-xl font-bold text-yellow-700">
+                            {cardInfo.lore_value || card.lore_value}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Set/Expansion */}
+                {(() => {
+                  const setName = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
+                                 (card.card_set && card.card_set !== 'null') ? card.card_set :
+                                 cardInfo.set_era || card.card_set || 'Unknown Set';
+
+                  return setName !== 'Unknown Set' && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Set</p>
+                      <p className="text-lg text-gray-900">{setName}</p>
+                    </div>
+                  );
+                })()}
+
+                {/* Card Number */}
+                {(cardInfo.card_number || card.card_number) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Card Number</p>
+                    <p className="text-lg text-gray-900">
+                      {cardInfo.card_number || card.card_number}
+                    </p>
+                  </div>
+                )}
+
+                {/* Year */}
+                {(cardInfo.year || card.set_year) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Year</p>
+                    <p className="text-lg text-gray-900">{cardInfo.year || card.set_year}</p>
+                  </div>
+                )}
+
+                {/* Rarity */}
+                {(cardInfo.rarity_tier || card.rarity_tier) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Rarity</p>
+                    <span className="inline-block px-3 py-1 bg-purple-100 text-purple-800 rounded-lg text-sm font-bold">
+                      {cardInfo.rarity_tier || card.rarity_tier}
+                    </span>
+                  </div>
+                )}
+
+                {/* Enchanted Badge */}
+                {(cardInfo.is_enchanted || card.is_enchanted) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Special</p>
+                    <span className="inline-block px-3 py-1 bg-gradient-to-r from-purple-400 via-pink-400 to-purple-400 text-white rounded-lg text-sm font-bold">
+                      ✨ Enchanted
+                    </span>
+                  </div>
+                )}
+
+                {/* Foil Badge */}
+                {(cardInfo.is_foil || card.is_foil) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Finish</p>
+                    <span className="inline-block px-3 py-1 bg-gradient-to-r from-yellow-200 via-yellow-300 to-yellow-200 text-yellow-900 rounded-lg text-sm font-bold">
+                      ✨ Foil
+                    </span>
+                  </div>
+                )}
+
+                {/* Franchise */}
+                {(cardInfo.franchise || card.franchise) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Franchise</p>
+                    <p className="text-lg text-gray-900">
+                      {cardInfo.franchise || card.franchise}
+                    </p>
+                  </div>
+                )}
+
+                {/* Artist Name */}
+                {(cardInfo.artist_name || card.artist_name) && (
+                  <div>
+                    <p className="text-sm font-semibold text-gray-600 mb-1">Artist</p>
+                    <p className="text-lg text-gray-900">
+                      {cardInfo.artist_name || card.artist_name}
+                    </p>
+                  </div>
+                )}
+
+                {/* Classifications */}
+                {(cardInfo.classifications || card.classifications) && (
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-semibold text-gray-600 mb-2">Classifications</p>
+                    <div className="flex flex-wrap gap-2">
+                      {(Array.isArray(cardInfo.classifications) ? cardInfo.classifications :
+                        Array.isArray(card.classifications) ? card.classifications :
+                        []).map((classification, idx) => (
+                        <span key={idx} className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-lg text-sm font-semibold">
+                          {classification}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Abilities */}
+                {(cardInfo.abilities || card.abilities) && (
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-semibold text-gray-600 mb-2">Abilities</p>
+                    <div className="space-y-2">
+                      {(Array.isArray(cardInfo.abilities) ? cardInfo.abilities :
+                        Array.isArray(card.abilities) ? card.abilities :
+                        []).map((ability, idx) => (
+                        <div key={idx} className="bg-gray-50 rounded-lg p-3 border border-gray-200">
+                          <p className="text-sm text-gray-800">{ability}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Flavor Text */}
+                {(cardInfo.flavor_text || card.flavor_text) && (
+                  <div className="md:col-span-2">
+                    <p className="text-sm font-semibold text-gray-600 mb-2">Flavor Text</p>
+                    <p className="text-sm text-gray-700 italic bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      "{cardInfo.flavor_text || card.flavor_text}"
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Market Listings */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h2 className="text-lg font-bold mb-3 text-gray-800">Market Listings</h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* eBay Active Listings */}
+                <a
+                  href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([cardInfo.card_name, cardInfo.character_version, cardInfo.set_name].filter(Boolean).join(' '))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
+                >
+                  <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-blue-900 text-sm">eBay</h3>
+                    <p className="text-xs text-blue-700 truncate">Active listings</p>
+                  </div>
+                </a>
+
+                {/* eBay Sold Listings */}
+                <a
+                  href={`https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent([cardInfo.card_name, cardInfo.character_version, cardInfo.set_name].filter(Boolean).join(' '))}&LH_Sold=1&LH_Complete=1`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
+                >
+                  <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-green-900 text-sm">eBay Sold</h3>
+                    <p className="text-xs text-green-700 truncate">Price history</p>
+                  </div>
+                </a>
+              </div>
+            </div>
+
+            {/* Front & Back Summaries */}
+            {(card.conversational_front_summary || card.conversational_back_summary) && (
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-xl font-bold mb-4 text-gray-800">Condition Summary</h2>
+
+                {card.conversational_front_summary && (
+                  <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-blue-600 mb-2">Front</h3>
+                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                      <ReactMarkdown className="text-sm text-gray-800 prose prose-sm max-w-none">
+                        {card.conversational_front_summary}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {card.conversational_back_summary && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-green-600 mb-2">Back</h3>
+                    <div className="bg-green-50 rounded-lg p-4 border border-green-200">
+                      <ReactMarkdown className="text-sm text-gray-800 prose prose-sm max-w-none">
+                        {card.conversational_back_summary}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Full Grading Report */}
+            {card.conversational_grading && (
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-xl font-bold mb-4 text-gray-800">Full Grading Report</h2>
+                <div className="prose prose-sm max-w-none">
+                  {(() => {
+                    try {
+                      const report = typeof card.conversational_grading === 'string'
+                        ? card.conversational_grading
+                        : JSON.stringify(card.conversational_grading, null, 2);
+
+                      // Check if this is JSON format (v4.2+)
+                      if (report.trim().startsWith('{')) {
+                        const jsonData = JSON.parse(report);
+
+                        // Format JSON sections with proper styling
+                        const formatValue = (value: any, depth: number = 0): React.ReactNode => {
+                          if (value === null || value === undefined) return <span className="text-gray-400">N/A</span>;
+                          if (typeof value === 'boolean') return <span className={value ? 'text-green-600' : 'text-red-600'}>{value ? 'Yes' : 'No'}</span>;
+                          if (typeof value === 'number') return <span className="text-blue-600 font-mono">{value}</span>;
+                          if (typeof value === 'string') {
+                            // Check for markdown bold
+                            if (value.includes('**')) {
+                              const parts = value.split(/(\*\*.*?\*\*)/g);
+                              return (
+                                <span>
+                                  {parts.map((part, idx) =>
+                                    part.startsWith('**') && part.endsWith('**') ?
+                                      <strong key={idx}>{part.slice(2, -2)}</strong> :
+                                      part
+                                  )}
+                                </span>
+                              );
+                            }
+                            return <span className="text-gray-700">{value}</span>;
+                          }
+                          if (Array.isArray(value)) {
+                            if (value.length === 0) return <span className="text-gray-400">None</span>;
+                            return (
+                              <ul className="list-disc list-inside space-y-1 mt-2">
+                                {value.map((item, idx) => (
+                                  <li key={idx} className="text-sm text-gray-700">
+                                    {typeof item === 'object' ? formatValue(item, depth + 1) : item}
+                                  </li>
+                                ))}
+                              </ul>
+                            );
+                          }
+                          if (typeof value === 'object') {
+                            return (
+                              <div className={`space-y-2 ${depth > 0 ? 'ml-4 mt-2 pl-4 border-l-2 border-gray-200' : ''}`}>
+                                {Object.entries(value).map(([k, v]) => (
+                                  <div key={k}>
+                                    <span className="font-semibold text-gray-700">{k.replace(/_/g, ' ')}:</span>{' '}
+                                    {formatValue(v, depth + 1)}
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          }
+                          return <span>{String(value)}</span>;
+                        };
+
+                        const formatJSONSection = (title: string, data: any, isCardInfo: boolean = false) => {
+                          if (!data || (typeof data === 'object' && Object.keys(data).length === 0)) return null;
+
+                          return (
+                            <div className="mb-6 pb-6 border-b last:border-b-0 border-gray-200">
+                              <h3 className={`${isCardInfo ? 'text-xl' : 'text-lg'} font-bold text-gray-900 mb-3`}>
+                                {title}
+                              </h3>
+                              <div className="bg-gray-50 rounded-lg p-4">
+                                {formatValue(data)}
+                              </div>
+                            </div>
+                          );
+                        };
+
+                        return (
+                          <div className="prose prose-sm max-w-none">
+                            {formatJSONSection('Card Information', jsonData.card_info, true)}
+                            {formatJSONSection('Front Evaluation', jsonData.front, false)}
+                            {formatJSONSection('Back Evaluation', jsonData.back, false)}
+                            {formatJSONSection('Image Quality Assessment', jsonData.image_confidence, false)}
+                            {formatJSONSection('Centering Analysis', jsonData.centering, false)}
+                            {formatJSONSection('Corner Analysis', jsonData.corners, false)}
+                            {formatJSONSection('Edge Analysis', jsonData.edges, false)}
+                            {formatJSONSection('Surface Analysis', jsonData.surface, false)}
+                            {formatJSONSection('Defect Pattern Analysis', jsonData.defect_pattern_analysis, false)}
+                            {formatJSONSection('Sub-Scores', jsonData.sub_scores, false)}
+                            {formatJSONSection('Final Grade Calculation', jsonData.final_grade || {
+                              decimal_grade: jsonData.decimal_grade,
+                              whole_grade: jsonData.whole_grade,
+                              preliminary_grade: jsonData.preliminary_grade,
+                              grade_range: jsonData.grade_range,
+                              condition_label: jsonData.condition_label,
+                              limiting_factor: jsonData.limiting_factor
+                            }, false)}
+                            {formatJSONSection('Grade Cap Analysis', jsonData.grade_cap_analysis, false)}
+                            {formatJSONSection('Professional Grade Estimates', jsonData.professional_grade_estimates, false)}
+
+                            {/* Meta Information */}
+                            {jsonData.prompt_version && (
+                              <div className="mt-8 pt-8 border-t-2 border-gray-300 bg-gray-50 -mx-8 -mb-8 px-8 py-6">
+                                <h4 className="text-lg font-bold text-gray-900 mb-3">Evaluation Details</h4>
+                                <div className="space-y-3 text-sm">
+                                  {/* Prompt Version - Full Width */}
+                                  <div>
+                                    <span className="font-semibold text-gray-700">Prompt Version:</span>{' '}
+                                    <span className="text-gray-600">{jsonData.prompt_version}</span>
+                                  </div>
+                                  {/* Evaluation Date and Processing Time - Side by Side */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <span className="font-semibold text-gray-700">Evaluation Date:</span>{' '}
+                                      <span className="text-gray-600">{formatGradedDate(card.created_at)}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-gray-700">Processing Time:</span>{' '}
+                                      <span className="text-gray-600">
+                                        {card.processing_time ? `${(card.processing_time / 1000).toFixed(1)}s` : 'N/A'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+
+                      // Fallback to markdown rendering
+                      return <ReactMarkdown>{report}</ReactMarkdown>;
+                    } catch (e) {
+                      return (
+                        <div className="bg-gray-50 p-4 rounded-lg">
+                          <pre className="whitespace-pre-wrap text-sm text-gray-700 overflow-x-auto">
+                            {typeof card.conversational_grading === 'string'
+                              ? card.conversational_grading
+                              : JSON.stringify(card.conversational_grading, null, 2)}
+                          </pre>
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Image Zoom Modal */}
+      {zoomImage && (
+        <ImageZoomModal
+          imageUrl={zoomImage}
+          onClose={() => setZoomImage(null)}
+        />
+      )}
+
+      {/* Schema.org structured data */}
+      <Script id="card-structured-data" type="application/ld+json">
+        {JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "Product",
+          "name": cardInfo.card_name || "Lorcana Card",
+          "category": "Lorcana Trading Card",
+          "brand": {
+            "@type": "Brand",
+            "name": "Disney Lorcana"
+          },
+          "offers": {
+            "@type": "AggregateOffer",
+            "priceCurrency": "USD",
+            "availability": "https://schema.org/InStock"
+          },
+          "aggregateRating": decimalGrade ? {
+            "@type": "AggregateRating",
+            "ratingValue": decimalGrade.toFixed(1),
+            "bestRating": "10",
+            "worstRating": "1"
+          } : undefined
+        })}
+      </Script>
+    </div>
+  );
+}
