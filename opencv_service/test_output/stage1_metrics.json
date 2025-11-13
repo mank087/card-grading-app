@@ -1,0 +1,168 @@
+{
+  "version": "stage1_opencv_v1.0",
+  "run_id": "e137272c-84ca-4b2b-b548-7e3fae8178ca",
+  "front": {
+    "side_label": "front",
+    "width": 1181,
+    "height": 1600,
+    "centering": {
+      "lr_ratio": [
+        51.080788644707134,
+        48.9192107068195
+      ],
+      "tb_ratio": [
+        27.701550001507496,
+        72.29844964248865
+      ],
+      "left_border_mean_px": 78.77083333333333,
+      "right_border_mean_px": 75.4375,
+      "top_border_mean_px": 77.8125,
+      "bottom_border_mean_px": 203.08333333333334
+    },
+    "edge_segments": {
+      "top": [
+        {
+          "segment_name": "top_1",
+          "whitening_length_px": 18.625,
+          "whitening_count": 149,
+          "chips_count": 1,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "top_2",
+          "whitening_length_px": 91.375,
+          "whitening_count": 731,
+          "chips_count": 6,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "top_3",
+          "whitening_length_px": 58.625,
+          "whitening_count": 469,
+          "chips_count": 2,
+          "white_dots_count": 0
+        }
+      ],
+      "right": [
+        {
+          "segment_name": "right_1",
+          "whitening_length_px": 2.3564727954971856,
+          "whitening_count": 1256,
+          "chips_count": 18,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "right_2",
+          "whitening_length_px": 1.2833020637898687,
+          "whitening_count": 684,
+          "chips_count": 7,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "right_3",
+          "whitening_length_px": 1.6779026217228465,
+          "whitening_count": 896,
+          "chips_count": 12,
+          "white_dots_count": 0
+        }
+      ],
+      "bottom": [
+        {
+          "segment_name": "bottom_1",
+          "whitening_length_px": 25.625,
+          "whitening_count": 205,
+          "chips_count": 4,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "bottom_2",
+          "whitening_length_px": 1.0,
+          "whitening_count": 8,
+          "chips_count": 0,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "bottom_3",
+          "whitening_length_px": 31.125,
+          "whitening_count": 249,
+          "chips_count": 4,
+          "white_dots_count": 0
+        }
+      ],
+      "left": [
+        {
+          "segment_name": "left_1",
+          "whitening_length_px": 1.724202626641651,
+          "whitening_count": 919,
+          "chips_count": 14,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "left_2",
+          "whitening_length_px": 3.928705440900563,
+          "whitening_count": 2094,
+          "chips_count": 33,
+          "white_dots_count": 0
+        },
+        {
+          "segment_name": "left_3",
+          "whitening_length_px": 2.758426966292135,
+          "whitening_count": 1473,
+          "chips_count": 16,
+          "white_dots_count": 0
+        }
+      ]
+    },
+    "corners": [
+      {
+        "corner_name": "tl",
+        "rounding_radius_px": 52.11787796020508,
+        "whitening_length_px": 1652.0,
+        "white_dots_count": 0
+      },
+      {
+        "corner_name": "tr",
+        "rounding_radius_px": 50.83561706542969,
+        "whitening_length_px": 1776.0,
+        "white_dots_count": 0
+      },
+      {
+        "corner_name": "bl",
+        "rounding_radius_px": 51.151832580566406,
+        "whitening_length_px": 708.0,
+        "white_dots_count": 0
+      },
+      {
+        "corner_name": "br",
+        "rounding_radius_px": 54.470279693603516,
+        "whitening_length_px": 2000.0,
+        "white_dots_count": 0
+      }
+    ],
+    "surface": {
+      "white_dots_count": 0,
+      "scratch_count": 520,
+      "crease_like_count": 68,
+      "glare_coverage_percent": 0.0,
+      "focus_variance": 166.30176919129758,
+      "lighting_uniformity_score": 0.5738100958167055,
+      "color_bias_bgr": [
+        98.38068215495343,
+        99.13281805673158,
+        99.94073878069433
+      ]
+    },
+    "sleeve_indicator": false,
+    "top_loader_indicator": false,
+    "slab_indicator": false,
+    "glare_mask_percent": 0.0,
+    "obstructions": [],
+    "debug_assets": {
+      "normalized_image": "./test_output\\front_normalized.png",
+      "glare_mask": "./test_output\\front_glare_mask.png",
+      "overlay": "./test_output\\front_overlay.png",
+      "card_mask": "./test_output\\front_card_mask.png"
+    }
+  },
+  "back": null
+}

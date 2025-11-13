@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage 2 Scoring v3.1",
+  "type": "object",
+  "required": [
+    "stage",
+    "version",
+    "category_scores",
+    "weighted_composite_score",
+    "final_grade",
+    "limiting_factors",
+    "centerings_used",
+    "analysis_summary"
+  ],
+  "properties": {
+    "stage": { "const": "scoring" },
+    "version": { "const": "3.1" },
+    "category_scores": { "type": "object" },
+    "weighted_composite_score": { "type": "number" },
+    "final_grade": {
+      "type": "object",
+      "required": ["decimal_final_grade", "whole_number_grade", "rounding_logic", "grade_uncertainty"],
+      "properties": {
+        "decimal_final_grade": { "type": "number" },
+        "whole_number_grade": { "type": "integer" },
+        "rounding_logic": { "type": "string" },
+        "grade_uncertainty": { "enum": ["±0.0", "±0.5", "±1.0", "N/A"] }
+      }
+    },
+    "limiting_factors": { "type": "array", "items": { "type": "string" } },
+    "centerings_used": {
+      "type": "object",
+      "required": ["front_lr", "front_tb", "back_lr", "back_tb", "front_type", "back_type"],
+      "properties": {
+        "front_lr": { "type": "string" },
+        "front_tb": { "type": "string" },
+        "back_lr":  { "type": "string" },
+        "back_tb":  { "type": "string" },
+        "front_type": { "enum": ["border-detected", "design-anchor", "N/A"] },
+        "back_type":  { "enum": ["border-detected", "design-anchor", "N/A"] }
+      }
+    },
+    "analysis_summary": {
+      "type": "object",
+      "required": ["positives", "negatives"],
+      "properties": {
+        "positives": { "type": "array", "items": { "type": "string" } },
+        "negatives": { "type": "array", "items": { "type": "string" } }
+      }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Stage 1 Observation v3.1",
+  "type": "object",
+  "required": [
+    "stage",
+    "version",
+    "edge_detection_mode",
+    "stage0_validation",
+    "defects",
+    "positive_observations",
+    "observations_count",
+    "confidence",
+    "image_quality"
+  ],
+  "properties": {
+    "stage": { "const": "observation" },
+    "version": { "const": "3.1" },
+    "edge_detection_mode": { "enum": ["standard", "color-channel", "manual-fallback"] },
+    "stage0_validation": {
+      "type": "object",
+      "required": [
+        "front_centering_lr_ok",
+        "front_centering_tb_ok",
+        "back_centering_lr_ok",
+        "back_centering_tb_ok",
+        "centering_estimate_type_front",
+        "centering_estimate_type_back",
+        "notes"
+      ],
+      "properties": {
+        "front_centering_lr_ok": { "type": ["boolean", "string"] },
+        "front_centering_tb_ok": { "type": ["boolean", "string"] },
+        "back_centering_lr_ok":  { "type": ["boolean", "string"] },
+        "back_centering_tb_ok":  { "type": ["boolean", "string"] },
+        "centering_estimate_type_front": { "enum": ["border-detected", "design-anchor", "N/A"] },
+        "centering_estimate_type_back":  { "enum": ["border-detected", "design-anchor", "N/A"] },
+        "notes": { "type": "string" }
+      }
+    },
+    "defects": { "type": "object" },
+    "positive_observations": {
+      "type": "object",
+      "required": ["corners", "edges", "surface"],
+      "properties": {
+        "corners": {
+          "type": "object",
+          "required": ["sharp", "slightly_soft", "rounded"],
+          "properties": {
+            "sharp": { "type": "integer" },
+            "slightly_soft": { "type": "integer" },
+            "rounded": { "type": "integer" }
+          }
+        },
+        "edges": {
+          "type": "object",
+          "required": ["smooth", "chipped"],
+          "properties": {
+            "smooth": { "type": "integer" },
+            "chipped": { "type": "integer" }
+          }
+        },
+        "surface": {
+          "type": "object",
+          "required": ["gloss_intact", "print_registration", "color_saturation"],
+          "properties": {
+            "gloss_intact": { "type": "boolean" },
+            "print_registration": { "enum": ["unknown", "good", "excellent"] },
+            "color_saturation": { "enum": ["unknown", "accurate", "strong"] }
+          }
+        }
+      }
+    },
+    "observations_count": { "type": "integer" },
+    "confidence": { "enum": ["high", "medium", "low"] },
+    "image_quality": {
+      "type": "object",
+      "required": ["grade", "focus_ok", "glare_present", "lighting_ok", "color_balance_ok", "notes"],
+      "properties": {
+        "grade": { "enum": ["A", "B", "C", "D"] },
+        "focus_ok": { "type": "boolean" },
+        "glare_present": { "type": "boolean" },
+        "lighting_ok": { "type": "boolean" },
+        "color_balance_ok": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}

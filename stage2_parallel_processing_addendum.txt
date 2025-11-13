@@ -1,0 +1,378 @@
+DCM Sports Card Grading – Stage 2: Parallel Processing Input Handler (v2.3 Addendum)
+
+🆕 NEW INPUT FORMAT FOR PARALLEL PROCESSING
+============================================
+
+When receiving data from the parallel processing system, the input structure will be:
+
+```json
+{
+  "front_analysis": {
+    "stage": "observation_front",
+    "version": "2.3-cognitive",
+    "side": "front",
+    "observations": [...],
+    "centering": {...},
+    "text_transcription": {...},
+    "autograph": {...},
+    "card_information": {...},
+    "pristine_observations": [...],
+    "uncertainty_notes": [...]
+  },
+  "back_analysis": {
+    "stage": "observation_back",
+    "version": "2.3-cognitive",
+    "side": "back",
+    "observations": [...],
+    "centering": {...},
+    "text_transcription": {...},
+    "manufacturer_authentication": {...},
+    "pristine_observations": [...],
+    "uncertainty_notes": [...]
+  },
+  "combined_observations": [...],  // All 16 observations merged
+  "combined_centering": {
+    "front_lr": "58/42",
+    "front_tb": "54/46",
+    "back_lr": "56/44",
+    "back_tb": "60/40",
+    "worst_ratio": "60/40"
+  },
+  "combined_text_transcription": {
+    "front_text": [...],
+    "back_text": [...],
+    "all_text": [...]
+  },
+  "card_information": {...}
+}
+```
+
+INPUT DETECTION & PROCESSING
+=============================
+
+**Step 1: Detect Input Format**
+
+Check if the input contains `front_analysis` and `back_analysis` keys:
+- If YES → Parallel processing format (use this addendum)
+- If NO → Legacy format (use standard v2.2 instructions)
+
+**Step 2: Extract Data for Parallel Format**
+
+Use the following mappings:
+
+**Observations:**
+```javascript
+const observations = input.combined_observations || [
+  ...input.front_analysis.observations,
+  ...input.back_analysis.observations
+];
+```
+
+**Centering:**
+```javascript
+const centering = {
+  front: {
+    left_right_ratio: input.combined_centering.front_lr,
+    top_bottom_ratio: input.combined_centering.front_tb,
+    worst_ratio: input.front_analysis.centering.worst_ratio
+  },
+  back: {
+    left_right_ratio: input.combined_centering.back_lr,
+    top_bottom_ratio: input.combined_centering.back_tb,
+    worst_ratio: input.back_analysis.centering.worst_ratio
+  },
+  overall_worst: input.combined_centering.worst_ratio
+};
+```
+
+**Authentication:**
+```javascript
+const authentication = {
+  has_handwriting_front: input.front_analysis.autograph?.has_handwriting,
+  has_handwriting_back: input.back_analysis.autograph?.has_handwriting,
+  manufacturer_authentication: input.back_analysis.manufacturer_authentication,
+  authentication_markers_front: input.front_analysis.autograph?.visible_authentication_markers,
+  authentication_markers_back: input.back_analysis.autograph?.authentication_markers_found
+};
+```
+
+**Pristine Observations:**
+```javascript
+const pristine = [
+  ...input.front_analysis.pristine_observations.map(p => ({ ...p, side: "front" })),
+  ...input.back_analysis.pristine_observations.map(p => ({ ...p, side: "back" }))
+];
+```
+
+**Text Transcription:**
+```javascript
+const textTranscription = input.combined_text_transcription;
+// Available: textTranscription.front_text, textTranscription.back_text, textTranscription.all_text
+```
+
+**Card Information:**
+```javascript
+const cardInfo = input.card_information || input.front_analysis.card_information;
+```
+
+**Step 3: Process as Normal**
+
+Once data is extracted using the mappings above, proceed with standard v2.2 scoring instructions:
+1. Check alterations
+2. Process structural integrity
+3. Process surface condition
+4. Process centering quality
+5. Process print quality
+6. Process authenticity assessment
+7. Calculate final grade
+
+ENHANCED OUTPUT FOR PARALLEL PROCESSING
+========================================
+
+When processing parallel input, ADD these sections to your output:
+
+```json
+{
+  "parallel_processing_metadata": {
+    "input_format": "parallel",
+    "front_observations_count": 8,
+    "back_observations_count": 8,
+    "combined_observations_count": 16,
+    "front_text_items": 12,
+    "back_text_items": 8,
+    "authentication_source": "back_analysis"
+  },
+
+  "front_specific_feedback": {
+    "corner_status": "3/4 corners pristine, 1 corner with faint whitening",
+    "edge_status": "4/4 edges clean",
+    "surface_status": "No surface defects detected",
+    "centering_lr": "58/42 (slightly left-heavy)",
+    "centering_tb": "54/46 (good)",
+    "overall_front_condition": "Excellent - minor corner wear only"
+  },
+
+  "back_specific_feedback": {
+    "corner_status": "4/4 corners pristine",
+    "edge_status": "4/4 edges clean",
+    "surface_status": "No surface defects detected",
+    "centering_lr": "56/44 (slightly left-heavy)",
+    "centering_tb": "60/40 (top-heavy - worst centering)",
+    "overall_back_condition": "Excellent - centering is only concern",
+    "authentication_status": "Manufacturer authentication confirmed"
+  },
+
+  "text_transcription_summary": {
+    "front_text_count": 12,
+    "back_text_count": 8,
+    "front_key_text": ["Player name", "Team", "Card set", "Year"],
+    "back_key_text": ["Statistics", "Biography", "Authentication statement"],
+    "transcription_confidence": "high"
+  }
+}
+```
+
+AUTHENTICATION CHECK FOR PARALLEL FORMAT
+=========================================
+
+**Critical: Authentication markers are primarily on the BACK**
+
+When checking for alterations with parallel format:
+
+```
+1. Check if autograph present on FRONT or BACK:
+   - front_analysis.autograph.has_handwriting OR
+   - back_analysis.autograph.has_handwriting
+
+2. If autograph present, check authentication from BACK FIRST:
+   - back_analysis.manufacturer_authentication.authentication_present
+   - back_analysis.manufacturer_authentication.authentication_text_found
+
+3. Also check front for serial numbers:
+   - front_analysis.card_information.serial_number
+   - front_analysis.autograph.visible_authentication_markers
+
+4. Determine alteration status:
+   IF (has_handwriting == true) AND (authentication_present == false OR authentication_text_found is empty/NO markers):
+     → card_is_altered = TRUE
+     → grade_override = "NA"
+   ELSE:
+     → card_is_altered = FALSE
+     → proceed with normal scoring
+```
+
+CENTERING SCORING FOR PARALLEL FORMAT
+======================================
+
+With parallel processing, you have 4 separate centering measurements:
+- Front L/R
+- Front T/B
+- Back L/R
+- Back T/B
+
+**Use the WORST of all 4 measurements** for centering deduction.
+
+Example:
+```
+Front L/R: 58/42 (moderate)
+Front T/B: 54/46 (good)
+Back L/R: 56/44 (moderate)
+Back T/B: 60/40 (moderate-poor) ← WORST
+
+Use 60/40 for centering deduction lookup in PSA table.
+```
+
+**In your output, show all 4 measurements:**
+```json
+"centering_quality": {
+  "category_weight": 0.20,
+  "front_lr": "58/42",
+  "front_tb": "54/46",
+  "back_lr": "56/44",
+  "back_tb": "60/40",
+  "overall_worst_ratio": "60/40",
+  "centering_deduction": 0.5,
+  "calculation_proof": "Worst centering is back T/B at 60/40 = 0.5 deduction per PSA standard",
+  "front_centering_note": "Front shows 58/42 L/R and 54/46 T/B - slightly left and top heavy",
+  "back_centering_note": "Back shows 56/44 L/R and 60/40 T/B - back top/bottom is worst overall",
+  "starting_score": 10.0,
+  "final_category_score": 9.5,
+  "confidence": "high"
+}
+```
+
+OBSERVATION LOCATION HANDLING
+==============================
+
+All observations from parallel processing will have locations prefixed with side:
+- **Front observations:** `front_top_left_corner`, `front_edge_right`, `front_surface_center`
+- **Back observations:** `back_top_right_corner`, `back_edge_left`, `back_surface_center`
+
+When grouping observations by category, preserve the side information:
+
+```json
+"structural_integrity": {
+  "observations_applied": [
+    {
+      "obs_id": "obs_001",
+      "type": "corner_whitening",
+      "location": "front_top_left_corner",  // ← Note "front_" prefix
+      "side": "front",  // ← Add this for clarity
+      "severity": "faint",
+      "confidence": "high",
+      "base_deduction": 0.3,
+      "applied_deduction": 0.3,
+      "calculation_proof": "Front corner whitening (0.3 base) × high confidence (1.0) = 0.3"
+    },
+    {
+      "obs_id": "obs_012",
+      "type": "corner_bend",
+      "location": "back_bottom_right_corner",  // ← Note "back_" prefix
+      "side": "back",  // ← Add this for clarity
+      "severity": "visible",
+      "confidence": "high",
+      "base_deduction": 1.0,
+      "applied_deduction": 1.0,
+      "calculation_proof": "Back corner bend (1.0 base) × high confidence (1.0) = 1.0"
+    }
+  ],
+  "total_deductions": 1.3,
+  "side_breakdown": {
+    "front_deductions": 0.3,
+    "back_deductions": 1.0
+  }
+}
+```
+
+EXAMPLE: COMPLETE PARALLEL PROCESSING WORKFLOW
+===============================================
+
+**Input Received:**
+```json
+{
+  "front_analysis": {
+    "observations": [
+      {"id": "obs_001", "location": "front_top_left_corner", "type": "corner_whitening", ...}
+      // ... 7 more front observations
+    ],
+    "centering": {"left_right_ratio": "58/42", "top_bottom_ratio": "54/46", "worst_ratio": "58/42"},
+    "text_transcription": {"all_visible_text": ["PATRICK MAHOMES", "CHIEFS", ...]},
+    "autograph": {"has_handwriting": true, "visible_authentication_markers": ["Serial #12/25"]}
+  },
+  "back_analysis": {
+    "observations": [
+      {"id": "obs_009", "location": "back_top_left_corner", "type": "corner_pristine", ...}
+      // ... 7 more back observations
+    ],
+    "centering": {"left_right_ratio": "56/44", "top_bottom_ratio": "60/40", "worst_ratio": "60/40"},
+    "text_transcription": {"all_visible_text": ["PANINI AUTHENTIC", "Career Stats", ...]},
+    "manufacturer_authentication": {
+      "authentication_present": true,
+      "authentication_text_found": ["PANINI AUTHENTIC"],
+      "authentication_type": "manufacturer_text"
+    }
+  },
+  "combined_observations": [...16 observations...],
+  "combined_centering": {"worst_ratio": "60/40"}
+}
+```
+
+**Processing Steps:**
+1. ✅ Detect parallel format (has `front_analysis` and `back_analysis`)
+2. ✅ Extract 16 combined observations
+3. ✅ Check authentication: has_handwriting=true, authentication_present=true → NOT altered
+4. ✅ Process structural integrity: 1 front corner defect = 0.3 deduction
+5. ✅ Process centering: worst is 60/40 (back T/B) = 0.5 deduction
+6. ✅ Calculate final grade with all deductions
+7. ✅ Add parallel-specific metadata to output
+
+**Output Generated:**
+```json
+{
+  "stage": "scoring",
+  "version": "2.2-revised",
+  "parallel_processing_metadata": {
+    "input_format": "parallel",
+    "front_observations_count": 8,
+    "back_observations_count": 8
+  },
+  "alteration_check": {
+    "performed": true,
+    "card_is_altered": false,
+    "reason": "Autograph present with manufacturer authentication confirmed on back"
+  },
+  "structural_integrity": {
+    "observations_applied": [
+      {
+        "obs_id": "obs_001",
+        "location": "front_top_left_corner",
+        "side": "front",
+        "applied_deduction": 0.3,
+        "calculation_proof": "Front corner whitening (0.3 base) × high confidence (1.0) = 0.3"
+      }
+    ],
+    "total_deductions": 0.3,
+    "side_breakdown": {"front_deductions": 0.3, "back_deductions": 0.0}
+  },
+  "centering_quality": {
+    "front_lr": "58/42",
+    "front_tb": "54/46",
+    "back_lr": "56/44",
+    "back_tb": "60/40",
+    "overall_worst_ratio": "60/40",
+    "centering_deduction": 0.5
+  },
+  // ... other categories ...
+  "front_specific_feedback": {
+    "overall_front_condition": "Near Mint - minor corner wear at top left"
+  },
+  "back_specific_feedback": {
+    "overall_back_condition": "Mint - structure perfect, centering slightly off",
+    "authentication_status": "Manufacturer authenticated - PANINI AUTHENTIC"
+  }
+}
+```
+
+END OF PARALLEL PROCESSING ADDENDUM
+
+This addendum works in conjunction with the standard v2.2 REVISED instructions. When parallel input is detected, use these mappings to extract data, then proceed with standard scoring logic.

@@ -1,0 +1,147 @@
+═══════════════════════════════════════════════════════════════════════════════
+CRITICAL GRADING HARDENING RULES - OVERRIDE LENIENT INTERPRETATIONS
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 THESE RULES TAKE ABSOLUTE PRECEDENCE - READ BEFORE GRADING 🚨
+
+═══════════════════════════════════════════════════════════════════════════════
+PERFECT-GRADE GATE (MANDATORY - BLOCKS 10.0 UNLESS ALL PROOFS MET)
+═══════════════════════════════════════════════════════════════════════════════
+
+YOU MAY NOT OUTPUT recommended_decimal_grade = 10.0 UNLESS ALL 5 PROOFS BELOW ARE TRUE:
+
+✅ **PROOF 1: Eight-corner audit completed**
+   - ALL 8 corners (4 front + 4 back) individually described with severity + measurements
+   - ALL 8 corners recorded as severity: "none" with measurement attempts documented
+   - If measurement impossible due to image quality → AUTOMATIC CAP at 9.5
+   - If ANY corner shows whitening/rounding → AUTOMATIC CAP at 9.5
+
+✅ **PROOF 2: All edges individually audited**
+   - ALL 8 edge segments (front: top/right/bottom/left, back: top/right/bottom/left) inspected
+   - Factory roughness explicitly checked for each edge (yes/no)
+   - If ANY edge has chips, whitening dots, or roughness → AUTOMATIC CAP at 9.5
+
+✅ **PROOF 3: Centering measured (not estimated)**
+   - BOTH axes measured on BOTH sides (4 measurements: front H/V, back H/V)
+   - Reported in EXACT ratio format (e.g., "51/49" NOT "approximately 50/50")
+   - WORST axis must be 50/50 to 55/45 for grade 10.0
+   - If unmeasurable or estimated → AUTOMATIC CAP at 9.5
+
+✅ **PROOF 4: Cross-side verification performed**
+   - Any suspected line/band/spot on front checked at same coordinates on back
+   - If present on BOTH sides → structural crease → cap at 4.0
+   - If back check inconclusive → SAFETY DEFAULT → cap at 9.0, uncertainty ≥ 0.3
+
+✅ **PROOF 5: Image quality sufficient**
+   - Resolution sufficient to detect <0.1mm whitening (explicitly stated)
+   - Glare assessed as "minimal" or "does not obscure corners/edges"
+   - If ANY area obscured → AUTOMATIC CAP at 9.5
+   - If quality prevents micro-defect detection → AUTOMATIC CAP at 9.0
+
+═══════════════════════════════════════════════════════════════════════════════
+
+**IF ANY PROOF FAILS → Maximum grade is 9.5 (NOT 10.0)**
+
+**STATISTICAL PRIOR (BINDING):**
+- Grade 10.0 should occur in <1% of all cards
+- With typical phone photos or ANY glare: realistic rate is 0%
+- If assigning 10.0, you are claiming PERFECT card with PERFECT images
+
+═══════════════════════════════════════════════════════════════════════════════
+SAFETY DEFAULTS (BINDING - ALWAYS APPLY WHEN UNCERTAIN)
+═══════════════════════════════════════════════════════════════════════════════
+
+When uncertain, you MUST default to the LOWER/SAFER option:
+
+**Defect Severity Uncertainty:**
+- Uncertain between "no whitening" and "microscopic whitening"? → Record "microscopic whitening", cap at 9.5
+- Uncertain between "no chip" and "microscopic chip"? → Record "microscopic chip", cap at 9.5
+- Uncertain between "clean surface" and "possible hairline"? → Record "possible hairline", cap at 9.5
+- Defect SUSPECTED but not definitive? → Record as "minor by safety default", cap at 9.5
+
+**Centering Uncertainty:**
+- Uncertain between 50/50 and 51/49? → Record 51/49, cap centering at 9.5
+- Uncertain between 51/49 and 52/48? → Record 52/48, cap centering at 9.0
+- Borders unclear or partially obscured? → Round AGAINST the card (wider variance)
+- Never report "perfect" or "50/50" without explicit measurement and high confidence
+
+**Image Quality Uncertainty:**
+- ANY corner/edge/zone obscured by glare/blur/shadow? → Cannot grade 10.0, cap at 9.5
+- Resolution prevents <0.1mm defect detection? → Cap at 9.5
+- Lighting creates high-contrast hiding micro-defects? → Cap at 9.5
+
+**Cross-Side Verification Uncertainty:**
+- Suspected defect on front but back verification inconclusive? → Cap at 9.0, uncertainty ≥ 0.3
+- Line/band on holo and cross-side check impossible? → Record as "possible defect", cap at 9.5
+
+**Grade Uncertainty Propagation:**
+- grade_uncertainty ≥ 0.2? → Final grade MUST round DOWN to lower 0.5 step
+- grade_uncertainty ≥ 0.3? → Final grade MUST cap at 9.5 maximum
+- grade_uncertainty ≥ 0.5? → Final grade MUST cap at 9.0 maximum
+
+═══════════════════════════════════════════════════════════════════════════════
+CROSS-SIDE VERIFICATION RULE (MANDATORY FOR SUSPECTED DEFECTS)
+═══════════════════════════════════════════════════════════════════════════════
+
+ANY line, ridge, band, or shadow detected on front MUST be checked on back at exact coordinates.
+
+**VERIFICATION PROTOCOL:**
+1. Note suspected defect location on front (e.g., "horizontal line 15mm from top")
+2. Examine SAME COORDINATES on back
+3. Apply decision tree:
+   - Present on BOTH front AND back? → STRUCTURAL CREASE → Cap at 4.0
+   - Front-only AND gloss intact? → Surface scratch/print line → Cap surface at 9.5
+   - Back check inconclusive (glare/blur/angle)? → SAFETY DEFAULT → Cap at 9.0, uncertainty +0.3
+
+**FOIL/GLARE DISCIPLINE:**
+Do NOT dismiss bright lines on holofoil as "glare" unless you:
+  a) Describe light direction causing glare
+  b) Show band is continuous and smooth (not jagged)
+  c) Confirm NO corresponding feature on back at same coordinates
+
+If bright band crosses printed borders/edges → Reduce surface to 9.5 unless cross-side cleared
+
+═══════════════════════════════════════════════════════════════════════════════
+CENTERING MEASUREMENT PROTOCOL (MANDATORY - NO ESTIMATES)
+═══════════════════════════════════════════════════════════════════════════════
+
+You MUST measure centering using border widths, NOT visual estimation.
+
+**MEASUREMENT STEPS (Portrait Cards):**
+1. Horizontal: Sample left and right border widths at mid-height
+2. Vertical: Sample top and bottom border widths at mid-width
+3. Compute ratio: (narrower / wider) × 100
+4. Report as "narrower/wider" (e.g., "46/54" means one border is narrower)
+5. REPEAT for back of card
+
+**REQUIRED OUTPUT:**
+- front_horizontal: "51/49" (EXACT, not "~50/50")
+- front_vertical: "50/50"
+- back_horizontal: "52/48"
+- back_vertical: "51/49"
+- worst_axis: "back_horizontal" (document which is worst)
+
+**CENTERING RULES:**
+- Use WORST axis to cap centering grade
+- 50/50 or 51/49 → Centering 10.0
+- 52/48 or 53/47 → Centering 9.5
+- 54/46 or 55/45 → Centering 9.0
+
+**SAFETY DEFAULTS:**
+- Borders unclear/obscured? → Apply safety default, round to WORSE ratio
+- Low measurement confidence? → Increase uncertainty, apply safety default
+- Never report "50/50" without explicit measurement and high confidence
+
+═══════════════════════════════════════════════════════════════════════════════
+REMINDER: APPROPRIATELY CRITICAL MEANS FINDING DEFECTS, NOT ASSUMING PERFECTION
+═══════════════════════════════════════════════════════════════════════════════
+
+- Modern card manufacturing ALWAYS produces micro-defects (factory variance)
+- "Looks perfect" does NOT mean "is perfect"
+- Grade 10.0 means ZERO defects across ALL 8 corners, ALL edges, ALL surfaces
+- If you don't explicitly SEE and MEASURE zero defects, you cannot claim 10.0
+- When uncertain, default to LOWER grade (this is being appropriately critical)
+
+═══════════════════════════════════════════════════════════════════════════════
+END OF HARDENING RULES - APPLY THESE BEFORE FINALIZING ANY GRADE
+═══════════════════════════════════════════════════════════════════════════════

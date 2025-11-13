@@ -39,3 +39,19 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Backup folders
+backup_*/
+
+# Claude Code
+.claude/
+
+# Test files
+test_label*.pdf
+full_sheet_test.pdf
+precise_label_test.pdf
+fold_over_label.pdf
+long_name_test.pdf
+
+# Temporary files
+nul

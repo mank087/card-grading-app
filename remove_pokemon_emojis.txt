@@ -1,0 +1,18 @@
+Line 2144: visibility icon
+Line 2153: regrade icon
+Line 2310: professional grading icon
+Line 2404, 2430: warning icons
+Line 2546: professional grade detected
+Line 2672, 2679: card information headers
+Line 2736: special features
+Line 2859: card description
+Line 2907: centering details
+Line 3092: orientation
+Line 3124, 3130, 3140: centering measurement
+Line 3164: tip icon
+Line 3449: confidence score
+Line 3549, 3590: case detection
+Line 3616, 3624: professional grades
+Line 3798: market pricing (SVG ok)
+Line 4449, 4475: condition headers
+Line 4920, 4973: search icons

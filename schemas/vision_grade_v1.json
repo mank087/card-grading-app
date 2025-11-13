@@ -1,0 +1,370 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Card Grading Vision API Response Schema",
+  "description": "Schema for Direct Vision Grader v1 (DVG v1) grading output",
+  "type": "object",
+  "required": [
+    "meta",
+    "card_info",
+    "centering",
+    "defects",
+    "autograph",
+    "image_quality",
+    "analysis_summary",
+    "recommended_grade"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": ["model_name", "provider", "version"],
+      "properties": {
+        "model_name": {
+          "type": "string",
+          "description": "AI model used for grading",
+          "enum": ["gpt-4o", "gpt-4o-mini"]
+        },
+        "provider": {
+          "type": "string",
+          "description": "API provider",
+          "const": "openai"
+        },
+        "version": {
+          "type": "string",
+          "description": "Grading system version",
+          "const": "dvg-v1"
+        }
+      }
+    },
+    "card_info": {
+      "type": "object",
+      "required": [
+        "card_name",
+        "player_or_character",
+        "set_name",
+        "year",
+        "manufacturer",
+        "card_number",
+        "sport_or_category"
+      ],
+      "properties": {
+        "card_name": {
+          "type": "string",
+          "description": "Full card name"
+        },
+        "player_or_character": {
+          "type": "string",
+          "description": "Player or character name"
+        },
+        "set_name": {
+          "type": "string",
+          "description": "Set or series name"
+        },
+        "year": {
+          "type": "string",
+          "description": "Year or 'Unknown'"
+        },
+        "manufacturer": {
+          "type": "string",
+          "description": "Manufacturer (Panini, Topps, etc) or 'Unknown'"
+        },
+        "card_number": {
+          "type": "string",
+          "description": "Card number or 'N/A'"
+        },
+        "sport_or_category": {
+          "type": "string",
+          "description": "Sport or category (Football, Basketball, Pokemon, etc)"
+        }
+      }
+    },
+    "centering": {
+      "type": "object",
+      "required": [
+        "front_left_right_ratio_text",
+        "front_top_bottom_ratio_text",
+        "back_left_right_ratio_text",
+        "back_top_bottom_ratio_text",
+        "method_front",
+        "method_back"
+      ],
+      "properties": {
+        "front_left_right_ratio_text": {
+          "type": "string",
+          "pattern": "^\\d{2}/\\d{2}$",
+          "description": "Front L/R centering ratio (e.g., '52/48')"
+        },
+        "front_top_bottom_ratio_text": {
+          "type": "string",
+          "pattern": "^\\d{2}/\\d{2}$",
+          "description": "Front T/B centering ratio (e.g., '54/46')"
+        },
+        "back_left_right_ratio_text": {
+          "type": "string",
+          "pattern": "^\\d{2}/\\d{2}$",
+          "description": "Back L/R centering ratio (e.g., '53/47')"
+        },
+        "back_top_bottom_ratio_text": {
+          "type": "string",
+          "pattern": "^\\d{2}/\\d{2}$",
+          "description": "Back T/B centering ratio (e.g., '50/50')"
+        },
+        "method_front": {
+          "type": "string",
+          "enum": ["border-present", "design-anchor"],
+          "description": "Centering estimation method for front"
+        },
+        "method_back": {
+          "type": "string",
+          "enum": ["border-present", "design-anchor"],
+          "description": "Centering estimation method for back"
+        }
+      }
+    },
+    "defects": {
+      "type": "object",
+      "required": ["front", "back"],
+      "properties": {
+        "front": {
+          "type": "object",
+          "required": ["corners", "edges", "surface"],
+          "properties": {
+            "corners": {
+              "type": "object",
+              "required": ["top_left", "top_right", "bottom_left", "bottom_right"],
+              "properties": {
+                "top_left": {
+                  "$ref": "#/definitions/defect"
+                },
+                "top_right": {
+                  "$ref": "#/definitions/defect"
+                },
+                "bottom_left": {
+                  "$ref": "#/definitions/defect"
+                },
+                "bottom_right": {
+                  "$ref": "#/definitions/defect"
+                }
+              }
+            },
+            "edges": {
+              "type": "object",
+              "required": ["top", "bottom", "left", "right"],
+              "properties": {
+                "top": {
+                  "$ref": "#/definitions/defect"
+                },
+                "bottom": {
+                  "$ref": "#/definitions/defect"
+                },
+                "left": {
+                  "$ref": "#/definitions/defect"
+                },
+                "right": {
+                  "$ref": "#/definitions/defect"
+                }
+              }
+            },
+            "surface": {
+              "type": "object",
+              "required": ["scratches", "creases", "print_defects", "stains", "other"],
+              "properties": {
+                "scratches": {
+                  "$ref": "#/definitions/defect"
+                },
+                "creases": {
+                  "$ref": "#/definitions/defect"
+                },
+                "print_defects": {
+                  "$ref": "#/definitions/defect"
+                },
+                "stains": {
+                  "$ref": "#/definitions/defect"
+                },
+                "other": {
+                  "$ref": "#/definitions/defect"
+                }
+              }
+            }
+          }
+        },
+        "back": {
+          "type": "object",
+          "required": ["corners", "edges", "surface"],
+          "properties": {
+            "corners": {
+              "type": "object",
+              "required": ["top_left", "top_right", "bottom_left", "bottom_right"],
+              "properties": {
+                "top_left": {
+                  "$ref": "#/definitions/defect"
+                },
+                "top_right": {
+                  "$ref": "#/definitions/defect"
+                },
+                "bottom_left": {
+                  "$ref": "#/definitions/defect"
+                },
+                "bottom_right": {
+                  "$ref": "#/definitions/defect"
+                }
+              }
+            },
+            "edges": {
+              "type": "object",
+              "required": ["top", "bottom", "left", "right"],
+              "properties": {
+                "top": {
+                  "$ref": "#/definitions/defect"
+                },
+                "bottom": {
+                  "$ref": "#/definitions/defect"
+                },
+                "left": {
+                  "$ref": "#/definitions/defect"
+                },
+                "right": {
+                  "$ref": "#/definitions/defect"
+                }
+              }
+            },
+            "surface": {
+              "type": "object",
+              "required": ["scratches", "creases", "print_defects", "stains", "other"],
+              "properties": {
+                "scratches": {
+                  "$ref": "#/definitions/defect"
+                },
+                "creases": {
+                  "$ref": "#/definitions/defect"
+                },
+                "print_defects": {
+                  "$ref": "#/definitions/defect"
+                },
+                "stains": {
+                  "$ref": "#/definitions/defect"
+                },
+                "other": {
+                  "$ref": "#/definitions/defect"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "autograph": {
+      "type": "object",
+      "required": ["present", "type", "cert_markers"],
+      "properties": {
+        "present": {
+          "type": "boolean",
+          "description": "True only if actual handwriting/pen strokes are visible"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["none", "on-card", "sticker"],
+          "description": "Type of autograph if present"
+        },
+        "cert_markers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Authentication markers if present, empty array if none"
+        }
+      }
+    },
+    "image_quality": {
+      "type": "object",
+      "required": ["grade", "focus_ok", "glare_present", "lighting_ok", "color_balance_ok", "notes"],
+      "properties": {
+        "grade": {
+          "type": "string",
+          "enum": ["A", "B", "C", "D"],
+          "description": "Image quality grade (A=Excellent, B=Good, C=Fair, D=Poor)"
+        },
+        "focus_ok": {
+          "type": "boolean",
+          "description": "Is the card in sharp focus?"
+        },
+        "glare_present": {
+          "type": "boolean",
+          "description": "Is there reflective glare obscuring details?"
+        },
+        "lighting_ok": {
+          "type": "boolean",
+          "description": "Is lighting even and sufficient?"
+        },
+        "color_balance_ok": {
+          "type": "boolean",
+          "description": "Do colors appear natural and accurate?"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Any image quality issues or notes"
+        }
+      }
+    },
+    "analysis_summary": {
+      "type": "object",
+      "required": ["positives", "negatives"],
+      "properties": {
+        "positives": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "description": "Array of positive aspects (at least 2-3)"
+        },
+        "negatives": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Array of negative aspects/defects (include even minor issues)"
+        }
+      }
+    },
+    "recommended_grade": {
+      "type": "object",
+      "required": ["recommended_decimal_grade", "recommended_whole_grade", "grade_uncertainty"],
+      "properties": {
+        "recommended_decimal_grade": {
+          "type": "number",
+          "minimum": 1.0,
+          "maximum": 10.0,
+          "description": "Decimal grade (e.g., 8.5)"
+        },
+        "recommended_whole_grade": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Whole number grade (e.g., 8)"
+        },
+        "grade_uncertainty": {
+          "type": "string",
+          "enum": ["±0.0", "±0.5", "±1.0"],
+          "description": "Grade uncertainty based on image quality"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "defect": {
+      "type": "object",
+      "required": ["severity", "description"],
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": ["none", "minor", "moderate", "heavy"],
+          "description": "Severity level of the defect"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of the defect or condition"
+        }
+      }
+    }
+  }
+}

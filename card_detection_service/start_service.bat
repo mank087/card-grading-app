@@ -1,0 +1,9 @@
+@echo off
+echo Starting Card Detection Service...
+echo.
+echo Installing dependencies...
+pip install -r requirements.txt
+echo.
+echo Starting Flask server on port 5001...
+python app.py
+pause
