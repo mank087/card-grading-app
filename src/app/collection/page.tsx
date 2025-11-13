@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { supabase } from '../../lib/supabaseClient'
@@ -167,7 +167,7 @@ const getCardLink = (card: Card) => {
   return `/card/${card.id}`;
 };
 
-export default function CollectionPage() {
+function CollectionPageContent() {
   const [cards, setCards] = useState<Card[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -723,4 +723,12 @@ function CardThumbnail({ path }: { path: string }) {
   }
 
   return <img src={url} alt="Card" className="w-full h-full object-cover" />
+}
+// Wrap in Suspense for Next.js 15 useSearchParams() requirement
+export default function CollectionPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading collection...</div>}>
+      <CollectionPageContent />
+    </Suspense>
+  )
 }
