@@ -42,19 +42,24 @@ export default function LoginPage() {
         const { error } = await supabase.auth.signUp({
           email,
           password,
+          options: {
+            emailRedirectTo: undefined
+          }
         })
         if (error) throw error
         alert('Check your email for the confirmation link!')
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log('Attempting login with:', { email, urlLength: email.length })
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         })
+        console.log('Login response:', { data, error })
         if (error) throw error
       }
     } catch (error: any) {
-      setError(error.message || 'An error occurred')
-      console.error('Auth error:', error)
+      console.error('Full auth error:', error)
+      setError(error.message || error.toString() || 'An error occurred')
     } finally {
       setLoading(false)
     }
