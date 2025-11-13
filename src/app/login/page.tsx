@@ -54,7 +54,8 @@ export default function LoginPage() {
           email,
           password,
         })
-        console.log('Login response:', { data, error })
+        console.log('Login response data:', data)
+        console.log('Login response error:', error)
         if (error) throw error
       }
     } catch (error: any) {
