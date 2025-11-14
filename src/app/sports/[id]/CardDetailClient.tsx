@@ -1975,6 +1975,18 @@ export function SportsCardDetails() {
         front: structuredDefects.front.surface,
         back: structuredDefects.back.surface
       }
+    } : {}),
+    // 🆕 Always include sub_scores from conversational data (matches Pokemon pattern)
+    ...(card.conversational_sub_scores ? {
+      sub_scores: card.conversational_sub_scores
+    } : {}),
+    // 🆕 Include recommended_grade if we have conversational grade (matches Pokemon pattern)
+    ...(card.conversational_decimal_grade ? {
+      recommended_grade: {
+        recommended_decimal_grade: card.conversational_decimal_grade,
+        recommended_whole_grade: card.conversational_whole_grade,
+        grade_uncertainty: card.conversational_grade_uncertainty
+      }
     } : {})
   };
 
