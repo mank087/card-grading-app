@@ -709,11 +709,18 @@ function CardThumbnail({ path }: { path: string }) {
   useEffect(() => {
     const loadImage = async () => {
       setLoading(true)
-      const { data } = await supabase
+
+      // Use authenticated client with user's access token
+      const authClient = getAuthenticatedClient()
+      const { data, error } = await authClient
         .storage
         .from('cards')
         .createSignedUrl(path, 60 * 60) // 1 hour
-      
+
+      if (error) {
+        console.error('Failed to create signed URL:', error)
+      }
+
       setUrl(data?.signedUrl || null)
       setLoading(false)
     }
