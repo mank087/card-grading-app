@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getStoredSession, getAuthenticatedClient } from '../../lib/directAuth'
+import { supabase } from '../../lib/supabaseClient'
 
 type Card = {
   id: string
