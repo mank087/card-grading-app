@@ -397,21 +397,102 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     // This doesn't break main grading - if it fails, we continue with null conversational result
     // 🆕 v3.3: Store full conversational result for v3.3 field extraction
     let conversationalResultV3_3: any = null;
+    let conversationalGradingData: any = null;
+    let isJSONMode = false;
 
     if (gradingResult && frontUrl && backUrl) {
       try {
-        console.log(`[GET /api/sports/${cardId}] 🧪 Starting conversational grading v3.3...`);
-        const conversationalResult = await gradeCardConversational(frontUrl, backUrl);
+        console.log(`[GET /api/sports/${cardId}] 🧪 Starting conversational grading v4.2...`);
+        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'sports');
         conversationalGradingResult = conversationalResult.markdown_report;
         conversationalResultV3_3 = conversationalResult; // Store full v3.3 result
-        console.log(`[GET /api/sports/${cardId}] ✅ Conversational grading v3.3 completed: ${conversationalResult.extracted_grade.decimal_grade}`);
+        console.log(`[GET /api/sports/${cardId}] ✅ Conversational grading completed: ${conversationalResult.extracted_grade.decimal_grade}`);
         console.log(`[GET /api/sports/${cardId}] 🏆 Rarity: ${conversationalResult.rarity_classification?.rarity_tier || 'Not detected'}`);
         console.log(`[GET /api/sports/${cardId}] 📍 Defects: Front=${conversationalResult.defect_coordinates_front.length}, Back=${conversationalResult.defect_coordinates_back.length}`);
+
+        // Detect if we're using JSON format (v4.x) or markdown format (v3.x)
+        isJSONMode = conversationalResult.meta?.version === 'conversational-v4.0-json';
+        console.log(`[GET /api/sports/${cardId}] Output format detected: ${isJSONMode ? 'JSON (v4.0)' : 'Markdown (v3.x)'}`);
+
+        // Parse JSON format and extract fields for database
+        if (isJSONMode && conversationalGradingResult) {
+          try {
+            const parsedJSONData = JSON.parse(conversationalGradingResult);
+            console.log(`[GET /api/sports/${cardId}] ✅ Successfully parsed JSON response`);
+
+            // Build conversationalGradingData from JSON
+            conversationalGradingData = {
+              decimal_grade: parsedJSONData.final_grade?.decimal_grade ?? null,
+              whole_grade: parsedJSONData.final_grade?.whole_grade ?? null,
+              grade_uncertainty: parsedJSONData.final_grade?.grade_range || '±0.5',
+              condition_label: parsedJSONData.final_grade?.condition_label || null,
+              final_grade_summary: parsedJSONData.final_grade?.summary || null,
+              image_confidence: parsedJSONData.image_quality?.confidence_letter || null,
+              sub_scores: {
+                centering: {
+                  front: parsedJSONData.raw_sub_scores?.centering_front || 0,
+                  back: parsedJSONData.raw_sub_scores?.centering_back || 0,
+                  weighted: parsedJSONData.weighted_scores?.centering_weighted || 0
+                },
+                corners: {
+                  front: parsedJSONData.raw_sub_scores?.corners_front || 0,
+                  back: parsedJSONData.raw_sub_scores?.corners_back || 0,
+                  weighted: parsedJSONData.weighted_scores?.corners_weighted || 0
+                },
+                edges: {
+                  front: parsedJSONData.raw_sub_scores?.edges_front || 0,
+                  back: parsedJSONData.raw_sub_scores?.edges_back || 0,
+                  weighted: parsedJSONData.weighted_scores?.edges_weighted || 0
+                },
+                surface: {
+                  front: parsedJSONData.raw_sub_scores?.surface_front || 0,
+                  back: parsedJSONData.raw_sub_scores?.surface_back || 0,
+                  weighted: parsedJSONData.weighted_scores?.surface_weighted || 0
+                }
+              },
+              centering_ratios: {
+                front_lr: parsedJSONData.centering?.front?.left_right || 'N/A',
+                front_tb: parsedJSONData.centering?.front?.top_bottom || 'N/A',
+                back_lr: parsedJSONData.centering?.back?.left_right || 'N/A',
+                back_tb: parsedJSONData.centering?.back?.top_bottom || 'N/A'
+              },
+              card_info: parsedJSONData.card_info || null,
+              case_detection: parsedJSONData.case_detection || null,
+              weighted_sub_scores: {
+                centering: parsedJSONData.weighted_scores?.centering_weighted || null,
+                corners: parsedJSONData.weighted_scores?.corners_weighted || null,
+                edges: parsedJSONData.weighted_scores?.edges_weighted || null,
+                surface: parsedJSONData.weighted_scores?.surface_weighted || null
+              },
+              limiting_factor: parsedJSONData.weighted_scores?.limiting_factor || null,
+              preliminary_grade: parsedJSONData.weighted_scores?.preliminary_grade || null,
+              slab_detection: parsedJSONData.professional_slab?.detected ? {
+                detected: true,
+                company: parsedJSONData.professional_slab.company || null,
+                grade: parsedJSONData.professional_slab.grade || null,
+                grade_description: parsedJSONData.professional_slab.grade_description || null,
+                cert_number: parsedJSONData.professional_slab.cert_number || null
+              } : null,
+              meta: {
+                version: 'conversational-v4.0-json',
+                prompt_version: parsedJSONData.metadata?.prompt_version || 'Conversational_Grading_v4.2_ENHANCED_STRICTNESS',
+                evaluated_at_utc: parsedJSONData.metadata?.timestamp || new Date().toISOString()
+              }
+            };
+
+            console.log(`[GET /api/sports/${cardId}] ✅ Extracted conversational data from JSON`);
+            console.log(`[GET /api/sports/${cardId}] Grade: ${conversationalGradingData.decimal_grade}, Confidence: ${conversationalGradingData.image_confidence}`);
+          } catch (jsonParseError) {
+            console.error(`[GET /api/sports/${cardId}] ⚠️ Failed to parse JSON, continuing without detailed fields:`, jsonParseError);
+          }
+        }
+
       } catch (error: any) {
         console.error(`[GET /api/sports/${cardId}] ⚠️ Conversational grading failed (non-critical):`, error.message);
         // Don't throw - this is experimental and shouldn't break main grading
         conversationalGradingResult = null;
         conversationalResultV3_3 = null;
+        conversationalGradingData = null;
       }
     }
 
@@ -427,8 +508,25 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       // Full AI grading JSON for comprehensive display
       ai_grading: gradingResult,
 
-      // 🧪 Experimental: Conversational grading markdown
+      // 🧪 Experimental: Conversational grading markdown (or JSON string)
       conversational_grading: conversationalGradingResult,
+
+      // 🎯 PRIMARY: Conversational AI grading v4.2 (extracted fields)
+      conversational_decimal_grade: conversationalGradingData?.decimal_grade || null,
+      conversational_whole_grade: conversationalGradingData?.whole_grade || null,
+      conversational_grade_uncertainty: conversationalGradingData?.grade_uncertainty || null,
+      conversational_sub_scores: conversationalGradingData?.sub_scores || null,
+      conversational_condition_label: conversationalGradingData?.condition_label || null,
+      conversational_final_grade_summary: conversationalGradingData?.final_grade_summary || null,
+      conversational_image_confidence: conversationalGradingData?.image_confidence || null,
+      conversational_case_detection: conversationalGradingData?.case_detection || null,
+      conversational_slab_detection: conversationalGradingData?.slab_detection || null,
+      conversational_weighted_sub_scores: conversationalGradingData?.weighted_sub_scores || null,
+      conversational_limiting_factor: conversationalGradingData?.limiting_factor || null,
+      conversational_preliminary_grade: conversationalGradingData?.preliminary_grade || null,
+      conversational_card_info: conversationalGradingData?.card_info || null,
+      conversational_prompt_version: conversationalGradingData?.meta?.prompt_version || 'v4.2',
+      conversational_evaluated_at: conversationalGradingData?.meta?.evaluated_at_utc ? new Date(conversationalGradingData.meta.evaluated_at_utc) : new Date(),
 
       // 🆕 v3.3: Enhanced conversational grading fields
       ...(conversationalResultV3_3 && {
@@ -455,14 +553,29 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         defect_coordinates_back: conversationalResultV3_3.defect_coordinates_back || [],
       }),
 
+      // 🎯 Card info from Conversational AI (override with AI-extracted data if available)
+      card_name: conversationalGradingData?.card_info?.card_name || cardFields.card_name,
+      featured: conversationalGradingData?.card_info?.player_or_character || cardFields.featured,
+      card_set: conversationalGradingData?.card_info?.set_name || cardFields.card_set,
+      manufacturer_name: conversationalGradingData?.card_info?.manufacturer || cardFields.manufacturer_name,
+      release_date: conversationalGradingData?.card_info?.year || cardFields.release_date,
+      card_number: conversationalGradingData?.card_info?.card_number || cardFields.card_number,
+
       // Grade information
       raw_decimal_grade: rawGrade,
       dcm_grade_whole: wholeGrade,
       ai_confidence_score: confidence,
       final_dcm_score: wholeGrade.toString(),
 
-      // Individual searchable/sortable columns
-      ...cardFields,
+      // Individual searchable/sortable columns (fallback for fields not in AI extraction)
+      serial_numbering: cardFields.serial_numbering,
+      authentic: cardFields.authentic,
+      rookie_or_first_print: cardFields.rookie_or_first_print,
+      rarity_description: cardFields.rarity_description,
+      autographed: cardFields.autographed,
+      estimated_market_value: cardFields.estimated_market_value,
+      estimated_range: cardFields.estimated_range,
+      estimate_confidence: cardFields.estimate_confidence,
 
       // Processing metadata
       processing_time: Date.now() - startTime
