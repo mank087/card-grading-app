@@ -246,15 +246,18 @@ function UniversalUploadPageContent() {
       const frontPath = `${user.id}/${cardId}/front.jpg`
       const backPath = `${user.id}/${cardId}/back.jpg`
 
+      // Use authenticated client for uploads (includes user's access token)
+      const authClient = getAuthenticatedClient()
+
       // Upload compressed front image
-      const { error: frontError } = await supabase.storage
+      const { error: frontError } = await authClient.storage
         .from('cards')
         .upload(frontPath, frontCompressed)
 
       if (frontError) throw frontError
 
       // Upload compressed back image
-      const { error: backError } = await supabase.storage
+      const { error: backError } = await authClient.storage
         .from('cards')
         .upload(backPath, backCompressed)
 
