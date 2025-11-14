@@ -710,18 +710,13 @@ function CardThumbnail({ path }: { path: string }) {
     const loadImage = async () => {
       setLoading(true)
 
-      // Use authenticated client with user's access token
-      const authClient = getAuthenticatedClient()
-      const { data, error } = await authClient
+      // Use public URL - simpler and doesn't require auth
+      const { data } = supabase
         .storage
         .from('cards')
-        .createSignedUrl(path, 60 * 60) // 1 hour
+        .getPublicUrl(path)
 
-      if (error) {
-        console.error('Failed to create signed URL:', error)
-      }
-
-      setUrl(data?.signedUrl || null)
+      setUrl(data?.publicUrl || null)
       setLoading(false)
     }
 
