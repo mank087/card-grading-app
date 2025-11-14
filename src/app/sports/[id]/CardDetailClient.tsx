@@ -1301,9 +1301,9 @@ export function SportsCardDetails() {
       setError(null);
       setIsProcessing(false);
 
-      console.log(`[FRONTEND DEBUG] Calling DVG v1 endpoint: /api/vision-grade/${cardId}`);
-      const res = await fetch(`/api/vision-grade/${cardId}?t=${Date.now()}`); // Cache-busting
-      console.log(`[FRONTEND DEBUG] DVG v1 API response status: ${res.status}`);
+      console.log(`Fetching sports card details for: ${cardId}`);
+      const res = await fetch(`/api/sports/${cardId}?t=${Date.now()}`); // Cache-busting
+      console.log(`Sports API response status: ${res.status}`);
 
       if (!res.ok) {
         // Check for private card access denied (403 status)
@@ -1350,8 +1350,8 @@ export function SportsCardDetails() {
             await new Promise(resolve => setTimeout(resolve, delay));
 
             try {
-              console.log(`[FRONTEND DEBUG] Retry ${attempt}: Calling /api/vision-grade/${cardId}`);
-              const retryRes = await fetch(`/api/vision-grade/${cardId}?t=${Date.now()}`); // Cache-busting
+              console.log(`Retry ${attempt}: Calling /api/sports/${cardId}`);
+              const retryRes = await fetch(`/api/sports/${cardId}?t=${Date.now()}`); // Cache-busting
 
               if (retryRes.ok) {
                 const data = await retryRes.json();
@@ -1496,9 +1496,9 @@ export function SportsCardDetails() {
       setLoading(true);
       setError(null);
 
-      // Call vision-grade API with force_regrade parameter to bypass cache
+      // Call sports API with force_regrade parameter to bypass cache
       console.log('[REGRADE] Forcing fresh grading for card:', cardId);
-      const res = await fetch(`/api/vision-grade/${cardId}?force_regrade=true&t=${Date.now()}`);
+      const res = await fetch(`/api/sports/${cardId}?force_regrade=true&t=${Date.now()}`);
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
