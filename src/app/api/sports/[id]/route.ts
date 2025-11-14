@@ -159,6 +159,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     let conversationalResultV3_3: any = null;
     let conversationalGradingData: any = null;
     let isJSONMode = false;
+    let gradingResult = null; // Legacy field for backward compatibility
 
     if (frontUrl && backUrl) {
       try {
@@ -172,8 +173,26 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         console.log(`[GET /api/sports/${cardId}] 📍 Defects: Front=${conversationalResult.defect_coordinates_front.length}, Back=${conversationalResult.defect_coordinates_back.length}`);
 
         // Detect if we're using JSON format (v4.x) or markdown format (v3.x)
-        isJSONMode = conversationalResult.meta?.version === 'conversational-v4.0-json';
-        console.log(`[GET /api/sports/${cardId}] Output format detected: ${isJSONMode ? 'JSON (v4.0)' : 'Markdown (v3.x)'}`);
+        isJSONMode = conversationalResult.meta?.version === 'conversational-v4.2-json' ||
+                     conversationalResult.meta?.version === 'conversational-v4.0-json';
+        console.log(`[GET /api/sports/${cardId}] Output format detected: ${isJSONMode ? 'JSON (v4.2)' : 'Markdown (v3.x)'}`);
+
+        // Create legacy gradingResult structure for backward compatibility
+        // This ensures old frontend code paths still work while we transition fully to conversational
+        if (conversationalGradingResult) {
+          try {
+            const jsonData = JSON.parse(conversationalGradingResult);
+            gradingResult = {
+              "Card Information": jsonData.card_info || {},
+              "Grading (DCM Master Scale)": {
+                "Raw Decimal Grade (Before Rounding)": jsonData.final_grade?.decimal_grade || 0,
+                "DCM Grade (Final Whole Number)": jsonData.final_grade?.whole_grade || 0
+              }
+            };
+          } catch (e) {
+            console.error(`[GET /api/sports/${cardId}] Failed to create legacy gradingResult:`, e);
+          }
+        }
 
         // Parse JSON format and extract fields for database
         if (isJSONMode && conversationalGradingResult) {
@@ -238,7 +257,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 version: 'conversational-v4.0-json',
                 prompt_version: parsedJSONData.metadata?.prompt_version || 'Conversational_Grading_v4.2_ENHANCED_STRICTNESS',
                 evaluated_at_utc: parsedJSONData.metadata?.timestamp || new Date().toISOString()
-              }
+              },
+              professional_grade_estimates: parsedJSONData.professional_grade_estimates || null
             };
 
             console.log(`[GET /api/sports/${cardId}] ✅ Extracted conversational data from JSON`);
@@ -261,6 +281,9 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
     // Update database with comprehensive sports card data
     const updateData = {
+      // Legacy AI grading for backward compatibility with frontend
+      ai_grading: gradingResult,
+
       // 🎯 PRIMARY: Conversational grading markdown/JSON (full report)
       conversational_grading: conversationalGradingResult,
 
@@ -280,6 +303,9 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       conversational_card_info: conversationalGradingData?.card_info || null,
       conversational_prompt_version: conversationalGradingData?.meta?.prompt_version || 'v4.2',
       conversational_evaluated_at: conversationalGradingData?.meta?.evaluated_at_utc ? new Date(conversationalGradingData.meta.evaluated_at_utc) : new Date(),
+
+      // 🆕 Professional grade estimates (PSA, BGS, SGC, etc.)
+      estimated_professional_grades: conversationalGradingData?.professional_grade_estimates || null,
 
       // 🆕 v3.3: Enhanced conversational grading fields
       ...(conversationalResultV3_3 && {
