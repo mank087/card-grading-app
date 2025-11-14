@@ -105,11 +105,12 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     const supabase = supabaseServer();
 
     // Get Other card from database
+    // Remove strict category filter - just fetch the card and let it through
+    // (Other category is a catch-all for non-specific card types)
     const { data: card, error: cardError } = await supabase
       .from("cards")
       .select("*")
       .eq("id", cardId)
-      .eq("category", "Other") // Ensure it's an Other card
       .single();
 
     if (cardError || !card) {

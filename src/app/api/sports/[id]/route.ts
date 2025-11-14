@@ -243,12 +243,20 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     const supabase = supabaseServer();
 
     // Get sports card from database
+    // Sports cards can have categories: Football, Baseball, Basketball, Hockey, Soccer, Wrestling, Sports
+    const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
+
     const { data: card, error: cardError } = await supabase
       .from("cards")
       .select("*")
       .eq("id", cardId)
-      .eq("category", "Sports") // Ensure it's a sports card
       .single();
+
+    // Verify it's a sports card
+    if (card && !sportCategories.includes(card.category)) {
+      console.error(`[GET /api/sports/${cardId}] Card is not a sports card, category: ${card.category}`);
+      return NextResponse.json({ error: "Not a sports card" }, { status: 404 });
+    }
 
     if (cardError || !card) {
       console.error(`[GET /api/sports/${cardId}] Card lookup error:`, cardError);
