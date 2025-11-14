@@ -3,7 +3,7 @@
 import React from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, ReportCardData } from './CardGradingReport';
-import { supabase } from '../../lib/supabaseClient';
+import { getAuthenticatedClient } from '../../lib/directAuth';
 import QRCode from 'qrcode';
 
 /**
@@ -236,12 +236,15 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           throw new Error('Card images not found. Missing both URLs and storage paths.');
         }
 
-        const { data: frontUrlData } = await supabase
+        // Use authenticated client for signed URLs
+        const authClient = getAuthenticatedClient();
+
+        const { data: frontUrlData } = await authClient
           .storage
           .from('cards')
           .createSignedUrl(card.front_path, 60 * 60); // 1 hour expiry
 
-        const { data: backUrlData } = await supabase
+        const { data: backUrlData } = await authClient
           .storage
           .from('cards')
           .createSignedUrl(card.back_path, 60 * 60); // 1 hour expiry

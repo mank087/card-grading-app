@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { supabase } from '../lib/supabaseClient'
+import { getStoredSession, getAuthenticatedClient } from '../lib/directAuth'
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
@@ -10,19 +10,27 @@ export default function Home() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
+      // Use direct auth session instead of Supabase client
+      const session = getStoredSession()
+      const sessionUser = session?.user
 
-      if (user) {
-        // Fetch user's recent cards
-        const { data } = await supabase
-          .from('cards')
-          .select('id, card_name, category, grade_numeric, ai_confidence_score, created_at')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(4)
+      setUser(sessionUser)
 
-        setRecentCards(data || [])
+      if (sessionUser) {
+        try {
+          // Use authenticated client for database queries
+          const authClient = getAuthenticatedClient()
+          const { data } = await authClient
+            .from('cards')
+            .select('id, card_name, category, grade_numeric, ai_confidence_score, created_at')
+            .eq('user_id', sessionUser.id)
+            .order('created_at', { ascending: false })
+            .limit(4)
+
+          setRecentCards(data || [])
+        } catch (err) {
+          console.error('Error fetching recent cards:', err)
+        }
       }
     }
 
