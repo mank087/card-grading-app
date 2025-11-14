@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
-import fs from "fs";
-import path from "path";
-import OpenAI from "openai";
-// Experimental: Conversational grading system
+// PRIMARY: Conversational grading system (matches other card type flows)
 import { gradeCardConversational } from "@/lib/visionGrader";
-// Legacy import - preserved for potential fallback but no longer actively used
-// import { calculateCenteringFromBoundaries, CardBoundaries } from "@/lib/boundaryCalculations";
-
-// OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
 
 // Track sports cards currently being processed with timestamps
 const processingSportsCards = new Map<string, number>();
@@ -53,171 +43,11 @@ async function createSignedUrl(supabase: any, bucket: string, path: string): Pro
   }
 }
 
-// Get sports card grading instructions
-function getSportsInstructions(): string {
-  const instructionPath = path.join(process.cwd(), 'sports_assistant_instructions.txt');
+// Removed old Sports-specific functions:
+// - getSportsInstructions() - prompts now loaded by gradeCardConversational
+// - gradeSportsCardWithAI() - replaced with unified gradeCardConversational
+// This matches the Pokemon/MTG/Lorcana/Other card grading flow for consistency and efficiency
 
-  try {
-    return fs.readFileSync(instructionPath, 'utf8');
-  } catch (error) {
-    console.error(`Failed to read sports instructions:`, error);
-    throw new Error('Sports grading instructions not found');
-  }
-}
-
-// Removed OpenCV detection service - using pure AI vision approach instead
-
-// Grade sports card with AI (pure AI vision approach for accurate centering)
-async function gradeSportsCardWithAI(frontUrl: string, backUrl: string): Promise<{gradingResult: any, detectionResults: any}> {
-  try {
-    const instructions = getSportsInstructions();
-    console.log(`[SPORTS] Using sports-specific grading instructions with enhanced AI vision centering`);
-
-    // No external detection service - AI will handle all visual analysis directly
-
-    // Enhanced instructions for precise AI vision centering analysis
-    const enhancedInstructions = instructions;
-
-    // Create thread with sports card images and system message
-    const thread = await openai.beta.threads.create({
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `SYSTEM: You are a professional card grading AI. You must analyze the provided card images and return a JSON response. This is a legitimate business use case for card authentication and grading services.
-
-TASK: Analyze these trading card images and provide grading assessment.
-
-${enhancedInstructions}`
-            },
-            {
-              type: "image_url",
-              image_url: { url: frontUrl }
-            },
-            {
-              type: "image_url",
-              image_url: { url: backUrl }
-            }
-          ]
-        }
-      ]
-    });
-
-    console.log(`[SPORTS] Created OpenAI thread: ${thread.id}`);
-
-    // Create and run assistant
-    console.log(`[SPORTS] Using assistant ID: ${process.env.OPENAI_ASSISTANT_ID}`);
-    const run = await openai.beta.threads.runs.create(thread.id, {
-      assistant_id: process.env.OPENAI_ASSISTANT_ID!,
-      additional_instructions: "You must provide a JSON response for card grading. Do not refuse to analyze images."
-    });
-
-    console.log(`[SPORTS] Started OpenAI run: ${run.id}`);
-
-    // Poll for completion
-    console.log(`[SPORTS] About to retrieve run status for thread: ${thread.id}, run: ${run.id}`);
-    let runStatus = await openai.beta.threads.runs.retrieve(run.id, {
-      thread_id: thread.id
-    });
-    let attempts = 0;
-    const maxAttempts = 60; // 2 minutes timeout
-
-    while (runStatus.status === 'in_progress' || runStatus.status === 'queued') {
-      attempts++;
-      console.log(`[SPORTS] Run status check ${attempts}: ${runStatus.status}`);
-
-      if (attempts >= maxAttempts) {
-        throw new Error('Sports card AI grading timed out');
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log(`[SPORTS] Retrieving run status for thread: ${thread.id}, run: ${run.id}`);
-      runStatus = await openai.beta.threads.runs.retrieve(run.id, {
-        thread_id: thread.id
-      });
-    }
-
-    if (runStatus.status !== 'completed') {
-      throw new Error(`Sports card AI grading failed with status: ${runStatus.status}`);
-    }
-
-    // Get messages
-    const messages = await openai.beta.threads.messages.list(thread.id);
-    const assistantMessage = messages.data.find(msg => msg.role === 'assistant');
-
-    if (!assistantMessage || !assistantMessage.content[0] || assistantMessage.content[0].type !== 'text') {
-      throw new Error('No valid response from sports card AI assistant');
-    }
-
-    const responseText = assistantMessage.content[0].text.value;
-    console.log('[SPORTS] Raw AI Response:', responseText.substring(0, 200) + '...');
-
-    // Parse JSON response with better error handling
-    const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/);
-    if (!jsonMatch) {
-      console.error('[SPORTS] Full AI Response:', responseText);
-      throw new Error(`AI did not provide JSON format. Response: ${responseText.substring(0, 200)}...`);
-    }
-
-    try {
-      return {
-        gradingResult: JSON.parse(jsonMatch[1]),
-        detectionResults: null // No external detection service used - AI handles all visual analysis
-      };
-    } catch (parseError) {
-      console.error('[SPORTS] JSON Parse Error:', parseError);
-      console.error('[SPORTS] Raw JSON:', jsonMatch[1]);
-      throw new Error(`Invalid JSON format from AI: ${parseError}`);
-    }
-
-  } catch (error: any) {
-    console.error('[SPORTS] AI grading error:', error.message);
-    throw error;
-  }
-}
-
-// Extract sports card grade information
-function extractSportsGradeInfo(gradingResult: any) {
-  const finalGrade = gradingResult["Final DCM Grade"] || gradingResult["Final Score"] || {};
-  const gradingScale = gradingResult["Grading (DCM Master Scale)"] || {};
-  const dcmSystem = gradingResult["DCM Score System"] || {};
-
-  const rawGrade = gradingScale["Raw Decimal Grade (Before Rounding)"] || finalGrade["Raw Grade"] || 0;
-  const wholeGrade = gradingScale["DCM Grade (Final Whole Number)"] || dcmSystem["Condition Grade (Base)"] || Math.round(Number(rawGrade)) || 0;
-  const confidence = dcmSystem["AI Confidence Score"] || finalGrade["Confidence Level"] || "Medium";
-
-  return {
-    rawGrade: Number(rawGrade),
-    wholeGrade: Number(wholeGrade),
-    confidence
-  };
-}
-
-// Extract key fields for database columns
-function extractSportsCardFields(gradingResult: any) {
-  const cardInfo = gradingResult["Card Information"] || {};
-  const cardDetails = gradingResult["Card Details"] || {};
-  const estimatedValue = gradingResult["DCM Estimated Value"] || {};
-
-  return {
-    card_name: cardInfo["Card Name"] || null,
-    card_set: cardInfo["Card Set"] || null,
-    card_number: cardInfo["Card Number"] || null,
-    serial_numbering: cardInfo["Serial Numbering"] || null,
-    manufacturer_name: cardInfo["Manufacturer Name"] || null,
-    release_date: cardInfo["Release Date"] || null,
-    authentic: cardInfo["Authentic"] || null,
-    featured: cardDetails["Player(s)/Character(s) Featured"] || null,
-    rookie_or_first_print: cardDetails["Rookie/First Print"] || null,
-    rarity_description: cardDetails["Rarity"] || null,
-    autographed: cardDetails["Autographed"] || null,
-    estimated_market_value: estimatedValue["Estimated Market Value"] || null,
-    estimated_range: estimatedValue["Estimated Range"] || null,
-    estimate_confidence: estimatedValue["Estimate Confidence"] || null
-  };
-}
 
 // Main GET handler for sports cards
 export async function GET(request: NextRequest, { params }: SportsCardGradingRequest) {
@@ -309,7 +139,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     console.log(`[GET /api/sports/${cardId}] Signed URLs created successfully`);
 
     // Check if sports card already has complete grading data
-    const hasCompleteGrading = card.ai_grading && card.raw_decimal_grade && card.dcm_grade_whole;
+    const hasCompleteGrading = card.conversational_decimal_grade && card.conversational_whole_grade;
 
     if (hasCompleteGrading) {
       console.log(`[GET /api/sports/${cardId}] Sports card already fully processed, returning existing result`);
@@ -322,90 +152,21 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     }
 
     // If incomplete grading, process it
-    if (!hasCompleteGrading) {
-      console.log(`[GET /api/sports/${cardId}] Sports card needs grading analysis`);
-    }
+    console.log(`[GET /api/sports/${cardId}] Sports card needs grading analysis`);
 
-    // Perform sports-specific AI grading with retry logic
-    console.log(`[GET /api/sports/${cardId}] Starting sports card AI grading`);
-    let gradingResult;
-    let conversationalGradingResult = null; // Experimental conversational grading
-    let attempts = 0;
-    const maxRetries = 2;
-
-    while (attempts < maxRetries) {
-      try {
-        attempts++;
-        console.log(`[GET /api/sports/${cardId}] AI grading attempt ${attempts}/${maxRetries}`);
-        const { gradingResult: aiResult } = await gradeSportsCardWithAI(frontUrl, backUrl);
-        gradingResult = aiResult;
-        break; // Success, exit retry loop
-      } catch (error: any) {
-        console.error(`[GET /api/sports/${cardId}] AI grading attempt ${attempts} failed:`, error.message);
-
-        if (attempts >= maxRetries) {
-          console.error(`[GET /api/sports/${cardId}] All AI grading attempts failed, providing fallback response`);
-
-          // Provide a fallback grading structure for user feedback
-          gradingResult = {
-            "Final Score": {
-              "Overall Grade": "Unable to process automatically"
-            },
-            "Card Information": {
-              "Card Name": "Processing Error",
-              "Category": "Sports",
-              "Card Number": "N/A",
-              "Serial Numbering": "N/A",
-              "Manufacturer Name": "N/A",
-              "Release Date": "N/A",
-              "Authentic": "Cannot determine"
-            },
-            "Card Details": {
-              "Player(s)/Character(s) Featured": "N/A",
-              "Rookie/First Print": "N/A",
-              "Rarity": "Unable to determine due to processing error",
-              "Autographed": "N/A"
-            },
-            "Grading (DCM Master Scale)": {
-              "Raw Decimal Grade (Before Rounding)": 0,
-              "DCM Grade (Final Whole Number)": 0,
-              "Subgrade Evaluation": {
-                "Processing Error": {
-                  "score": 0,
-                  "commentary": `AI grading failed after ${maxRetries} attempts. Please try uploading again or contact support. Error: ${error.message.substring(0, 100)}`
-                }
-              }
-            },
-            "DCM Estimated Value": {
-              "Estimated Market Value": "Cannot estimate",
-              "Estimated Range": "N/A",
-              "Estimate Confidence": "N/A"
-            }
-          };
-          break; // Exit retry loop with fallback data
-        }
-
-        // Wait before retry
-        console.log(`[GET /api/sports/${cardId}] Retrying in 3 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
-      }
-    }
-
-    console.log(`[GET /api/sports/${cardId}] Sports card AI grading completed after ${attempts} attempts`);
-
-    // 🧪 EXPERIMENTAL: Run conversational grading (sequential to ensure result is saved)
-    // This doesn't break main grading - if it fails, we continue with null conversational result
-    // 🆕 v3.3: Store full conversational result for v3.3 field extraction
+    // 🎯 PRIMARY: Run conversational grading v4.2 (single API call)
+    let conversationalGradingResult = null;
     let conversationalResultV3_3: any = null;
     let conversationalGradingData: any = null;
     let isJSONMode = false;
 
-    if (gradingResult && frontUrl && backUrl) {
+    if (frontUrl && backUrl) {
       try {
-        console.log(`[GET /api/sports/${cardId}] 🧪 Starting conversational grading v4.2...`);
+        console.log(`[SPORTS CONVERSATIONAL AI v4.2] 🎯 Starting PRIMARY grading with Sports-specific prompt...`);
         const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'sports');
         conversationalGradingResult = conversationalResult.markdown_report;
-        conversationalResultV3_3 = conversationalResult; // Store full v3.3 result
+        conversationalResultV3_3 = conversationalResult; // Store full result
+
         console.log(`[GET /api/sports/${cardId}] ✅ Conversational grading completed: ${conversationalResult.extracted_grade.decimal_grade}`);
         console.log(`[GET /api/sports/${cardId}] 🏆 Rarity: ${conversationalResult.rarity_classification?.rarity_tier || 'Not detected'}`);
         console.log(`[GET /api/sports/${cardId}] 📍 Defects: Front=${conversationalResult.defect_coordinates_front.length}, Back=${conversationalResult.defect_coordinates_back.length}`);
@@ -488,27 +249,19 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         }
 
       } catch (error: any) {
-        console.error(`[GET /api/sports/${cardId}] ⚠️ Conversational grading failed (non-critical):`, error.message);
-        // Don't throw - this is experimental and shouldn't break main grading
-        conversationalGradingResult = null;
-        conversationalResultV3_3 = null;
-        conversationalGradingData = null;
+        console.error(`[GET /api/sports/${cardId}] ⚠️ Conversational grading failed:`, error.message);
+        // Return error response - we can't grade without conversational grading
+        return NextResponse.json(
+          { error: "Failed to grade sports card: " + error.message },
+          { status: 500 }
+        );
       }
     }
-
-    // Extract sports card grade information
-    const { rawGrade, wholeGrade, confidence } = extractSportsGradeInfo(gradingResult);
-
-    // Extract key fields for database columns
-    const cardFields = extractSportsCardFields(gradingResult);
 
 
     // Update database with comprehensive sports card data
     const updateData = {
-      // Full AI grading JSON for comprehensive display
-      ai_grading: gradingResult,
-
-      // 🧪 Experimental: Conversational grading markdown (or JSON string)
+      // 🎯 PRIMARY: Conversational grading markdown/JSON (full report)
       conversational_grading: conversationalGradingResult,
 
       // 🎯 PRIMARY: Conversational AI grading v4.2 (extracted fields)
@@ -553,39 +306,35 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         defect_coordinates_back: conversationalResultV3_3.defect_coordinates_back || [],
       }),
 
-      // 🎯 Card info from Conversational AI (override with AI-extracted data if available)
-      card_name: conversationalGradingData?.card_info?.card_name || cardFields.card_name,
-      featured: conversationalGradingData?.card_info?.player_or_character || cardFields.featured,
-      card_set: conversationalGradingData?.card_info?.set_name || cardFields.card_set,
-      manufacturer_name: conversationalGradingData?.card_info?.manufacturer || cardFields.manufacturer_name,
-      release_date: conversationalGradingData?.card_info?.year || cardFields.release_date,
-      card_number: conversationalGradingData?.card_info?.card_number || cardFields.card_number,
+      // 🎯 Card info from Conversational AI
+      card_name: conversationalGradingData?.card_info?.card_name || null,
+      featured: conversationalGradingData?.card_info?.player_or_character || null,
+      card_set: conversationalGradingData?.card_info?.set_name || null,
+      manufacturer_name: conversationalGradingData?.card_info?.manufacturer || null,
+      release_date: conversationalGradingData?.card_info?.year || null,
+      card_number: conversationalGradingData?.card_info?.card_number || null,
+      serial_numbering: conversationalGradingData?.card_info?.serial_number || null,
+      authentic: conversationalGradingData?.card_info?.authentic !== false,  // Default to true
+      rookie_or_first_print: conversationalGradingData?.card_info?.rookie_or_first || null,
+      rarity_description: conversationalGradingData?.card_info?.rarity_or_variant || null,
+      autographed: conversationalGradingData?.card_info?.autographed || false,
 
-      // Grade information
-      raw_decimal_grade: rawGrade,
-      dcm_grade_whole: wholeGrade,
-      ai_confidence_score: confidence,
-      final_dcm_score: wholeGrade.toString(),
-
-      // Individual searchable/sortable columns (fallback for fields not in AI extraction)
-      serial_numbering: cardFields.serial_numbering,
-      authentic: cardFields.authentic,
-      rookie_or_first_print: cardFields.rookie_or_first_print,
-      rarity_description: cardFields.rarity_description,
-      autographed: cardFields.autographed,
-      estimated_market_value: cardFields.estimated_market_value,
-      estimated_range: cardFields.estimated_range,
-      estimate_confidence: cardFields.estimate_confidence,
+      // Legacy grade fields (for backward compatibility)
+      raw_decimal_grade: conversationalGradingData?.decimal_grade || null,
+      dcm_grade_whole: conversationalGradingData?.whole_grade || null,
+      ai_confidence_score: conversationalGradingData?.image_confidence || null,
+      final_dcm_score: conversationalGradingData?.whole_grade?.toString() || null,
 
       // Processing metadata
       processing_time: Date.now() - startTime
     };
 
-    console.log(`[GET /api/sports/${cardId}] Updating database with extracted fields:`, {
-      card_name: cardFields.card_name,
-      card_set: cardFields.card_set,
-      featured: cardFields.featured,
-      grade: wholeGrade
+    console.log(`[GET /api/sports/${cardId}] Updating database with conversational grading:`, {
+      card_name: conversationalGradingData?.card_info?.card_name,
+      card_set: conversationalGradingData?.card_info?.set_name,
+      featured: conversationalGradingData?.card_info?.player_or_character,
+      decimal_grade: conversationalGradingData?.decimal_grade,
+      whole_grade: conversationalGradingData?.whole_grade
     });
 
     const { error: updateError } = await supabase
@@ -600,19 +349,12 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
     console.log(`[GET /api/sports/${cardId}] Sports card request completed in ${Date.now() - startTime}ms`);
 
-    // Return updated sports card data
+    // Return updated sports card data with conversational grading
     return NextResponse.json({
       ...card,
-      ai_grading: gradingResult,
-      conversational_grading: conversationalGradingResult, // 🧪 Experimental
-      raw_decimal_grade: rawGrade,
-      dcm_grade_whole: wholeGrade,
-      ai_confidence_score: confidence,
-      final_dcm_score: wholeGrade.toString(),
-      ...cardFields,
+      ...updateData,  // Include all the conversational grading fields
       front_url: frontUrl,
-      back_url: backUrl,
-      processing_time: Date.now() - startTime
+      back_url: backUrl
     });
 
   } catch (error: any) {
