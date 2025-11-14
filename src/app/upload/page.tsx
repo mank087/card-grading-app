@@ -263,8 +263,8 @@ function UniversalUploadPageContent() {
 
       if (backError) throw backError
 
-      // Save record in DB with selected category
-      const { error: dbError } = await supabase.from('cards').insert({
+      // Save record in DB with selected category (use authenticated client)
+      const { error: dbError } = await authClient.from('cards').insert({
         id: cardId,
         user_id: user.id,
         serial: `${config.serialPrefix}-${Math.random().toString(36).slice(2, 8)}`,
