@@ -2041,15 +2041,28 @@ export function SportsCardDetails() {
   console.log('[Professional Grades Debug] Full card keys:', Object.keys(card));
   console.log('[Professional Grades Debug] Full dvgGrading keys:', Object.keys(dvgGrading));
 
-  // Legacy fallback for compatibility
-  const aiCardInfo = card.ai_grading?.["Card Information"] || {};
+  // 🎯 Sports cards: Map conversational data to expected structure (matches Pokemon/MTG/Lorcana/Other)
+  const aiCardInfo = card.conversational_card_info || card.ai_grading?.["Card Information"] || {};
   const aiCardDetails = card.ai_grading?.["Card Details"] || {};
   const finalScore = card.ai_grading?.["Final Score"] || {};
-  const gradingScale = card.ai_grading?.["Grading (DCM Master Scale)"] || {};
+
+  // For Sports cards, create gradingScale from conversational data (matches Pokemon pattern)
+  const gradingScale = card.conversational_sub_scores ? {
+    "Visual_Inspection_Results": {
+      centering: card.conversational_sub_scores.centering,
+      corners: card.conversational_sub_scores.corners,
+      edges: card.conversational_sub_scores.edges,
+      surface: card.conversational_sub_scores.surface
+    },
+    "Centering_Measurements": card.conversational_centering_ratios || {}
+  } : (card.ai_grading?.["Grading (DCM Master Scale)"] || {});
+
   const visualInspection = gradingScale["Visual_Inspection_Results"] || {};
 
   // v3.1: Read centering from multiple possible sources (v3.1 centerings_used, legacy Centering_Measurements, or stage0_detection)
-  const centeringData = card.ai_grading?.["Centering_Measurements"] ||
+  // 🎯 Sports cards: Use conversational_centering_ratios FIRST (matches Pokemon pattern)
+  const centeringData = card.conversational_centering_ratios ||
+                        card.ai_grading?.["Centering_Measurements"] ||
                         card.ai_grading?.centerings_used ||
                         card.stage0_detection ||
                         gradingScale["Centering_Measurements"] || {};
