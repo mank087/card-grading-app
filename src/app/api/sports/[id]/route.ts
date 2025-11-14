@@ -236,7 +236,72 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 back_lr: parsedJSONData.centering?.back?.left_right || 'N/A',
                 back_tb: parsedJSONData.centering?.back?.top_bottom || 'N/A'
               },
+              // 🆕 Detailed corners/edges/surface analysis (matches Pokemon structure)
+              corners_edges_surface: {
+                // Centering summaries (for "Centering Details" section)
+                front_centering: {
+                  summary: parsedJSONData.centering?.front_summary || parsedJSONData.centering?.front?.summary || parsedJSONData.centering?.front?.analysis || 'Centering analysis not available.'
+                },
+                back_centering: {
+                  summary: parsedJSONData.centering?.back_summary || parsedJSONData.centering?.back?.summary || parsedJSONData.centering?.back?.analysis || 'Centering analysis not available.'
+                },
+                // Front corners
+                front_corners: {
+                  top_left: parsedJSONData.corners?.front?.top_left?.condition || 'N/A',
+                  top_right: parsedJSONData.corners?.front?.top_right?.condition || 'N/A',
+                  bottom_left: parsedJSONData.corners?.front?.bottom_left?.condition || 'N/A',
+                  bottom_right: parsedJSONData.corners?.front?.bottom_right?.condition || 'N/A',
+                  sub_score: parsedJSONData.raw_sub_scores?.corners_front || 0,
+                  summary: parsedJSONData.corners?.front_summary || parsedJSONData.corners?.front?.summary || 'Corner analysis not available'
+                },
+                // Back corners
+                back_corners: {
+                  top_left: parsedJSONData.corners?.back?.top_left?.condition || 'N/A',
+                  top_right: parsedJSONData.corners?.back?.top_right?.condition || 'N/A',
+                  bottom_left: parsedJSONData.corners?.back?.bottom_left?.condition || 'N/A',
+                  bottom_right: parsedJSONData.corners?.back?.bottom_right?.condition || 'N/A',
+                  sub_score: parsedJSONData.raw_sub_scores?.corners_back || 0,
+                  summary: parsedJSONData.corners?.back_summary || parsedJSONData.corners?.back?.summary || 'Corner analysis not available'
+                },
+                // Front edges
+                front_edges: {
+                  top: parsedJSONData.edges?.front?.top?.condition || 'N/A',
+                  bottom: parsedJSONData.edges?.front?.bottom?.condition || 'N/A',
+                  left: parsedJSONData.edges?.front?.left?.condition || 'N/A',
+                  right: parsedJSONData.edges?.front?.right?.condition || 'N/A',
+                  sub_score: parsedJSONData.raw_sub_scores?.edges_front || 0,
+                  summary: parsedJSONData.edges?.front_summary || parsedJSONData.edges?.front?.summary || 'Edge analysis not available'
+                },
+                // Back edges
+                back_edges: {
+                  top: parsedJSONData.edges?.back?.top?.condition || 'N/A',
+                  bottom: parsedJSONData.edges?.back?.bottom?.condition || 'N/A',
+                  left: parsedJSONData.edges?.back?.left?.condition || 'N/A',
+                  right: parsedJSONData.edges?.back?.right?.condition || 'N/A',
+                  sub_score: parsedJSONData.raw_sub_scores?.edges_back || 0,
+                  summary: parsedJSONData.edges?.back_summary || parsedJSONData.edges?.back?.summary || 'Edge analysis not available'
+                },
+                // Front surface
+                front_surface: {
+                  defects: parsedJSONData.surface?.front?.defects || [],
+                  analysis: parsedJSONData.surface?.front?.analysis || 'No analysis available',
+                  sub_score: parsedJSONData.raw_sub_scores?.surface_front || 0,
+                  summary: parsedJSONData.surface?.front_summary || parsedJSONData.surface?.front?.summary || 'Surface analysis not available'
+                },
+                // Back surface
+                back_surface: {
+                  defects: parsedJSONData.surface?.back?.defects || [],
+                  analysis: parsedJSONData.surface?.back?.analysis || 'No analysis available',
+                  sub_score: parsedJSONData.raw_sub_scores?.surface_back || 0,
+                  summary: parsedJSONData.surface?.back_summary || parsedJSONData.surface?.back?.summary || 'Surface analysis not available'
+                }
+              },
               card_info: parsedJSONData.card_info || null,
+              // 🆕 Transformed defects for database storage
+              transformedDefects: {
+                front: parsedJSONData.defect_summary?.front || null,
+                back: parsedJSONData.defect_summary?.back || null
+              },
               case_detection: parsedJSONData.case_detection || null,
               weighted_sub_scores: {
                 centering: parsedJSONData.weighted_scores?.centering_weighted || null,
@@ -301,6 +366,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       conversational_limiting_factor: conversationalGradingData?.limiting_factor || null,
       conversational_preliminary_grade: conversationalGradingData?.preliminary_grade || null,
       conversational_card_info: conversationalGradingData?.card_info || null,
+      conversational_centering_ratios: conversationalGradingData?.centering_ratios || null,
+      conversational_corners_edges_surface: conversationalGradingData?.corners_edges_surface || null,  // 🆕 Detailed corner/edge/surface analysis
+      conversational_defects_front: conversationalGradingData?.transformedDefects?.front || null,  // 🆕 Front defects
+      conversational_defects_back: conversationalGradingData?.transformedDefects?.back || null,  // 🆕 Back defects
       conversational_prompt_version: conversationalGradingData?.meta?.prompt_version || 'v4.2',
       conversational_evaluated_at: conversationalGradingData?.meta?.evaluated_at_utc ? new Date(conversationalGradingData.meta.evaluated_at_utc) : new Date(),
 

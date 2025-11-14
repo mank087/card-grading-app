@@ -307,6 +307,10 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           // Protective case detection
           conversational_case_detection: jsonData.case_detection || null,
 
+          // 🆕 Defect summaries (matches Pokemon/MTG/Lorcana pattern)
+          conversational_defects_front: jsonData.defect_summary?.front || null,
+          conversational_defects_back: jsonData.defect_summary?.back || null,
+
           // 🎯 Professional grade estimates (PSA, BGS, SGC, CGC comparisons)
           estimated_professional_grades: jsonData.professional_grade_estimates || null
         };
