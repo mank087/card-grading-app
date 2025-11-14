@@ -4378,82 +4378,7 @@ export function SportsCardDetails() {
             </div>
           )}
 
-          {/* 4. DCM Condition Assessment */}
-          {dcmConditionAssessment && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Condition Assessment</h2>
-
-              {/* Overall Condition Badge */}
-              <div className="text-center mb-6">
-                <div className={`inline-flex items-center px-6 py-3 rounded-full text-xl font-bold border-2 ${getConditionColor(dcmConditionAssessment.overallCondition)}`}>
-                  {dcmConditionAssessment.overallCondition} Condition
-                </div>
-                <p className="text-sm text-gray-600 mt-2">Based on DCM Professional Standards</p>
-                <p className="text-xs text-gray-500 mt-1">Assessment Score: {dcmConditionAssessment.assessmentScore}/100</p>
-              </div>
-
-              {/* Category Breakdown */}
-              <div className="grid md:grid-cols-2 gap-4 mb-6">
-                {Object.entries(dcmConditionAssessment.categoryConditions).map(([key, category]) => (
-                  <div key={key} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <div>
-                      <span className="font-medium text-gray-800">{category.name}:</span>
-                      {category.defectCount > 0 && (
-                        <span className="text-xs text-gray-500 ml-2">({category.defectCount} issue{category.defectCount !== 1 ? 's' : ''})</span>
-                      )}
-                    </div>
-                    <span className={`font-semibold px-3 py-1 rounded-full text-sm border ${getConditionColor(category.condition)}`}>
-                      {category.condition}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Detailed Summary */}
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h4 className="font-semibold text-blue-900 mb-2">Condition Summary</h4>
-                <p className="text-sm text-blue-800 leading-relaxed">{dcmConditionAssessment.conditionSummary}</p>
-              </div>
-
-              {/* Category Details - Expandable */}
-              <div className="mt-4">
-                <details className="group">
-                  <summary className="cursor-pointer text-sm font-medium text-gray-700 hover:text-gray-900 list-none">
-                    <div className="flex items-center justify-between p-3 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
-                      <span>View Detailed Category Analysis</span>
-                      <span className="group-open:rotate-90 transition-transform">▶</span>
-                    </div>
-                  </summary>
-                  <div className="mt-3 space-y-3">
-                    {Object.entries(dcmConditionAssessment.categoryConditions).map(([key, category]) => (
-                      category.defectCount > 0 && (
-                        <div key={key} className="p-3 border border-gray-200 rounded-lg">
-                          <h5 className="font-medium text-gray-800 mb-2">{category.name} Issues:</h5>
-                          <div className="flex flex-wrap gap-2">
-                            {category.flagsDetected.map((flag, index) => (
-                              <span key={index} className="px-2 py-1 bg-red-100 text-red-800 text-xs rounded-full">{flag}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    ))}
-                  </div>
-                </details>
-              </div>
-
-              {/* Condition Legend */}
-              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                {(['Mint', 'Excellent', 'Good', 'Fair'] as const).map((condition) => (
-                  <div key={condition} className={`p-2 rounded text-center border ${getConditionColor(condition)}`}>
-                    <div className="font-semibold">{condition}</div>
-                    <div className="mt-1 text-xs opacity-80">{getConditionDescription(condition).split(' ').slice(0, 4).join(' ')}...</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* 5. Professional Grading Company Estimates - REMOVED OLD SECTION */}
+          {/* 4. Professional Grading Company Estimates - REMOVED OLD SECTION */}
           {/* v2.2 REVISED: Execution Control & Fatal Flags */}
           {card.ai_grading?.["Execution Control"] && (
             <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
@@ -5023,36 +4948,6 @@ export function SportsCardDetails() {
         </div>
       )}
 
-      {/* Parsing Error Alert */}
-      {parsingError && (
-        <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3 flex-1">
-              <h3 className="text-sm font-medium text-yellow-800">
-                Some grading details couldn't be displayed
-              </h3>
-              <div className="mt-2 text-sm text-yellow-700">
-                <p>{parsingError}</p>
-                <p className="mt-1">The overall grade is still accurate. You can try re-grading the card to refresh the details.</p>
-              </div>
-              <div className="mt-4">
-                <button
-                  onClick={() => handleRegrade()}
-                  disabled={isProcessing}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-yellow-800 bg-yellow-100 hover:bg-yellow-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isProcessing ? 'Re-grading...' : 'Re-grade Card'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* DEBUG PANEL - Development Only */}
       {/* Image Zoom Modal */}
