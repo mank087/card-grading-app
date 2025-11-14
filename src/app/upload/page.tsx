@@ -21,7 +21,7 @@ const CARD_TYPES = {
     icon: '',
     serialPrefix: 'SPORTS',
     category: 'Sports',
-    apiEndpoint: '/api/vision-grade',
+    apiEndpoint: '/api/sports',
     route: '/sports',
     description: {
       title: 'Sports Cards',
