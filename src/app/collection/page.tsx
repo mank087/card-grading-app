@@ -3,14 +3,15 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { getStoredSession, getAuthenticatedClient } from '../../lib/directAuth'
-import { supabase } from '../../lib/supabaseClient'
+import { getStoredSession } from '../../lib/directAuth'
 
 type Card = {
   id: string
   serial: string
   front_path: string
   back_path: string
+  front_url?: string | null  // 🎯 Signed URL from API
+  back_url?: string | null   // 🎯 Signed URL from API
   card_name?: string
   featured?: string  // 🎯 Player/character name
   category?: string
@@ -182,8 +183,8 @@ function CollectionPageContent() {
 
   useEffect(() => {
     const fetchCards = async () => {
-      setLoading(true) // Ensure loading state is true before fetch
-      setError(null) // Clear any previous errors
+      setLoading(true)
+      setError(null)
 
       try {
         // Check for stored session from direct auth
@@ -197,27 +198,16 @@ function CollectionPageContent() {
 
         const user = session.user
 
-        // Get authenticated Supabase client with our access token
-        const supabase = getAuthenticatedClient()
+        // Call server-side API that creates signed URLs (same approach as card detail pages)
+        const url = `/api/cards/my-collection?user_id=${user.id}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`
+        const res = await fetch(url)
 
-        let query = supabase
-          .from('cards')
-          .select('id, serial, front_path, back_path, card_name, featured, category, card_set, manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score, ai_grading, dcm_grade_whole, dvg_image_quality, created_at, visibility, conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence, conversational_card_info, dvg_decimal_grade')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-
-        // Apply search filter if provided
-        if (searchQuery) {
-          query = query.or(`serial.ilike.%${searchQuery}%,card_name.ilike.%${searchQuery}%`)
-        }
-
-        const { data, error } = await query
-
-        if (error) {
+        if (!res.ok) {
           throw new Error('Failed to load cards.')
         }
 
-        setCards(data || [])
+        const { cards } = await res.json()
+        setCards(cards || [])
       } catch (err) {
         console.error(err)
         setError('Failed to load cards. Please try again later.')
@@ -227,7 +217,7 @@ function CollectionPageContent() {
     }
 
     fetchCards()
-  }, [searchQuery]) // Re-run when search query changes
+  }, [searchQuery])
 
   // Handle column sorting
   const handleSort = (column: string) => {
@@ -486,7 +476,7 @@ function CollectionPageContent() {
 
                   {/* Card Image */}
                   <div className="aspect-[3/4] relative">
-                    <CardThumbnail path={card.front_path} />
+                    <CardThumbnail url={card.front_url} />
 
                     {/* Visibility Badge */}
                     <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 ${
@@ -702,31 +692,11 @@ function CollectionPageContent() {
   )
 }
 
-function CardThumbnail({ path }: { path: string }) {
-  const [url, setUrl] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const loadImage = async () => {
-      setLoading(true)
-
-      // Use public URL - simpler and doesn't require auth
-      const { data } = supabase
-        .storage
-        .from('cards')
-        .getPublicUrl(path)
-
-      setUrl(data?.publicUrl || null)
-      setLoading(false)
-    }
-
-    loadImage()
-  }, [path])
-
-  if (loading || !url) {
+function CardThumbnail({ url }: { url: string | null }) {
+  if (!url) {
     return (
-      <div className="w-40 h-56 border grid place-items-center text-sm text-gray-500 bg-gray-100 animate-pulse">
-        Loading…
+      <div className="w-full h-full border grid place-items-center text-sm text-gray-500 bg-gray-100">
+        No image
       </div>
     )
   }
