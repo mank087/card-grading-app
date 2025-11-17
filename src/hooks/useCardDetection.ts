@@ -84,20 +84,15 @@ export const useCardDetection = (
       const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current);
       lastConfidenceRef.current = smoothedConfidence;
 
-      // Track stable frames
-      if (smoothedConfidence > 70) {
+      // Track stable frames (lowered threshold for testing)
+      if (smoothedConfidence > 50) {
         stableFramesRef.current++;
       } else {
         stableFramesRef.current = 0;
       }
 
-      // Debug logging (only log periodically to avoid spam)
-      if (Math.random() < 0.05) { // 5% of frames
-        console.log('[CardDetection] Confidence:', smoothedConfidence, 'Detected:', smoothedConfidence > 70);
-      }
-
       setDetection({
-        isCardDetected: smoothedConfidence > 70,
+        isCardDetected: smoothedConfidence > 50, // Lowered for testing
         confidence: smoothedConfidence,
         message: getDetectionMessage(smoothedConfidence, stableFramesRef.current)
       });
@@ -124,62 +119,55 @@ export const useCardDetection = (
 
 /**
  * Analyze image data for card presence
- * Looks for edges and contrast indicating a card
+ * Simplified: Just check for content variance (card vs empty background)
  */
 function analyzeFrameForCard(imageData: ImageData): DetectionResult {
   const { data, width, height } = imageData;
 
-  // Calculate edge density using simplified gradient
-  let edgeCount = 0;
-  let totalPixels = 0;
-  const threshold = 30;
+  // Calculate average brightness and variance
+  let sum = 0;
+  let sumSquares = 0;
+  let sampleCount = 0;
 
-  // Sample every 4th pixel for performance
-  for (let y = 1; y < height - 1; y += 4) {
-    for (let x = 1; x < width - 1; x += 4) {
+  // Sample every 8th pixel for performance
+  for (let y = 0; y < height; y += 8) {
+    for (let x = 0; x < width; x += 8) {
       const idx = (y * width + x) * 4;
-
-      // Get grayscale value
       const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
 
-      // Check horizontal gradient
-      const rightIdx = (y * width + (x + 1)) * 4;
-      const rightGray = (data[rightIdx] + data[rightIdx + 1] + data[rightIdx + 2]) / 3;
-
-      // Check vertical gradient
-      const downIdx = ((y + 1) * width + x) * 4;
-      const downGray = (data[downIdx] + data[downIdx + 1] + data[downIdx + 2]) / 3;
-
-      const gradientH = Math.abs(gray - rightGray);
-      const gradientV = Math.abs(gray - downGray);
-
-      if (gradientH > threshold || gradientV > threshold) {
-        edgeCount++;
-      }
-
-      totalPixels++;
+      sum += gray;
+      sumSquares += gray * gray;
+      sampleCount++;
     }
   }
 
-  const edgeDensity = edgeCount / totalPixels;
+  const mean = sum / sampleCount;
+  const variance = (sumSquares / sampleCount) - (mean * mean);
+  const stdDev = Math.sqrt(variance);
 
-  // Calculate confidence based on edge density
-  // Card should have moderate edge density (not too low = empty, not too high = cluttered)
+  console.log('[CardDetection] Analysis - Mean:', mean.toFixed(1), 'StdDev:', stdDev.toFixed(1), 'Samples:', sampleCount);
+
+  // A card should have moderate variation (edges, text, image)
+  // Empty background = low variance (uniform color)
+  // Card present = higher variance (details)
+
   let confidence = 0;
 
-  if (edgeDensity < 0.05) {
-    // Too few edges - probably empty or very blurry
+  if (stdDev < 10) {
+    // Very uniform - probably empty or solid background
     confidence = 0;
-  } else if (edgeDensity >= 0.05 && edgeDensity <= 0.25) {
-    // Good edge density - likely a card
-    confidence = Math.round(((edgeDensity - 0.05) / 0.20) * 100);
+  } else if (stdDev >= 10 && stdDev <= 60) {
+    // Good variance - likely a card with details
+    confidence = Math.round(((stdDev - 10) / 50) * 100);
   } else {
-    // Too many edges - cluttered background
-    confidence = Math.max(0, 100 - Math.round((edgeDensity - 0.25) * 200));
+    // Too much variation - complex background or very detailed card
+    confidence = 100;
   }
 
+  console.log('[CardDetection] Final confidence:', confidence);
+
   return {
-    isCardDetected: confidence > 70,
+    isCardDetected: confidence > 50, // Lowered threshold for testing
     confidence: Math.min(100, Math.max(0, confidence)),
     message: ''
   };
@@ -198,9 +186,9 @@ function smoothConfidence(newConfidence: number, oldConfidence: number): number 
  * Generate user-friendly detection message
  */
 function getDetectionMessage(confidence: number, stableFrames: number): string {
-  if (confidence < 30) {
+  if (confidence < 20) {
     return 'Position card in frame';
-  } else if (confidence < 70) {
+  } else if (confidence < 50) {
     return 'Adjusting position...';
   } else if (stableFrames < 15) {
     return 'Hold steady...';
