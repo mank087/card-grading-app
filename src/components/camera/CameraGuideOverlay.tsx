@@ -9,7 +9,7 @@ export default function CameraGuideOverlay({ cardDetected = false, side }: Camer
   return (
     <div className="absolute inset-0 pointer-events-none">
       {/* Card outline guide - centered with standard card aspect ratio */}
-      <div className="absolute inset-0 flex items-center justify-center p-8">
+      <div className="absolute inset-0 flex items-center justify-center">
         <div
           className={`relative border-4 rounded-lg transition-all duration-300 ${
             cardDetected
