@@ -84,15 +84,15 @@ export const useCardDetection = (
       const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current);
       lastConfidenceRef.current = smoothedConfidence;
 
-      // Track stable frames (lowered threshold for testing)
-      if (smoothedConfidence > 50) {
+      // Track stable frames
+      if (smoothedConfidence > 60) {
         stableFramesRef.current++;
       } else {
         stableFramesRef.current = 0;
       }
 
       setDetection({
-        isCardDetected: smoothedConfidence > 50, // Lowered for testing
+        isCardDetected: smoothedConfidence > 60,
         confidence: smoothedConfidence,
         message: getDetectionMessage(smoothedConfidence, stableFramesRef.current)
       });
@@ -119,55 +119,80 @@ export const useCardDetection = (
 
 /**
  * Analyze image data for card presence
- * Simplified: Just check for content variance (card vs empty background)
+ * Looks for a distinct rectangular object different from background
  */
 function analyzeFrameForCard(imageData: ImageData): DetectionResult {
   const { data, width, height } = imageData;
 
-  // Calculate average brightness and variance
-  let sum = 0;
-  let sumSquares = 0;
-  let sampleCount = 0;
+  // 1. Calculate center region stats (where card should be)
+  const centerWidth = Math.floor(width * 0.6);
+  const centerHeight = Math.floor(height * 0.6);
+  const centerX = Math.floor((width - centerWidth) / 2);
+  const centerY = Math.floor((height - centerHeight) / 2);
 
-  // Sample every 8th pixel for performance
+  // 2. Calculate edge region stats (background)
+  const edgePixels: number[] = [];
+  const centerPixels: number[] = [];
+
+  // Sample edges (background)
   for (let y = 0; y < height; y += 8) {
     for (let x = 0; x < width; x += 8) {
       const idx = (y * width + x) * 4;
       const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
 
-      sum += gray;
-      sumSquares += gray * gray;
-      sampleCount++;
+      // Check if pixel is in edge region (not in center)
+      if (x < centerX || x >= centerX + centerWidth || y < centerY || y >= centerY + centerHeight) {
+        edgePixels.push(gray);
+      } else {
+        centerPixels.push(gray);
+      }
     }
   }
 
-  const mean = sum / sampleCount;
-  const variance = (sumSquares / sampleCount) - (mean * mean);
-  const stdDev = Math.sqrt(variance);
+  // Calculate stats for both regions
+  const edgeMean = edgePixels.reduce((a, b) => a + b, 0) / edgePixels.length;
+  const centerMean = centerPixels.reduce((a, b) => a + b, 0) / centerPixels.length;
 
-  console.log('[CardDetection] Analysis - Mean:', mean.toFixed(1), 'StdDev:', stdDev.toFixed(1), 'Samples:', sampleCount);
+  // Calculate variance for center region (card detail)
+  const centerVariance = centerPixels.reduce((sum, val) => sum + Math.pow(val - centerMean, 2), 0) / centerPixels.length;
+  const centerStdDev = Math.sqrt(centerVariance);
 
-  // A card should have moderate variation (edges, text, image)
-  // Empty background = low variance (uniform color)
-  // Card present = higher variance (details)
+  // Calculate difference between center and edge (card vs background)
+  const colorDifference = Math.abs(centerMean - edgeMean);
+
+  console.log('[CardDetection] Edge Mean:', edgeMean.toFixed(1), 'Center Mean:', centerMean.toFixed(1), 'Diff:', colorDifference.toFixed(1), 'Center StdDev:', centerStdDev.toFixed(1));
+
+  // A card should have:
+  // 1. Higher variance in center (details, text, image) - StdDev > 20
+  // 2. Different color from edges (distinct object) - Diff > 15
 
   let confidence = 0;
 
-  if (stdDev < 10) {
-    // Very uniform - probably empty or solid background
-    confidence = 0;
-  } else if (stdDev >= 10 && stdDev <= 60) {
-    // Good variance - likely a card with details
-    confidence = Math.round(((stdDev - 10) / 50) * 100);
+  // Must have BOTH conditions to be a card
+  const hasDetail = centerStdDev > 20;  // Card has texture/detail
+  const isDifferent = colorDifference > 15;  // Card is distinct from background
+
+  if (hasDetail && isDifferent) {
+    // Both conditions met - likely a card
+    // Calculate confidence based on how strong the signals are
+    const detailScore = Math.min(100, Math.round((centerStdDev - 20) / 0.4)); // 0-100
+    const diffScore = Math.min(100, Math.round((colorDifference - 15) / 0.5)); // 0-100
+    confidence = Math.round((detailScore + diffScore) / 2);
+  } else if (hasDetail) {
+    // Has detail but not distinct - might be detailed background
+    confidence = Math.min(30, Math.round(centerStdDev / 2));
+  } else if (isDifferent) {
+    // Different color but no detail - might be solid object
+    confidence = Math.min(30, Math.round(colorDifference));
   } else {
-    // Too much variation - complex background or very detailed card
-    confidence = 100;
+    // Neither - definitely not a card
+    confidence = 0;
   }
 
-  console.log('[CardDetection] Final confidence:', confidence);
+  console.log('[CardDetection] Has Detail:', hasDetail, 'Is Different:', isDifferent, '→ Confidence:', confidence);
 
   return {
-    isCardDetected: confidence > 50, // Lowered threshold for testing
+    isCardDetected: confidence > 60, // Card detected if confidence > 60%
     confidence: Math.min(100, Math.max(0, confidence)),
     message: ''
   };
@@ -186,9 +211,9 @@ function smoothConfidence(newConfidence: number, oldConfidence: number): number 
  * Generate user-friendly detection message
  */
 function getDetectionMessage(confidence: number, stableFrames: number): string {
-  if (confidence < 20) {
+  if (confidence < 30) {
     return 'Position card in frame';
-  } else if (confidence < 50) {
+  } else if (confidence < 60) {
     return 'Adjusting position...';
   } else if (stableFrames < 15) {
     return 'Hold steady...';
