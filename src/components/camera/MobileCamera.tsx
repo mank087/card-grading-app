@@ -33,6 +33,24 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     };
   }, [facingMode]); // Only depend on facingMode, not the functions
 
+  // Ensure video element has the stream when stream changes
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      console.log('[MobileCamera] Syncing stream to video element');
+      console.log('[MobileCamera] Stream active:', stream.active);
+      console.log('[MobileCamera] Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.label}, enabled: ${t.enabled}`));
+
+      videoRef.current.srcObject = stream;
+
+      // Force play
+      videoRef.current.play().then(() => {
+        console.log('[MobileCamera] Video playing');
+      }).catch(err => {
+        console.error('[MobileCamera] Video play error:', err);
+      });
+    }
+  }, [stream]); // Run when stream changes
+
   const handleCapture = async () => {
     setIsProcessing(true);
     try {
