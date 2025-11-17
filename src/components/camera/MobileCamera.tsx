@@ -298,11 +298,10 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           }`}>
             {detection.message}
           </p>
-          {detection.isCardDetected && (
-            <p className="text-xs text-gray-500">
-              Confidence: {detection.confidence}%
-            </p>
-          )}
+          {/* Always show confidence for debugging */}
+          <p className="text-xs text-gray-500">
+            Confidence: {detection.confidence}% {detection.isCardDetected && '✓ Detected'}
+          </p>
         </div>
       </div>
     </div>

@@ -55,6 +55,14 @@ export const useCardDetection = (
       if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
+        console.log('[CardDetection] Canvas initialized:', canvas.width, 'x', canvas.height);
+      }
+
+      // Debug: Check if video dimensions are valid
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        console.warn('[CardDetection] Video dimensions are 0, skipping detection');
+        animationFrameRef.current = requestAnimationFrame(detectCard);
+        return;
       }
 
       // Draw current frame
@@ -81,6 +89,11 @@ export const useCardDetection = (
         stableFramesRef.current++;
       } else {
         stableFramesRef.current = 0;
+      }
+
+      // Debug logging (only log periodically to avoid spam)
+      if (Math.random() < 0.05) { // 5% of frames
+        console.log('[CardDetection] Confidence:', smoothedConfidence, 'Detected:', smoothedConfidence > 70);
       }
 
       setDetection({
