@@ -357,14 +357,9 @@ function UniversalUploadPageContent() {
     // Process captured image
     handleFileSelect(file, currentSide)
 
-    // Move to next side or back to selection
-    if (currentSide === 'front' && !backFile) {
-      setCurrentSide('back')
-      // Stay in camera mode for back capture
-    } else {
-      // Both sides captured, return to main view
-      setUploadMode('select')
-    }
+    // Always return to main view after capture
+    // This lets user see what was captured and choose next action
+    setUploadMode('select')
   }
 
   const handleCameraCancel = () => {
@@ -471,7 +466,6 @@ function UniversalUploadPageContent() {
                 id="front-input"
                 type="file"
                 accept="image/*"
-                capture="environment"
                 disabled={isCompressing}
                 onChange={(e) => {
                   const file = e.target.files?.[0]
@@ -527,20 +521,29 @@ function UniversalUploadPageContent() {
                       )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (showCameraOption) {
-                        setCurrentSide('front')
-                        setUploadMode('camera')
-                      } else {
-                        document.getElementById('front-input')?.click()
-                      }
-                    }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    {showCameraOption ? '🔄 Recapture Front' : '🔄 Change Front Image'}
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    {showCameraOption && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentSide('front')
+                          setUploadMode('camera')
+                        }}
+                        className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        📷 Camera
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('front-input')?.click()}
+                      className={`px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors ${
+                        showCameraOption ? '' : 'col-span-2'
+                      }`}
+                    >
+                      🖼️ Gallery
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -554,7 +557,6 @@ function UniversalUploadPageContent() {
                 id="back-input"
                 type="file"
                 accept="image/*"
-                capture="environment"
                 disabled={isCompressing}
                 onChange={(e) => {
                   const file = e.target.files?.[0]
@@ -610,20 +612,29 @@ function UniversalUploadPageContent() {
                       )}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (showCameraOption) {
-                        setCurrentSide('back')
-                        setUploadMode('camera')
-                      } else {
-                        document.getElementById('back-input')?.click()
-                      }
-                    }}
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    {showCameraOption ? '🔄 Recapture Back' : '🔄 Change Back Image'}
-                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    {showCameraOption && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCurrentSide('back')
+                          setUploadMode('camera')
+                        }}
+                        className="px-3 py-2 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        📷 Camera
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById('back-input')?.click()}
+                      className={`px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors ${
+                        showCameraOption ? '' : 'col-span-2'
+                      }`}
+                    >
+                      🖼️ Gallery
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
