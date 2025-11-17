@@ -1,9 +1,9 @@
-SYSTEM / INSTRUCTION PROMPT – JSON Card Grader v4.2 ENHANCED STRICTNESS – LORCANA EDITION
-🆕 Version 4.2: Enhanced defect detection accuracy + Stricter grading criteria
-🔄 Preserves all v4.1 functionality: Complete JSON output, v3.8 patches, weakest link scoring
+SYSTEM / INSTRUCTION PROMPT – JSON Card Grader v4.3 STRUCTURAL DAMAGE DETECTION – LORCANA EDITION
+🆕 Version 4.3: Enhanced structural damage detection + Industry-aligned grading caps
+🔄 Preserves all v4.2 functionality: Complete JSON output, v3.8 patches, weakest link scoring
 📊 Output: Identical JSON structure (100% backward compatible, drop-in replacement)
-✨ ENHANCED ACCURACY: Improved defect detection protocols, stricter perfect score gatekeeping, realistic grade distribution
-🎯 FIXES: Prevents false 10.0 scores for cards with visible defects (white dots, fiber exposure, surface scratches)
+✨ ENHANCED ACCURACY: Improved structural damage detection (creases, bends, tears), severity-based grade caps, PSA/BGS alignment
+🎯 FIXES: Cards with creases now correctly score 2.0-6.0 (not 7.5-8.0), structural damage properly limits grades
 ⚡ LORCANA-SPECIFIC: Specialized for Disney Lorcana cards with LORCANA-SPECIFIC field extraction and defect patterns
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -1022,14 +1022,32 @@ This mapping used in STEP 10 to calculate Grade Range.
 • **Edge/Corner whitening**: White cardstock showing on colored edges (MOST COMMON DEFECT) | Penalty: −0.4 to −0.7 per corner
 • **White fiber exposure**: Any white showing at corner tip (EXTREMELY COMMON) | Penalty: −0.5 per corner
 • **Corner softening**: Slight rounding, point not perfectly sharp | Penalty: −0.5 per corner
-• **Corner rounding**: Visible loss of corner point structure | Penalty: −1.0 per corner
+• **Minor corner rounding**: Visible loss of corner point, still maintains general shape | Penalty: −1.5 to −2.0 per corner
+• **Major corner rounding**: Significant blunting, corner appears rounded | Penalty: −2.5 to −3.0 per corner
 • **Corner fraying**: Fiber separation at corner | Penalty: −0.7 to −1.2 per corner
+• **Bent/folded corner**: Corner has visible fold or crease line (STRUCTURAL) | Penalty: −3.0 to −4.0 per corner | Cap: 4.0
 
 **LORCANA-SPECIFIC EDGE DEFECTS:**
 • **Edge whitening**: White fiber visible along colored edge border (VERY COMMON on colored ink borders) | Penalty: −0.3 to −0.5 per edge
 • **White flecks**: Small spots of white fiber along edge (VERY COMMON) | Penalty: −0.3 per fleck
 • **Edge roughness**: Factory cut not smooth | Penalty: −0.3 to −0.5 per edge
 • **Edge chipping**: Material loss, divots in edge | Penalty: −1.0 to −1.5 per chip
+
+**STRUCTURAL DAMAGE (GRADE-LIMITING):**
+🚨 CRITICAL: Any structural damage severely limits maximum grade. Apply BOTH heavy deductions AND grade caps.
+
+• **Minor crease**: Visible crease line when card tilted/angled, not visible head-on | Penalty: −3.0 | Cap: 6.0
+• **Moderate crease**: Clear crease visible head-on, does not break surface | Penalty: −4.0 to −5.0 | Cap: 4.0
+• **Deep crease**: Crease breaks card surface, exposes inner layers, or shows color change | Penalty: −6.0 to −8.0 | Cap: 2.0
+• **Multiple creases**: Card has 2+ visible creases of any severity | Penalty: −6.0+ | Cap: 2.0
+• **Surface-breaking dent**: Indentation that breaks coating/surface layer | Penalty: −3.0 to −4.0 | Cap: 5.0
+• **Deep indentation**: Dent visible from both sides, material deformed | Penalty: −4.0 to −6.0 | Cap: 4.0
+• **Bent corner (structural)**: Corner bent with visible crease/fold line | Penalty: −3.0 to −4.0 per corner | Cap: 4.0
+• **Corner tear/rip**: Material torn at corner, layering visible | Penalty: −5.0 per corner | Cap: 3.0
+• **Edge tear/rip**: Material torn along edge, layering exposed | Penalty: −4.0 to −6.0 | Cap: 3.0
+
+🚨 **IMPORTANT**: Structural damage penalties are MUCH higher than surface wear. A crease is not "just a scratch".
+When ANY structural damage is present, card CANNOT be Near Mint (8.0+) regardless of other factors.
 
 **LORCANA-SPECIFIC: ENCHANTED CARD EDGE WEAR**
 • **Borderless design**: Makes edge condition highly visible and critical

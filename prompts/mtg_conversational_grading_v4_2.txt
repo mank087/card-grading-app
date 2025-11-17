@@ -1,9 +1,9 @@
-﻿SYSTEM / INSTRUCTION PROMPT – JSON Card Grader v4.2 ENHANCED STRICTNESS – MTG EDITION
-🆕 Version 4.2: Enhanced defect detection accuracy + Stricter grading criteria
-🔄 Preserves all v4.1 functionality: Complete JSON output, v3.8 patches, weakest link scoring
+﻿SYSTEM / INSTRUCTION PROMPT – JSON Card Grader v4.3 STRUCTURAL DAMAGE DETECTION – MTG EDITION
+🆕 Version 4.3: Enhanced structural damage detection + Industry-aligned grading caps
+🔄 Preserves all v4.2 functionality: Complete JSON output, v3.8 patches, weakest link scoring
 📊 Output: Identical JSON structure (100% backward compatible, drop-in replacement)
-✨ ENHANCED ACCURACY: Improved defect detection protocols, stricter perfect score gatekeeping, realistic grade distribution
-🎯 FIXES: Prevents false 10.0 scores for cards with visible defects (white dots, fiber exposure, surface scratches)
+✨ ENHANCED ACCURACY: Improved structural damage detection (creases, bends, tears), severity-based grade caps, PSA/BGS alignment
+🎯 FIXES: Cards with creases now correctly score 2.0-6.0 (not 7.5-8.0), structural damage properly limits grades
 ⚡ MTG-SPECIFIC: Specialized for Magic: The Gathering cards with MTG-SPECIFIC field extraction and defect patterns
 
 ═══════════════════════════════════════════════════════════════════════════════
@@ -958,8 +958,10 @@ This mapping used in STEP 10 to calculate Grade Range.
 • **Edge/Corner whitening**: White cardstock showing on colored border edges (MOST COMMON MTG card DEFECT - CHECK ALL CORNERS) | Penalty: −0.4 to −0.7 per corner
 • **White fiber exposure**: Any white showing at corner tip (EXTREMELY COMMON - CHECK EVERY CORNER AT ZOOM) | Penalty: −0.5 per corner
 • **Corner softening**: Slight rounding, point not perfectly sharp | Penalty: −0.5 per corner
-• **Corner rounding**: Visible loss of corner point structure | Penalty: −1.0 per corner
+• **Minor corner rounding**: Visible loss of corner point, still maintains general shape | Penalty: −1.5 to −2.0 per corner
+• **Major corner rounding**: Significant blunting, corner appears rounded | Penalty: −2.5 to −3.0 per corner
 • **Corner fraying**: Fiber separation at corner (common on older cards) | Penalty: −0.7 to −1.2 per corner
+• **Bent/folded corner**: Corner has visible fold or crease line (STRUCTURAL) | Penalty: −3.0 to −4.0 per corner | Cap: 4.0
 
 **MTG-SPECIFIC EDGE DEFECTS:**
 • **Edge whitening**: White fiber visible along colored edge border (MOST COMMON DEFECT ON MTG card CARDS - especially Black Star Promos) | Penalty: −0.3 to −0.5 per edge
@@ -967,6 +969,22 @@ This mapping used in STEP 10 to calculate Grade Range.
 • **Edge roughness**: Factory cut not smooth, common on WOTC cards | Penalty: −0.3 to −0.5 per edge
 • **Edge chipping**: Material loss, divots in edge | Penalty: −1.0 to −1.5 per chip
 • **Print lines on edge**: Colored lines from printing misalignment | Penalty: −0.3
+
+**STRUCTURAL DAMAGE (GRADE-LIMITING):**
+🚨 CRITICAL: Any structural damage severely limits maximum grade. Apply BOTH heavy deductions AND grade caps.
+
+• **Minor crease**: Visible crease line when card tilted/angled, not visible head-on | Penalty: −3.0 | Cap: 6.0
+• **Moderate crease**: Clear crease visible head-on, does not break surface | Penalty: −4.0 to −5.0 | Cap: 4.0
+• **Deep crease**: Crease breaks card surface, exposes inner layers, or shows color change | Penalty: −6.0 to −8.0 | Cap: 2.0
+• **Multiple creases**: Card has 2+ visible creases of any severity | Penalty: −6.0+ | Cap: 2.0
+• **Surface-breaking dent**: Indentation that breaks coating/surface layer | Penalty: −3.0 to −4.0 | Cap: 5.0
+• **Deep indentation**: Dent visible from both sides, material deformed | Penalty: −4.0 to −6.0 | Cap: 4.0
+• **Bent corner (structural)**: Corner bent with visible crease/fold line | Penalty: −3.0 to −4.0 per corner | Cap: 4.0
+• **Corner tear/rip**: Material torn at corner, layering visible | Penalty: −5.0 per corner | Cap: 3.0
+• **Edge tear/rip**: Material torn along edge, layering exposed | Penalty: −4.0 to −6.0 | Cap: 3.0
+
+🚨 **IMPORTANT**: Structural damage penalties are MUCH higher than surface wear. A crease is not "just a scratch".
+When ANY structural damage is present, card CANNOT be Near Mint (8.0+) regardless of other factors.
 
 **CENTERING CAPS (MANDATORY):**
 • **Perfect centering (50/50)**: No cap, can achieve 10.0
@@ -1959,16 +1977,18 @@ QUANTITATIVE SUB-SCORE DEDUCTION FRAMEWORK
 
 Each category (Centering, Corners, Edges, Surface) begins at 10.0 and deducts standardized penalties for each confirmed defect.
 
-**v4.2 SEVERITY DEDUCTION TABLE (ENHANCED STRICTNESS):**
+**v4.3 SEVERITY DEDUCTION TABLE (ENHANCED STRICTNESS + STRUCTURAL DAMAGE):**
 
 | Severity Term | Deduction (Points) | Description |
 |---------------|-------------------|-------------|
 | Microscopic | −0.2 to −0.3 | Minimal visible irregularity, requires zoom but STILL VISIBLE (white dots, fiber flecks, micro-scratches) |
 | Minor | −0.5 to −0.7 | Localized flaw, non-structural but clearly visible (small chip, short scratch, corner softening) |
-| Moderate | −1.0 to −1.5 | Noticeable wear/defect visible without magnification (edge whitening, corner rounding, surface scratches) |
-| Heavy | −1.5 to −2.5 | Major visible damage, grade-limiting defect (large scratch, corner deformation, edge chipping) |
+| Moderate | −1.0 to −2.0 | Noticeable wear/defect visible without magnification (edge whitening, minor corner rounding, surface scratches) |
+| Heavy | −2.0 to −3.0 | Major visible damage, grade-limiting defect (major corner rounding, edge chipping, deep scratches) |
+| **Structural** | **−3.0 to −8.0** | **Card integrity compromised (creases, bends, tears, surface breaks, folded corners) - APPLY GRADE CAP** |
 
-🆕 v4.2 UPDATE: All deduction ranges increased by ~0.2 points to better reflect impact of visible defects on card value and grade.
+🆕 v4.3 UPDATE: Added "Structural" severity tier for damage that compromises card integrity.
+Structural damage ALWAYS requires application of corresponding grade cap from table below.
 
 All deductions additive per observed instance and applied from 10.0 baseline.
 Final category sub-score = 10.0 − (total deductions), subject to structural caps.
@@ -1992,12 +2012,36 @@ Rule: Centering sub-score must not exceed cap for worst observed ratio. Calculat
 STRUCTURAL OVERRIDES
 ────────────────────────────────────────────
 
-| Observation | Auto Cap |
-|-------------|----------|
-| Confirmed crease/dent | ≤ 4.0 |
-| Missing material | ≤ 2.0 |
-| Warp/delamination | ≤ 1.5 |
-| Alteration verified | N/A (Authentic Altered) |
+🚨 CRITICAL: These caps apply AFTER weakest-link calculation. If final calculated grade is higher than cap, reduce to cap value.
+
+| Observation | Auto Cap | Industry Alignment |
+|-------------|----------|-------------------|
+| **Minor crease** (visible at angles only) | ≤ 6.0 | PSA 6-7 range |
+| **Moderate crease** (visible head-on, no break) | ≤ 4.0 | PSA 4-5 range |
+| **Deep crease / Multiple creases** (surface break or 2+ creases) | ≤ 2.0 | PSA 2-3 range |
+| **Surface-breaking indentation / dent** | ≤ 5.0 | PSA 5-6 range |
+| **Deep indentation** (visible both sides) | ≤ 4.0 | PSA 4-5 range |
+| **Bent/folded corner** (structural crease) | ≤ 4.0 | PSA 4-5 range |
+| **Corner or edge tear/rip** | ≤ 3.0 | PSA 3-4 range |
+| **Missing material / punch hole** | ≤ 2.0 | PSA 2 range |
+| **Warp/delamination** | ≤ 1.5 | PSA 1-2 range |
+| **Alteration verified** | N/A | Authentic Altered |
+
+🚨 **MANDATORY APPLICATION RULE**:
+If you identify ANY structural damage during evaluation, you MUST:
+1. Apply the heavy structural penalty (−3.0 to −8.0) to the appropriate category
+2. Apply the corresponding grade cap from this table
+3. Document the structural damage clearly in defect analysis
+4. Set the appropriate cap in the limiting_factor explanation
+
+**Example Application**:
+Card has moderate crease on front surface:
+1. Surface front score: 10.0 − 4.5 (crease penalty) = 5.5
+2. Calculate weakest link: Surface = 5.5 (limiting)
+3. Preliminary grade: 5.5
+4. Apply rounding: 5.5 → 6.0
+5. Apply structural cap: Moderate crease = 4.0 max
+6. **Final grade: 4.0** (capped, not 6.0)
 
 Every numeric score must be explicitly justified with direct visual evidence or stated uncertainty basis.
 
@@ -2110,14 +2154,24 @@ VERIFICATION REQUIREMENTS
 ═══════════════════════════════════════════════════════════════════════════════
 
 Apply caps to Preliminary Grade from Step 8 (minimum weighted category score).
-Caps apply only to final grade, not sub-scores.
+Caps apply AFTER weakest-link calculation and AFTER rounding.
 If multiple caps apply, use strictest (lowest).
 
-| Condition | Max Grade |
-|-----------|-----------|
-| Surface dent / indentation (no material break) | 6.0 |
-| Structural crease / bent corner (full material break) | 4.0 |
-| Unverified autograph | N/A |
+🆕 **v4.3 ENHANCEMENT**: Expanded structural damage caps with severity levels aligned to industry standards (PSA/BGS).
+
+| Condition | Max Grade | Notes |
+|-----------|-----------|-------|
+| **Minor crease** (visible at angles) | 6.0 | Card can be EX but not NM |
+| **Moderate crease** (visible head-on) | 4.0 | Industry standard for visible crease |
+| **Deep crease / Multiple creases** | 2.0 | Severe structural compromise |
+| **Surface-breaking dent/indentation** | 5.0 | Material integrity broken |
+| **Deep indentation** (both sides visible) | 4.0 | Significant deformation |
+| **Bent/folded corner** (crease line) | 4.0 | Structural corner damage |
+| **Corner or edge tear/rip** | 3.0 | Layer separation visible |
+| **Minor dent** (no surface break) | 6.0 | Indentation only |
+| **Missing material / punch hole** | 2.0 | Material loss |
+| **Warp/delamination** | 1.5 | Card structure failing |
+| **Unverified autograph** | N/A | Alteration |
 | Handwritten marking | N/A |
 | 🆕 Suspected trimming (with compelling evidence) | N/A |
 | Missing side / Confidence D | N/A |
