@@ -25,8 +25,13 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   // Start camera on mount and when facingMode changes
   useEffect(() => {
     startCamera(facingMode);
-    return () => stopCamera();
-  }, [facingMode, startCamera, stopCamera]);
+
+    // Cleanup function - inline to avoid stale closures
+    return () => {
+      console.log('[MobileCamera] Cleaning up camera on unmount or facingMode change');
+      stopCamera();
+    };
+  }, [facingMode]); // Only depend on facingMode, not the functions
 
   const handleCapture = async () => {
     setIsProcessing(true);

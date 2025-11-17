@@ -9,6 +9,7 @@ export const useCamera = () => {
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isStarting, setIsStarting] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null); // Track current stream with ref
 
   const startCamera = async (facingMode: 'user' | 'environment' = 'environment') => {
     // Prevent multiple simultaneous start attempts
@@ -22,12 +23,13 @@ export const useCamera = () => {
 
     try {
       // First, stop any existing camera stream
-      if (stream) {
+      if (streamRef.current) {
         console.log('[Camera] Stopping existing stream before starting new one');
-        stream.getTracks().forEach(track => {
+        streamRef.current.getTracks().forEach(track => {
           track.stop();
           track.enabled = false;
         });
+        streamRef.current = null;
         setStream(null);
       }
 
@@ -86,7 +88,8 @@ export const useCamera = () => {
       console.log('[Camera] Media stream acquired successfully');
       console.log('[Camera] Stream tracks:', mediaStream.getTracks().map(t => `${t.kind}: ${t.label}`));
 
-      setStream(mediaStream);
+      streamRef.current = mediaStream; // Update ref
+      setStream(mediaStream); // Update state
       setHasPermission(true);
       setError(null);
 
@@ -165,12 +168,13 @@ export const useCamera = () => {
   const stopCamera = useCallback(() => {
     console.log('[Camera] Stopping camera...');
 
-    if (stream) {
-      stream.getTracks().forEach(track => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
         console.log('[Camera] Stopping track:', track.kind, track.label);
         track.stop();
         track.enabled = false;
       });
+      streamRef.current = null;
       setStream(null);
     }
 
@@ -184,7 +188,7 @@ export const useCamera = () => {
     // Reset states
     setError(null);
     setIsStarting(false);
-  }, [stream]);
+  }, []); // No dependencies needed since we use ref
 
   const captureImage = (): Promise<CapturedImage | null> => {
     return new Promise((resolve) => {
@@ -224,11 +228,23 @@ export const useCamera = () => {
     });
   };
 
+  // Cleanup on unmount only
   useEffect(() => {
     return () => {
-      stopCamera();
+      console.log('[Camera Hook] Component unmounting, cleaning up camera');
+      // Use ref to access current stream (avoids stale closure)
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => {
+          track.stop();
+          track.enabled = false;
+        });
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+      }
     };
-  }, [stopCamera]);
+  }, []); // Empty array - only run on unmount
 
   return {
     videoRef,
