@@ -8,9 +8,6 @@ interface CameraGuideOverlayProps {
 export default function CameraGuideOverlay({ cardDetected = false, side }: CameraGuideOverlayProps) {
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Semi-transparent overlay - darker outside the guide */}
-      <div className="absolute inset-0 bg-black/40" />
-
       {/* Card outline guide - centered with standard card aspect ratio */}
       <div className="absolute inset-0 flex items-center justify-center p-8">
         <div
@@ -22,8 +19,7 @@ export default function CameraGuideOverlay({ cardDetected = false, side }: Camer
           style={{
             width: '80%',
             maxWidth: '350px',
-            aspectRatio: '2.5 / 3.5', // Standard trading card ratio
-            backgroundColor: 'rgba(0, 0, 0, 0.2)' // Slight tint inside guide
+            aspectRatio: '2.5 / 3.5' // Standard trading card ratio
           }}
         >
           {/* Corner markers - L-shaped brackets */}
