@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useCamera } from '@/hooks/useCamera';
+import { useCardDetection } from '@/hooks/useCardDetection';
 import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
 import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality';
+import { cropToGuideFrame } from '@/utils/guideCrop';
 import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
 
@@ -21,6 +23,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [isProcessing, setIsProcessing] = useState(false);
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+
+  // Auto card detection
+  const detection = useCardDetection(videoRef, !!stream);
 
   // Start camera on mount and when facingMode changes
   useEffect(() => {
@@ -61,11 +66,36 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         return;
       }
 
-      setCapturedImageUrl(captured.dataUrl);
-      setCapturedFile(captured.file);
+      console.log('[MobileCamera] Image captured, applying auto-crop...');
+
+      // Auto-crop to guide frame boundaries
+      let finalFile = captured.file;
+      let finalDataUrl = captured.dataUrl;
+
+      try {
+        const cropResult = await cropToGuideFrame(captured.file, {
+          paddingPercent: 0.05, // 5% padding for positioning tolerance
+          maintainAspectRatio: true
+        });
+
+        finalFile = cropResult.croppedFile;
+        finalDataUrl = cropResult.croppedDataUrl;
+
+        console.log('[MobileCamera] Auto-crop applied:', {
+          original: cropResult.originalSize,
+          cropped: cropResult.croppedSize,
+          removed: `${Math.round((1 - (cropResult.croppedSize.width * cropResult.croppedSize.height) / (cropResult.originalSize.width * cropResult.originalSize.height)) * 100)}%`
+        });
+      } catch (cropErr) {
+        console.warn('[MobileCamera] Auto-crop failed, using original image:', cropErr);
+        // Continue with original image if crop fails
+      }
+
+      setCapturedImageUrl(finalDataUrl);
+      setCapturedFile(finalFile);
 
       // Validate image quality
-      const imageData = await getImageDataFromFile(captured.file);
+      const imageData = await getImageDataFromFile(finalFile);
       if (imageData) {
         const validation = validateImageQuality(imageData);
         setQualityValidation(validation);
@@ -238,17 +268,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           className="absolute inset-0 w-full h-full object-cover"
         />
 
-        {/* Debug Info Overlay */}
-        <div className="absolute top-2 left-2 bg-black/70 text-white p-2 rounded text-xs font-mono z-50">
-          <div>Stream: {stream ? '✓ Active' : '✗ None'}</div>
-          <div>Video: {videoRef.current?.videoWidth}x{videoRef.current?.videoHeight}</div>
-          <div>Ready: {videoRef.current?.readyState}</div>
-          <div>Paused: {videoRef.current?.paused ? 'Yes' : 'No'}</div>
-          <div>SrcObj: {videoRef.current?.srcObject ? '✓' : '✗'}</div>
-        </div>
-
         {/* Guide Overlay */}
-        <CameraGuideOverlay side={side} cardDetected={false} />
+        <CameraGuideOverlay side={side} cardDetected={detection.isCardDetected} />
       </div>
 
       {/* Controls */}
@@ -271,9 +292,18 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           </button>
         </div>
 
-        <p className="text-center text-gray-400 text-sm mt-4">
-          Tap the button to capture
-        </p>
+        <div className="text-center mt-4 space-y-1">
+          <p className={`text-sm font-medium transition-colors ${
+            detection.isStable ? 'text-green-400' : detection.isCardDetected ? 'text-yellow-400' : 'text-gray-400'
+          }`}>
+            {detection.message}
+          </p>
+          {detection.isCardDetected && (
+            <p className="text-xs text-gray-500">
+              Confidence: {detection.confidence}%
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
