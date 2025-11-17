@@ -100,7 +100,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           <div className="w-16"></div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-6">
+        <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
           <div className="text-center space-y-4 max-w-md">
             <div className="text-6xl">📷</div>
             <h3 className="text-xl font-bold text-white">Camera Permission Needed</h3>
@@ -108,16 +108,29 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
               To capture card images, we need access to your camera. Please allow camera access when prompted.
             </p>
             {error && (
-              <div className="bg-red-900/50 border border-red-500 rounded-lg p-4">
+              <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 text-left">
+                <p className="text-red-200 text-sm font-semibold mb-2">Error Details:</p>
                 <p className="text-red-200 text-sm">{error}</p>
               </div>
             )}
+
+            {/* Diagnostic Information */}
+            <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 text-left">
+              <p className="text-gray-400 text-xs font-semibold mb-2">Diagnostic Info:</p>
+              <div className="text-gray-300 text-xs space-y-1">
+                <p>• Browser: {typeof navigator !== 'undefined' ? navigator.userAgent.split(' ').slice(-2).join(' ') : 'Unknown'}</p>
+                <p>• HTTPS: {typeof window !== 'undefined' ? (window.location.protocol === 'https:' ? '✓ Yes' : '✗ No (Required!)') : 'Unknown'}</p>
+                <p>• MediaDevices API: {typeof navigator !== 'undefined' && navigator.mediaDevices ? '✓ Available' : '✗ Not Available'}</p>
+                <p>• getUserMedia: {typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia ? '✓ Supported' : '✗ Not Supported'}</p>
+              </div>
+            </div>
+
             <div className="space-y-3">
               <button
                 onClick={() => startCamera(facingMode)}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
               >
-                Enable Camera
+                Try Again
               </button>
               <button
                 onClick={onCancel}
@@ -125,6 +138,18 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
               >
                 Use Gallery Instead
               </button>
+            </div>
+
+            {/* Help Text */}
+            <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-3 text-left">
+              <p className="text-blue-200 text-xs font-semibold mb-2">Troubleshooting:</p>
+              <ul className="text-blue-300 text-xs space-y-1 list-disc list-inside">
+                <li>Make sure camera permission is allowed in browser settings</li>
+                <li>Close other apps that might be using the camera</li>
+                <li>Refresh the page and try again</li>
+                <li>Ensure you're using HTTPS (not HTTP)</li>
+                <li>Try using "Gallery" option as a workaround</li>
+              </ul>
             </div>
           </div>
         </div>
@@ -181,6 +206,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           autoPlay
           playsInline
           muted
+          webkit-playsinline="true"
           className="absolute inset-0 w-full h-full object-cover"
         />
 

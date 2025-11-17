@@ -11,13 +11,45 @@ export const useCamera = () => {
 
   const startCamera = async (facingMode: 'user' | 'environment' = 'environment') => {
     try {
-      const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+      // First, check if getUserMedia is supported
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera API not supported in this browser');
+      }
+
+      let mediaStream: MediaStream | null = null;
+
+      // Try with preferred constraints first
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          }
+        });
+      } catch (firstErr) {
+        console.warn('First camera attempt failed, trying with simpler constraints:', firstErr);
+
+        // Fallback: Try with just facingMode
+        try {
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: facingMode
+            }
+          });
+        } catch (secondErr) {
+          console.warn('Second camera attempt failed, trying with any camera:', secondErr);
+
+          // Last resort: Try with just video: true
+          mediaStream = await navigator.mediaDevices.getUserMedia({
+            video: true
+          });
         }
-      });
+      }
+
+      if (!mediaStream) {
+        throw new Error('Failed to get media stream');
+      }
 
       setStream(mediaStream);
       setHasPermission(true);
@@ -25,10 +57,33 @@ export const useCamera = () => {
 
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        // Ensure video plays (important for iOS Safari)
+        try {
+          await videoRef.current.play();
+        } catch (playErr) {
+          console.warn('Video autoplay failed:', playErr);
+          // This is often not a critical error - user can manually start
+        }
       }
     } catch (err: any) {
       console.error('Camera access error:', err);
-      setError(err.message || 'Failed to access camera');
+      let errorMessage = 'Failed to access camera';
+
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMessage = 'Camera permission denied. Please allow camera access in your browser settings.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMessage = 'No camera found on this device.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMessage = 'Camera is already in use by another application.';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        errorMessage = 'Camera does not support the requested settings.';
+      } else if (err.name === 'SecurityError') {
+        errorMessage = 'Camera access blocked. Please ensure you are using HTTPS.';
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+
+      setError(errorMessage);
       setHasPermission(false);
     }
   };
