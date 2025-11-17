@@ -220,6 +220,15 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           className="absolute inset-0 w-full h-full object-cover"
         />
 
+        {/* Debug Info Overlay */}
+        <div className="absolute top-2 left-2 bg-black/70 text-white p-2 rounded text-xs font-mono z-50">
+          <div>Stream: {stream ? '✓ Active' : '✗ None'}</div>
+          <div>Video: {videoRef.current?.videoWidth}x{videoRef.current?.videoHeight}</div>
+          <div>Ready: {videoRef.current?.readyState}</div>
+          <div>Paused: {videoRef.current?.paused ? 'Yes' : 'No'}</div>
+          <div>SrcObj: {videoRef.current?.srcObject ? '✓' : '✗'}</div>
+        </div>
+
         {/* Guide Overlay */}
         <CameraGuideOverlay side={side} cardDetected={false} />
       </div>
