@@ -6,6 +6,9 @@ import { supabase } from '@/lib/supabaseClient'
 import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
 import { compressImage, formatFileSize, getOptimalCompressionSettings } from '@/lib/imageCompression'
 import CardAnalysisAnimation from './sports/CardAnalysisAnimation'
+import { useDeviceDetection } from '@/hooks/useDeviceDetection'
+import UploadMethodSelector from '@/components/camera/UploadMethodSelector'
+import MobileCamera from '@/components/camera/MobileCamera'
 
 interface CompressionInfo {
   originalSize: number;
@@ -126,6 +129,11 @@ function UniversalUploadPageContent() {
   const [status, setStatus] = useState('')
   const [isCompressing, setIsCompressing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+
+  // Camera/upload mode state
+  const [uploadMode, setUploadMode] = useState<'select' | 'camera' | 'gallery'>('select')
+  const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front')
+  const { showCameraOption } = useDeviceDetection()
 
   // Update selected type when URL param changes
   useEffect(() => {
@@ -320,6 +328,60 @@ function UniversalUploadPageContent() {
     }
   }
 
+  // Handle camera/gallery selection
+  const handleCameraSelect = () => {
+    setUploadMode('camera')
+    // Determine which side to capture next
+    if (!frontFile) {
+      setCurrentSide('front')
+    } else if (!backFile) {
+      setCurrentSide('back')
+    }
+  }
+
+  const handleGallerySelect = () => {
+    setUploadMode('gallery')
+    // Determine which side to upload next
+    if (!frontFile) {
+      setCurrentSide('front')
+      // Trigger file input
+      setTimeout(() => document.getElementById('front-input')?.click(), 100)
+    } else if (!backFile) {
+      setCurrentSide('back')
+      // Trigger file input
+      setTimeout(() => document.getElementById('back-input')?.click(), 100)
+    }
+  }
+
+  const handleCameraCapture = (file: File) => {
+    // Process captured image
+    handleFileSelect(file, currentSide)
+
+    // Move to next side or back to selection
+    if (currentSide === 'front' && !backFile) {
+      setCurrentSide('back')
+      // Stay in camera mode for back capture
+    } else {
+      // Both sides captured, return to main view
+      setUploadMode('select')
+    }
+  }
+
+  const handleCameraCancel = () => {
+    setUploadMode('select')
+  }
+
+  // Show camera if in camera mode
+  if (uploadMode === 'camera') {
+    return (
+      <MobileCamera
+        side={currentSide}
+        onCapture={handleCameraCapture}
+        onCancel={handleCameraCancel}
+      />
+    )
+  }
+
   // Show loading animation when uploading
   if (isUploading && frontFile) {
     return (
@@ -391,118 +453,182 @@ function UniversalUploadPageContent() {
           </div>
         </div>
 
-        {/* Front and Back Image Upload - Responsive Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Front Image Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Front Image:
-            </label>
-            <input
-              id="front-input"
-              type="file"
-              accept="image/*"
-              disabled={isCompressing}
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) handleFileSelect(file, 'front')
-              }}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => document.getElementById('front-input')?.click()}
-              disabled={isCompressing}
-              className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="text-center">
-                <div className="text-2xl mb-2">📸</div>
-                <div className="text-sm font-medium text-gray-700">
-                  {frontFile ? 'Change Front Image' : 'Select Front Image'}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Click to browse files</div>
-              </div>
-            </button>
-            {frontFile && (
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-16 h-20 bg-gray-100 rounded border overflow-hidden">
-                    <img
-                      src={URL.createObjectURL(frontFile)}
-                      alt="Front preview"
-                      className="w-full h-full object-cover"
-                    />
+        {/* Upload Method Selector or File Upload - Show selector only when both images not uploaded */}
+        {!frontFile && !backFile && showCameraOption && uploadMode === 'select' ? (
+          <UploadMethodSelector
+            side="front"
+            onCameraSelect={handleCameraSelect}
+            onGallerySelect={handleGallerySelect}
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Front Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Front Image:
+              </label>
+              <input
+                id="front-input"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={isCompressing}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    handleFileSelect(file, 'front')
+                    setUploadMode('select')
+                  }
+                }}
+                className="hidden"
+              />
+              {!frontFile ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (showCameraOption) {
+                      setCurrentSide('front')
+                      setUploadMode('camera')
+                    } else {
+                      document.getElementById('front-input')?.click()
+                    }
+                  }}
+                  disabled={isCompressing}
+                  className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">📸</div>
+                    <div className="text-sm font-medium text-gray-700">
+                      {showCameraOption ? 'Capture Front Image' : 'Select Front Image'}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {showCameraOption ? 'Tap to open camera' : 'Click to browse files'}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-green-600 font-medium">✓ {frontFile.name}</p>
-                    {frontCompressionInfo && (
-                      <div className="text-xs text-gray-600 space-y-1 mt-1">
-                        <p>Original: {formatFileSize(frontCompressionInfo.originalSize)}</p>
-                        <p>Compressed: {formatFileSize(frontCompressionInfo.compressedSize)} ({frontCompressionInfo.compressionRatio.toFixed(1)}% smaller)</p>
-                        <p>Dimensions: {frontCompressionInfo.dimensions.width}×{frontCompressionInfo.dimensions.height}px</p>
-                      </div>
-                    )}
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="w-16 h-20 bg-gray-100 rounded border overflow-hidden flex-shrink-0">
+                      <img
+                        src={URL.createObjectURL(frontFile)}
+                        alt="Front preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-green-600 font-medium truncate">✓ {frontFile.name}</p>
+                      {frontCompressionInfo && (
+                        <div className="text-xs text-gray-600 space-y-1 mt-1">
+                          <p>Original: {formatFileSize(frontCompressionInfo.originalSize)}</p>
+                          <p>Compressed: {formatFileSize(frontCompressionInfo.compressedSize)} ({frontCompressionInfo.compressionRatio.toFixed(1)}% smaller)</p>
+                          <p>Dimensions: {frontCompressionInfo.dimensions.width}×{frontCompressionInfo.dimensions.height}px</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (showCameraOption) {
+                        setCurrentSide('front')
+                        setUploadMode('camera')
+                      } else {
+                        document.getElementById('front-input')?.click()
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    {showCameraOption ? '🔄 Recapture Front' : '🔄 Change Front Image'}
+                  </button>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Back Image Upload */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Back Image:
-            </label>
-            <input
-              id="back-input"
-              type="file"
-              accept="image/*"
-              disabled={isCompressing}
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) handleFileSelect(file, 'back')
-              }}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => document.getElementById('back-input')?.click()}
-              disabled={isCompressing}
-              className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="text-center">
-                <div className="text-2xl mb-2">🔄</div>
-                <div className="text-sm font-medium text-gray-700">
-                  {backFile ? 'Change Back Image' : 'Select Back Image'}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">Click to browse files</div>
-              </div>
-            </button>
-            {backFile && (
-              <div className="mt-3 space-y-2">
-                <div className="flex items-center space-x-3">
-                  <div className="w-16 h-20 bg-gray-100 rounded border overflow-hidden">
-                    <img
-                      src={URL.createObjectURL(backFile)}
-                      alt="Back preview"
-                      className="w-full h-full object-cover"
-                    />
+            {/* Back Image Upload */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Back Image:
+              </label>
+              <input
+                id="back-input"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                disabled={isCompressing}
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) {
+                    handleFileSelect(file, 'back')
+                    setUploadMode('select')
+                  }
+                }}
+                className="hidden"
+              />
+              {!backFile ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (showCameraOption) {
+                      setCurrentSide('back')
+                      setUploadMode('camera')
+                    } else {
+                      document.getElementById('back-input')?.click()
+                    }
+                  }}
+                  disabled={isCompressing}
+                  className="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="text-center">
+                    <div className="text-2xl mb-2">🔄</div>
+                    <div className="text-sm font-medium text-gray-700">
+                      {showCameraOption ? 'Capture Back Image' : 'Select Back Image'}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-1">
+                      {showCameraOption ? 'Tap to open camera' : 'Click to browse files'}
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-green-600 font-medium">✓ {backFile.name}</p>
-                    {backCompressionInfo && (
-                      <div className="text-xs text-gray-600 space-y-1 mt-1">
-                        <p>Original: {formatFileSize(backCompressionInfo.originalSize)}</p>
-                        <p>Compressed: {formatFileSize(backCompressionInfo.compressedSize)} ({backCompressionInfo.compressionRatio.toFixed(1)}% smaller)</p>
-                        <p>Dimensions: {backCompressionInfo.dimensions.width}×{backCompressionInfo.dimensions.height}px</p>
-                      </div>
-                    )}
+                </button>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="w-16 h-20 bg-gray-100 rounded border overflow-hidden flex-shrink-0">
+                      <img
+                        src={URL.createObjectURL(backFile)}
+                        alt="Back preview"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-green-600 font-medium truncate">✓ {backFile.name}</p>
+                      {backCompressionInfo && (
+                        <div className="text-xs text-gray-600 space-y-1 mt-1">
+                          <p>Original: {formatFileSize(backCompressionInfo.originalSize)}</p>
+                          <p>Compressed: {formatFileSize(backCompressionInfo.compressedSize)} ({backCompressionInfo.compressionRatio.toFixed(1)}% smaller)</p>
+                          <p>Dimensions: {backCompressionInfo.dimensions.width}×{backCompressionInfo.dimensions.height}px</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (showCameraOption) {
+                        setCurrentSide('back')
+                        setUploadMode('camera')
+                      } else {
+                        document.getElementById('back-input')?.click()
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    {showCameraOption ? '🔄 Recapture Back' : '🔄 Change Back Image'}
+                  </button>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Upload Button */}
         <button
