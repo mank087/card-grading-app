@@ -22,11 +22,11 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
-  // Start camera on mount
+  // Start camera on mount and when facingMode changes
   useEffect(() => {
     startCamera(facingMode);
     return () => stopCamera();
-  }, [facingMode]);
+  }, [facingMode, startCamera, stopCamera]);
 
   const handleCapture = async () => {
     setIsProcessing(true);
@@ -127,7 +127,12 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
             <div className="space-y-3">
               <button
-                onClick={() => startCamera(facingMode)}
+                onClick={async () => {
+                  // Ensure clean state before retry
+                  stopCamera();
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  startCamera(facingMode);
+                }}
                 className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
               >
                 Try Again
