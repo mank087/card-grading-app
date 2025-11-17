@@ -3080,10 +3080,10 @@ export function SportsCardDetails() {
 
                     return (
                       <div className="space-y-6">
-                        {/* Images and Vertical Bars */}
-                        <div className="flex items-start justify-center gap-6">
-                          {/* Front T/B Vertical Bar (Left of Front Image) */}
-                          <div className="flex flex-col items-center gap-2">
+                        {/* Images and Vertical Bars - Mobile Responsive */}
+                        <div className="flex flex-col lg:flex-row items-start justify-center gap-6 lg:gap-4">
+                          {/* Front T/B Vertical Bar (Left of Front Image) - Hidden on mobile */}
+                          <div className="hidden lg:flex flex-col items-center gap-2">
                             <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Top/Bottom</span>
                             <div className="flex flex-col h-96 w-6 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
                               <div
@@ -3099,11 +3099,11 @@ export function SportsCardDetails() {
                           </div>
 
                           {/* Front Image with L/R Bar Below */}
-                          <div className="flex flex-col items-center gap-4">
+                          <div className="flex flex-col items-center gap-4 w-full lg:w-auto">
                             <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg px-4 py-1.5">
                               <p className="text-white font-bold text-sm uppercase tracking-wider">Front</p>
                             </div>
-                            <div className="relative overflow-hidden rounded-lg border-2 border-blue-300 shadow-lg w-64">
+                            <div className="relative overflow-hidden rounded-lg border-2 border-blue-300 shadow-lg w-full max-w-xs lg:w-64">
                               <img
                                 src={card.front_url}
                                 alt="Card Front"
@@ -3112,7 +3112,7 @@ export function SportsCardDetails() {
                             </div>
 
                             {/* Front L/R Bar directly below front image */}
-                            <div className="space-y-1 w-64">
+                            <div className="space-y-1 w-full max-w-xs lg:w-64">
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-700 font-semibold">L/R: <span className="text-blue-600">{frontLR.left}/{frontLR.right}</span></span>
                                 <span className={`text-sm font-medium ${frontLR.color}`}>{frontLR.quality}</span>
@@ -3129,8 +3129,26 @@ export function SportsCardDetails() {
                               </div>
                             </div>
 
+                            {/* Front T/B ratio - Mobile Only */}
+                            <div className="lg:hidden w-full max-w-xs">
+                              <div className="flex items-center justify-between text-sm mb-1">
+                                <span className="text-gray-700 font-semibold">T/B: <span className="text-purple-600">{frontTB.left}/{frontTB.right}</span></span>
+                                <span className={`text-sm font-medium ${frontTB.color}`}>{frontTB.quality}</span>
+                              </div>
+                              <div className="flex h-5 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
+                                <div
+                                  className="bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
+                                  style={{ width: `${frontTB.left}%` }}
+                                />
+                                <div
+                                  className="bg-gradient-to-r from-purple-700 to-purple-800 transition-all duration-500"
+                                  style={{ width: `${frontTB.right}%` }}
+                                />
+                              </div>
+                            </div>
+
                             {card.conversational_sub_scores?.centering && (
-                              <div className="text-center w-64">
+                              <div className="text-center w-full max-w-xs lg:w-64">
                                 <span className="text-sm text-gray-600">Score: </span>
                                 <span className="text-xl font-bold text-blue-600">{card.conversational_sub_scores.centering.front}/10</span>
                               </div>
@@ -3138,7 +3156,7 @@ export function SportsCardDetails() {
 
                             {/* Front Centering Analysis */}
                             {(card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis) && (
-                              <div className="w-64 mt-2">
+                              <div className="w-full max-w-xs lg:w-64 mt-2">
                                 <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-3 border-2 border-blue-300 shadow-md">
                                   <p className="text-xs text-blue-900 font-bold mb-1.5 uppercase tracking-wide">DCM Optic™ Analysis</p>
                                   <p className="text-xs text-gray-800 leading-relaxed">
@@ -3150,11 +3168,11 @@ export function SportsCardDetails() {
                           </div>
 
                           {/* Back Image with L/R Bar Below */}
-                          <div className="flex flex-col items-center gap-4">
+                          <div className="flex flex-col items-center gap-4 w-full lg:w-auto">
                             <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-lg px-4 py-1.5">
                               <p className="text-white font-bold text-sm uppercase tracking-wider">Back</p>
                             </div>
-                            <div className="relative overflow-hidden rounded-lg border-2 border-cyan-300 shadow-lg w-64">
+                            <div className="relative overflow-hidden rounded-lg border-2 border-cyan-300 shadow-lg w-full max-w-xs lg:w-64">
                               <img
                                 src={card.back_url}
                                 alt="Card Back"
@@ -3163,7 +3181,7 @@ export function SportsCardDetails() {
                             </div>
 
                             {/* Back L/R Bar directly below back image */}
-                            <div className="space-y-1 w-64">
+                            <div className="space-y-1 w-full max-w-xs lg:w-64">
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-700 font-semibold">L/R: <span className="text-cyan-600">{backLR.left}/{backLR.right}</span></span>
                                 <span className={`text-sm font-medium ${backLR.color}`}>{backLR.quality}</span>
@@ -3180,8 +3198,26 @@ export function SportsCardDetails() {
                               </div>
                             </div>
 
+                            {/* Back T/B ratio - Mobile Only */}
+                            <div className="lg:hidden w-full max-w-xs">
+                              <div className="flex items-center justify-between text-sm mb-1">
+                                <span className="text-gray-700 font-semibold">T/B: <span className="text-purple-600">{backTB.left}/{backTB.right}</span></span>
+                                <span className={`text-sm font-medium ${backTB.color}`}>{backTB.quality}</span>
+                              </div>
+                              <div className="flex h-5 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
+                                <div
+                                  className="bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
+                                  style={{ width: `${backTB.left}%` }}
+                                />
+                                <div
+                                  className="bg-gradient-to-r from-purple-700 to-purple-800 transition-all duration-500"
+                                  style={{ width: `${backTB.right}%` }}
+                                />
+                              </div>
+                            </div>
+
                             {card.conversational_sub_scores?.centering && (
-                              <div className="text-center w-64">
+                              <div className="text-center w-full max-w-xs lg:w-64">
                                 <span className="text-sm text-gray-600">Score: </span>
                                 <span className="text-xl font-bold text-cyan-600">{card.conversational_sub_scores.centering.back}/10</span>
                               </div>
@@ -3189,7 +3225,7 @@ export function SportsCardDetails() {
 
                             {/* Back Centering Analysis */}
                             {(card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis) && (
-                              <div className="w-64 mt-2">
+                              <div className="w-full max-w-xs lg:w-64 mt-2">
                                 <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-lg p-3 border-2 border-cyan-300 shadow-md">
                                   <p className="text-xs text-cyan-900 font-bold mb-1.5 uppercase tracking-wide">DCM Optic™ Analysis</p>
                                   <p className="text-xs text-gray-800 leading-relaxed">
@@ -3200,8 +3236,8 @@ export function SportsCardDetails() {
                             )}
                           </div>
 
-                          {/* Back T/B Vertical Bar (Right of Back Image) */}
-                          <div className="flex flex-col items-center gap-2">
+                          {/* Back T/B Vertical Bar (Right of Back Image) - Hidden on mobile */}
+                          <div className="hidden lg:flex flex-col items-center gap-2">
                             <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Top/Bottom</span>
                             <div className="flex flex-col h-96 w-6 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
                               <div

@@ -10,6 +10,7 @@ export default function Navigation() {
   const [user, setUser] = useState<any>(null);
   const [searchSerial, setSearchSerial] = useState("");
   const [uploadDropdownOpen, setUploadDropdownOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
 
   // Check authentication status
@@ -54,17 +55,23 @@ export default function Navigation() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Close dropdown when clicking outside
+  // Close dropdown and mobile menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (uploadDropdownOpen && !(event.target as Element).closest('.upload-dropdown')) {
+      const target = event.target as Element;
+
+      if (uploadDropdownOpen && !target.closest('.upload-dropdown')) {
         setUploadDropdownOpen(false);
+      }
+
+      if (mobileMenuOpen && !target.closest('.mobile-menu') && !target.closest('.mobile-menu-button')) {
+        setMobileMenuOpen(false);
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [uploadDropdownOpen]);
+  }, [uploadDropdownOpen, mobileMenuOpen]);
 
   const handleLogout = async () => {
     try {
@@ -101,7 +108,10 @@ export default function Navigation() {
                 height={40}
                 className="object-contain"
               />
-              <span className="text-xl font-bold text-gray-800">Dynamic Collectibles Management</span>
+              <span className="text-base sm:text-xl font-bold text-gray-800">
+                <span className="hidden sm:inline">Dynamic Collectibles Management</span>
+                <span className="sm:hidden">DCM</span>
+              </span>
             </Link>
           </div>
 
@@ -230,71 +240,86 @@ export default function Navigation() {
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden">
+          <div className="md:hidden mobile-menu-button">
             <button
               type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="text-gray-700 hover:text-blue-600 focus:outline-none focus:text-blue-600"
               aria-label="Toggle menu"
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              {mobileMenuOpen ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Mobile Navigation Menu */}
-        <div className="md:hidden pb-4">
-          <div className="flex flex-col space-y-2">
-            <Link
-              href="/collection"
-              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              My Collection
-            </Link>
-            <Link
-              href="/upload?category=Sports"
-              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Grade Sports Cards
-            </Link>
-            <Link
-              href="/upload?category=Pokemon"
-              className="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Grade Pokémon Cards
-            </Link>
-            <Link
-              href="/upload?category=MTG"
-              className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Grade MTG Cards
-            </Link>
-            <Link
-              href="/upload?category=Lorcana"
-              className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Grade Lorcana Cards
-            </Link>
-            <Link
-              href="/upload?category=Other"
-              className="text-gray-700 hover:text-gray-600 px-3 py-2 rounded-md text-sm font-medium"
-            >
-              Grade Other Cards
-            </Link>
+        {/* Mobile Navigation Menu - Conditional */}
+        {mobileMenuOpen && (
+          <div className="md:hidden pb-4 border-t border-gray-200 mt-2 mobile-menu">
+            <div className="flex flex-col space-y-2 pt-2">
+              <Link
+                href="/collection"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                My Collection
+              </Link>
+              <Link
+                href="/upload?category=Sports"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Grade Sports Cards
+              </Link>
+              <Link
+                href="/upload?category=Pokemon"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Grade Pokémon Cards
+              </Link>
+              <Link
+                href="/upload?category=MTG"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Grade MTG Cards
+              </Link>
+              <Link
+                href="/upload?category=Lorcana"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Grade Lorcana Cards
+              </Link>
+              <Link
+                href="/upload?category=Other"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-gray-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Grade Other Cards
+              </Link>
 
-            {/* Mobile Search */}
-            <form onSubmit={handleSearch} className="px-3 py-2">
-              <input
-                type="text"
-                value={searchSerial}
-                onChange={(e) => setSearchSerial(e.target.value)}
-                placeholder="Search by serial..."
-                className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </form>
+              {/* Mobile Search */}
+              <form onSubmit={(e) => { handleSearch(e); setMobileMenuOpen(false); }} className="px-3 py-2">
+                <input
+                  type="text"
+                  value={searchSerial}
+                  onChange={(e) => setSearchSerial(e.target.value)}
+                  placeholder="Search by serial..."
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+              </form>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </nav>
   );

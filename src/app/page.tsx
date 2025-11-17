@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getStoredSession, getAuthenticatedClient } from '../lib/directAuth'
+import ScrollingCardBackground from './ui/ScrollingCardBackground'
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
@@ -40,8 +41,14 @@ export default function Home() {
   return (
     <main className="flex min-h-screen flex-col">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-600 to-purple-700 text-white py-20">
-        <div className="container mx-auto px-4 text-center">
+      <section className="relative bg-gradient-to-br from-blue-600 to-purple-700 text-white py-20 overflow-hidden">
+        {/* Scrolling Card Background */}
+        <ScrollingCardBackground opacity={40} blur={2} speed={1} />
+
+        {/* Gradient overlay for better text readability */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600/70 to-purple-700/70 z-0"></div>
+
+        <div className="container mx-auto px-4 text-center relative z-10">
           <div className="flex justify-center mb-6">
             <Image
               src="/DCM-logo.png"
