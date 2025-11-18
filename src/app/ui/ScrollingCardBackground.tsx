@@ -16,7 +16,10 @@ export default function ScrollingCardBackground({
   // Static card images stored in public/homepage-cards/
   const staticCardImages = [
     '/homepage-cards/maxxine-dupri.png',
-    '/homepage-cards/pikachu-grey-felt-hat.png'
+    '/homepage-cards/pikachu-grey-felt-hat.png',
+    '/homepage-cards/Charizard 1999.png',
+    '/homepage-cards/Micahel Jordan Rookie.png',
+    '/homepage-cards/Tom Brady Downtown Buccaneers.png'
   ];
 
   const cardImages = staticCardImages;
