@@ -10,6 +10,7 @@ export default function Navigation() {
   const [user, setUser] = useState<any>(null);
   const [searchSerial, setSearchSerial] = useState("");
   const [uploadDropdownOpen, setUploadDropdownOpen] = useState(false);
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const router = useRouter();
 
@@ -64,6 +65,10 @@ export default function Navigation() {
         setUploadDropdownOpen(false);
       }
 
+      if (accountDropdownOpen && !target.closest('.account-dropdown')) {
+        setAccountDropdownOpen(false);
+      }
+
       if (mobileMenuOpen && !target.closest('.mobile-menu') && !target.closest('.mobile-menu-button')) {
         setMobileMenuOpen(false);
       }
@@ -71,7 +76,7 @@ export default function Navigation() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [uploadDropdownOpen, mobileMenuOpen]);
+  }, [uploadDropdownOpen, accountDropdownOpen, mobileMenuOpen]);
 
   const handleLogout = async () => {
     try {
@@ -123,12 +128,50 @@ export default function Navigation() {
             >
               My Collection
             </Link>
-            <Link
-              href="/account"
-              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-            >
-              Account
-            </Link>
+
+            {/* Account Dropdown - Only show when logged in */}
+            {user && (
+              <div className="relative account-dropdown">
+                <button
+                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1"
+                >
+                  <span>Account</span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {accountDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                    <div className="py-1">
+                      <Link
+                        href="/account"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                        onClick={() => setAccountDropdownOpen(false)}
+                      >
+                        My Account
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setAccountDropdownOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Upload Dropdown */}
             <div className="relative upload-dropdown">
               <button
@@ -223,19 +266,7 @@ export default function Navigation() {
 
           {/* Auth Section - Right Side */}
           <div className="flex items-center space-x-4">
-            {user ? (
-              <div className="flex items-center space-x-3">
-                <span className="text-sm text-gray-700">
-                  {user.email}
-                </span>
-                <button
-                  onClick={handleLogout}
-                  className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-sm font-medium transition-colors"
-                >
-                  Logout
-                </button>
-              </div>
-            ) : (
+            {!user && (
               <Link
                 href="/login"
                 className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
@@ -277,13 +308,18 @@ export default function Navigation() {
               >
                 My Collection
               </Link>
-              <Link
-                href="/account"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Account
-              </Link>
+
+              {/* Account - Only show when logged in */}
+              {user && (
+                <Link
+                  href="/account"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  My Account
+                </Link>
+              )}
+
               <Link
                 href="/upload?category=Sports"
                 onClick={() => setMobileMenuOpen(false)}
@@ -330,6 +366,19 @@ export default function Navigation() {
                   className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </form>
+
+              {/* Logout - Only show when logged in */}
+              {user && (
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    handleLogout();
+                  }}
+                  className="text-left text-red-600 hover:text-red-700 hover:bg-red-50 px-3 py-2 rounded-md text-sm font-medium transition-colors w-full border-t border-gray-200 mt-2 pt-4"
+                >
+                  Logout
+                </button>
+              )}
             </div>
           </div>
         )}
