@@ -28,7 +28,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-gray-400 text-sm mb-4">
-              Professional AI-powered card grading and authentication service. Get accurate, detailed assessments of your trading card collection with our advanced grading technology.
+              Professional card grading and collection management service. Get detailed assessments of your trading card collection with DCM Optic™ technology.
             </p>
             <div className="flex space-x-4">
               {/* Social Media Links */}
@@ -50,98 +50,78 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Services */}
+          {/* Grade a Card */}
           <div>
-            <h3 className="text-lg font-semibold mb-4">Services</h3>
+            <h3 className="text-lg font-semibold mb-4">Grade a Card</h3>
             <ul className="space-y-3 text-sm">
               <li>
-                <Link href="/upload/sports" className="text-gray-400 hover:text-white transition-colors">
-                  Sports Card Grading
+                <Link href="/upload?category=Sports" className="text-gray-400 hover:text-white transition-colors">
+                  Sports Cards
                 </Link>
               </li>
               <li>
-                <Link href="/upload" className="text-gray-400 hover:text-white transition-colors">
-                  All Card Types
+                <Link href="/upload?category=Pokemon" className="text-gray-400 hover:text-white transition-colors">
+                  Pokémon Cards
+                </Link>
+              </li>
+              <li>
+                <Link href="/upload?category=MTG" className="text-gray-400 hover:text-white transition-colors">
+                  MTG Cards
+                </Link>
+              </li>
+              <li>
+                <Link href="/upload?category=Lorcana" className="text-gray-400 hover:text-white transition-colors">
+                  Lorcana Cards
+                </Link>
+              </li>
+              <li>
+                <Link href="/upload?category=Other" className="text-gray-400 hover:text-white transition-colors">
+                  Other Cards
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Resources */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Resources</h3>
+            <ul className="space-y-3 text-sm">
+              <li>
+                <Link href="/about" className="text-gray-400 hover:text-white transition-colors">
+                  About Us
+                </Link>
+              </li>
+              <li>
+                <Link href="/grading-rubric" className="text-gray-400 hover:text-white transition-colors">
+                  Grading Rubric
                 </Link>
               </li>
               <li>
                 <Link href="/collection" className="text-gray-400 hover:text-white transition-colors">
-                  Collection Management
+                  My Collection
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Legal */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Legal</h3>
+            <ul className="space-y-3 text-sm">
+              <li>
+                <Link href="/contact" className="text-gray-400 hover:text-white transition-colors">
+                  Contact Us
                 </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Authentication Services
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Market Valuation
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Support */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Support</h3>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Help Center
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Grading Standards
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Submission Guidelines
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Contact Support
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  FAQ
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Legal & Company */}
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Company</h3>
-            <ul className="space-y-3 text-sm">
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  About Us
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Privacy Policy
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                <Link href="/terms" className="text-gray-400 hover:text-white transition-colors">
                   Terms of Service
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Cookie Policy
-                </a>
-              </li>
-              <li>
-                <a href="#" className="text-gray-400 hover:text-white transition-colors">
-                  Security
-                </a>
+                <Link href="/privacy" className="text-gray-400 hover:text-white transition-colors">
+                  Privacy Policy
+                </Link>
               </li>
             </ul>
           </div>
@@ -149,27 +129,18 @@ export default function Footer() {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 py-6">
-          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <div className="text-sm text-gray-400">
-              © {currentYear} Dynamic Collectibles Management. All rights reserved.
-            </div>
-
-            <div className="flex items-center space-x-6 text-sm text-gray-400">
-              <span>Powered by AI Technology</span>
-              <div className="flex items-center space-x-2">
-                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                <span>System Status: Operational</span>
-              </div>
-            </div>
+          <div className="text-center text-sm text-gray-400">
+            © {currentYear} Dynamic Collectibles Management. All rights reserved.
           </div>
         </div>
 
         {/* Professional Disclaimer */}
         <div className="border-t border-gray-800 py-4">
           <p className="text-xs text-gray-500 text-center max-w-4xl mx-auto">
-            DCM provides AI-powered grading assessments for informational purposes. While our technology delivers highly accurate results,
-            final market valuations may vary. Always consult with certified professionals for insurance or major transaction purposes.
-            Our grading standards are designed to be consistent with industry best practices.
+            DCM grading assessments are provided for informational and hobby purposes only. Our grades are independent evaluations
+            and should not be considered as an indication of grades that may be assigned by third-party professional grading services
+            such as PSA, BGS, CGC, or SGC. For official authentication, certification, or resale purposes, please consult with
+            established third-party grading companies.
           </p>
         </div>
       </div>
