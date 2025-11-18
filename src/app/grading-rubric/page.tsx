@@ -203,6 +203,115 @@ export default function GradingRubricPage() {
           </div>
         </section>
 
+        {/* Image Confidence & Uncertainty */}
+        <section className="mb-16">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+            Image Confidence Rating System
+          </h2>
+
+          <div className="bg-white rounded-xl shadow-md p-8 mb-8">
+            <p className="text-lg text-gray-700 mb-6">
+              Every DCM grade includes an <strong>Image Confidence Rating</strong> and <strong>Grade Uncertainty Range</strong>. This transparency helps you understand how confident the assessment is based on your submitted photos.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Image Confidence Levels</h3>
+                <div className="space-y-3">
+                  <div className="p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-l-4 border-green-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl font-bold text-green-800">A</span>
+                      <span className="text-sm font-semibold text-green-700">Excellent Quality</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      Crystal clear images with perfect lighting, sharp focus, and no glare. Highest grading confidence.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl font-bold text-blue-800">B</span>
+                      <span className="text-sm font-semibold text-blue-700">Good Quality</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      Clear images with minor issues like slight glare or shadows. High grading confidence.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border-l-4 border-yellow-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl font-bold text-yellow-800">C</span>
+                      <span className="text-sm font-semibold text-yellow-700">Fair Quality</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      Acceptable images with noticeable issues like moderate glare, lower resolution, or focus problems. Moderate confidence.
+                    </p>
+                  </div>
+
+                  <div className="p-4 bg-gradient-to-r from-red-50 to-red-100 rounded-lg border-l-4 border-red-500">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl font-bold text-red-800">D</span>
+                      <span className="text-sm font-semibold text-red-700">Poor Quality</span>
+                    </div>
+                    <p className="text-sm text-gray-700">
+                      Images with significant issues like heavy glare, blur, or poor lighting. Lower grading confidence - consider resubmitting.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Grade Uncertainty Ranges</h3>
+                <p className="text-gray-700 mb-4">
+                  The uncertainty range indicates how much the actual grade might vary based on image quality and card condition complexity.
+                </p>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                    <span className="font-semibold text-gray-900">±0.25 to ±0.5</span>
+                    <span className="text-sm text-green-700">A-rated images</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <span className="font-semibold text-gray-900">±0.5 to ±0.75</span>
+                    <span className="text-sm text-blue-700">B-rated images</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+                    <span className="font-semibold text-gray-900">±0.75 to ±1.0</span>
+                    <span className="text-sm text-yellow-700">C-rated images</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
+                    <span className="font-semibold text-gray-900">±1.0 to ±1.5</span>
+                    <span className="text-sm text-red-700">D-rated images</span>
+                  </div>
+                </div>
+
+                <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="text-sm text-purple-800">
+                    <strong>Example:</strong> A card graded 8.5 with ±0.5 uncertainty means the grade likely falls between 8.0 and 9.0 based on the image quality provided.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 rounded-lg p-6 border border-blue-200">
+              <h4 className="font-bold text-blue-900 mb-2 flex items-center">
+                <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Pro Tip: Getting the Best Confidence Rating
+              </h4>
+              <ul className="text-sm text-blue-800 space-y-1 ml-7">
+                <li>• Use natural lighting or a bright, diffused light source</li>
+                <li>• Avoid flash photography that creates glare</li>
+                <li>• Keep the card flat and parallel to the camera</li>
+                <li>• Fill the frame with the card, leaving minimal background</li>
+                <li>• Ensure the entire card is in focus</li>
+                <li>• Take photos against a contrasting, solid-color background</li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
         {/* Component Scores */}
         <section className="mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
