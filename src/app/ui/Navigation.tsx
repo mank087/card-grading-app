@@ -119,7 +119,8 @@ export default function Navigation() {
           </div>
 
           {/* Center Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
+            {/* My Collection */}
             <Link
               href="/collection"
               className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
@@ -127,54 +128,11 @@ export default function Navigation() {
               My Collection
             </Link>
 
-            {/* Account Dropdown - Only show when logged in */}
-            {user && (
-              <div className="relative account-dropdown">
-                <button
-                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1"
-                >
-                  <span>Account</span>
-                  <svg
-                    className={`w-4 h-4 transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`}
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-
-                {accountDropdownOpen && (
-                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
-                    <div className="py-1">
-                      <Link
-                        href="/account"
-                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                        onClick={() => setAccountDropdownOpen(false)}
-                      >
-                        My Account
-                      </Link>
-                      <button
-                        onClick={() => {
-                          setAccountDropdownOpen(false);
-                          handleLogout();
-                        }}
-                        className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
-                      >
-                        Logout
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Upload Dropdown */}
+            {/* Grade a Card - Highlighted Purple Dropdown */}
             <div className="relative upload-dropdown">
               <button
                 onClick={() => setUploadDropdownOpen(!uploadDropdownOpen)}
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1 shadow-md"
               >
                 <span>Grade a Card</span>
                 <svg
@@ -238,11 +196,11 @@ export default function Navigation() {
                   value={searchSerial}
                   onChange={(e) => setSearchSerial(e.target.value)}
                   placeholder="Search by serial..."
-                  className="w-48 px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-48 px-3 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
                 />
                 <button
                   type="submit"
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-1 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-600"
                 >
                   <svg
                     className="w-4 h-4"
@@ -260,6 +218,49 @@ export default function Navigation() {
                 </button>
               </div>
             </form>
+
+            {/* Account Dropdown - Only show when logged in */}
+            {user && (
+              <div className="relative account-dropdown">
+                <button
+                  onClick={() => setAccountDropdownOpen(!accountDropdownOpen)}
+                  className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-1"
+                >
+                  <span>Account</span>
+                  <svg
+                    className={`w-4 h-4 transition-transform ${accountDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {accountDropdownOpen && (
+                  <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                    <div className="py-1">
+                      <Link
+                        href="/account"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                        onClick={() => setAccountDropdownOpen(false)}
+                      >
+                        My Account
+                      </Link>
+                      <button
+                        onClick={() => {
+                          setAccountDropdownOpen(false);
+                          handleLogout();
+                        }}
+                        className="w-full text-left block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      >
+                        Logout
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Auth Section - Right Side */}
