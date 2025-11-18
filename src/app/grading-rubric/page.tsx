@@ -203,6 +203,67 @@ export default function GradingRubricPage() {
           </div>
         </section>
 
+        {/* Component Scores */}
+        <section className="mb-16">
+          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
+            Detailed Component Breakdown
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
+                Centering Score
+              </h3>
+              <p className="text-gray-700 mb-3">
+                Measures how evenly the borders are distributed around the card. Perfect centering (10.0) means 50/50 left-right and top-bottom.
+              </p>
+              <p className="text-sm text-gray-600">
+                Graded from 1.0-10.0 with 0.5 precision
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <span className="w-2 h-2 bg-green-500 rounded-full mr-3"></span>
+                Corners Score
+              </h3>
+              <p className="text-gray-700 mb-3">
+                Evaluates all four corners for sharpness, rounding, and white fiber exposure. Each corner is individually assessed.
+              </p>
+              <p className="text-sm text-gray-600">
+                Graded from 1.0-10.0 with 0.5 precision
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <span className="w-2 h-2 bg-yellow-500 rounded-full mr-3"></span>
+                Edges Score
+              </h3>
+              <p className="text-gray-700 mb-3">
+                Examines all four edges for whitening, chipping, roughness, and other defects. Factory-fresh edges score 10.0.
+              </p>
+              <p className="text-sm text-gray-600">
+                Graded from 1.0-10.0 with 0.5 precision
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                <span className="w-2 h-2 bg-purple-500 rounded-full mr-3"></span>
+                Surface Score
+              </h3>
+              <p className="text-gray-700 mb-3">
+                Detects scratches, print defects, stains, and other surface imperfections on both front and back.
+              </p>
+              <p className="text-sm text-gray-600">
+                Graded from 1.0-10.0 with 0.5 precision
+              </p>
+            </div>
+          </div>
+        </section>
+
         {/* Image Confidence & Uncertainty */}
         <section className="mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
@@ -312,67 +373,6 @@ export default function GradingRubricPage() {
           </div>
         </section>
 
-        {/* Component Scores */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-            Detailed Component Breakdown
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-blue-500 rounded-full mr-3"></span>
-                Centering Score
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Measures how evenly the borders are distributed around the card. Perfect centering (10.0) means 50/50 left-right and top-bottom.
-              </p>
-              <p className="text-sm text-gray-600">
-                Graded from 1.0-10.0 with 0.5 precision
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-3"></span>
-                Corners Score
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Evaluates all four corners for sharpness, rounding, and white fiber exposure. Each corner is individually assessed.
-              </p>
-              <p className="text-sm text-gray-600">
-                Graded from 1.0-10.0 with 0.5 precision
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full mr-3"></span>
-                Edges Score
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Examines all four edges for whitening, chipping, roughness, and other defects. Factory-fresh edges score 10.0.
-              </p>
-              <p className="text-sm text-gray-600">
-                Graded from 1.0-10.0 with 0.5 precision
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-purple-500 rounded-full mr-3"></span>
-                Surface Score
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Detects scratches, print defects, stains, and other surface imperfections on both front and back.
-              </p>
-              <p className="text-sm text-gray-600">
-                Graded from 1.0-10.0 with 0.5 precision
-              </p>
-            </div>
-          </div>
-        </section>
-
         {/* Technology */}
         <section className="mb-16">
           <div className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-2xl p-8 border border-purple-200">
@@ -464,10 +464,10 @@ export default function GradingRubricPage() {
               Experience the precision of DCM Optic™ grading technology. Get professional-grade assessments in under 2 minutes.
             </p>
             <a
-              href="/upload?category=Sports"
+              href="/login"
               className="inline-block bg-white text-purple-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-gray-100 transition-colors shadow-lg"
             >
-              Grade Your First Card Free
+              Create an Account
             </a>
           </div>
         </section>
