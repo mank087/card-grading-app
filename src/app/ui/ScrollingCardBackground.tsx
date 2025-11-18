@@ -20,6 +20,8 @@ export default function ScrollingCardBackground({
   useEffect(() => {
     const fetchCardImages = async () => {
       try {
+        console.log('[ScrollingCardBackground] Starting to fetch card images...');
+
         // Try to fetch public cards first (using is_public boolean column)
         let { data, error } = await supabase
           .from('cards')
@@ -28,9 +30,14 @@ export default function ScrollingCardBackground({
           .not('front_path', 'is', null)
           .limit(30);
 
+        console.log('[ScrollingCardBackground] Public cards query result:', {
+          foundCards: data?.length || 0,
+          error: error?.message || 'none'
+        });
+
         // If no public cards found, fetch any cards as fallback
         if (error || !data || data.length === 0) {
-          console.log('No public cards found, fetching any available cards...');
+          console.log('[ScrollingCardBackground] No public cards found, fetching any available cards...');
           const result = await supabase
             .from('cards')
             .select('front_path')
@@ -39,32 +46,50 @@ export default function ScrollingCardBackground({
 
           data = result.data;
           error = result.error;
+
+          console.log('[ScrollingCardBackground] Fallback query result:', {
+            foundCards: data?.length || 0,
+            error: error?.message || 'none'
+          });
         }
 
         if (error) {
-          console.error('Error fetching card images:', error);
+          console.error('[ScrollingCardBackground] Error fetching card images:', error);
           return;
         }
 
         if (data && data.length > 0) {
+          console.log('[ScrollingCardBackground] Creating signed URLs for', data.length, 'cards...');
+
           // Create signed URLs for each card's front image
-          const urlPromises = data.map(async (card) => {
-            const { data: urlData } = await supabase.storage
-              .from('cards')
-              .createSignedUrl(card.front_path, 60 * 60); // 1 hour expiry
-            return urlData?.signedUrl || null;
+          const urlPromises = data.map(async (card, index) => {
+            try {
+              const { data: urlData, error: urlError } = await supabase.storage
+                .from('cards')
+                .createSignedUrl(card.front_path, 60 * 60); // 1 hour expiry
+
+              if (urlError) {
+                console.error(`[ScrollingCardBackground] Error creating signed URL for card ${index}:`, urlError);
+                return null;
+              }
+
+              return urlData?.signedUrl || null;
+            } catch (err) {
+              console.error(`[ScrollingCardBackground] Exception creating signed URL for card ${index}:`, err);
+              return null;
+            }
           });
 
           const urls = await Promise.all(urlPromises);
           const validUrls = urls.filter(url => url !== null) as string[];
 
+          console.log(`[ScrollingCardBackground] ✅ Successfully loaded ${validUrls.length} card images for background`);
           setCardImages(validUrls);
-          console.log(`Loaded ${validUrls.length} card images for background`);
         } else {
-          console.warn('No cards with front_path found in database');
+          console.warn('[ScrollingCardBackground] ⚠️ No cards with front_path found in database');
         }
       } catch (err) {
-        console.error('Error loading background cards:', err);
+        console.error('[ScrollingCardBackground] ❌ Exception loading background cards:', err);
       }
     };
 
