@@ -22,13 +22,14 @@ export default function ScrollingCardBackground({
       try {
         console.log('[ScrollingCardBackground] Starting to fetch card images...');
 
-        // Try to fetch public cards first (using is_public boolean column)
+        // Fetch MORE cards to account for some having missing images (fetch 100, need ~30 valid)
         let { data, error } = await supabase
           .from('cards')
           .select('front_path')
           .eq('is_public', true)
           .not('front_path', 'is', null)
-          .limit(30);
+          .order('created_at', { ascending: false })
+          .limit(100);
 
         console.log('[ScrollingCardBackground] Public cards query result:', {
           foundCards: data?.length || 0,
@@ -42,7 +43,8 @@ export default function ScrollingCardBackground({
             .from('cards')
             .select('front_path')
             .not('front_path', 'is', null)
-            .limit(30);
+            .order('created_at', { ascending: false })
+            .limit(100);
 
           data = result.data;
           error = result.error;
@@ -96,15 +98,24 @@ export default function ScrollingCardBackground({
     fetchCardImages();
   }, []);
 
-  // If no images loaded yet, show nothing (or could show skeleton)
-  if (cardImages.length === 0) {
+  // Need at least 10 valid images to show the background (otherwise looks sparse)
+  if (cardImages.length < 10) {
+    console.warn(`[ScrollingCardBackground] ⚠️ Only ${cardImages.length} valid images found, need at least 10. Not rendering.`);
     return null;
   }
 
-  // Distribute cards across 3 rows
-  const row1Cards = cardImages.slice(0, 10);
-  const row2Cards = cardImages.slice(10, 20);
-  const row3Cards = cardImages.slice(20, 30);
+  // Distribute cards across 3 rows (repeat images if we don't have enough)
+  const imagesNeeded = 30;
+  let allImages = [...cardImages];
+
+  // If we have fewer than 30 images, repeat them to fill 3 rows
+  while (allImages.length < imagesNeeded) {
+    allImages = [...allImages, ...cardImages];
+  }
+
+  const row1Cards = allImages.slice(0, 10);
+  const row2Cards = allImages.slice(10, 20);
+  const row3Cards = allImages.slice(20, 30);
 
   // Duplicate arrays for seamless infinite scroll
   const row1Double = [...row1Cards, ...row1Cards];
