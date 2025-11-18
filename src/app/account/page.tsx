@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { getStoredSession } from '@/lib/directAuth'
 import { useRouter } from 'next/navigation'
 
 type AccountStats = {
@@ -27,14 +28,15 @@ export default function AccountPage() {
   useEffect(() => {
     const fetchAccountData = async () => {
       try {
-        // Get current user
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        // Get current user from stored session (same method as navigation/collection)
+        const session = getStoredSession()
 
-        if (userError || !user) {
+        if (!session || !session.user) {
           router.push('/login')
           return
         }
 
+        const user = session.user
         setUser(user)
 
         // Fetch all user's cards
