@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
+import { getStoredSession } from "@/lib/directAuth";
 
 export default function Navigation() {
   const [user, setUser] = useState<any>(null);
@@ -16,44 +17,41 @@ export default function Navigation() {
 
   // Check authentication status
   useEffect(() => {
-    const getUser = async () => {
+    const checkAuth = () => {
       try {
-        const { data: { user }, error } = await supabase.auth.getUser();
-        if (error) {
-          console.warn('Auth error (will clear session):', error.message);
-          // Clear any invalid session
-          await supabase.auth.signOut();
-          setUser(null);
+        // Use the same auth method as collection page
+        const session = getStoredSession();
+        if (session && session.user) {
+          console.log('[Navigation] User state updated:', `Logged in as ${session.user.email}`);
+          setUser(session.user);
         } else {
-          setUser(user);
+          console.log('[Navigation] User state updated: Not logged in');
+          setUser(null);
         }
       } catch (error: any) {
-        console.warn('Auth check failed, clearing session:', error.message);
-        // Clear session on any auth failure
-        try {
-          await supabase.auth.signOut();
-        } catch (signOutError) {
-          console.warn('Failed to sign out:', signOutError);
-        }
+        console.warn('[Navigation] Auth check failed:', error.message);
         setUser(null);
       }
     };
 
-    getUser();
+    // Check auth immediately
+    checkAuth();
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setUser(session?.user ?? null);
+    // Re-check auth periodically (every 5 seconds) to catch login/logout
+    const interval = setInterval(checkAuth, 5000);
 
-        // Handle auth errors
-        if (event === 'TOKEN_REFRESHED' && !session) {
-          console.warn('Token refresh failed, user will need to re-login');
-        }
+    // Also listen for storage events (in case user logs in/out in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'supabase.auth.token') {
+        checkAuth();
       }
-    );
+    };
+    window.addEventListener('storage', handleStorageChange);
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   // Close dropdown and mobile menu when clicking outside
