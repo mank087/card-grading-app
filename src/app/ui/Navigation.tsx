@@ -123,6 +123,12 @@ export default function Navigation() {
             >
               My Collection
             </Link>
+            <Link
+              href="/account"
+              className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+            >
+              Account
+            </Link>
             {/* Upload Dropdown */}
             <div className="relative upload-dropdown">
               <button
@@ -270,6 +276,13 @@ export default function Navigation() {
                 className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
               >
                 My Collection
+              </Link>
+              <Link
+                href="/account"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Account
               </Link>
               <Link
                 href="/upload?category=Sports"
