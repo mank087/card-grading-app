@@ -295,30 +295,9 @@ export default function AccountPage() {
 
           {stats.averageGrade !== null ? (
             <>
-              {/* Average Grade & Highest Grade */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-6 border-2 border-yellow-300">
-                  <p className="text-sm text-yellow-700 font-medium mb-2">Average Grade</p>
-                  <p className="text-5xl font-bold text-yellow-900">{stats.averageGrade}</p>
-                  <p className="text-xs text-yellow-600 mt-2">Across all graded cards</p>
-                </div>
-                <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border-2 border-green-300">
-                  <p className="text-sm text-green-700 font-medium mb-2">Highest Grade</p>
-                  <p className="text-5xl font-bold text-green-900">{stats.highestGrade}</p>
-                  {stats.highestGradeCardId && (
-                    <a
-                      href={getCardLink(stats.highestGradeCardId, stats.highestGradeCategory)}
-                      className="text-sm text-green-600 hover:text-green-800 underline mt-2 inline-block"
-                    >
-                      View this card →
-                    </a>
-                  )}
-                </div>
-              </div>
-
               {/* Grade Distribution Chart */}
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Grade Distribution</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Grade Distribution</h3>
                 <div className="space-y-2">
                   {[10, 9, 8, 7, 6, 5, 4, 3, 2, 1].map(grade => {
                     const count = stats.gradeDistribution[grade] || 0
