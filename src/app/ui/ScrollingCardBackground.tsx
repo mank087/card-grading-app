@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Image from "next/image";
-import { supabase } from "@/lib/supabaseClient";
 
 interface ScrollingCardBackgroundProps {
   opacity?: number; // 0-100, default 40
@@ -15,92 +13,17 @@ export default function ScrollingCardBackground({
   blur = 2,
   speed = 1
 }: ScrollingCardBackgroundProps) {
-  const [cardImages, setCardImages] = useState<string[]>([]);
+  // Static card images stored in public/homepage-cards/
+  const staticCardImages = [
+    '/homepage-cards/maxxine-dupri.png',
+    '/homepage-cards/pikachu-grey-felt-hat.png'
+  ];
 
-  useEffect(() => {
-    const fetchCardImages = async () => {
-      try {
-        console.log('[ScrollingCardBackground] Starting to fetch card images...');
+  const cardImages = staticCardImages;
 
-        // Fetch MORE cards to account for some having missing images (fetch 100, need ~30 valid)
-        let { data, error } = await supabase
-          .from('cards')
-          .select('front_path')
-          .eq('is_public', true)
-          .not('front_path', 'is', null)
-          .order('created_at', { ascending: false })
-          .limit(100);
-
-        console.log('[ScrollingCardBackground] Public cards query result:', {
-          foundCards: data?.length || 0,
-          error: error?.message || 'none'
-        });
-
-        // If no public cards found, fetch any cards as fallback
-        if (error || !data || data.length === 0) {
-          console.log('[ScrollingCardBackground] No public cards found, fetching any available cards...');
-          const result = await supabase
-            .from('cards')
-            .select('front_path')
-            .not('front_path', 'is', null)
-            .order('created_at', { ascending: false })
-            .limit(100);
-
-          data = result.data;
-          error = result.error;
-
-          console.log('[ScrollingCardBackground] Fallback query result:', {
-            foundCards: data?.length || 0,
-            error: error?.message || 'none'
-          });
-        }
-
-        if (error) {
-          console.error('[ScrollingCardBackground] Error fetching card images:', error);
-          return;
-        }
-
-        if (data && data.length > 0) {
-          console.log('[ScrollingCardBackground] Creating signed URLs for', data.length, 'cards...');
-
-          // Create signed URLs for each card's front image
-          const urlPromises = data.map(async (card, index) => {
-            try {
-              const { data: urlData, error: urlError } = await supabase.storage
-                .from('cards')
-                .createSignedUrl(card.front_path, 60 * 60); // 1 hour expiry
-
-              if (urlError) {
-                console.error(`[ScrollingCardBackground] Error creating signed URL for card ${index}:`, urlError);
-                return null;
-              }
-
-              return urlData?.signedUrl || null;
-            } catch (err) {
-              console.error(`[ScrollingCardBackground] Exception creating signed URL for card ${index}:`, err);
-              return null;
-            }
-          });
-
-          const urls = await Promise.all(urlPromises);
-          const validUrls = urls.filter(url => url !== null) as string[];
-
-          console.log(`[ScrollingCardBackground] ✅ Successfully loaded ${validUrls.length} card images for background`);
-          setCardImages(validUrls);
-        } else {
-          console.warn('[ScrollingCardBackground] ⚠️ No cards with front_path found in database');
-        }
-      } catch (err) {
-        console.error('[ScrollingCardBackground] ❌ Exception loading background cards:', err);
-      }
-    };
-
-    fetchCardImages();
-  }, []);
-
-  // Need at least 10 valid images to show the background (otherwise looks sparse)
-  if (cardImages.length < 10) {
-    console.warn(`[ScrollingCardBackground] ⚠️ Only ${cardImages.length} valid images found, need at least 10. Not rendering.`);
+  // Need at least 2 images to show the background
+  if (cardImages.length < 2) {
+    console.warn(`[ScrollingCardBackground] ⚠️ Only ${cardImages.length} images available, need at least 2. Not rendering.`);
     return null;
   }
 
