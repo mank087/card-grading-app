@@ -15,10 +15,24 @@ export default function ScrollingCardBackground({
 }: ScrollingCardBackgroundProps) {
   // Static card images stored in public/homepage-cards/
   const staticCardImages = [
-    '/homepage-cards/maxxine-dupri.png',
-    '/homepage-cards/pikachu-grey-felt-hat.png',
+    '/homepage-cards/Aaron Judge Auto.png',
+    '/homepage-cards/Black Lotus MTG.png',
     '/homepage-cards/Charizard 1999.png',
+    '/homepage-cards/Garbage Pail Kids Adam Bomb.png',
+    '/homepage-cards/Garbage Pail Kids Hound Doug.png',
+    '/homepage-cards/Gisele Bundchen Pop Century.png',
+    '/homepage-cards/Ian Malcom, Chaotician MTG.png',
+    '/homepage-cards/Kaboom Kevin Durant.png',
+    '/homepage-cards/Magneton.png',
+    '/homepage-cards/Mathew Stafford Kurt Warner Auto.png',
+    '/homepage-cards/maxxine-dupri.png',
+    '/homepage-cards/Mega Lucario EX.png',
     '/homepage-cards/Micahel Jordan Rookie.png',
+    '/homepage-cards/Mickey Mantle 1952.png',
+    '/homepage-cards/Mickey Mouse Brave Little Prince.png',
+    '/homepage-cards/pikachu-grey-felt-hat.png',
+    '/homepage-cards/Shohei Ohtani Auto Patch.png',
+    '/homepage-cards/The One Ring MTG.png',
     '/homepage-cards/Tom Brady Downtown Buccaneers.png'
   ];
 

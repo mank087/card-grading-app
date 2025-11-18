@@ -111,9 +111,8 @@ export default function Navigation() {
                 height={40}
                 className="object-contain"
               />
-              <span className="text-base sm:text-xl font-bold text-gray-800">
-                <span className="hidden sm:inline">Dynamic Collectibles Management</span>
-                <span className="sm:hidden">DCM</span>
+              <span className="text-base sm:text-xl font-bold text-gray-800 hidden sm:inline">
+                Dynamic Collectibles Management
               </span>
             </Link>
           </div>
@@ -263,24 +262,82 @@ export default function Navigation() {
             )}
           </div>
 
-          {/* Auth Section - Right Side */}
-          <div className="flex items-center space-x-4">
-            {!user && (
+          {/* Mobile Top Buttons - Right Side */}
+          <div className="flex md:hidden items-center space-x-2">
+            {/* Grade a Card Button - Mobile */}
+            <div className="relative upload-dropdown">
+              <button
+                onClick={() => setUploadDropdownOpen(!uploadDropdownOpen)}
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors shadow-md"
+              >
+                Grade
+              </button>
+
+              {uploadDropdownOpen && (
+                <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                  <div className="py-1">
+                    <Link
+                      href="/upload?category=Sports"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                      onClick={() => setUploadDropdownOpen(false)}
+                    >
+                      Sports Cards
+                    </Link>
+                    <Link
+                      href="/upload?category=Pokemon"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
+                      onClick={() => setUploadDropdownOpen(false)}
+                    >
+                      Pokémon Cards
+                    </Link>
+                    <Link
+                      href="/upload?category=MTG"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                      onClick={() => setUploadDropdownOpen(false)}
+                    >
+                      MTG Cards
+                    </Link>
+                    <Link
+                      href="/upload?category=Lorcana"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                      onClick={() => setUploadDropdownOpen(false)}
+                    >
+                      Lorcana Cards
+                    </Link>
+                    <Link
+                      href="/upload?category=Other"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-800 transition-colors"
+                      onClick={() => setUploadDropdownOpen(false)}
+                    >
+                      Other Cards
+                    </Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Login or My Collection Button - Mobile */}
+            {user ? (
+              <Link
+                href="/collection"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+              >
+                Collection
+              </Link>
+            ) : (
               <Link
                 href="/login"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
               >
                 Login
               </Link>
             )}
-          </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden mobile-menu-button">
+            {/* Mobile menu button */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="text-gray-700 hover:text-blue-600 focus:outline-none focus:text-blue-600"
+              className="text-gray-700 hover:text-purple-600 focus:outline-none focus:text-purple-600 mobile-menu-button"
               aria-label="Toggle menu"
             >
               {mobileMenuOpen ? (
@@ -294,66 +351,34 @@ export default function Navigation() {
               )}
             </button>
           </div>
+
+          {/* Desktop Auth Section - Right Side */}
+          <div className="hidden md:flex items-center space-x-4">
+            {!user && (
+              <Link
+                href="/login"
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                Login
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Mobile Navigation Menu - Conditional */}
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 border-t border-gray-200 mt-2 mobile-menu">
             <div className="flex flex-col space-y-2 pt-2">
-              <Link
-                href="/collection"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                My Collection
-              </Link>
-
-              {/* Account - Only show when logged in */}
+              {/* My Account - Only show when logged in */}
               {user && (
                 <Link
                   href="/account"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
                   My Account
                 </Link>
               )}
-
-              <Link
-                href="/upload?category=Sports"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Grade Sports Cards
-              </Link>
-              <Link
-                href="/upload?category=Pokemon"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-red-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Grade Pokémon Cards
-              </Link>
-              <Link
-                href="/upload?category=MTG"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Grade MTG Cards
-              </Link>
-              <Link
-                href="/upload?category=Lorcana"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Grade Lorcana Cards
-              </Link>
-              <Link
-                href="/upload?category=Other"
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-gray-700 hover:text-gray-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
-              >
-                Grade Other Cards
-              </Link>
 
               {/* Mobile Search */}
               <form onSubmit={(e) => { handleSearch(e); setMobileMenuOpen(false); }} className="px-3 py-2">
