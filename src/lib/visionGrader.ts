@@ -531,14 +531,14 @@ Return your observations in the required JSON format.`;
               type: 'image_url',
               image_url: {
                 url: frontImageUrl,
-                detail: 'high'
+                detail: 'auto'
               }
             },
             {
               type: 'image_url',
               image_url: {
                 url: backImageUrl,
-                detail: 'high'
+                detail: 'auto'
               }
             },
             {
@@ -1448,14 +1448,14 @@ export async function gradeCardConversational(
               type: 'image_url',
               image_url: {
                 url: frontImageUrl,
-                detail: 'high'
+                detail: 'auto'
               }
             },
             {
               type: 'image_url',
               image_url: {
                 url: backImageUrl,
-                detail: 'high'
+                detail: 'auto'
               }
             },
             {

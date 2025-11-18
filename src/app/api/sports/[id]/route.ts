@@ -127,10 +127,12 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       console.log(`[GET /api/sports/${cardId}] 🌐 Public card - access granted`);
     }
 
-    // Create signed URLs for sports card images
+    // Create signed URLs for sports card images (parallel for speed)
     console.log(`[GET /api/sports/${cardId}] Creating signed URLs for front: ${card.front_path}, back: ${card.back_path}`);
-    const frontUrl = await createSignedUrl(supabase, "cards", card.front_path);
-    const backUrl = await createSignedUrl(supabase, "cards", card.back_path);
+    const [frontUrl, backUrl] = await Promise.all([
+      createSignedUrl(supabase, "cards", card.front_path),
+      createSignedUrl(supabase, "cards", card.back_path)
+    ]);
 
     if (!frontUrl || !backUrl) {
       console.error(`[GET /api/sports/${cardId}] Failed to create signed URLs. Front: ${frontUrl}, Back: ${backUrl}`);

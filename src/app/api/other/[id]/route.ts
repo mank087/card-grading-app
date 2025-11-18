@@ -121,10 +121,12 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
 
     console.log(`[GET /api/other/${cardId}] Other card found`);
 
-    // Create signed URLs for Other card images
+    // Create signed URLs for Other card images (parallel for speed)
     console.log(`[GET /api/other/${cardId}] Creating signed URLs for front: ${card.front_path}, back: ${card.back_path}`);
-    const frontUrl = await createSignedUrl(supabase, "cards", card.front_path);
-    const backUrl = await createSignedUrl(supabase, "cards", card.back_path);
+    const [frontUrl, backUrl] = await Promise.all([
+      createSignedUrl(supabase, "cards", card.front_path),
+      createSignedUrl(supabase, "cards", card.back_path)
+    ]);
 
     if (!frontUrl || !backUrl) {
       console.error(`[GET /api/other/${cardId}] Failed to create signed URLs. Front: ${frontUrl}, Back: ${backUrl}`);
