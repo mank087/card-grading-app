@@ -20,15 +20,15 @@ export default function ScrollingCardBackground({
   useEffect(() => {
     const fetchCardImages = async () => {
       try {
-        // Try to fetch public cards first
+        // Try to fetch public cards first (using is_public boolean column)
         let { data, error } = await supabase
           .from('cards')
           .select('front_path')
-          .eq('visibility', 'public')
+          .eq('is_public', true)
           .not('front_path', 'is', null)
           .limit(30);
 
-        // If no public cards or visibility column doesn't exist, fetch any cards
+        // If no public cards found, fetch any cards as fallback
         if (error || !data || data.length === 0) {
           console.log('No public cards found, fetching any available cards...');
           const result = await supabase

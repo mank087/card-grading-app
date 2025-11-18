@@ -2020,8 +2020,8 @@ export function SportsCardDetails() {
     rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
     subset: stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset,
     rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || dvgGrading.card_info?.rarity_tier,
-    autographed: card.conversational_card_info?.autographed || card.autograph_type !== 'none',
-    memorabilia: card.conversational_card_info?.memorabilia || card.memorabilia_type !== 'none',
+    autographed: card.conversational_card_info?.autographed ?? (card.autograph_type !== 'none'),
+    memorabilia: card.conversational_card_info?.memorabilia ?? (card.memorabilia_type !== 'none'),
     card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text  // 🆕 Card back description
   };
 
