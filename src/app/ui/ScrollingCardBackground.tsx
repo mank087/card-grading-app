@@ -20,13 +20,26 @@ export default function ScrollingCardBackground({
   useEffect(() => {
     const fetchCardImages = async () => {
       try {
-        // Fetch 30 random public cards with front images
-        const { data, error } = await supabase
+        // Try to fetch public cards first
+        let { data, error } = await supabase
           .from('cards')
-          .select('front_url')
+          .select('front_path')
           .eq('visibility', 'public')
-          .not('front_url', 'is', null)
+          .not('front_path', 'is', null)
           .limit(30);
+
+        // If no public cards or visibility column doesn't exist, fetch any cards
+        if (error || !data || data.length === 0) {
+          console.log('No public cards found, fetching any available cards...');
+          const result = await supabase
+            .from('cards')
+            .select('front_path')
+            .not('front_path', 'is', null)
+            .limit(30);
+
+          data = result.data;
+          error = result.error;
+        }
 
         if (error) {
           console.error('Error fetching card images:', error);
@@ -34,8 +47,21 @@ export default function ScrollingCardBackground({
         }
 
         if (data && data.length > 0) {
-          const urls = data.map(card => card.front_url);
-          setCardImages(urls);
+          // Create signed URLs for each card's front image
+          const urlPromises = data.map(async (card) => {
+            const { data: urlData } = await supabase.storage
+              .from('cards')
+              .createSignedUrl(card.front_path, 60 * 60); // 1 hour expiry
+            return urlData?.signedUrl || null;
+          });
+
+          const urls = await Promise.all(urlPromises);
+          const validUrls = urls.filter(url => url !== null) as string[];
+
+          setCardImages(validUrls);
+          console.log(`Loaded ${validUrls.length} card images for background`);
+        } else {
+          console.warn('No cards with front_path found in database');
         }
       } catch (err) {
         console.error('Error loading background cards:', err);
@@ -75,8 +101,8 @@ export default function ScrollingCardBackground({
             <Image
               src={url}
               alt=""
-              width={200}
-              height={280}
+              width={300}
+              height={420}
               className="rounded-lg shadow-lg object-cover"
               loading={index < 5 ? "eager" : "lazy"}
               unoptimized
@@ -92,8 +118,8 @@ export default function ScrollingCardBackground({
             <Image
               src={url}
               alt=""
-              width={200}
-              height={280}
+              width={300}
+              height={420}
               className="rounded-lg shadow-lg object-cover"
               loading="lazy"
               unoptimized
@@ -109,8 +135,8 @@ export default function ScrollingCardBackground({
             <Image
               src={url}
               alt=""
-              width={200}
-              height={280}
+              width={300}
+              height={420}
               className="rounded-lg shadow-lg object-cover"
               loading="lazy"
               unoptimized
@@ -122,29 +148,101 @@ export default function ScrollingCardBackground({
       <style jsx>{`
         .scroll-row {
           display: flex;
-          gap: 1.5rem;
+          gap: 1rem;
           position: absolute;
           width: max-content;
           animation-timing-function: linear;
           animation-iteration-count: infinite;
         }
 
-        .scroll-row:nth-child(1) {
-          top: 5%;
+        /* Mobile: smaller cards, tighter spacing */
+        @media (max-width: 768px) {
+          .scroll-row {
+            gap: 0.75rem;
+          }
+
+          .card-item {
+            width: 150px !important;
+            height: 210px !important;
+          }
+
+          .scroll-row:nth-child(1) {
+            top: 5%;
+          }
+
+          .scroll-row:nth-child(2) {
+            top: 40%;
+          }
+
+          .scroll-row:nth-child(3) {
+            top: 75%;
+          }
         }
 
-        .scroll-row:nth-child(2) {
-          top: 40%;
+        /* Tablet: medium cards */
+        @media (min-width: 769px) and (max-width: 1024px) {
+          .scroll-row {
+            gap: 1.25rem;
+          }
+
+          .card-item {
+            width: 200px !important;
+            height: 280px !important;
+          }
+
+          .scroll-row:nth-child(1) {
+            top: 8%;
+          }
+
+          .scroll-row:nth-child(2) {
+            top: 42%;
+          }
+
+          .scroll-row:nth-child(3) {
+            top: 76%;
+          }
         }
 
-        .scroll-row:nth-child(3) {
-          top: 75%;
+        /* Desktop: larger cards, better spacing */
+        @media (min-width: 1025px) {
+          .scroll-row {
+            gap: 2rem;
+          }
+
+          .card-item {
+            width: 280px !important;
+            height: 392px !important;
+          }
+
+          .scroll-row:nth-child(1) {
+            top: 10%;
+          }
+
+          .scroll-row:nth-child(2) {
+            top: 45%;
+          }
+
+          .scroll-row:nth-child(3) {
+            top: 80%;
+          }
+        }
+
+        /* Large Desktop: even larger cards */
+        @media (min-width: 1920px) {
+          .scroll-row {
+            gap: 2.5rem;
+          }
+
+          .card-item {
+            width: 320px !important;
+            height: 448px !important;
+          }
         }
 
         .card-item {
           flex-shrink: 0;
-          width: 200px;
-          height: 280px;
+          width: 280px;
+          height: 392px;
         }
 
         @keyframes scroll-right {
@@ -172,7 +270,8 @@ export default function ScrollingCardBackground({
 
         .scroll-left {
           animation-name: scroll-left;
-          right: 0;
+          left: 0;
+          transform: translateX(-50%);
         }
 
         /* Pause on hover for accessibility */
