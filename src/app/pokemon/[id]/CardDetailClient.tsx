@@ -2607,7 +2607,7 @@ export function PokemonCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: (card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade) || undefined,
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -2631,7 +2631,7 @@ export function PokemonCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: (card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade) || undefined,
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -2655,7 +2655,7 @@ export function PokemonCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: (card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade) || undefined,
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
