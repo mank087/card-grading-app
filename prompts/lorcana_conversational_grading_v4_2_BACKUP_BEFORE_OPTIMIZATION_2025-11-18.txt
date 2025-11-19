@@ -640,11 +640,30 @@ DO NOT default to null without checking borders, card number area, and back pane
 5. **FIFTH**: If multiple indicators found, combine (e.g., "Enchanted Promo")
 6. **ONLY use null if you have thoroughly checked ALL indicators above and found nothing**
 
-**LORCANA SUBSET EXAMPLES:**
-- **Enchanted:** Borderless full-art with holographic finish across entire card
-- **Foil:** Standard border/frame with holographic layer
-- **Promo:** Set code "PRO" instead of standard sets
+**REAL-WORLD LORCANA EXAMPLES:**
 
+Example 1: **Enchanted Character**
+- Frame: Artwork extends to all edges, no border visible
+- Finish: Holographic/rainbow foil across entire card
+- Text overlay on art
+- ✅ Correct subset value: "Enchanted"
+
+Example 2: **Foil Character**
+- Frame: Standard border and frame intact
+- Finish: Holographic foil layer over card
+- Normal card layout
+- ✅ Correct subset value: "Foil"
+
+Example 3: **Standard Non-Foil Character**
+- Frame: Standard border and frame
+- Finish: Non-foil, matte finish
+- No special treatment
+- ✅ Correct subset value: null
+
+Example 4: **Promo Card**
+- Set code: PRO instead of TFC/ROF/ITI/etc.
+- May have special promo stamp
+- ✅ Correct subset value: "Promo"
 
 🆕 ENCHANTED & FOIL VARIANTS:
 
@@ -1479,20 +1498,62 @@ If multiple caps apply, use strictest (lowest).
 
 🚨 **MANDATORY**: If preliminary grade = 10.0, complete this verification before finalizing.
 
-**PERFECT GRADE REQUIREMENTS:**
+**PERFECT GRADE VERIFICATION PROTOCOL:**
 
-Before assigning 10.0, ALL criteria must be met:
+Before assigning final grade of 10.0, answer ALL questions below. If ANY answer is "No" or "Uncertain", grade CANNOT be 10.0.
 
-**Centering:** Front & back both scored 10.0 with visually equal borders
-**Corners (8 total):** ALL corners with zero white fiber at max zoom, perfect factory points intact
-**Edges (8 total):** ALL edges with zero white flecks/fiber, smooth factory cut quality
-**Surface:** Both sides with zero scratches/dots/debris/defects, holographic pattern intact (if foil/enchanted)
-**Image Quality:** Grade A (<10% glare, professional quality, all areas visible)
+**CENTERING VERIFICATION:**
+□ Front centering: Borders visually equal on all sides? | YES / NO
+□ Back centering: Borders visually equal on all sides? | YES / NO
+□ Both front and back centering scored 10.0? | YES / NO
 
-**CRITICAL RULES:**
-• If ANY criterion not met → Maximum grade 9.5 or lower
-• When uncertain → Choose 9.5, NOT 10.0
-• Perfect 10.0 should be <1% of all cards graded
+**CORNER VERIFICATION (All 4 corners, BOTH sides = 8 corners total):**
+□ Top Left Front: Zero white fiber visible at maximum zoom? | YES / NO
+□ Top Right Front: Zero white fiber visible at maximum zoom? | YES / NO
+□ Bottom Left Front: Zero white fiber visible at maximum zoom? | YES / NO
+□ Bottom Right Front: Zero white fiber visible at maximum zoom? | YES / NO
+□ Top Left Back: Zero white fiber visible at maximum zoom? | YES / NO
+□ Top Right Back: Zero white fiber visible at maximum zoom? | YES / NO
+□ Bottom Left Back: Zero white fiber visible at maximum zoom? | YES / NO
+□ Bottom Right Back: Zero white fiber visible at maximum zoom? | YES / NO
+□ All 8 corners have perfect factory-cut points intact? | YES / NO
+
+**EDGE VERIFICATION (All 4 edges, BOTH sides = 8 edges total):**
+□ Top edge front: Zero white flecks/fiber along entire edge? | YES / NO
+□ Bottom edge front: Zero white flecks/fiber along entire edge? | YES / NO
+□ Left edge front: Zero white flecks/fiber along entire edge? | YES / NO
+□ Right edge front: Zero white flecks/fiber along entire edge? | YES / NO
+□ Top edge back: Zero white flecks/fiber along entire edge? | YES / NO
+□ Bottom edge back: Zero white flecks/fiber along entire edge? | YES / NO
+□ Left edge back: Zero white flecks/fiber along entire edge? | YES / NO
+□ Right edge back: Zero white flecks/fiber along entire edge? | YES / NO
+□ Factory cut quality pristine on all edges (smooth, no roughness)? | YES / NO
+
+**SURFACE VERIFICATION:**
+□ Front surface: Zero white dots, debris, or print defects? | YES / NO
+□ Front surface: Zero scratches (even micro-scratches)? | YES / NO
+□ Front surface: Holographic pattern intact with no disruption (if foil/enchanted)? | YES / NO
+□ Back surface: Zero white dots, debris, or print defects? | YES / NO
+□ Back surface: Zero scratches (even micro-scratches)? | YES / NO
+□ Back surface: No compression marks, roller lines, or factory defects? | YES / NO
+
+**IMAGE QUALITY VERIFICATION:**
+□ Image confidence Grade A (<10% glare, professional quality)? | YES / NO
+□ All areas of card clearly visible and assessable? | YES / NO
+□ Lighting sufficient to detect micro-defects? | YES / NO
+
+**FINAL VERIFICATION:**
+□ ALL checkboxes above marked YES? | YES / NO
+□ Have you examined the card at MAXIMUM zoom for defects? | YES / NO
+□ Are you CERTAIN there are ZERO defects on this card? | YES / NO
+
+**OUTCOME:**
+• If ALL boxes checked YES → Proceed with 10.0 grade
+• If ANY box checked NO → Reduce grade to 9.5 or lower based on defects found
+• If ANY box checked UNCERTAIN → Reduce grade to 9.5 with increased uncertainty
+
+🚨 When in doubt: Choose 9.5, NOT 10.0
+🚨 Perfect 10.0 should be <1% of all cards graded
 
 ═══════════════════════════════════════════════════════════════════════════════
 [STEP 11] CONDITION LABEL CONVERSION
