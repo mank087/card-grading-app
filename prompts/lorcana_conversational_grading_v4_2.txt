@@ -1079,40 +1079,121 @@ Use the WORST axis (L/R or T/B) to determine the cap.
 
 A. CENTERING EVALUATION (FRONT)
 
-Measure border symmetry or design anchor symmetry.
+🆕 **ENHANCED CENTERING EVALUATION (STRICT MEASUREMENT REQUIRED)**
 
-🆕 PATCH 1: Three measurement methods - select appropriate method for card design:
+🚨 **CRITICAL RULE: NO PERFECT CENTERING WITHOUT PROOF**
+You may NOT assign 50/50 centering unless BOTH opposing borders are:
+✅ Visible and clearly defined
+✅ Measurable with numeric values
+✅ Unobstructed by glare or holder
+✅ Evenly lit (no shadows distorting perception)
+✅ Not distorted by foil reflections or patterns
 
-**METHOD 1: Border-Present Measurement (Standard)**
-Use when card has visible border/frame:
-• Measure LEFT border width vs RIGHT border width → Calculate L:R ratio
-• Measure TOP border width vs BOTTOM border width → Calculate T:B ratio
-• Express as ratio (e.g., 55/45 means left is 55% of total horizontal border)
-• Determine worst axis (axis with most deviation from 50/50)
+**If ANY of these conditions are NOT met → Perfect 50/50 is PROHIBITED**
 
-**METHOD 2: Design-Anchor Measurement (Borderless/Full-Art)**
-Use when no visible border (Enchanted cards, full-art variants):
-• Identify symmetrical design elements (character position, text boxes, stat boxes)
-• Measure distance from card edge to design anchor on each side
-• Calculate ratio same as Method 1
-• Note: Enchanted cards often have asymmetric designs - measure relative to physical card edges
+**STEP 1: MANDATORY CARD TYPE CLASSIFICATION**
+Before measuring, classify card into ONE category:
 
-**METHOD 3: Design-Anchor-Asymmetric (Intentionally Asymmetric Design)**
-Use when design is intentionally asymmetric:
-• Identify if asymmetry is intentional (character facing one direction, action scene composition)
-• Measure alignment of key design elements (character head, focal point) relative to card edges
-• If design is intentionally off-center, note this and score based on execution, not traditional centering
+**TYPE A - Standard Bordered Card**
+• Clearly defined borders on all four edges
+• Straight rectangular shape
+• Borders are structural, not decorative
+• Method: Direct border measurement (most accurate)
 
-Centering Score Guide:
-• 10.0: Perfect 50/50 on both axes
-• 9.5: Near-perfect (52/48 to 55/45 on worst axis)
-• 9.0: Slight off-center (55/45 to 60/40 on worst axis)
-• 8.5: Noticeable (60/40 to 65/35 on worst axis)
-• 8.0: Moderate (65/35 to 70/30 on worst axis)
-• 7.0: Significant (70/30 to 75/25 on worst axis)
-• 6.0 or lower: Severe (75/25 or worse)
+**TYPE B - Asymmetric Bordered Insert**
+• Borders differ left/right or top/bottom
+• Includes Enchanted variants with asymmetric frames
+• Method: Design anchors required
+• **Maximum centering score: 9.0** (unless exceptional anchor evidence)
+
+**TYPE C - Borderless / Full-Art Card**
+• No visible border OR artwork extends to edges
+• Enchanted cards often fall in this category
+• Method: Internal layout anchors ONLY
+• **Maximum centering score: 9.0** (unless strong anchors prove near-perfect)
+
+**TYPE D - Foil-Frame / Pattern-Frame Card**
+• Holographic or geometric frame (decorative, not structural)
+• Borders may appear "busy" or distorted by design
+• Method: Identify STRUCTURAL frame (ignore foil patterns)
+• **Maximum centering score: 9.0** (if reflective distortion present)
+
+**TYPE E - Die-Cut / Non-Rectangular Card**
+• Shaped edges, removed corners, jagged/rounded cuts
+• Method: Internal geometric centering only
+• **Maximum centering score: 9.0** (traditional centering impossible)
+
+**STEP 2: NUMERIC MEASUREMENT (REQUIRED)**
+
+You MUST provide approximate numeric measurements:
+
+**For bordered cards (Type A):**
+• "Left border ≈ [X] pixels"
+• "Right border ≈ [Y] pixels"
+• "Top border ≈ [X] pixels"
+• "Bottom border ≈ [Y] pixels"
+
+**For borderless/anchor cards (Types B-E):**
+• "[Anchor element] is ≈ [X] pixels from left edge"
+• "[Anchor element] is ≈ [Y] pixels from right edge"
+• Must identify at least TWO anchor points per axis
+
+**STEP 3: CALCULATE RATIOS INDEPENDENTLY**
+
+Measure each axis separately (NO reuse or symmetry assumptions):
+
+**Left/Right Ratio:**
+• Narrower border ÷ Wider border × 100 = ratio
+• Example: 23px ÷ 30px × 100 = 76.67 → **77/23** ratio
+
+**Top/Bottom Ratio:**
+• Narrower border ÷ Wider border × 100 = ratio
+• Example: 19px ÷ 25px × 100 = 76.00 → **76/24** ratio
+
+**Use WORST axis** for centering score
+
+**STEP 4: SECOND-PASS VERIFICATION (MANDATORY)**
+
+After calculating ratio, ask yourself:
+❓ "Do my measured border values logically support this centering ratio?"
+
+If NO → Revise to more conservative ratio
+If uncertain → Default to LESS perfect ratio (55/45 or 60/40, NEVER 50/50)
+
+**STEP 5: APPLY CONSERVATIVE DEFAULTS**
+
+If certainty is LOW due to:
+• Glare or poor visibility
+• Unclear border edges
+• Foil distortion
+• Busy artwork
+• Image quality issues
+
+→ You MUST use less perfect ratio
+→ NEVER default upward toward perfection
+→ Example: If unsure between 50/50 and 55/45 → Use 55/45
+
+**CENTERING SCORE CAPS (Based on Worst Axis):**
+| Ratio | Maximum Score |
+|-------|---------------|
+| 50/50 to 52/48 | 10.0 |
+| 53/47 to 55/45 | 9.5 |
+| 56/44 to 58/42 | 9.0 |
+| 59/41 to 65/35 | 8.0 |
+| 66/34 to 70/30 | 7.0 |
+| 71/29 or worse | 6.0 or lower |
 
 🚨 Apply centering caps from defect guide if applicable
+
+**REQUIRED OUTPUT FORMAT:**
+• card_type: "Standard Bordered" / "Asymmetric Insert" / "Borderless" / "Foil-Frame" / "Die-Cut"
+• measurement_method: "Border measurement" / "Design anchors" / "Internal geometry"
+• measurements: "Left ≈ [X]px, Right ≈ [Y]px, Top ≈ [X]px, Bottom ≈ [Y]px"
+• left_right: ratio (e.g., "55/45")
+• top_bottom: ratio (e.g., "52/48")
+• worst_axis: "left_right" / "top_bottom"
+• score: 0.0-10.0
+• analysis: MINIMUM 3 SENTENCES - (1) Card type classification (2) Numeric measurements + ratios (3) How measurements were determined and verification notes
 
 B. CORNERS EVALUATION (FRONT)
 
@@ -1186,11 +1267,49 @@ Lorcana card backs feature:
 • Inkwell symbol
 • Consistent back design across all cards (except special variants)
 
-Evaluate back using same criteria as front:
-• A. Centering (measure borders/design symmetry)
-• B. Corners (inspect all 4 corners)
-• C. Edges (inspect all 4 edges)
-• D. Surface (inspect for defects)
+Evaluate back using same criteria as front. Apply ALL strict methodology from Step 3.
+
+────────────────────────────────────────
+A. CENTERING EVALUATION (BACK)
+────────────────────────────────────────
+
+🚨 **Apply SAME strict centering methodology as front** (Steps 1-5 from Front Centering section)
+
+**CRITICAL REQUIREMENTS:**
+• Classify back card type (Type A-E)
+• Provide numeric measurements (pixels/percentages)
+• Calculate ratios independently (NO carrying over front measurements)
+• Second-pass verification required
+• Conservative defaults (if uncertain → LESS perfect ratio)
+• **NO 50/50 without proof** (visible, measurable, unobstructed borders)
+
+**OUTPUT:**
+• card_type: "Standard Bordered" / "Asymmetric Insert" / "Borderless" / "Foil-Frame" / "Die-Cut"
+• measurement_method: "Border measurement" / "Design anchors" / "Internal geometry"
+• measurements: "Left ≈ [X]px, Right ≈ [Y]px, Top ≈ [X]px, Bottom ≈ [Y]px"
+• left_right: ratio
+• top_bottom: ratio
+• worst_axis: "left_right" / "top_bottom"
+• score: 0.0-10.0 (independent from front, apply cap per table)
+• analysis: MINIMUM 3 SENTENCES - (1) Card type classification (2) Numeric measurements + ratios (3) How measurements were determined and verification notes
+
+────────────────────────────────────────
+B. CORNERS EVALUATION (BACK)
+────────────────────────────────────────
+
+Inspect all 4 corners using same methodology as front.
+
+────────────────────────────────────────
+C. EDGES EVALUATION (BACK)
+────────────────────────────────────────
+
+Inspect all 4 edges using same methodology as front.
+
+────────────────────────────────────────
+D. SURFACE EVALUATION (BACK)
+────────────────────────────────────────
+
+Inspect entire back surface using same methodology as front.
 
 IMPORTANT: Back defects are just as important as front defects in final grading.
 Do not assume back is better/worse than front - evaluate independently.
