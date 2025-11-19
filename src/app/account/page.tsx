@@ -314,7 +314,7 @@ export default function AccountPage() {
                         </div>
                         <div className="flex-1 bg-gray-200 rounded-full h-8 relative overflow-hidden">
                           <div
-                            className={`h-full rounded-full flex items-center justify-end pr-3 text-white text-sm font-medium ${
+                            className={`h-full rounded-full ${
                               grade === 10 ? 'bg-gradient-to-r from-yellow-400 to-yellow-600' :
                               grade === 9 ? 'bg-gradient-to-r from-green-400 to-green-600' :
                               grade >= 7 ? 'bg-gradient-to-r from-blue-400 to-blue-600' :
@@ -322,7 +322,8 @@ export default function AccountPage() {
                               'bg-gradient-to-r from-gray-400 to-gray-600'
                             }`}
                             style={{ width: `${Math.max(percentage, 5)}%` }}
-                          >
+                          />
+                          <div className="absolute inset-0 flex items-center justify-end pr-3 text-sm font-medium text-white pointer-events-none">
                             {count} card{count !== 1 ? 's' : ''}
                           </div>
                         </div>
