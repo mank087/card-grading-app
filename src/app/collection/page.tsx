@@ -3,6 +3,7 @@
 import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { getStoredSession } from '../../lib/directAuth'
 
 type Card = {
@@ -177,6 +178,7 @@ function CollectionPageContent() {
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [displayLimit, setDisplayLimit] = useState(20) // Initial display limit
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
 
@@ -286,6 +288,15 @@ function CollectionPageContent() {
     return card.category === selectedCategory;
   })
 
+  // Limit displayed cards for performance
+  const displayedCards = filteredCards.slice(0, displayLimit)
+  const hasMore = filteredCards.length > displayLimit
+
+  // Load more handler
+  const loadMore = () => {
+    setDisplayLimit(prev => prev + 20)
+  }
+
   if (loading) return <p className="p-6 text-center">Loading your collection...</p>
   if (error) return <p className="p-6 text-center text-red-600">{error}</p>
   if (cards.length === 0) return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
@@ -373,8 +384,9 @@ function CollectionPageContent() {
                   : `You have no ${selectedCategory} cards in your collection.`}
               </p>
             ) : (
+              <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filteredCards.map((card) => {
+                {displayedCards.map((card) => {
               // Get card info (matches detail page line 1999)
               const cardInfo = getCardInfo(card);
 
@@ -501,6 +513,19 @@ function CollectionPageContent() {
               );
                 })}
               </div>
+
+              {/* Load More Button */}
+              {hasMore && (
+                <div className="mt-8 text-center">
+                  <button
+                    onClick={loadMore}
+                    className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors"
+                  >
+                    Load More Cards ({filteredCards.length - displayLimit} remaining)
+                  </button>
+                </div>
+              )}
+              </>
             )}
           </>
         )}
@@ -617,7 +642,7 @@ function CollectionPageContent() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredCards.map((card) => (
+                  {displayedCards.map((card) => (
                     <tr key={card.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
@@ -683,6 +708,18 @@ function CollectionPageContent() {
                 </tbody>
               </table>
             </div>
+
+            {/* Load More Button for List View */}
+            {hasMore && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={loadMore}
+                  className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors"
+                >
+                  Load More Cards ({filteredCards.length - displayLimit} remaining)
+                </button>
+              </div>
+            )}
           </div>
             )}
           </>
@@ -693,6 +730,33 @@ function CollectionPageContent() {
 }
 
 function CardThumbnail({ url }: { url: string | null }) {
+  const [imageError, setImageError] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+  const maxRetries = 2
+
+  // Reset error state when URL changes
+  useEffect(() => {
+    setImageError(false)
+    setRetryCount(0)
+    setIsLoading(true)
+  }, [url])
+
+  // Handle image load error with retry logic
+  const handleError = () => {
+    if (retryCount < maxRetries) {
+      // Retry loading the image after a delay
+      setTimeout(() => {
+        setRetryCount(prev => prev + 1)
+        setImageError(false)
+        setIsLoading(true)
+      }, 1000 * (retryCount + 1)) // Exponential backoff: 1s, 2s
+    } else {
+      setImageError(true)
+      setIsLoading(false)
+    }
+  }
+
   if (!url) {
     return (
       <div className="w-full h-full border grid place-items-center text-sm text-gray-500 bg-gray-100">
@@ -701,7 +765,41 @@ function CardThumbnail({ url }: { url: string | null }) {
     )
   }
 
-  return <img src={url} alt="Card" className="w-full h-full object-cover" />
+  if (imageError) {
+    return (
+      <div className="w-full h-full border grid place-items-center text-sm text-gray-500 bg-gray-100">
+        <div className="text-center p-4">
+          <div className="text-2xl mb-2">🖼️</div>
+          <div className="text-xs">Image unavailable</div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="w-full h-full relative bg-gray-100">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+          <div className="animate-pulse text-gray-400">
+            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+        </div>
+      )}
+      <Image
+        src={`${url}${retryCount > 0 ? `&retry=${retryCount}` : ''}`}
+        alt="Card"
+        fill
+        sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, (max-width: 1024px) 33vw, 25vw"
+        className="object-cover"
+        loading="lazy"
+        onLoadingComplete={() => setIsLoading(false)}
+        onError={handleError}
+        unoptimized={url.includes('supabase')} // Skip Next.js optimization for Supabase signed URLs
+      />
+    </div>
+  )
 }
 // Wrap in Suspense for Next.js 15 useSearchParams() requirement
 export default function CollectionPage() {
