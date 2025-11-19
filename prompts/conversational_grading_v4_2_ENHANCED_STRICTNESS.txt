@@ -375,34 +375,123 @@ Each subgrade category (centering, corners, edges, surface) requires MINIMUM 2 S
 A. CENTERING
 ────────────────────────────────────────
 
-🆕 ENHANCED CENTERING MEASUREMENT METHODOLOGY
+🆕 **ENHANCED CENTERING EVALUATION (STRICT MEASUREMENT REQUIRED)**
 
-**CENTERING METHODOLOGY:**
-1. Border present? → Measure border widths (most accurate)
-2. Design anchors visible? → Use logos/text/elements
-3. Full-bleed/asymmetric? → Use anchors with conservative scoring
+🚨 **CRITICAL RULE: NO PERFECT CENTERING WITHOUT PROOF**
+You may NOT assign 50/50 centering unless BOTH opposing borders are:
+✅ Visible and clearly defined
+✅ Measurable with numeric values
+✅ Unobstructed by glare or holder
+✅ Evenly lit (no shadows distorting perception)
+✅ Not distorted by foil reflections or patterns
 
-**Measurement:** Calculate ratio (narrower ÷ wider × 100), use worst axis
-**Validation:** Front/back measured separately, apply caps independently
+**If ANY of these conditions are NOT met → Perfect 50/50 is PROHIBITED**
 
-**METHOD 1: BORDER MEASUREMENT** (card has printed border)
-Measure border widths L/R and T/B, calculate ratios, use worst axis.
+**STEP 1: MANDATORY CARD TYPE CLASSIFICATION**
+Before measuring, classify card into ONE category:
 
-**METHOD 2: DESIGN ANCHOR** (no border, clear elements)
-Use logos/nameplates/patterns as reference, measure to edges.
+**TYPE A - Standard Bordered Card**
+• Clearly defined borders on all four edges
+• Straight rectangular shape
+• Borders are structural, not decorative
+• Method: Direct border measurement (most accurate)
 
-**METHOD 3: ASYMMETRIC DESIGN** (action shots, artistic)
-Find available anchors, assign conservative scores (cap 9.0), note "Asymmetric design limits precision".
+**TYPE B - Asymmetric Bordered Insert**
+• Borders differ left/right or top/bottom
+• Includes modern inserts (Dominators, My House, Fireworks, etc.)
+• Method: Design anchors required
+• **Maximum centering score: 9.0** (unless exceptional anchor evidence)
+
+**TYPE C - Borderless / Full-Art Card**
+• No visible border OR artwork extends to edges
+• Method: Internal layout anchors ONLY
+• **Maximum centering score: 9.0** (unless strong anchors prove near-perfect)
+
+**TYPE D - Foil-Frame / Pattern-Frame Card**
+• Holographic or geometric frame (decorative, not structural)
+• Borders may appear "busy" or distorted by design
+• Method: Identify STRUCTURAL frame (ignore foil patterns)
+• **Maximum centering score: 9.0** (if reflective distortion present)
+
+**TYPE E - Die-Cut / Non-Rectangular Card**
+• Shaped edges, removed corners, jagged/rounded cuts
+• Method: Internal geometric centering only
+• **Maximum centering score: 9.0** (traditional centering impossible)
+
+**STEP 2: NUMERIC MEASUREMENT (REQUIRED)**
+
+You MUST provide approximate numeric measurements:
+
+**For bordered cards (Type A):**
+• "Left border ≈ [X] pixels"
+• "Right border ≈ [Y] pixels"
+• "Top border ≈ [X] pixels"
+• "Bottom border ≈ [Y] pixels"
+
+**For borderless/anchor cards (Types B-E):**
+• "[Anchor element] is ≈ [X] pixels from left edge"
+• "[Anchor element] is ≈ [Y] pixels from right edge"
+• Must identify at least TWO anchor points per axis
+
+**STEP 3: CALCULATE RATIOS INDEPENDENTLY**
+
+Measure each axis separately (NO reuse or symmetry assumptions):
+
+**Left/Right Ratio:**
+• Narrower border ÷ Wider border × 100 = ratio
+• Example: 23px ÷ 30px × 100 = 76.67 → **77/23** ratio
+
+**Top/Bottom Ratio:**
+• Narrower border ÷ Wider border × 100 = ratio
+• Example: 19px ÷ 25px × 100 = 76.00 → **76/24** ratio
+
+**Use WORST axis** for centering score
+
+**STEP 4: SECOND-PASS VERIFICATION (MANDATORY)**
+
+After calculating ratio, ask yourself:
+❓ "Do my measured border values logically support this centering ratio?"
+
+If NO → Revise to more conservative ratio
+If uncertain → Default to LESS perfect ratio (55/45 or 60/40, NEVER 50/50)
+
+**STEP 5: APPLY CONSERVATIVE DEFAULTS**
+
+If certainty is LOW due to:
+• Glare or poor visibility
+• Unclear border edges
+• Foil distortion
+• Busy artwork
+• Image quality issues
+
+→ You MUST use less perfect ratio
+→ NEVER default upward toward perfection
+→ Example: If unsure between 50/50 and 55/45 → Use 55/45
+
+**CENTERING SCORE CAPS (Based on Worst Axis):**
+| Ratio | Maximum Score |
+|-------|---------------|
+| 50/50 to 52/48 | 10.0 |
+| 53/47 to 55/45 | 9.5 |
+| 56/44 to 58/42 | 9.0 |
+| 59/41 to 65/35 | 8.0 |
+| 66/34 to 70/30 | 7.0 |
+| 71/29 or worse | 6.0 or lower |
 
 🆕 CENTERING VALIDATION CHECKS:
 • PATCH 2: Cross-check front and back centering for plausibility (often track, but need not match)
 • PATCH 2: Apply centering cap to each side independently using that side's worst axis
 • PATCH 2: If front/back ratios differ by ≥8 percentage points on same axis, note "centering discrepancy" and expand uncertainty (narrative only)
 
-**OUTPUT:**
-• left_right: ratio | top_bottom: ratio | method: border-present/design-anchor/asymmetric
-• worst_axis: left_right/top_bottom | score: 0-10
-• analysis: MINIMUM 2 SENTENCES - (1) Measured ratios + worst axis (2) How measured (borders/features used, card characteristics)
+**REQUIRED OUTPUT FORMAT:**
+• card_type: "Standard Bordered" / "Asymmetric Insert" / "Borderless" / "Foil-Frame" / "Die-Cut"
+• measurement_method: "Border measurement" / "Design anchors" / "Internal geometry"
+• measurements: "Left ≈ [X]px, Right ≈ [Y]px, Top ≈ [X]px, Bottom ≈ [Y]px"
+• left_right: ratio (e.g., "55/45")
+• top_bottom: ratio (e.g., "52/48")
+• worst_axis: "left_right" / "top_bottom"
+• score: 0.0-10.0
+• analysis: MINIMUM 3 SENTENCES - (1) Card type classification (2) Numeric measurements + ratios (3) How measurements were determined and verification notes
 
 ────────────────────────────────────────
 B. CORNERS
@@ -853,16 +942,25 @@ Apply same requirements as Step 3:
 A. CENTERING (Back)
 ────────────────────────────────────────
 
-Apply same centering methodology as front (Method 1, 2, or 3 based on border/design).
-Use back-specific measurements; do not carry over front measurements.
+🚨 **Apply SAME strict centering methodology as front** (Steps 1-5 from Front Centering section)
+
+**CRITICAL REQUIREMENTS:**
+• Classify back card type (Type A-E)
+• Provide numeric measurements (pixels/percentages)
+• Calculate ratios independently (NO carrying over front measurements)
+• Second-pass verification required
+• Conservative defaults (if uncertain → LESS perfect ratio)
+• **NO 50/50 without proof** (visible, measurable, unobstructed borders)
 
 **OUTPUT:**
+• card_type: "Standard Bordered" / "Asymmetric Insert" / "Borderless" / "Foil-Frame" / "Die-Cut"
+• measurement_method: "Border measurement" / "Design anchors" / "Internal geometry"
+• measurements: "Left ≈ [X]px, Right ≈ [Y]px, Top ≈ [X]px, Bottom ≈ [Y]px"
 • left_right: ratio
 • top_bottom: ratio
-• method: which method used
 • worst_axis: "left_right" / "top_bottom"
 • score: 0.0-10.0 (independent from front, apply cap per table)
-• analysis: 2-3 sentences describing methodology, reference points, border distribution
+• analysis: MINIMUM 3 SENTENCES - (1) Card type classification (2) Numeric measurements + ratios (3) How measurements were determined and verification notes
 
 ────────────────────────────────────────
 B. CORNERS (Back)
