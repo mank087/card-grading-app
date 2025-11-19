@@ -760,73 +760,495 @@ B. CORNERS
 
 🔍 **v4.2 MANDATORY CORNER INSPECTION PROTOCOL**
 
-Examine EACH corner at maximum zoom for: white fiber, rounding, sharpness, wear.
+For EACH of the 4 corners, perform this examination sequence:
 
-**Scoring Guide:**
-- **Sharp (10.0)**: Zero fiber, perfect point
-- **Minimal Softening (9.5)**: Sub-mm wear at zoom
-- **Slight Rounding (9.0)**: Visible rounding, white showing
-- **Moderate (8.0-8.5)**: Obvious rounding without zoom
-- **Heavy (<8.0)**: Blunted, significant exposure
+**STEP 1: ZOOM TO MAXIMUM**
+• Examine corner tip at highest magnification available
+• Look for even sub-millimeter wear or fiber exposure
 
-**Context Factors:** Dark borders hide wear better | Light borders show every fiber | Holographic edges may peel/wear
+**STEP 2: WHITE FIBER CHECK**
+• 🚨 CRITICAL: Any white fiber visible = NOT sharp corner
+• Check contrast: white fibers show clearly on dark borders
+• Even tiny white specks at corner tip = "minimal softening" (not "sharp")
 
-**Deductions:** White fiber (−0.5 per corner) | Softening (−0.5) | Minor rounding (−1.5 to −2.0) | Major rounding (−2.5 to −3.0)
+**STEP 3: SHARPNESS ASSESSMENT**
+• **Sharp (10.0)**: Perfect point, ZERO fiber exposure, factory-cut apex intact
+• **Minimal Softening (9.5)**: Sub-millimeter wear visible under zoom, slight fiber exposure
+• **Slight Rounding (9.0)**: Visible rounding of corner tip, clear white showing
+• **Moderate Wear (8.0-8.5)**: Obvious rounding, whitening visible without zoom
+• **Heavy Wear (<8.0)**: Blunted corner, significant fiber exposure
 
-**REQUIREMENTS:** For each corner, observe actual colors/features (never assume), create unique descriptions, vary sentence structure, reference specific observable features.
+**STEP 4: CONTEXT ANALYSIS**
+• **Dark borders**: Hides fiber exposure better - look extra carefully
+• **Light borders**: Every fiber shows clearly - easier to assess
+• **Holographic corners**: Check if foil intact or peeling/wearing
+• **Chrome finish corners**: More prone to showing wear - be thorough
 
-**OUTPUT:** For each corner: document defects with size estimates (mm), type, context, and how card characteristics affected assessment.
+🚨 **PERFECT CORNER RULE**:
+For 10.0 corner score, ALL 4 corners must have:
+• ZERO visible fiber exposure (even at maximum zoom)
+• Perfect factory-cut points intact
+• NO softening, rounding, or wear of any kind
+• If you see ANY white at corner tip = NOT 10.0
 
-────────────────────────────────────────
+**RECOMMENDED DEDUCTIONS:**
+• One corner with minimal fiber: −0.5 from 10.0 = 9.5
+• Two corners with minimal fiber: −1.0 from 10.0 = 9.0
+• Any corner with visible rounding: −1.5 minimum = 8.5 maximum
+
+Inspect all 4 corners individually. Use nomenclature from viewer's perspective.
+
+🆕 QUANTITATIVE CORNER ASSESSMENT REQUIREMENTS:
+
+For EACH corner, provide:
+1. **Specific Observable Details**:
+   - Size of affected area (estimate in mm if visible wear)
+   - Type of defect (white fiber exposure, rounding, compression, etc.)
+   - Color contrast (how wear shows against card border/background)
+   - Sharpness of corner point (intact, slightly soft, rounded, blunt)
+
+2. **Context-Aware Analysis**:
+   - How does border color affect visibility? (White border shows wear more than dark border)
+   - How does card finish impact assessment? (Holographic corners may show different wear)
+   - Is wear typical for this card type/era/manufacturer?
+   - How does wear compare across all 4 corners? (Isolated vs uniform)
+
+3. **Grade Impact Explanation**:
+   - Why does this specific defect result in sub-score given?
+   - What would elevate this corner to next grade level?
+
+**CORNER WEAR CLASSIFICATION** (General Reference - Describe What YOU Actually Observe):
+• Sharp: Perfect point structure visible, no wear observed
+• Minimal softening: Sub-millimeter affected area, point structure still defined
+• Slight rounding: Small but visible rounding at tip, some sharpness lost
+• Moderate wear: Clear rounding visible, whitening may be present, point less defined
+• Heavy wear: Blunted or flat corner, significant whitening, structural rounding obvious
+
+⚠️ DO NOT use these exact phrases - describe the ACTUAL corner you observe with SPECIFIC measurements and details unique to THIS card.
+
+🚨 **v4.2 CRITICAL: ANTI-REPETITION ENFORCEMENT**
+
+**UNACCEPTABLE - Generic Repetitive Output:**
+❌ BAD: "The top left corner is sharp with no visible wear. The dark border helps assess integrity."
+❌ BAD: "The top right corner is sharp with no visible wear. The dark border helps assess integrity."
+❌ BAD: "The bottom left corner is sharp with no visible wear. The dark border helps assess integrity."
+❌ BAD: "The bottom right corner is sharp with no visible wear. The dark border helps assess integrity."
+
+**WHY THIS IS UNACCEPTABLE:**
+• Same sentence structure repeated 4 times (copy-paste analysis)
+• "Dark border" claim without verifying actual card colors
+• No observation of THIS specific corner's unique characteristics
+• No variation between corners (impossible - each corner is unique)
+
+**HOW TO ANALYZE EACH CORNER CORRECTLY:**
+
+**METHODOLOGY FOR CORNER ANALYSIS:**
+
+**1. OBSERVE CORNER LOCATION**
+• Which corner are you examining? (top left, top right, bottom left, bottom right)
+• What design elements are near this corner? (player image, background, border design, text)
+• What colors are visible at this corner? (observe actual colors, don't assume)
+
+**2. ASSESS CORNER GEOMETRY**
+• Is the point sharp, slightly rounded, or blunted?
+• Is there any white fiber visible at the tip?
+• How does the corner apex appear under zoom?
+• Are all edges of the corner tip intact?
+
+**3. IDENTIFY COLOR TRANSITIONS AT CORNER**
+• Where do different colors meet at this corner?
+• How do these color transitions help assess condition?
+• Does wear show more easily against certain colors?
+• Are there multiple colors intersecting at this point?
+
+**4. NOTE CORNER-SPECIFIC FEATURES**
+• What makes this corner's observation unique?
+• Is there a design element that aids or hinders assessment?
+• How does this corner differ from the other three?
+• What observable characteristic is specific to this position?
+
+**5. VARY YOUR DESCRIPTION APPROACH**
+• Use different opening words for each corner description
+• Employ varied verbs to describe condition
+• Reference different observable features per corner
+• Create unique sentence structures that cannot be copy-pasted
+
+**MANDATORY REQUIREMENTS FOR EACH CORNER:**
+1. **State actual colors observed** - Never use generic terms like "dark border" without verifying
+2. **Reference specific location features** - Describe what design elements are at THIS corner
+3. **Use unique sentence structure** - Each of 4 corners must have different description pattern
+4. **Note distinguishing characteristics** - What makes THIS corner's observation distinct?
+5. **Explain assessment method** - How did corner features help or hinder your evaluation?
+
+🚨 **REPETITION CHECK:**
+Before finalizing corner analysis, verify:
+□ Each corner description uses DIFFERENT wording
+□ Actual card colors mentioned (not assumed "dark border")
+□ Specific design elements near each corner referenced
+□ No copy-paste phrases between corners
+□ Each description is unique to that specific corner
+
+**OUTPUT FORMAT:**
+For each corner (top_left, top_right, bottom_left, bottom_right):
+• condition: MINIMUM 2 SENTENCES - (1) Describe what you observe at THIS SPECIFIC corner mentioning ACTUAL colors/design elements visible, (2) Explain how THIS corner's unique characteristics (not generic "border color" but ACTUAL colors like "red and white border") affect your assessment
+• defects: Array of strings describing specific issues observed on THIS corner, or empty array []
+
+• summary: MINIMUM 2 SENTENCES - (1) Synthesize the overall corner condition with specific observations, (2) Explain HOW you determined the grade (what features you analyzed, which corners were worst, what patterns you observed)
+• score: 0.0-10.0
+
+────────────────────────────────────────────
 C. EDGES
 ────────────────────────────────────────────
 
 🔍 **v4.2 MANDATORY EDGE INSPECTION PROTOCOL**
 
-**SCAN METHODOLOGY:** Examine all 4 edges at max zoom for white flecks/fiber, chipping, roughness.
+For EACH of the 4 edges, perform this examination sequence:
 
-**Scoring:**
-- **Perfect (10.0)**: Zero white, clean factory cut, smooth edge
-- **Excellent (9.5)**: Minor white fleck(s), otherwise clean
-- **Very Good (9.0)**: Light whitening, multiple small fiber areas
-- **Good (8.0-8.5)**: Moderate whitening, continuous exposure
-- **Fair (<8.0)**: Heavy whitening, chipping, rough/damaged
+**STEP 1: EDGE MAGNIFICATION SCAN**
+• Examine entire edge perimeter at maximum zoom
+• Scan slowly from corner to corner
+• Look for ANY white flecks (fiber exposure spots)
 
-**Deductions:** White flecks (−0.3 each) | Edge whitening (−0.7 per edge) | Chipping (−1.5 to −2.0)
+**STEP 2: WHITE FLECK DETECTION**
+• **White flecks**: Tiny white spots along edge (1-2mm in size)
+• These are fiber exposure from manufacturing or handling
+• 🚨 CRITICAL: ANY white fleck visible = defect (minimum −0.3 deduction)
+• Count total white flecks on edge (cumulative deductions)
 
-**Context:** Dark borders show white clearly | Light borders need careful examination | Modern cards (2000+) should have clean cuts | Vintage may have rougher factory cuts
+**STEP 3: EDGE INTEGRITY ASSESSMENT**
+• **Perfect (10.0)**: Clean factory cut, ZERO white showing, smooth edge along entire length
+• **Excellent (9.5)**: Minor white fleck(s) visible under zoom, otherwise clean
+• **Very Good (9.0)**: Light whitening visible, multiple small areas of fiber exposure
+• **Good (8.0-8.5)**: Moderate whitening, continuous fiber exposure along portions
+• **Fair (<8.0)**: Heavy whitening, chipping, rough/damaged edge
 
-**REQUIREMENTS:** For each edge, describe actual colors at edge (never generic "dark border"), reference edge-specific features, use unique descriptions, vary sentence structure.
+**STEP 4: FACTORY CUT VS DAMAGE**
+• **Factory rough cut**: Uneven cut from manufacturing (minor penalty −0.3 to −0.5)
+• **Handling wear**: White fiber from friction/handling (moderate penalty −0.5 to −1.0)
+• **Chipping**: Missing material from edge (heavy penalty −1.0 to −1.5)
 
-**OUTPUT:** For each edge: describe visible defects with location/measurements, specify which edges affected, how card finish/color affects visibility.
+**STEP 5: CONTEXT ANALYSIS**
+• **Dark borders**: White shows very clearly - easier to spot
+• **Light borders**: White shows less - look extra carefully
+• **Vintage cards**: May have rougher factory cuts (still document, but context matters)
+• **Modern cards (2000+)**: Should have very clean cuts - be strict
 
-────────────────────────────────────────
+🚨 **PERFECT EDGE RULE**:
+For 10.0 edge score, ALL 4 edges must have:
+• ZERO white flecks or fiber exposure (even at maximum zoom)
+• Clean, smooth factory cut along entire perimeter
+• NO roughness, chipping, or whitening of any kind
+• If you see ANY white along edge = NOT 10.0
+
+**RECOMMENDED DEDUCTIONS:**
+• 1-2 white flecks on one edge: −0.3 per fleck
+• Continuous whitening on one edge: −0.7
+• Multiple edges with whitening: −1.0 to −1.5
+• Chipping visible: −1.5 to −2.0
+
+Inspect all 4 edges (left, right, top, bottom).
+
+🚨 **SYSTEMATIC VALIDATION - NO 10.0 WITH ANY DEFECTS:**
+If you documented ANY edge defect (white fleck, whitening, chipping, rough cut, print line):
+→ Maximum score for this side = 9.5 (NOT 10.0)
+
+**Validation Check**:
+• Count total edge defects recorded
+• If defect count > 0 AND score = 10.0 → INVALID
+• Reduce score to 9.5 maximum
+• Only edges with ZERO documented defects can score 10.0
+
+🆕 QUANTITATIVE EDGE ASSESSMENT REQUIREMENTS:
+
+For EACH edge, provide:
+1. **Specific Observable Details**:
+   - Describe defect location (isolated spot, continuous run, multiple areas)
+   - Measure extent (length in mm or percentage of edge affected)
+   - Type of defect (white fiber showing, ink chipping, rough factory cut, print line, fuzzing)
+   - Depth/severity (surface level, extends into cardstock, visible from front)
+
+2. **Context-Aware Analysis**:
+   - How does border color contrast with defect? (White showing on dark border vs light)
+   - Is factory cut quality clean or rough for this manufacturer/era?
+   - Does card finish (glossy, matte, chrome) affect how edge wear presents?
+   - Are edge issues isolated to one area or distributed evenly?
+
+3. **Manufacturing vs Damage Distinction**:
+   - Is this factory defect (print line, uneven cut) or handling wear (whitening, chipping)?
+   - How does distinction affect grade impact?
+
+**EDGE DEFECT TYPES** (General Reference - Describe What YOU Actually Observe):
+• Whitening: White cardstock fiber visible where coating worn through
+• Chipping: Areas where ink/coating layer is missing or damaged
+• Print Line: Factory printing artifacts (not handling damage)
+• Rough Cut: Uneven factory cutting (not handling wear)
+
+⚠️ DO NOT use these exact phrases - describe the ACTUAL edge defect you observe with SPECIFIC location, measurements, and details unique to THIS card's edges.
+• Fuzzing: Loose fibers at edge
+
+🚨 **v4.2 CRITICAL: ANTI-REPETITION ENFORCEMENT FOR EDGES**
+
+**UNACCEPTABLE - Generic Repetitive Output:**
+❌ BAD: "The top edge is smooth with no visible white flecks. The dark border aids in detecting defects."
+❌ BAD: "The bottom edge is smooth with no visible white flecks. The dark border aids in detecting defects."
+❌ BAD: "The left edge is smooth with no visible white flecks. The dark border aids in detecting defects."
+❌ BAD: "The right edge is smooth with no visible white flecks. The dark border aids in detecting defects."
+
+**WHY THIS IS UNACCEPTABLE:**
+• Identical sentence structure repeated 4 times (copy-paste)
+• "Dark border" mentioned without observing actual card colors
+• No specific observations unique to each edge
+• No variation (each edge has different characteristics)
+
+**HOW TO ANALYZE EACH EDGE CORRECTLY:**
+
+**METHODOLOGY FOR EDGE ANALYSIS:**
+
+**1. IDENTIFY EDGE POSITION**
+• Which edge are you examining? (top, bottom, left, right)
+• What runs along this edge? (border, design element, color transition, background)
+• What colors are visible along this edge? (observe actual colors present)
+
+**2. SCAN ENTIRE EDGE PERIMETER**
+• Examine from corner to corner along full length
+• Look for white flecks, fiber exposure, or chipping
+• Note if defects are isolated or continuous
+• Check smoothness of factory cut along entire edge
+
+**3. OBSERVE COLOR CONTRAST AT EDGE**
+• What colors meet at this edge boundary?
+• How do color transitions help detect wear?
+• Does white fiber show more against certain colors?
+• Are there multiple color zones along this edge?
+
+**4. ASSESS FACTORY CUT QUALITY**
+• Is the cut clean and straight?
+• Are there any uneven sections?
+• Does cut quality vary along edge length?
+• Is roughness manufacturing or handling damage?
+
+**5. CREATE UNIQUE EDGE DESCRIPTION**
+• Use different opening words for each edge
+• Vary verbs and sentence structure
+• Reference specific features along THIS edge
+• Note what makes this edge observation distinct from others
+
+**MANDATORY REQUIREMENTS FOR EACH EDGE:**
+1. **State actual colors at edge** - Describe colors you see, never assume generic "dark border"
+2. **Reference edge-specific features** - What design elements run along THIS particular edge?
+3. **Use unique descriptions** - Each of 4 edges must have different sentence pattern
+4. **Note position characteristics** - How does this edge's location affect observation?
+5. **Explain detection method** - How did edge features help or limit your assessment?
+
+🚨 **REPETITION CHECK:**
+Before finalizing edge analysis, verify:
+□ Each edge description uses DIFFERENT wording
+□ Actual card colors at each edge mentioned
+□ Position-specific design elements referenced
+□ No copy-paste phrases between edges
+□ Each description unique to that specific edge
+
+**OUTPUT FORMAT:**
+For each edge (top, bottom, left, right):
+• condition: MINIMUM 2 SENTENCES - (1) Describe what you observe on THIS SPECIFIC edge mentioning ACTUAL colors/design elements visible along it, (2) Explain how THIS edge's characteristics (actual colors like "red and white", not generic "border color") affect visibility and assessment
+• defects: Array of strings describing specific issues observed on THIS edge, or empty array []
+
+• summary: MINIMUM 2 SENTENCES - (1) Synthesize the overall edge condition with specific observations from each edge, (2) Explain HOW you determined the grade (what you analyzed, which edges showed issues, factory cut quality for this card)
+• score: 0.0-10.0
+
+────────────────────────────────────────────
 D. SURFACE
 ────────────────────────────────────────────
 
 🔍 **v4.2 MANDATORY SURFACE DEFECT DETECTION PROTOCOL**
 
-**SCAN METHODOLOGY:** Examine entire card surface systematically for defects.
+Before assigning surface score, perform these checks systematically:
 
-**Defect Types:**
-- **Scratches:** Hairline (<0.2mm) vs Visible (≥0.2mm)
-- **Print defects:** Dots, lines, misalignment, registration issues
-- **Stains:** Foreign substance, discoloration
-- **Indentations:** Depressions without creases
-- **Holographic issues:** Foil scratches, pattern disruption
+**STEP 1: MICROSCOPIC DEFECT SCAN**
+Examine surface at maximum zoom for:
+• **White dots** - Small white specks (print defects or debris)
+• **Micro-scratches** - Hairline scratches (may only be visible at angles)
+• **Fiber exposure** - Any areas where cardstock fibers visible
+• **Debris** - Foreign material embedded in surface
+• **Roller lines** - Faint parallel lines from manufacturing
+• **Compression marks** - Subtle indentations from stacking
 
-**Scoring:**
-- **Perfect (10.0)**: Zero defects
-- **Excellent (9.5)**: 1-2 hairline scratches
-- **Very Good (9.0)**: 1 visible scratch OR 3+ hairlines
-- **Good (8.0-8.5)**: Multiple scratches or print defects
+**STEP 2: REFLECTION ANALYSIS**
+Examine card under different lighting angles:
+• **Direct light**: Look for scratches that catch light
+• **Angled light**: Reveals surface undulations and wear
+• **Dark field**: White/light defects more visible
+• **Bright field**: Dark defects and shadows more visible
 
-**Deductions:** Hairline (−0.5) | Visible scratch (−1.0 to −1.5) | Print defect (−0.5 to −1.0) | Stain (−1.0 to −2.0) | Indentation (−1.5 to −3.0)
+**STEP 3: FINISH-SPECIFIC EXAMINATION**
+• **Refractor/Prizm/Chrome**: Check for ANY disruption to holographic pattern
+• **Matte finish**: Look for glossy spots (handling wear)
+• **Glossy finish**: Look for dull spots or scuffing
+• **Standard finish**: Check print quality for voids, spots, misregistration
 
-**Finish-Specific:** Refractor/Prizm/Chrome (check pattern disruption) | Matte (glossy spots from wear) | Glossy (dull spots/scuffing)
+**STEP 4: CONTEXT-AWARE SEVERITY**
+• Dark/busy backgrounds: Defects may be less visible but still present - look carefully
+• Light/plain backgrounds: Every defect highly visible - document thoroughly
+• Holographic cards: Any pattern disruption is significant (−0.5 minimum per disruption)
 
-**OUTPUT:** List all defects with type, location, size/severity, and how they interact with card features (finish, artwork, etc.).
+🚨 CRITICAL:
+• ANY visible white dot = minimum −0.2 to −0.3 deduction
+• ANY visible scratch = minimum −0.3 to −0.5 deduction
+• ANY fiber exposure = minimum −0.3 deduction
+• Pattern disruption on refractor = minimum −0.5 deduction
 
+🚨 **PERFECT SURFACE RULE**:
+For 10.0 surface score, the surface must have:
+• ZERO scratches (even micro-scratches visible at zoom)
+• ZERO white dots, debris, or print defects
+• ZERO surface indentations, dents, or compression marks
+• ZERO pattern disruption (for holographic/refractor cards)
+• Pristine factory finish with NO visible wear
+• If you see ANY surface defect = NOT 10.0
+
+**RECOMMENDED DEDUCTIONS**:
+• Single micro-scratch: −0.3 to −0.5
+• Single white dot: −0.2 to −0.3
+• Print line: −0.3 to −0.5
+• Surface indentation: −0.3 to −0.7
+• Pattern disruption (holo): −0.5 minimum
+• Multiple defects: Apply defect aggregation rules
+
+🚨 **SYSTEMATIC VALIDATION - NO 10.0 WITH ANY DEFECTS:**
+If you documented ANY surface defect (scratch, white dot, print line, indentation, pattern disruption):
+→ Maximum score for this side = 9.5 (NOT 10.0)
+
+**Validation Check**:
+• Count total surface defects recorded
+• If defect count > 0 AND score = 10.0 → INVALID
+• Reduce score to 9.5 maximum
+• Only surface with ZERO documented defects can score 10.0
+
+🆕 QUANTITATIVE SURFACE ASSESSMENT REQUIREMENTS:
+
+Provide detailed, context-aware surface analysis:
+
+1. **Specific Observable Details**:
+   - Length and width of scratches (estimate in mm, describe extent)
+   - Location and distribution (specific areas like "upper left quadrant")
+   - Type and severity (fine hairline vs deep scratch, print line vs damage)
+   - Visual impact (how defect contrasts with surrounding area)
+   - Interaction with card finish (how does refractor/chrome/matte affect visibility?)
+
+2. **Context-Aware Analysis**:
+   - Identify card finish type (Refractor, Prizm, Mosaic, Chrome, Matte, Holographic, Standard)
+   - How does finish affect defect visibility? (Chrome shows every scratch; matte hides minor wear)
+   - Is this manufacturing defect or handling damage?
+   - How does artwork color/complexity affect defect visibility?
+   - Is wear pattern consistent with card age and handling?
+
+3. **Finish-Specific Analysis**:
+   - **Refractor/Prizm/Chrome**: Do scratches disrupt rainbow pattern? Where and how extensively?
+   - **Holographic**: Are foil areas intact or showing wear/peeling?
+   - **Matte finish**: Surface dulling/glossing from contact?
+   - **Standard finish**: Print quality assessment, ink consistency
+
+4. **Manufacturing vs Damage Distinction**:
+   - **Print Defects** (manufacturing): Print lines, registration issues, ink voids, spots - measure size and location on THIS card
+   - **Physical Damage** (handling): Scratches, abrasions, scuffs, dents, creases - describe what YOU observe on THIS card's surface
+   - **Condition Issues**: Staining, wax residue, fading - note location and extent specific to THIS card
+
+   ⚠️ DO NOT use generic examples - describe the ACTUAL surface condition you observe with SPECIFIC measurements unique to THIS card.
+
+5. **Grade Impact Explanation**:
+   - Why does this defect result in sub-score given?
+   - How does finish type amplify or minimize impact?
+   - What would improve surface to next grade level?
+
+🚨 **v4.2 CRITICAL: ANTI-REPETITION ENFORCEMENT FOR SURFACE**
+
+**UNACCEPTABLE - Generic Template Output:**
+❌ BAD: "No defects were observed on the front surface. The glossy finish aids in detecting any scratches or marks."
+❌ BAD: "The front surface is flawless with no visible defects. The card's finish is glossy, enhancing the visibility of any potential issues."
+
+**WHY THIS IS UNACCEPTABLE:**
+• Generic "glossy finish" without describing THIS card's actual finish characteristics
+• Template phrase "aids in detecting" without actual card-specific observations
+• No mention of actual colors, design elements, or finish variations on THIS card
+• Same phrases used for every flawless card (impossible - each card surface unique)
+
+**HOW TO ANALYZE SURFACE CORRECTLY:**
+
+**METHODOLOGY FOR SURFACE ANALYSIS:**
+
+**1. IDENTIFY ACTUAL FINISH TYPE**
+• What type of finish does THIS card have? (glossy, matte, chrome, refractor, holographic, standard)
+• How does the finish reflect light? (high shine, subtle sheen, no reflection)
+• Does finish vary across different areas of the card?
+• Are there texture differences you can observe?
+
+**2. OBSERVE CARD'S COLOR SCHEME**
+• What colors are present on THIS card? (list specific colors you see)
+• Are there distinct color zones? (background, border, design elements)
+• How do colors transition between areas?
+• Do certain colors make defects more or less visible?
+
+**3. EXAMINE ACROSS SURFACE AREAS**
+• Player image area - what do you observe?
+• Text/typography areas - condition of printed elements?
+• Background areas - any defects in solid color zones?
+• Border areas - finish quality along edges?
+• Design elements - condition of graphics, logos, patterns?
+
+**4. SCAN FOR DEFECTS SYSTEMATICALLY**
+• White dots or specks - present? where? how many?
+• Scratches - visible? location? length?
+• Print defects - roller lines? ink voids? misregistration?
+• Surface wear - dulling? scuffing? compression marks?
+• Foreign material - debris? staining?
+
+**5. RELATE FINISH TO DETECTION ABILITY**
+• How does THIS card's finish affect defect visibility?
+• What defects would be easier vs harder to see on this finish?
+• How did you examine the surface to detect issues?
+• What areas required closer inspection and why?
+
+**6. CREATE UNIQUE SURFACE DESCRIPTION**
+• Reference actual colors present on card
+• Describe specific design areas examined
+• Note finish characteristics observed
+• Explain how finish affected your assessment
+• Make front and back descriptions distinct (cannot be identical)
+
+**MANDATORY REQUIREMENTS FOR SURFACE:**
+1. **Describe actual finish characteristics** - Not just "glossy" but how it appears on THIS specific card
+2. **State card's actual colors** - List specific colors you observe in different areas
+3. **Reference specific surface zones** - Describe condition across different design elements
+4. **Explain finish impact on assessment** - How did finish type affect defect detection?
+5. **Vary front vs back descriptions** - Each side has unique features, describe distinctly
+
+🚨 **SURFACE ANALYSIS CHECKLIST:**
+Before finalizing surface analysis, verify:
+□ Actual finish type described (not just "glossy" but characteristics on THIS card)
+□ Card's actual colors mentioned in analysis
+□ Specific design elements referenced (player image, text, background areas)
+□ Different observations for front vs back (cannot be identical)
+□ No template phrases copied between front and back
+
+**OUTPUT FORMAT:**
+• defects: Array of objects, each with:
+  - type: "scratch" / "crease" / "print_line" / "dent" / "stain" / etc.
+  - severity: "microscopic" / "minor" / "moderate" / "heavy"
+  - location: SPECIFIC area on THIS card (not generic "center area")
+  - size: Approximate measurement unique to THIS defect
+  - description: DETAILED observation - describe what you see on THIS card's surface and how THIS card's finish type affects the defect's visibility
+
+• score: 0.0-10.0 (start at 10.0, apply deductions per framework)
+• summary: MINIMUM 2 SENTENCES - (1) State the overall surface condition with specific defect counts and types, (2) Note THIS card's specific finish type and how it affected your assessment
+• analysis: MINIMUM 2 SENTENCES - (1) Describe the specific defects you observed with measurements and locations, (2) Explain HOW you determined the grade (what features of THIS card's surface you analyzed, how the finish type impacted visibility, whether defects are manufacturing or handling)
+
+🔍 CRITICAL REMINDERS:
+• Refractor/holographic patterns are INTENTIONAL - only mark scratches that disrupt these patterns
+• Provide measurements and locations, not just labels
+• Explain HOW you observe defect, not just that it exists
+• Consider card finish when assessing severity
+
+═══════════════════════════════════════════════════════════════════════════════
 [STEP 4] BACK EVALUATION
 ═══════════════════════════════════════════════════════════════════════════════
 
