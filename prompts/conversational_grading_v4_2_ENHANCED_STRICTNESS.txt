@@ -301,9 +301,9 @@ Protective holders (penny sleeves, top loaders, one-touch, semi-rigid, slabs) ac
 
 **SURFACE:** White dots (−0.2 to −0.3) | Roller lines (−0.3 to −0.5) | Micro-scratches (−0.3 to −0.5) | Print voids (−0.3 to −0.7) | Holographic disruption (−0.5 to −1.0)
 
-**CORNERS:** White fiber (−0.5 per corner) | Softening (−0.5) | Minor rounding (−1.5 to −2.0) | Major rounding (−2.5 to −3.0) | Bent/folded (−3.0 to −4.0, CAP 4.0)
+**CORNERS:** White fiber (−0.5 per corner) | Softening (−0.5) | Minor rounding (−1.5 to −2.0) | Major rounding (−2.5 to −3.0) | **Corner lift/tilt (−3.0 to −4.0, CAP 4.0)** | Bent/folded (−3.0 to −4.0, CAP 4.0)
 
-**EDGES:** White flecks (−0.3 each) | Whitening (−0.7 per edge) | Roughness (−0.3 to −0.5) | Chipping (−1.0 to −1.5)
+**EDGES:** White flecks (−0.3 each) | Whitening (−0.7 per edge) | **Edge roughness (−0.3 to −2.0 depending on severity)** | Chipping (−1.0 to −1.5)
 
 **STRUCTURAL (GRADE-LIMITING):**
 🚨 ANY structural damage = SEVERE caps + heavy deductions
@@ -312,7 +312,8 @@ Protective holders (penny sleeves, top loaders, one-touch, semi-rigid, slabs) ac
 • Deep crease (breaks surface): −6.0 to −8.0, CAP 2.0
 • Multiple creases: −6.0+, CAP 2.0
 • Deep indentation: −4.0 to −6.0, CAP 4.0
-• Bent corner: −3.0 to −4.0, CAP 4.0
+• **Corner lift/tilt (corner raised from surface): −3.0 to −4.0, CAP 4.0**
+• Bent/folded corner: −3.0 to −4.0, CAP 4.0
 • Tears/rips: −4.0 to −6.0, CAP 3.0
 
 🚨 **Structural damage ≠ surface wear** - Cannot be Near Mint (8.0+) with ANY structural damage
@@ -322,11 +323,13 @@ Protective holders (penny sleeves, top loaders, one-touch, semi-rigid, slabs) ac
 
 🆕 **v4.3 DETECTION PRIORITY** (Most Missed):
 1. STRUCTURAL DAMAGE - Scan for creases/bends/tears FIRST
-2. Corner white fiber - Check ALL corners at max zoom
-3. Edge white flecks - Scan entire perimeter
-4. Surface white dots - Check entire surface
-5. Micro-scratches - Examine at angles
-6. Holographic disruption - Check refractor/prizm patterns
+2. **CORNER LIFTS/TILTS** - Check if corners lie flat or curl upward (view at angle)
+3. Corner white fiber - Check ALL corners at max zoom
+4. **EDGE ROUGHNESS** - Check edge texture for smoothness/fraying
+5. Edge white flecks - Scan entire perimeter
+6. Surface white dots - Check entire surface
+7. Micro-scratches - Examine at angles
+8. Holographic disruption - Check refractor/prizm patterns
 
 ══════════════════════════════════════════════════════════════════════
 [STEP 3] FRONT EVALUATION
@@ -407,25 +410,52 @@ B. CORNERS
 
 🔍 **v4.2 MANDATORY CORNER INSPECTION PROTOCOL**
 
-Examine EACH corner at maximum zoom for: white fiber, rounding, sharpness, wear.
+🚨 **TWO-PHASE CORNER INSPECTION (Complete BOTH phases for each corner):**
+
+**PHASE 1: STRUCTURAL INTEGRITY CHECK (Check FIRST - Grade-Limiting)**
+Examine corner from side/angle view for structural damage:
+
+🔴 **CORNER LIFT/TILT DETECTION** (Most Commonly Missed):
+• Look at corner from side angle - does it lift UP from card surface?
+• Check if corner curls upward or tilts away from flat plane
+• Bent corners cast shadows underneath when viewed at angle
+• Corner should lie completely flat - any separation = structural damage
+• **Detection Method**: Tilt card toward light source - lifted corners show gap/shadow beneath
+• **Visual Cues**: Corner appears raised, light passes under corner, visible separation from surface
+
+🔴 **CORNER BEND/FOLD DETECTION**:
+• Does corner show crease line where it was folded or bent?
+• Is corner point displaced from original position?
+• Does corner have memory of being bent (doesn't lie flat even when pressed)?
+• **Detection Method**: Look for crease lines radiating from corner, color breaks at fold point
+• **Visual Cues**: White stress lines, fold marks, creased appearance, corner sits at wrong angle
+
+**🚨 CRITICAL - STRUCTURAL CORNER DAMAGE GRADING:**
+• **ANY corner lift/tilt** = −3.0 to −4.0, GRADE CAP 4.0 (cannot score above 4.0)
+• **Corner with fold/crease** = −3.0 to −4.0, GRADE CAP 4.0
+• **Multiple lifted corners** = −5.0+, GRADE CAP 3.0
+• Corner lift/tilt is STRUCTURAL DAMAGE, not wear - card cannot be NM/Mint with this defect
+
+**PHASE 2: WEAR/FIBER INSPECTION** (Only after confirming no structural damage)
+Examine corner tip at maximum zoom for wear characteristics:
 
 **Scoring Guide:**
-• **Sharp (10.0)**: ZERO fiber exposure, perfect apex
-• **Minimal Softening (9.5)**: Sub-mm wear, slight fiber
-• **Slight Rounding (9.0)**: Visible rounding, clear white
-• **Moderate (8.0-8.5)**: Obvious rounding, whitening
+• **Sharp (10.0)**: ZERO fiber exposure, perfect apex, lies completely flat
+• **Minimal Softening (9.5)**: Sub-mm wear, slight fiber, flat to surface
+• **Slight Rounding (9.0)**: Visible rounding, clear white, flat to surface
+• **Moderate (8.0-8.5)**: Obvious rounding, whitening, flat to surface
 • **Heavy (<8.0)**: Blunted, significant fiber
 
-🚨 **10.0 Rule**: ALL 4 corners must have ZERO fiber (even at max zoom)
+🚨 **10.0 Rule**: ALL 4 corners must have ZERO fiber (even at max zoom) AND lie completely flat
 **Deductions**: 1 corner minimal fiber = −0.5 | 2 corners = −1.0 | Any rounding = −1.5 min
 
 **Context Factors**: Dark borders hide fiber (inspect carefully) | Light borders show all | Holographic corners check foil integrity
 
 **CORNER WEAR CLASSIFICATION** (General Reference - Describe What YOU Actually Observe):
-• Sharp: Perfect point structure visible, no wear observed
-• Minimal softening: Sub-millimeter affected area, point structure still defined
-• Slight rounding: Small but visible rounding at tip, some sharpness lost
-• Moderate wear: Clear rounding visible, whitening may be present, point less defined
+• Sharp: Perfect point structure visible, no wear observed, lies flat
+• Minimal softening: Sub-millimeter affected area, point structure still defined, lies flat
+• Slight rounding: Small but visible rounding at tip, some sharpness lost, lies flat
+• Moderate wear: Clear rounding visible, whitening may be present, point less defined, lies flat
 • Heavy wear: Blunted or flat corner, significant whitening, structural rounding obvious
 
 ⚠️ DO NOT use these exact phrases - describe the ACTUAL corner you observe with SPECIFIC measurements and details unique to THIS card.
@@ -457,17 +487,40 @@ C. EDGES
 
 🔍 **v4.2 MANDATORY EDGE INSPECTION PROTOCOL**
 
-Scan ALL 4 edges at max zoom for white flecks, fiber exposure, chipping.
+Scan ALL 4 edges at max zoom for: white flecks, fiber exposure, chipping, AND roughness.
+
+**🚨 TWO-PHASE EDGE INSPECTION (Complete BOTH phases for each edge):**
+
+**PHASE 1: EDGE ROUGHNESS/TEXTURE CHECK**
+Examine edge surface texture for smoothness:
+
+🔴 **EDGE ROUGHNESS DETECTION** (Commonly Missed):
+• Is edge surface smooth and even, or does it appear jagged/irregular?
+• Look for uneven factory cut - edge should be straight and clean
+• Check for fraying, fuzzing, or fiber separation along edge line
+• Rough edges appear bumpy, serrated, or have visible texture irregularities
+• **Detection Method**: Examine edge line continuity - should be single clean line, not broken/interrupted
+• **Visual Cues**: Edge looks fuzzy, jagged line instead of clean cut, visible fiber separation
+
+**Edge Roughness Grading:**
+• **Smooth factory cut** = No deduction (expected for well-cut card)
+• **Minor roughness** (isolated small area) = −0.3 to −0.5
+• **Moderate roughness** (visible along section of edge) = −0.7 to −1.0
+• **Heavy roughness** (entire edge or multiple edges rough) = −1.5 to −2.0
+• Note: Roughness is different from whitening - can have rough edge without white showing
+
+**PHASE 2: WHITENING/DAMAGE CHECK**
+Examine edge for white fiber exposure and damage:
 
 **Scoring Guide:**
-• **Perfect (10.0)**: ZERO white showing, smooth edge
-• **Excellent (9.5)**: Minor white fleck(s) under zoom
-• **Very Good (9.0)**: Light whitening, multiple spots
-• **Good (8.0-8.5)**: Moderate whitening, continuous fiber
-• **Fair (<8.0)**: Heavy whitening, chipping, damage
+• **Perfect (10.0)**: ZERO white showing, smooth edge, no roughness
+• **Excellent (9.5)**: Minor white fleck(s) under zoom, edge smooth
+• **Very Good (9.0)**: Light whitening, multiple spots, minimal roughness
+• **Good (8.0-8.5)**: Moderate whitening, continuous fiber, or moderate roughness
+• **Fair (<8.0)**: Heavy whitening, chipping, damage, or heavy roughness
 
-🚨 **10.0 Rule**: ALL 4 edges must have ZERO white flecks (even at max zoom)
-**Deductions**: 1-2 flecks = −0.3 each | Continuous whitening = −0.7 | Chipping = −1.5
+🚨 **10.0 Rule**: ALL 4 edges must have ZERO white flecks AND be smooth (even at max zoom)
+**Deductions**: 1-2 flecks = −0.3 each | Continuous whitening = −0.7 | Chipping = −1.5 | Roughness = −0.3 to −2.0
 
 **Context**: Dark borders show white clearly | Light borders need careful inspection | Modern cards (2000+) should have clean cuts
 
