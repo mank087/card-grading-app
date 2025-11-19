@@ -1,14 +1,23 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface CardAnalysisAnimationProps {
   frontImageUrl: string
   cardName?: string
+  allowNavigation?: boolean
+  onGradeAnother?: () => void
 }
 
-export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName }: CardAnalysisAnimationProps) {
+export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, allowNavigation = true, onGradeAnother }: CardAnalysisAnimationProps) {
   const [currentStep, setCurrentStep] = useState(0)
+  const router = useRouter()
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
 
   // Progress through steps over time
   useEffect(() => {
@@ -23,6 +32,43 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName }
   return (
     <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-red-900 via-yellow-900 to-blue-900">
       <div className="text-center max-w-md mx-auto p-6">
+        {/* Navigation Message and Buttons - TOP */}
+        {allowNavigation && (
+          <div className="mb-6">
+            <p className="text-sm text-gray-300 mb-4">
+              Card grading in process, this may take 1-2 minutes. You may grade another card or view your collection while the card processes.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => {
+                  console.log('[PokemonCardAnalysisAnimation] Grade Another clicked')
+                  if (onGradeAnother) {
+                    onGradeAnother()
+                  } else {
+                    router.push('/upload')
+                  }
+                }}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+              >
+                <span className="text-lg">📸</span>
+                <span>Grade Another</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  console.log('[PokemonCardAnalysisAnimation] My Collection clicked')
+                  router.push('/collection')
+                }}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+              >
+                <span className="text-lg">📚</span>
+                <span>My Collection</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Animated Card Container */}
         <div className="relative w-72 h-96 mx-auto mb-8 overflow-hidden rounded-lg shadow-2xl">
           {/* Card Border with Glow */}
@@ -112,14 +158,14 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName }
 
           <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 mb-4">
             <p className="text-sm text-red-300">
-              🤖 <strong>AI Vision Analysis</strong>
+              <strong>DCM Optic™ Analysis</strong>
               <br />
               Advanced algorithms examining every detail of your Pokemon card
             </p>
           </div>
 
           <p className="text-xs text-gray-400">
-            Professional grading in progress • Usually takes 1-2 minutes
+            Professional grading in progress
           </p>
         </div>
       </div>

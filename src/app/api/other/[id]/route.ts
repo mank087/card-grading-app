@@ -136,9 +136,12 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     console.log(`[GET /api/other/${cardId}] Signed URLs created successfully`);
 
     // Check if Other card already has complete grading data
-    // Accept both numeric grades and N/A grades (conversational_decimal_grade will be null for N/A)
-    const hasCompleteGrading = card.ai_grading && card.conversational_grading &&
-      (card.conversational_decimal_grade !== undefined || card.conversational_whole_grade !== undefined);
+    // Card is complete if:
+    // 1. Has ai_grading AND numeric grades (decimal AND whole), OR
+    // 2. Has ai_grading AND N/A grade (null) with a complete conversational grading report (for altered cards)
+    const hasCompleteGrading =
+      (card.ai_grading && card.conversational_decimal_grade && card.conversational_whole_grade) ||
+      (card.ai_grading && card.conversational_grading && card.conversational_grading.length > 0);
 
     // Skip cache if force_regrade is requested
     if (hasCompleteGrading && !forceRegrade) {

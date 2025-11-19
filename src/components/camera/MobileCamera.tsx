@@ -111,7 +111,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const handleConfirm = () => {
     if (capturedFile) {
       onCapture(capturedFile);
-      stopCamera();
+      // Don't stop camera here - let parent component control it
+      // Camera will be stopped by cleanup when component unmounts
     }
   };
 
@@ -119,6 +120,12 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     setCapturedImageUrl(null);
     setCapturedFile(null);
     setQualityValidation(null);
+    // Restart camera to ensure fresh stream
+    console.log('[MobileCamera] Restarting camera after retake');
+    stopCamera();
+    setTimeout(() => {
+      startCamera(facingMode);
+    }, 200);
   };
 
   const handleSwitchCamera = () => {

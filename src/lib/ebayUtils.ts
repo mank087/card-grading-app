@@ -261,14 +261,16 @@ export function generateEbaySearchUrl(cardData: CardData): string {
   // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
   const callouts: string[] = [];
 
-  // Rookie card callout (high value indicator)
-  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
+  // Rookie card callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) &&
+      cardData.rookie_or_first_print !== "No" && cardData.rookie_or_first_print !== false && cardData.rookie_or_first_print !== "false" && cardData.rookie_or_first_print !== "N/A") {
     callouts.push("rookie");
     callouts.push("RC");
   }
 
-  // Autograph callout (high value indicator)
-  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
+  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
+      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
     callouts.push("auto");
     callouts.push("autograph");
   }
@@ -354,14 +356,16 @@ export function generateEbaySoldListingsUrl(cardData: CardData): string {
   // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
   const callouts: string[] = [];
 
-  // Rookie card callout (high value indicator)
-  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
+  // Rookie card callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) &&
+      cardData.rookie_or_first_print !== "No" && cardData.rookie_or_first_print !== false && cardData.rookie_or_first_print !== "false" && cardData.rookie_or_first_print !== "N/A") {
     callouts.push("rookie");
     callouts.push("RC");
   }
 
-  // Autograph callout (high value indicator)
-  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
+  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
+      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
     callouts.push("auto");
     callouts.push("autograph");
   }
@@ -434,14 +438,16 @@ export function generateEbayGradedSearchUrl(cardData: CardData): string {
   // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
   const callouts: string[] = [];
 
-  // Rookie card callout (high value indicator)
-  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
+  // Rookie card callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) &&
+      cardData.rookie_or_first_print !== "No" && cardData.rookie_or_first_print !== false && cardData.rookie_or_first_print !== "false" && cardData.rookie_or_first_print !== "N/A") {
     callouts.push("rookie");
     callouts.push("RC");
   }
 
-  // Autograph callout (high value indicator)
-  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
+  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
+      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
     callouts.push("auto");
     callouts.push("autograph");
   }
@@ -626,12 +632,36 @@ export function generateOtherEbaySearchUrl(cardData: CardData): string {
     searchTerms.push(cardData.card_number);
   }
 
+  // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
+  const callouts: string[] = [];
+
+  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
+      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
+    callouts.push("auto");
+    callouts.push("autograph");
+  }
+
+  // Serial numbered callout (rarity indicator)
+  if (cardData.serial_numbering &&
+      cardData.serial_numbering !== "N/A" &&
+      !cardData.serial_numbering.toLowerCase().includes('not present') &&
+      !cardData.serial_numbering.toLowerCase().includes('none')) {
+    callouts.push("numbered");
+    const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
+    if (numberMatch) {
+      callouts.push(`/${numberMatch[1]}`);
+    }
+  }
+
   // 6. Grade-based condition indicator
   if (cardData.dcm_grade_whole && cardData.dcm_grade_whole >= 9) {
     searchTerms.push('NM'); // Near Mint condition
   }
 
-  const searchQuery = searchTerms.join(' ');
+  // Combine all terms: callouts first for prominence, then card details
+  const allTerms = [...callouts, ...searchTerms];
+  const searchQuery = allTerms.join(' ');
 
   const baseUrl = 'https://www.ebay.com/sch/i.html';
   const params = new URLSearchParams({
@@ -676,7 +706,31 @@ export function generateOtherEbaySoldListingsUrl(cardData: CardData): string {
     searchTerms.push(cardData.card_number);
   }
 
-  const searchQuery = searchTerms.join(' ');
+  // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
+  const callouts: string[] = [];
+
+  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
+  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
+      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
+    callouts.push("auto");
+    callouts.push("autograph");
+  }
+
+  // Serial numbered callout (rarity indicator)
+  if (cardData.serial_numbering &&
+      cardData.serial_numbering !== "N/A" &&
+      !cardData.serial_numbering.toLowerCase().includes('not present') &&
+      !cardData.serial_numbering.toLowerCase().includes('none')) {
+    callouts.push("numbered");
+    const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
+    if (numberMatch) {
+      callouts.push(`/${numberMatch[1]}`);
+    }
+  }
+
+  // Combine all terms: callouts first for prominence, then card details
+  const allTerms = [...callouts, ...searchTerms];
+  const searchQuery = allTerms.join(' ');
 
   const baseUrl = 'https://www.ebay.com/sch/i.html';
   const params = new URLSearchParams({
@@ -691,3 +745,4 @@ export function generateOtherEbaySoldListingsUrl(cardData: CardData): string {
 
   return `${baseUrl}?${params.toString()}`;
 }
+

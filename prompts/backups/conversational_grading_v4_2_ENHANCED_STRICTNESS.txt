@@ -1493,7 +1493,7 @@ Return valid JSON object with this EXACT structure:
     "subset": "Prizm Silver" or null,  // 🚨 IMPORTANT: If card_name differs from player_or_character, use card_name as subset (e.g., "Round Numbers"). Also check small print on card borders for additional parallel text (e.g., "Silver Prizm"). If both found, combine them (e.g., "Round Numbers Silver Prizm"). null only if no subset/insert/parallel indicators present.
     "card_back_text": "Descriptive text from back of card (2-4 sentences max)" or null,  // Extract main biographical/contextual text from card back
     "autographed": false,
-    "memorabilia": false,
+    "memorabilia": null,
     "pokemon_type": null,
     "pokemon_stage": null,
     "hp": null,

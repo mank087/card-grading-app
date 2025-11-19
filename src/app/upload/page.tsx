@@ -9,6 +9,7 @@ import CardAnalysisAnimation from './sports/CardAnalysisAnimation'
 import { useDeviceDetection } from '@/hooks/useDeviceDetection'
 import UploadMethodSelector from '@/components/camera/UploadMethodSelector'
 import MobileCamera from '@/components/camera/MobileCamera'
+import { useGradingQueue } from '@/contexts/GradingQueueContext'
 
 interface CompressionInfo {
   originalSize: number;
@@ -111,6 +112,22 @@ type CardType = keyof typeof CARD_TYPES;
 function UniversalUploadPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { addToQueue } = useGradingQueue();
+
+  // 🔒 Authentication state
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  // 🔒 Authentication check - redirect to login if not authenticated
+  useEffect(() => {
+    const session = getStoredSession();
+    if (!session || !session.user) {
+      console.log('[Upload] User not authenticated, redirecting to login');
+      router.push('/login');
+      setIsAuthenticated(false);
+    } else {
+      setIsAuthenticated(true);
+    }
+  }, [router]);
 
   // Get category from URL query param and default to Sports
   const categoryParam = searchParams?.get('category') || 'Sports';
@@ -131,8 +148,9 @@ function UniversalUploadPageContent() {
   const [isUploading, setIsUploading] = useState(false)
 
   // Camera/upload mode state
-  const [uploadMode, setUploadMode] = useState<'select' | 'camera' | 'gallery'>('select')
+  const [uploadMode, setUploadMode] = useState<'select' | 'camera' | 'gallery' | 'review'>('select')
   const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front')
+  const [originalUploadMethod, setOriginalUploadMethod] = useState<'camera' | 'gallery'>('camera')
   const { showCameraOption } = useDeviceDetection()
 
   // Update selected type when URL param changes
@@ -142,6 +160,13 @@ function UniversalUploadPageContent() {
       setSelectedType(categoryParam as CardType);
     }
   }, [searchParams]);
+
+  // Scroll to top when returning to main upload screen
+  useEffect(() => {
+    if (uploadMode === 'select') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [uploadMode]);
 
   const config = CARD_TYPES[selectedType];
 
@@ -228,7 +253,7 @@ function UniversalUploadPageContent() {
   }
 
   const handleUpload = async () => {
-    if (!frontCompressed || !backCompressed) {
+    if (!frontCompressed || !backCompressed || !frontFile) {
       setStatus('❌ Please select both front and back images and wait for compression')
       return
     }
@@ -238,6 +263,7 @@ function UniversalUploadPageContent() {
 
     if (!session || !session.user) {
       setStatus('❌ You must be logged in to upload')
+      alert('You must be logged in to upload cards. Please log in and try again.')
       return
     }
 
@@ -250,6 +276,21 @@ function UniversalUploadPageContent() {
       // Create unique ID for this card
       const cardId = crypto.randomUUID()
 
+      // Create object URL for the front image to use in queue
+      const frontImageUrl = URL.createObjectURL(frontFile)
+
+      // Add card to grading queue immediately with 'uploading' status
+      const queueId = addToQueue({
+        cardId,
+        category: config.category,
+        categoryLabel: config.label,
+        frontImageUrl,
+        status: 'uploading',
+        resultUrl: `${config.route}/${cardId}`
+      })
+
+      console.log('[Upload] Added to queue:', queueId, cardId)
+
       // Build full storage paths
       const frontPath = `${user.id}/${cardId}/front.jpg`
       const backPath = `${user.id}/${cardId}/back.jpg`
@@ -257,20 +298,29 @@ function UniversalUploadPageContent() {
       // Use authenticated client for uploads (includes user's access token)
       const authClient = getAuthenticatedClient()
 
+      console.log('[Upload] Uploading front image...')
       // Upload compressed front image
       const { error: frontError } = await authClient.storage
         .from('cards')
         .upload(frontPath, frontCompressed)
 
-      if (frontError) throw frontError
+      if (frontError) {
+        console.error('[Upload] Front upload error:', frontError)
+        throw frontError
+      }
 
+      console.log('[Upload] Uploading back image...')
       // Upload compressed back image
       const { error: backError } = await authClient.storage
         .from('cards')
         .upload(backPath, backCompressed)
 
-      if (backError) throw backError
+      if (backError) {
+        console.error('[Upload] Back upload error:', backError)
+        throw backError
+      }
 
+      console.log('[Upload] Saving to database...')
       // Save record in DB with selected category (use authenticated client)
       const { error: dbError } = await authClient.from('cards').insert({
         id: cardId,
@@ -282,54 +332,28 @@ function UniversalUploadPageContent() {
         is_public: true,
       })
 
-      if (dbError) throw dbError
-
-      setStatus(`✅ ${config.label} uploaded successfully!`)
-
-      // Wait for the card to be fully processed before redirecting
-      const waitForProcessing = async () => {
-        let attempts = 0
-        const maxAttempts = 60 // 2 minutes max wait
-
-        while (attempts < maxAttempts) {
-          try {
-            const checkRes = await fetch(`${config.apiEndpoint}/${cardId}`)
-
-            if (checkRes.ok) {
-              const data = await checkRes.json()
-              // If card has ai_grading, it's fully processed
-              // Accept both numeric grades and N/A grades
-              if (data.ai_grading && (data.raw_decimal_grade !== undefined || data.dcm_grade_whole !== undefined || data.grading_status)) {
-                router.push(`${config.route}/${cardId}`)
-                return
-              }
-            }
-
-            // Wait 2 seconds before checking again
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            attempts++
-          } catch (error) {
-            console.error('Error checking card status:', error)
-            attempts++
-            await new Promise(resolve => setTimeout(resolve, 2000))
-          }
-        }
-
-        // If we get here, something went wrong - redirect anyway
-        router.push(`${config.route}/${cardId}`)
+      if (dbError) {
+        console.error('[Upload] Database error:', dbError)
+        throw dbError
       }
 
-      // Start checking for completion
-      waitForProcessing()
+      console.log('[Upload] Upload complete! Card is now processing.')
+      setStatus(`✅ ${config.label} uploaded successfully! Processing in background...`)
+
+      // Card is now processing - background polling will handle status updates
+      // The loading animation will show with navigation buttons allowing user to leave
+      // isUploading stays true to show CardAnalysisAnimation
     } catch (err: any) {
-      console.error(err)
+      console.error('[Upload] Upload failed:', err)
       setStatus(`❌ Upload failed: ${err.message}`)
+      alert(`Upload failed: ${err.message}`)
       setIsUploading(false)
     }
   }
 
   // Handle camera/gallery selection
   const handleCameraSelect = () => {
+    setOriginalUploadMethod('camera')
     setUploadMode('camera')
     // Determine which side to capture next
     if (!frontFile) {
@@ -340,85 +364,428 @@ function UniversalUploadPageContent() {
   }
 
   const handleGallerySelect = () => {
+    setOriginalUploadMethod('gallery')
+    // Show gallery selection screen instead of immediately opening file picker
     setUploadMode('gallery')
-    // Determine which side to upload next
-    if (!frontFile) {
-      setCurrentSide('front')
-      // Trigger file input
-      setTimeout(() => document.getElementById('front-input')?.click(), 100)
-    } else if (!backFile) {
-      setCurrentSide('back')
-      // Trigger file input
-      setTimeout(() => document.getElementById('back-input')?.click(), 100)
+  }
+
+  const handleGalleryFileSelect = (side: 'front' | 'back') => {
+    // Trigger the appropriate file input
+    console.log(`[Gallery] Attempting to select ${side} image`)
+    setCurrentSide(side)
+    const inputId = side === 'front' ? 'front-input' : 'back-input'
+    const input = document.getElementById(inputId) as HTMLInputElement
+    console.log(`[Gallery] Found input element:`, input)
+    if (input) {
+      input.click()
+      console.log(`[Gallery] Clicked ${inputId}`)
+    } else {
+      console.error(`[Gallery] Input element ${inputId} not found!`)
     }
+  }
+
+  const handleRetakePhoto = (side: 'front' | 'back') => {
+    // Clear only the specific side being retaken
+    if (side === 'front') {
+      setFrontFile(null)
+      setFrontHash(null)
+      setFrontCompressed(null)
+      setFrontCompressionInfo(null)
+    } else {
+      setBackFile(null)
+      setBackHash(null)
+      setBackCompressed(null)
+      setBackCompressionInfo(null)
+    }
+    // Return to the original upload method (camera or gallery)
+    setCurrentSide(side)
+    setUploadMode(originalUploadMethod)
+  }
+
+  const handleReviewImages = () => {
+    setUploadMode('select')
+    // Scroll handled by useEffect
+  }
+
+  const handleResetUpload = () => {
+    // Reset all upload state to allow grading another card
+    setFrontFile(null)
+    setBackFile(null)
+    setFrontCompressed(null)
+    setBackCompressed(null)
+    setFrontCompressionInfo(null)
+    setBackCompressionInfo(null)
+    setFrontHash(null)
+    setBackHash(null)
+    setIsUploading(false)
+    setIsCompressing(false)
+    setStatus('')
+    setUploadMode('select')
+    console.log('[Upload] Reset upload state - ready for new card')
   }
 
   const handleCameraCapture = (file: File) => {
     // Process captured image
     handleFileSelect(file, currentSide)
 
-    // Always return to main view after capture
-    // This lets user see what was captured and choose next action
-    setUploadMode('select')
+    // Determine next step based on what photos we have
+    const willHaveFront = currentSide === 'front' || frontFile
+    const willHaveBack = currentSide === 'back' || backFile
+
+    if (currentSide === 'front' && !willHaveBack) {
+      // Initial upload: after capturing front, go to back camera
+      setCurrentSide('back')
+      setUploadMode('camera')
+    } else if (currentSide === 'back' && !willHaveFront) {
+      // Initial upload (back first): after capturing back, go to front camera
+      setCurrentSide('front')
+      setUploadMode('camera')
+    } else {
+      // Retake scenario OR both photos captured: go to review screen
+      setUploadMode('review')
+    }
   }
 
   const handleCameraCancel = () => {
     setUploadMode('select')
   }
 
-  // Show camera if in camera mode
-  if (uploadMode === 'camera') {
-    return (
-      <MobileCamera
-        side={currentSide}
-        onCapture={handleCameraCapture}
-        onCancel={handleCameraCancel}
+  // Render hidden file inputs for all modes
+  const hiddenFileInputs = (
+    <>
+      <input
+        id="front-input"
+        type="file"
+        accept="image/*"
+        disabled={isCompressing}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) {
+            handleFileSelect(file, 'front')
+            // Clear the input so same file can be selected again
+            e.target.value = ''
+          }
+        }}
+        className="hidden"
       />
-    )
+      <input
+        id="back-input"
+        type="file"
+        accept="image/*"
+        disabled={isCompressing}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) {
+            handleFileSelect(file, 'back')
+            // Clear the input so same file can be selected again
+            e.target.value = ''
+          }
+        }}
+        className="hidden"
+      />
+    </>
+  )
+
+  // 🔒 Show loading while checking authentication
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
   }
 
-  // Show loading animation when uploading
+  // 🔒 Don't render anything if not authenticated (redirect is in progress)
+  if (isAuthenticated === false) {
+    return null;
+  }
+
+  // Show loading animation when uploading (check this FIRST before other modes)
   if (isUploading && frontFile) {
     return (
       <CardAnalysisAnimation
         frontImageUrl={URL.createObjectURL(frontFile)}
         cardName={config.label}
+        onGradeAnother={handleResetUpload}
       />
     )
   }
 
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8 pt-20">
-      <div className="text-center mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload Card for Grading</h1>
-        <p className="text-gray-600 mb-6">Professional AI grading and analysis for all card types</p>
+  // Show camera if in camera mode
+  if (uploadMode === 'camera') {
+    return (
+      <>
+        {hiddenFileInputs}
+        <MobileCamera
+          key={currentSide} // Force remount when switching sides
+          side={currentSide}
+          onCapture={handleCameraCapture}
+          onCancel={handleCameraCancel}
+        />
+      </>
+    )
+  }
 
-        <div className="max-w-2xl mx-auto mb-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-            <h3 className="font-semibold text-blue-900 mb-2">📊 What We Analyze</h3>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p><strong>Centering:</strong> Border measurements and ratios</p>
-              <p><strong>Condition:</strong> Corners, edges, surface quality</p>
-              <p><strong>Authentication:</strong> Print quality, structural integrity</p>
-              <p><strong>Card Details:</strong> Automatic extraction and identification</p>
+  // Show gallery selection screen
+  if (uploadMode === 'gallery') {
+    return (
+      <>
+        {hiddenFileInputs}
+        <div className="fixed inset-0 bg-white z-50 flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-4">
+          <h2 className="text-lg font-bold text-center">Select Images from Gallery</h2>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          <div className="max-w-2xl mx-auto space-y-4">
+            <p className="text-center text-gray-600 mb-6">
+              Select photos of the front and back of your card
+            </p>
+
+            {/* Front Image Selection */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Front of Card</h3>
+                {frontFile && <span className="text-green-600 text-sm">✓ Selected</span>}
+              </div>
+              <div className="p-4">
+                {frontFile ? (
+                  <div className="space-y-3">
+                    <img
+                      src={URL.createObjectURL(frontFile)}
+                      alt="Front of card"
+                      className="w-full rounded-lg"
+                    />
+                    <button
+                      onClick={() => handleGalleryFileSelect('front')}
+                      className="w-full px-4 py-2 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                    >
+                      Change Front Image
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleGalleryFileSelect('front')}
+                    className="w-full px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+                  >
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">🖼️</div>
+                      <div className="text-lg font-semibold text-gray-900 mb-1">
+                        Select Front Image
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Tap to choose from gallery
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Back Image Selection */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Back of Card</h3>
+                {backFile && <span className="text-green-600 text-sm">✓ Selected</span>}
+              </div>
+              <div className="p-4">
+                {backFile ? (
+                  <div className="space-y-3">
+                    <img
+                      src={URL.createObjectURL(backFile)}
+                      alt="Back of card"
+                      className="w-full rounded-lg"
+                    />
+                    <button
+                      onClick={() => handleGalleryFileSelect('back')}
+                      className="w-full px-4 py-2 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+                    >
+                      Change Back Image
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleGalleryFileSelect('back')}
+                    className="w-full px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+                  >
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">🖼️</div>
+                      <div className="text-lg font-semibold text-gray-900 mb-1">
+                        Select Back Image
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Tap to choose from gallery
+                      </div>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Tips */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+              <p className="text-sm text-blue-800 font-semibold mb-2">💡 Tips for Best Results:</p>
+              <ul className="text-xs text-blue-700 space-y-1">
+                <li>• Use good lighting - avoid shadows and glare</li>
+                <li>• Ensure all 4 corners are visible</li>
+                <li>• Keep the card flat and in focus</li>
+                <li>• Capture against a plain background</li>
+              </ul>
             </div>
           </div>
+        </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <h3 className="font-semibold text-gray-900 mb-2">{config.description.title}</h3>
-            <ul className="text-sm text-gray-700 space-y-1 list-disc list-inside text-left">
-              {config.description.items.map((item, idx) => (
-                <li key={idx}>{item}</li>
-              ))}
-            </ul>
-            <p className="text-xs text-gray-600 mt-3">
-              <strong>Analysis Time:</strong> Typically 30-90 seconds for comprehensive grading
-            </p>
-          </div>
+        {/* Action Buttons */}
+        <div className="bg-white border-t border-gray-200 px-4 py-4 space-y-3">
+          <button
+            onClick={handleUpload}
+            disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
+            className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+          >
+            {isCompressing ? 'Processing Images...' : isUploading ? 'Uploading...' : !frontFile || !backFile ? 'Select Both Images' : '✓ Submit for Grading'}
+          </button>
+
+          {frontFile && backFile && (
+            <button
+              onClick={() => setUploadMode('select')}
+              className="w-full px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            >
+              ← Back to Upload
+            </button>
+          )}
         </div>
       </div>
+      </>
+    )
+  }
 
-      <div className="w-full max-w-md md:max-w-3xl space-y-6 bg-white p-6 rounded-lg shadow-lg">
+  // Show review screen after both photos captured
+  if (uploadMode === 'review' && frontFile && backFile) {
+    return (
+      <>
+        {hiddenFileInputs}
+        <div className="fixed inset-0 bg-white z-50 flex flex-col">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-4">
+          <h2 className="text-lg font-bold text-center">Review Your Images</h2>
+        </div>
+
+        {/* Images Preview */}
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+          <div className="max-w-2xl mx-auto space-y-4">
+            {/* Front Image */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="bg-gray-100 px-4 py-2 border-b">
+                <h3 className="font-semibold text-gray-900">Front of Card</h3>
+              </div>
+              <div className="p-4">
+                <img
+                  src={URL.createObjectURL(frontFile)}
+                  alt="Front of card"
+                  className="w-full rounded-lg"
+                />
+              </div>
+            </div>
+
+            {/* Back Image */}
+            <div className="bg-white rounded-lg shadow-md overflow-hidden">
+              <div className="bg-gray-100 px-4 py-2 border-b">
+                <h3 className="font-semibold text-gray-900">Back of Card</h3>
+              </div>
+              <div className="p-4">
+                <img
+                  src={URL.createObjectURL(backFile)}
+                  alt="Back of card"
+                  className="w-full rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="bg-white border-t border-gray-200 px-4 py-4 space-y-3">
+          <button
+            onClick={handleUpload}
+            disabled={!frontCompressed || !backCompressed || isCompressing}
+            className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+          >
+            ✓ Submit for Grading
+          </button>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleRetakePhoto('front')}
+              className="px-4 py-3 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              🔄 Retake Front
+            </button>
+            <button
+              onClick={() => handleRetakePhoto('back')}
+              className="px-4 py-3 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
+            >
+              🔄 Retake Back
+            </button>
+          </div>
+
+          <button
+            onClick={() => setUploadMode('select')}
+            className="w-full px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+          >
+            ← Back to Upload
+          </button>
+        </div>
+      </div>
+      </>
+    )
+  }
+
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 pt-20">
+      {hiddenFileInputs}
+
+      {/* Header - Always first */}
+      <div className="text-center mb-4 md:mb-6 w-full">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Upload Card for Grading</h1>
+        <p className="text-gray-600 text-sm md:text-base">DCM Optic™ grading and analysis for all card types</p>
+      </div>
+
+      {/* Flex container for reordering on mobile */}
+      <div className="flex flex-col w-full max-w-md md:max-w-3xl">
+        {/* Informational Sections - Show after upload form on mobile, before on desktop */}
+        <div className="order-3 md:order-1 mb-6 md:mb-8">
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-900 mb-2 text-sm md:text-base">📊 What We Analyze</h3>
+              <div className="text-xs md:text-sm text-blue-800 space-y-1">
+                <p><strong>Centering:</strong> Border measurements and ratios</p>
+                <p><strong>Condition:</strong> Corners, edges, surface quality</p>
+                <p><strong>Authentication:</strong> Print quality, structural integrity</p>
+                <p><strong>Card Details:</strong> Automatic extraction and identification</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-2 text-sm md:text-base">{config.description.title}</h3>
+              <ul className="text-xs md:text-sm text-gray-700 space-y-1 list-disc list-inside text-left">
+                {config.description.items.map((item, idx) => (
+                  <li key={idx}>{item}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-600 mt-3">
+                <strong>Analysis Time:</strong> Typically 30-90 seconds for comprehensive grading
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Upload Form - Show first on mobile, after info sections on desktop */}
+        <div className="order-1 md:order-2 w-full space-y-6 bg-white p-4 md:p-6 rounded-lg shadow-lg">
         {/* Card Type Selector */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -462,20 +829,6 @@ function UniversalUploadPageContent() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Front Image:
               </label>
-              <input
-                id="front-input"
-                type="file"
-                accept="image/*"
-                disabled={isCompressing}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    handleFileSelect(file, 'front')
-                    setUploadMode('select')
-                  }
-                }}
-                className="hidden"
-              />
               {!frontFile ? (
                 <button
                   type="button"
@@ -553,20 +906,6 @@ function UniversalUploadPageContent() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Back Image:
               </label>
-              <input
-                id="back-input"
-                type="file"
-                accept="image/*"
-                disabled={isCompressing}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) {
-                    handleFileSelect(file, 'back')
-                    setUploadMode('select')
-                  }
-                }}
-                className="hidden"
-              />
               {!backFile ? (
                 <button
                   type="button"
@@ -659,10 +998,13 @@ function UniversalUploadPageContent() {
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-500">
-          <p>Professional AI grading system with advanced image analysis</p>
+          <p>DCM Optic™ advanced grading system</p>
           <p>Comprehensive evaluation of centering, condition, and authenticity</p>
         </div>
+        </div>
+        {/* End Upload Form */}
       </div>
+      {/* End Flex Container */}
     </main>
   )
 }

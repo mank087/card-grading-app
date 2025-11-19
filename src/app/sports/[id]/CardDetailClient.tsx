@@ -2020,8 +2020,8 @@ export function SportsCardDetails() {
     rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
     subset: stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset,
     rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || dvgGrading.card_info?.rarity_tier,
-    autographed: card.conversational_card_info?.autographed ?? (card.autograph_type !== 'none'),
-    memorabilia: card.conversational_card_info?.memorabilia ?? (card.memorabilia_type !== 'none'),
+    autographed: (card.conversational_card_info?.autographed === true || card.conversational_card_info?.autographed === 'Yes' || card.conversational_card_info?.autographed === 'yes' || (card.autograph_type && card.autograph_type !== 'none' && card.autograph_type !== 'false')) ? true : false,
+    memorabilia: (card.conversational_card_info?.memorabilia === true || card.conversational_card_info?.memorabilia === 'Yes' || card.conversational_card_info?.memorabilia === 'yes' || (card.memorabilia_type && card.memorabilia_type !== 'none' && card.memorabilia_type !== 'false')) ? true : false,
     card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text  // 🆕 Card back description
   };
 
@@ -2560,16 +2560,46 @@ export function SportsCardDetails() {
               })()}
 
               {/* Overall Card Condition Summary */}
-              {card.conversational_final_grade_summary && (
-                <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-lg p-6 border-2 border-indigo-200 mt-6">
-                  <h3 className="text-lg font-bold text-gray-800 mb-3">
-                    Overall Card Condition Summary
-                  </h3>
-                  <p className="text-gray-700 leading-relaxed">
-                    {card.conversational_final_grade_summary}
-                  </p>
-                </div>
-              )}
+              {card.conversational_final_grade_summary && (() => {
+                // Check if there are any subgrades below 10 (indicating defects)
+                const subScores = card.conversational_sub_scores || dvgGrading?.sub_scores;
+                const hasDefects = subScores && (
+                  (subScores.centering?.weighted ?? subScores.centering?.weighted_score ?? 10) < 10 ||
+                  (subScores.corners?.weighted ?? subScores.corners?.weighted_score ?? 10) < 10 ||
+                  (subScores.edges?.weighted ?? subScores.edges?.weighted_score ?? 10) < 10 ||
+                  (subScores.surface?.weighted ?? subScores.surface?.weighted_score ?? 10) < 10
+                );
+
+                // For perfect cards, show a clean summary without limiting factor language
+                // For cards with defects, show the full summary including limiting factors
+                let displaySummary = card.conversational_final_grade_summary;
+
+                if (!hasDefects) {
+                  // Remove limiting factor language for perfect cards
+                  displaySummary = displaySummary
+                    .replace(/The limiting factor.*?(?=\.|$)/gi, '')
+                    .replace(/limiting factor:?\s*[^.]*\.?/gi, '')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+                }
+
+                return (
+                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-lg p-6 border-2 border-indigo-200 mt-6">
+                    <h3 className="text-lg font-bold text-gray-800 mb-3">
+                      Overall Card Condition Summary
+                    </h3>
+                    <p className="text-gray-700 leading-relaxed">
+                      {displaySummary}
+                    </p>
+                    {hasDefects && card.conversational_limiting_factor && (
+                      <div className="mt-4 pt-4 border-t border-indigo-200">
+                        <p className="text-sm font-semibold text-indigo-700 mb-1">Limiting Factor:</p>
+                        <p className="text-sm text-gray-700">{card.conversational_limiting_factor}</p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* 📄 Download Report Button & Social Sharing */}
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 my-6 px-4">
@@ -2586,7 +2616,7 @@ export function SportsCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: card.conversational_decimal_grade ?? (recommendedGrade.recommended_decimal_grade || undefined),
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -2610,7 +2640,7 @@ export function SportsCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: card.conversational_decimal_grade ?? (recommendedGrade.recommended_decimal_grade || undefined),
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -2634,7 +2664,7 @@ export function SportsCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: card.conversational_decimal_grade ?? (recommendedGrade.recommended_decimal_grade || undefined),
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -4090,7 +4120,7 @@ export function SportsCardDetails() {
                       serial_numbering: cardInfo.serial_number || dvgGrading.rarity_features?.serial_number || card.serial_numbering,
                       rookie_or_first_print: (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') ? "Yes" :
                                              (dvgGrading.rarity_features?.rookie_or_first === 'true' ? "Yes" : card.rookie_or_first_print),
-                      autographed: (cardInfo.autographed || dvgGrading.autograph?.present || card.autographed) ? "Yes" : "No",
+                      autographed: cardInfo.autographed ? "Yes" : "No",  // Use only cardInfo (AI analysis), don't fall back to old data
                       dcm_grade_whole: card.dvg_whole_grade || card.dcm_grade_whole
                     } as CardData)}
                     target="_blank"
@@ -4119,7 +4149,7 @@ export function SportsCardDetails() {
                       serial_numbering: cardInfo.serial_number || dvgGrading.rarity_features?.serial_number || card.serial_numbering,
                       rookie_or_first_print: (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') ? "Yes" :
                                              (dvgGrading.rarity_features?.rookie_or_first === 'true' ? "Yes" : card.rookie_or_first_print),
-                      autographed: (cardInfo.autographed || dvgGrading.autograph?.present || card.autographed) ? "Yes" : "No",
+                      autographed: cardInfo.autographed ? "Yes" : "No",  // Use only cardInfo (AI analysis), don't fall back to old data
                       dcm_grade_whole: card.dvg_whole_grade || card.dcm_grade_whole
                     } as CardData)}
                     target="_blank"

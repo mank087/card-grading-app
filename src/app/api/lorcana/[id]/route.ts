@@ -227,7 +227,12 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
     console.log(`[GET /api/lorcana/${cardId}] Signed URLs created successfully`);
 
     // Check if Lorcana card already has complete grading data
-    const hasCompleteGrading = card.ai_grading && card.raw_decimal_grade && card.dcm_grade_whole;
+    // Card is complete if:
+    // 1. Has ai_grading AND numeric grades (decimal AND whole), OR
+    // 2. Has ai_grading AND N/A grade (null) with a complete conversational grading report (for altered cards)
+    const hasCompleteGrading =
+      (card.ai_grading && card.raw_decimal_grade && card.dcm_grade_whole) ||
+      (card.ai_grading && card.conversational_grading && card.conversational_grading.length > 0);
 
     // Skip cache if force_regrade is requested
     if (hasCompleteGrading && !forceRegrade) {

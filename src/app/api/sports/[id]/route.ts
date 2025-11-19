@@ -141,7 +141,12 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     console.log(`[GET /api/sports/${cardId}] Signed URLs created successfully`);
 
     // Check if sports card already has complete grading data
-    const hasCompleteGrading = card.conversational_decimal_grade && card.conversational_whole_grade;
+    // Card is complete if:
+    // 1. Has numeric grades (decimal AND whole), OR
+    // 2. Has N/A grade (null) with a complete conversational grading report (for altered cards)
+    const hasCompleteGrading =
+      (card.conversational_decimal_grade && card.conversational_whole_grade) ||
+      (card.conversational_grading && card.conversational_grading.length > 0);
 
     if (hasCompleteGrading) {
       console.log(`[GET /api/sports/${cardId}] Sports card already fully processed, returning existing result`);

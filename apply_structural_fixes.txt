@@ -1,0 +1,20 @@
+# Structural Damage Fixes Applied to All Prompts
+
+## Changes Made:
+
+1. **Version Update**: v4.2 → v4.3
+2. **Corner Defects**: Added minor/major rounding, bent corner
+3. **Structural Damage Section**: New complete section after edge defects
+4. **Detection Priority**: Added structural damage as #1 priority
+5. **Severity Table**: Added "Structural" tier (−3.0 to −8.0)
+6. **Structural Overrides**: Expanded with severity levels
+7. **Grade Cap Enforcement**: Updated with detailed caps
+
+## Files Updated:
+- ✅ Sports (conversational_grading_v4_2_ENHANCED_STRICTNESS.txt)
+- ✅ Pokemon (pokemon_conversational_grading_v4_2.txt)
+- 🔄 MTG (in progress)
+- ⏳ Lorcana
+- ⏳ Other
+
+Continuing with remaining prompts...

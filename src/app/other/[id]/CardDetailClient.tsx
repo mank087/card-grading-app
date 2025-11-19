@@ -2054,6 +2054,8 @@ export function OtherCardDetails() {
     // 🎯 OTHER-SPECIFIC FIELDS
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer || null,
     card_date: stripMarkdown(card.conversational_card_info?.card_date) || card.card_date || null,
+    autographed: (card.conversational_card_info?.autographed === true || card.conversational_card_info?.autographed === 'Yes' || card.conversational_card_info?.autographed === 'yes') ? true : false,
+    memorabilia: (card.conversational_card_info?.memorabilia === true || card.conversational_card_info?.memorabilia === 'Yes' || card.conversational_card_info?.memorabilia === 'yes') ? true : false,
     special_features: stripMarkdown(card.conversational_card_info?.special_features) || card.special_features || null,
     front_text: card.conversational_card_info?.front_text || card.front_text || null,
     back_text: card.conversational_card_info?.back_text || card.back_text || null
@@ -2616,7 +2618,7 @@ export function OtherCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: (card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade) || undefined,
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -2640,7 +2642,7 @@ export function OtherCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: (card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade) || undefined,
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -2664,7 +2666,7 @@ export function OtherCardDetails() {
                         setName: dvgGrading?.card_info?.set_name || card.card_set,
                         year: dvgGrading?.card_info?.year || card.release_date,
                         manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade || undefined,
+                        grade: (card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade) || undefined,
                         gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
                         url: currentUrl
                       };
@@ -3013,6 +3015,34 @@ export function OtherCardDetails() {
                     </div>
                   )}
 
+                  {/* Autographed */}
+                  {(cardInfo.autographed === true || cardInfo.autographed === 'Yes' || cardInfo.autographed === 'yes' || card.autographed === true) && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Autographed</p>
+                      <p className="text-lg text-gray-900">true</p>
+                    </div>
+                  )}
+                  {(cardInfo.autographed === false || cardInfo.autographed === 'No' || cardInfo.autographed === 'no' || (!cardInfo.autographed && card.autographed === false)) && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Autographed</p>
+                      <p className="text-lg text-gray-900">false</p>
+                    </div>
+                  )}
+
+                  {/* Memorabilia */}
+                  {(cardInfo.memorabilia === true || cardInfo.memorabilia === 'Yes' || cardInfo.memorabilia === 'yes' || card.memorabilia === true) && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Memorabilia</p>
+                      <p className="text-lg text-gray-900">true</p>
+                    </div>
+                  )}
+                  {(cardInfo.memorabilia === false || cardInfo.memorabilia === 'No' || cardInfo.memorabilia === 'no' || (!cardInfo.memorabilia && card.memorabilia === false)) && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Memorabilia</p>
+                      <p className="text-lg text-gray-900">false</p>
+                    </div>
+                  )}
+
                   {/* Special Features */}
                   {(cardInfo.special_features || card.special_features) && (
                     <div>
@@ -3065,6 +3095,67 @@ export function OtherCardDetails() {
                     </div>
                   )}
 
+                </div>
+              </div>
+
+              {/* Market Listings Section - eBay Search */}
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-lg font-bold mb-3 text-gray-800">Market Listings</h2>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* eBay Active Listings */}
+                  <a
+                    href={generateOtherEbaySearchUrl({
+                      card_name: cardInfo.card_name || card.card_name,
+                      card_set: cardInfo.set_name || card.card_set,
+                      featured: cardInfo.player_or_character || card.featured,
+                      manufacturer: cardInfo.manufacturer || card.manufacturer,
+                      card_number: cardInfo.card_number || card.card_number,
+                      card_date: cardInfo.card_date || card.card_date,
+                      release_date: cardInfo.year || card.release_date,
+                      serial_numbering: cardInfo.serial_number || card.serial_numbering,
+                      autographed: cardInfo.autographed ? "Yes" : "No",  // Use only cardInfo (AI analysis), don't fall back to old data
+                      dcm_grade_whole: card.conversational_whole_grade || card.dcm_grade_whole
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
+                  >
+                    <div className="w-16 h-16 bg-blue-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-blue-900 mb-2 text-lg">General Search</h3>
+                    <p className="text-sm text-blue-700 text-center leading-relaxed">Find all available cards matching this description</p>
+                  </a>
+
+                  {/* eBay Sold Listings */}
+                  <a
+                    href={generateOtherEbaySoldListingsUrl({
+                      card_name: cardInfo.card_name || card.card_name,
+                      card_set: cardInfo.set_name || card.card_set,
+                      featured: cardInfo.player_or_character || card.featured,
+                      manufacturer: cardInfo.manufacturer || card.manufacturer,
+                      card_number: cardInfo.card_number || card.card_number,
+                      card_date: cardInfo.card_date || card.card_date,
+                      release_date: cardInfo.year || card.release_date,
+                      serial_numbering: cardInfo.serial_number || card.serial_numbering,
+                      autographed: cardInfo.autographed ? "Yes" : "No",  // Use only cardInfo (AI analysis), don't fall back to old data
+                      dcm_grade_whole: card.conversational_whole_grade || card.dcm_grade_whole
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center p-6 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
+                  >
+                    <div className="w-16 h-16 bg-green-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-green-900 mb-2 text-lg">Sold Listings</h3>
+                    <p className="text-sm text-green-700 text-center leading-relaxed">See actual sale prices and market history</p>
+                  </a>
                 </div>
               </div>
 
