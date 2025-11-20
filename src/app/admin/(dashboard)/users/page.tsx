@@ -51,6 +51,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
     total_pages: 0
   })
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<'all' | 'active' | 'suspended'>('all')
   const [selectedUser, setSelectedUser] = useState<UserDetails | null>(null)
@@ -65,6 +66,7 @@ function UsersContent({ adminRole }: { adminRole: string }) {
 
   const fetchUsers = async () => {
     setLoading(true)
+    setError(null)
     try {
       const params = new URLSearchParams({
         page: pagination.page.toString(),
@@ -76,12 +78,18 @@ function UsersContent({ adminRole }: { adminRole: string }) {
       const response = await fetch(`/api/admin/users?${params}`)
       const data = await response.json()
 
+      console.log('Users API Response:', { status: response.status, ok: response.ok, data })
+
       if (response.ok) {
-        setUsers(data.users)
+        setUsers(data.users || [])
         setPagination(data.pagination)
+      } else {
+        setError(data.error || 'Failed to fetch users')
+        console.error('API Error:', data)
       }
     } catch (error) {
       console.error('Error fetching users:', error)
+      setError('Network error: ' + (error instanceof Error ? error.message : 'Unknown error'))
     } finally {
       setLoading(false)
     }
@@ -215,12 +223,28 @@ function UsersContent({ adminRole }: { adminRole: string }) {
         </div>
       </div>
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <div className="text-red-800">
+              <strong>Error:</strong> {error}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading users...</div>
+        ) : error ? (
+          <div className="p-8 text-center text-red-500">Error loading users. Check console for details.</div>
         ) : users.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No users found</div>
+          <div className="p-8 text-center text-gray-500">
+            <p>No users found</p>
+            <p className="text-xs text-gray-400 mt-2">Total: {pagination.total}</p>
+          </div>
         ) : (
           <>
             <div className="overflow-x-auto">
