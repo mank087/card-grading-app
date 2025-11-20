@@ -101,13 +101,13 @@ export default function ImagePreview({
               <p className="text-gray-400 text-xs">
                 <span className="font-semibold">Grade {qualityValidation.confidenceLetter}:</span>{' '}
                 {qualityValidation.confidenceLetter === 'A' &&
-                  'Sharp focus, excellent lighting. AI grading will be highly accurate (±0.25 grades).'}
+                  'Exceptional quality - sharp, well-lit, no glare. AI grading highly accurate (±0.25 grades).'}
                 {qualityValidation.confidenceLetter === 'B' &&
-                  'Good clarity with moderate shadows. AI grading accuracy is good (±0.5 grades).'}
+                  'Good quality - clear focus and lighting. AI grading accuracy is good (±0.5 grades).'}
                 {qualityValidation.confidenceLetter === 'C' &&
-                  'Fair quality with noticeable blur or shadows. AI grading may vary (±1.0 grade).'}
+                  'Acceptable quality but may have blur, shadows, or glare. AI grading may vary (±1.0 grade).'}
                 {qualityValidation.confidenceLetter === 'D' &&
-                  'Poor quality - severe blur or lighting issues. AI grading accuracy reduced (±1.5 grades).'}
+                  'Poor quality - significant blur or lighting issues. AI grading accuracy reduced (±1.5 grades).'}
               </p>
             </div>
 

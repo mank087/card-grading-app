@@ -155,6 +155,12 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
   const allPassed = blurCheck.passed && brightnessCheck.passed;
 
   // Calculate confidence letter based on AI grading system
+  // NOTE: We only check blur + brightness, but AI also checks glare, corners visible, shadows, etc.
+  // Therefore we use CONSERVATIVE thresholds to avoid over-promising Grade A
+  //
+  // AI Grade A needs: <10% glare, all corners visible, even lighting, sharp focus, sub-mm defects
+  // We only verify: sharp focus + good brightness (not enough for guaranteed A)
+  //
   // A (Excellent): Sharp focus, even lighting, <10% glare → ±0.25 grade uncertainty
   // B (Good): Good clarity, moderate shadows, 10-30% glare → ±0.5 grade uncertainty
   // C (Fair): Noticeable blur, heavy shadows, 30-60% glare → ±1.0 grade uncertainty
@@ -162,11 +168,12 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
   let confidenceLetter: 'A' | 'B' | 'C' | 'D';
   let gradeUncertainty: string;
 
-  if (overallScore >= 90) {
-    confidenceLetter = 'A';
+  // Conservative thresholds - we can't detect glare/corners/shadows, so default to B unless exceptional
+  if (overallScore >= 95) {
+    confidenceLetter = 'A';  // Only perfect scores get A
     gradeUncertainty = '±0.25';
-  } else if (overallScore >= 75) {
-    confidenceLetter = 'B';
+  } else if (overallScore >= 80) {
+    confidenceLetter = 'B';  // Most good images will be B (realistic)
     gradeUncertainty = '±0.5';
   } else if (overallScore >= 60) {
     confidenceLetter = 'C';
