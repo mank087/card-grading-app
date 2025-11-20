@@ -6,11 +6,12 @@ interface DetectionResult {
   isCardDetected: boolean;
   confidence: number; // 0-100
   message: string;
+  hints?: string[]; // Specific feedback about what's wrong
 }
 
 /**
- * Lightweight card detection hook
- * Analyzes the guide frame area for card presence
+ * Enhanced card detection hook
+ * Multi-criteria analysis for robust card detection
  */
 export const useCardDetection = (
   videoRef: React.RefObject<HTMLVideoElement>,
@@ -19,12 +20,14 @@ export const useCardDetection = (
   const [detection, setDetection] = useState<DetectionResult>({
     isCardDetected: false,
     confidence: 0,
-    message: 'Position card in frame'
+    message: 'Position card in frame',
+    hints: []
   });
   const animationFrameRef = useRef<number>();
   const canvasRef = useRef<HTMLCanvasElement>();
   const stableFramesRef = useRef<number>(0);
   const lastConfidenceRef = useRef<number>(0);
+  const frameCountRef = useRef<number>(0);
 
   useEffect(() => {
     if (!enabled || !videoRef.current) {
@@ -77,28 +80,35 @@ export const useCardDetection = (
       // Sample pixels within guide frame
       const imageData = ctx.getImageData(frameX, frameY, frameWidth, frameHeight);
 
-      // Detect card presence
-      const result = analyzeFrameForCard(imageData);
+      // Detect card presence using enhanced multi-criteria analysis
+      const result = analyzeFrameForCard(imageData, frameCountRef.current);
+      frameCountRef.current++;
 
-      // Smooth confidence changes to avoid flickering
-      const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current);
+      // Faster smoothing for quicker response
+      const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current, 0.5);
       lastConfidenceRef.current = smoothedConfidence;
 
+      // Lowered threshold for easier detection
+      const DETECTION_THRESHOLD = 50; // Was 60, now 50 for better sensitivity
+
       // Track stable frames
-      if (smoothedConfidence > 60) {
+      if (smoothedConfidence > DETECTION_THRESHOLD) {
         stableFramesRef.current++;
       } else {
         stableFramesRef.current = 0;
       }
 
       setDetection({
-        isCardDetected: smoothedConfidence > 60,
+        isCardDetected: smoothedConfidence > DETECTION_THRESHOLD,
         confidence: smoothedConfidence,
-        message: getDetectionMessage(smoothedConfidence, stableFramesRef.current)
+        message: getDetectionMessage(smoothedConfidence, stableFramesRef.current),
+        hints: result.hints
       });
 
-      // Continue detection loop (30 FPS to save battery)
-      animationFrameRef.current = requestAnimationFrame(detectCard);
+      // Continue detection loop (aim for ~20 FPS to save battery)
+      setTimeout(() => {
+        animationFrameRef.current = requestAnimationFrame(detectCard);
+      }, 50);
     };
 
     detectCard();
@@ -113,34 +123,36 @@ export const useCardDetection = (
   return {
     ...detection,
     stableFrames: stableFramesRef.current,
-    isStable: stableFramesRef.current >= 15 // 0.5 seconds at 30fps
+    isStable: stableFramesRef.current >= 10 // Faster response time
   };
 };
 
 /**
- * Analyze image data for card presence
- * Looks for a distinct rectangular object different from background
+ * Enhanced multi-criteria card detection
+ * Uses weighted scoring for robust detection across lighting conditions
  */
-function analyzeFrameForCard(imageData: ImageData): DetectionResult {
+function analyzeFrameForCard(imageData: ImageData, frameCount: number): DetectionResult {
   const { data, width, height } = imageData;
+  const hints: string[] = [];
 
-  // 1. Calculate center region stats (where card should be)
-  const centerWidth = Math.floor(width * 0.6);
-  const centerHeight = Math.floor(height * 0.6);
+  // Define regions more precisely
+  const centerWidth = Math.floor(width * 0.7); // Larger center region
+  const centerHeight = Math.floor(height * 0.7);
   const centerX = Math.floor((width - centerWidth) / 2);
   const centerY = Math.floor((height - centerHeight) / 2);
 
-  // 2. Calculate edge region stats (background)
+  // Sample pixels (optimized sampling)
   const edgePixels: number[] = [];
   const centerPixels: number[] = [];
+  const allPixels: number[] = [];
 
-  // Sample edges (background)
-  for (let y = 0; y < height; y += 8) {
-    for (let x = 0; x < width; x += 8) {
+  // Sample every 6 pixels for better detection (was 8)
+  for (let y = 0; y < height; y += 6) {
+    for (let x = 0; x < width; x += 6) {
       const idx = (y * width + x) * 4;
       const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+      allPixels.push(gray);
 
-      // Check if pixel is in edge region (not in center)
       if (x < centerX || x >= centerX + centerWidth || y < centerY || y >= centerY + centerHeight) {
         edgePixels.push(gray);
       } else {
@@ -149,75 +161,168 @@ function analyzeFrameForCard(imageData: ImageData): DetectionResult {
     }
   }
 
-  // Calculate stats for both regions
+  // CRITERION 1: Brightness analysis
+  const overallMean = allPixels.reduce((a, b) => a + b, 0) / allPixels.length;
   const edgeMean = edgePixels.reduce((a, b) => a + b, 0) / edgePixels.length;
   const centerMean = centerPixels.reduce((a, b) => a + b, 0) / centerPixels.length;
 
-  // Calculate variance for center region (card detail)
+  // Check for lighting issues
+  if (overallMean < 30) {
+    hints.push('Too dark - add more light');
+  } else if (overallMean > 220) {
+    hints.push('Too bright - reduce glare');
+  }
+
+  // CRITERION 2: Texture/Detail analysis
   const centerVariance = centerPixels.reduce((sum, val) => sum + Math.pow(val - centerMean, 2), 0) / centerPixels.length;
   const centerStdDev = Math.sqrt(centerVariance);
 
-  // Calculate difference between center and edge (card vs background)
+  // CRITERION 3: Edge contrast (card vs background)
   const colorDifference = Math.abs(centerMean - edgeMean);
 
-  console.log('[CardDetection] Edge Mean:', edgeMean.toFixed(1), 'Center Mean:', centerMean.toFixed(1), 'Diff:', colorDifference.toFixed(1), 'Center StdDev:', centerStdDev.toFixed(1));
+  // CRITERION 4: Edge detection (look for rectangular edges)
+  const edgeStrength = detectEdges(imageData, centerX, centerY, centerWidth, centerHeight);
 
-  // A card should have:
-  // 1. Higher variance in center (details, text, image) - StdDev > 20
-  // 2. Different color from edges (distinct object) - Diff > 15
+  // CRITERION 5: Color saturation (cards usually have some color)
+  const saturation = calculateSaturation(data, centerX, centerY, centerWidth, centerHeight);
 
-  let confidence = 0;
-
-  // Must have BOTH conditions to be a card
-  const hasDetail = centerStdDev > 20;  // Card has texture/detail
-  const isDifferent = colorDifference > 15;  // Card is distinct from background
-
-  if (hasDetail && isDifferent) {
-    // Both conditions met - likely a card
-    // Calculate confidence based on how strong the signals are
-    const detailScore = Math.min(100, Math.round((centerStdDev - 20) / 0.4)); // 0-100
-    const diffScore = Math.min(100, Math.round((colorDifference - 15) / 0.5)); // 0-100
-    confidence = Math.round((detailScore + diffScore) / 2);
-  } else if (hasDetail) {
-    // Has detail but not distinct - might be detailed background
-    confidence = Math.min(30, Math.round(centerStdDev / 2));
-  } else if (isDifferent) {
-    // Different color but no detail - might be solid object
-    confidence = Math.min(30, Math.round(colorDifference));
-  } else {
-    // Neither - definitely not a card
-    confidence = 0;
+  // Log diagnostics every 30 frames (~1.5 seconds)
+  if (frameCount % 30 === 0) {
+    console.log('[CardDetection] Brightness:', overallMean.toFixed(1),
+                '| Detail:', centerStdDev.toFixed(1),
+                '| Contrast:', colorDifference.toFixed(1),
+                '| Edges:', edgeStrength.toFixed(1),
+                '| Saturation:', saturation.toFixed(1));
   }
 
-  console.log('[CardDetection] Has Detail:', hasDetail, 'Is Different:', isDifferent, '→ Confidence:', confidence);
+  // WEIGHTED SCORING (not all-or-nothing)
+  let score = 0;
+  const weights = { detail: 30, contrast: 25, edges: 25, saturation: 20 };
+
+  // Detail score (texture variance)
+  if (centerStdDev > 15) { // Lowered from 20
+    const detailScore = Math.min(100, (centerStdDev - 15) * 2);
+    score += (detailScore / 100) * weights.detail;
+  } else {
+    hints.push('No card detail detected');
+  }
+
+  // Contrast score (card vs background)
+  if (colorDifference > 10) { // Lowered from 15
+    const contrastScore = Math.min(100, (colorDifference - 10) * 3);
+    score += (contrastScore / 100) * weights.contrast;
+  } else {
+    hints.push('Card not distinct from background');
+  }
+
+  // Edge score (rectangular shape)
+  if (edgeStrength > 0.3) { // Cards have defined edges
+    const edgeScore = Math.min(100, edgeStrength * 100);
+    score += (edgeScore / 100) * weights.edges;
+  }
+
+  // Saturation score (cards have color)
+  if (saturation > 10) { // Not pure grayscale
+    const satScore = Math.min(100, saturation * 2);
+    score += (satScore / 100) * weights.saturation;
+  }
+
+  // Boost score if brightness is good
+  if (overallMean >= 50 && overallMean <= 200) {
+    score *= 1.2; // 20% bonus for good lighting
+  }
+
+  const confidence = Math.min(100, Math.max(0, Math.round(score)));
 
   return {
-    isCardDetected: confidence > 60, // Card detected if confidence > 60%
-    confidence: Math.min(100, Math.max(0, confidence)),
-    message: ''
+    isCardDetected: confidence > 50,
+    confidence,
+    message: '',
+    hints: hints.length > 0 ? hints : undefined
   };
 }
 
 /**
- * Smooth confidence changes to avoid flickering
+ * Simple edge detection using gradient analysis
  */
-function smoothConfidence(newConfidence: number, oldConfidence: number): number {
-  // Use exponential moving average
-  const alpha = 0.3;
+function detectEdges(imageData: ImageData, cx: number, cy: number, cw: number, ch: number): number {
+  const { data, width } = imageData;
+  let edgeStrength = 0;
+  let edgeCount = 0;
+
+  // Sample horizontal and vertical gradients
+  for (let y = cy; y < cy + ch; y += 10) {
+    for (let x = cx; x < cx + cw; x += 10) {
+      if (x + 1 >= width || y + 1 >= imageData.height) continue;
+
+      const idx = (y * width + x) * 4;
+      const idxRight = (y * width + (x + 1)) * 4;
+      const idxDown = ((y + 1) * width + x) * 4;
+
+      const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+      const grayRight = (data[idxRight] + data[idxRight + 1] + data[idxRight + 2]) / 3;
+      const grayDown = (data[idxDown] + data[idxDown + 1] + data[idxDown + 2]) / 3;
+
+      const gx = Math.abs(gray - grayRight);
+      const gy = Math.abs(gray - grayDown);
+      const gradient = Math.sqrt(gx * gx + gy * gy);
+
+      if (gradient > 20) { // Edge threshold
+        edgeStrength += gradient;
+        edgeCount++;
+      }
+    }
+  }
+
+  return edgeCount > 0 ? edgeStrength / edgeCount / 100 : 0;
+}
+
+/**
+ * Calculate color saturation
+ */
+function calculateSaturation(data: Uint8ClampedArray, cx: number, cy: number, cw: number, ch: number): number {
+  let saturation = 0;
+  let count = 0;
+
+  for (let y = cy; y < cy + ch; y += 8) {
+    for (let x = cx; x < cx + cw; x += 8) {
+      const idx = (y * 1000 + x) * 4; // Approximate width
+      if (idx + 2 < data.length) {
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        saturation += (max - min);
+        count++;
+      }
+    }
+  }
+
+  return count > 0 ? saturation / count : 0;
+}
+
+/**
+ * Smooth confidence changes with configurable responsiveness
+ */
+function smoothConfidence(newConfidence: number, oldConfidence: number, alpha: number = 0.5): number {
+  // Use exponential moving average with higher alpha for faster response
   return Math.round(alpha * newConfidence + (1 - alpha) * oldConfidence);
 }
 
 /**
- * Generate user-friendly detection message
+ * Generate user-friendly detection message with better feedback
  */
 function getDetectionMessage(confidence: number, stableFrames: number): string {
-  if (confidence < 30) {
+  if (confidence < 20) {
     return 'Position card in frame';
-  } else if (confidence < 60) {
-    return 'Adjusting position...';
-  } else if (stableFrames < 15) {
+  } else if (confidence < 40) {
+    return 'Getting closer...';
+  } else if (confidence < 50) {
+    return 'Almost there...';
+  } else if (stableFrames < 10) { // Reduced from 15 for faster feedback
     return 'Hold steady...';
   } else {
-    return 'Ready to capture!';
+    return '✓ Ready to capture!';
   }
 }

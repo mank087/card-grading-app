@@ -13,27 +13,27 @@ export default function CameraGuideOverlay({ cardDetected = false, side }: Camer
         <div
           className={`relative border-4 rounded-lg transition-all duration-300 ${
             cardDetected
-              ? 'border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.5)]'
-              : 'border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]'
+              ? 'border-green-400 shadow-[0_0_30px_rgba(34,197,94,0.7)] animate-pulse'
+              : 'border-white/80 shadow-[0_0_20px_rgba(255,255,255,0.3)]'
           }`}
           style={{
-            width: '80%',
-            maxWidth: '350px',
+            width: '82%', // Slightly larger for better visibility
+            maxWidth: '360px',
             aspectRatio: '2.5 / 3.5' // Standard trading card ratio
           }}
         >
-          {/* Corner markers - L-shaped brackets */}
-          <div className={`absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 transition-colors duration-300 ${
-            cardDetected ? 'border-green-400' : 'border-white'
+          {/* Corner markers - L-shaped brackets with thicker borders when detected */}
+          <div className={`absolute -top-1 -left-1 w-10 h-10 border-t-[5px] border-l-[5px] transition-all duration-300 rounded-tl-lg ${
+            cardDetected ? 'border-green-400' : 'border-white/80'
           }`} />
-          <div className={`absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 transition-colors duration-300 ${
-            cardDetected ? 'border-green-400' : 'border-white'
+          <div className={`absolute -top-1 -right-1 w-10 h-10 border-t-[5px] border-r-[5px] transition-all duration-300 rounded-tr-lg ${
+            cardDetected ? 'border-green-400' : 'border-white/80'
           }`} />
-          <div className={`absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 transition-colors duration-300 ${
-            cardDetected ? 'border-green-400' : 'border-white'
+          <div className={`absolute -bottom-1 -left-1 w-10 h-10 border-b-[5px] border-l-[5px] transition-all duration-300 rounded-bl-lg ${
+            cardDetected ? 'border-green-400' : 'border-white/80'
           }`} />
-          <div className={`absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 transition-colors duration-300 ${
-            cardDetected ? 'border-green-400' : 'border-white'
+          <div className={`absolute -bottom-1 -right-1 w-10 h-10 border-b-[5px] border-r-[5px] transition-all duration-300 rounded-br-lg ${
+            cardDetected ? 'border-green-400' : 'border-white/80'
           }`} />
 
           {/* Center crosshair (optional) */}
@@ -64,15 +64,24 @@ export default function CameraGuideOverlay({ cardDetected = false, side }: Camer
       </div>
 
       {/* Bottom instructions */}
-      <div className="absolute bottom-28 left-0 right-0 text-center px-4">
+      <div className="absolute bottom-36 left-0 right-0 text-center px-4">
         <div className="space-y-2">
-          <div className="bg-black/70 text-white px-4 py-2 rounded-lg inline-block">
-            <p className="text-sm font-medium">
-              {cardDetected ? '✓ Card Detected - Ready to Capture' : 'Position all 4 corners inside the frame'}
-            </p>
-          </div>
+          {cardDetected ? (
+            <div className="bg-green-600/90 text-white px-5 py-2.5 rounded-lg inline-block shadow-lg">
+              <p className="text-sm font-bold flex items-center gap-2 justify-center">
+                <span className="text-lg">✓</span>
+                Card Detected - Tap to Capture
+              </p>
+            </div>
+          ) : (
+            <div className="bg-black/70 text-white px-4 py-2 rounded-lg inline-block">
+              <p className="text-sm font-medium">
+                Align card with frame
+              </p>
+            </div>
+          )}
           <div className="bg-black/60 text-white/90 px-4 py-1.5 rounded-lg inline-block">
-            <p className="text-xs">💡 Avoid glare, shadows, and reflections</p>
+            <p className="text-xs">💡 Good lighting, avoid glare</p>
           </div>
         </div>
       </div>

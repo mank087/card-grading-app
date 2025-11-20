@@ -299,16 +299,38 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           </button>
         </div>
 
-        <div className="text-center mt-4 space-y-1">
+        <div className="text-center mt-4 space-y-2">
           <p className={`text-sm font-medium transition-colors ${
             detection.isStable ? 'text-green-400' : detection.isCardDetected ? 'text-yellow-400' : 'text-gray-400'
           }`}>
             {detection.message}
           </p>
-          {/* Always show confidence for debugging */}
-          <p className="text-xs text-gray-500">
-            Confidence: {detection.confidence}% {detection.isCardDetected && '✓ Detected'}
-          </p>
+
+          {/* Show detection hints when not fully detected */}
+          {detection.hints && detection.hints.length > 0 && !detection.isStable && (
+            <div className="bg-orange-900/50 border border-orange-500/50 rounded-lg px-3 py-2 max-w-xs mx-auto">
+              <p className="text-xs text-orange-200 font-medium">
+                {detection.hints[0]}
+              </p>
+            </div>
+          )}
+
+          {/* Confidence indicator */}
+          <div className="flex items-center justify-center gap-2">
+            <div className="flex-1 max-w-48 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 ${
+                  detection.confidence > 70 ? 'bg-green-400' :
+                  detection.confidence > 40 ? 'bg-yellow-400' :
+                  'bg-gray-500'
+                }`}
+                style={{ width: `${detection.confidence}%` }}
+              />
+            </div>
+            <p className="text-xs text-gray-400 w-12">
+              {detection.confidence}%
+            </p>
+          </div>
         </div>
       </div>
     </div>
