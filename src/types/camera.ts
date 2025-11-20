@@ -39,6 +39,8 @@ export interface QualityCheckResult {
 export interface ImageQualityValidation {
   isValid: boolean;
   overallScore: number;
+  confidenceLetter: 'A' | 'B' | 'C' | 'D';
+  gradeUncertainty: string;
   checks: {
     blur: QualityCheckResult;
     brightness: QualityCheckResult;

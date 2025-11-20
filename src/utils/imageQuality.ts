@@ -33,27 +33,34 @@ function checkBlur(imageData: ImageData): QualityCheckResult {
   }
   variance = sum / count;
 
-  // Thresholds (tuned for card images)
-  const BLUR_THRESHOLD_GOOD = 100;
-  const BLUR_THRESHOLD_ACCEPTABLE = 50;
+  // Thresholds (tuned for card images - stricter for better discrimination)
+  const BLUR_THRESHOLD_EXCELLENT = 500;  // Very sharp
+  const BLUR_THRESHOLD_GOOD = 250;       // Sharp enough
+  const BLUR_THRESHOLD_ACCEPTABLE = 100; // Minimum acceptable
 
-  if (variance >= BLUR_THRESHOLD_GOOD) {
+  if (variance >= BLUR_THRESHOLD_EXCELLENT) {
     return {
       passed: true,
       score: 100,
-      message: 'Image is sharp and clear'
+      message: 'Excellent sharpness - crystal clear'
+    };
+  } else if (variance >= BLUR_THRESHOLD_GOOD) {
+    return {
+      passed: true,
+      score: Math.round(70 + ((variance - BLUR_THRESHOLD_GOOD) / (BLUR_THRESHOLD_EXCELLENT - BLUR_THRESHOLD_GOOD) * 30)),
+      message: 'Good sharpness - details clear'
     };
   } else if (variance >= BLUR_THRESHOLD_ACCEPTABLE) {
     return {
       passed: true,
-      score: 70,
-      message: 'Image quality is acceptable'
+      score: Math.round(60 + ((variance - BLUR_THRESHOLD_ACCEPTABLE) / (BLUR_THRESHOLD_GOOD - BLUR_THRESHOLD_ACCEPTABLE) * 10)),
+      message: 'Acceptable sharpness - may affect grading'
     };
   } else {
     return {
       passed: false,
-      score: Math.round((variance / BLUR_THRESHOLD_ACCEPTABLE) * 100),
-      message: 'Image is too blurry - hold camera steady'
+      score: Math.round((variance / BLUR_THRESHOLD_ACCEPTABLE) * 60),
+      message: 'Too blurry - hold camera steady and tap to focus'
     };
   }
 }
@@ -78,28 +85,52 @@ function checkBrightness(imageData: ImageData): QualityCheckResult {
 
   const avgBrightness = sum / sampleSize;
 
-  // Ideal range: 80-180 (out of 255)
-  const IDEAL_MIN = 80;
-  const IDEAL_MAX = 180;
-  const ACCEPTABLE_MIN = 60;
-  const ACCEPTABLE_MAX = 220;
+  // Stricter thresholds for better discrimination
+  const EXCELLENT_MIN = 100;
+  const EXCELLENT_MAX = 160;
+  const GOOD_MIN = 85;
+  const GOOD_MAX = 180;
+  const ACCEPTABLE_MIN = 70;
+  const ACCEPTABLE_MAX = 200;
 
-  if (avgBrightness >= IDEAL_MIN && avgBrightness <= IDEAL_MAX) {
+  if (avgBrightness >= EXCELLENT_MIN && avgBrightness <= EXCELLENT_MAX) {
     return {
       passed: true,
       score: 100,
       message: 'Lighting is excellent'
     };
-  } else if (avgBrightness >= ACCEPTABLE_MIN && avgBrightness <= ACCEPTABLE_MAX) {
+  } else if (avgBrightness >= GOOD_MIN && avgBrightness <= GOOD_MAX) {
+    // Graduated scoring within good range
+    let score = 85;
+    if (avgBrightness < EXCELLENT_MIN) {
+      // Slightly darker than excellent
+      score = Math.round(85 + ((avgBrightness - GOOD_MIN) / (EXCELLENT_MIN - GOOD_MIN) * 15));
+    } else if (avgBrightness > EXCELLENT_MAX) {
+      // Slightly brighter than excellent
+      score = Math.round(85 + ((GOOD_MAX - avgBrightness) / (GOOD_MAX - EXCELLENT_MAX) * 15));
+    }
     return {
       passed: true,
-      score: 70,
-      message: 'Lighting is acceptable'
+      score,
+      message: 'Lighting is good'
+    };
+  } else if (avgBrightness >= ACCEPTABLE_MIN && avgBrightness <= ACCEPTABLE_MAX) {
+    // Graduated scoring within acceptable range
+    let score = 65;
+    if (avgBrightness < GOOD_MIN) {
+      score = Math.round(65 + ((avgBrightness - ACCEPTABLE_MIN) / (GOOD_MIN - ACCEPTABLE_MIN) * 15));
+    } else if (avgBrightness > GOOD_MAX) {
+      score = Math.round(65 + ((ACCEPTABLE_MAX - avgBrightness) / (ACCEPTABLE_MAX - GOOD_MAX) * 15));
+    }
+    return {
+      passed: true,
+      score,
+      message: 'Lighting is acceptable - may affect grading'
     };
   } else if (avgBrightness < ACCEPTABLE_MIN) {
     return {
       passed: false,
-      score: Math.round((avgBrightness / ACCEPTABLE_MIN) * 100),
+      score: Math.round((avgBrightness / ACCEPTABLE_MIN) * 60),
       message: 'Image is too dark - add more light'
     };
   } else {
@@ -114,6 +145,7 @@ function checkBrightness(imageData: ImageData): QualityCheckResult {
 /**
  * Validate image quality for card grading
  * Returns overall validation result with specific check results
+ * Aligned with AI grading confidence letter system
  */
 export function validateImageQuality(imageData: ImageData): ImageQualityValidation {
   const blurCheck = checkBlur(imageData);
@@ -121,6 +153,28 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
 
   const overallScore = Math.round((blurCheck.score + brightnessCheck.score) / 2);
   const allPassed = blurCheck.passed && brightnessCheck.passed;
+
+  // Calculate confidence letter based on AI grading system
+  // A (Excellent): Sharp focus, even lighting, <10% glare → ±0.25 grade uncertainty
+  // B (Good): Good clarity, moderate shadows, 10-30% glare → ±0.5 grade uncertainty
+  // C (Fair): Noticeable blur, heavy shadows, 30-60% glare → ±1.0 grade uncertainty
+  // D (Poor): Severe blur, very poor lighting, >60% glare → ±1.5 grade uncertainty
+  let confidenceLetter: 'A' | 'B' | 'C' | 'D';
+  let gradeUncertainty: string;
+
+  if (overallScore >= 90) {
+    confidenceLetter = 'A';
+    gradeUncertainty = '±0.25';
+  } else if (overallScore >= 75) {
+    confidenceLetter = 'B';
+    gradeUncertainty = '±0.5';
+  } else if (overallScore >= 60) {
+    confidenceLetter = 'C';
+    gradeUncertainty = '±1.0';
+  } else {
+    confidenceLetter = 'D';
+    gradeUncertainty = '±1.5';
+  }
 
   const suggestions: string[] = [];
   if (!blurCheck.passed) {
@@ -134,9 +188,18 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
     }
   }
 
+  // Add confidence letter explanation
+  if (confidenceLetter === 'D') {
+    suggestions.push('Poor image quality may result in inaccurate grading (±1.5 grades)');
+  } else if (confidenceLetter === 'C') {
+    suggestions.push('Fair image quality - grade may vary by ±1.0 grade');
+  }
+
   return {
     isValid: allPassed && overallScore >= 60,
     overallScore,
+    confidenceLetter,
+    gradeUncertainty,
     checks: {
       blur: blurCheck,
       brightness: brightnessCheck

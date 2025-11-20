@@ -57,15 +57,25 @@ export default function ImagePreview({
                 {qualityValidation.isValid ? '✓' : '⚠️'}
               </span>
               <div className="flex-1">
-                <p className={`font-semibold ${
-                  qualityValidation.isValid ? 'text-green-300' : 'text-yellow-300'
-                }`}>
-                  {qualityValidation.isValid
-                    ? 'Image Quality: Good'
-                    : 'Image Quality: Could Be Better'}
-                </p>
-                <p className="text-xs text-gray-400">
-                  Score: {qualityValidation.overallScore}/100
+                <div className="flex items-center gap-2">
+                  <p className={`font-semibold ${
+                    qualityValidation.isValid ? 'text-green-300' : 'text-yellow-300'
+                  }`}>
+                    Image Quality: Grade {qualityValidation.confidenceLetter}
+                  </p>
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                    qualityValidation.confidenceLetter === 'A' ? 'bg-green-600 text-white' :
+                    qualityValidation.confidenceLetter === 'B' ? 'bg-blue-600 text-white' :
+                    qualityValidation.confidenceLetter === 'C' ? 'bg-yellow-600 text-white' :
+                    'bg-red-600 text-white'
+                  }`}>
+                    {qualityValidation.confidenceLetter === 'A' ? 'Excellent' :
+                     qualityValidation.confidenceLetter === 'B' ? 'Good' :
+                     qualityValidation.confidenceLetter === 'C' ? 'Fair' : 'Poor'}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  Score: {qualityValidation.overallScore}/100 • AI Grade Uncertainty: {qualityValidation.gradeUncertainty}
                 </p>
               </div>
             </div>
@@ -84,6 +94,21 @@ export default function ImagePreview({
                 <span>{qualityValidation.checks.brightness.passed ? '✓' : '⚠'}</span>
                 <span>{qualityValidation.checks.brightness.message}</span>
               </div>
+            </div>
+
+            {/* Confidence Letter Explanation */}
+            <div className="mt-2 pt-2 border-t border-gray-600">
+              <p className="text-gray-400 text-xs">
+                <span className="font-semibold">Grade {qualityValidation.confidenceLetter}:</span>{' '}
+                {qualityValidation.confidenceLetter === 'A' &&
+                  'Sharp focus, excellent lighting. AI grading will be highly accurate (±0.25 grades).'}
+                {qualityValidation.confidenceLetter === 'B' &&
+                  'Good clarity with moderate shadows. AI grading accuracy is good (±0.5 grades).'}
+                {qualityValidation.confidenceLetter === 'C' &&
+                  'Fair quality with noticeable blur or shadows. AI grading may vary (±1.0 grade).'}
+                {qualityValidation.confidenceLetter === 'D' &&
+                  'Poor quality - severe blur or lighting issues. AI grading accuracy reduced (±1.5 grades).'}
+              </p>
             </div>
 
             {/* Suggestions */}
