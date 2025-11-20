@@ -65,7 +65,12 @@ const getCardName = (card: Card) => {
 
 const getPlayerName = (card: Card) => {
   const cardInfo = getCardInfo(card);
-  return cardInfo.player_or_character || cardInfo.card_name || 'Unknown Player';
+  // For sports cards: show player name first
+  // For TCG cards (MTG, Pokemon, Lorcana): show card name first
+  const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+  return isSportsCard
+    ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown Player')
+    : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card');
 };
 
 const getCardSet = (card: Card) => {
@@ -390,8 +395,13 @@ function CollectionPageContent() {
               // Get card info (matches detail page line 1999)
               const cardInfo = getCardInfo(card);
 
-              // Build player/card name for display (matches detail page line 2188)
-              const displayName = cardInfo.player_or_character || cardInfo.card_name || "Unknown Player";
+              // Build player/card name for display
+              // For sports cards: show player name first
+              // For TCG cards (MTG, Pokemon, Lorcana): show card name first
+              const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+              const displayName = isSportsCard
+                ? (cardInfo.player_or_character || cardInfo.card_name || "Unknown Player")
+                : (cardInfo.card_name || cardInfo.player_or_character || "Unknown Card");
 
               // Build special features string (matches detail page line 2223-2230)
               const features: string[] = [];
