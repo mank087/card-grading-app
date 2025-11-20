@@ -22,7 +22,7 @@ export async function GET(
     }
 
     // Get user
-    const { data: user, error: userError } = await supabase
+    const { data: user, error: userError } = await supabaseAdmin
       .from('users')
       .select('*')
       .eq('id', id)
@@ -33,7 +33,7 @@ export async function GET(
     }
 
     // Get user's cards
-    const { data: cards, error: cardsError } = await supabase
+    const { data: cards, error: cardsError } = await supabaseAdmin
       .from('cards')
       .select('id, category, created_at, conversational_decimal_grade')
       .eq('user_id', id)
@@ -41,7 +41,7 @@ export async function GET(
       .limit(10)
 
     // Get user statistics
-    const { data: allCards } = await supabase
+    const { data: allCards } = await supabaseAdmin
       .from('cards')
       .select('id, conversational_decimal_grade')
       .eq('user_id', id)
@@ -102,7 +102,7 @@ export async function PATCH(
       // For now, we'll log the action in admin_activity_log
 
       // Log the suspension action
-      await supabase
+      await supabaseAdmin
         .from('admin_activity_log')
         .insert({
           admin_id: admin.id,
@@ -119,7 +119,7 @@ export async function PATCH(
       }, { status: 200 })
     } else if (action === 'activate') {
       // Log the activation action
-      await supabase
+      await supabaseAdmin
         .from('admin_activity_log')
         .insert({
           admin_id: admin.id,
@@ -174,7 +174,7 @@ export async function DELETE(
     const reason = searchParams.get('reason') || 'No reason provided'
 
     // Delete user's cards first (cascade)
-    const { error: cardsError } = await supabase
+    const { error: cardsError } = await supabaseAdmin
       .from('cards')
       .delete()
       .eq('user_id', id)
@@ -184,7 +184,7 @@ export async function DELETE(
     }
 
     // Delete user
-    const { error: userError } = await supabase
+    const { error: userError } = await supabaseAdmin
       .from('users')
       .delete()
       .eq('id', id)
@@ -194,7 +194,7 @@ export async function DELETE(
     }
 
     // Log the deletion
-    await supabase
+    await supabaseAdmin
       .from('admin_activity_log')
       .insert({
         admin_id: admin.id,
