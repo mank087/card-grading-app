@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
 
     // Build query
-    let query = supabase
+    let query = supabaseAdmin
       .from('users')
       .select('id, email, created_at, updated_at', { count: 'exact' })
 
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
 
     // Get card counts for each user
     const userIds = users?.map(u => u.id) || []
-    const { data: cardCounts } = await supabase
+    const { data: cardCounts } = await supabaseAdmin
       .from('cards')
       .select('user_id')
       .in('user_id', userIds)
