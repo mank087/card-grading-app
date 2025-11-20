@@ -1,0 +1,93 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { verifyAdminSession } from '@/lib/admin/adminAuth'
+import { supabase } from '@/lib/supabaseClient'
+
+export async function GET(request: NextRequest) {
+  try {
+    // Verify admin session
+    const token = request.cookies.get('admin_token')?.value
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const admin = await verifyAdminSession(token)
+    if (!admin) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    // Get query parameters
+    const searchParams = request.nextUrl.searchParams
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '20')
+    const search = searchParams.get('search') || ''
+    const sortBy = searchParams.get('sortBy') || 'created_at'
+    const sortOrder = searchParams.get('sortOrder') || 'desc'
+    const status = searchParams.get('status') || 'all' // all, active, suspended
+
+    const offset = (page - 1) * limit
+
+    // Build query
+    let query = supabase
+      .from('users')
+      .select('id, email, created_at, updated_at', { count: 'exact' })
+
+    // Apply search filter
+    if (search) {
+      query = query.ilike('email', `%${search}%`)
+    }
+
+    // Apply status filter
+    if (status === 'active') {
+      query = query.is('suspended_at', null)
+    } else if (status === 'suspended') {
+      query = query.not('suspended_at', 'is', null)
+    }
+
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+
+    // Apply pagination
+    query = query.range(offset, offset + limit - 1)
+
+    const { data: users, error, count } = await query
+
+    if (error) {
+      throw error
+    }
+
+    // Get card counts for each user
+    const userIds = users?.map(u => u.id) || []
+    const { data: cardCounts } = await supabase
+      .from('cards')
+      .select('user_id')
+      .in('user_id', userIds)
+
+    const cardCountMap: Record<string, number> = {}
+    cardCounts?.forEach(card => {
+      cardCountMap[card.user_id] = (cardCountMap[card.user_id] || 0) + 1
+    })
+
+    // Enrich user data
+    const enrichedUsers = users?.map(user => ({
+      ...user,
+      card_count: cardCountMap[user.id] || 0,
+      is_suspended: false // Will be determined by suspended_at field when we add it
+    }))
+
+    return NextResponse.json({
+      users: enrichedUsers,
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        total_pages: Math.ceil((count || 0) / limit)
+      }
+    }, { status: 200 })
+  } catch (error) {
+    console.error('Error fetching users:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
