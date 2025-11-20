@@ -10,10 +10,11 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">1. Introduction</h2>
             <p>
               Welcome to DCM Grading ("we," "our," or "us"). We are committed to protecting your personal information and your right to privacy.
-              This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our card grading service
-              available at dcmgrading.com (the "Service").
+              This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered card grading
+              service available at dcmgrading.com (the "Service").
             </p>
             <p>
+              Our Service uses advanced AI technology to analyze and grade trading cards, providing estimated condition assessments and valuations.
               By using the Service, you agree to the collection and use of information in accordance with this policy. If you do not agree with
               our policies and practices, please do not use our Service.
             </p>
@@ -22,30 +23,22 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">2. Information We Collect</h2>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">2.1 Personal Information You Provide</h3>
-            <p>We collect information that you voluntarily provide to us when you:</p>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">2.1 Personal Data</h3>
+            <p>We collect personal information that you voluntarily provide when you:</p>
             <ul className="list-disc list-inside ml-4 space-y-2">
-              <li>Register for an account</li>
-              <li>Upload images of trading cards for grading</li>
+              <li>Register for an account (name, email address, password)</li>
+              <li>Subscribe to a paid plan (payment information processed through secure third-party payment processors)</li>
               <li>Contact us for support or inquiries</li>
-              <li>Sign up for our newsletter or communications</li>
-            </ul>
-            <p className="mt-4">This information may include:</p>
-            <ul className="list-disc list-inside ml-4 space-y-2">
-              <li>Email address</li>
-              <li>Name</li>
-              <li>Account credentials</li>
-              <li>Images of trading cards</li>
-              <li>Communication preferences</li>
+              <li>Update your account preferences</li>
             </ul>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">2.2 Information Automatically Collected</h3>
-            <p>When you access our Service, we may automatically collect certain information, including:</p>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">2.2 Non-Personal Data</h3>
+            <p>We automatically collect certain non-personal information, including:</p>
             <ul className="list-disc list-inside ml-4 space-y-2">
-              <li>Device information (browser type, operating system)</li>
-              <li>IP address and general location</li>
-              <li>Usage data (pages visited, time spent, features used)</li>
-              <li>Cookies and similar tracking technologies</li>
+              <li><strong>Trading card images:</strong> Images you upload for AI grading analysis. These images are retained as long as your account remains active or until you request deletion.</li>
+              <li><strong>Usage data:</strong> Information about how you interact with the Service, including features used and grading history</li>
+              <li><strong>Device information:</strong> Browser type, operating system, device specifications, and IP address</li>
+              <li><strong>Platform metrics:</strong> Analytics data to improve our AI models and Service performance</li>
             </ul>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">2.3 Third-Party Authentication</h3>
@@ -57,17 +50,16 @@ export default function PrivacyPolicyPage() {
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">3. How We Use Your Information</h2>
-            <p>We use the information we collect to:</p>
+            <p>We use the information we collect for the following purposes:</p>
             <ul className="list-disc list-inside ml-4 space-y-2">
-              <li>Provide, maintain, and improve our card grading Service</li>
-              <li>Process and analyze uploaded card images using AI technology</li>
-              <li>Create and manage your user account</li>
-              <li>Send you technical notices, updates, and support messages</li>
-              <li>Respond to your comments, questions, and customer service requests</li>
-              <li>Monitor and analyze usage patterns and trends</li>
-              <li>Detect, prevent, and address technical issues and security threats</li>
-              <li>Comply with legal obligations and enforce our terms</li>
-              <li>Send marketing communications (with your consent)</li>
+              <li><strong>AI Grading Services:</strong> Process and analyze uploaded card images using our AI technology to generate grading reports and condition assessments</li>
+              <li><strong>Account Management:</strong> Create, maintain, and secure your user account</li>
+              <li><strong>Payment Processing:</strong> Process subscription payments and manage billing through secure third-party payment processors</li>
+              <li><strong>Service Improvement:</strong> Analyze usage patterns to enhance our AI models and improve grading accuracy</li>
+              <li><strong>Communication:</strong> Send you technical notices, updates, support messages, and respond to inquiries</li>
+              <li><strong>Security:</strong> Detect, prevent, and address technical issues, fraud, and security threats</li>
+              <li><strong>Legal Compliance:</strong> Comply with applicable laws and enforce our Terms and Conditions</li>
+              <li><strong>Marketing:</strong> Send promotional communications about new features or services (with your consent, and you may opt out at any time)</li>
             </ul>
           </section>
 
@@ -76,13 +68,17 @@ export default function PrivacyPolicyPage() {
             <p>We may share your information in the following circumstances:</p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">4.1 Service Providers</h3>
-            <p>We may share your information with third-party service providers who perform services on our behalf, including:</p>
+            <p>We share your information with trusted third-party service providers who assist us in operating the Service. These providers are bound by confidentiality agreements and include:</p>
             <ul className="list-disc list-inside ml-4 space-y-2">
-              <li>Cloud hosting and storage (Supabase, Vercel)</li>
-              <li>AI and image processing services (OpenAI)</li>
-              <li>Authentication services (Google OAuth)</li>
-              <li>Analytics providers</li>
+              <li><strong>Cloud Hosting:</strong> Supabase, Vercel for data storage and application hosting</li>
+              <li><strong>AI Processing:</strong> OpenAI for AI-powered card grading analysis</li>
+              <li><strong>Payment Processing:</strong> Secure third-party payment processors for subscription and payment handling</li>
+              <li><strong>Authentication:</strong> Google OAuth and other identity providers</li>
+              <li><strong>Analytics:</strong> Service usage and performance analytics providers</li>
             </ul>
+            <p className="mt-4">
+              These service providers only have access to your information as necessary to perform their functions and are obligated to maintain confidentiality.
+            </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">4.2 Legal Compliance</h3>
             <p>We may disclose your information if required to do so by law or in response to valid requests by public authorities.</p>
@@ -100,9 +96,17 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">5. Data Retention</h2>
             <p>
-              We retain your personal information for as long as necessary to fulfill the purposes outlined in this Privacy Policy,
-              unless a longer retention period is required or permitted by law. When you delete your account, we will delete or
-              anonymize your personal information within 30 days.
+              We retain your personal information for as long as necessary to provide the Service and fulfill the purposes outlined in this Privacy Policy:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Account Information:</strong> Retained as long as your account remains active</li>
+              <li><strong>Card Images:</strong> Retained as long as your account remains active or until you request deletion</li>
+              <li><strong>Payment Records:</strong> Retained as required by law for tax and accounting purposes</li>
+              <li><strong>Usage Data:</strong> Aggregated and anonymized data may be retained indefinitely for analytics</li>
+            </ul>
+            <p className="mt-4">
+              When you delete your account or request data deletion, we will permanently delete your personal information within 30 days,
+              except where we are required to retain it by law.
             </p>
           </section>
 
@@ -126,9 +130,17 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">7. Data Security</h2>
             <p>
-              We implement appropriate technical and organizational security measures to protect your personal information against
-              unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet or
-              electronic storage is 100% secure, and we cannot guarantee absolute security.
+              We take the security of your personal information seriously and implement industry-standard security measures, including:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Encryption:</strong> SSL/TLS encryption for data transmission</li>
+              <li><strong>Access Controls:</strong> Restricted access to personal information on a need-to-know basis</li>
+              <li><strong>Security Audits:</strong> Regular security assessments and monitoring</li>
+              <li><strong>Secure Infrastructure:</strong> Industry-leading cloud hosting with built-in security features</li>
+            </ul>
+            <p className="mt-4">
+              However, no online service is 100% secure. While we strive to protect your personal information, we cannot guarantee
+              absolute security. You are responsible for maintaining the confidentiality of your account credentials.
             </p>
           </section>
 
@@ -170,7 +182,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Contact Us</h2>
             <p>If you have any questions about this Privacy Policy, please contact us:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
-              <li>Email: privacy@dcmgrading.com</li>
+              <li>Email: admin@dcmgrading.com</li>
               <li>Website: https://dcmgrading.com</li>
             </ul>
           </section>

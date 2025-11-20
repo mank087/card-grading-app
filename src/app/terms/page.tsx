@@ -21,13 +21,19 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">2. Description of Service</h2>
             <p>
-              DCM Grading provides an AI-powered card grading service that analyzes images of trading cards (including Pokémon,
-              Magic: The Gathering, Lorcana, and other collectible card games) and provides estimated condition grades and valuations.
+              DCM Grading provides an AI-powered pre-grading service for trading cards, including Pokémon, Magic: The Gathering,
+              Lorcana, and other collectible card games. Our Service analyzes images of trading cards and provides estimated
+              condition grades and valuations using advanced AI technology.
             </p>
             <p className="mt-4">
-              <strong>Important Disclaimer:</strong> Our grading service provides estimates based on AI analysis and should be used
-              for informational purposes only. Actual professional grading results may vary. We do not guarantee the accuracy of our
-              assessments, and they should not be solely relied upon for buying, selling, or insurance purposes.
+              <strong>IMPORTANT DISCLAIMER:</strong> The grading results provided by DCM Grading are estimates based on AI analysis
+              and are not guaranteed to align with official third-party professional grading services such as PSA, BGS, CGC, or others.
+              Our assessments should be used for informational and educational purposes only. <strong>DCM Grading is not responsible
+              for any discrepancies between our AI grading results and those of professional grading companies.</strong>
+            </p>
+            <p className="mt-4">
+              We do not guarantee the accuracy, completeness, or reliability of our grading assessments. Results should not be solely
+              relied upon for buying, selling, insurance, or any financial decisions regarding trading cards.
             </p>
           </section>
 
@@ -52,8 +58,9 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">3.3 Account Eligibility</h3>
             <p>
-              You must be at least 13 years old to use this Service. By creating an account, you represent and warrant that you meet
-              this age requirement and have the legal capacity to enter into these Terms.
+              You must be at least 18 years old to use this Service. By creating an account, you represent and warrant that you are
+              18 years of age or older and have the legal capacity to enter into these Terms. If you are under 18, you may not use
+              the Service.
             </p>
           </section>
 
@@ -93,11 +100,22 @@ export default function TermsPage() {
               create derivative works without our express written permission.
             </p>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.2 Your Content</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.2 Your Content and License Grant</h3>
             <p>
-              You retain ownership of the images and content you upload to the Service. By uploading content, you grant us a
-              worldwide, non-exclusive, royalty-free license to use, store, process, and display your content solely for the
-              purpose of providing and improving the Service.
+              You retain ownership of the images and content you upload to the Service. However, by uploading content, you grant
+              DCM Grading a worldwide, non-exclusive, royalty-free, transferable license to use, store, process, reproduce, modify,
+              and display your content for the following purposes:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Providing AI grading analysis and generating grading reports</li>
+              <li>Improving and training our AI models and algorithms</li>
+              <li>Operating, maintaining, and enhancing the Service</li>
+              <li>Complying with legal obligations</li>
+            </ul>
+            <p className="mt-4">
+              You represent and warrant that you have all necessary rights to upload the content and grant us this license, and that
+              your content does not infringe any intellectual property rights, violate any laws, or contain offensive, inappropriate,
+              or illegal material.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.3 Third-Party Intellectual Property</h3>
@@ -111,30 +129,76 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">6. Payment and Fees</h2>
             <p>
-              Currently, certain features of the Service may be offered free of charge. We reserve the right to introduce paid
-              subscriptions, premium features, or usage-based fees in the future. If we introduce paid services:
+              DCM Grading operates on a pay-per-use and/or subscription-based model. Certain features may be offered free of charge,
+              while premium features require payment.
             </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">6.1 Pricing and Billing</h3>
             <ul className="list-disc list-inside ml-4 space-y-2">
               <li>We will provide clear notice of pricing before you incur any charges</li>
-              <li>All fees are non-refundable unless otherwise stated</li>
-              <li>You authorize us to charge your payment method for applicable fees</li>
-              <li>Prices are subject to change with reasonable notice</li>
+              <li>You authorize us to charge your designated payment method for all applicable fees</li>
+              <li>Subscription fees are billed in advance on a recurring basis (monthly, annually, or as otherwise specified)</li>
+              <li>Pay-per-use fees are charged as services are consumed</li>
+              <li>Prices are subject to change with reasonable advance notice</li>
             </ul>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">6.2 Refund Policy</h3>
+            <p>
+              <strong>All payments are nonrefundable,</strong> except where required by applicable law. We do not provide refunds
+              or credits for:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Partial subscription periods</li>
+              <li>Unused credits or grading quota</li>
+              <li>Dissatisfaction with grading results</li>
+              <li>Account termination or suspension</li>
+            </ul>
+            <p className="mt-4">
+              If you experience technical issues or service disruptions, please contact us at admin@dcmgrading.com and we will work
+              to resolve the issue. In exceptional circumstances, we may provide refunds or credits at our sole discretion.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">6.3 Payment Processing</h3>
+            <p>
+              Payments are processed through secure third-party payment processors. We do not store your complete credit card
+              information on our servers.
+            </p>
           </section>
 
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">7. Disclaimers and Limitations of Liability</h2>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">7.1 No Warranty</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">7.1 "AS IS" Disclaimer</h3>
             <p>
-              THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR IMPLIED,
-              INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
+              THE SERVICE IS PROVIDED ON AN "AS IS" AND "AS AVAILABLE" BASIS WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS OR
+              IMPLIED, INCLUDING BUT NOT LIMITED TO:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>IMPLIED WARRANTIES OF MERCHANTABILITY</li>
+              <li>IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR PURPOSE</li>
+              <li>WARRANTIES OF NON-INFRINGEMENT</li>
+              <li>WARRANTIES THAT THE SERVICE WILL BE UNINTERRUPTED OR ERROR-FREE</li>
+              <li>WARRANTIES REGARDING THE ACCURACY OR RELIABILITY OF GRADING RESULTS</li>
+            </ul>
+            <p className="mt-4">
+              <strong>WE MAKE NO REPRESENTATIONS OR WARRANTIES ABOUT THE SUITABILITY, RELIABILITY, AVAILABILITY, TIMELINESS, OR
+              ACCURACY OF THE SERVICE FOR ANY PURPOSE.</strong>
             </p>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">7.2 Accuracy of Grading</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">7.2 Accuracy of AI Grading</h3>
             <p>
-              WE DO NOT GUARANTEE THE ACCURACY, COMPLETENESS, OR RELIABILITY OF OUR AI-POWERED CARD GRADING ASSESSMENTS.
-              GRADES AND VALUATIONS ARE ESTIMATES ONLY AND SHOULD NOT BE SOLELY RELIED UPON FOR FINANCIAL DECISIONS.
+              <strong>WE DO NOT GUARANTEE THE ACCURACY, COMPLETENESS, OR RELIABILITY OF OUR AI-POWERED CARD GRADING ASSESSMENTS.</strong>
+              Our AI technology provides estimates that:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Are not guaranteed to match professional grading service results</li>
+              <li>May vary from actual card condition or market value</li>
+              <li>Should not be relied upon as the sole basis for financial decisions</li>
+              <li>Are subject to limitations inherent in AI analysis and image quality</li>
+            </ul>
+            <p className="mt-4">
+              YOU ASSUME ALL RISK ASSOCIATED WITH RELYING ON OUR GRADING ASSESSMENTS. WE ARE NOT LIABLE FOR ANY LOSSES OR DAMAGES
+              RESULTING FROM DECISIONS MADE BASED ON OUR GRADING RESULTS.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">7.3 Limitation of Liability</h3>
@@ -179,12 +243,21 @@ export default function TermsPage() {
             <p>You may terminate your account at any time by contacting us or using the account deletion feature in the Service.</p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">9.2 Termination by Us</h3>
-            <p>We reserve the right to suspend or terminate your access to the Service at any time, with or without cause, including if:</p>
+            <p>
+              We reserve the right to suspend or terminate your access to the Service immediately, at any time, with or without
+              notice, with or without cause, including but not limited to if:
+            </p>
             <ul className="list-disc list-inside ml-4 space-y-2">
-              <li>You violate these Terms</li>
-              <li>Your use of the Service poses a security or legal risk</li>
-              <li>You engage in fraudulent or illegal activities</li>
+              <li>You violate these Terms or any applicable laws</li>
+              <li>Your use of the Service poses a security, legal, or reputational risk</li>
+              <li>You engage in fraudulent, abusive, or illegal activities</li>
+              <li>Your payment method fails or your account becomes delinquent</li>
+              <li>We discontinue the Service or specific features</li>
             </ul>
+            <p className="mt-4">
+              <strong>We may suspend or terminate accounts without prior notice</strong> when we determine, in our sole discretion,
+              that such action is necessary to protect the Service, other users, or our business interests.
+            </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">9.3 Effect of Termination</h3>
             <p>
@@ -249,7 +322,7 @@ export default function TermsPage() {
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">12.5 Contact Information</h3>
             <p>For questions about these Terms, please contact us at:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
-              <li>Email: legal@dcmgrading.com</li>
+              <li>Email: admin@dcmgrading.com</li>
               <li>Website: https://dcmgrading.com</li>
             </ul>
           </section>
