@@ -37,11 +37,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply status filter
-    if (status === 'active') {
-      query = query.is('suspended_at', null)
-    } else if (status === 'suspended') {
-      query = query.not('suspended_at', 'is', null)
-    }
+    // Note: suspended_at column doesn't exist yet in users table
+    // Uncomment when suspension feature is added
+    // if (status === 'active') {
+    //   query = query.is('suspended_at', null)
+    // } else if (status === 'suspended') {
+    //   query = query.not('suspended_at', 'is', null)
+    // }
 
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' })
