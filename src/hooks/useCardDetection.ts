@@ -15,7 +15,8 @@ interface DetectionResult {
  */
 export const useCardDetection = (
   videoRef: React.RefObject<HTMLVideoElement>,
-  enabled: boolean = true
+  enabled: boolean = true,
+  side: 'front' | 'back' = 'front' // Add side parameter to adjust detection
 ) => {
   const [detection, setDetection] = useState<DetectionResult>({
     isCardDetected: false,
@@ -82,7 +83,7 @@ export const useCardDetection = (
       const imageData = ctx.getImageData(frameX, frameY, frameWidth, frameHeight);
 
       // Detect card presence using enhanced multi-criteria analysis
-      const result = analyzeFrameForCard(imageData, frameCountRef.current);
+      const result = analyzeFrameForCard(imageData, frameCountRef.current, side);
       frameCountRef.current++;
 
       // Faster smoothing for quicker response
@@ -142,10 +143,12 @@ export const useCardDetection = (
 /**
  * Enhanced multi-criteria card detection
  * Uses weighted scoring for robust detection across lighting conditions
+ * Adjusted for card backs (uniform surfaces, lower saturation)
  */
-function analyzeFrameForCard(imageData: ImageData, frameCount: number): DetectionResult {
+function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'front' | 'back' = 'front'): DetectionResult {
   const { data, width, height } = imageData;
   const hints: string[] = [];
+  const isBack = side === 'back';
 
   // Define regions more precisely
   const centerWidth = Math.floor(width * 0.7); // Larger center region
@@ -208,33 +211,38 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number): Detectio
   }
 
   // WEIGHTED SCORING (not all-or-nothing)
+  // Adjust weights and thresholds for card backs (more uniform, less colorful)
   let score = 0;
-  const weights = { detail: 30, contrast: 25, edges: 25, saturation: 20 };
+  const weights = isBack
+    ? { detail: 20, contrast: 30, edges: 35, saturation: 15 }  // Back: focus on shape/edges
+    : { detail: 30, contrast: 25, edges: 25, saturation: 20 }; // Front: balanced
 
-  // Detail score (texture variance)
-  if (centerStdDev > 15) { // Lowered from 20
-    const detailScore = Math.min(100, (centerStdDev - 15) * 2);
+  // Detail score (texture variance) - more lenient for backs
+  const detailThreshold = isBack ? 8 : 15;  // Backs can be more uniform
+  if (centerStdDev > detailThreshold) {
+    const detailScore = Math.min(100, (centerStdDev - detailThreshold) * 2);
     score += (detailScore / 100) * weights.detail;
-  } else {
+  } else if (!isBack) {
     hints.push('No card detail detected');
   }
 
   // Contrast score (card vs background)
-  if (colorDifference > 10) { // Lowered from 15
+  if (colorDifference > 10) {
     const contrastScore = Math.min(100, (colorDifference - 10) * 3);
     score += (contrastScore / 100) * weights.contrast;
   } else {
     hints.push('Card not distinct from background');
   }
 
-  // Edge score (rectangular shape)
-  if (edgeStrength > 0.3) { // Cards have defined edges
+  // Edge score (rectangular shape) - MORE important for backs
+  if (edgeStrength > 0.3) {
     const edgeScore = Math.min(100, edgeStrength * 100);
     score += (edgeScore / 100) * weights.edges;
   }
 
-  // Saturation score (cards have color)
-  if (saturation > 10) { // Not pure grayscale
+  // Saturation score (cards have color) - less important for backs
+  const saturationThreshold = isBack ? 5 : 10;  // Backs can be white/gray
+  if (saturation > saturationThreshold) {
     const satScore = Math.min(100, saturation * 2);
     score += (satScore / 100) * weights.saturation;
   }

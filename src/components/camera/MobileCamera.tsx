@@ -24,8 +24,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
 
-  // Auto card detection
-  const detection = useCardDetection(videoRef, !!stream);
+  // Auto card detection - pass side to adjust detection for card backs
+  const detection = useCardDetection(videoRef, !!stream, side);
 
   // Start camera on mount and when facingMode changes
   useEffect(() => {
