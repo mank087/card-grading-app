@@ -315,22 +315,23 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             </div>
           )}
 
-          {/* Confidence indicator */}
-          <div className="flex items-center justify-center gap-2">
-            <div className="flex-1 max-w-48 h-1.5 bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={`h-full transition-all duration-300 ${
-                  detection.confidence > 70 ? 'bg-green-400' :
-                  detection.confidence > 40 ? 'bg-yellow-400' :
-                  'bg-gray-500'
-                }`}
-                style={{ width: `${detection.confidence}%` }}
-              />
+          {/* Simplified detection indicator - only show when actively detecting */}
+          {!detection.isStable && (
+            <div className="flex items-center justify-center gap-2">
+              <p className="text-xs text-gray-500 uppercase tracking-wide">Detection</p>
+              <div className="flex gap-1">
+                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  detection.confidence > 20 ? 'bg-green-400' : 'bg-gray-600'
+                }`} />
+                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  detection.confidence > 50 ? 'bg-green-400' : 'bg-gray-600'
+                }`} />
+                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                  detection.confidence > 80 ? 'bg-green-400' : 'bg-gray-600'
+                }`} />
+              </div>
             </div>
-            <p className="text-xs text-gray-400 w-12">
-              {detection.confidence}%
-            </p>
-          </div>
+          )}
         </div>
       </div>
     </div>

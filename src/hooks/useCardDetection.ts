@@ -28,6 +28,7 @@ export const useCardDetection = (
   const stableFramesRef = useRef<number>(0);
   const lastConfidenceRef = useRef<number>(0);
   const frameCountRef = useRef<number>(0);
+  const lastDetectedStateRef = useRef<boolean>(false); // Track last detected state for hysteresis
 
   useEffect(() => {
     if (!enabled || !videoRef.current) {
@@ -88,18 +89,29 @@ export const useCardDetection = (
       const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current, 0.5);
       lastConfidenceRef.current = smoothedConfidence;
 
-      // Lowered threshold for easier detection
-      const DETECTION_THRESHOLD = 50; // Was 60, now 50 for better sensitivity
+      // Use hysteresis to prevent flickering (different thresholds for entering vs exiting detected state)
+      const ENTER_THRESHOLD = 50; // Threshold to become "detected"
+      const EXIT_THRESHOLD = 35;  // Threshold to lose "detected" status (lower = stickier)
+
+      let isCardDetected: boolean;
+      if (lastDetectedStateRef.current) {
+        // Currently detected - need to drop below exit threshold to lose detection
+        isCardDetected = smoothedConfidence > EXIT_THRESHOLD;
+      } else {
+        // Currently not detected - need to exceed enter threshold to gain detection
+        isCardDetected = smoothedConfidence > ENTER_THRESHOLD;
+      }
+      lastDetectedStateRef.current = isCardDetected;
 
       // Track stable frames
-      if (smoothedConfidence > DETECTION_THRESHOLD) {
+      if (isCardDetected) {
         stableFramesRef.current++;
       } else {
         stableFramesRef.current = 0;
       }
 
       setDetection({
-        isCardDetected: smoothedConfidence > DETECTION_THRESHOLD,
+        isCardDetected,
         confidence: smoothedConfidence,
         message: getDetectionMessage(smoothedConfidence, stableFramesRef.current),
         hints: result.hints
