@@ -69,6 +69,13 @@ interface Card {
   explanation: any;
   summary: string;
   processing_time?: number;
+  conversational_card_info?: {
+    card_name?: string;
+    player_or_character?: string;
+    card_front_text?: string;
+    card_back_text?: string;
+    [key: string]: any;
+  };
 }
 
 const renderValue = (value: any) => {
@@ -310,6 +317,19 @@ export default function CardDetails() {
             </div>
           </div>
 
+          {/* Card Text (for MTG and other TCG cards) */}
+          {card.category === 'MTG' && card.conversational_card_info?.card_front_text && (
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="text-xl font-bold mb-4">Card Text</h3>
+              <div className="space-y-3">
+                <div className="prose prose-sm max-w-none">
+                  <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    {card.conversational_card_info.card_front_text}
+                  </pre>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* QR Code */}
           <div className="bg-white rounded-lg shadow-lg p-6 text-center">
