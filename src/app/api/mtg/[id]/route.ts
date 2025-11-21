@@ -189,9 +189,11 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
 
     if (cardVisibility === 'private') {
       // Private card - only owner can view
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      // Get user_id from query parameter (client-side directAuth uses localStorage)
+      const { searchParams } = new URL(request.url);
+      const userId = searchParams.get('user_id');
 
-      if (authError || !user) {
+      if (!userId) {
         console.log(`[GET /api/mtg/${cardId}] 🔒 Private card access denied - not authenticated`);
         return NextResponse.json({
           error: "This card is private",
@@ -200,8 +202,8 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         }, { status: 403 });
       }
 
-      if (card.user_id !== user.id) {
-        console.log(`[GET /api/mtg/${cardId}] 🔒 Private card access denied - user ${user.id} is not owner ${card.user_id}`);
+      if (card.user_id !== userId) {
+        console.log(`[GET /api/mtg/${cardId}] 🔒 Private card access denied - user ${userId} is not owner ${card.user_id}`);
         return NextResponse.json({
           error: "This card is private",
           message: "Only the owner can view this card.",
@@ -209,7 +211,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         }, { status: 403 });
       }
 
-      console.log(`[GET /api/mtg/${cardId}] ✅ Private card access granted to owner ${user.id}`);
+      console.log(`[GET /api/mtg/${cardId}] ✅ Private card access granted to owner ${userId}`);
     } else {
       // Public card - anyone can view
       console.log(`[GET /api/mtg/${cardId}] 🌐 Public card - access granted`);

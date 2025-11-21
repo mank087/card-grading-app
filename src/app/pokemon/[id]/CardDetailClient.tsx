@@ -1304,8 +1304,12 @@ export function PokemonCardDetails() {
       setError(null);
       setIsProcessing(false);
 
+      // Get user session to pass user_id for private card access
+      const session = getStoredSession();
+      const userParam = session?.user?.id ? `&user_id=${session.user.id}` : '';
+
       console.log(`[FRONTEND DEBUG] Calling Pokemon API endpoint: /api/pokemon/${cardId}`);
-      const res = await fetch(`/api/pokemon/${cardId}?t=${Date.now()}`); // Cache-busting
+      const res = await fetch(`/api/pokemon/${cardId}?t=${Date.now()}${userParam}`); // Cache-busting
       console.log(`[FRONTEND DEBUG] Pokemon API response status: ${res.status}`);
 
       if (!res.ok) {
@@ -1354,7 +1358,7 @@ export function PokemonCardDetails() {
 
             try {
               console.log(`[FRONTEND DEBUG] Retry ${attempt}: Calling /api/pokemon/${cardId}`);
-              const retryRes = await fetch(`/api/pokemon/${cardId}?t=${Date.now()}`); // Cache-busting
+              const retryRes = await fetch(`/api/pokemon/${cardId}?t=${Date.now()}${userParam}`); // Cache-busting
 
               if (retryRes.ok) {
                 const data = await retryRes.json();

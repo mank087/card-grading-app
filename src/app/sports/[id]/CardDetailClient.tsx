@@ -1303,8 +1303,12 @@ export function SportsCardDetails() {
       setError(null);
       setIsProcessing(false);
 
+      // Get user session to pass user_id for private card access
+      const session = getStoredSession();
+      const userParam = session?.user?.id ? `&user_id=${session.user.id}` : '';
+
       console.log(`Fetching sports card details for: ${cardId}`);
-      const res = await fetch(`/api/sports/${cardId}?t=${Date.now()}`); // Cache-busting
+      const res = await fetch(`/api/sports/${cardId}?t=${Date.now()}${userParam}`); // Cache-busting
       console.log(`Sports API response status: ${res.status}`);
 
       if (!res.ok) {
@@ -1353,7 +1357,7 @@ export function SportsCardDetails() {
 
             try {
               console.log(`Retry ${attempt}: Calling /api/sports/${cardId}`);
-              const retryRes = await fetch(`/api/sports/${cardId}?t=${Date.now()}`); // Cache-busting
+              const retryRes = await fetch(`/api/sports/${cardId}?t=${Date.now()}${userParam}`); // Cache-busting
 
               if (retryRes.ok) {
                 const data = await retryRes.json();
