@@ -21,6 +21,7 @@ import {
 } from "@/lib/socialUtils";
 import { assessCardCondition, getConditionColor, getConditionDescription, getConditionFromGrade, type DCMConditionAssessment, type VisualInspectionResults } from '@/lib/conditionAssessment';
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
+import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 
