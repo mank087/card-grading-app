@@ -312,7 +312,7 @@ export async function GET(request: NextRequest, { params }: CardGradingRequest) 
 
     console.log(`[GET /api/card/${cardId}] Request completed in ${Date.now() - startTime}ms`);
 
-    // Return updated card data
+    // Return updated card data (including conversational_card_info from database)
     return NextResponse.json({
       ...card,
       ai_grading: gradingResult,
@@ -323,7 +323,8 @@ export async function GET(request: NextRequest, { params }: CardGradingRequest) 
       ...cardFields,
       front_url: frontUrl,
       back_url: backUrl,
-      processing_time: Date.now() - startTime
+      processing_time: Date.now() - startTime,
+      conversational_card_info: card.conversational_card_info // Include from database
     });
 
   } catch (error: any) {
