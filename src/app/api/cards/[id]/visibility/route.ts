@@ -35,16 +35,18 @@ export async function PATCH(
       );
     }
 
-    // Get authenticated user
-    const supabase = supabaseServer();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    // Get user ID from query parameter (client-side auth uses localStorage)
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('user_id');
 
-    if (authError || !user) {
+    if (!userId) {
       return NextResponse.json(
         { error: "Unauthorized - Please log in" },
         { status: 401 }
       );
     }
+
+    const supabase = supabaseServer();
 
     // Parse request body
     const body = await request.json();
@@ -73,7 +75,7 @@ export async function PATCH(
     }
 
     // Verify ownership
-    if (card.user_id !== user.id) {
+    if (card.user_id !== userId) {
       return NextResponse.json(
         { error: "Forbidden - You can only change visibility of your own cards" },
         { status: 403 }
@@ -96,7 +98,7 @@ export async function PATCH(
       );
     }
 
-    console.log(`✅ Card ${cardId} visibility updated to ${visibility} by user ${user.id}`);
+    console.log(`✅ Card ${cardId} visibility updated to ${visibility} by user ${userId}`);
 
     return NextResponse.json({
       success: true,

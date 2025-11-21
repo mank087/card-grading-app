@@ -1565,7 +1565,13 @@ export function MTGCardDetails() {
 
       setIsTogglingVisibility(true);
 
-      const response = await fetch(`/api/cards/${card.id}/visibility`, {
+      // Get user session for authentication
+      const session = getStoredSession();
+      if (!session || !session.user) {
+        throw new Error('You must be logged in to change visibility');
+      }
+
+      const response = await fetch(`/api/cards/${card.id}/visibility?user_id=${session.user.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
