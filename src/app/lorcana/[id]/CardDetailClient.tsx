@@ -2345,44 +2345,56 @@ export function MTGCardDetails() {
           <div className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
             🎴 Disney Lorcana Card
           </div>
-          {/* 🔒 Visibility Toggle Button */}
-          <button
-            onClick={() => {
-              // Show confirmation modal for making private
-              if (visibility === 'public') {
-                const confirmed = confirm(
-                  '⚠️ Make this card private?\n\n' +
-                  '🔒 Only you will be able to view this card\n' +
-                  '🔒 Card will NOT be searchable by anyone\n' +
-                  '🔒 Shared links will stop working\n\n' +
-                  'Continue?'
-                );
-                if (confirmed) {
-                  toggleVisibility();
-                }
-              } else {
-                // No confirmation needed for making public
-                toggleVisibility();
-              }
-            }}
-            disabled={isTogglingVisibility}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-              visibility === 'public'
-                ? 'bg-green-100 text-green-800 hover:bg-green-200 border-2 border-green-500'
-                : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border-2 border-gray-400'
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            title={visibility === 'public' ? 'This card is public (click to make private)' : 'This card is private (click to make public)'}
-          >
-            <span>{isTogglingVisibility ? 'Updating...' : visibility === 'public' ? 'Public' : 'Private'}</span>
-          </button>
-          <button
-            onClick={regradeCard}
-            disabled={loading}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-            title="Re-grade this card with the latest model"
-          >
-            <span>{loading ? 'Re-grading...' : 'Re-grade Card'}</span>
-          </button>
+          {/* Only show visibility toggle and re-grade buttons to card owner */}
+          {(() => {
+            const session = getStoredSession();
+            const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+
+            if (!isOwner) return null;
+
+            return (
+              <>
+                {/* 🔒 Visibility Toggle Button */}
+                <button
+                  onClick={() => {
+                    // Show confirmation modal for making private
+                    if (visibility === 'public') {
+                      const confirmed = confirm(
+                        '⚠️ Make this card private?\n\n' +
+                        '🔒 Only you will be able to view this card\n' +
+                        '🔒 Card will NOT be searchable by anyone\n' +
+                        '🔒 Shared links will stop working\n\n' +
+                        'Continue?'
+                      );
+                      if (confirmed) {
+                        toggleVisibility();
+                      }
+                    } else {
+                      // No confirmation needed for making public
+                      toggleVisibility();
+                    }
+                  }}
+                  disabled={isTogglingVisibility}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                    visibility === 'public'
+                      ? 'bg-green-100 text-green-800 hover:bg-green-200 border-2 border-green-500'
+                      : 'bg-gray-100 text-gray-800 hover:bg-gray-200 border-2 border-gray-400'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  title={visibility === 'public' ? 'This card is public (click to make private)' : 'This card is private (click to make public)'}
+                >
+                  <span>{isTogglingVisibility ? 'Updating...' : visibility === 'public' ? 'Public' : 'Private'}</span>
+                </button>
+                <button
+                  onClick={regradeCard}
+                  disabled={loading}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  title="Re-grade this card with the latest model"
+                >
+                  <span>{loading ? 'Re-grading...' : 'Re-grade Card'}</span>
+                </button>
+              </>
+            );
+          })()}
         </div>
       </div>
 
