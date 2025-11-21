@@ -19,6 +19,7 @@ export interface ReportCardData {
   backImageUrl: string;
   grade: number;
   conditionLabel: string;
+  labelCondition: string; // Condition category for card labels (e.g., "Mint", "Near Mint")
   gradeRange: string;
   professionalGrades: {
     psa: string | number;
@@ -134,7 +135,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
                 <View style={reportStyles.cardLabelDivider} />
                 <Text style={reportStyles.cardLabelConfidence}>
-                  {cardData.aiConfidence}
+                  {cardData.labelCondition}
                 </Text>
               </View>
             </View>
@@ -233,7 +234,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                   </Text>
                   <View style={reportStyles.cardLabelDivider} />
                   <Text style={reportStyles.cardLabelConfidence}>
-                    {cardData.aiConfidence}
+                    {cardData.labelCondition}
                   </Text>
                 </View>
               </View>

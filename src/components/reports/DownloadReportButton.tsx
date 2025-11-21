@@ -4,6 +4,7 @@ import React from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, ReportCardData } from './CardGradingReport';
 import { getAuthenticatedClient } from '../../lib/directAuth';
+import { getConditionFromGrade } from '../../lib/conditionAssessment';
 import QRCode from 'qrcode';
 
 /**
@@ -350,6 +351,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         backImageUrl: backImageBase64,
         grade: card.conversational_decimal_grade || 0,
         conditionLabel: card.conversational_condition_label || 'N/A',
+        labelCondition: card.conversational_condition_label
+          ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+          : (getConditionFromGrade(card.conversational_decimal_grade) || 'N/A'),
         gradeRange: (() => {
           // Extract just the uncertainty value (e.g., "10.0 ± 0.25" → "0.25")
           const uncertaintyStr = card.conversational_grade_uncertainty || '±0.25';

@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getStoredSession } from '../../lib/directAuth'
+import { getConditionFromGrade } from '@/lib/conditionAssessment'
 
 type Card = {
   id: string
@@ -86,18 +87,27 @@ const getYear = (card: Card) => {
 };
 
 const getCardGrade = (card: Card) => {
-  // 🎯 PRIMARY: Use conversational AI grade if available (rounds to whole number for collection display)
+  // 🎯 PRIMARY: Use conversational AI grade if available
   if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
-    return Math.round(card.conversational_decimal_grade);
+    return card.conversational_decimal_grade;
   }
   // FALLBACK: DVG v1 grade
   if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
-    return Math.round(card.dvg_decimal_grade);
+    return card.dvg_decimal_grade;
   }
   // LEGACY: Old grade fields
   if (card.dcm_grade_whole) return card.dcm_grade_whole;
   if (card.grade_numeric) return card.grade_numeric;
   return null;
+};
+
+// Format grade for display (matches detail page formatting)
+const formatGrade = (grade: number): string => {
+  // Show .5 grades, otherwise show whole numbers
+  if (grade % 1 === 0.5) {
+    return grade.toFixed(1);
+  }
+  return Math.round(grade).toString();
 };
 
 const getGradeSource = (card: Card): 'conversational' | 'structured' | null => {
@@ -184,6 +194,7 @@ function CollectionPageContent() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [displayLimit, setDisplayLimit] = useState(20) // Initial display limit
+  const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
 
@@ -300,6 +311,48 @@ function CollectionPageContent() {
   // Load more handler
   const loadMore = () => {
     setDisplayLimit(prev => prev + 20)
+  }
+
+  // Delete card handler
+  const handleDeleteCard = async (cardId: string, cardName: string) => {
+    // Confirmation dialog
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${cardName}"?\n\nThis action cannot be undone.`
+    )
+
+    if (!confirmDelete) {
+      return
+    }
+
+    setDeletingCardId(cardId)
+
+    try {
+      // Get user session
+      const session = getStoredSession()
+      if (!session || !session.user) {
+        throw new Error('You must be logged in to delete cards')
+      }
+
+      const response = await fetch(`/api/cards/${cardId}?user_id=${session.user.id}`, {
+        method: 'DELETE',
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete card')
+      }
+
+      // Remove card from local state
+      setCards(prevCards => prevCards.filter(card => card.id !== cardId))
+
+      // Show success message
+      alert('Card deleted successfully!')
+    } catch (error: any) {
+      console.error('Delete error:', error)
+      alert(`Failed to delete card: ${error.message}`)
+    } finally {
+      setDeletingCardId(null)
+    }
   }
 
   if (loading) return <p className="p-6 text-center">Loading your collection...</p>
@@ -481,17 +534,29 @@ function CollectionPageContent() {
 
                       {/* Right: Grade Display */}
                       <div className="text-center flex-shrink-0">
-                        <div className="font-bold text-purple-700 text-3xl leading-none">
-                          {getCardGrade(card) || '?'}
-                        </div>
-                        {getImageQualityGrade(card) && (
-                          <>
-                            <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                            <div className="font-semibold text-purple-600 text-base">
-                              {getImageQualityGrade(card)}
-                            </div>
-                          </>
-                        )}
+                        {(() => {
+                          const grade = getCardGrade(card);
+                          // Use actual AI-generated condition label, stripping abbreviation
+                          const condition = card.conversational_condition_label
+                            ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                            : (grade ? getConditionFromGrade(grade) : '');
+
+                          return (
+                            <>
+                              <div className="font-bold text-purple-700 text-3xl leading-none">
+                                {grade ? formatGrade(grade) : '?'}
+                              </div>
+                              {condition && (
+                                <>
+                                  <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+                                  <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
+                                    {condition}
+                                  </div>
+                                </>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -551,8 +616,12 @@ function CollectionPageContent() {
               </p>
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+                {/* Mobile scroll hint */}
+                <div className="md:hidden bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-700">
+                  ← Swipe to see all columns including Actions →
+                </div>
+                <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
+                  <table className="w-full" style={{ minWidth: '1200px' }}>
                     <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th
@@ -646,7 +715,7 @@ function CollectionPageContent() {
                         )}
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:static sticky right-0 bg-gray-50 shadow-md md:shadow-none" style={{ minWidth: '200px' }}>
                       Actions
                     </th>
                   </tr>
@@ -678,17 +747,24 @@ function CollectionPageContent() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm font-medium text-gray-900">
-                          {getCardGrade(card) || '-'}
-                          {getGradeSource(card) && (
-                            <span className="text-xs ml-1" title={getGradeSource(card) === 'conversational' ? 'AI Visual Assessment' : 'Structured Analysis'}>
-                              {getGradeSource(card) === 'conversational' ? '🤖' : '🔢'}
-                            </span>
-                          )}
-                          {getImageQualityGrade(card) && (
-                            <span className="text-xs text-gray-500 ml-1">
-                              / {getImageQualityGrade(card)}
-                            </span>
-                          )}
+                          {(() => {
+                            const grade = getCardGrade(card);
+                            // Use actual AI-generated condition label, stripping abbreviation
+                            const condition = card.conversational_condition_label
+                              ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                              : (grade ? getConditionFromGrade(grade) : '');
+
+                            return (
+                              <>
+                                {grade ? formatGrade(grade) : '-'}
+                                {condition && (
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    / {condition}
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -705,13 +781,23 @@ function CollectionPageContent() {
                           {card.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <Link
-                          href={getCardLink(card)}
-                          className="text-purple-600 hover:text-purple-800 font-medium"
-                        >
-                          View Details
-                        </Link>
+                      <td className="px-6 py-4 text-sm md:static sticky right-0 bg-white shadow-md md:shadow-none" style={{ minWidth: '200px' }}>
+                        <div className="flex items-center gap-3 flex-nowrap">
+                          <Link
+                            href={getCardLink(card)}
+                            className="text-purple-600 hover:text-purple-800 font-medium whitespace-nowrap"
+                          >
+                            View Details
+                          </Link>
+                          <button
+                            onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
+                            disabled={deletingCardId === card.id}
+                            className="text-red-600 hover:text-red-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
+                            title="Delete card"
+                          >
+                            {deletingCardId === card.id ? 'Deleting...' : 'Delete'}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

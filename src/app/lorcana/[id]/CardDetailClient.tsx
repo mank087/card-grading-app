@@ -21,6 +21,7 @@ import {
   type CardSharingData
 } from "@/lib/socialUtils";
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
+import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 
@@ -1810,18 +1811,21 @@ export function MTGCardDetails() {
 
     // Regular error display
     return (
-      <div className="text-red-500 text-center p-8">
-        <h1 className="text-2xl font-bold mb-4">Error</h1>
-        <p>{error}</p>
-        <div className="mt-4 space-x-4">
-          <button
-            onClick={fetchMTGCardDetails}
-            className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+      <div className="text-center p-8">
+        <h1 className="text-2xl font-bold mb-4 text-gray-800">Card Not Available</h1>
+        <p className="text-gray-600 mb-6">This card no longer exists or is not viewable at this moment.</p>
+        <div className="flex gap-4 justify-center">
+          <Link
+            href="/collection"
+            className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-md font-medium transition-colors"
           >
-            Retry
-          </button>
-          <Link href="/upload/sports" className="text-blue-500 inline-block">
-            Back to Sports Upload
+            My Collection
+          </Link>
+          <Link
+            href="/upload?category=Lorcana"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md font-medium transition-colors"
+          >
+            Grade a Card
           </Link>
         </div>
       </div>
@@ -2463,25 +2467,41 @@ export function MTGCardDetails() {
 
                   {/* Right: Grade Display */}
                   <div className="text-center flex-shrink-0">
-                    <div className="font-bold text-purple-700 text-3xl leading-none">
-                      {(() => {
-                        // 🎯 PRIMARY: Use conversational AI grade if available
-                        if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
-                          return formatGrade(card.conversational_decimal_grade);
-                        }
-                        // FALLBACK: DVG v1 grade
-                        if (recommendedGrade.recommended_decimal_grade === null || card.dvg_decimal_grade === null) {
-                          return 'N/A';
-                        }
-                        const decimalGrade = card.dvg_decimal_grade || recommendedGrade.recommended_decimal_grade || card.dcm_grade_decimal;
-                        // 🔧 FIX: Show 'N/A' instead of '?' for altered/ungradeable cards
-                        return decimalGrade !== undefined && decimalGrade !== null ? formatGrade(decimalGrade) : 'N/A';
-                      })()}
-                    </div>
-                    <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                    <div className="font-semibold text-purple-600 text-lg">
-                      {card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B'}
-                    </div>
+                    {(() => {
+                      // Get the numeric grade
+                      let grade: number | null = null;
+                      if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
+                        grade = card.conversational_decimal_grade;
+                      } else if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
+                        grade = card.dvg_decimal_grade;
+                      } else if (recommendedGrade.recommended_decimal_grade !== null && recommendedGrade.recommended_decimal_grade !== undefined) {
+                        grade = recommendedGrade.recommended_decimal_grade;
+                      } else if (card.dcm_grade_decimal !== null && card.dcm_grade_decimal !== undefined) {
+                        grade = card.dcm_grade_decimal;
+                      }
+
+                      // Use actual AI-generated condition label, stripping abbreviation like (GM), (M), etc
+                      const condition = card.conversational_condition_label
+                        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                        : (grade !== null ? getConditionFromGrade(grade) : '');
+                      const displayGrade = grade !== null ? formatGrade(grade) : 'N/A';
+
+                      return (
+                        <>
+                          <div className="font-bold text-purple-700 text-3xl leading-none">
+                            {displayGrade}
+                          </div>
+                          {condition && (
+                            <>
+                              <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+                              <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
+                                {condition}
+                              </div>
+                            </>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>

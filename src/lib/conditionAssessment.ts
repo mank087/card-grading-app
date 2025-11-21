@@ -438,3 +438,18 @@ export function getConditionDescription(condition: ConditionLevel): string {
     default: return 'Condition assessment unavailable';
   }
 }
+
+// Helper function to map numeric grade to condition category
+export function getConditionFromGrade(grade: number | null | undefined): string {
+  if (grade === null || grade === undefined) return '';
+
+  if (grade >= 10) return 'Gem Mint';
+  if (grade >= 9.5) return 'Mint';
+  if (grade >= 9.0) return 'Mint';
+  if (grade >= 8.0) return 'Near Mint';
+  if (grade >= 7.0) return 'Excellent';
+  if (grade >= 6.0) return 'Very Good';
+  if (grade >= 5.0) return 'Good';
+  if (grade >= 4.0) return 'Fair';
+  return 'Poor';
+}

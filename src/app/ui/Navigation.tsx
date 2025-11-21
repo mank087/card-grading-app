@@ -4,8 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabaseClient";
-import { getStoredSession } from "@/lib/directAuth";
+import { getStoredSession, signOut } from "@/lib/directAuth";
 
 export default function Navigation() {
   const [user, setUser] = useState<any>(null);
@@ -76,12 +75,9 @@ export default function Navigation() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [uploadDropdownOpen, accountDropdownOpen, mobileMenuOpen]);
 
-  const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-    } catch (error: any) {
-      console.warn('Logout error (continuing anyway):', error.message);
-    }
+  const handleLogout = () => {
+    // Clear the session using the directAuth signOut function
+    signOut();
     setUser(null);
     router.push('/login');
   };
