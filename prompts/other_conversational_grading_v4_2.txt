@@ -426,70 +426,106 @@ EXTRACTION GUIDELINES
 • Never use null for card_name, front_text, or back_text
 
 [STEP 2] IMAGE QUALITY & CONFIDENCE ASSESSMENT
-═══════════════════════════════════════════════════════════════════════════════
+══════════════════════════════════════════════════════════════════════
 
-Rate overall visual clarity and assign image confidence letter.
+Rate visual clarity and assign confidence letter based **solely on regional visibility**.
+Do NOT estimate glare percentages. Treat glare, blur, shadows, reflections,
+background blending, sleeve/case obstructions, cropping, and angle distortion
+as "visibility reduction" whenever they prevent reliable evaluation.
 
-🆕 DETAILED IMAGE QUALITY CRITERIA:
+The model MUST classify visibility using these EXACT labels:
 
-RATING | CRITERIA | LIGHTING | GLARE/OBSTRUCTION | FOCUS | CONFIDENCE
--------|----------|----------|-------------------|-------|------------
-Excellent | All corners/edges/surface visible both sides with NO obstruction | Professional-quality even lighting, all micro-defects clearly visible | Minimal glare <10%, NO areas obscured | Sharp focus, micro-defects assessable at zoom | A
-Good | Most features visible, minor limitations | Uneven or moderate shadows 10-25% | Glare 10-30% or partial corner obstruction | Good clarity, slight blur OK | B
-Fair | Major features visible, significant limits | Heavy shadows 40-60% | Heavy glare 30-60% or multiple corners obscured | Noticeable blur, limited detail | C
-Poor | Limited visibility, major issues | Very poor lighting prevents assessment | Glare >60% or major obstruction | Severe blur or one side missing | D
+• fully_visible
+• mostly_visible
+• partially_visible
+• not_visible
 
-🆕 v4.2 STRICTNESS UPDATE: Grade A requires near-professional photo quality
-• <10% surface glare (NOT <20% from v4.1) - must be minimal, not just "minor"
-• High resolution capable of zoom to assess micro-defects (white dots, fiber exposure)
-• Even, bright lighting from multiple angles revealing all defects
-• All 4 corners fully visible and sharp with NO obstruction
-• No areas obscured by holders/cases affecting micro-defect assessment
-• Can detect sub-millimeter defects at maximum zoom
+Applies to:
+- All four corners (front and back)
+- All four edges (front and back)
+- Front and back surfaces
+- Centering reference areas (borders or design anchors)
 
-Grade A uncertainty: ±0.25 ONLY if all above criteria fully met
-If any criteria not fully met: Grade B (±0.5) - most smartphone photos should be Grade B
+Compute regional visibility as:
 
-Protective holders (penny sleeves, top loaders, one-touch, semi-rigid) acceptable for Grade A as long as card fully visible through transparent plastic.
+• corners_visibility_score   = average of all corner labels
+• edges_visibility_score     = average of all edge labels
+• surface_visibility_score   = average of front/back surface labels
+• centering_visibility_score = average of front/back centering labels
 
-────────────────────────────────────────────
-CLEAR DEFINITIONS - WHAT DISQUALIFIES GRADE A
-────────────────────────────────────────────
+Mapping labels to numeric values:
+• fully_visible       = 1.00
+• mostly_visible      = 0.75
+• partially_visible   = 0.50
+• not_visible         = 0.00
 
-**Physical Obstructions (Automatic B or lower):**
-• Any corner cut off, hidden, or not visible
-• Any edge portion hidden by holder, crop, or object
-• Thick case borders covering card perimeter
-• Foreign objects blocking card view
+overall_visibility_score = MIN(
+  corners_visibility_score,
+  edges_visibility_score,
+  surface_visibility_score,
+  centering_visibility_score
+)
 
-**Glare/Reflection Thresholds:**
-• Grade A: <20% of surface has glare, defects still visible through it
-• Grade B: 20-40% glare, some areas hard to assess
-• Grade C: 40-60% glare, major assessment difficulty
-• Grade D: >60% glare, unreliable assessment
+This ensures confidence reflects the **weakest region**, consistent with weakest link grading.
 
-**Lighting Issues:**
-• Grade A: Colors accurate, all areas visible, minor shadows OK
-• Grade B: Moderate shadows (10-25%), some color wash
-• Grade C: Heavy shadows (40-60%), significant color distortion
-• Grade D: Extremely poor lighting prevents assessment
+══════════════════════════════════════════════════════════════════════
+CONFIDENCE TABLE
+══════════════════════════════════════════════════════════════════════
 
-**Focus/Clarity:**
-• Grade A: Can read small text, corners sharp, texture visible
-• Grade B: Slight blur, major text readable, general condition clear
-• Grade C: Noticeable blur, hard to read text, limited detail
-• Grade D: Severe blur prevents defect assessment
+| Grade | Key Characteristics                                                | Confidence | Uncertainty |
+|-------|---------------------------------------------------------------------|------------|-------------|
+| **A (Excellent)** | All critical regions fully_visible or mostly_visible.      | A          | ±0.25       |
+|                   | No grading area partially_visible or not_visible.          |            |             |
+|                   | Micro-defects and texture clearly assessable.              |            |             |
+|                   | Both centering reference areas fully evaluable.            |            |             |
+| **B (Good)**      | Majority of regions fully_visible or mostly_visible.       | B          | ±0.50       |
+|                   | Up to ONE area may be partially_visible.                   |            |             |
+|                   | All critical areas still readable enough for reliable eval.|            |             |
+| **C (Fair)**      | Multiple regions partially_visible OR one region not_visible.| C        | ±1.0        |
+|                   | Visibility limits reliable micro-defect detection.         |            |             |
+| **D (Poor)**      | Any major region not_visible (corners, edges, surface, centering).| D  | ±1.5        |
+|                   | Severe obstruction, cropping, blur, or missing side.       |            |             |
 
-**Protective Cases - Grade A Acceptable If:**
-✅ Penny sleeve with full card visibility
-✅ Top loader with clear plastic, all corners visible
-✅ One-touch holder with transparent plastic, no thick borders obscuring edges
-✅ Semi-rigid holder where card fully visible
-✅ Grading slab ONLY if glare <20% and card fully assessable
+══════════════════════════════════════════════════════════════════════
+CONFIDENCE LETTER ASSIGNMENT (based on overall_visibility_score)
+══════════════════════════════════════════════════════════════════════
 
-────────────────────────────────────────────
+overall_visibility_score >= 0.90  →  Confidence A (±0.25)
+overall_visibility_score >= 0.70  →  Confidence B (±0.50)
+overall_visibility_score >= 0.45  →  Confidence C (±1.0)
+overall_visibility_score <  0.45  →  Confidence D (±1.5)
+
+══════════════════════════════════════════════════════════════════════
+GRADE A REQUIREMENTS
+══════════════════════════════════════════════════════════════════════
+
+All of the following MUST be true to assign **Grade A**:
+
+• All corners fully_visible or mostly_visible
+• All edges fully_visible or mostly_visible
+• Both surfaces fully_visible or mostly_visible
+• Centering references fully_visible or mostly_visible
+• No region partially_visible or not_visible
+• Card details readable enough to detect micro defects at zoom
+
+Protective holders (penny sleeves, top loaders, semi-rigids, slabs) ARE acceptable
+if they do not cause any region to drop below mostly_visible.
+
+══════════════════════════════════════════════════════════════════════
+GRADE A DISQUALIFIERS
+══════════════════════════════════════════════════════════════════════
+
+A confidence grade **CANNOT** be A if **any** of the following occur:
+
+• Any corner, edge, surface area, or centering reference is partially_visible or not_visible
+• Any region obscured by sleeve glare, reflections, fingerprints, label overlap
+• Any cropping removes part of a grading region
+• Text or fine surface texture not adequately visible
+• Perspective distortion prevents reliable evaluation
+
+────────────────────────────────────────────────
 🆕 HOLDER TYPE RECOGNITION
-────────────────────────────────────────────
+────────────────────────────────────────────────
 
 Identify protective covering type (if any):
 
@@ -554,9 +590,9 @@ Example for penny sleeve:
     "notes": "Card in penny sleeve with minor glare, adds ±0.25 uncertainty"
   }
 
-────────────────────────────────────────────
+────────────────────────────────────────────────
 IMAGE CONFIDENCE TO UNCERTAINTY MAPPING
-────────────────────────────────────────────
+────────────────────────────────────────────────
 
 Each confidence grade has corresponding uncertainty for Grade Range calculation:
 • Grade A (Excellent): ±0.25 uncertainty
@@ -568,7 +604,7 @@ This mapping used in STEP 10 to calculate Grade Range.
 
 🆕 PATCH 9: Image Confidence describes photographic clarity only and must not justify numeric deductions; it informs uncertainty range and narrative caution.
 
-═══════════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════
 [STEP 2.5] COMMON DEFECT REFERENCE GUIDE (v4.2 ENHANCEMENT)
 ═══════════════════════════════════════════════════════════════════════════════
 

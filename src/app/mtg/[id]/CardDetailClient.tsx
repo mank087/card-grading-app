@@ -1,5 +1,6 @@
 "use client";
 
+// Force rebuild to pick up card text changes
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -1270,6 +1271,7 @@ export function MTGCardDetails() {
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [regradingImageUrl, setRegradingImageUrl] = useState<string | null>(null);
   const [origin, setOrigin] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1490,11 +1492,14 @@ export function MTGCardDetails() {
     try {
       if (!card) return;
 
-      const confirmed = confirm('Regrade card with the same uploaded images?');
+      const confirmed = confirm('Re-grade this card? This will analyze the same original uploaded images for another pass through the DCM Optic™ system');
       if (!confirmed) return;
 
+      // Store image URL before clearing card
+      setRegradingImageUrl(card.front_url);
       setLoading(true);
       setError(null);
+      setCard(null); // Clear current card to show loading screen
 
       // Call MTG API with force_regrade parameter to bypass cache
       console.log('[REGRADE] Forcing fresh grading for MTG card:', cardId);
@@ -1508,13 +1513,12 @@ export function MTGCardDetails() {
       const data = await res.json();
       console.log('[REGRADE] Fresh grading completed:', data);
 
-      // Refresh the page to show new data
-      window.location.reload();
+      // Update card state with fresh data (triggers re-render with new grading)
+      setCard(data);
+      setLoading(false);
     } catch (error: any) {
       console.error('Error re-grading card:', error);
       setError(error.message || 'Failed to re-grade card');
-      alert(`Error re-grading card: ${error.message || 'Please try again.'}`);
-    } finally {
       setLoading(false);
     }
   };
@@ -1591,16 +1595,158 @@ export function MTGCardDetails() {
     }
   };
 
-  if (loading || isProcessing) {
+  // Show full animated re-grade screen ONLY when regradingImageUrl is set
+  if (regradingImageUrl && (loading || isProcessing)) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-6"></div>
-          <p className="text-lg">Finalizing analysis...</p>
-          <p className="text-sm text-gray-500 mt-2">Almost ready!</p>
+      <div className="flex justify-center items-center min-h-screen bg-black">
+        <div className="text-center max-w-md mx-auto p-6">
+          {/* Navigation Buttons */}
+          <div className="mb-6">
+            <p className="text-sm text-gray-300 mb-4">
+              Card re-grading in process, this may take 1-2 minutes. You may grade another card or view your collection while the card processes.
+            </p>
+
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => router.push('/upload')}
+                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+              >
+                <span className="text-lg">📸</span>
+                <span>Grade Another</span>
+              </button>
+
+              <button
+                onClick={() => router.push('/collection')}
+                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 text-sm cursor-pointer"
+              >
+                <span className="text-lg">📚</span>
+                <span>My Collection</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Animated Card Container */}
+          <div className="relative w-72 h-96 mx-auto mb-8 overflow-hidden rounded-lg shadow-2xl">
+            {/* Green Glowing Border */}
+            <div
+              className="absolute inset-0 rounded-lg animate-pulse"
+              style={{
+                border: '3px solid #00ff00',
+                boxShadow: '0 0 20px rgba(0,255,0,0.5), inset 0 0 20px rgba(0,255,0,0.1)'
+              }}
+            />
+
+            {/* Card Image */}
+            <img
+              src={regradingImageUrl}
+              alt="Card being re-graded"
+              className="w-full h-full object-cover rounded-lg"
+            />
+
+            {/* Radar Sweep Effect */}
+            <div
+              className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] rounded-full pointer-events-none"
+              style={{
+                background: 'conic-gradient(rgba(0,255,0,0.3) 0deg, rgba(0,255,0,0) 60deg, rgba(0,255,0,0) 360deg)',
+                animation: 'spin 4s linear infinite'
+              }}
+            />
+
+            {/* X-ray Scanning Bar (Cyan) */}
+            <div
+              className="absolute left-0 w-full h-1/2 pointer-events-none"
+              style={{
+                background: 'linear-gradient(rgba(0, 255, 255, 0.2), rgba(0, 255, 255, 0.6), rgba(0, 255, 255, 0.2))',
+                animation: 'scan 3s linear infinite'
+              }}
+            />
+
+            {/* Corner Detection Points */}
+            <div className="absolute top-2 left-2 w-3 h-3 bg-red-500 rounded-full animate-ping" />
+            <div className="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full animate-ping" style={{ animationDelay: '0.5s' }} />
+            <div className="absolute bottom-2 left-2 w-3 h-3 bg-red-500 rounded-full animate-ping" style={{ animationDelay: '1s' }} />
+            <div className="absolute bottom-2 right-2 w-3 h-3 bg-red-500 rounded-full animate-ping" style={{ animationDelay: '1.5s' }} />
+
+            {/* Center Point */}
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-yellow-400 rounded-full animate-bounce" />
+          </div>
+
+          {/* Analysis Status */}
+          <div className="text-white">
+            <h2 className="text-2xl font-bold mb-2 text-green-400">
+              🔍 Re-analyzing Magic: The Gathering Card
+            </h2>
+
+            {/* Progress Steps */}
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center justify-between text-sm">
+                <span className="flex items-center">
+                  <div className="w-2 h-2 rounded-full mr-2 bg-yellow-500 animate-pulse" />
+                  Detecting card boundaries
+                </span>
+                <span className="text-yellow-400">⟳</span>
+              </div>
+              <div className="flex items-center justify-between text-sm opacity-40">
+                <span className="flex items-center">
+                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
+                  Measuring centering ratios
+                </span>
+                <span className="text-gray-400">⏳</span>
+              </div>
+              <div className="flex items-center justify-between text-sm opacity-40">
+                <span className="flex items-center">
+                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
+                  Evaluating corners & edges
+                </span>
+                <span className="text-gray-400">⏳</span>
+              </div>
+              <div className="flex items-center justify-between text-sm opacity-40">
+                <span className="flex items-center">
+                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
+                  Assessing surface condition
+                </span>
+                <span className="text-gray-400">⏳</span>
+              </div>
+              <div className="flex items-center justify-between text-sm opacity-40">
+                <span className="flex items-center">
+                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
+                  Generating final grade
+                </span>
+                <span className="text-gray-400">⏳</span>
+              </div>
+            </div>
+
+            <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mb-4">
+              <p className="text-sm text-blue-300">
+                <strong>DCM Optic™ Analysis</strong>
+                <br />
+                Advanced algorithms examining every detail of your card
+              </p>
+            </div>
+
+            <p className="text-xs text-gray-400">
+              Professional grading in progress
+            </p>
+          </div>
+
+          <style jsx>{`
+            @keyframes spin {
+              from { transform: rotate(0deg); }
+              to { transform: rotate(360deg); }
+            }
+            @keyframes scan {
+              0% { top: -100%; }
+              100% { top: 100%; }
+            }
+          `}</style>
         </div>
       </div>
     );
+  }
+
+  // Simple loading state for initial card view (no animation)
+  if (loading || isProcessing) {
+    return null; // Return nothing - page will show briefly before card loads
   }
 
   if (error) {
@@ -3076,22 +3222,25 @@ export function MTGCardDetails() {
                     </div>
                   )}
 
-                  {/* Keywords */}
-                  {(cardInfo.keywords || card.keywords) && (
-                    <div className="col-span-2">
-                      <p className="text-sm font-semibold text-gray-600 mb-2">Keywords</p>
-                      <div className="flex flex-wrap gap-2">
-                        {(Array.isArray(cardInfo.keywords) ? cardInfo.keywords : (Array.isArray(card.keywords) ? card.keywords : [])).map((keyword: string, idx: number) => (
-                          <span
-                            key={idx}
-                            className="px-3 py-1 bg-purple-100 text-purple-800 rounded-lg text-sm font-semibold"
-                          >
+                  {/* Keywords - Only show if array has items */}
+                  {(() => {
+                    const keywordsArray = Array.isArray(cardInfo.keywords) ? cardInfo.keywords : (Array.isArray(card.keywords) ? card.keywords : []);
+                    return keywordsArray.length > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-sm font-semibold text-gray-600 mb-2">Keywords</p>
+                        <div className="flex flex-wrap gap-2">
+                          {keywordsArray.map((keyword: string, idx: number) => (
+                            <span
+                              key={idx}
+                              className="px-3 py-1 bg-purple-100 text-purple-800 rounded-lg text-sm font-semibold"
+                            >
                             {keyword}
                           </span>
                         ))}
                       </div>
                     </div>
-                  )}
+                    );
+                  })()}
 
                   {/* Scryfall Database Link */}
                   {(card.scryfall_id || card.conversational_card_info?.scryfall_id) && (
@@ -3228,6 +3377,23 @@ export function MTGCardDetails() {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* MTG Card Text Section - Abilities, Rules, Flavor Text */}
+                {cardInfo.card_front_text && (
+                  <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6 mt-6">
+                    <h3 className="text-xl font-bold text-gray-900 mb-4 pb-3 border-b-2 border-gray-200 flex items-center gap-2">
+                      <span>📜</span>
+                      <span>Card Text</span>
+                    </h3>
+
+                    {/* Card Rules & Flavor Text */}
+                    <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <pre className="whitespace-pre-wrap font-sans text-sm text-gray-700 leading-relaxed">
+                        {cardInfo.card_front_text}
+                      </pre>
+                    </div>
                   </div>
                 )}
 
