@@ -12,11 +12,69 @@ interface DashboardStats {
   averageGrade: number
   recentActivity: Array<{
     id: string
+    serial: string
     card_name: string | null
-    conversational_decimal_grade: number | null
-    created_at: string
     category: string | null
+    conversational_decimal_grade: number | null
+    conversational_condition_label: string | null
+    conversational_card_info: any
+    ai_grading: any
+    featured: string | null
+    card_set: string | null
+    release_date: string | null
+    manufacturer_name: string | null
+    card_number: string | null
+    front_path: string
+    visibility: 'public' | 'private'
+    user_id: string
+    created_at: string
   }>
+}
+
+// Helper functions - EXACT MATCH to collection page logic
+const stripMarkdown = (text: string | null | undefined): string | null => {
+  if (!text) return null
+  return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '')
+}
+
+// Build card info object (matches collection page from line 46)
+const getCardInfo = (card: any) => {
+  const dvgGrading = card.ai_grading || {}
+  return {
+    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
+    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading.card_info?.player_or_character,
+    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name,
+    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
+    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
+    card_number: stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
+  }
+}
+
+const getPlayerName = (card: any) => {
+  const cardInfo = getCardInfo(card)
+  const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
+  return isSportsCard
+    ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown Player')
+    : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card')
+}
+
+const getManufacturer = (card: any) => {
+  return getCardInfo(card).manufacturer || 'Unknown'
+}
+
+const getCardSet = (card: any) => {
+  return getCardInfo(card).set_name || 'Unknown Set'
+}
+
+const getYear = (card: any) => {
+  return getCardInfo(card).year || 'N/A'
+}
+
+const formatGrade = (grade: number): string => {
+  if (grade % 1 === 0.5) {
+    return grade.toFixed(1)
+  }
+  return Math.round(grade).toString()
 }
 
 export default function AdminDashboardPage() {
@@ -195,33 +253,136 @@ export default function AdminDashboardPage() {
       {/* Recent Activity */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+          <h2 className="text-lg font-semibold text-gray-900">Recent Activity (Latest 10 Cards)</h2>
         </div>
-        <div className="divide-y divide-gray-200">
-          {stats.recentActivity.length > 0 ? (
-            stats.recentActivity.map((item) => (
-              <div key={item.id} className="px-6 py-4 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">
-                      {item.card_name || 'Unnamed Card'}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {item.category || 'Unknown'} • Grade: {item.conversational_decimal_grade || 'N/A'}
-                    </p>
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString()}
-                  </div>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="px-6 py-8 text-center text-gray-500">
-              No recent activity
-            </div>
-          )}
-        </div>
+        {stats.recentActivity.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Card Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Manufacturer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Series
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Year
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Grade
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Graded Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Visibility
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {stats.recentActivity.map((card) => {
+                  // Get category route for link
+                  const categoryRoutes: Record<string, string> = {
+                    'Football': '/sports',
+                    'Baseball': '/sports',
+                    'Basketball': '/sports',
+                    'Hockey': '/sports',
+                    'Soccer': '/sports',
+                    'Wrestling': '/sports',
+                    'Sports': '/sports',
+                    'Pokemon': '/pokemon',
+                    'MTG': '/mtg',
+                    'Lorcana': '/lorcana',
+                    'Other': '/other'
+                  }
+                  const route = categoryRoutes[card.category || ''] || '/other'
+
+                  return (
+                    <tr key={card.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="text-sm font-medium text-gray-900">
+                            {getPlayerName(card)}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {getManufacturer(card) || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {getCardSet(card)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {getYear(card) || '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {(() => {
+                            const grade = card.conversational_decimal_grade
+                            // Use actual AI-generated condition label, stripping abbreviation (matches collection page line 751-753)
+                            const condition = card.conversational_condition_label
+                              ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                              : ''
+
+                            return (
+                              <>
+                                {grade ? formatGrade(grade) : '-'}
+                                {condition && (
+                                  <span className="text-xs text-gray-500 ml-1">
+                                    / {condition}
+                                  </span>
+                                )}
+                              </>
+                            )
+                          })()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {card.created_at ? new Date(card.created_at).toLocaleDateString() : '-'}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                          card.visibility === 'public'
+                            ? 'bg-green-100 text-green-800 border-green-500'
+                            : 'bg-gray-100 text-gray-800 border-gray-400'
+                        }`}>
+                          {card.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm">
+                        <Link
+                          href={`${route}/${card.id}`}
+                          className="text-purple-600 hover:text-purple-800 font-medium"
+                        >
+                          View Details
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="px-6 py-8 text-center text-gray-500">
+            No recent activity
+          </div>
+        )}
       </div>
     </div>
   )

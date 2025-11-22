@@ -2346,7 +2346,7 @@ export function SportsCardDetails() {
             {/* Front Card with Label */}
             <div>
               {/* Front Label - PSA Style */}
-              <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg shadow-md p-3 mb-3 h-[86px]">
+              <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg shadow-md p-3 mb-3 h-[110px]">
                 <div className="flex items-center justify-between h-full">
                   {/* Left: DCM Logo */}
                   <div className="flex-shrink-0">
@@ -2357,83 +2357,62 @@ export function SportsCardDetails() {
                     />
                   </div>
 
-                  {/* Center: Card Information */}
-                  <div className="flex-1 min-w-0 mx-3 py-1">
+                  {/* Center: Card Information - New 4-Line Structure */}
+                  <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
+                    {/* Line 1: Player/Character Name */}
                     <div
-                      className="font-bold text-gray-900 leading-tight overflow-hidden"
+                      className="font-bold text-gray-900 leading-tight truncate"
                       style={{
-                        fontSize: (cardInfo.player_or_character || card.card_name || "Unknown Player").length > 25 ? '0.75rem' : '0.875rem',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        maxHeight: '2.5em'
+                        fontSize: (() => {
+                          const name = cardInfo.player_or_character || card.card_name || "Unknown Player";
+                          if (name.length > 35) return '11px';
+                          if (name.length > 25) return '12px';
+                          return '14px';
+                        })()
                       }}
                       title={cardInfo.player_or_character || card.card_name || "Unknown Player"}
                     >
                       {cardInfo.player_or_character || card.card_name || "Unknown Player"}
                     </div>
+
+                    {/* Line 2: Set Name • Card # • Year */}
                     <div
-                      className="text-gray-700 leading-tight mt-0.5 overflow-hidden"
+                      className="text-gray-700 leading-tight"
                       style={{
-                        fontSize: (() => {
-                          // Build special features string
-                          const features: string[] = [];
-                          if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
-                          if (cardInfo.autographed) features.push('Auto');
-                          const serialNum = cardInfo.serial_number;
-                          if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-                            features.push(serialNum);
-                          }
-                          const specialFeatures = features.length > 0 ? features.join(' ') : '';
-
-                          // Include card name if different from player name
-                          const playerName = cardInfo.player_or_character || card.featured || '';
-                          const cardNameToUse = (cardInfo.card_name && cardInfo.card_name !== playerName) ? cardInfo.card_name : cardInfo.subset;
-
-                          // Build full text: card_name/subset - set name - special features - card number - year
-                          const parts = [
-                            cardNameToUse,
-                            cardInfo.set_name || "Unknown Set",
-                            specialFeatures,
-                            cardInfo.card_number,
-                            cardInfo.year || "N/A"
-                          ].filter(p => p && p.trim() !== '');
-                          const fullText = parts.join(' - ');
-                          return fullText.length > 40 ? '0.625rem' : '0.75rem';
-                        })(),
+                        fontSize: (cardInfo.set_name || "Unknown Set").length > 30 ? '10px' : '11px',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
-                        maxHeight: '2em'
+                        overflow: 'hidden'
                       }}
+                      title={`${cardInfo.set_name || "Unknown Set"} • ${cardInfo.card_number || ''} • ${cardInfo.year || 'N/A'}`}
                     >
-                      {(() => {
-                        // Build special features string
-                        const features: string[] = [];
-                        if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
-                        if (cardInfo.autographed) features.push('Auto');
-                        const serialNum = cardInfo.serial_number;
-                        if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-                          features.push(serialNum);
-                        }
-                        const specialFeatures = features.length > 0 ? features.join(' ') : '';
-
-                        // Include card name if different from player name
-                        const playerName = cardInfo.player_or_character || card.featured || '';
-                        const cardNameToUse = (cardInfo.card_name && cardInfo.card_name !== playerName) ? cardInfo.card_name : cardInfo.subset;
-
-                        // Build full text: card_name/subset - set name - special features - card number - year
-                        const parts = [
-                          cardNameToUse,
-                          cardInfo.set_name || "Unknown Set",
-                          specialFeatures,
-                          cardInfo.card_number,
-                          cardInfo.year || "N/A"
-                        ].filter(p => p && p.trim() !== '');
-                        return parts.join(' - ');
-                      })()}
+                      {[
+                        cardInfo.set_name || "Unknown Set",
+                        cardInfo.card_number,
+                        cardInfo.year
+                      ].filter(p => p).join(' • ')}
                     </div>
-                    <div className="text-gray-500 text-[10px] mt-1 font-mono truncate">
+
+                    {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                    {(() => {
+                      const features: string[] = [];
+                      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
+                      if (cardInfo.autographed) features.push('Auto');
+                      const serialNum = cardInfo.serial_number;
+                      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+                        features.push(serialNum);
+                      }
+                      if (features.length === 0) return null;
+                      return (
+                        <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                          {features.join(' • ')}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Line 4: DCM Serial Number */}
+                    <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
                       {card.serial || `DCM-${card.id?.slice(0, 8)}`}
                     </div>
                   </div>
@@ -2499,7 +2478,7 @@ export function SportsCardDetails() {
             {/* Back Card with Label */}
             <div>
               {/* Back Label - QR Code Centered */}
-              <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg shadow-md mb-3 h-[86px] flex items-center justify-center p-3">
+              <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg shadow-md mb-3 h-[110px] flex items-center justify-center p-3">
                 {/* QR Code with Logo Overlay */}
                 <div className="bg-white p-1 rounded relative">
                   <QRCodeCanvas

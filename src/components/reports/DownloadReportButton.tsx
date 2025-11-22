@@ -328,6 +328,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         features.push(serialNum);
       }
       const specialFeatures = features.length > 0 ? features.join(' ') : '';
+      const specialFeaturesString = features.length > 0 ? features.join(' • ') : ''; // New format with bullets
 
       // Build full card details: set - features - number - year (no duplicate card name/subset)
       const parts = [
@@ -363,6 +364,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         })(),
         serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
         cardDetails: cardDetails,
+        specialFeaturesString: specialFeaturesString,
         cardUrl: cardUrl,
         qrCodeDataUrl: qrCodeDataUrl,
         professionalGrades: {

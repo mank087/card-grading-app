@@ -146,6 +146,8 @@ function UniversalUploadPageContent() {
   const [status, setStatus] = useState('')
   const [isCompressing, setIsCompressing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadedCardId, setUploadedCardId] = useState<string | null>(null)
+  const [uploadedCardCategory, setUploadedCardCategory] = useState<string | null>(null)
 
   // Camera/upload mode state
   const [uploadMode, setUploadMode] = useState<'select' | 'camera' | 'gallery' | 'review'>('select')
@@ -275,6 +277,10 @@ function UniversalUploadPageContent() {
 
       // Create unique ID for this card
       const cardId = crypto.randomUUID()
+
+      // Store the card ID and category for auto-redirect when grading completes
+      setUploadedCardId(cardId)
+      setUploadedCardCategory(config.category)
 
       // Create object URL for the front image to use in queue
       const frontImageUrl = URL.createObjectURL(frontFile)
@@ -420,6 +426,8 @@ function UniversalUploadPageContent() {
     setIsUploading(false)
     setIsCompressing(false)
     setStatus('')
+    setUploadedCardId(null)
+    setUploadedCardCategory(null)
     setUploadMode('select')
     console.log('[Upload] Reset upload state - ready for new card')
   }
@@ -509,6 +517,8 @@ function UniversalUploadPageContent() {
       <CardAnalysisAnimation
         frontImageUrl={URL.createObjectURL(frontFile)}
         cardName={config.label}
+        cardId={uploadedCardId || undefined}
+        category={uploadedCardCategory || undefined}
         onGradeAnother={handleResetUpload}
       />
     )

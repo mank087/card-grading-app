@@ -72,7 +72,8 @@ export interface ReportCardData {
   generatedDate: string;
   reportId: string;
   serial: string;
-  cardDetails: string; // Full card details string (subset - set - features - number - year)
+  cardDetails: string; // Full card details string (subset - set - features - number - year) - DEPRECATED, use separate fields
+  specialFeaturesString: string; // Special features (RC • Auto • Serial #)
   cardUrl: string; // URL to the graded card page
   qrCodeDataUrl?: string; // Base64 QR code image for back label
   overallSummary?: string; // 3-4 sentence overall card condition summary
@@ -112,19 +113,28 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
         <View style={reportStyles.columnHalf}>
           <Text style={reportStyles.columnHeader}>FRONT</Text>
 
-          {/* Front Label */}
+          {/* Front Label - New 4-Line Structure */}
           <View style={reportStyles.cardLabelContainer}>
             <View style={reportStyles.cardLabelRow}>
               <View style={reportStyles.cardLabelLeft}>
                 <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
               </View>
               <View style={reportStyles.cardLabelCenter}>
+                {/* Line 1: Player/Card Name */}
                 <Text style={reportStyles.cardLabelPlayerName}>
                   {cardData.playerName || cardData.cardName}
                 </Text>
+                {/* Line 2: Set Name • Card # • Year */}
                 <Text style={reportStyles.cardLabelDetails}>
-                  {cardData.cardDetails}
+                  {[cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • ')}
                 </Text>
+                {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                {cardData.specialFeaturesString && (
+                  <Text style={reportStyles.cardLabelFeatures}>
+                    {cardData.specialFeaturesString}
+                  </Text>
+                )}
+                {/* Line 4: DCM Serial Number */}
                 <Text style={reportStyles.cardLabelSerial}>
                   {cardData.serial}
                 </Text>
@@ -218,12 +228,21 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                   <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
                 </View>
                 <View style={reportStyles.cardLabelCenter}>
+                  {/* Line 1: Player/Card Name */}
                   <Text style={reportStyles.cardLabelPlayerName}>
                     {cardData.playerName || cardData.cardName}
                   </Text>
+                  {/* Line 2: Set Name • Card # • Year */}
                   <Text style={reportStyles.cardLabelDetails}>
-                    {cardData.cardDetails}
+                    {[cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • ')}
                   </Text>
+                  {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                  {cardData.specialFeaturesString && (
+                    <Text style={reportStyles.cardLabelFeatures}>
+                      {cardData.specialFeaturesString}
+                    </Text>
+                  )}
+                  {/* Line 4: DCM Serial Number */}
                   <Text style={reportStyles.cardLabelSerial}>
                     {cardData.serial}
                   </Text>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch dashboard statistics
+    // Fetch dashboard statistics using admin client for proper permissions
     const [
       usersResult,
       cardsResult,
@@ -24,33 +24,32 @@ export async function GET(request: NextRequest) {
       gradeDistResult
     ] = await Promise.all([
       // Total users
-      supabase.from('users').select('id', { count: 'exact', head: true }),
+      supabaseAdmin.from('users').select('id', { count: 'exact', head: true }),
 
       // Total cards
-      supabase.from('cards').select('id', { count: 'exact', head: true }),
+      supabaseAdmin.from('cards').select('id', { count: 'exact', head: true }),
 
       // Users registered in last 7 days
-      supabase
+      supabaseAdmin
         .from('users')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
 
       // Cards graded in last 7 days
-      supabase
+      supabaseAdmin
         .from('cards')
         .select('id', { count: 'exact', head: true })
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()),
 
       // Grade distribution (perfect 10s)
-      supabase
+      supabaseAdmin
         .from('cards')
-        .select('conversational_decimal_grade')
-        .eq('conversational_decimal_grade', 10)
         .select('id', { count: 'exact', head: true })
+        .eq('conversational_decimal_grade', 10)
     ])
 
     // Get average grade
-    const { data: avgGradeData } = await supabase
+    const { data: avgGradeData } = await supabaseAdmin
       .from('cards')
       .select('conversational_decimal_grade')
       .not('conversational_decimal_grade', 'is', null)
@@ -59,10 +58,28 @@ export async function GET(request: NextRequest) {
       ? avgGradeData.reduce((sum, card) => sum + (card.conversational_decimal_grade || 0), 0) / avgGradeData.length
       : 0
 
-    // Get recent activity
-    const { data: recentActivity } = await supabase
+    // Get recent activity with detailed card information (matches collection page fields)
+    const { data: recentActivity } = await supabaseAdmin
       .from('cards')
-      .select('id, card_name, conversational_decimal_grade, created_at, category')
+      .select(`
+        id,
+        serial,
+        card_name,
+        category,
+        conversational_decimal_grade,
+        conversational_condition_label,
+        conversational_card_info,
+        ai_grading,
+        featured,
+        card_set,
+        release_date,
+        manufacturer_name,
+        card_number,
+        front_path,
+        visibility,
+        user_id,
+        created_at
+      `)
       .order('created_at', { ascending: false })
       .limit(10)
 

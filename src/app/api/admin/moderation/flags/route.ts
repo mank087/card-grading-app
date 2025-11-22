@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
 
     // Build query
-    let query = supabase
+    let query = supabaseAdmin
       .from('card_flags')
       .select('*, flagged_by_admin:admin_users!card_flags_flagged_by_fkey(email, full_name)', { count: 'exact' })
 
@@ -53,9 +53,9 @@ export async function GET(request: NextRequest) {
 
     // Get card details for each flag
     const cardIds = flags?.map(f => f.card_id).filter(Boolean) || []
-    const { data: cards } = await supabase
+    const { data: cards } = await supabaseAdmin
       .from('cards')
-      .select('id, category, front_image_url, conversational_decimal_grade, user_id')
+      .select('id, category, front_path, conversational_decimal_grade, user_id')
       .in('id', cardIds)
 
     const cardMap: Record<string, any> = {}
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     // Get user emails for cards
     const userIds = cards?.map(c => c.user_id).filter(Boolean) || []
-    const { data: users } = await supabase
+    const { data: users } = await supabaseAdmin
       .from('users')
       .select('id, email')
       .in('id', userIds)

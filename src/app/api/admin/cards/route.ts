@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,10 +27,29 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit
 
-    // Build query
-    let query = supabase
+    // Build query with all fields needed for collection-style display
+    let query = supabaseAdmin
       .from('cards')
-      .select('id, user_id, category, created_at, conversational_decimal_grade, front_image_url, back_image_url', { count: 'exact' })
+      .select(`
+        id,
+        user_id,
+        serial,
+        card_name,
+        category,
+        conversational_decimal_grade,
+        conversational_condition_label,
+        conversational_card_info,
+        ai_grading,
+        featured,
+        card_set,
+        release_date,
+        manufacturer_name,
+        card_number,
+        front_path,
+        visibility,
+        is_featured,
+        created_at
+      `, { count: 'exact' })
 
     // Apply category filter
     if (category !== 'all') {
@@ -63,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     // Get user emails for each card
     const userIds = cards?.map(c => c.user_id).filter(Boolean) || []
-    const { data: users } = await supabase
+    const { data: users } = await supabaseAdmin
       .from('users')
       .select('id, email')
       .in('id', userIds)

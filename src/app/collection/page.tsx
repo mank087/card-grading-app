@@ -466,29 +466,16 @@ function CollectionPageContent() {
               }
               const specialFeatures = features.length > 0 ? features.join(' ') : '';
 
-              // Build full card details text (matches detail page line 2233-2241)
-              const parts = [
-                cardInfo.subset,
-                cardInfo.set_name || "Unknown Set",
-                specialFeatures,
-                cardInfo.card_number,
-                cardInfo.year || "N/A"
-              ].filter(p => p && p.trim() !== '');
-              const cardDetails = parts.join(' - ');
+              // Build set details for Line 2 (Set Name • Card # • Year)
+              const setName = cardInfo.set_name || cardInfo.set_era || "Unknown Set";
+              const cardNumber = cardInfo.card_number;
+              const year = cardInfo.year || cardInfo.card_date || card.card_date;
 
-              // Dynamic sizing for player name (shorter name = larger font)
-              const playerNameSize = displayName.length > 30
-                ? 'text-[0.65rem]'
-                : displayName.length > 20
-                ? 'text-xs'
-                : 'text-sm';
+              // Dynamic sizing for player name (Line 1)
+              const nameFontSize = displayName.length > 35 ? '11px' : displayName.length > 25 ? '12px' : '14px';
 
-              // Dynamic sizing for card details
-              const detailsSize = cardDetails.length > 40
-                ? 'text-[0.5rem]'
-                : cardDetails.length > 30
-                ? 'text-[0.55rem]'
-                : 'text-[0.625rem]';
+              // Dynamic sizing for set details (Line 2)
+              const setFontSize = setName.length > 30 ? '10px' : '11px';
 
               return (
                 <div key={card.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
@@ -504,30 +491,41 @@ function CollectionPageContent() {
                         />
                       </div>
 
-                      {/* Center: Card Information */}
-                      <div className="flex-1 min-w-0 mx-1">
+                      {/* Center: Card Information - New 4-Line Structure */}
+                      <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
+                        {/* Line 1: Player/Card Name - Dynamic Font Sizing */}
                         <div
-                          className={`font-bold text-gray-900 leading-tight overflow-hidden ${playerNameSize}`}
-                          style={{
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical'
-                          }}
+                          className="font-bold text-gray-900 leading-tight truncate"
+                          style={{ fontSize: nameFontSize }}
                           title={displayName}
                         >
                           {displayName}
                         </div>
+
+                        {/* Line 2: Set Name • Card # • Year */}
                         <div
-                          className={`text-gray-700 leading-tight mt-1 overflow-hidden ${detailsSize}`}
+                          className="text-gray-700 leading-tight"
                           style={{
+                            fontSize: setFontSize,
                             display: '-webkit-box',
-                            WebkitLineClamp: 1,
-                            WebkitBoxOrient: 'vertical'
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden'
                           }}
+                          title={`${setName} • ${cardNumber || ''} • ${year || 'N/A'}`}
                         >
-                          {cardDetails}
+                          {[setName, cardNumber, year].filter(p => p).join(' • ')}
                         </div>
-                        <div className="text-gray-500 font-mono truncate text-[0.5rem] mt-0.5">
+
+                        {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                        {features.length > 0 && (
+                          <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                            {features.join(' • ')}
+                          </div>
+                        )}
+
+                        {/* Line 4: DCM Serial Number */}
+                        <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
                           {card.serial}
                         </div>
                       </div>

@@ -18,7 +18,7 @@ interface Flag {
   card: {
     id: string
     category: string
-    front_image_url: string
+    front_path: string
     conversational_decimal_grade: number | null
     user_id: string
   } | null
@@ -271,9 +271,9 @@ function ModerationContent() {
                         {flag.card ? (
                           <div className="flex items-center">
                             <div className="relative w-12 h-16 mr-3 flex-shrink-0">
-                              {flag.card.front_image_url ? (
+                              {flag.card.front_path ? (
                                 <Image
-                                  src={flag.card.front_image_url}
+                                  src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/card-images/${flag.card.front_path}`}
                                   alt="Card"
                                   fill
                                   className="object-contain rounded"
@@ -395,9 +395,9 @@ function ModerationContent() {
                     <h3 className="text-lg font-semibold mb-3">Flagged Card</h3>
                     <div className="flex gap-4">
                       <div className="relative w-48 h-64 flex-shrink-0">
-                        {selectedFlag.card.front_image_url ? (
+                        {selectedFlag.card.front_path ? (
                           <Image
-                            src={selectedFlag.card.front_image_url}
+                            src={`${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/card-images/${selectedFlag.card.front_path}`}
                             alt="Card front"
                             fill
                             className="object-contain rounded-lg"

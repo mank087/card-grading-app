@@ -2,17 +2,29 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useGradingQueue } from '@/contexts/GradingQueueContext'
+
+const CARD_TYPES_CONFIG = {
+  Sports: { route: '/sports' },
+  Pokemon: { route: '/pokemon' },
+  MTG: { route: '/mtg' },
+  Lorcana: { route: '/lorcana' },
+  Other: { route: '/other' }
+}
 
 interface CardAnalysisAnimationProps {
   frontImageUrl: string
   cardName?: string
+  cardId?: string
+  category?: string
   allowNavigation?: boolean
   onGradeAnother?: () => void
 }
 
-export default function CardAnalysisAnimation({ frontImageUrl, cardName, allowNavigation = true, onGradeAnother }: CardAnalysisAnimationProps) {
+export default function CardAnalysisAnimation({ frontImageUrl, cardName, cardId, category, allowNavigation = true, onGradeAnother }: CardAnalysisAnimationProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const router = useRouter()
+  const { queue } = useGradingQueue()
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -28,6 +40,23 @@ export default function CardAnalysisAnimation({ frontImageUrl, cardName, allowNa
 
     return () => clearInterval(interval)
   }, [])
+
+  // Auto-redirect when the uploaded card completes grading
+  useEffect(() => {
+    if (!cardId || !category) return
+
+    // Find the card in the queue
+    const queueCard = queue.find(c => c.cardId === cardId)
+
+    if (queueCard && queueCard.status === 'completed' && queueCard.resultUrl) {
+      console.log('[CardAnalysisAnimation] Card grading completed! Auto-redirecting to:', queueCard.resultUrl)
+
+      // Add a small delay before redirect to ensure the notification shows
+      setTimeout(() => {
+        router.push(queueCard.resultUrl!)
+      }, 500)
+    }
+  }, [queue, cardId, category, router])
   return (
     <div className="flex justify-center items-center min-h-screen bg-black">
       <div className="text-center max-w-md mx-auto p-6">

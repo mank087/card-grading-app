@@ -97,6 +97,13 @@ export const reportStyles = StyleSheet.create({
     marginBottom: 1,
   },
 
+  cardLabelFeatures: {
+    fontSize: 7,
+    color: '#2563eb', // Blue-600
+    fontWeight: 'bold',
+    marginBottom: 1,
+  },
+
   cardLabelSerial: {
     fontSize: 7,  // Increased from 6
     color: '#6b7280',

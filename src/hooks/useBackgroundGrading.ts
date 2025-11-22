@@ -36,7 +36,7 @@ export function useBackgroundGrading() {
       return
     }
 
-    // Poll every 2 seconds for updates
+    // Poll every 5 seconds for updates (reduced from 2s to minimize API load)
     const checkCardStatus = async () => {
       for (const card of processingCards) {
         try {
@@ -161,8 +161,8 @@ export function useBackgroundGrading() {
       }
     }
 
-    // Start polling
-    pollingIntervalRef.current = setInterval(checkCardStatus, 2000)
+    // Start polling every 5 seconds (reduced from 2s to minimize API load with multiple users)
+    pollingIntervalRef.current = setInterval(checkCardStatus, 5000)
 
     // Check immediately
     checkCardStatus()
