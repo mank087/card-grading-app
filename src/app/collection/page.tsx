@@ -475,11 +475,21 @@ function CollectionPageContent() {
               const cardNumber = cardInfo.card_number;
               const year = cardInfo.year || cardInfo.card_date || card.card_date;
 
-              // Dynamic sizing for player name (Line 1)
-              const nameFontSize = displayName.length > 35 ? '11px' : displayName.length > 25 ? '12px' : '14px';
+              // Dynamic sizing for player name (Line 1) - more aggressive scaling
+              const nameFontSize = displayName.length > 40 ? '9px'
+                : displayName.length > 35 ? '10px'
+                : displayName.length > 28 ? '11px'
+                : displayName.length > 20 ? '12px'
+                : '13px';
 
-              // Dynamic sizing for set details (Line 2)
-              const setFontSize = setName.length > 30 ? '10px' : '11px';
+              // Build set line text
+              const setLineText = [setName, cardNumber, year].filter(p => p).join(' • ');
+
+              // Dynamic sizing for set details (Line 2) - more aggressive scaling
+              const setFontSize = setLineText.length > 50 ? '8px'
+                : setLineText.length > 40 ? '9px'
+                : setLineText.length > 30 ? '10px'
+                : '11px';
 
               return (
                 <div key={card.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
@@ -497,10 +507,17 @@ function CollectionPageContent() {
 
                       {/* Center: Card Information - New 4-Line Structure */}
                       <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-                        {/* Line 1: Player/Card Name - Dynamic Font Sizing */}
+                        {/* Line 1: Player/Card Name - Dynamic Font Sizing with 2-line wrap */}
                         <div
-                          className="font-bold text-gray-900 leading-tight truncate"
-                          style={{ fontSize: nameFontSize }}
+                          className="font-bold text-gray-900 leading-tight"
+                          style={{
+                            fontSize: nameFontSize,
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            wordBreak: 'break-word'
+                          }}
                           title={displayName}
                         >
                           {displayName}
@@ -514,11 +531,12 @@ function CollectionPageContent() {
                             display: '-webkit-box',
                             WebkitLineClamp: 2,
                             WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden'
+                            overflow: 'hidden',
+                            wordBreak: 'break-word'
                           }}
-                          title={`${setName} • ${cardNumber || ''} • ${year || 'N/A'}`}
+                          title={setLineText}
                         >
-                          {[setName, cardNumber, year].filter(p => p).join(' • ')}
+                          {setLineText}
                         </div>
 
                         {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
