@@ -618,17 +618,13 @@ function CollectionPageContent() {
               </p>
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                {/* Mobile scroll hint */}
-                <div className="md:hidden bg-blue-50 border-b border-blue-200 px-4 py-2 text-sm text-blue-700">
-                  ← Swipe to see all columns including Actions →
-                </div>
-                <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
-                  <table className="w-full" style={{ minWidth: '1200px' }}>
+                <div className="overflow-x-auto">
+                  <table className="w-full table-fixed">
                     <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th
                       onClick={() => handleSort('name')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="w-[28%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
                         Card Name
@@ -640,24 +636,11 @@ function CollectionPageContent() {
                       </div>
                     </th>
                     <th
-                      onClick={() => handleSort('manufacturer')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        Manufacturer
-                        {sortColumn === 'manufacturer' && (
-                          <span className="text-indigo-600">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
                       onClick={() => handleSort('series')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="w-[24%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
-                        Series
+                        Set
                         {sortColumn === 'series' && (
                           <span className="text-indigo-600">
                             {sortDirection === 'asc' ? '▲' : '▼'}
@@ -667,7 +650,7 @@ function CollectionPageContent() {
                     </th>
                     <th
                       onClick={() => handleSort('year')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
                         Year
@@ -680,7 +663,7 @@ function CollectionPageContent() {
                     </th>
                     <th
                       onClick={() => handleSort('grade')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
                         Grade
@@ -693,10 +676,10 @@ function CollectionPageContent() {
                     </th>
                     <th
                       onClick={() => handleSort('date')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
-                        Graded Date
+                        Date
                         {sortColumn === 'date' && (
                           <span className="text-indigo-600">
                             {sortDirection === 'asc' ? '▲' : '▼'}
@@ -706,10 +689,10 @@ function CollectionPageContent() {
                     </th>
                     <th
                       onClick={() => handleSort('visibility')}
-                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
-                        Visibility
+                        Status
                         {sortColumn === 'visibility' && (
                           <span className="text-indigo-600">
                             {sortDirection === 'asc' ? '▲' : '▼'}
@@ -717,7 +700,7 @@ function CollectionPageContent() {
                         )}
                       </div>
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider md:static sticky right-0 bg-gray-50 shadow-md md:shadow-none" style={{ minWidth: '200px' }}>
+                    <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
@@ -725,79 +708,71 @@ function CollectionPageContent() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {displayedCards.map((card) => (
                     <tr key={card.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="text-sm font-medium text-gray-900">
-                            {getPlayerName(card)}
-                          </div>
+                      <td className="px-3 py-3">
+                        <div className="text-sm font-medium text-gray-900 truncate" title={getPlayerName(card)}>
+                          {getPlayerName(card)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {getManufacturer(card) || '-'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
+                      <td className="px-3 py-3">
+                        <div className="text-sm text-gray-900 truncate" title={getCardSet(card)}>
                           {getCardSet(card)}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         <div className="text-sm text-gray-900">
                           {getYear(card) || '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         <div className="text-sm font-medium text-gray-900">
                           {(() => {
                             const grade = getCardGrade(card);
-                            // Use actual AI-generated condition label, stripping abbreviation
                             const condition = card.conversational_condition_label
                               ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
                               : (grade ? getConditionFromGrade(grade) : '');
 
                             return (
-                              <>
-                                {grade ? formatGrade(grade) : '-'}
+                              <div>
+                                <span>{grade ? formatGrade(grade) : '-'}</span>
                                 {condition && (
-                                  <span className="text-xs text-gray-500 ml-1">
-                                    / {condition}
-                                  </span>
+                                  <div className="text-xs text-gray-500 truncate" title={condition}>
+                                    {condition}
+                                  </div>
                                 )}
-                              </>
+                              </div>
                             );
                           })()}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-3 py-3">
                         <div className="text-sm text-gray-500">
-                          {card.created_at ? new Date(card.created_at).toLocaleDateString() : '-'}
+                          {card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
                           card.visibility === 'public'
-                            ? 'bg-green-100 text-green-800 border-green-500'
-                            : 'bg-gray-100 text-gray-800 border-gray-400'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-gray-100 text-gray-600'
                         }`}>
-                          {card.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
+                          {card.visibility === 'public' ? '🌐' : '🔒'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm md:static sticky right-0 bg-white shadow-md md:shadow-none" style={{ minWidth: '200px' }}>
-                        <div className="flex items-center gap-3 flex-nowrap">
+                      <td className="px-3 py-3 text-sm">
+                        <div className="flex items-center gap-2">
                           <Link
                             href={getCardLink(card)}
-                            className="text-purple-600 hover:text-purple-800 font-medium whitespace-nowrap"
+                            className="text-purple-600 hover:text-purple-800 font-medium"
                           >
-                            View Details
+                            View
                           </Link>
                           <button
                             onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
                             disabled={deletingCardId === card.id}
-                            className="text-red-600 hover:text-red-800 font-medium disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
+                            className="text-red-500 hover:text-red-700 font-medium disabled:opacity-50 cursor-pointer"
                             title="Delete card"
                           >
-                            {deletingCardId === card.id ? 'Deleting...' : 'Delete'}
+                            {deletingCardId === card.id ? '...' : '✕'}
                           </button>
                         </div>
                       </td>
