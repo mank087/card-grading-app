@@ -56,7 +56,11 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
   const { id: cardId } = await params;
   const startTime = Date.now();
 
-  console.log(`[GET /api/sports/${cardId}] Starting sports card grading request`);
+  // Check for force_regrade query parameter
+  const { searchParams } = new URL(request.url);
+  const forceRegrade = searchParams.get('force_regrade') === 'true';
+
+  console.log(`[GET /api/sports/${cardId}] Starting sports card grading request (force_regrade: ${forceRegrade})`);
 
   // Clean up any stuck processing cards first
   cleanupStuckCards();
@@ -104,7 +108,6 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     if (cardVisibility === 'private') {
       // Private card - only owner can view
       // Get user_id from query parameter (client-side directAuth uses localStorage)
-      const { searchParams } = new URL(request.url);
       const userId = searchParams.get('user_id');
 
       if (!userId) {
@@ -152,7 +155,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       (card.conversational_decimal_grade && card.conversational_whole_grade) ||
       (card.conversational_grading && card.conversational_grading.length > 0);
 
-    if (hasCompleteGrading) {
+    // Skip cache if force_regrade is requested
+    if (hasCompleteGrading && !forceRegrade) {
       console.log(`[GET /api/sports/${cardId}] Sports card already fully processed, returning existing result`);
 
       // Parse conversational_grading if it exists to extract professional grades
@@ -374,8 +378,12 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       });
     }
 
-    // If incomplete grading, process it
-    console.log(`[GET /api/sports/${cardId}] Sports card needs grading analysis`);
+    // If incomplete grading OR force_regrade is requested, process it
+    if (!hasCompleteGrading) {
+      console.log(`[GET /api/sports/${cardId}] Sports card needs grading analysis`);
+    } else if (forceRegrade) {
+      console.log(`[GET /api/sports/${cardId}] 🔄 Force re-grade requested, bypassing cache`);
+    }
 
     // 🎯 PRIMARY: Run conversational grading v4.2 (single API call)
     let conversationalGradingResult = null;
