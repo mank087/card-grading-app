@@ -631,31 +631,314 @@ MEASUREMENT STANDARDS
 • Example: "gloss loss affecting approximately 15% of surface"
 
 ────────────────────────────────────────────────────────────────────────
-COMMON DEFECT TYPES
+🚨 COMPREHENSIVE VISUAL DEFECT IDENTIFICATION GUIDE
 ────────────────────────────────────────────────────────────────────────
 
-**CORNERS:**
-• Fiber exposure: White cardstock showing at corner tip
-• Corner rounding: Loss of sharp corner geometry
-• Corner lift/tilt: Corner raised from card plane (STRUCTURAL - grade cap)
-• Corner bend: Creased corner (STRUCTURAL - grade cap)
+**PURPOSE:** Train AI to recognize ALL common trading card defects through detailed visual descriptions. ANY defect = NOT 10.0.
 
-**EDGES:**
-• Whitening: White fiber visible along edge
-• Chipping: Border coating removed revealing cardstock
-• Roughness: Uneven/jagged factory cut
-• Fuzzing: Fiber separation along edge line
+══════════════════════════════════════════════════════════════════════════
+CORNER DEFECTS - VISUAL IDENTIFICATION
+══════════════════════════════════════════════════════════════════════════
 
-**SURFACE:**
-• Scratch: Linear mark in surface coating
-• Crease: Fold line in cardstock (STRUCTURAL - grade cap)
-• Print line: Roller mark from printing process
-• Print defect: Ink errors (spots, voids, smudges)
-• Stain: Discoloration from foreign substance
-• Dent: Surface indentation (may trigger grade cap)
-• Holo scratch: Scratch in holographic layer
-• Gloss loss: Dulled or matte areas on glossy surface
-• Wax stain: Residue from wax pack storage
+**🔴 FIBER EXPOSURE / CORNER WHITENING**
+Visual Appearance:
+• WHITE cardstock fibers visible at corner tip against colored border
+• Appears as a bright white "flash" or "dot" at the apex of the corner
+• High contrast against dark borders (navy, black, red) - very visible
+• Low contrast against white/light borders - requires careful inspection
+• May appear as a small white triangle or irregular white patch
+• Cardstock layer exposed where protective coating has worn away
+
+How to Detect:
+• Zoom to maximum on each corner tip
+• Look for ANY white showing that is NOT part of the card design
+• On dark borders: white fiber is bright/obvious against dark background
+• On light borders: look for texture change, slight brightness difference
+• Compare corner tips to card's border color - any mismatch = defect
+
+Severity Levels:
+• Microscopic (<0.1mm): Barely visible white dot at apex, only at max zoom → -0.3 to -0.5
+• Minor (0.1-0.3mm): Clear white fiber visible, affects corner tip area → -0.5 to -1.0
+• Moderate (0.3-0.5mm): Obvious whitening, extends along corner edges → -1.0 to -1.5
+• Heavy (>0.5mm): Significant white exposure, corner clearly worn → -1.5 to -2.5
+
+**🔴 CORNER ROUNDING / SOFTENING**
+Visual Appearance:
+• Corner apex is curved/rounded instead of sharp 90° point
+• Loss of crisp geometric corner shape
+• Corner appears "soft" or "blunted"
+• May look like corner was rubbed or worn down
+• Corner profile is convex curve instead of sharp angle
+
+How to Detect:
+• Compare corner shape to a true 90° angle
+• Sharp corner: Two edges meet at distinct point
+• Rounded corner: Edges blend into curved apex
+• Look at corner silhouette - should be angular, not curved
+
+Severity Levels:
+• Slight softening: Barely perceptible curve, almost sharp → -0.3 to -0.5
+• Minor rounding: Noticeable curve at apex, point still somewhat defined → -0.5 to -1.0
+• Moderate rounding: Clear rounded profile, no sharp point → -1.0 to -1.5
+• Heavy rounding: Significantly blunted, almost semicircular → -1.5 to -2.5
+
+**🔴 CORNER DING / IMPACT DAMAGE**
+Visual Appearance:
+• Small indentation or compression at corner
+• Corner may appear pushed in or flattened
+• May have associated color break (white stress mark)
+• Differs from rounding - ding has irregular shape from impact
+• May show crescent or arc-shaped damage pattern
+
+How to Detect:
+• Look for irregular damage pattern (not gradual wear)
+• Check for associated white stress lines radiating from impact
+• Examine corner from multiple angles - ding shows depth/compression
+• Touch/handling damage often shows on multiple corners
+
+**🔴 CORNER LIFT / TILT (STRUCTURAL - GRADE CAP 4.0)**
+Visual Appearance:
+• Corner separates from flat card plane
+• Corner curls upward or away from surface
+• Creates shadow underneath when viewed at angle
+• Gap visible between corner and what should be flat surface
+• Corner may catch light differently due to angle change
+
+How to Detect:
+• View card at shallow angle toward light source
+• Lifted corner casts shadow underneath
+• Light passes under corner showing separation
+• Card does not lie perfectly flat when placed on surface
+
+══════════════════════════════════════════════════════════════════════════
+EDGE DEFECTS - VISUAL IDENTIFICATION
+══════════════════════════════════════════════════════════════════════════
+
+**🔴 EDGE WHITENING**
+Visual Appearance:
+• White cardstock fibers visible along the edge line
+• Appears as white line or series of white dots along edge perimeter
+• Most visible on dark-bordered cards (contrast with border color)
+• May be continuous (runs along edge) or intermittent (white spots)
+• Differs from print border - whitening is UNDER the printed layer
+
+How to Detect:
+• Scan entire edge length from corner to corner
+• Look for ANY white showing along the edge boundary
+• On dark borders: white is bright and obvious
+• On light borders: look for texture change or raised fiber appearance
+• Check where edge meets the design - white should NOT be visible
+
+Severity Levels:
+• Microscopic: 1-2 tiny white flecks, only visible at max zoom → -0.2 to -0.3 per fleck
+• Minor: Several white spots or short whitening segment (~5-15% of edge) → -0.3 to -0.5
+• Moderate: Continuous whitening or multiple areas (~15-40% of edge) → -0.5 to -1.0
+• Heavy: Extensive whitening covering most of edge (>40%) → -1.0 to -2.0
+
+**🔴 EDGE CHIPPING**
+Visual Appearance:
+• Small pieces of printed border/coating missing from edge
+• Reveals white or tan cardstock beneath
+• Looks like tiny "bites" taken out of the edge
+• More severe than whitening - actual material loss
+• May have irregular edges at chip boundaries
+
+How to Detect:
+• Look for areas where border color is completely absent
+• Chips have defined boundaries (not gradual fade like whitening)
+• Often occurs from handling damage or contact with other cards
+• Check for multiple chips - damage often occurs in patterns
+
+Severity Levels:
+• Minor chip: Single small area (<0.3mm) with coating loss → -0.5 to -0.7
+• Moderate chips: Multiple chips or larger area (0.3-1mm) → -0.7 to -1.5
+• Heavy chipping: Significant material loss, multiple areas → -1.5 to -2.5
+
+**🔴 EDGE ROUGHNESS / FUZZING**
+Visual Appearance:
+• Edge line appears jagged, uneven, or feathered
+• Cardstock fibers separating along edge (fuzzy appearance)
+• Edge looks "hairy" or textured instead of clean cut
+• May see individual fiber strands extending from edge
+• Different from whitening - roughness is texture, whitening is color
+
+How to Detect:
+• Examine edge line profile - should be single clean line
+• Rough edge shows interrupted, uneven line
+• Look for fiber strands extending beyond edge boundary
+• Compare to clean factory cut (straight, smooth edge)
+
+**🔴 EDGE NICK / DENT**
+Visual Appearance:
+• Small indentation in the edge (edge pushed inward)
+• Compression damage along edge line
+• May show associated white stress mark
+• Creates irregular profile when viewing edge straight-on
+• Different from chip (nick is compression, chip is material loss)
+
+**🔴 EDGE PRINT LINE**
+Visual Appearance:
+• Line running parallel to edge (factory printing artifact)
+• May be slightly different color than surrounding area
+• Consistent line pattern (not random damage)
+• Manufacturing defect, not handling damage
+
+══════════════════════════════════════════════════════════════════════════
+SURFACE DEFECTS - VISUAL IDENTIFICATION
+══════════════════════════════════════════════════════════════════════════
+
+**🔴 WHITE DOTS / SPECKS**
+Visual Appearance:
+• Small white spots on the card surface
+• May be print defects (ink voids) or debris/contamination
+• High contrast against dark/colored areas
+• Lower visibility on light areas (look for texture bump)
+• Can be perfectly round (print void) or irregular (contamination)
+
+How to Detect:
+• Scan entire surface systematically in zones
+• Look for ANY white spots that are not part of design
+• Check solid color areas especially (defects most visible)
+• Vary lighting angle to catch embedded debris
+
+Severity Levels:
+• Single microscopic dot (<0.1mm) → -0.2 to -0.3
+• Single visible dot (0.1-0.3mm) → -0.3 to -0.5
+• Multiple dots → multiply base deduction, consider pattern
+• Large white spot (>0.3mm) → -0.5 to -1.0
+
+**🔴 SCRATCHES**
+Visual Appearance:
+• Linear marks in the surface coating/finish
+• May appear as fine hairlines (micro-scratches) or deeper grooves
+• Catch light at certain angles - appear bright or dark depending on angle
+• On holographic/chrome: disrupts rainbow pattern, very obvious
+• On matte: may appear as glossy line (coating disturbed)
+• On glossy: may appear as dull line or catch light
+
+How to Detect:
+• Tilt card under light at various angles
+• Scratches catch light and become visible as lines
+• On refractor/chrome: look for pattern disruption in holographic effect
+• Check high-traffic areas: center, edges, anywhere handling occurs
+• Long scratches may cross entire surface
+
+Severity Levels:
+• Micro-scratch: Hairline, only visible at angle with light → -0.3 to -0.5
+• Minor scratch: Clearly visible line, <1cm length → -0.5 to -0.7
+• Moderate scratch: Obvious scratch, 1-3cm or deeper → -0.7 to -1.5
+• Heavy scratch: Deep groove, long scratch, or multiple → -1.5 to -3.0
+
+**🔴 SURFACE SCUFFING / ABRASION**
+Visual Appearance:
+• Area of surface that appears dulled, matte, or worn
+• Differs from scratch (area vs line)
+• Loss of glossy finish in affected zone
+• May show directional texture from rubbing
+• Common on card surfaces from sliding against other cards
+
+How to Detect:
+• Look for areas with different sheen than surrounding surface
+• On glossy cards: scuffed area appears matte or dull
+• On matte cards: scuffed area may appear glossy or slick
+• Check card center and edges (common contact points)
+
+**🔴 PRINT DEFECTS (Manufacturing)**
+Visual Appearance:
+• Print lines: Horizontal lines from roller marks in printing
+• Ink voids: Small areas where ink didn't adhere (tiny white spots in colored areas)
+• Ink spots: Extra ink deposits (colored dots where shouldn't be)
+• Registration issues: Colors slightly misaligned (fuzzy edges on design)
+• Smudging: Ink spread beyond intended area
+
+How to Detect:
+• Print defects are consistent with manufacturing (not handling)
+• Check print quality of text and detailed areas
+• Look for color registration at design boundaries
+• Examine solid color areas for voids or spots
+
+**🔴 DENTS / INDENTATIONS**
+Visual Appearance:
+• Depressed area in card surface
+• Creates subtle shadow or highlight depending on lighting
+• May be from pressure damage (stacking, objects placed on card)
+• Surface bows inward at damage point
+• May or may not have associated crease
+
+How to Detect:
+• View card at shallow angle with raking light
+• Indentation creates shadow in the depression
+• Run finger gently over surface (feel the dip) - but don't touch collectibles!
+• Examine card surface reflection - dent disrupts smooth reflection
+
+**🔴 CREASES / FOLDS (STRUCTURAL - GRADE CAP)**
+Visual Appearance:
+• Linear fold line where card was bent
+• Often shows white stress line along fold
+• Card surface broken at crease point
+• May be subtle (light crease) or severe (hard fold)
+• Permanent structural damage to cardstock
+
+How to Detect:
+• Creases often visible as line with slightly different color/texture
+• White stress line along fold is telltale sign
+• View at angle - crease catches light differently
+• Card may not lie flat if heavily creased
+
+GRADE CAPS for Creases:
+• Light surface crease (no color break): Max grade 6.0-7.0
+• Crease with white line: Max grade 4.0-5.0
+• Heavy crease/fold: Max grade 3.0-4.0
+
+**🔴 STAINING / DISCOLORATION**
+Visual Appearance:
+• Area of card with color different from original
+• May be yellowing (age), water damage, or contact stains
+• Wax staining: Oily residue from wax pack (yellowish spots)
+• Water staining: Ring marks or wavy discoloration patterns
+• Fingerprint oils: Visible fingerprint pattern in certain light
+
+**🔴 HOLOGRAPHIC / FOIL DAMAGE**
+Visual Appearance:
+• On refractor/chrome/prizm: Rainbow pattern disrupted
+• Foil peeling: Holographic layer separating from card base
+• Foil scratches: Linear damage in holographic layer
+• Pattern disruption: Area where holographic effect is dulled or absent
+• These defects are MORE severe on premium cards
+
+How to Detect:
+• Tilt holographic card - pattern should be uniform
+• Look for areas where rainbow/refractor effect is missing
+• Check for scratches that show through holographic layer
+• Any disruption to foil pattern is significant deduction
+
+══════════════════════════════════════════════════════════════════════════
+🚨 CRITICAL 10.0 ENFORCEMENT RULES
+══════════════════════════════════════════════════════════════════════════
+
+**A 10.0 SCORE MEANS ZERO DEFECTS. ANY of these = NOT 10.0:**
+
+CORNERS (must have ALL 8 perfect):
+□ ANY white fiber visible at ANY corner tip → NOT 10.0
+□ ANY rounding or softening of ANY corner → NOT 10.0
+□ ANY ding or impact damage on ANY corner → NOT 10.0
+
+EDGES (must have ALL 8 perfect):
+□ ANY white fleck or whitening on ANY edge → NOT 10.0
+□ ANY chip or coating loss on ANY edge → NOT 10.0
+□ ANY roughness or fuzzing on ANY edge → NOT 10.0
+
+SURFACE (must have BOTH sides perfect):
+□ ANY white dot or speck on surface → NOT 10.0
+□ ANY scratch (even micro-scratch at angle) → NOT 10.0
+□ ANY scuffing or gloss loss → NOT 10.0
+□ ANY print defect (line, void, spot) → NOT 10.0
+□ ANY pattern disruption on holographic cards → NOT 10.0
+
+**VALIDATION RULE:**
+If you document ANY defect in corners, edges, OR surface:
+→ The maximum possible score for that component = 9.5 (NOT 10.0)
+→ Check your output: defects array has entries? Score cannot be 10.0
 
 **CENTERING:**
 • Off-center: Image shifted from geometric center
@@ -1194,21 +1477,35 @@ Examine corner tip at maximum zoom for wear characteristics:
 • May show additional damage (fraying, tearing)
 
 ────────────────────────────────────────────────────────────────────────
-🚨 10.0 RULE FOR CORNERS
+🚨 10.0 RULE FOR CORNERS - STRICTLY ENFORCED
 ────────────────────────────────────────────────────────────────────────
 
+**10.0 = ZERO DEFECTS. Period.**
+
 ALL 8 corners (4 front + 4 back) must have:
-• ZERO fiber exposure (even at maximum zoom)
-• Perfect geometry (no rounding)
+• ZERO fiber exposure (even at maximum zoom - no white showing at tips)
+• ZERO rounding or softening (corners must be sharp 90° angles)
+• ZERO dings or impact damage (no compression marks)
 • Completely flat to card surface (no lift/tilt)
 
-If ANY corner fails ANY criteria → Maximum score 9.5 (NOT 10.0)
+**🚨 CRITICAL VALIDATION:**
+□ Did you see ANY white at ANY corner tip? → Score CANNOT be 10.0
+□ Does ANY corner appear soft or rounded? → Score CANNOT be 10.0
+□ Did you add ANY entry to defects array? → Score CANNOT be 10.0
+
+If you document ANY defect → Maximum score = 9.5 (NOT 10.0)
+
+**COMMON MISTAKES TO AVOID:**
+❌ "Corners appear sharp" with score 10.0 but defects array shows fiber → INVALID
+❌ Describing "minor fiber" but still scoring 10.0 → INVALID
+❌ All 8 corners have identical description → INVALID (each corner is unique)
 
 ────────────────────────────────────────────────────────────────────────
 DEDUCTION GUIDE
 ────────────────────────────────────────────────────────────────────────
 
-• 1 corner with minimal fiber = −0.5 points
+• 1 corner with microscopic fiber (<0.1mm) = −0.5 points (max 9.5)
+• 1 corner with minor fiber (0.1-0.3mm) = −0.5 to −1.0 points
 • 2 corners with minimal fiber = −1.0 points
 • Any corner with rounding = −1.5 points minimum
 • Any corner with lift/tilt = GRADE CAP 4.0
@@ -1342,22 +1639,44 @@ Examine edge for white fiber exposure and damage:
 **Fair (<8.0)**: Heavy whitening, chipping, damage, or heavy roughness
 
 ────────────────────────────────────────────────────────────────────────
-🚨 10.0 RULE FOR EDGES
+🚨 10.0 RULE FOR EDGES - STRICTLY ENFORCED
 ────────────────────────────────────────────────────────────────────────
 
-ALL 8 edges (4 front + 4 back) must have:
-• ZERO white flecks (even at maximum zoom)
-• Smooth factory cut (no roughness)
-• No chipping or damage
+**10.0 = ZERO DEFECTS. Period.**
 
-If ANY edge fails ANY criteria → Maximum score 9.5 (NOT 10.0)
+ALL 8 edges (4 front + 4 back) must have:
+• ZERO white flecks (even at maximum zoom - no white dots or lines anywhere along edge)
+• ZERO whitening (no white fiber exposure along ANY portion of edge)
+• ZERO chipping (no coating loss revealing cardstock)
+• Smooth factory cut (no roughness, fuzzing, or uneven texture)
+• No nicks, dents, or edge damage of any kind
+
+**🚨 CRITICAL VALIDATION:**
+□ Did you see ANY white spot or fleck on ANY edge? → Score CANNOT be 10.0
+□ Does ANY edge show continuous whitening? → Score CANNOT be 10.0
+□ Is ANY edge rough, fuzzy, or uneven? → Score CANNOT be 10.0
+□ Did you add ANY entry to defects array? → Score CANNOT be 10.0
+
+If you document ANY defect → Maximum score = 9.5 (NOT 10.0)
+
+**COMMON MISTAKES TO AVOID:**
+❌ "Edges are clean" with score 10.0 but defects array shows whitening → INVALID
+❌ Describing "minor white fleck" but still scoring 10.0 → INVALID
+❌ All 4 edges have identical description → INVALID (each edge is unique)
+
+**INSPECTION REMINDER:**
+• Scan ENTIRE edge length from corner to corner
+• White fiber shows as bright spots against dark borders
+• Check for texture irregularities even without color change
+• Edges that look "good" from distance may show defects at zoom
 
 ────────────────────────────────────────────────────────────────────────
 DEDUCTION GUIDE
 ────────────────────────────────────────────────────────────────────────
 
-• 1-2 white flecks = −0.3 each
-• Continuous whitening = −0.7 per edge
+• 1 white fleck = −0.3 to −0.5 (max 9.5)
+• 2-3 white flecks = −0.5 to −0.7
+• Continuous whitening on one edge = −0.7 to −1.0 per edge
 • Chipping = −1.0 to −1.5
 • Minor roughness = −0.3 to −0.5
 • Moderate roughness = −0.7 to −1.0
@@ -1576,23 +1895,53 @@ Examine card under different lighting angles:
 • Pattern disruption on refractor = minimum −0.5 deduction
 
 ────────────────────────────────────────────────────────────────────────
-🚨 PERFECT SURFACE RULE
+🚨 PERFECT SURFACE RULE - STRICTLY ENFORCED
 ────────────────────────────────────────────────────────────────────────
 
-For 10.0 surface score, the surface must have:
-• ZERO scratches (even micro-scratches visible at zoom)
-• ZERO white dots, debris, or print defects
+**10.0 = ZERO DEFECTS. Period.**
+
+For 10.0 surface score, BOTH front and back surfaces must have:
+• ZERO scratches (even micro-scratches visible when tilting under light)
+• ZERO white dots or specks (any white spot not part of design = defect)
+• ZERO debris or contamination embedded in surface
+• ZERO print defects (lines, voids, ink spots, registration errors)
 • ZERO surface indentations, dents, or compression marks
-• ZERO pattern disruption (for holographic/refractor cards)
-• Pristine factory finish with NO visible wear
-• If you see ANY surface defect = NOT 10.0
+• ZERO scuffing or gloss loss (no areas of dulled finish)
+• ZERO pattern disruption (for holographic/refractor/chrome cards)
+• ZERO staining or discoloration (yellowing, water marks, wax residue)
+• Pristine factory finish with NO visible wear of ANY kind
+
+**🚨 CRITICAL VALIDATION:**
+□ Did you see ANY white dot or speck on surface? → Score CANNOT be 10.0
+□ Did ANY scratch become visible when tilting card under light? → Score CANNOT be 10.0
+□ Does ANY area show different sheen (scuffing/gloss loss)? → Score CANNOT be 10.0
+□ Is holographic pattern disrupted in ANY area? → Score CANNOT be 10.0
+□ Did you add ANY entry to defects array? → Score CANNOT be 10.0
+
+If you document ANY defect → Maximum score = 9.5 (NOT 10.0)
+
+**COMMON MISTAKES TO AVOID:**
+❌ "Surface is pristine" with score 10.0 but defects array shows scratch → INVALID
+❌ Describing "minor white dot" but still scoring 10.0 → INVALID
+❌ Missing micro-scratches (tilt card to catch light reflections)
+❌ Missing white dots on dark backgrounds (high contrast = easy to see)
+❌ Missing scuffing on glossy surfaces (look for dull areas)
+
+**INSPECTION REMINDER:**
+• Use 9-zone grid to systematically scan entire surface
+• Tilt card under light at multiple angles to reveal scratches
+• Check holographic areas for ANY pattern disruption
+• White dots are HIGH CONTRAST against dark/colored areas
+• Surface wear often appears in center and edges (handling zones)
 
 ────────────────────────────────────────────────────────────────────────
 RECOMMENDED DEDUCTIONS
 ────────────────────────────────────────────────────────────────────────
 
-• Single micro-scratch: −0.3 to −0.5
-• Single white dot: −0.2 to −0.3
+• Single micro-scratch: −0.3 to −0.5 (max 9.5)
+• Single visible scratch: −0.5 to −0.7
+• Single white dot: −0.2 to −0.3 (max 9.5)
+• Multiple white dots: −0.5 to −1.0
 • Print line: −0.3 to −0.5
 • Surface indentation: −0.3 to −0.7
 • Pattern disruption (holo): −0.5 minimum
