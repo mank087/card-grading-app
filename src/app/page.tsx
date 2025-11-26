@@ -136,9 +136,9 @@ export default function Home() {
           <h1 className="text-5xl font-bold mb-4">Dynamic Collectibles Management</h1>
           <p className="text-xl mb-8 max-w-3xl mx-auto leading-relaxed">
             Powered by <span className="font-semibold">DCM Optic™</span>, our proprietary artificial intelligence
-            grading system featuring a comprehensive 50+ point inspection process and variable confidence scoring
-            for precise analysis of trading cards including Sports, Pokémon®, Magic: The Gathering®,
-            Disney Lorcana®, and more.
+            grading system featuring comprehensive multi-point inspection across centering, corners, edges, and surface
+            with variable confidence scoring for precise analysis of trading cards including Sports, Pokémon®,
+            Magic: The Gathering®, Disney Lorcana®, and more.
           </p>
 
           {user ? (
