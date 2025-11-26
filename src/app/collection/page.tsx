@@ -475,13 +475,13 @@ function CollectionPageContent() {
               const cardNumber = cardInfo.card_number;
               const year = cardInfo.year || cardInfo.card_date || card.card_date;
 
-              // Dynamic sizing for player name (Line 1) - single line, very aggressive scaling
-              const nameFontSize = displayName.length > 45 ? '8px'
-                : displayName.length > 40 ? '9px'
-                : displayName.length > 35 ? '10px'
-                : displayName.length > 30 ? '11px'
-                : displayName.length > 25 ? '12px'
-                : '13px';
+              // Dynamic sizing for player name (Line 1) - single line, scale to fit
+              // Use transform scaleX to compress longer names horizontally
+              // At ~18 chars, text fits at full size. Beyond that, compress proportionally.
+              const maxCharsAtFullSize = 20;
+              const nameScaleX = displayName.length <= maxCharsAtFullSize
+                ? 1
+                : Math.max(0.55, maxCharsAtFullSize / displayName.length);
 
               // Build set line text
               const setLineText = [setName, cardNumber, year].filter(p => p).join(' • ');
@@ -508,10 +508,14 @@ function CollectionPageContent() {
 
                       {/* Center: Card Information - New 4-Line Structure */}
                       <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-                        {/* Line 1: Player/Card Name - Dynamic Font Sizing, single line */}
+                        {/* Line 1: Player/Card Name - Scale to fit on single line */}
                         <div
-                          className="font-bold text-gray-900 leading-tight truncate whitespace-nowrap"
-                          style={{ fontSize: nameFontSize }}
+                          className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
+                          style={{
+                            fontSize: '13px',
+                            transform: `scaleX(${nameScaleX})`,
+                            lineHeight: '1.2'
+                          }}
                           title={displayName}
                         >
                           {displayName}
