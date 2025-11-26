@@ -300,69 +300,82 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
   // Reset dash pattern
   doc.setLineDashPattern([], 0);
 
-  // Fold order labels
+  // Fold/Cut labels - using scissors symbol (✂) for cut option
   doc.setTextColor(COLORS.textLight);
   doc.setFontSize(6);
   doc.setFont('helvetica', 'bold');
 
-  // Left fold labels
-  doc.text('Fold 1st', FOLD_X1 - 35, 0.5 * INCH);
-  doc.text('Fold 1st', FOLD_X1 - 35, PAGE_HEIGHT / 2);
-  doc.text('Fold 1st', FOLD_X1 - 35, PAGE_HEIGHT - 0.5 * INCH);
+  // Left fold/cut labels
+  doc.text('Fold or Cut', FOLD_X1 - 40, 0.5 * INCH);
+  doc.text('Fold or Cut', FOLD_X1 - 40, PAGE_HEIGHT / 2);
+  doc.text('Fold or Cut', FOLD_X1 - 40, PAGE_HEIGHT - 0.5 * INCH);
 
-  // Right fold labels
-  doc.text('Fold 2nd', FOLD_X2 + 5, 0.5 * INCH);
-  doc.text('Fold 2nd', FOLD_X2 + 5, PAGE_HEIGHT / 2);
-  doc.text('Fold 2nd', FOLD_X2 + 5, PAGE_HEIGHT - 0.5 * INCH);
+  // Right fold/cut labels
+  doc.text('Fold or Cut', FOLD_X2 + 5, 0.5 * INCH);
+  doc.text('Fold or Cut', FOLD_X2 + 5, PAGE_HEIGHT / 2);
+  doc.text('Fold or Cut', FOLD_X2 + 5, PAGE_HEIGHT - 0.5 * INCH);
 
-  // Bottom fold labels (fold 4th)
-  doc.text('Fold 4th', 0.5 * INCH, FOLD_Y2 + 10);
-  doc.text('Fold 4th', PAGE_WIDTH / 2 - 20, FOLD_Y2 + 10);
-  doc.text('Fold 4th', PAGE_WIDTH - 1.2 * INCH, FOLD_Y2 + 10);
+  // Bottom fold/cut labels
+  doc.text('Fold or Cut', 0.5 * INCH, FOLD_Y2 + 10);
+  doc.text('Fold or Cut', PAGE_WIDTH / 2 - 20, FOLD_Y2 + 10);
+  doc.text('Fold or Cut', PAGE_WIDTH - 1.2 * INCH, FOLD_Y2 + 10);
 
-  // Top fold labels (fold 5th - last)
-  doc.text('Fold 5th', 0.5 * INCH, FOLD_Y1 - 5);
-  doc.text('Fold 5th', PAGE_WIDTH / 2 - 20, FOLD_Y1 - 5);
-  doc.text('Fold 5th', PAGE_WIDTH - 1.2 * INCH, FOLD_Y1 - 5);
+  // Top fold/cut labels
+  doc.text('Fold or Cut', 0.5 * INCH, FOLD_Y1 - 5);
+  doc.text('Fold or Cut', PAGE_WIDTH / 2 - 20, FOLD_Y1 - 5);
+  doc.text('Fold or Cut', PAGE_WIDTH - 1.2 * INCH, FOLD_Y1 - 5);
 
   // ============================================
-  // FOLDING INSTRUCTIONS (Left panel - more space in landscape)
+  // INSTRUCTIONS (Left panel - two options: fold or cut)
   // ============================================
 
   const instX = 0.5 * INCH;
-  const instY = FOLD_Y1 + 0.3 * INCH;
+  const instY = FOLD_Y1 + 0.2 * INCH;
 
   doc.setTextColor(COLORS.textMedium);
-  doc.setFontSize(10);
+  doc.setFontSize(9);
   doc.setFont('helvetica', 'bold');
-  doc.text('FOLDING INSTRUCTIONS', instX, instY);
+  doc.text('TWO DISPLAY OPTIONS:', instX, instY);
 
-  doc.setFont('helvetica', 'normal');
+  // Option A: Cut out label
   doc.setFontSize(8);
-  const instructions = [
+  doc.setFont('helvetica', 'bold');
+  doc.text('OPTION A: Cut Out Label', instX, instY + 18);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7);
+  const cutInstructions = [
     '1. Print at 100% scale',
-    '2. Fold LEFT edge along dotted line',
-    '3. Fold RIGHT edge along dotted line',
-    '    - Tuck back the overlap on the left',
-    '4. Fold BOTTOM edge along dotted line',
-    '5. Fold TOP edge along dotted line (last)',
+    '2. Cut along ALL dotted lines',
+    '3. Insert label into sleeve, toploader,',
+    '   or magnetic holder',
   ];
-
-  instructions.forEach((line, i) => {
-    doc.text(line, instX, instY + 18 + (i * 14));
+  cutInstructions.forEach((line, i) => {
+    doc.text(line, instX, instY + 30 + (i * 10));
   });
 
-  doc.setFont('helvetica', 'italic');
-  doc.setFontSize(7);
-  doc.text('Tip: Folding top edge last allows the label to', instX, instY + 115);
-  doc.text('slip into the toploader more easily.', instX, instY + 126);
-
+  // Option B: Fold for display stand
+  doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.text('Final size: 2.5" x 3.5"', instX, instY + 148);
+  doc.text('OPTION B: Fold for Display Stand', instX, instY + 78);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.text('(fits standard toploader or card sleeve)', instX, instY + 161);
+  const foldInstructions = [
+    '1. Print at 100% scale',
+    '2. Fold ALL edges along dotted lines',
+    '3. Tuck flaps behind to create stand',
+    '4. Display upright alongside your card',
+  ];
+  foldInstructions.forEach((line, i) => {
+    doc.text(line, instX, instY + 90 + (i * 10));
+  });
+
+  // Final size note
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('Label size: 2.5" x 3.5"', instX, instY + 145);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6);
+  doc.text('(standard trading card dimensions)', instX, instY + 156);
 
   // ============================================
   // DRAW LABEL BORDER (white background with purple border)
