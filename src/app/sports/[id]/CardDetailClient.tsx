@@ -2284,9 +2284,9 @@ export function SportsCardDetails() {
 
   // v3.1: Read centering from multiple possible sources (v3.1 centerings_used, legacy Centering_Measurements, or stage0_detection)
   // 🎯 Sports cards: Use conversational_centering_ratios FIRST (matches Pokemon pattern)
-  // 🆕 Also try to extract centering from conversational_grading JSON directly as fallback
+  // 🆕 ALWAYS try to extract centering from conversational_grading JSON as primary source
   let parsedCenteringFromJSON = null;
-  if (card.conversational_grading && !card.conversational_centering_ratios) {
+  if (card.conversational_grading) {
     try {
       const parsed = typeof card.conversational_grading === 'string'
         ? JSON.parse(card.conversational_grading)
@@ -2301,12 +2301,13 @@ export function SportsCardDetails() {
         console.log('[Sports Page] 🔧 Extracted centering from conversational_grading JSON:', parsedCenteringFromJSON);
       }
     } catch (e) {
-      console.log('[Sports Page] Could not parse conversational_grading for centering');
+      console.log('[Sports Page] Could not parse conversational_grading for centering:', e);
     }
   }
 
-  const centeringData = card.conversational_centering_ratios ||
-                        parsedCenteringFromJSON ||
+  // Use parsed JSON centering FIRST (most reliable source), then fall back to other sources
+  const centeringData = parsedCenteringFromJSON ||
+                        card.conversational_centering_ratios ||
                         card.ai_grading?.["Centering_Measurements"] ||
                         card.ai_grading?.centerings_used ||
                         card.stage0_detection ||
