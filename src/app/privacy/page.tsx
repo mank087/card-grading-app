@@ -165,13 +165,20 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">10. International Data Transfers</h2>
             <p>
-              Your information may be transferred to and maintained on computers located outside of your state, province, country,
-              or other governmental jurisdiction where data protection laws may differ. By using our Service, you consent to such transfers.
+              DCM Grading is based in Georgia, United States. Your information may be transferred to and maintained on computers located outside of your state, province, country,
+              or other governmental jurisdiction where data protection laws may differ. By using our Service, you consent to such transfers to Georgia, United States and other locations where our service providers operate.
             </p>
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">11. Changes to This Privacy Policy</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">11. Governing Law</h2>
+            <p>
+              This Privacy Policy and any disputes arising from it shall be governed by and construed in accordance with the laws of the State of Georgia, United States, without regard to its conflict of law provisions.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Changes to This Privacy Policy</h2>
             <p>
               We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy
               on this page and updating the "Last Updated" date. You are advised to review this Privacy Policy periodically for any changes.
@@ -179,7 +186,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Contact Us</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">13. Contact Us</h2>
             <p>If you have any questions about this Privacy Policy, please contact us:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
               <li>Email: admin@dcmgrading.com</li>
@@ -187,12 +194,6 @@ export default function PrivacyPolicyPage() {
             </ul>
           </section>
 
-          <section className="mt-12 pt-8 border-t border-gray-200">
-            <p className="text-sm text-gray-500 italic">
-              <strong>Note:</strong> This privacy policy is provided as a template and should be reviewed by a qualified attorney
-              to ensure compliance with applicable laws and regulations in your jurisdiction.
-            </p>
-          </section>
         </div>
       </div>
     </main>

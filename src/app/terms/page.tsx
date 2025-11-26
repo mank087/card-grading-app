@@ -280,17 +280,22 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.1 Governing Law</h3>
             <p>
-              These Terms shall be governed by and construed in accordance with the laws of [Your State/Country], without regard to
+              These Terms shall be governed by and construed in accordance with the laws of the State of Georgia, United States, without regard to
               its conflict of law provisions.
             </p>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.2 Arbitration</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.2 Jurisdiction</h3>
             <p>
-              Any dispute arising from these Terms or the Service shall be resolved through binding arbitration in accordance with
-              the rules of the American Arbitration Association, except where prohibited by law.
+              Any legal action or proceeding arising out of or relating to these Terms or the Service shall be brought exclusively in the state or federal courts located in Georgia, United States, and you consent to the personal jurisdiction of such courts.
             </p>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.3 Class Action Waiver</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.3 Arbitration</h3>
+            <p>
+              Any dispute arising from these Terms or the Service shall be resolved through binding arbitration in accordance with
+              the rules of the American Arbitration Association, conducted in Georgia, United States, except where prohibited by law.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">11.4 Class Action Waiver</h3>
             <p>
               You agree to resolve disputes with us on an individual basis and waive your right to participate in class actions or
               class-wide arbitration.
@@ -335,13 +340,6 @@ export default function TermsPage() {
             </p>
           </section>
 
-          <section className="mt-12 pt-8 border-t border-gray-200">
-            <p className="text-sm text-gray-500 italic">
-              <strong>Note:</strong> These Terms and Conditions are provided as a template and should be reviewed by a qualified attorney
-              to ensure compliance with applicable laws and regulations in your jurisdiction. The arbitration and governing law provisions
-              should be customized based on your location and business structure.
-            </p>
-          </section>
         </div>
       </div>
     </main>
