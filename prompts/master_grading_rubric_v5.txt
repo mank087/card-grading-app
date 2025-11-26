@@ -1045,6 +1045,14 @@ CENTERING QUALITY TERMINOLOGY (MANDATORY - NO EXCEPTIONS)
 
 🚨 MANDATORY: The word you put in "quality_tier" field MUST be the EXACT SAME word you use to start your "analysis" sentence. If quality_tier = "Excellent", analysis MUST start with "Excellent centering...". NO EXCEPTIONS.
 
+⚠️ QUALITY TIER vs SCORE CLARIFICATION:
+• Quality tier describes the centering PRECISION (how close to 50/50)
+• Score reflects PSA GRADEABILITY (whether it meets gem mint thresholds)
+• A card CAN have "Good" quality tier (54/46-55/45) AND still receive 10.0 score
+• Why? Because 55/45 is the PSA 10 threshold - "Good" centering qualifies for gem mint!
+• Example: 55/45 centering → quality_tier: "Good", score: 10.0 (both correct)
+• The quality tier is descriptive, the score reflects grading standards
+
 **Example Correct Outputs:**
 
 ✅ "Excellent centering with L/R at 52/48 and T/B at 51/49. The slight rightward shift is minimal and well within gem mint standards."
@@ -1069,22 +1077,42 @@ For EACH side (front and back):
       "left_right": "44/56",
       "top_bottom": "48/52",
       "worst_axis": "left_right",
+      "quality_tier": "Perfect" | "Excellent" | "Good" | "Fair" | "Off-Center",
       "score": 8.5,
-      "analysis": "MAXIMUM 2-3 SENTENCES: (1) Quality tier + both axis ratios + worst axis. (2) Context (PSA standards, visual assessment). (3) Optional: Measurement method or uncertainty if relevant."
+      "analysis": "MAXIMUM 2-3 SENTENCES: MUST START with quality_tier word. (1) Quality tier + both axis ratios. (2) Context. (3) Optional notes."
     },
     "back": {
-      // Same structure as front
-      "card_type": "...",
-      "measurement_method": "...",
-      "measurements": "...",
-      "left_right": "...",
-      "top_bottom": "...",
-      "worst_axis": "...",
+      "card_type": "Standard Bordered" | "Asymmetric Insert" | "Borderless" | "Foil-Frame" | "Die-Cut",
+      "measurement_method": "Border measurement" | "Design anchors" | "Internal geometry",
+      "measurements": "Left ≈ X.Xmm, Right ≈ X.Xmm, Top ≈ X.Xmm, Bottom ≈ X.Xmm",
+      "left_right": "XX/XX",
+      "top_bottom": "XX/XX",
+      "worst_axis": "left_right" | "top_bottom",
+      "quality_tier": "Perfect" | "Excellent" | "Good" | "Fair" | "Off-Center",
       "score": 0.0-10.0,
-      "analysis": "MAXIMUM 2-3 SENTENCES: Independent back centering analysis using quality tier terminology."
+      "analysis": "MAXIMUM 2-3 SENTENCES: MUST START with quality_tier word. Independent back centering analysis."
     }
   }
 }
+
+🚨 QUALITY TIER SELECTION RULES (NO EXCEPTIONS):
+1. Measure BOTH axes (L/R and T/B) for the side being evaluated
+2. Find the WORST axis (highest deviation from 50)
+3. Look up the quality tier using these EXACT thresholds:
+   • 0-1% deviation (50/50, 51/49) → quality_tier: "Perfect"
+   • 2-3% deviation (52/48, 53/47) → quality_tier: "Excellent"
+   • 4-5% deviation (54/46, 55/45) → quality_tier: "Good"
+   • 6-10% deviation (56/44 to 60/40) → quality_tier: "Fair"
+   • 11%+ deviation (61/39 or worse) → quality_tier: "Off-Center"
+4. The quality_tier MUST match the ratios mathematically - NO EXCEPTIONS
+5. The first word of "analysis" MUST be the same as "quality_tier"
+
+Example: If back centering is 48/52 L/R and 46/54 T/B:
+• Worst axis = T/B at 46/54 (4% deviation)
+• 4% deviation = "Good" tier
+• quality_tier: "Good"
+• analysis: "Good centering with 48/52 horizontal and 46/54 vertical..."
+• score: 10.0 (55/45 or better qualifies for 10.0)
 
 ═══════════════════════════════════════════════════════════════════════
 SECTION 8: GRADING METHODOLOGY - CORNERS

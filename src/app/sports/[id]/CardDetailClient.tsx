@@ -2294,8 +2294,10 @@ export function SportsCardDetails() {
         parsedCenteringFromJSON = {
           front_lr: parsed.centering.front?.left_right || null,
           front_tb: parsed.centering.front?.top_bottom || null,
+          front_quality_tier: parsed.centering.front?.quality_tier || null,
           back_lr: parsed.centering.back?.left_right || null,
-          back_tb: parsed.centering.back?.top_bottom || null
+          back_tb: parsed.centering.back?.top_bottom || null,
+          back_quality_tier: parsed.centering.back?.quality_tier || null
         };
         console.log('[Sports Page] 🔧 Extracted centering from conversational_grading JSON:', parsedCenteringFromJSON);
       }
@@ -2316,8 +2318,10 @@ export function SportsCardDetails() {
   const centeringMeasurements = {
     front_x_axis_ratio: centeringData.front_x_axis_ratio || centeringData.front_lr || "N/A",
     front_y_axis_ratio: centeringData.front_y_axis_ratio || centeringData.front_tb || "N/A",
+    front_quality_tier: centeringData.front_quality_tier || null,
     back_x_axis_ratio: centeringData.back_x_axis_ratio || centeringData.back_lr || "N/A",
     back_y_axis_ratio: centeringData.back_y_axis_ratio || centeringData.back_tb || "N/A",
+    back_quality_tier: centeringData.back_quality_tier || null,
     front_centering_method: centeringData.front_centering_method || centeringData.front_type || "N/A",
     back_centering_method: centeringData.back_centering_method || centeringData.back_type || "N/A",
     ...centeringData // Include all other fields
@@ -3523,12 +3527,6 @@ export function SportsCardDetails() {
                           </div>
                         </div>
 
-                        {/* Footnote */}
-                        <div className="pt-3 border-t border-blue-200">
-                          <p className="text-xs text-gray-500 text-center">
-                            Perfect centering = 50/50 • Lighter shade = Primary side
-                          </p>
-                        </div>
                       </div>
                     );
                   })()}
