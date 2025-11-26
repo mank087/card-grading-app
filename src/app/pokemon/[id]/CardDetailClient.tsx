@@ -3973,13 +3973,14 @@ export function PokemonCardDetails() {
                 const rawBackSurface = detailsJson.surface?.back || detailsJson.back_surface || {};
 
                 // Extract condition text from nested structure
+                // 🔧 FIX: Check both 'sub_score' (API format) and 'score' (legacy) for scores
                 const frontCorners = {
                   top_left: rawFrontCorners.top_left?.condition || rawFrontCorners.top_left,
                   top_right: rawFrontCorners.top_right?.condition || rawFrontCorners.top_right,
                   bottom_left: rawFrontCorners.bottom_left?.condition || rawFrontCorners.bottom_left,
                   bottom_right: rawFrontCorners.bottom_right?.condition || rawFrontCorners.bottom_right,
                   summary: rawFrontCorners.front_summary || rawFrontCorners.summary,
-                  sub_score: rawFrontCorners.score
+                  sub_score: rawFrontCorners.sub_score ?? rawFrontCorners.score
                 };
 
                 const backCorners = {
@@ -3988,7 +3989,7 @@ export function PokemonCardDetails() {
                   bottom_left: rawBackCorners.bottom_left?.condition || rawBackCorners.bottom_left,
                   bottom_right: rawBackCorners.bottom_right?.condition || rawBackCorners.bottom_right,
                   summary: rawBackCorners.back_summary || rawBackCorners.summary,
-                  sub_score: rawBackCorners.score
+                  sub_score: rawBackCorners.sub_score ?? rawBackCorners.score
                 };
 
                 const frontEdges = {
@@ -3997,7 +3998,7 @@ export function PokemonCardDetails() {
                   left: rawFrontEdges.left?.condition || rawFrontEdges.left,
                   right: rawFrontEdges.right?.condition || rawFrontEdges.right,
                   summary: rawFrontEdges.front_summary || rawFrontEdges.summary,
-                  sub_score: rawFrontEdges.score
+                  sub_score: rawFrontEdges.sub_score ?? rawFrontEdges.score
                 };
 
                 const backEdges = {
@@ -4006,21 +4007,21 @@ export function PokemonCardDetails() {
                   left: rawBackEdges.left?.condition || rawBackEdges.left,
                   right: rawBackEdges.right?.condition || rawBackEdges.right,
                   summary: rawBackEdges.back_summary || rawBackEdges.summary,
-                  sub_score: rawBackEdges.score
+                  sub_score: rawBackEdges.sub_score ?? rawBackEdges.score
                 };
 
                 const frontSurface = {
                   analysis: rawFrontSurface.condition || rawFrontSurface.analysis,  // 🔧 FIX: Use 'condition' field (v5.0+) or 'analysis' (legacy)
                   defects: rawFrontSurface.defects,
                   summary: rawFrontSurface.front_summary || rawFrontSurface.summary,
-                  sub_score: rawFrontSurface.score
+                  sub_score: rawFrontSurface.sub_score ?? rawFrontSurface.score
                 };
 
                 const backSurface = {
                   analysis: rawBackSurface.condition || rawBackSurface.analysis,  // 🔧 FIX: Use 'condition' field (v5.0+) or 'analysis' (legacy)
                   defects: rawBackSurface.defects,
                   summary: rawBackSurface.back_summary || rawBackSurface.summary,
-                  sub_score: rawBackSurface.score
+                  sub_score: rawBackSurface.sub_score ?? rawBackSurface.score
                 };
 
                 return (
