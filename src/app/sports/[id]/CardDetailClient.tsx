@@ -2284,7 +2284,29 @@ export function SportsCardDetails() {
 
   // v3.1: Read centering from multiple possible sources (v3.1 centerings_used, legacy Centering_Measurements, or stage0_detection)
   // 🎯 Sports cards: Use conversational_centering_ratios FIRST (matches Pokemon pattern)
+  // 🆕 Also try to extract centering from conversational_grading JSON directly as fallback
+  let parsedCenteringFromJSON = null;
+  if (card.conversational_grading && !card.conversational_centering_ratios) {
+    try {
+      const parsed = typeof card.conversational_grading === 'string'
+        ? JSON.parse(card.conversational_grading)
+        : card.conversational_grading;
+      if (parsed.centering) {
+        parsedCenteringFromJSON = {
+          front_lr: parsed.centering.front?.left_right || null,
+          front_tb: parsed.centering.front?.top_bottom || null,
+          back_lr: parsed.centering.back?.left_right || null,
+          back_tb: parsed.centering.back?.top_bottom || null
+        };
+        console.log('[Sports Page] 🔧 Extracted centering from conversational_grading JSON:', parsedCenteringFromJSON);
+      }
+    } catch (e) {
+      console.log('[Sports Page] Could not parse conversational_grading for centering');
+    }
+  }
+
   const centeringData = card.conversational_centering_ratios ||
+                        parsedCenteringFromJSON ||
                         card.ai_grading?.["Centering_Measurements"] ||
                         card.ai_grading?.centerings_used ||
                         card.stage0_detection ||
@@ -2301,15 +2323,14 @@ export function SportsCardDetails() {
     ...centeringData // Include all other fields
   };
 
-  // Debug visual inspection data
-  console.log('[Sports Page] Card AI grading:', card.ai_grading);
-  console.log('[Sports Page] Grading scale data:', gradingScale);
-  console.log('[Sports Page] Visual inspection results:', visualInspection);
-  console.log('[Sports Page] Centering measurements variable:', centeringMeasurements);
-  console.log('[Sports Page] Centering measurements has data?', Object.keys(centeringMeasurements).length > 0);
-  console.log('[Sports Page] front_x_axis_ratio value:', centeringMeasurements?.front_x_axis_ratio);
-  console.log('[Sports Page] Centering_Measurements (underscore):', card.ai_grading?.["Centering_Measurements"]);
-  console.log('[Sports Page] Available ai_grading keys:', card.ai_grading ? Object.keys(card.ai_grading) : 'none');
+  // Debug centering data sources
+  console.log('[Sports Page] 🎯 Centering Debug:');
+  console.log('  - conversational_centering_ratios:', card.conversational_centering_ratios);
+  console.log('  - parsedCenteringFromJSON:', parsedCenteringFromJSON);
+  console.log('  - Final centeringData:', centeringData);
+  console.log('  - Final centeringMeasurements:', centeringMeasurements);
+  console.log('  - back_x_axis_ratio (Horizontal):', centeringMeasurements.back_x_axis_ratio);
+  console.log('  - back_y_axis_ratio (Vertical):', centeringMeasurements.back_y_axis_ratio);
   const dcmSystem = card.ai_grading?.["DCM Score System"] || {};
   const aiConfidence = card.ai_grading?.["AI Confidence Assessment"] || {};
 
