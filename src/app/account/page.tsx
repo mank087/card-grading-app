@@ -68,7 +68,15 @@ export default function AccountPage() {
 
         // Calculate statistics
         const totalCards = cards.length
-        const publicCards = cards.filter(c => c.is_public === true || c.visibility === 'public').length
+        // Priority: visibility field (if set) takes precedence over is_public
+        // visibility='private' means private, visibility='public' or (no visibility + is_public=true) means public
+        const publicCards = cards.filter(c => {
+          // If visibility field is set, use it
+          if (c.visibility === 'private') return false;
+          if (c.visibility === 'public') return true;
+          // Fallback to is_public for older cards without visibility field
+          return c.is_public === true;
+        }).length
         const privateCards = totalCards - publicCards
 
         // Cards by category
