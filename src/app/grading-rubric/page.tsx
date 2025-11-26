@@ -34,7 +34,7 @@ export default function GradingRubricPage() {
           <div className="space-y-6">
             {/* Phase 0: Pre-Grading Verification */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-red-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 0: Pre-Grading Verification (5 Points)</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 0: Pre-Grading Verification</h3>
               <p className="text-sm text-gray-600 mb-4">Mandatory verification before condition evaluation begins</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -62,7 +62,7 @@ export default function GradingRubricPage() {
 
             {/* Phase 1: Image Analysis */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-blue-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 1: Image Quality & Confidence Assessment (5 Points)</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 1: Image Quality & Confidence Assessment</h3>
               <p className="text-sm text-gray-600 mb-4">Establishes grading confidence based on image quality</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -90,7 +90,7 @@ export default function GradingRubricPage() {
 
             {/* Phase 2: Card Information */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-indigo-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 2: Card Information Extraction (4 Points)</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 2: Card Information Extraction</h3>
               <p className="text-sm text-gray-600 mb-4">Identifies card metadata and special features</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -114,7 +114,7 @@ export default function GradingRubricPage() {
 
             {/* Phase 3: Centering */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 3: Centering Evaluation (4 Points)</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 3: Centering Evaluation</h3>
               <p className="text-sm text-gray-600 mb-4">Independent front and back centering analysis with PSA-aligned standards</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -143,7 +143,7 @@ export default function GradingRubricPage() {
 
             {/* Phase 4: Corners */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 4: Corner Inspection (4 Points)</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 4: Corner Inspection</h3>
               <p className="text-sm text-gray-600 mb-4">Two-phase protocol examining all 8 corners individually</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -167,7 +167,7 @@ export default function GradingRubricPage() {
 
             {/* Phase 5: Edges */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-teal-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 5: Edge Inspection (4 Points)</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 5: Edge Inspection</h3>
               <p className="text-sm text-gray-600 mb-4">Two-phase protocol examining all 8 edges individually</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -191,7 +191,7 @@ export default function GradingRubricPage() {
 
             {/* Phase 6: Surface */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 6: Surface Inspection (4 Points)</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 6: Surface Inspection</h3>
               <p className="text-sm text-gray-600 mb-4">Systematic 9-zone grid analysis of both front and back surfaces</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -252,7 +252,7 @@ export default function GradingRubricPage() {
               </div>
 
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
-                <div className="text-3xl font-bold text-blue-800 w-16">8-8.5</div>
+                <div className="text-2xl font-bold text-blue-800 w-20">8.5-8</div>
                 <div>
                   <p className="font-bold text-gray-900">Near Mint-Mint</p>
                   <p className="text-sm text-gray-600">Slight wear visible upon close examination. Minor rounding, light whitening, or small surface imperfections.</p>
@@ -260,7 +260,7 @@ export default function GradingRubricPage() {
               </div>
 
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-400">
-                <div className="text-3xl font-bold text-blue-700 w-16">7-7.5</div>
+                <div className="text-2xl font-bold text-blue-700 w-20">7.5-7</div>
                 <div>
                   <p className="font-bold text-gray-900">Near Mint</p>
                   <p className="text-sm text-gray-600">Minor surface wear or slight corner/edge wear visible at normal viewing distance</p>
@@ -268,7 +268,7 @@ export default function GradingRubricPage() {
               </div>
 
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-l-4 border-purple-500">
-                <div className="text-3xl font-bold text-purple-800 w-16">6-6.5</div>
+                <div className="text-2xl font-bold text-purple-800 w-20">6.5-6</div>
                 <div>
                   <p className="font-bold text-gray-900">Excellent-Mint</p>
                   <p className="text-sm text-gray-600">Visible wear on corners or edges, moderate centering issues, but still displays well</p>
@@ -276,9 +276,9 @@ export default function GradingRubricPage() {
               </div>
 
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border-l-4 border-gray-500">
-                <div className="text-3xl font-bold text-gray-800 w-16">1-5.5</div>
+                <div className="text-2xl font-bold text-gray-800 w-20">5.5-1</div>
                 <div>
-                  <p className="font-bold text-gray-900">Good to Excellent</p>
+                  <p className="font-bold text-gray-900">Excellent to Good</p>
                   <p className="text-sm text-gray-600">Significant wear, structural damage (creases, bends), or other issues affecting overall appearance</p>
                 </div>
               </div>
