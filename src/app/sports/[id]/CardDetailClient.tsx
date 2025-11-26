@@ -566,6 +566,36 @@ const getUncertaintyFromConfidence = (confidence: string | null | undefined): st
   }
 };
 
+// Helper: Convert range format (e.g., "9.75-10.25") to ± format (e.g., "±0.25")
+const convertRangeToPlusMinus = (uncertainty: string | null | undefined): string => {
+  if (!uncertainty) return '±0.5';
+
+  const uncertaintyStr = uncertainty.toString().trim();
+
+  // If already in ± format, return as-is
+  if (uncertaintyStr.includes('±')) {
+    const match = uncertaintyStr.match(/±\s*[\d.]+/);
+    return match ? match[0] : '±0.5';
+  }
+
+  // If in range format (e.g., "9.75-10.25"), convert to ±
+  const rangeMatch = uncertaintyStr.match(/([\d.]+)\s*-\s*([\d.]+)/);
+  if (rangeMatch) {
+    const lower = parseFloat(rangeMatch[1]);
+    const upper = parseFloat(rangeMatch[2]);
+    const plusMinus = ((upper - lower) / 2).toFixed(2);
+    return `±${plusMinus}`;
+  }
+
+  // If just a number (e.g., "0.5"), assume it's the ± value
+  if (/^[\d.]+$/.test(uncertaintyStr)) {
+    return `±${uncertaintyStr}`;
+  }
+
+  // Default fallback
+  return '±0.5';
+};
+
 const getGradeColor = (grade: string | number) => {
   const numGrade = typeof grade === 'string' ? parseFloat(grade) : grade;
   if (numGrade >= 9.5) return 'text-green-600 font-bold';
@@ -1294,6 +1324,157 @@ export function SportsCardDetails() {
   // 📦 Parsed defects state
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
 
+  // Extract data from AI grading
+  // DVG v1 data structure
+  /**
+   * ✨ NEW: Access structured defect data (no more regex parsing!)
+   * Structured data is pre-parsed on backend and saved to database
+   * Falls back to regex parsing only if structured data unavailable
+   */
+  const parseConversationalDefects = (markdown: string | null | undefined) => {
+    if (!markdown) return null;
+
+    const parseCorner = (text: string) => {
+      const severity = text.match(/(Microscopic|Minor|Moderate|Heavy)/i)?.[1] || 'none';
+      const description = text.replace(/^-?\s*\*\*[^*]+\*\*:\s*/i, '').trim();
+      return { severity: severity.toLowerCase(), description };
+    };
+
+    const parseEdge = (text: string) => {
+      const severity = text.match(/(Microscopic|Minor|Moderate|Heavy|Clean)/i)?.[1] || 'none';
+      const description = text.replace(/^-?\s*\*\*[^*]+\*\*:\s*/i, '').trim();
+      return { severity: severity === 'Clean' ? 'none' : severity.toLowerCase(), description };
+    };
+
+    const parseSurface = (section: string) => {
+      const defects = {
+        scratches: { severity: 'none', description: 'No scratches detected' },
+        creases: { severity: 'none', description: 'No creases detected' },
+        print_defects: { severity: 'none', description: 'No print defects detected' },
+        stains: { severity: 'none', description: 'No stains detected' },
+        other: { severity: 'none', description: 'No other issues detected' }
+      };
+
+      // Look for surface mentions
+      if (section.match(/scratch/i)) {
+        const match = section.match(/([Mm]inor|[Mm]oderate|[Hh]eavy)?\s*(?:surface\s*)?scratch/i);
+        const severity = match?.[1]?.toLowerCase() || 'minor';
+        defects.scratches = {
+          severity,
+          description: section.match(/- ([^\n]*scratch[^\n]*)/i)?.[1]?.trim() || 'Surface scratch detected'
+        };
+      }
+
+      if (section.match(/crease/i)) {
+        defects.creases = {
+          severity: 'moderate',
+          description: section.match(/- ([^\n]*crease[^\n]*)/i)?.[1]?.trim() || 'Crease detected'
+        };
+      }
+
+      if (section.match(/print/i)) {
+        defects.print_defects = {
+          severity: 'minor',
+          description: section.match(/- ([^\n]*print[^\n]*)/i)?.[1]?.trim() || 'Print defect detected'
+        };
+      }
+
+      if (section.match(/stain|discolor/i)) {
+        defects.stains = {
+          severity: 'minor',
+          description: section.match(/- ([^\n]*(?:stain|discolor)[^\n]*)/i)?.[1]?.trim() || 'Staining detected'
+        };
+      }
+
+      // If no defects found, check for "clean" or "no visible" statements
+      if (section.match(/clean|no visible|no major/i) && !section.match(/scratch|crease|print|stain/i)) {
+        defects.other = { severity: 'none', description: 'Surface appears clean' };
+      }
+
+      return defects;
+    };
+
+    // Extract STEP 3 (Front) and STEP 4 (Back)
+    const frontMatch = markdown.match(/\[STEP 3\] FRONT ANALYSIS[\s\S]*?(?=\[STEP 4\]|$)/i);
+    const backMatch = markdown.match(/\[STEP 4\] BACK ANALYSIS[\s\S]*?(?=\[STEP 5\]|$)/i);
+
+    const extractDefects = (sectionText: string) => {
+      // Extract corners
+      const cornersSection = sectionText.match(/CORNERS.*?\((?:Front|Back)\)[\s\S]*?(?=EDGES|$)/i)?.[0] || '';
+      const corners = {
+        top_left: parseCorner(cornersSection.match(/-?\s*Top Left:\s*([^\n]+)/i)?.[1] || 'Clean'),
+        top_right: parseCorner(cornersSection.match(/-?\s*Top Right:\s*([^\n]+)/i)?.[1] || 'Clean'),
+        bottom_left: parseCorner(cornersSection.match(/-?\s*Bottom Left:\s*([^\n]+)/i)?.[1] || 'Clean'),
+        bottom_right: parseCorner(cornersSection.match(/-?\s*Bottom Right:\s*([^\n]+)/i)?.[1] || 'Clean')
+      };
+
+      // Extract edges
+      const edgesSection = sectionText.match(/EDGES.*?\((?:Front|Back)\)[\s\S]*?(?=SURFACE|$)/i)?.[0] || '';
+      const edges = {
+        top: parseEdge(edgesSection.match(/-?\s*Top:\s*([^\n]+)/i)?.[1] || 'Clean'),
+        bottom: parseEdge(edgesSection.match(/-?\s*Bottom:\s*([^\n]+)/i)?.[1] || 'Clean'),
+        left: parseEdge(edgesSection.match(/-?\s*Left:\s*([^\n]+)/i)?.[1] || 'Clean'),
+        right: parseEdge(edgesSection.match(/-?\s*Right:\s*([^\n]+)/i)?.[1] || 'Clean')
+      };
+
+      // Extract surface
+      const surfaceSection = sectionText.match(/SURFACE.*?\((?:Front|Back)\)[\s\S]*?(?=COLOR|FEATURE|FRONT SUMMARY|BACK SUMMARY|$)/i)?.[0] || '';
+      const surface = parseSurface(surfaceSection);
+
+      return { corners, edges, surface };
+    };
+
+    const frontDefects = frontMatch ? extractDefects(frontMatch[0]) : null;
+    const backDefects = backMatch ? extractDefects(backMatch[0]) : null;
+
+    if (!frontDefects && !backDefects) return null;
+
+    return {
+      front: frontDefects || {
+        corners: {
+          top_left: { severity: 'none', description: 'No data' },
+          top_right: { severity: 'none', description: 'No data' },
+          bottom_left: { severity: 'none', description: 'No data' },
+          bottom_right: { severity: 'none', description: 'No data' }
+        },
+        edges: {
+          top: { severity: 'none', description: 'No data' },
+          bottom: { severity: 'none', description: 'No data' },
+          left: { severity: 'none', description: 'No data' },
+          right: { severity: 'none', description: 'No data' }
+        },
+        surface: {
+          scratches: { severity: 'none', description: 'No data' },
+          creases: { severity: 'none', description: 'No data' },
+          print_defects: { severity: 'none', description: 'No data' },
+          stains: { severity: 'none', description: 'No data' },
+          other: { severity: 'none', description: 'No data' }
+        }
+      },
+      back: backDefects || {
+        corners: {
+          top_left: { severity: 'none', description: 'No data' },
+          top_right: { severity: 'none', description: 'No data' },
+          bottom_left: { severity: 'none', description: 'No data' },
+          bottom_right: { severity: 'none', description: 'No data' }
+        },
+        edges: {
+          top: { severity: 'none', description: 'No data' },
+          bottom: { severity: 'none', description: 'No data' },
+          left: { severity: 'none', description: 'No data' },
+          right: { severity: 'none', description: 'No data' }
+        },
+        surface: {
+          scratches: { severity: 'none', description: 'No data' },
+          creases: { severity: 'none', description: 'No data' },
+          print_defects: { severity: 'none', description: 'No data' },
+          stains: { severity: 'none', description: 'No data' },
+          other: { severity: 'none', description: 'No data' }
+        }
+      }
+    };
+  };
+
   // Fetch sports card details using sports-specific API
   const fetchSportsCardDetails = useCallback(async () => {
     if (!cardId) return;
@@ -1503,7 +1684,16 @@ export function SportsCardDetails() {
 
       // Call sports API with force_regrade parameter to bypass cache
       console.log('[REGRADE] Forcing fresh grading for card:', cardId);
-      const res = await fetch(`/api/sports/${cardId}?force_regrade=true&t=${Date.now()}`);
+
+      // Re-grading can take 30-60 seconds, so use a longer timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000); // 120 second timeout
+
+      const res = await fetch(`/api/sports/${cardId}?force_regrade=true&t=${Date.now()}`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
@@ -1518,7 +1708,14 @@ export function SportsCardDetails() {
       setLoading(false);
     } catch (error: any) {
       console.error('Error re-grading card:', error);
-      setError(error.message || 'Failed to re-grade card');
+
+      // Handle timeout specifically
+      if (error.name === 'AbortError') {
+        setError('Re-grading timed out (took longer than 2 minutes). Please refresh the page to see if grading completed.');
+      } else {
+        setError(error.message || 'Failed to re-grade card');
+      }
+
       setLoading(false);
     }
   };
@@ -1856,156 +2053,6 @@ export function SportsCardDetails() {
   console.log('[Card Data Debug] Has dvg_grading?', !!card.dvg_grading);
   console.log('[Card Data Debug] dvg_grading keys:', card.dvg_grading ? Object.keys(card.dvg_grading) : []);
 
-  // Extract data from AI grading
-  // DVG v1 data structure
-  /**
-   * ✨ NEW: Access structured defect data (no more regex parsing!)
-   * Structured data is pre-parsed on backend and saved to database
-   * Falls back to regex parsing only if structured data unavailable
-   */
-  const parseConversationalDefects = (markdown: string | null | undefined) => {
-    if (!markdown) return null;
-
-    const parseCorner = (text: string) => {
-      const severity = text.match(/(Microscopic|Minor|Moderate|Heavy)/i)?.[1] || 'none';
-      const description = text.replace(/^-?\s*\*\*[^*]+\*\*:\s*/i, '').trim();
-      return { severity: severity.toLowerCase(), description };
-    };
-
-    const parseEdge = (text: string) => {
-      const severity = text.match(/(Microscopic|Minor|Moderate|Heavy|Clean)/i)?.[1] || 'none';
-      const description = text.replace(/^-?\s*\*\*[^*]+\*\*:\s*/i, '').trim();
-      return { severity: severity === 'Clean' ? 'none' : severity.toLowerCase(), description };
-    };
-
-    const parseSurface = (section: string) => {
-      const defects = {
-        scratches: { severity: 'none', description: 'No scratches detected' },
-        creases: { severity: 'none', description: 'No creases detected' },
-        print_defects: { severity: 'none', description: 'No print defects detected' },
-        stains: { severity: 'none', description: 'No stains detected' },
-        other: { severity: 'none', description: 'No other issues detected' }
-      };
-
-      // Look for surface mentions
-      if (section.match(/scratch/i)) {
-        const match = section.match(/([Mm]inor|[Mm]oderate|[Hh]eavy)?\s*(?:surface\s*)?scratch/i);
-        const severity = match?.[1]?.toLowerCase() || 'minor';
-        defects.scratches = {
-          severity,
-          description: section.match(/- ([^\n]*scratch[^\n]*)/i)?.[1]?.trim() || 'Surface scratch detected'
-        };
-      }
-
-      if (section.match(/crease/i)) {
-        defects.creases = {
-          severity: 'moderate',
-          description: section.match(/- ([^\n]*crease[^\n]*)/i)?.[1]?.trim() || 'Crease detected'
-        };
-      }
-
-      if (section.match(/print/i)) {
-        defects.print_defects = {
-          severity: 'minor',
-          description: section.match(/- ([^\n]*print[^\n]*)/i)?.[1]?.trim() || 'Print defect detected'
-        };
-      }
-
-      if (section.match(/stain|discolor/i)) {
-        defects.stains = {
-          severity: 'minor',
-          description: section.match(/- ([^\n]*(?:stain|discolor)[^\n]*)/i)?.[1]?.trim() || 'Staining detected'
-        };
-      }
-
-      // If no defects found, check for "clean" or "no visible" statements
-      if (section.match(/clean|no visible|no major/i) && !section.match(/scratch|crease|print|stain/i)) {
-        defects.other = { severity: 'none', description: 'Surface appears clean' };
-      }
-
-      return defects;
-    };
-
-    // Extract STEP 3 (Front) and STEP 4 (Back)
-    const frontMatch = markdown.match(/\[STEP 3\] FRONT ANALYSIS[\s\S]*?(?=\[STEP 4\]|$)/i);
-    const backMatch = markdown.match(/\[STEP 4\] BACK ANALYSIS[\s\S]*?(?=\[STEP 5\]|$)/i);
-
-    const extractDefects = (sectionText: string) => {
-      // Extract corners
-      const cornersSection = sectionText.match(/CORNERS.*?\((?:Front|Back)\)[\s\S]*?(?=EDGES|$)/i)?.[0] || '';
-      const corners = {
-        top_left: parseCorner(cornersSection.match(/-?\s*Top Left:\s*([^\n]+)/i)?.[1] || 'Clean'),
-        top_right: parseCorner(cornersSection.match(/-?\s*Top Right:\s*([^\n]+)/i)?.[1] || 'Clean'),
-        bottom_left: parseCorner(cornersSection.match(/-?\s*Bottom Left:\s*([^\n]+)/i)?.[1] || 'Clean'),
-        bottom_right: parseCorner(cornersSection.match(/-?\s*Bottom Right:\s*([^\n]+)/i)?.[1] || 'Clean')
-      };
-
-      // Extract edges
-      const edgesSection = sectionText.match(/EDGES.*?\((?:Front|Back)\)[\s\S]*?(?=SURFACE|$)/i)?.[0] || '';
-      const edges = {
-        top: parseEdge(edgesSection.match(/-?\s*Top:\s*([^\n]+)/i)?.[1] || 'Clean'),
-        bottom: parseEdge(edgesSection.match(/-?\s*Bottom:\s*([^\n]+)/i)?.[1] || 'Clean'),
-        left: parseEdge(edgesSection.match(/-?\s*Left:\s*([^\n]+)/i)?.[1] || 'Clean'),
-        right: parseEdge(edgesSection.match(/-?\s*Right:\s*([^\n]+)/i)?.[1] || 'Clean')
-      };
-
-      // Extract surface
-      const surfaceSection = sectionText.match(/SURFACE.*?\((?:Front|Back)\)[\s\S]*?(?=COLOR|FEATURE|FRONT SUMMARY|BACK SUMMARY|$)/i)?.[0] || '';
-      const surface = parseSurface(surfaceSection);
-
-      return { corners, edges, surface };
-    };
-
-    const frontDefects = frontMatch ? extractDefects(frontMatch[0]) : null;
-    const backDefects = backMatch ? extractDefects(backMatch[0]) : null;
-
-    if (!frontDefects && !backDefects) return null;
-
-    return {
-      front: frontDefects || {
-        corners: {
-          top_left: { severity: 'none', description: 'No data' },
-          top_right: { severity: 'none', description: 'No data' },
-          bottom_left: { severity: 'none', description: 'No data' },
-          bottom_right: { severity: 'none', description: 'No data' }
-        },
-        edges: {
-          top: { severity: 'none', description: 'No data' },
-          bottom: { severity: 'none', description: 'No data' },
-          left: { severity: 'none', description: 'No data' },
-          right: { severity: 'none', description: 'No data' }
-        },
-        surface: {
-          scratches: { severity: 'none', description: 'No data' },
-          creases: { severity: 'none', description: 'No data' },
-          print_defects: { severity: 'none', description: 'No data' },
-          stains: { severity: 'none', description: 'No data' },
-          other: { severity: 'none', description: 'No data' }
-        }
-      },
-      back: backDefects || {
-        corners: {
-          top_left: { severity: 'none', description: 'No data' },
-          top_right: { severity: 'none', description: 'No data' },
-          bottom_left: { severity: 'none', description: 'No data' },
-          bottom_right: { severity: 'none', description: 'No data' }
-        },
-        edges: {
-          top: { severity: 'none', description: 'No data' },
-          bottom: { severity: 'none', description: 'No data' },
-          left: { severity: 'none', description: 'No data' },
-          right: { severity: 'none', description: 'No data' }
-        },
-        surface: {
-          scratches: { severity: 'none', description: 'No data' },
-          creases: { severity: 'none', description: 'No data' },
-          print_defects: { severity: 'none', description: 'No data' },
-          stains: { severity: 'none', description: 'No data' },
-          other: { severity: 'none', description: 'No data' }
-        }
-      }
-    };
-  };
 
   // ✨ Defects are now parsed in useEffect (see lines 1203-1249)
   // This prevents infinite re-renders by keeping setState calls out of render phase
@@ -2142,6 +2189,10 @@ export function SportsCardDetails() {
         recommended_whole_grade: card.conversational_whole_grade,
         grade_uncertainty: card.conversational_grade_uncertainty
       }
+    } : {}),
+    // 🆕 Include case_detection from conversational data (v5.0)
+    ...(card.conversational_case_detection ? {
+      case_detection: card.conversational_case_detection
     } : {})
   };
 
@@ -2181,7 +2232,8 @@ export function SportsCardDetails() {
   };
 
   const recommendedGrade = dvgGrading.recommended_grade || {};
-  const centering = dvgGrading.centering || {};
+  // 🎯 Sports cards: Use conversational_centering_ratios FIRST (matches Pokemon pattern)
+  const centering = card.conversational_centering_ratios || dvgGrading.centering || {};
   const imageQuality = dvgGrading.image_quality || {};
   const analysisSummary = dvgGrading.analysis_summary || {};
   const defects = dvgGrading.defects || {};
@@ -2568,23 +2620,9 @@ export function SportsCardDetails() {
                 </p>
 
                 <div className="mt-4 flex justify-center space-x-4 flex-wrap gap-2">
-                  {/* 🎯 v3.2: Uncertainty badge */}
+                  {/* 🎯 v3.2: Uncertainty badge - always derived from confidence letter */}
                   <span className="text-xs bg-white/20 px-3 py-1 rounded-full">
-                    Uncertainty: {(() => {
-                      // 🔧 FIX: For N/A grades, derive uncertainty from confidence score
-                      let uncertainty = '';
-                      if (card.conversational_grade_uncertainty && card.conversational_grade_uncertainty !== 'N/A') {
-                        uncertainty = card.conversational_grade_uncertainty;
-                      } else if (recommendedGrade.grade_uncertainty && recommendedGrade.grade_uncertainty !== 'N/A') {
-                        uncertainty = recommendedGrade.grade_uncertainty;
-                      } else {
-                        // Derive from confidence score
-                        uncertainty = getUncertaintyFromConfidence(card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade);
-                      }
-                      // Extract only the ± portion (e.g., "10.0 ± 0.25" → "± 0.25")
-                      const plusMinusMatch = uncertainty.match(/±\s*[\d.]+/);
-                      return plusMinusMatch ? plusMinusMatch[0] : uncertainty;
-                    })()}
+                    Uncertainty: {getUncertaintyFromConfidence(card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade)}
                   </span>
 
                   {/* 🎯 v3.2: Image Confidence Badge (A/B/C/D) */}
@@ -2765,7 +2803,7 @@ export function SportsCardDetails() {
 
               {/* 📄 Download Report Button & Social Sharing */}
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 my-6 px-4">
-                <DownloadReportButton card={card} />
+                <DownloadReportButton card={card} cardType="sports" />
 
                 {/* Social Sharing Buttons */}
                 <div className="flex flex-wrap items-center gap-3">
@@ -3069,7 +3107,7 @@ export function SportsCardDetails() {
                 )}
 
                 {/* Special Features Section */}
-                {(dvgGrading.rarity_features || cardInfo.serial_number || cardInfo.rookie_or_first || dvgGrading.autograph || cardInfo.subset) && (
+                {(dvgGrading.rarity_features || cardInfo.serial_number || cardInfo.rookie_or_first || dvgGrading.autograph || cardInfo.subset || cardInfo.autographed || cardInfo.memorabilia) && (
                   <div className="border-t pt-5">
                     <div className="flex items-center gap-2 mb-4">
                       <h3 className="text-lg font-bold text-gray-800">Special Features</h3>
@@ -3246,7 +3284,7 @@ export function SportsCardDetails() {
               </div>
 
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}
-              {(card.conversational_sub_scores || centering.front_left_right_ratio_text || centering.back_left_right_ratio_text) && (
+              {(card.conversational_sub_scores || centering.front_lr || centering.front_left_right_ratio_text || centering.back_lr || centering.back_left_right_ratio_text) && (
               <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
 
                 {/* Card Images with Centering Bars */}
@@ -3265,6 +3303,51 @@ export function SportsCardDetails() {
                       return { left, right, quality: 'Off-Center (>6%)', color: 'text-orange-400' };
                     };
 
+                    // Standardized quality assessment function (aligned with master rubric v5)
+                    const getQualityAssessment = (lrRatio: { left: number; right: number }, tbRatio: { left: number; right: number }) => {
+                      const lrDiff = Math.abs(lrRatio.left - 50);
+                      const tbDiff = Math.abs(tbRatio.left - 50);
+                      const worstDiff = Math.max(lrDiff, tbDiff);
+
+                      // Perfect: 0-1% deviation (50/50 or 51/49)
+                      if (worstDiff <= 1) return { text: 'Perfect', color: '#22c55e', colorClass: 'text-green-600' };
+                      // Excellent: 2-3% deviation (52/48 or 53/47)
+                      if (worstDiff <= 3) return { text: 'Excellent', color: '#22c55e', colorClass: 'text-green-600' };
+                      // Good: 4-5% deviation (54/46 or 55/45 - PSA 10 threshold)
+                      if (worstDiff <= 5) return { text: 'Good', color: '#3b82f6', colorClass: 'text-blue-600' };
+                      // Fair: 6-10% deviation (56/44 to 60/40 - PSA 9 range)
+                      if (worstDiff <= 10) return { text: 'Fair', color: '#eab308', colorClass: 'text-yellow-600' };
+                      // Off-Center: 11%+ deviation (61/39 or worse)
+                      return { text: 'Off-Center', color: '#ef4444', colorClass: 'text-orange-600' };
+                    };
+
+                    // Helper to format DCM analysis text into structured display
+                    const formatDCMAnalysis = (text: string, lrRatio: string, tbRatio: string, lrObj: { left: number; right: number }, tbObj: { left: number; right: number }, aiQualityTier?: string) => {
+                      // Priority 1: Use AI's quality tier if available (v5.0+)
+                      let quality;
+                      if (aiQualityTier && ['Perfect', 'Excellent', 'Good', 'Fair', 'Off-Center'].includes(aiQualityTier)) {
+                        // Use AI's tier directly
+                        const colorMap: Record<string, { color: string; colorClass: string }> = {
+                          'Perfect': { color: '#22c55e', colorClass: 'text-green-600' },
+                          'Excellent': { color: '#22c55e', colorClass: 'text-green-600' },
+                          'Good': { color: '#3b82f6', colorClass: 'text-blue-600' },
+                          'Fair': { color: '#eab308', colorClass: 'text-yellow-600' },
+                          'Off-Center': { color: '#ef4444', colorClass: 'text-orange-600' }
+                        };
+                        quality = { text: aiQualityTier, ...colorMap[aiQualityTier] };
+                      } else {
+                        // Fallback: Calculate from ratios (backward compatibility)
+                        quality = getQualityAssessment(lrObj, tbObj);
+                      }
+
+                      // Determine icon based on quality
+                      let icon = '✓';
+                      if (quality.text === 'Fair') icon = '⚠';
+                      if (quality.text === 'Off-Center') icon = '✗';
+
+                      return { text, qualityText: quality.text, icon, colorClass: quality.colorClass, lrRatio, tbRatio };
+                    };
+
                     const frontLR = parseRatio(card.conversational_centering_ratios?.front_lr || centering.front_left_right_ratio_text || '50/50');
                     const frontTB = parseRatio(card.conversational_centering_ratios?.front_tb || centering.front_top_bottom_ratio_text || '50/50');
                     const backLR = parseRatio(card.conversational_centering_ratios?.back_lr || centering.back_left_right_ratio_text || '50/50');
@@ -3273,29 +3356,26 @@ export function SportsCardDetails() {
                     return (
                       <div className="space-y-6">
                         {/* Images and Vertical Bars - Mobile Responsive */}
-                        <div className="flex flex-col lg:flex-row items-start justify-center gap-6 lg:gap-4">
-                          {/* Front T/B Vertical Bar (Left of Front Image) - Hidden on mobile */}
-                          <div className="hidden lg:flex flex-col items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Top/Bottom</span>
-                            <div className="flex flex-col h-96 w-6 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
-                              <div
-                                className="bg-gradient-to-b from-purple-500 to-purple-400 transition-all duration-500"
-                                style={{ height: `${frontTB.left}%` }}
-                              />
-                              <div
-                                className="bg-gradient-to-b from-purple-700 to-purple-800 transition-all duration-500"
-                                style={{ height: `${frontTB.right}%` }}
-                              />
+                        <div className="flex flex-col lg:flex-row items-start justify-center gap-6 lg:gap-8">
+                          {/* Front Side */}
+                          <div className="flex flex-col items-center gap-4 w-full lg:w-auto lg:max-w-md">
+                            {/* Front Label - Purple DCM Gradient */}
+                            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg px-6 py-2 shadow-md">
+                              <p className="text-white font-bold text-base uppercase tracking-wider">Front</p>
                             </div>
-                            <span className="text-sm font-bold text-purple-600 mt-2">{frontTB.left}/{frontTB.right}</span>
-                          </div>
 
-                          {/* Front Image with L/R Bar Below */}
-                          <div className="flex flex-col items-center gap-4 w-full lg:w-auto">
-                            <div className="bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg px-4 py-1.5">
-                              <p className="text-white font-bold text-sm uppercase tracking-wider">Front</p>
-                            </div>
-                            <div className="relative overflow-hidden rounded-lg border-2 border-blue-300 shadow-lg w-full max-w-xs lg:w-64">
+                            {/* Score Display */}
+                            {card.conversational_sub_scores?.centering && (
+                              <div className="text-center">
+                                <span className="text-sm text-gray-600 font-semibold">Centering Score</span>
+                                <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                                  {card.conversational_sub_scores.centering.front}/10
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Card Image */}
+                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
                               <img
                                 src={card.front_url}
                                 alt="Card Front"
@@ -3303,68 +3383,68 @@ export function SportsCardDetails() {
                               />
                             </div>
 
-                            {/* Front L/R Bar directly below front image */}
-                            <div className="space-y-1 w-full max-w-xs lg:w-64">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-700 font-semibold">L/R: <span className="text-blue-600">{frontLR.left}/{frontLR.right}</span></span>
-                                <span className={`text-sm font-medium ${frontLR.color}`}>{frontLR.quality}</span>
-                              </div>
-                              <div className="flex h-5 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
-                                <div
-                                  className="bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
-                                  style={{ width: `${frontLR.left}%` }}
-                                />
-                                <div
-                                  className="bg-gradient-to-r from-purple-700 to-purple-800 transition-all duration-500"
-                                  style={{ width: `${frontLR.right}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            {/* Front T/B ratio - Mobile Only */}
-                            <div className="lg:hidden w-full max-w-xs">
-                              <div className="flex items-center justify-between text-sm mb-1">
-                                <span className="text-gray-700 font-semibold">T/B: <span className="text-purple-600">{frontTB.left}/{frontTB.right}</span></span>
-                                <span className={`text-sm font-medium ${frontTB.color}`}>{frontTB.quality}</span>
-                              </div>
-                              <div className="flex h-5 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
-                                <div
-                                  className="bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
-                                  style={{ width: `${frontTB.left}%` }}
-                                />
-                                <div
-                                  className="bg-gradient-to-r from-purple-700 to-purple-800 transition-all duration-500"
-                                  style={{ width: `${frontTB.right}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            {card.conversational_sub_scores?.centering && (
-                              <div className="text-center w-full max-w-xs lg:w-64">
-                                <span className="text-sm text-gray-600">Score: </span>
-                                <span className="text-xl font-bold text-blue-600">{card.conversational_sub_scores.centering.front}/10</span>
-                              </div>
-                            )}
-
                             {/* Front Centering Analysis */}
-                            {(card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis) && (
-                              <div className="w-full max-w-xs lg:w-64 mt-2">
-                                <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-lg p-3 border-2 border-blue-300 shadow-md">
-                                  <p className="text-xs text-blue-900 font-bold mb-1.5 uppercase tracking-wide">DCM Optic™ Analysis</p>
-                                  <p className="text-xs text-gray-800 leading-relaxed">
-                                    {card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis}
-                                  </p>
+                            {(card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis) && (() => {
+                              const analysisText = card.conversational_corners_edges_surface?.front_centering?.summary || centeringAnalysisText.front || centering.front_centering_analysis;
+                              // Get AI's quality tier if available (v5.0+)
+                              const aiQualityTier = card.conversational_centering_ratios?.front_quality_tier;
+                              const formatted = formatDCMAnalysis(
+                                analysisText,
+                                `${frontLR.left}/${frontLR.right}`,
+                                `${frontTB.left}/${frontTB.right}`,
+                                frontLR,
+                                frontTB,
+                                aiQualityTier
+                              );
+                              return (
+                                <div className="w-full max-w-xs mt-3">
+                                  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border-2 border-purple-300 shadow-lg min-h-[200px] flex flex-col">
+                                    <p className="text-sm text-purple-900 font-bold mb-3 uppercase tracking-wide flex items-center gap-2">
+                                      <span>DCM Optic™ Analysis</span>
+                                      <span className={`text-xl ${formatted.colorClass}`}>{formatted.icon}</span>
+                                    </p>
+                                    <div className="space-y-2 mb-3 bg-white/60 rounded-lg p-3 border border-purple-200">
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-700 font-medium">Horizontal (L/R):</span>
+                                        <span className="font-bold text-purple-700">{formatted.lrRatio}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-700 font-medium">Vertical (T/B):</span>
+                                        <span className="font-bold text-purple-700">{formatted.tbRatio}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm pt-2 border-t border-purple-200">
+                                        <span className="text-gray-700 font-medium">Quality:</span>
+                                        <span className={`font-bold ${formatted.colorClass} capitalize`}>{formatted.qualityText}</span>
+                                      </div>
+                                    </div>
+                                    <p className="text-xs text-gray-700 leading-relaxed flex-grow">
+                                      {formatted.text}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+
+                          {/* Back Image with DCM Analysis */}
+                          <div className="flex flex-col items-center gap-4 w-full lg:w-auto lg:max-w-md">
+                            {/* Purple DCM Gradient Label */}
+                            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg px-6 py-2 shadow-md">
+                              <p className="text-white font-bold text-base uppercase tracking-wider">Back</p>
+                            </div>
+
+                            {/* Score Display */}
+                            {card.conversational_sub_scores?.centering && (
+                              <div className="text-center">
+                                <span className="text-sm text-gray-600 font-semibold">Centering Score</span>
+                                <div className="text-4xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                                  {card.conversational_sub_scores.centering.back}/10
                                 </div>
                               </div>
                             )}
-                          </div>
 
-                          {/* Back Image with L/R Bar Below */}
-                          <div className="flex flex-col items-center gap-4 w-full lg:w-auto">
-                            <div className="bg-gradient-to-r from-cyan-500 to-blue-500 rounded-lg px-4 py-1.5">
-                              <p className="text-white font-bold text-sm uppercase tracking-wider">Back</p>
-                            </div>
-                            <div className="relative overflow-hidden rounded-lg border-2 border-cyan-300 shadow-lg w-full max-w-xs lg:w-64">
+                            {/* Card Image */}
+                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
                               <img
                                 src={card.back_url}
                                 alt="Card Back"
@@ -3372,76 +3452,42 @@ export function SportsCardDetails() {
                               />
                             </div>
 
-                            {/* Back L/R Bar directly below back image */}
-                            <div className="space-y-1 w-full max-w-xs lg:w-64">
-                              <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-700 font-semibold">L/R: <span className="text-cyan-600">{backLR.left}/{backLR.right}</span></span>
-                                <span className={`text-sm font-medium ${backLR.color}`}>{backLR.quality}</span>
-                              </div>
-                              <div className="flex h-5 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
-                                <div
-                                  className="bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
-                                  style={{ width: `${backLR.left}%` }}
-                                />
-                                <div
-                                  className="bg-gradient-to-r from-purple-700 to-purple-800 transition-all duration-500"
-                                  style={{ width: `${backLR.right}%` }}
-                                />
-                              </div>
-                            </div>
+                            {/* DCM Analysis */}
+                            {(() => {
+                              const backLRRatio = card.centering_ratios?.back_lr || centering.back_left_right || 'N/A';
+                              const backTBRatio = card.centering_ratios?.back_tb || centering.back_top_bottom || 'N/A';
+                              const backAnalysisText = card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis || 'No analysis available';
+                              const backQualityTier = card.centering_ratios?.back_quality_tier;
 
-                            {/* Back T/B ratio - Mobile Only */}
-                            <div className="lg:hidden w-full max-w-xs">
-                              <div className="flex items-center justify-between text-sm mb-1">
-                                <span className="text-gray-700 font-semibold">T/B: <span className="text-purple-600">{backTB.left}/{backTB.right}</span></span>
-                                <span className={`text-sm font-medium ${backTB.color}`}>{backTB.quality}</span>
-                              </div>
-                              <div className="flex h-5 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
-                                <div
-                                  className="bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-500"
-                                  style={{ width: `${backTB.left}%` }}
-                                />
-                                <div
-                                  className="bg-gradient-to-r from-purple-700 to-purple-800 transition-all duration-500"
-                                  style={{ width: `${backTB.right}%` }}
-                                />
-                              </div>
-                            </div>
+                              const backLRObj = parseRatio(backLRRatio);
+                              const backTBObj = parseRatio(backTBRatio);
+                              const formattedBack = formatDCMAnalysis(backAnalysisText, backLRRatio, backTBRatio, backLRObj, backTBObj, backQualityTier);
 
-                            {card.conversational_sub_scores?.centering && (
-                              <div className="text-center w-full max-w-xs lg:w-64">
-                                <span className="text-sm text-gray-600">Score: </span>
-                                <span className="text-xl font-bold text-cyan-600">{card.conversational_sub_scores.centering.back}/10</span>
-                              </div>
-                            )}
+                              return (
+                                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border-2 border-purple-300 shadow-lg min-h-[200px] flex flex-col">
+                                  <p className="text-xs text-purple-900 font-bold mb-2.5 uppercase tracking-wide">DCM Optic™ Analysis</p>
 
-                            {/* Back Centering Analysis */}
-                            {(card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis) && (
-                              <div className="w-full max-w-xs lg:w-64 mt-2">
-                                <div className="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-lg p-3 border-2 border-cyan-300 shadow-md">
-                                  <p className="text-xs text-cyan-900 font-bold mb-1.5 uppercase tracking-wide">DCM Optic™ Analysis</p>
-                                  <p className="text-xs text-gray-800 leading-relaxed">
-                                    {card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis}
-                                  </p>
+                                  {/* Metrics in white semi-transparent box */}
+                                  <div className="space-y-2 mb-3 bg-white/60 rounded-lg p-3 border border-purple-200">
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-700 font-medium">Horizontal (L/R):</span>
+                                      <span className="font-bold text-purple-700">{formattedBack.lrRatio}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm">
+                                      <span className="text-gray-700 font-medium">Vertical (T/B):</span>
+                                      <span className="font-bold text-purple-700">{formattedBack.tbRatio}</span>
+                                    </div>
+                                    <div className="flex justify-between text-sm pt-1 border-t border-purple-200">
+                                      <span className="text-gray-700 font-medium">Quality:</span>
+                                      <span className={`font-bold ${formattedBack.qualityColorClass}`}>{formattedBack.quality}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Summary Text */}
+                                  <p className="text-xs text-gray-700 leading-relaxed flex-grow">{formattedBack.text}</p>
                                 </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Back T/B Vertical Bar (Right of Back Image) - Hidden on mobile */}
-                          <div className="hidden lg:flex flex-col items-center gap-2">
-                            <span className="text-sm font-semibold text-gray-600 whitespace-nowrap">Top/Bottom</span>
-                            <div className="flex flex-col h-96 w-6 rounded-full overflow-hidden bg-black border-2 border-purple-500/40 shadow-md">
-                              <div
-                                className="bg-gradient-to-b from-purple-500 to-purple-400 transition-all duration-500"
-                                style={{ height: `${backTB.left}%` }}
-                              />
-                              <div
-                                className="bg-gradient-to-b from-purple-700 to-purple-800 transition-all duration-500"
-                                style={{ height: `${backTB.right}%` }}
-                              />
-                            </div>
-                            <span className="text-sm font-bold text-purple-600 mt-2">{backTB.left}/{backTB.right}</span>
+                              );
+                            })()}
                           </div>
                         </div>
 
@@ -3673,9 +3719,9 @@ export function SportsCardDetails() {
                           )}
                         </div>
 
-                        {frontSurface.analysis && (
+                        {(frontSurface.condition || frontSurface.analysis) && (
                           <div className="mb-3">
-                            <p className="text-xs text-gray-700">{frontSurface.analysis}</p>
+                            <p className="text-xs text-gray-700">{frontSurface.condition || frontSurface.analysis}</p>
                           </div>
                         )}
 
@@ -3817,9 +3863,9 @@ export function SportsCardDetails() {
                           )}
                         </div>
 
-                        {backSurface.analysis && (
+                        {(backSurface.condition || backSurface.analysis) && (
                           <div className="mb-3">
-                            <p className="text-xs text-gray-700">{backSurface.analysis}</p>
+                            <p className="text-xs text-gray-700">{backSurface.condition || backSurface.analysis}</p>
                           </div>
                         )}
 
@@ -3933,12 +3979,7 @@ export function SportsCardDetails() {
                         </div>
                         <div className="flex justify-between items-center mt-2">
                           <p className="text-sm font-semibold text-gray-700">Confidence Level: {confidence.level}</p>
-                          <p className="text-sm font-semibold text-gray-600">Grade Uncertainty: {(() => {
-                            const uncertainty = recommendedGrade.grade_uncertainty || '';
-                            // Extract only the ± portion (e.g., "10.0 ± 0.25" → "± 0.25")
-                            const plusMinusMatch = uncertainty.match(/±\s*[\d.]+/);
-                            return plusMinusMatch ? plusMinusMatch[0] : uncertainty;
-                          })()}</p>
+                          <p className="text-sm font-semibold text-gray-600">Grade Uncertainty: {getUncertaintyFromConfidence(imageGrade)}</p>
                         </div>
                       </div>
 
@@ -4002,37 +4043,59 @@ export function SportsCardDetails() {
                       {/* Protective Case Detection - Integrated into Confidence */}
                       {(() => {
                         const caseDetection = card.conversational_case_detection || dvgGrading.case_detection;
-                        return caseDetection && caseDetection.case_type && caseDetection.case_type !== 'none' && (
-                        <div className="mt-4 bg-blue-50 border-2 border-blue-300 rounded-lg p-4 shadow-sm">
+                        if (!caseDetection) return null;
+
+                        const caseType = caseDetection.case_type || 'none';
+                        const caseVisible = caseType !== 'none';
+                        const bgColor = caseVisible ? 'bg-blue-50 border-blue-300' : 'bg-gray-50 border-gray-300';
+                        const titleColor = caseVisible ? 'text-blue-800' : 'text-gray-700';
+                        const accentColor = caseVisible ? 'text-blue-700 border-blue-200' : 'text-gray-600 border-gray-200';
+
+                        return (
+                        <div className={`mt-4 ${bgColor} border-2 rounded-lg p-4 shadow-sm`}>
                           <div className="flex items-start gap-3">
                             <div className="flex-1">
-                              <h3 className="text-lg font-bold text-blue-800 mb-2">
-                                Protective Case Detected: {caseDetection.case_type.replace(/_/g, ' ').toUpperCase()}
+                              <h3 className={`text-lg font-bold ${titleColor} mb-2`}>
+                                {caseVisible
+                                  ? `Protective Case Detected: ${caseType.replace(/_/g, ' ').toUpperCase()}`
+                                  : 'Protective Case Detection'}
                               </h3>
                               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                                <div className="bg-white rounded p-3 border border-blue-200">
-                                  <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Visibility</p>
-                                  <p className="font-semibold text-blue-700 capitalize">{caseDetection.visibility}</p>
+                                <div className="bg-white rounded p-3 border border-gray-200">
+                                  <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Case Type</p>
+                                  <p className={`font-semibold ${accentColor} capitalize`}>
+                                    {caseType === 'none' ? 'No Case' : caseType.replace(/_/g, ' ')}
+                                  </p>
                                 </div>
-                                <div className="bg-white rounded p-3 border border-blue-200">
-                                  <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Impact Level</p>
-                                  <p className="font-semibold text-blue-700 capitalize">{caseDetection.impact_level}</p>
-                                </div>
+                                {caseDetection.case_visibility && (
+                                  <div className="bg-white rounded p-3 border border-gray-200">
+                                    <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Visibility</p>
+                                    <p className={`font-semibold ${accentColor} capitalize`}>{caseDetection.case_visibility}</p>
+                                  </div>
+                                )}
+                                {caseDetection.impact_level && (
+                                  <div className="bg-white rounded p-3 border border-gray-200">
+                                    <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Impact Level</p>
+                                    <p className={`font-semibold ${accentColor} capitalize`}>{caseDetection.impact_level}</p>
+                                  </div>
+                                )}
                                 {caseDetection.adjusted_uncertainty && (
-                                  <div className="bg-white rounded p-3 border border-blue-200">
-                                    <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Adjusted Uncertainty</p>
-                                    <p className="font-semibold text-blue-700">{caseDetection.adjusted_uncertainty}</p>
+                                  <div className="bg-white rounded p-3 border border-gray-200">
+                                    <p className="text-xs text-gray-600 uppercase tracking-wide mb-1">Uncertainty Adjustment</p>
+                                    <p className={`font-semibold ${accentColor}`}>{caseDetection.adjusted_uncertainty}</p>
                                   </div>
                                 )}
                               </div>
                               {caseDetection.notes && (
-                                <p className="text-xs text-blue-700 mt-3 italic">
+                                <p className={`text-xs ${accentColor} mt-3 italic`}>
                                   {caseDetection.notes}
                                 </p>
                               )}
-                              <p className="text-xs text-blue-700 mt-2 italic">
-                                Note: Protective cases may limit visibility of minor defects and can increase grade uncertainty.
-                              </p>
+                              {caseVisible && (
+                                <p className="text-xs text-blue-700 mt-2 italic">
+                                  Note: Protective cases may limit visibility of minor defects and can increase grade uncertainty.
+                                </p>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -4849,92 +4912,357 @@ export function SportsCardDetails() {
                           console.log('[DCM Optic Report] 📝 Markdown format detected');
                         }
 
-                        // JSON Format Handler
+                        // JSON Format Handler - Professional Executive Report Style
                         if (isJSONReport && jsonData) {
-                          const formatJSONSection = (title: string, content: any, isFirst = false) => {
-                            if (!content) return null;
+                          // Helper to format label from snake_case
+                          const formatLabel = (key: string) => key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
-                            let formattedContent = '';
-
-                            if (typeof content === 'string') {
-                              formattedContent = content;
-                            } else if (typeof content === 'object') {
-                              // Filter out Pokemon-specific fields for sports cards
-                              const pokemonFields = ['pokemon_type', 'pokemon_stage', 'hp', 'card_type'];
-                              const filteredEntries = Object.entries(content).filter(([key, value]) => {
-                                // Skip Pokemon fields that are null or undefined
-                                if (pokemonFields.includes(key) && (value === null || value === undefined)) {
-                                  return false;
-                                }
-                                return true;
-                              });
-
-                              formattedContent = filteredEntries
-                                .map(([key, value]) => {
-                                  const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                                  if (typeof value === 'object') {
-                                    return `${label}:\n${JSON.stringify(value, null, 2)}`;
-                                  }
-                                  return `${label}: ${value}`;
-                                })
-                                .join('\n\n');
-                            }
-
+                          // Helper to render a key-value pair
+                          const renderField = (label: string, value: any, className = "") => {
+                            if (value === null || value === undefined || value === '') return null;
                             return (
-                              <div key={title} className={`${isFirst ? '' : 'mt-8 pt-8 border-t border-gray-200'}`}>
-                                <h4 className="text-lg font-bold text-gray-900 mb-4">{title}</h4>
-                                <div className="text-gray-700 leading-relaxed space-y-3 whitespace-pre-line">
-                                  {formattedContent}
-                                </div>
+                              <div className={`${className}`}>
+                                <span className="font-semibold text-gray-700">{label}:</span>{' '}
+                                <span className="text-gray-600">{String(value)}</span>
                               </div>
                             );
                           };
 
+                          // Section Header Component
+                          const SectionHeader = ({ title, isFirst = false }: { title: string; isFirst?: boolean }) => (
+                            <div className={`${isFirst ? '' : 'mt-10 pt-8 border-t-2 border-indigo-100'}`}>
+                              <h4 className="text-xl font-bold text-indigo-900 mb-4 pb-2 border-b border-indigo-200">{title}</h4>
+                            </div>
+                          );
+
+                          // Subsection Header Component
+                          const SubsectionHeader = ({ title }: { title: string }) => (
+                            <h5 className="text-lg font-semibold text-gray-800 mt-6 mb-3">{title}</h5>
+                          );
+
+                          // Executive Summary Box
+                          const ExecutiveSummary = ({ text }: { text: string }) => (
+                            <div className="bg-indigo-50 border-l-4 border-indigo-500 p-4 my-4">
+                              <p className="text-sm font-medium text-gray-700 italic">{text}</p>
+                            </div>
+                          );
+
+                          // Score Badge Component
+                          const ScoreBadge = ({ score, label }: { score: number | string; label?: string }) => (
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-bold bg-indigo-100 text-indigo-800">
+                              {label && <span className="mr-1">{label}:</span>}
+                              {score}/10
+                            </span>
+                          );
+
+                          // Card Information Section
+                          const renderCardInfo = () => {
+                            const info = jsonData.card_info;
+                            if (!info) return null;
+
+                            return (
+                              <>
+                                <SectionHeader title="Card Information" isFirst={true} />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 mt-4">
+                                  {renderField('Card Name', info.card_name)}
+                                  {renderField('Set Name', info.set_name)}
+                                  {renderField('Year', info.year)}
+                                  {renderField('Manufacturer', info.manufacturer)}
+                                  {renderField('Card Number', info.card_number)}
+                                  {renderField('Authentic', info.authentic)}
+                                  {renderField('Player Or Character', info.player_or_character)}
+                                  {renderField('Sport', info.sport)}
+                                  {renderField('Team', info.team)}
+                                  {renderField('Card Type', info.card_type)}
+                                  {renderField('Subset', info.subset)}
+                                  {renderField('Serial Number', info.serial_number)}
+                                  {renderField('Rarity Tier', info.rarity_tier)}
+                                </div>
+
+                                {info.card_front_text && (
+                                  <div className="mt-4">
+                                    <span className="font-semibold text-gray-700">Card Front Text:</span>
+                                    <p className="text-gray-600 mt-1 text-sm whitespace-pre-line">{info.card_front_text}</p>
+                                  </div>
+                                )}
+
+                                {info.card_back_text && info.card_back_text !== 'null' && (
+                                  <div className="mt-4">
+                                    <span className="font-semibold text-gray-700">Card Back Text:</span>
+                                    <p className="text-gray-600 mt-1 text-sm">{info.card_back_text}</p>
+                                  </div>
+                                )}
+                              </>
+                            );
+                          };
+
+                          // Set Metadata Section
+                          const renderSetMetadata = () => {
+                            const meta = jsonData.card_info?.set_metadata || jsonData.set_metadata;
+                            if (!meta) return null;
+
+                            return (
+                              <>
+                                <SubsectionHeader title="Set Metadata" />
+                                {meta.set_identifier_reason && (
+                                  <p className="text-gray-600 text-sm mb-4">{meta.set_identifier_reason}</p>
+                                )}
+                                <div className="bg-gray-50 rounded-lg p-4 font-mono text-xs overflow-x-auto">
+                                  <pre className="text-gray-700">{JSON.stringify(meta, null, 2)}</pre>
+                                </div>
+                              </>
+                            );
+                          };
+
+                          // Centering Analysis Section
+                          const renderCentering = () => {
+                            const centering = jsonData.centering;
+                            if (!centering) return null;
+
+                            const renderSide = (side: any, label: string) => {
+                              if (!side) return null;
+                              return (
+                                <>
+                                  <SubsectionHeader title={label} />
+                                  <p className="text-sm text-gray-600 mb-3">
+                                    {side.card_type && `Card type: ${side.card_type}. `}
+                                    {side.measurement_method && `Measured using ${side.measurement_method.toLowerCase()}.`}
+                                  </p>
+                                  {side.measurements && (
+                                    <p className="text-sm text-gray-600 mb-3">{side.measurements}</p>
+                                  )}
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-4">
+                                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                                      <div className="text-xs text-gray-500 uppercase">Left/Right</div>
+                                      <div className="text-lg font-bold text-indigo-700">{side.left_right || 'N/A'}</div>
+                                    </div>
+                                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                                      <div className="text-xs text-gray-500 uppercase">Top/Bottom</div>
+                                      <div className="text-lg font-bold text-indigo-700">{side.top_bottom || 'N/A'}</div>
+                                    </div>
+                                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                                      <div className="text-xs text-gray-500 uppercase">Worst Axis</div>
+                                      <div className="text-lg font-bold text-gray-700">{side.worst_axis || 'N/A'}</div>
+                                    </div>
+                                    <div className="bg-gray-50 rounded-lg p-3 text-center">
+                                      <div className="text-xs text-gray-500 uppercase">Score</div>
+                                      <div className="text-lg font-bold text-indigo-700">{side.score || 'N/A'}/10</div>
+                                    </div>
+                                  </div>
+                                  {side.quality_tier && (
+                                    <p className="text-sm"><span className="font-semibold">Quality Tier:</span> {side.quality_tier}</p>
+                                  )}
+                                  {side.analysis && (
+                                    <ExecutiveSummary text={side.analysis} />
+                                  )}
+                                </>
+                              );
+                            };
+
+                            return (
+                              <>
+                                <SectionHeader title="Centering Analysis" />
+                                {renderSide(centering.front, 'Front')}
+                                {renderSide(centering.back, 'Back')}
+                              </>
+                            );
+                          };
+
+                          // Corner Analysis Section
+                          const renderCorners = () => {
+                            const corners = jsonData.corners;
+                            if (!corners) return null;
+
+                            const renderCornerSide = (side: any, label: string) => {
+                              if (!side) return null;
+                              const cornerPositions = ['top_left', 'top_right', 'bottom_left', 'bottom_right'];
+
+                              return (
+                                <>
+                                  <SubsectionHeader title={label} />
+                                  {side.summary && (
+                                    <p className="text-sm text-gray-600 mb-4">{side.summary}</p>
+                                  )}
+                                  <div className="grid grid-cols-2 gap-4 my-4">
+                                    {cornerPositions.map(pos => {
+                                      const corner = side[pos];
+                                      if (!corner) return null;
+                                      return (
+                                        <div key={pos} className="bg-gray-50 rounded-lg p-3">
+                                          <div className="flex justify-between items-center mb-2">
+                                            <span className="font-semibold text-gray-700 text-sm">{formatLabel(pos)}</span>
+                                            <ScoreBadge score={corner.score} />
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-4">
+                                    <span className="font-semibold text-gray-700">Overall Score:</span>
+                                    <ScoreBadge score={side.score} />
+                                  </div>
+                                </>
+                              );
+                            };
+
+                            return (
+                              <>
+                                <SectionHeader title="Corner Analysis" />
+                                {renderCornerSide(corners.front, 'Front')}
+                                {renderCornerSide(corners.back, 'Back')}
+                              </>
+                            );
+                          };
+
+                          // Edge Analysis Section
+                          const renderEdges = () => {
+                            const edges = jsonData.edges;
+                            if (!edges) return null;
+
+                            const renderEdgeSide = (side: any, label: string) => {
+                              if (!side) return null;
+                              const edgePositions = ['top', 'bottom', 'left', 'right'];
+
+                              return (
+                                <>
+                                  <SubsectionHeader title={label} />
+                                  {side.summary && (
+                                    <p className="text-sm text-gray-600 mb-4">{side.summary}</p>
+                                  )}
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-4">
+                                    {edgePositions.map(pos => {
+                                      const edge = side[pos];
+                                      if (!edge) return null;
+                                      return (
+                                        <div key={pos} className="bg-gray-50 rounded-lg p-3 text-center">
+                                          <div className="text-xs text-gray-500 uppercase mb-1">{formatLabel(pos)}</div>
+                                          <div className="text-lg font-bold text-indigo-700">{edge.score}/10</div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-4">
+                                    <span className="font-semibold text-gray-700">Overall Score:</span>
+                                    <ScoreBadge score={side.score} />
+                                  </div>
+                                </>
+                              );
+                            };
+
+                            return (
+                              <>
+                                <SectionHeader title="Edge Analysis" />
+                                {renderEdgeSide(edges.front, 'Front')}
+                                {renderEdgeSide(edges.back, 'Back')}
+                              </>
+                            );
+                          };
+
+                          // Surface Analysis Section
+                          const renderSurface = () => {
+                            const surface = jsonData.surface;
+                            if (!surface) return null;
+
+                            const renderSurfaceSide = (side: any, label: string) => {
+                              if (!side) return null;
+                              return (
+                                <>
+                                  <SubsectionHeader title={label} />
+                                  <div className="space-y-2">
+                                    {side.finish_type && (
+                                      <p className="text-sm"><span className="font-semibold">Finish Type:</span> {side.finish_type}</p>
+                                    )}
+                                    {side.condition && (
+                                      <p className="text-sm text-gray-600">{side.condition}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-4">
+                                    <span className="font-semibold text-gray-700">Score:</span>
+                                    <ScoreBadge score={side.score} />
+                                  </div>
+                                  {side.summary && (
+                                    <ExecutiveSummary text={side.summary} />
+                                  )}
+                                </>
+                              );
+                            };
+
+                            return (
+                              <>
+                                <SectionHeader title="Surface Analysis" />
+                                {renderSurfaceSide(surface.front, 'Front')}
+                                {renderSurfaceSide(surface.back, 'Back')}
+                              </>
+                            );
+                          };
+
+                          // Final Grade Section
+                          const renderFinalGrade = () => {
+                            const grade = jsonData.final_grade || {
+                              decimal_grade: jsonData.decimal_grade,
+                              whole_grade: jsonData.whole_grade,
+                              grade_range: jsonData.grade_range,
+                              condition_label: jsonData.condition_label,
+                              summary: jsonData.final_grade_summary
+                            };
+                            if (!grade) return null;
+
+                            return (
+                              <>
+                                <SectionHeader title="Final Grade Calculation" />
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 my-6">
+                                  <div className="bg-indigo-100 rounded-xl p-4 text-center">
+                                    <div className="text-xs text-indigo-600 uppercase font-semibold">Decimal Grade</div>
+                                    <div className="text-3xl font-bold text-indigo-800 mt-1">{grade.decimal_grade || 'N/A'}</div>
+                                  </div>
+                                  <div className="bg-indigo-100 rounded-xl p-4 text-center">
+                                    <div className="text-xs text-indigo-600 uppercase font-semibold">Whole Grade</div>
+                                    <div className="text-3xl font-bold text-indigo-800 mt-1">{grade.whole_grade || 'N/A'}</div>
+                                  </div>
+                                  <div className="bg-gray-100 rounded-xl p-4 text-center">
+                                    <div className="text-xs text-gray-600 uppercase font-semibold">Grade Range</div>
+                                    <div className="text-xl font-bold text-gray-700 mt-1">{grade.grade_range || 'N/A'}</div>
+                                  </div>
+                                  <div className="bg-purple-100 rounded-xl p-4 text-center">
+                                    <div className="text-xs text-purple-600 uppercase font-semibold">Condition</div>
+                                    <div className="text-lg font-bold text-purple-800 mt-1">{grade.condition_label || 'N/A'}</div>
+                                  </div>
+                                </div>
+                                {grade.summary && (
+                                  <ExecutiveSummary text={grade.summary} />
+                                )}
+                              </>
+                            );
+                          };
+
                           return (
-                            <div className="prose prose-sm max-w-none">
-                              {formatJSONSection('Card Information', jsonData.card_info, true)}
-                              {formatJSONSection('Front Evaluation', jsonData.front, false)}
-                              {formatJSONSection('Back Evaluation', jsonData.back, false)}
-                              {formatJSONSection('Image Quality Assessment', jsonData.image_confidence, false)}
-                              {formatJSONSection('Centering Analysis', jsonData.centering, false)}
-                              {formatJSONSection('Corner Analysis', jsonData.corners, false)}
-                              {formatJSONSection('Edge Analysis', jsonData.edges, false)}
-                              {formatJSONSection('Surface Analysis', jsonData.surface, false)}
-                              {formatJSONSection('Defect Pattern Analysis', jsonData.defect_pattern_analysis, false)}
-                              {formatJSONSection('Sub-Scores', jsonData.sub_scores, false)}
-                              {formatJSONSection('Final Grade Calculation', jsonData.final_grade || {
-                                decimal_grade: jsonData.decimal_grade,
-                                whole_grade: jsonData.whole_grade,
-                                preliminary_grade: jsonData.preliminary_grade,
-                                grade_range: jsonData.grade_range,
-                                condition_label: jsonData.condition_label,
-                                limiting_factor: jsonData.limiting_factor
-                              }, false)}
-                              {formatJSONSection('Grade Cap Analysis', jsonData.grade_cap_analysis, false)}
-                              {formatJSONSection('Professional Grade Estimates', jsonData.professional_grade_estimates, false)}
+                            <div className="space-y-2">
+                              {renderCardInfo()}
+                              {renderSetMetadata()}
+                              {renderCentering()}
+                              {renderCorners()}
+                              {renderEdges()}
+                              {renderSurface()}
+                              {renderFinalGrade()}
 
                               {/* Meta Information */}
-                              {jsonData.prompt_version && (
-                                <div className="mt-8 pt-8 border-t-2 border-gray-300 bg-gray-50 -mx-8 -mb-8 px-8 py-6">
+                              {(jsonData.prompt_version || jsonData.metadata?.prompt_version) && (
+                                <div className="mt-10 pt-8 border-t-2 border-gray-300 bg-gray-50 -mx-8 -mb-8 px-8 py-6">
                                   <h4 className="text-lg font-bold text-gray-900 mb-3">Evaluation Details</h4>
-                                  <div className="space-y-3 text-sm">
-                                    {/* Prompt Version - Full Width */}
+                                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                                     <div>
                                       <span className="font-semibold text-gray-700">Prompt Version:</span>{' '}
-                                      <span className="text-gray-600">{jsonData.prompt_version}</span>
+                                      <span className="text-gray-600">{jsonData.prompt_version || jsonData.metadata?.prompt_version}</span>
                                     </div>
-                                    {/* Evaluation Date and Processing Time - Side by Side */}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                      <div>
-                                        <span className="font-semibold text-gray-700">Evaluation Date:</span>{' '}
-                                        <span className="text-gray-600">{formatGradedDate(card.created_at)}</span>
-                                      </div>
-                                      <div>
-                                        <span className="font-semibold text-gray-700">Processing Time:</span>{' '}
-                                        <span className="text-gray-600">
-                                          {card.processing_time ? `${(card.processing_time / 1000).toFixed(1)}s` : 'N/A'}
-                                        </span>
-                                      </div>
+                                    <div>
+                                      <span className="font-semibold text-gray-700">Evaluation Date:</span>{' '}
+                                      <span className="text-gray-600">{formatGradedDate(card.created_at)}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-gray-700">Processing Time:</span>{' '}
+                                      <span className="text-gray-600">
+                                        {card.processing_time ? `${(card.processing_time / 1000).toFixed(1)}s` : 'N/A'}
+                                      </span>
                                     </div>
                                   </div>
                                 </div>
@@ -5088,14 +5416,24 @@ export function SportsCardDetails() {
                             {meta && (
                               <div className="mt-8 pt-8 border-t-2 border-gray-300 bg-gray-50 -mx-8 -mb-8 px-8 py-6">
                                 <h4 className="text-lg font-bold text-gray-900 mb-3">Evaluation Details</h4>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                <div className="space-y-3 text-sm">
+                                  {/* Prompt Version - Full Width */}
                                   <div>
                                     <span className="font-semibold text-gray-700">Prompt Version:</span>{' '}
                                     <span className="text-gray-600">{meta.promptVersion}</span>
                                   </div>
-                                  <div>
-                                    <span className="font-semibold text-gray-700">Evaluation Date:</span>{' '}
-                                    <span className="text-gray-600">{meta.evaluationDate}</span>
+                                  {/* Evaluation Date and Processing Time - Side by Side */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                      <span className="font-semibold text-gray-700">Evaluation Date:</span>{' '}
+                                      <span className="text-gray-600">{meta.evaluationDate}</span>
+                                    </div>
+                                    <div>
+                                      <span className="font-semibold text-gray-700">Processing Time:</span>{' '}
+                                      <span className="text-gray-600">
+                                        {card.processing_time ? `${(card.processing_time / 1000).toFixed(1)}s` : 'N/A'}
+                                      </span>
+                                    </div>
                                   </div>
                                 </div>
                               </div>

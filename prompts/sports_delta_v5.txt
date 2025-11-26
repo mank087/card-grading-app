@@ -1,0 +1,503 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: SPORTS CARDS v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY sports card-specific rules.
+The master grading rubric (Sections 1-13) applies to ALL sports cards.
+This delta provides card-specific extraction rules, defect patterns, and examples.
+
+**CARD TYPES COVERED:**
+Baseball, Basketball, Football, Hockey, Soccer, Wrestling, Boxing, MMA, Racing, Golf, Tennis, and other sports trading cards
+
+═══════════════════════════════════════════════════════════════════════
+A. SPORTS CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from sports cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All Sports Cards)
+────────────────────────────────────────────────────────────────────────
+
+**card_name**: Full card name/title as printed
+• Often includes player name + card type/designation
+• Example: "Ken Griffey Jr. Rookie Card"
+• Example: "Tom Brady Gold Standard"
+• Example: "LeBron James Dominators"
+
+**player_or_character**: Player/athlete name
+• Full name as printed on card
+• Example: "Ken Griffey Jr."
+• Example: "Tom Brady"
+• Example: "LeBron James"
+• If multiple players (dual/triple card): List all, separated by " / "
+• Example: "Michael Jordan / Scottie Pippen"
+
+**set_name**: Set or series name
+• Official set name from manufacturer
+• Example: "Topps Chrome"
+• Example: "Panini Prizm"
+• Example: "Upper Deck SP Authentic"
+• Example: "Bowman Chrome"
+
+**year**: Year from copyright or release date
+• 4-digit year format
+• Example: "2024", "2023", "1989"
+• Check card back for copyright date (© 2024)
+• If range shown (e.g., 2023-24 season), use first year: "2023"
+
+**manufacturer**: Card publisher
+• Official company name
+• Common manufacturers:
+  - Topps (baseball, various)
+  - Panini (basketball, football, soccer)
+  - Upper Deck (hockey, various)
+  - Bowman (baseball)
+  - Fleer (vintage)
+  - Donruss (vintage, basketball)
+  - Score (vintage, various)
+
+**card_number**: Card number within set
+• Full number as printed
+• Example: "#123"
+• Example: "RC-45" (Rookie Card subset)
+• Example: "AU-TB" (Autograph designation)
+• May include set code: "2024 Topps Chrome #150"
+
+**sport_or_category**: Sport category
+• Primary sport type
+• Options: Baseball, Basketball, Football, Hockey, Soccer, Wrestling, Boxing, MMA, Racing, Golf, Tennis, Track & Field, Other
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS (Modern Sports Cards 2000+)
+────────────────────────────────────────────────────────────────────────
+
+**subset**: Subset/insert/parallel name
+• CRITICAL: Modern cards (2010+) frequently have subset/insert/parallel variants
+• You MUST actively search for subset indicators in small print areas on EVERY card
+• DO NOT default to null without checking borders, card number area, and back panel
+
+**Where to Check:**
+1. Back of card (bottom/top/sides) - small text
+2. Front borders (left/right edges) - vertical text
+3. Near card number area - parallel designation
+4. Product info area (back bottom) - insert name
+
+**Common Subset Patterns:**
+• Panini Prizm: "Silver Prizm", "Gold Prizm", "Ruby Wave", "Tiger Stripe", "Disco"
+• Topps Chrome: "Refractor", "X-Fractor", "Wave Refractor", "Atomic Refractor"
+• Panini Mosaic: "Silver Mosaic", "Gold Mosaic", "Stained Glass", "Genesis"
+• Panini Optic: "Holo", "Purple Shock", "Orange", "Red", "Blue"
+• Inserts: "Round Numbers", "Gold Standard", "Dominators", "My House", "Fireworks"
+
+**Detection Tips:**
+• Small font, often includes "Insert"/"Parallel"/"Variant"/"Limited"
+• Look for color names (Silver, Gold, Red, etc.)
+• Pattern names (Wave, Mosaic, Prizm, etc.)
+• Don't confuse with large decorative text or player/team names
+
+**Examples:**
+✅ GOOD: Panini Prizm Silver card → Back has "Silver Prizm Parallel" → subset: "Silver Prizm"
+✅ GOOD: Topps Chrome Refractor → Side has "Refractor" → subset: "Refractor"
+❌ BAD: Base card with no subset text after checking all locations → subset: null
+
+**serial_number**: Serial number if present
+• Format: "/99" or "12/99" or "#12/99"
+• Location: Usually bottom front (foil stamped) or back lower section
+• Hand-numbered: If pen-written, verify manufacturer authentication (not TTM/IP)
+• Color-coded foil meanings:
+  - Gold foil: Often /10
+  - Silver foil: Often /25
+  - Black foil: Often /1 (1-of-1)
+  - Red foil: Often /5
+• Examples: "/99", "45/99", "1/1", "/199", "No. 012 of 099"
+
+**rookie_or_first**: Rookie card designation (true|false)
+• true if ANY of these present:
+  - "RC" logo/designation printed on card
+  - "Rookie Card" text on front or back
+  - First-year player card (verify year matches player's rookie season)
+  - Official rookie designation from manufacturer
+• false if:
+  - Veteran player card
+  - No rookie indicators
+  - Second-year or later card
+
+**rarity_or_variant**: Type/variant classification
+• Options: Base, SP (Short Print), SSP (Super Short Print), Parallel, Insert, Autograph, Relic, Promo
+• Base: Standard mass-produced card, no special features
+• SP: Short Print (serial /26-/99 or known SP from set checklist)
+• SSP: Super Short Print (serial /2-/25)
+• Parallel: Color/pattern variant (Prizm Silver, Refractor, etc.)
+• Insert: Named insert set (Gold Standard, Dominators, etc.)
+• Autograph: On-card or sticker autograph
+• Relic: Memorabilia card (jersey, bat, patch, etc.)
+
+**authentic**: Licensed product verification (true|false)
+• true if ALL present:
+  - Official league logos (MLB, NBA, NFL, NHL, MLBPA, NFLPA, NBPA, NHLPA)
+  - Licensed manufacturer (Topps, Panini, Upper Deck, Bowman)
+  - Professional print quality
+  - Correct card stock and finish
+• false if:
+  - Missing league logos
+  - Unknown manufacturer
+  - Poor print quality (bootleg indicators)
+  - Incorrect fonts or logos
+
+────────────────────────────────────────────────────────────────────────
+OPTIONAL FIELDS (If Visible)
+────────────────────────────────────────────────────────────────────────
+
+**team**: Player's team
+• Team name as shown on card
+• Example: "Seattle Mariners", "New England Patriots", "Los Angeles Lakers"
+
+**position**: Player position
+• Abbreviation or full position
+• Example: "QB" (Quarterback), "OF" (Outfielder), "PG" (Point Guard)
+
+**card_back_text**: Descriptive paragraph from card back (2-4 sentences)
+• NOT just stats - extract bio/highlights/context text
+• Example: "Brady led the Patriots to six Super Bowl victories during his 20-year tenure in New England. His combination of accuracy, leadership, and clutch performance made him one of the greatest quarterbacks of all time."
+• null if no descriptive text (stats-only back)
+
+═══════════════════════════════════════════════════════════════════════
+B. SPORTS CARD RARITY CLASSIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+Assign highest visible tier only (in priority order):
+
+────────────────────────────────────────────────────────────────────────
+RARITY TIER HIERARCHY (Check in Order, Assign First Match)
+────────────────────────────────────────────────────────────────────────
+
+**1. 1-of-1 / Superfractor**
+• Serial number = 1/1
+• Unique card, only one in existence
+• Often labeled "Superfractor", "1/1", "Printing Plate"
+• Extremely rare, highest tier
+
+**2. Super Short Print (SSP)**
+• Serial numbered /2 to /25
+• Very limited production
+• High value, highly collectible
+
+**3. Short Print (SP)**
+• Serial numbered /26 to /99
+• Limited production run
+• More available than SSP but still scarce
+
+**4. Autographed**
+• On-card or sticker autograph
+• REQUIRES manufacturer authentication (hologram, certification, COA)
+• If autograph.present = true AND autograph.type = "manufacturer_authenticated" → rarity_tier = "autographed"
+• Unverified autographs = N/A grade (not counted as autograph tier)
+
+**5. Memorabilia / Relic**
+• Embedded patch, jersey swatch, bat piece, ball piece, ticket stub, etc.
+• Material is manufacturer-authenticated as game-used or event-used
+• Look for authenticity statements on card back
+• Examples: "Game-Used Jersey", "Event-Worn Patch", "Stadium Seat Relic"
+
+**6. Modern Parallels (Prizm, Mosaic, Refractor, Chrome)**
+• Color/pattern variants with holographic or special finishes
+• Panini Prizm: Silver, Gold, Ruby Wave, Tiger Stripe, Disco, Neon Green, etc.
+• Topps Chrome/Refractor: X-Fractor, Wave, Atomic, Pulsar, Speckle, etc.
+• Panini Mosaic: Silver, Gold, Stained Glass, Genesis, Reactive Blue, etc.
+• Panini Optic: Holo, Purple Shock, Orange, Red, Blue, Pink, etc.
+• Panini Select: Silver, Gold, Copper, Tie-Dye, Zebra, etc.
+• Special patterns: Cracked Ice, Nebula, Galaxy, Shimmer, etc.
+
+**7. Parallel / Insert Variant**
+• Named insert set or variant
+• Examples: "Gold Standard", "Dominators", "My House", "Fireworks", "Round Numbers"
+• Different from base design, special subset within product
+• May have unique card numbers or design elements
+
+**8. Rookie / Debut / 1st Edition**
+• Rookie Card (RC) designation
+• Player's first licensed card
+• 1st Edition marking (vintage cards)
+• Debut card from player's rookie season
+
+**9. Limited Edition**
+• Serial numbered /100 to /999
+• Limited but not as scarce as SP/SSP
+• Still collectible, numbered for authentication
+
+**10. Commemorative / Promo**
+• Topps NOW (event-specific, limited time print)
+• Panini Instant (on-demand event cards)
+• Stadium giveaway promos
+• Special event issues (Opening Day, All-Star, World Series, etc.)
+
+**11. Base / Common**
+• Mass production, no special features
+• Standard set card, widely available
+• No autograph, serial, rookie, memorabilia, or named subset
+
+────────────────────────────────────────────────────────────────────────
+🚨 CRITICAL TIER SELECTION RULE
+────────────────────────────────────────────────────────────────────────
+
+**Autograph Priority:**
+• Check for autograph FIRST
+• If autograph.present = true AND autograph.type = "manufacturer_authenticated" → rarity_tier MUST be "autographed"
+• Then check for other features in priority order
+
+**Subset/Insert Detection:**
+• CRITICAL: If card has NAMED SUBSET or INSERT designation → This is an INSERT, NOT base_common
+• Set rarity_tier = "parallel_variant" or higher (depending on serial number)
+• ONLY use "base_common" if NO special features present:
+  - No autograph
+  - No serial number
+  - No rookie designation
+  - No memorabilia
+  - No named subset/insert/parallel
+
+**Examples:**
+• Card with "Silver Prizm" parallel → rarity_tier = "modern_parallel"
+• Card with "/50" serial + autograph → rarity_tier = "autographed" (autograph takes priority)
+• Card with "Round Numbers" insert designation → rarity_tier = "parallel_variant"
+• Plain base card, no features → rarity_tier = "base_common"
+
+═══════════════════════════════════════════════════════════════════════
+C. SPORTS CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common Sports Card Defects - How They Present on Sports Cards:**
+
+────────────────────────────────────────────────────────────────────────
+1. CHIPPING ON COLORED BORDERS
+────────────────────────────────────────────────────────────────────────
+
+**Why Sports Cards Show This:**
+• Sports cards often have dark or colored borders (blue, red, green, black, orange)
+• Border ink is surface coating over white cardstock
+• When coating chips or wears, white cardstock shows through
+• Creates high contrast (dark color + white = very visible)
+
+**Detection:**
+• Look for white fiber exposure along edges
+• Most common on corners where handling occurs
+• Check all four edges for white flecks or continuous whitening
+• Dark borders make detection easier (white shows clearly)
+
+**Severity:**
+• Minor: 1-3 small white flecks (<0.1mm each)
+• Moderate: Continuous whitening along edge section (3-10mm)
+• Heavy: Extensive chipping, multiple edges affected, large areas
+
+**Grading Impact:**
+• Each white fleck: -0.3 deduction
+• Continuous whitening per edge: -0.7 deduction
+• Heavy chipping: -1.5 or more
+
+────────────────────────────────────────────────────────────────────────
+2. TWO-SIDED DESIGN CONSIDERATIONS
+────────────────────────────────────────────────────────────────────────
+
+**Sports Card Back Characteristics:**
+• Text-heavy design (player stats, bio, career highlights)
+• Often includes season stats table
+• May have manufacturer info, copyright, legal text
+• Centering often measured using text blocks as anchors (not always bordered)
+
+**Centering Assessment:**
+• Front: Usually has borders or photo framing for measurement
+• Back: May be borderless - use text blocks, stats table, or logos as centering anchors
+• Text boxes serve as internal design anchors for ratio calculation
+
+**Print Quality Differences:**
+• Front: Glossy, photo-quality, high-end finish
+• Back: May be matte, text-focused, different coating
+• Front surface defects more impactful (visible display side)
+• Back surface defects still count but weighted less (45% vs 55%)
+
+────────────────────────────────────────────────────────────────────────
+3. PRINT LINES ON GLOSSY SURFACES
+────────────────────────────────────────────────────────────────────────
+
+**High-Gloss Sports Cards:**
+• Chrome, Prizm, Optic, Mosaic, Select - all have high-gloss finishes
+• Glossy surfaces show print defects more readily than matte
+• Print lines are manufacturing artifacts, not handling damage
+
+**Common Print Line Locations:**
+• Along player image edges (where photo meets background)
+• In solid color areas (sky, background, uniform colors)
+• Horizontal or vertical roller lines from printing process
+
+**Differentiate from Creases:**
+• Print line: Surface-level ink defect, doesn't break cardstock, straight line, consistent width
+• Crease: Structural damage, cardstock folded, visible at angles, disrupts surface plane
+
+**Grading Impact:**
+• Single print line: -0.3 to -0.5 (manufacturing defect, not handling)
+• Multiple print lines: -0.7 to -1.0
+• Print line does NOT trigger structural damage caps (not a crease)
+
+────────────────────────────────────────────────────────────────────────
+4. HOLOFOIL/REFRACTOR PATTERN DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Sports Cards with Holographic Patterns:**
+• Prizm: Rainbow holographic pattern across entire card
+• Refractor: Wavelike rainbow effect (Topps Chrome)
+• Chrome: Metallic reflective finish with rainbow
+• Mosaic: Geometric holographic pattern
+• Optic: Holographic coating with color variants
+
+**Common Holofoil Defects:**
+• **Holo scratches**: Scratches in holographic layer (disrupts rainbow pattern)
+• **Holo bleed**: Holographic pattern extending outside intended area
+• **Pattern disruption**: Missing or damaged sections of holo pattern
+• **Foil peeling**: Holographic layer separating from cardstock (rare but serious)
+
+**Detection Method:**
+• View card at angle to see holographic layer clearly
+• Tilt card under light - holo defects catch light differently
+• Scratches will appear as breaks in rainbow pattern
+• Pattern disruption visible as dull/non-reflective areas
+
+**Grading Impact:**
+• Single holo scratch (hairline): -0.5 minimum
+• Multiple holo scratches: -1.0 to -1.5
+• Pattern disruption (missing holo section): -0.7 to -1.0
+• Holofoil defects prevent 10.0 surface score (high-end product expectation)
+
+────────────────────────────────────────────────────────────────────────
+5. PATCH/RELIC WINDOW CONSIDERATIONS
+────────────────────────────────────────────────────────────────────────
+
+**Memorabilia Cards with Cutout Windows:**
+• Window cut into card to embed jersey swatch, bat piece, patch, etc.
+• Window edges are factory-cut, not grading defects
+• Material visible through window is intentional
+
+**What to Grade:**
+• Window edges: Should be clean factory cut, not frayed/damaged
+• Area around window: Check for wear, corner damage near cutout
+• Surface: Grade normally (avoid window area itself)
+• Centering: Measure card centering independently of window placement
+
+**Window Edge Issues (Actual Defects):**
+• Fraying around window perimeter (cardstock damage) = defect
+• Chipping of ink coating near window = defect
+• Window material loose or falling out = serious defect
+
+**NOT Defects:**
+• Window itself (intentional design)
+• Material texture visible through window (jersey weave, bat grain)
+• Window placement off-center (judge overall card centering, not window position)
+
+────────────────────────────────────────────────────────────────────────
+6. DIE-CUT SPORTS CARDS
+────────────────────────────────────────────────────────────────────────
+
+**Die-Cut Design:**
+• Shaped edges (not rectangular)
+• Removed corners or decorative cuts
+• Jagged/rounded edges by design
+
+**Centering Assessment:**
+• Traditional border centering impossible (no straight edges)
+• Use internal geometric centering only
+• Identify design anchors (player image, text, logos)
+• Maximum centering score: 9.0 (perfect centering difficult to verify)
+
+**Edge Grading:**
+• Die-cut edges are intentional, not defects
+• Grade edge condition (smoothness of die-cut, no tearing)
+• Check for fraying or damage to shaped edges
+• Clean die-cut = no deduction; damaged die-cut = defect
+
+────────────────────────────────────────────────────────────────────────
+7. VINTAGE SPORTS CARD ISSUES (Pre-2000)
+────────────────────────────────────────────────────────────────────────
+
+**Era-Specific Expectations:**
+• 1950s-1970s: Rougher factory cuts common, centering often poor
+• 1980s: Improved quality but still variable centering
+• 1990s: Better cutting, glossy finishes introduced
+
+**Common Vintage Defects:**
+• Factory cut roughness (not handling damage) - minimal deduction for era
+• Wax staining (cards stored in wax packs) - yellowing or residue
+• Print registration issues (colors misaligned) - manufacturing defect
+• Centering issues (off-center common, 70/30 or worse typical)
+
+**Grading Adjustments:**
+• Don't expect 10.0 corners on vintage (manufacturing limitations)
+• Centering caps still apply but context-aware (60/40 is good for 1970s card)
+• Factory roughness noted but less penalized than modern cards
+
+═══════════════════════════════════════════════════════════════════════
+D. SPORTS CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**Purpose:** Demonstrate proper analysis technique with sports card-specific details.
+
+────────────────────────────────────────────────────────────────────────
+CENTERING EXAMPLE (Sports Card with Colored Border)
+────────────────────────────────────────────────────────────────────────
+
+"This 2024 Topps Chrome baseball card features a distinctive dark blue border surrounding the player photo. Examining the front borders, I measure: left border ≈ 2.8mm, right border ≈ 3.5mm, top border ≈ 3.0mm, bottom border ≈ 3.2mm. Calculating the left-right ratio: 2.8mm (narrower) ÷ 3.5mm (wider) × 100 = 80%, expressed as 80/20 ratio. For top-bottom: 3.0mm ÷ 3.2mm × 100 = 93.75%, expressed as 94/6 ratio. The worst axis is left-right at 80/20, which according to the centering caps table, limits the maximum centering score to 5.0. The card is visibly off-center with the player image shifted toward the left edge."
+
+────────────────────────────────────────────────────────────────────────
+CORNER EXAMPLE (Sports Card with Dark Border)
+────────────────────────────────────────────────────────────────────────
+
+**Top-Left Corner (Front):**
+"The top-left corner sits against a solid red border background. Examining at maximum zoom, I observe a small amount of white fiber exposure at the corner tip, measuring approximately 0.2mm in length. The corner maintains relatively sharp geometry overall but shows this minor whitening where the red border coating has worn through to reveal the white cardstock beneath. This minor defect is characteristic of handling wear on dark-bordered sports cards, where the high contrast between red ink and white cardstock makes even small amounts of fiber exposure highly visible. The corner lies completely flat against the card surface with no lift or tilt detected."
+
+**Top-Right Corner (Front):**
+"The top-right corner meets a red border identical to the opposite corner. At maximum zoom, this corner displays a slightly larger area of white fiber exposure, roughly 0.3mm in extent, with visible rounding of the corner apex. The border coating has worn away more extensively here compared to the top-left corner, suggesting this area received more handling contact. The white cardstock is clearly visible against the red background, and the corner geometry shows mild softening. Despite this wear, the corner remains structurally sound with no signs of lifting, tilting, or creasing."
+
+────────────────────────────────────────────────────────────────────────
+EDGE EXAMPLE (Sports Card)
+────────────────────────────────────────────────────────────────────────
+
+**Right Edge (Front):**
+"The right edge of this basketball card runs along a black border, which provides high contrast for detecting any white fiber exposure. Scanning the full length of this edge from the top-right corner to the bottom-right corner, I detect 3 small white flecks scattered along the edge line. Each fleck measures less than 0.1mm in length and appears as a tiny break in the black border coating where white cardstock shows through. Additionally, examining the factory cut quality, the middle section of this edge (approximately 3mm length) shows slight roughness - the cut line appears fuzzy rather than perfectly straight and clean. The combination of minor whitening (3 flecks) and localized roughness results in an edge score of 9.0 for this specific edge."
+
+────────────────────────────────────────────────────────────────────────
+SURFACE EXAMPLE (Sports Card with Prizm Holographic Finish)
+────────────────────────────────────────────────────────────────────────
+
+**Front Surface:**
+"The front surface of this 2023 Panini Prizm football card features a rainbow holographic refractor pattern overlaying the player image. The card displays a silver prizm parallel finish, creating a distinctive rainbow reflection across the entire front surface when viewed at angles. Examining the card under varying lighting angles to assess the holographic layer, I detect one hairline scratch located in the upper-right quadrant of the card. This scratch runs diagonally for approximately 4mm and is visible as a break in the refractor rainbow pattern - when tilting the card, the scratch appears as a dull line where the holographic effect is disrupted. The scratch does not appear to penetrate through to the cardstock level beneath; it is confined to the surface holographic coating. The rest of the surface maintains pristine condition with the rainbow pattern intact, no print defects observed, no staining, and no additional scratches detected in the remaining zones. The single holographic scratch prevents a perfect 10.0 surface score, resulting in a 9.5 grade for the front surface."
+
+────────────────────────────────────────────────────────────────────────
+MEMORABILIA/RELIC CARD EXAMPLE
+────────────────────────────────────────────────────────────────────────
+
+**Card with Jersey Swatch Window:**
+"This 2024 Panini Prizm memorabilia card features a rectangular window cutout in the lower-right portion of the front, through which a piece of game-used jersey material is visible. The window measures approximately 20mm × 30mm and is cleanly die-cut with smooth edges - no fraying or cardstock damage detected around the window perimeter. The jersey swatch itself displays visible fabric weave texture and appears to be authenticated by the manufacturer (back of card states 'Game-Used Material').
+
+Grading the card condition independently of the relic window:
+- Centering is assessed using the card's overall design anchors, ignoring window placement
+- Corners near the window (bottom-right) are intact with no damage from the die-cutting process
+- Edges around window are factory-cut and show no chipping or wear
+- Surface is graded on areas outside the window - glossy finish is pristine with no scratches
+
+The presence of the memorabilia window does not negatively impact the grade; it is an intentional design feature. The card is assessed based on its condition as a relic card, with the window treated as part of the original design rather than a defect."
+
+═══════════════════════════════════════════════════════════════════════
+END OF SPORTS DELTA v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**TOTAL LINES:** ~550
+**ESTIMATED TOKENS:** ~4,000-4,500
+
+**COMBINED PROMPT SIZE (Master + Sports Delta):**
+• Master Rubric: ~18,000-20,000 tokens
+• Sports Delta: ~4,000-4,500 tokens
+• **TOTAL: ~22,000-24,500 tokens** ✓ Within target range
+
+When grading sports cards, use:
+1. Master Grading Rubric v5.0 (universal grading rules)
+2. Sports Delta v5.0 (this file - sports-specific rules)
+
+Apply ALL instructions from BOTH files to complete grading analysis.

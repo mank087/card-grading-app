@@ -7,11 +7,13 @@ import { StyleSheet, Font } from '@react-pdf/renderer';
 
 export const reportStyles = StyleSheet.create({
   // Page layout - compact for single page fit
+  // IMPORTANT: overflow: 'hidden' ensures content never spills to a second page
   page: {
     padding: 14,  // Reduced from 16 to compensate for larger fonts
     fontSize: 9,  // Increased from 8
     fontFamily: 'Helvetica',
     backgroundColor: '#ffffff',
+    overflow: 'hidden',  // Prevent any overflow to second page
   },
 
   // Header section with logo on right - Reduced for single page fit
@@ -89,12 +91,16 @@ export const reportStyles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#1f2937',
     marginBottom: 1,
+    maxLines: 1,  // Single line only
+    overflow: 'hidden',
   },
 
   cardLabelDetails: {
     fontSize: 8,  // Increased from 7
     color: '#4b5563',
     marginBottom: 1,
+    maxLines: 1,  // Single line only
+    overflow: 'hidden',
   },
 
   cardLabelFeatures: {
@@ -102,6 +108,8 @@ export const reportStyles = StyleSheet.create({
     color: '#2563eb', // Blue-600
     fontWeight: 'bold',
     marginBottom: 1,
+    maxLines: 1,  // Single line only
+    overflow: 'hidden',
   },
 
   cardLabelSerial: {
@@ -111,25 +119,26 @@ export const reportStyles = StyleSheet.create({
   },
 
   cardLabelRight: {
-    width: 25,
+    width: 38,
     alignItems: 'center',
+    justifyContent: 'center',
   },
 
   cardLabelGrade: {
-    fontSize: 15,  // Increased from 14
+    fontSize: 14,  // Balanced size - fits within label
     fontWeight: 'bold',
     color: '#7c3aed',
   },
 
   cardLabelDivider: {
-    width: 15,
+    width: 20,
     height: 1,
     backgroundColor: '#7c3aed',
-    marginVertical: 1,
+    marginVertical: 2,
   },
 
   cardLabelConfidence: {
-    fontSize: 11,  // Increased from 10
+    fontSize: 5,  // Small enough to fit "Gem Mint" on one line
     fontWeight: 'bold',
     color: '#7c3aed',
   },
@@ -296,7 +305,9 @@ export const reportStyles = StyleSheet.create({
   subgradeSummary: {
     fontSize: 7,  // Increased from 6
     color: '#4a5568',
-    lineHeight: 1.4,
+    lineHeight: 1.3,  // Reduced from 1.4 for tighter fit
+    maxLines: 3,  // Allow up to 3 lines (truncation cuts off mid-line 3)
+    overflow: 'hidden',  // Hide any overflow
   },
 
   // AI Confidence section - compact, reduced for single page fit
@@ -340,7 +351,9 @@ export const reportStyles = StyleSheet.create({
   overallSummaryText: {
     fontSize: 7,  // Increased from 6
     color: '#1e293b', // Slate-800
-    lineHeight: 1.4,
+    lineHeight: 1.3,  // Reduced from 1.4 for tighter fit
+    maxLines: 4,  // Limit to 4 lines max
+    overflow: 'hidden',  // Hide any overflow
   },
 
   // Professional Grades Comparison section - Reduced for single page fit

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational } from "@/lib/visionGrader";
+// Professional grade estimation (deterministic backend mapper)
+import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // HYBRID SET IDENTIFICATION: Pokemon TCG API for set lookup when AI doesn't have it in mini table
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 
@@ -229,12 +231,16 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
     if (hasCompleteGrading && !forceRegrade) {
       console.log(`[GET /api/pokemon/${cardId}] Pokemon card already fully processed, returning existing result`);
 
-      // Parse conversational_grading if it exists and hasn't been parsed yet
+      // ALWAYS parse conversational_grading to extract corners/edges/surface data
+      // Even if sub_scores exists, we need the detailed analysis for display
       let parsedConversationalData = null;
-      if (card.conversational_grading && !card.conversational_sub_scores) {
+      if (card.conversational_grading) {
         try {
           console.log('[POKEMON CACHE] Parsing cached conversational_grading JSON...');
           const jsonData = JSON.parse(card.conversational_grading);
+
+          // 🔍 DEBUG: Log surface data structure
+          console.log('[POKEMON CACHE DEBUG] Surface data structure:', JSON.stringify(jsonData.surface, null, 2));
 
           parsedConversationalData = {
             decimal_grade: jsonData.final_grade?.decimal_grade ?? null,
@@ -318,16 +324,17 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
               // Front surface
               front_surface: {
                 defects: jsonData.surface?.front?.defects || [],
-                analysis: jsonData.surface?.front?.analysis || 'No analysis available',
+                analysis: jsonData.surface?.front?.condition || jsonData.surface?.front?.analysis || 'No analysis available',
                 sub_score: jsonData.raw_sub_scores?.surface_front || 0,
-                summary: jsonData.surface?.front_summary || jsonData.surface?.front?.summary || 'Surface analysis not available'
+                summary: jsonData.surface?.front?.summary || jsonData.surface?.front_summary || 'Surface analysis not available',
+                finish_type: jsonData.surface?.front?.finish_type || null  // Include finish type if available
               },
               // Back surface
               back_surface: {
                 defects: jsonData.surface?.back?.defects || [],
-                analysis: jsonData.surface?.back?.analysis || 'No analysis available',
+                analysis: jsonData.surface?.back?.condition || jsonData.surface?.back?.analysis || 'No analysis available',
                 sub_score: jsonData.raw_sub_scores?.surface_back || 0,
-                summary: jsonData.surface?.back_summary || jsonData.surface?.back?.summary || 'Surface analysis not available'
+                summary: jsonData.surface?.back?.summary || jsonData.surface?.back_summary || 'Surface analysis not available'
               }
             },
             card_info: jsonData.card_info || null,
@@ -338,6 +345,72 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
             case_detection: jsonData.case_detection || null,
             professional_grade_estimates: jsonData.professional_grade_estimates || null
           };
+
+          // Calculate professional grade estimates if not stored in JSON
+          if (!parsedConversationalData.professional_grade_estimates && parsedConversationalData.decimal_grade) {
+            try {
+              console.log('[POKEMON CACHE] 🔧 Calculating professional grade estimates...');
+
+              // Parse centering ratios
+              const parseCentering = (ratio: string | undefined): [number, number] | undefined => {
+                if (!ratio || ratio === 'N/A') return undefined;
+                const parts = ratio.split('/').map(Number);
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                  return [parts[0], parts[1]] as [number, number];
+                }
+                return undefined;
+              };
+
+              // Check if autograph is manufacturer-authenticated
+              const autographType = jsonData.autograph?.type || 'none';
+              const cardInfoData = jsonData.card_info || {};
+              const rarityFeatures = jsonData.rarity_features || {};
+
+              const hasAutographType = autographType === 'manufacturer_authenticated' ||
+                                       autographType === 'on-card' ||
+                                       autographType === 'sticker';
+              const hasAutographedFlag = cardInfoData.autographed === true;
+              const hasAutographRarity = cardInfoData.rarity_or_variant?.toLowerCase()?.includes('autograph') ||
+                                         cardInfoData.rarity_tier?.toLowerCase()?.includes('autograph');
+              const hasAutographInName = cardInfoData.card_name?.toLowerCase()?.includes('autograph');
+              const hasRarityAutograph = rarityFeatures.autograph?.present === true;
+              const isAuthentic = cardInfoData.authentic !== false;
+
+              const isAuthenticatedAutograph = isAuthentic && (
+                hasAutographType ||
+                hasAutographedFlag ||
+                hasAutographRarity ||
+                hasAutographInName ||
+                hasRarityAutograph
+              );
+
+              const mapperInput = {
+                final_grade: parsedConversationalData.decimal_grade,
+                centering: {
+                  front_lr: parseCentering(parsedConversationalData.centering_ratios?.front_lr),
+                  front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
+                  back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
+                  back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
+                },
+                corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
+                edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
+                surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
+                has_structural_damage: jsonData.structural_damage?.detected || false,
+                has_handwriting: jsonData.handwriting?.detected || false,
+                has_alterations: jsonData.alterations?.detected || false,
+                crease_detected: jsonData.structural_damage?.has_creases || false,
+                bent_corner_detected: jsonData.structural_damage?.has_bent_corners || false,
+                is_authenticated_autograph: isAuthenticatedAutograph
+              };
+
+              const professionalEstimates = estimateProfessionalGrades(mapperInput);
+              parsedConversationalData.professional_grade_estimates = professionalEstimates;
+
+              console.log(`[POKEMON CACHE] ✅ Professional estimates: PSA ${professionalEstimates.PSA.estimated_grade}, BGS ${professionalEstimates.BGS.estimated_grade}`);
+            } catch (mapperError) {
+              console.error('[POKEMON CACHE] ⚠️ Professional mapper failed:', mapperError);
+            }
+          }
 
           console.log('[POKEMON CACHE] ✅ Parsed cached JSON successfully');
         } catch (error) {
@@ -434,9 +507,10 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
 
         // Map JSON to structured data format
         conversationalGradingData = {
-          decimal_grade: jsonData.final_grade?.decimal_grade ?? null,
-          whole_grade: jsonData.final_grade?.whole_grade ?? null,
-          grade_range: jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±0.5',
+          // Handle both v5.0 (scoring.final_grade) and v4.2 (final_grade.decimal_grade) formats
+          decimal_grade: jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null,
+          whole_grade: jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null,
+          grade_range: jsonData.image_quality?.grade_uncertainty || jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || '±0.5',  // 🔧 FIX: Prioritize ± format over range
           condition_label: jsonData.final_grade?.condition_label || null,
           final_grade_summary: jsonData.final_grade?.summary || null,  // 🆕 Overall card condition summary
           image_confidence: jsonData.image_quality?.confidence_letter || null,
@@ -534,7 +608,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
           },
           card_info: jsonData.card_info || null,
           case_detection: jsonData.case_detection || null,
-          professional_slab: jsonData.professional_slab || null,
+          professional_slab: jsonData.slab_detection || null,  // 🔧 FIX: Master rubric outputs slab_detection, not professional_slab
           professional_grade_estimates: jsonData.professional_grade_estimates || null,
           meta: jsonData.metadata || null
         };
@@ -544,6 +618,90 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
           sub_scores: conversationalGradingData.sub_scores,
           has_defects: !!(conversationalGradingData.transformedDefects?.front)
         });
+
+        // 🎯 Call backend deterministic mapper for professional grade estimates
+        if (conversationalGradingData.decimal_grade && conversationalGradingData.decimal_grade !== 'N/A') {
+          try {
+            console.log(`[GET /api/pokemon/${cardId}] 🔧 Calling professional grade mapper (deterministic)...`);
+
+            // Parse centering ratios from strings like "55/45" to [55, 45]
+            const parseCentering = (ratio: string): [number, number] | undefined => {
+              if (!ratio || ratio === 'N/A') return undefined;
+              const parts = ratio.split('/').map(p => parseInt(p.trim()));
+              if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                return [parts[0], parts[1]] as [number, number];
+              }
+              return undefined;
+            };
+
+            // Check if autograph is manufacturer-authenticated (not an alteration)
+            // Multiple ways to detect authenticated autographs:
+            const autographType = jsonData.autograph?.type || 'none';
+            const cardInfoData = jsonData.card_info || {};
+            const rarityFeatures = jsonData.rarity_features || {};
+
+            // Check various indicators of authenticated autograph
+            const hasAutographType = autographType === 'manufacturer_authenticated' ||
+                                     autographType === 'on-card' ||
+                                     autographType === 'sticker';
+            const hasAutographedFlag = cardInfoData.autographed === true;
+            const hasAutographRarity = cardInfoData.rarity_or_variant?.toLowerCase()?.includes('autograph') ||
+                                       cardInfoData.rarity_tier?.toLowerCase()?.includes('autograph');
+            const hasAutographInName = cardInfoData.card_name?.toLowerCase()?.includes('autograph');
+            const hasRarityAutograph = rarityFeatures.autograph?.present === true;
+            const isAuthentic = cardInfoData.authentic !== false;
+
+            const isAuthenticatedAutograph = isAuthentic && (
+              hasAutographType ||
+              hasAutographedFlag ||
+              hasAutographRarity ||
+              hasAutographInName ||
+              hasRarityAutograph
+            );
+
+            console.log(`[GET /api/pokemon/${cardId}] 🔍 Autograph detection: type=${autographType}, flag=${hasAutographedFlag}, rarity=${hasAutographRarity}, name=${hasAutographInName}, rarityFeatures=${hasRarityAutograph}, authentic=${isAuthentic} → isAuthenticated=${isAuthenticatedAutograph}`);
+
+            const mapperInput = {
+              final_grade: conversationalGradingData.decimal_grade,
+              centering: {
+                front_lr: parseCentering(conversationalGradingData.centering_ratios?.front_lr),
+                front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
+                back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
+                back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
+              },
+              corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
+              edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
+              surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
+              has_structural_damage: jsonData.structural_damage?.detected || false,
+              has_handwriting: jsonData.handwriting?.detected || false,
+              has_alterations: jsonData.alterations?.detected || false,
+              crease_detected: jsonData.structural_damage?.has_creases || false,
+              bent_corner_detected: jsonData.structural_damage?.has_bent_corners || false,
+              // If autograph is authenticated, don't treat as alteration
+              is_authenticated_autograph: isAuthenticatedAutograph
+            };
+
+            const professionalEstimates = estimateProfessionalGrades(mapperInput);
+            conversationalGradingData.professional_grade_estimates = professionalEstimates;
+
+            // Update card_info with derived autographed flag for frontend display
+            if (isAuthenticatedAutograph && conversationalGradingData.card_info) {
+              conversationalGradingData.card_info = {
+                ...conversationalGradingData.card_info,
+                autographed: true
+              };
+              console.log(`[GET /api/pokemon/${cardId}] ✅ Set card_info.autographed = true (authenticated autograph detected)`);
+            }
+
+            console.log(`[GET /api/pokemon/${cardId}] ✅ Professional estimates: PSA ${professionalEstimates.PSA.estimated_grade}, BGS ${professionalEstimates.BGS.estimated_grade}, SGC ${professionalEstimates.SGC.estimated_grade}, CGC ${professionalEstimates.CGC.estimated_grade}`);
+          } catch (mapperError) {
+            console.error(`[GET /api/pokemon/${cardId}] ⚠️ Professional mapper failed:`, mapperError);
+            conversationalGradingData.professional_grade_estimates = null;
+          }
+        } else {
+          console.log(`[GET /api/pokemon/${cardId}] ⏭️ Skipping professional mapper (grade is N/A or null)`);
+          conversationalGradingData.professional_grade_estimates = null;
+        }
 
         // 🆕 HYBRID SET IDENTIFICATION: Check if we need API lookup
         const cardInfo = conversationalGradingData.card_info;

@@ -1,0 +1,427 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: MAGIC: THE GATHERING v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY Magic: The Gathering card-specific rules.
+The master grading rubric (Sections 1-13) applies to ALL MTG cards.
+This delta provides card-specific extraction rules, defect patterns, and examples.
+
+**CARD TYPES COVERED:**
+Magic: The Gathering cards from all sets (Alpha 1993 - present)
+
+═══════════════════════════════════════════════════════════════════════
+A. MTG CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from MTG cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All MTG Cards)
+────────────────────────────────────────────────────────────────────────
+
+**card_name**: Card name (top of card)
+• Extract exact card name as printed
+• Example: "Lightning Bolt", "Black Lotus", "Jace, the Mind Sculptor"
+
+**mtg_card_type**: Card type line
+• Extract from type line (below artwork)
+• Options: Creature, Instant, Sorcery, Enchantment, Artifact, Planeswalker, Land, Tribal, Battle
+• May include supertypes: Legendary, Snow, Basic, World
+• May include subtypes: Human Wizard, Dragon, Equipment, Aura, etc.
+• Example: "Legendary Creature — Human Wizard"
+• Example: "Instant"
+• Example: "Artifact — Equipment"
+
+**creature_type**: Creature subtype (if creature)
+• Extract creature types from type line after "—"
+• Example: "Human Wizard", "Dragon", "Elf Warrior", "Goblin Rogue"
+• If not a creature: null
+
+**mana_cost**: Mana cost (top-right corner)
+• Extract mana symbols from top-right
+• Use standard notation: {#}{W}{U}{B}{R}{G}{C}
+• {#} = colorless/generic mana (number)
+• {W} = White, {U} = Blue, {B} = Black, {R} = Red, {G} = Green, {C} = Colorless
+• Example: "{2}{U}{U}", "{3}{W}{W}", "{B}{B}{B}", "{X}{R}{R}"
+• Hybrid mana: "{W/U}", "{2/B}", "{G/W}"
+• Phyrexian mana: "{W/P}", "{U/P}"
+• If Land or mana cost not visible: null
+
+**color_identity**: Card color(s)
+• Determine from mana cost and color indicator
+• Options: W (White), U (Blue), B (Black), R (Red), G (Green), C (Colorless)
+• Multi-color: List all colors (e.g., "W,U", "B,R,G")
+• Colorless: "C"
+• Example: "{2}{U}{U}" → "U"
+• Example: "{3}{W}{B}" → "W,B"
+• Example: Artifact with no colored symbols → "C"
+
+**power_toughness**: Power/Toughness (if creature)
+• Extract from bottom-right corner (for creatures)
+• Format: "P/T" (e.g., "3/3", "5/5", "*/2", "2+*/2+*")
+• Use exact notation including asterisks and plus signs
+• Example: "3/3", "5/1", "*/", "2+*/2+*", "7/7"
+• If not a creature or not visible: null
+
+**set_name**: Set/expansion name
+• Extract from set symbol or set code
+• Use Set Identification Module below
+• Example: "Modern Horizons 3", "Murders at Karlov Manor", "Bloomburrow"
+
+**card_number**: Collector number
+• Bottom of card (e.g., "123/249")
+• Format: "X/Y" where X = card number, Y = set size
+• Example: "045/249", "234/271"
+
+**year**: Release year
+• Check copyright text or use set identification
+• 4-digit year (e.g., "2024", "2023", "1993")
+
+**manufacturer**: Card publisher
+• "Wizards of the Coast" for all MTG cards
+
+**authentic**: Licensed product verification (true|false)
+• true if official MTG card from Wizards of the Coast
+• false if proxy, counterfeit, or unofficial
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS (MTG Specific)
+────────────────────────────────────────────────────────────────────────
+
+**rarity_tier**: Card rarity
+• See Rarity Classification section below
+• Based on set symbol color and card features
+
+**subset**: Treatment/variant type
+• Options: Borderless, Extended Art, Showcase, Retro Frame, Full Art, Etched Foil, etc.
+• Check for special frame treatments
+• Example: "Borderless", "Extended Art", "Showcase Frame"
+
+**serial_number**: Serial number (if present)
+• Very rare in MTG, mostly on special editions
+• Format: "/500", "1/1", etc.
+• Most MTG cards: null
+
+**card_front_text**: Rules text and abilities
+• Extract complete rules text from card
+• Include abilities, keywords, flavor text separator
+• Format with line breaks between abilities
+• Example for creature: "Flying\nWhen ~ enters the battlefield, draw a card.\n\nFlavor: [text]"
+• Example for instant: "Counter target spell.\nDraw a card."
+
+**card_back_text**: MTG card backs are standardized
+• All MTG cards have the same back (Magic card back)
+• Use: "Standard Magic: The Gathering card back" or null
+
+═══════════════════════════════════════════════════════════════════════
+B. MTG CARD RARITY CLASSIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+Assign highest visible tier only (in priority order):
+
+────────────────────────────────────────────────────────────────────────
+RARITY TIER HIERARCHY
+────────────────────────────────────────────────────────────────────────
+
+**1. 1-of-1**
+• Serial numbered 1/1
+• Extremely rare special editions
+• Examples: Serialized Showcase treatments, The One Ring (001/001)
+
+**2. Power Nine**
+• The 9 most powerful/valuable cards from Alpha/Beta/Unlimited
+• Black Lotus, Moxes (5), Ancestral Recall, Time Walk, Timetwister
+• Only applicable to vintage cards
+
+**3. Super Short Print**
+• Serial numbered /2 to /25
+• Extremely limited special editions
+
+**4. Mythic Rare Serialized**
+• Mythic rare with serial number /500 or similar
+• Modern special treatments
+
+**5. Mythic Rare**
+• Set symbol color: Orange/Red
+• Highest standard rarity tier
+• Approximately 1 per 8 packs
+
+**6. Rare**
+• Set symbol color: Gold
+• Standard rare tier
+• Approximately 1 per pack
+
+**7. Borderless**
+• No border frame treatment
+• Art extends to edges
+• Special showcase variant
+
+**8. Extended Art**
+• Artwork extends beyond normal frame
+• Larger art area than normal
+• Collector Booster exclusive
+
+**9. Showcase Frame**
+• Special alternate frame treatment
+• Set-specific showcase style
+• Examples: Storybook (Eldraine), Ninja (Kamigawa), Art Deco (New Capenna)
+
+**10. Authenticated Autograph**
+• Artist signature with authentication
+• Artist Proof cards
+• Convention exclusives with verified signatures
+
+**11. Foil Mythic/Rare**
+• Foil treatment on mythic or rare card
+• Holographic finish
+
+**12. Uncommon**
+• Set symbol color: Silver
+• Middle rarity tier
+
+**13. Common**
+• Set symbol color: Black
+• Most basic rarity
+
+**14. Promo**
+• Special promotional printing
+• Promo stamp or set code
+• Event exclusives, buy-a-box promos, etc.
+
+**15. Retro Frame**
+• Old-school card frame style on modern card
+• Nostalgia treatment
+
+**16. Special Guest**
+• Cards from other artists/IPs in MTG sets
+• Example: Special Guest cards in Bloomburrow
+
+────────────────────────────────────────────────────────────────────────
+SET SYMBOL COLOR GUIDE
+────────────────────────────────────────────────────────────────────────
+
+• **Black** = Common
+• **Silver** = Uncommon
+• **Gold** = Rare
+• **Orange/Red** = Mythic Rare
+• **Purple** = Special (timeshifted, etc.)
+
+═══════════════════════════════════════════════════════════════════════
+C. MTG SET IDENTIFICATION MODULE
+═══════════════════════════════════════════════════════════════════════
+
+**DETECTION METHOD:**
+• Primary: 3-letter set code (bottom of card or expansion symbol)
+• Secondary: Expansion symbol visual recognition
+• Tertiary: Card number denominator + year
+
+────────────────────────────────────────────────────────────────────────
+COMMON MODERN SETS LOOKUP TABLE (2020-2025)
+────────────────────────────────────────────────────────────────────────
+
+**2024-2025 Standard Sets:**
+| Set Code | Set Name                    | Year | Cards |
+|----------|----------------------------|------|-------|
+| MH3      | Modern Horizons 3           | 2024 | 303+  |
+| OTJ      | Outlaws of Thunder Junction | 2024 | 271   |
+| BLB      | Bloomburrow                 | 2024 | 281   |
+| DSK      | Duskmourn                   | 2024 | 276   |
+| FDN      | Foundations                 | 2024 | 291   |
+| MKM      | Murders at Karlov Manor     | 2024 | 286   |
+| SPM      | Spider-Man Crossover        | 2025 | TBD   |
+
+**2023 Standard Sets:**
+| Set Code | Set Name                    | Year | Cards |
+|----------|----------------------------|------|-------|
+| BRO      | The Brothers' War           | 2022 | 287   |
+| ONE      | Phyrexia: All Will Be One   | 2023 | 271   |
+| MOM      | March of the Machine        | 2023 | 281   |
+| WOE      | Wilds of Eldraine           | 2023 | 266   |
+| LCI      | The Lost Caverns of Ixalan  | 2023 | 286   |
+
+**2020-2022 Standard Sets:**
+| Set Code | Set Name                    | Year | Cards |
+|----------|----------------------------|------|-------|
+| ZNR      | Zendikar Rising             | 2020 | 280   |
+| KHM      | Kaldheim                    | 2021 | 285   |
+| STX      | Strixhaven                  | 2021 | 275   |
+| MID      | Midnight Hunt               | 2021 | 277   |
+| VOW      | Crimson Vow                 | 2021 | 277   |
+| NEO      | Kamigawa Neon Dynasty       | 2022 | 302   |
+| SNC      | New Capenna                 | 2022 | 281   |
+| DMU      | Dominaria United            | 2022 | 281   |
+
+**OUTPUT FORMAT:**
+{
+  "set_name": "Murders at Karlov Manor",
+  "set_code": "MKM",
+  "set_year": 2024,
+  "set_confidence": "high",
+  "needs_api_lookup": false
+}
+
+If set not found in table:
+{
+  "set_name": null,
+  "set_code": null,
+  "set_year": null,
+  "set_confidence": "low",
+  "needs_api_lookup": true
+}
+
+═══════════════════════════════════════════════════════════════════════
+D. MTG CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common MTG Defects - How They Present:**
+
+────────────────────────────────────────────────────────────────────────
+1. FOIL CURLING (MOST COMMON MTG ISSUE)
+────────────────────────────────────────────────────────────────────────
+
+**Why MTG Foils Curl:**
+• MTG foil layer expands/contracts with humidity
+• Card bows into a curve (concave or convex)
+• Extremely common on MTG foils from all eras
+• Not technically a "defect" but affects grading
+
+**Detection:**
+• View card from side - does it curve?
+• Check if card lies flat on surface
+• Minor curve: <2mm lift from flat surface
+• Moderate curve: 2-5mm lift
+• Heavy curve: >5mm lift (significant bow)
+
+**Grading Impact:**
+• Curling is noted but graded based on SURFACE/EDGE condition
+• If curl is severe enough to cause edge stress → grade edges accordingly
+• If curl causes surface creasing → structural damage cap applies
+• Light curl without damage: Note in comments, minimal grade impact
+
+────────────────────────────────────────────────────────────────────────
+2. BORDER COLOR VARIATIONS (White vs. Black Border Wear)
+────────────────────────────────────────────────────────────────────────
+
+**MTG Border Types:**
+• Black border: Original printings, core sets (vintage)
+• White border: Reprints (Chronicles, older core sets)
+• Borderless: Modern special treatments
+
+**Wear Patterns:**
+• Black borders: Show white cardstock easily when chipped (high contrast)
+• White borders: Whitening blends in (harder to detect edge wear)
+• Detection: Look for color breaks or fiber exposure
+
+**Grading Impact:**
+• Black border wear: Very visible, same deductions as sports cards
+• White border wear: Harder to see but still counts
+• Inspect carefully at edges regardless of border color
+
+────────────────────────────────────────────────────────────────────────
+3. ETCHED FOIL DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Etched Foil (Modern Treatment):**
+• Matte/textured holographic finish
+• Different from traditional glossy foil
+• Can show unique defect patterns
+
+**Common Etched Foil Issues:**
+• Surface scratches more visible on matte texture
+• Fingerprints show more readily
+• Etching pattern can wear down from handling
+• Less prone to curling than traditional foil
+
+**Detection:**
+• Examine under angled lighting
+• Look for breaks in etched pattern
+• Check for glossy spots where etching wore off
+
+**Grading Impact:**
+• Etched foil scratches: -0.5 to -1.5 depending on severity
+• Pattern wear: -0.3 to -0.7
+• Similar impact to regular foil defects
+
+────────────────────────────────────────────────────────────────────────
+4. PRINT LINES AND REGISTRATION ISSUES
+────────────────────────────────────────────────────────────────────────
+
+**MTG Print Quality:**
+• Roller lines common on foils (horizontal lines)
+• Color misregistration (colors slightly offset)
+• Print artifacts more visible on solid color areas
+
+**Detection:**
+• Scan card surface for horizontal/vertical lines
+• Check text boxes for registration errors
+• Look at mana symbols for alignment
+
+**Grading Impact:**
+• Print lines: -0.3 to -0.5 (manufacturing defect)
+• Color misregistration: -0.3 to -0.7
+• Does NOT trigger structural damage caps
+
+────────────────────────────────────────────────────────────────────────
+5. BORDERLESS CARD EDGE ISSUES
+────────────────────────────────────────────────────────────────────────
+
+**Borderless MTG Cards:**
+• Art extends to edges
+• No border to hide edge wear
+• Edge damage more visible
+
+**Common Issues:**
+• White fiber exposure shows against artwork
+• Edge chipping very obvious
+• Centering harder to assess (use internal anchors)
+
+**Grading Impact:**
+• Same deductions as normal cards
+• Edge wear more visually obvious
+• Centering: Maximum 9.0 (borderless cards)
+
+────────────────────────────────────────────────────────────────────────
+6. VINTAGE MTG ISSUES (Alpha/Beta/Unlimited/Revised)
+────────────────────────────────────────────────────────────────────────
+
+**Era-Specific (1993-1995):**
+• Thinner cardstock than modern cards
+• Centering often poor (70/30 common)
+• Edge roughness from older cutting technology
+• Print quality variable
+
+**Grading Expectations:**
+• Perfect 10.0 extremely rare for Alpha/Beta/Unlimited
+• 8.0-9.0 considered excellent for vintage
+• Factory defects more tolerated due to era
+
+═══════════════════════════════════════════════════════════════════════
+E. MTG CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**CENTERING EXAMPLE (MTG Black Border Card):**
+"This Magic: The Gathering card features a black border frame. Measuring the visible borders: left border ≈ 2.5mm, right border ≈ 3.2mm, top border ≈ 3.0mm, bottom border ≈ 2.8mm. Calculating left-right ratio: 2.5mm ÷ 3.2mm × 100 = 78.1%, expressed as 78/22 ratio. Top-bottom: 2.8mm ÷ 3.0mm × 100 = 93.3%, expressed as 93/7 ratio. Worst axis is left-right at 78/22, capping centering score at 5.0."
+
+**CORNER EXAMPLE (MTG Foil Card):**
+"Top-left corner of this foil Magic card sits at the intersection of the black border and the holographic foil artwork area. At maximum zoom, I observe sharp corner geometry with no visible fiber exposure. The black border ink remains intact. The foil layer shows no cracking or peeling at this corner. Corner lies flat with no lift or tilt detected. This corner appears pristine."
+
+**SURFACE EXAMPLE (MTG Etched Foil):**
+"This Magic card features an etched foil treatment with a matte holographic finish across the entire front surface. The etched pattern creates a subtle textured appearance. Examining under angled lighting, I detect one hairline scratch in the center area running approximately 4mm diagonally. The scratch appears as a glossy line where the matte etched texture has been smoothed down. Additionally, there is minor edge wear at the top edge with 2 small white flecks visible where the black border has chipped. Overall surface score: 9.0."
+
+═══════════════════════════════════════════════════════════════════════
+END OF MTG DELTA v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**TOTAL LINES:** ~470
+**ESTIMATED TOKENS:** ~3,500-4,000
+
+**COMBINED PROMPT SIZE (Master + MTG Delta):**
+• Master Rubric: ~18,000-20,000 tokens
+• MTG Delta: ~3,500-4,000 tokens
+• **TOTAL: ~21,500-24,000 tokens** ✓ Within target range
+
+When grading MTG cards, use:
+1. Master Grading Rubric v5.0 (universal grading rules)
+2. MTG Delta v5.0 (this file - MTG-specific rules)
+
+Apply ALL instructions from BOTH files to complete grading analysis.

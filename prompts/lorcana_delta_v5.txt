@@ -1,0 +1,248 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: DISNEY LORCANA v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY Disney Lorcana card-specific rules.
+The master grading rubric (Sections 1-13) applies to ALL Lorcana cards.
+This delta provides card-specific extraction rules, defect patterns, and examples.
+
+**CARD TYPES COVERED:**
+Disney Lorcana TCG cards from all sets (The First Chapter 2023 - present)
+
+═══════════════════════════════════════════════════════════════════════
+A. LORCANA CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from Disney Lorcana cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All Lorcana Cards)
+────────────────────────────────────────────────────────────────────────
+
+**player_or_character**: Character name
+• Disney character name
+• Example: "Mickey Mouse", "Elsa", "Stitch", "Mulan"
+
+**card_name**: Full card title
+• Character name + version/title
+• Example: "Mickey Mouse - Brave Little Tailor", "Elsa - Snow Queen", "Stitch - Rock Star"
+• Format: "Character - Version"
+
+**character_version**: Version subtitle
+• The version/title portion after the dash
+• Example: "Brave Little Tailor", "Snow Queen", "Rock Star", "Abominable Snowman"
+
+**ink_color**: Card ink color
+• Options: Amber, Amethyst, Emerald, Ruby, Sapphire, Steel
+• Determined by card border/frame color
+• Amber = Orange/Yellow
+• Amethyst = Purple
+• Emerald = Green
+• Ruby = Red
+• Sapphire = Blue
+• Steel = Gray/Silver
+
+**lorcana_card_type**: Card type
+• Options: Character, Action, Item, Location, Song
+• Most cards are Characters
+
+**inkwell**: Inkwell status (true|false)
+• Check for inkwell symbol (ink drop icon)
+• Located in bottom-left corner or card info area
+• true = has inkwell (can be used as ink)
+• false = no inkwell
+
+**strength**: Character strength (if Character)
+• Attack value (sword icon)
+• Numeric value (e.g., "3", "5", "7")
+• null if not a Character
+
+**willpower**: Character willpower (if Character)
+• Defense/health value (shield icon)
+• Numeric value (e.g., "4", "6", "8")
+• null if not a Character
+
+**lore_value**: Lore value
+• Quest value (for questing)
+• Numeric value (e.g., "1", "2", "3")
+• Located in corner, usually hexagon icon
+
+**ink_cost**: Card cost
+• Number of ink required to play
+• Numeric value (e.g., "2", "4", "7")
+• Top-left corner
+
+**classifications**: Character classifications
+• Options: Storyborn, Dreamborn, Floodborn, Hero, Villain, Ally, Prince, Princess, King, Queen, Dragon, Deity, etc.
+• Multiple classifications possible
+• Array format: ["Storyborn", "Hero", "Prince"]
+
+**set_name**: Set/expansion name
+• Extract from set symbol or card number
+• See Set Identification Module below
+• Example: "The First Chapter", "Rise of the Floodborn", "Into the Inklands"
+
+**card_number**: Collector number
+• Format: "X/Y" (e.g., "045/204")
+• Bottom of card
+
+**year**: Release year
+• 4-digit year (e.g., "2023", "2024")
+
+**manufacturer**: Card publisher
+• "Ravensburger" for all Lorcana cards
+
+**authentic**: Licensed product verification (true|false)
+• true if official Disney Lorcana card from Ravensburger
+• Check for Disney logo, Lorcana logo
+• false if proxy/counterfeit
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS
+────────────────────────────────────────────────────────────────────────
+
+**rarity_tier**: Card rarity
+• See Rarity Classification section below
+
+**subset**: Variant type
+• Options: Foil, Enchanted, Promo, etc.
+• Enchanted = ultra-rare holographic variant
+
+**card_front_text**: Abilities and effects
+• Extract all card text
+• Include abilities, keywords, flavor text
+• Format with line breaks
+
+═══════════════════════════════════════════════════════════════════════
+B. LORCANA CARD RARITY CLASSIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+Assign highest visible tier only (in priority order):
+
+**1. Enchanted**
+• Ultra-rare holographic variant
+• Full-art treatment with special holographic finish
+• Card number > set size (e.g., 205/204)
+• Extremely limited, highest rarity
+
+**2. Legendary**
+• Highest standard rarity tier
+• Rarity symbol: Special icon
+
+**3. Super Rare**
+• High rarity tier
+• Rarity symbol: Triangle with borders
+
+**4. Rare**
+• Standard rare tier
+• Rarity symbol: Triangle
+
+**5. Foil**
+• Holographic treatment on any rarity
+• Can be Common, Uncommon, Rare, etc. in foil
+
+**6. Uncommon**
+• Middle rarity tier
+• Rarity symbol: Hexagon
+
+**7. Common**
+• Most basic rarity
+• Rarity symbol: Circle
+
+**8. Promo**
+• Promotional cards
+• Special promo stamp or designation
+
+═══════════════════════════════════════════════════════════════════════
+C. LORCANA SET IDENTIFICATION MODULE
+═══════════════════════════════════════════════════════════════════════
+
+**COMMON LORCANA SETS (2023-2024):**
+
+| Set Code | Set Name                    | Year | Cards |
+|----------|----------------------------|------|-------|
+| TFC      | The First Chapter           | 2023 | 204   |
+| ROF      | Rise of the Floodborn       | 2023 | 204   |
+| ITI      | Into the Inklands           | 2024 | 204   |
+| URU      | Ursula's Return             | 2024 | 204   |
+| SHI      | Shimmering Skies            | 2024 | 204   |
+| AZU      | Azurite Sea                 | 2024 | 204   |
+| PRO      | Promo Cards                 | Var. | —     |
+
+**OUTPUT FORMAT:**
+{
+  "set_name": "Rise of the Floodborn",
+  "set_code": "ROF",
+  "set_year": 2023,
+  "set_confidence": "high",
+  "needs_api_lookup": false
+}
+
+═══════════════════════════════════════════════════════════════════════
+D. LORCANA CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common Lorcana Defects:**
+
+────────────────────────────────────────────────────────────────────────
+1. ENCHANTED VARIANT HOLOGRAPHIC DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Enchanted Cards:**
+• Full-art holographic treatment
+• Entire card surface is holographic
+• More susceptible to surface defects
+
+**Common Issues:**
+• Holo scratches across entire surface
+• Pattern disruption
+• Fingerprints visible on holo surface
+
+**Grading Impact:**
+• Holo scratches: -0.5 to -1.5 per scratch
+• Prevents 10.0 surface score
+
+────────────────────────────────────────────────────────────────────────
+2. INK SPLASH BORDER DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Lorcana Border Design:**
+• Ink splash pattern borders (decorative)
+• Color matches ink color (Amber, Amethyst, etc.)
+• Border can show chipping/wear
+
+**Detection:**
+• Check border edges for white fiber exposure
+• Ink color provides high contrast with white cardstock
+
+**Grading Impact:**
+• Same as standard edge grading
+• Whitening visible against colored borders
+
+════════════════════════════════════════════════════════════════════════
+E. LORCANA CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**CENTERING EXAMPLE:**
+"This Disney Lorcana card features an Amethyst (purple) border. Measuring borders: left ≈ 3.0mm, right ≈ 3.5mm, top ≈ 2.8mm, bottom ≈ 3.2mm. Left-right ratio: 86/14. Top-bottom ratio: 88/12. Worst axis: top-bottom at 88/12, capping centering at 4.0."
+
+**ENCHANTED VARIANT EXAMPLE:**
+"This Enchanted variant Lorcana card has a full-art holographic treatment across the entire front surface. Examining the holographic layer, I detect one hairline scratch in the center running approximately 6mm. The scratch disrupts the rainbow holographic pattern. Surface score: 9.0 due to holo scratch."
+
+═══════════════════════════════════════════════════════════════════════
+END OF LORCANA DELTA v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**TOTAL LINES:** ~260
+**ESTIMATED TOKENS:** ~2,000-2,500
+
+**COMBINED PROMPT SIZE (Master + Lorcana Delta):**
+• Master Rubric: ~18,000-20,000 tokens
+• Lorcana Delta: ~2,000-2,500 tokens
+• **TOTAL: ~20,000-22,500 tokens** ✓ Within target range
+
+When grading Disney Lorcana cards, use:
+1. Master Grading Rubric v5.0 (universal grading rules)
+2. Lorcana Delta v5.0 (this file - Lorcana-specific rules)
+
+Apply ALL instructions from BOTH files to complete grading analysis.

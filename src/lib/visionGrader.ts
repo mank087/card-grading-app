@@ -1219,9 +1219,32 @@ let conversationalPromptJSON: string | null = null;
 function loadConversationalPrompt(cardType: 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other' = 'sports'): { text: string; format: 'markdown' | 'json' } {
   const isDevelopment = process.env.NODE_ENV === 'development';
   const outputFormat = (process.env.GRADING_OUTPUT_FORMAT || 'markdown').toLowerCase();
+  const useV5 = process.env.USE_V5_ARCHITECTURE === 'true';
 
   // Determine which format to use
   const useJSON = outputFormat === 'json';
+
+  // 🆕 V5.0 ARCHITECTURE: Master Rubric + Delta
+  if (useV5 && useJSON) {
+    try {
+      // Import promptLoader_v5 dynamically
+      const { loadGradingPrompt } = require('./promptLoader_v5');
+      const result = loadGradingPrompt(cardType);
+
+      if (result.success && result.prompt) {
+        console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] ✅ Loaded v5.0 architecture (${result.metadata.estimated_tokens} tokens)`);
+        return { text: result.prompt, format: 'json' };
+      } else {
+        console.error(`[CONVERSATIONAL ${cardType.toUpperCase()}] ❌ v5.0 load failed: ${result.error || 'No prompt returned'}`);
+        console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] 🔄 Falling back to v4.2...`);
+        // Fall through to v4.2 loading
+      }
+    } catch (error) {
+      console.error(`[CONVERSATIONAL ${cardType.toUpperCase()}] ❌ v5.0 error:`, error);
+      console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] 🔄 Falling back to v4.2...`);
+      // Fall through to v4.2 loading
+    }
+  }
 
   // Use cached prompt in production (reload in development for testing)
   if (!isDevelopment) {
@@ -1399,7 +1422,7 @@ export async function gradeCardConversational(
   backImageUrl: string,
   cardType: 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other' = 'sports',
   options?: {
-    model?: 'gpt-4o' | 'gpt-4o-mini';
+    model?: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-5.1';
     temperature?: number;
     max_tokens?: number;
     seed?: number;
@@ -1407,7 +1430,7 @@ export async function gradeCardConversational(
   }
 ): Promise<ConversationalGradeResultV3_3> {
   const {
-    model = 'gpt-4o',
+    model = 'gpt-5.1',  // 🆕 GPT-5.1 - Latest model (November 2025) with improved vision + accuracy
     temperature = 0.2,  // 🔑 Low temperature for strict instruction adherence (v3.5 PATCHED v3)
     max_tokens = 5500,  // 🆕 Increased for STEP 13 Professional Commentary (was 4000)
     seed = 42,          // Fixed seed for reproducibility
@@ -1434,7 +1457,7 @@ export async function gradeCardConversational(
       model: model,
       temperature: temperature,
       top_p: top_p,        // Nucleus sampling - full probability space (1.0) allows nuanced variation
-      max_tokens: max_tokens,
+      max_completion_tokens: max_tokens,  // GPT-5.1 uses max_completion_tokens instead of max_tokens
       seed: seed,          // Fixed seed for reproducibility
       messages: [
         {
@@ -1520,11 +1543,13 @@ Provide detailed analysis as markdown with all required sections.`
         throw new Error('Failed to parse JSON response from AI');
       }
 
-      // Extract grade data from JSON
+      // Extract grade data from JSON (handle both v4.2 and v5.0 formats)
       const extractedGrade = {
-        decimal_grade: jsonData.final_grade?.decimal_grade ?? null,
-        whole_grade: jsonData.final_grade?.whole_grade ?? null,
-        uncertainty: jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±0.5'
+        // v5.0: jsonData.scoring.final_grade (simple number)
+        // v4.2: jsonData.final_grade.decimal_grade (nested object)
+        decimal_grade: jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null,
+        whole_grade: jsonData.final_grade?.whole_grade ?? (jsonData.scoring?.final_grade ? Math.round(jsonData.scoring.final_grade) : null),
+        uncertainty: jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±0.5'
       };
 
       console.log(`[CONVERSATIONAL JSON] Extracted grade: ${extractedGrade.decimal_grade} (${extractedGrade.uncertainty})`);

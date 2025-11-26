@@ -213,98 +213,65 @@ export function generateMTGEbaySoldListingsUrl(cardData: CardData): string {
 }
 
 /**
- * Generate eBay search URL for a specific card (Sports cards - comprehensive search)
+ * Generate eBay search URL for a specific card (Sports cards - simplified search)
+ * Order: Player Name + Card Number + Set Name + Special Features (auto, RC, /99, etc.)
  */
 export function generateEbaySearchUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // Priority order: Player name, card name (if different), subset, card number, set name, then special callouts
-
-  // 1. Add player/character name (most important)
+  // 1. Player/Character name (most important identifier)
   if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Add card name if it's different from player name (e.g., insert/subset names like "Round Numbers")
-  if (cardData.card_name && cardData.card_name !== cardData.featured) {
-    searchTerms.push(cardData.card_name);
-  }
-
-  // 3. Add subset/insert (important for specific variants)
-  if (cardData.subset && cardData.subset !== cardData.card_name) {
-    searchTerms.push(cardData.subset);
-  }
-
-  // 4. Add card number if available (for precise identification)
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(`#${cardData.card_number}`); // With # prefix only
+    searchTerms.push(cardData.card_number);
   }
 
-  // 5. Add card set/year
+  // 3. Set name
   if (cardData.card_set) {
     searchTerms.push(cardData.card_set);
   }
 
-  // Add year from release date if not already in search terms
-  if (cardData.release_date) {
-    const year = cardData.release_date.match(/\d{4}/)?.[0];
-    if (year && !searchTerms.some(term => term.includes(year))) {
-      searchTerms.push(year);
-    }
+  // 4. Special features (only add if applicable)
+
+  // Autograph - add "auto" keyword
+  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
+    searchTerms.push("auto");
   }
 
-  // Add manufacturer for more specific results
-  if (cardData.manufacturer_name) {
-    searchTerms.push(cardData.manufacturer_name);
+  // Rookie card - add "RC" keyword
+  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
+    searchTerms.push("RC");
   }
 
-  // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
-  const callouts: string[] = [];
-
-  // Rookie card callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) &&
-      cardData.rookie_or_first_print !== "No" && cardData.rookie_or_first_print !== false && cardData.rookie_or_first_print !== "false" && cardData.rookie_or_first_print !== "N/A") {
-    callouts.push("rookie");
-    callouts.push("RC");
-  }
-
-  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
-      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
-    callouts.push("auto");
-    callouts.push("autograph");
-  }
-
-  // Serial numbered callout (rarity indicator)
+  // Serial numbered - add the /XX format (e.g., "/99")
   if (cardData.serial_numbering &&
       cardData.serial_numbering !== "N/A" &&
       !cardData.serial_numbering.toLowerCase().includes('not present') &&
       !cardData.serial_numbering.toLowerCase().includes('none')) {
-    callouts.push("numbered");
-    // Try to extract the number (e.g., "/99", "12/99")
     const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
     if (numberMatch) {
-      callouts.push(`/${numberMatch[1]}`);
+      searchTerms.push(`/${numberMatch[1]}`);
     }
   }
 
-  // Add callouts to search terms
-  searchTerms.push(...callouts);
+  // 5. Subset/parallel (only if it adds useful info not in set name)
+  if (cardData.subset &&
+      cardData.subset !== cardData.card_name &&
+      cardData.subset !== cardData.card_set &&
+      !cardData.card_set?.toLowerCase().includes(cardData.subset.toLowerCase())) {
+    searchTerms.push(cardData.subset);
+  }
 
-  // Join terms and encode for URL
   const searchQuery = searchTerms.join(" ");
-  const encodedQuery = encodeURIComponent(searchQuery);
 
-  // eBay search URL with relevant filters
-  // _sacat=213 is the Sports Trading Cards category
-  // _udlo and _udhi for price range
-  // LH_Sold=1 for sold listings
-  // LH_Complete=1 for completed listings
   const baseUrl = "https://www.ebay.com/sch/i.html";
   const params = new URLSearchParams({
     _nkw: searchQuery,
     _sacat: "213", // Sports Trading Cards category
-    LH_TitleDesc: "0", // Search title and description
+    LH_TitleDesc: "0", // Search title only
     _udlo: "1", // Minimum price $1
     _sop: "16", // Sort by: Best Match
   });
@@ -313,79 +280,57 @@ export function generateEbaySearchUrl(cardData: CardData): string {
 }
 
 /**
- * Generate eBay sold listings URL for pricing research
+ * Generate eBay sold listings URL for pricing research (Sports cards - simplified)
+ * Order: Player Name + Card Number + Set Name + Special Features (auto, RC, /99, etc.)
  */
 export function generateEbaySoldListingsUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // Priority order: Player name, card name (if different), subset, card number, set name, then special callouts
-
-  // 1. Add player/character name
+  // 1. Player/Character name (most important identifier)
   if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Add card name if it's different from player name (e.g., insert/subset names like "Round Numbers")
-  if (cardData.card_name && cardData.card_name !== cardData.featured) {
-    searchTerms.push(cardData.card_name);
-  }
-
-  // 3. Add subset/insert (important for specific variants)
-  if (cardData.subset && cardData.subset !== cardData.card_name) {
-    searchTerms.push(cardData.subset);
-  }
-
-  // 4. Add card number for more specific results
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(`#${cardData.card_number}`); // With # prefix only
+    searchTerms.push(cardData.card_number);
   }
 
-  // 4. Add card set
+  // 3. Set name
   if (cardData.card_set) {
     searchTerms.push(cardData.card_set);
   }
 
-  // Add year
-  if (cardData.release_date) {
-    const year = cardData.release_date.match(/\d{4}/)?.[0];
-    if (year) {
-      searchTerms.push(year);
-    }
+  // 4. Special features (only add if applicable)
+
+  // Autograph - add "auto" keyword
+  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
+    searchTerms.push("auto");
   }
 
-  // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
-  const callouts: string[] = [];
-
-  // Rookie card callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) &&
-      cardData.rookie_or_first_print !== "No" && cardData.rookie_or_first_print !== false && cardData.rookie_or_first_print !== "false" && cardData.rookie_or_first_print !== "N/A") {
-    callouts.push("rookie");
-    callouts.push("RC");
+  // Rookie card - add "RC" keyword
+  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
+    searchTerms.push("RC");
   }
 
-  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
-      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
-    callouts.push("auto");
-    callouts.push("autograph");
-  }
-
-  // Serial numbered callout (rarity indicator)
+  // Serial numbered - add the /XX format (e.g., "/99")
   if (cardData.serial_numbering &&
       cardData.serial_numbering !== "N/A" &&
       !cardData.serial_numbering.toLowerCase().includes('not present') &&
       !cardData.serial_numbering.toLowerCase().includes('none')) {
-    callouts.push("numbered");
     const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
     if (numberMatch) {
-      callouts.push(`/${numberMatch[1]}`);
+      searchTerms.push(`/${numberMatch[1]}`);
     }
   }
 
-  // Add callouts to search terms
-  searchTerms.push(...callouts);
-
-  // Note: Removed "graded" term to show all sales (graded and ungraded)
+  // 5. Subset/parallel (only if it adds useful info not in set name)
+  if (cardData.subset &&
+      cardData.subset !== cardData.card_name &&
+      cardData.subset !== cardData.card_set &&
+      !cardData.card_set?.toLowerCase().includes(cardData.subset.toLowerCase())) {
+    searchTerms.push(cardData.subset);
+  }
 
   const searchQuery = searchTerms.join(" ");
 
@@ -403,74 +348,54 @@ export function generateEbaySoldListingsUrl(cardData: CardData): string {
 }
 
 /**
- * Generate eBay graded cards search URL
+ * Generate eBay graded cards search URL (Sports cards - simplified)
+ * Order: Player Name + Card Number + Set Name + Special Features + "graded"
  */
 export function generateEbayGradedSearchUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // Priority order: Player name, card name (if different), subset, card number, set name, then special callouts
-
-  // 1. Add player/character name
+  // 1. Player/Character name (most important identifier)
   if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Add card name if it's different from player name (e.g., insert/subset names like "Round Numbers")
-  if (cardData.card_name && cardData.card_name !== cardData.featured) {
-    searchTerms.push(cardData.card_name);
-  }
-
-  // 3. Add subset/insert (important for specific variants)
-  if (cardData.subset && cardData.subset !== cardData.card_name) {
-    searchTerms.push(cardData.subset);
-  }
-
-  // 4. Add card number for precise identification
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(`#${cardData.card_number}`); // With # prefix only
+    searchTerms.push(cardData.card_number);
   }
 
-  // 5. Add card set
+  // 3. Set name
   if (cardData.card_set) {
     searchTerms.push(cardData.card_set);
   }
 
-  // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
-  const callouts: string[] = [];
+  // 4. Special features (only add if applicable)
 
-  // Rookie card callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) &&
-      cardData.rookie_or_first_print !== "No" && cardData.rookie_or_first_print !== false && cardData.rookie_or_first_print !== "false" && cardData.rookie_or_first_print !== "N/A") {
-    callouts.push("rookie");
-    callouts.push("RC");
+  // Autograph - add "auto" keyword
+  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
+    searchTerms.push("auto");
   }
 
-  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
-      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
-    callouts.push("auto");
-    callouts.push("autograph");
+  // Rookie card - add "RC" keyword
+  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
+    searchTerms.push("RC");
   }
 
-  // Serial numbered callout (rarity indicator)
+  // Serial numbered - add the /XX format (e.g., "/99")
   if (cardData.serial_numbering &&
       cardData.serial_numbering !== "N/A" &&
       !cardData.serial_numbering.toLowerCase().includes('not present') &&
       !cardData.serial_numbering.toLowerCase().includes('none')) {
-    callouts.push("numbered");
     const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
     if (numberMatch) {
-      callouts.push(`/${numberMatch[1]}`);
+      searchTerms.push(`/${numberMatch[1]}`);
     }
   }
 
-  // Add callouts to search terms
-  searchTerms.push(...callouts);
-
-  // Add graded term
+  // 5. Add "graded" keyword for graded card search
   searchTerms.push("graded");
 
-  // Add specific grade if high grade
+  // 6. Add specific grade if high grade (PSA 9, PSA 10, etc.)
   if (cardData.dcm_grade_whole && cardData.dcm_grade_whole >= 9) {
     searchTerms.push(`${cardData.dcm_grade_whole}`);
   }
@@ -481,7 +406,7 @@ export function generateEbayGradedSearchUrl(cardData: CardData): string {
   const params = new URLSearchParams({
     _nkw: searchQuery,
     _sacat: "213", // Sports Trading Cards category
-    LH_TitleDesc: "0",
+    LH_TitleDesc: "0", // Search title only
     _udlo: "5", // Minimum price $5 for graded cards
     _sop: "16", // Sort by: Best Match
   });

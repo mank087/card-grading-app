@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 // PRIMARY: Conversational grading system (matches other card type flows)
 import { gradeCardConversational } from "@/lib/visionGrader";
+// Professional grade estimation (deterministic backend mapper)
+import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 
 // Track sports cards currently being processed with timestamps
 const processingSportsCards = new Map<string, number>();
@@ -152,8 +154,220 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
     if (hasCompleteGrading) {
       console.log(`[GET /api/sports/${cardId}] Sports card already fully processed, returning existing result`);
+
+      // Parse conversational_grading if it exists to extract professional grades
+      let parsedConversationalData = null;
+      if (card.conversational_grading) {
+        try {
+          console.log('[SPORTS CACHE] Parsing cached conversational_grading JSON...');
+          const jsonData = JSON.parse(card.conversational_grading);
+
+          parsedConversationalData = {
+            decimal_grade: jsonData.final_grade?.decimal_grade ?? null,
+            whole_grade: jsonData.final_grade?.whole_grade ?? null,
+            grade_range: jsonData.final_grade?.grade_range || '±0.5',
+            condition_label: jsonData.final_grade?.condition_label || null,
+            final_grade_summary: jsonData.final_grade?.summary || null,
+            image_confidence: jsonData.image_quality?.confidence_letter || null,
+            sub_scores: {
+              centering: {
+                front: jsonData.raw_sub_scores?.centering_front || 0,
+                back: jsonData.raw_sub_scores?.centering_back || 0,
+                weighted: jsonData.weighted_scores?.centering_weighted || 0
+              },
+              corners: {
+                front: jsonData.raw_sub_scores?.corners_front || 0,
+                back: jsonData.raw_sub_scores?.corners_back || 0,
+                weighted: jsonData.weighted_scores?.corners_weighted || 0
+              },
+              edges: {
+                front: jsonData.raw_sub_scores?.edges_front || 0,
+                back: jsonData.raw_sub_scores?.edges_back || 0,
+                weighted: jsonData.weighted_scores?.edges_weighted || 0
+              },
+              surface: {
+                front: jsonData.raw_sub_scores?.surface_front || 0,
+                back: jsonData.raw_sub_scores?.surface_back || 0,
+                weighted: jsonData.weighted_scores?.surface_weighted || 0
+              }
+            },
+            centering_ratios: {
+              front_lr: jsonData.centering?.front?.left_right || 'N/A',
+              front_tb: jsonData.centering?.front?.top_bottom || 'N/A',
+              back_lr: jsonData.centering?.back?.left_right || 'N/A',
+              back_tb: jsonData.centering?.back?.top_bottom || 'N/A'
+            },
+            corners_edges_surface: {
+              front_centering: {
+                summary: jsonData.centering?.front_summary || jsonData.centering?.front?.summary || jsonData.centering?.front?.analysis || 'Centering analysis not available.'
+              },
+              back_centering: {
+                summary: jsonData.centering?.back_summary || jsonData.centering?.back?.summary || jsonData.centering?.back?.analysis || 'Centering analysis not available.'
+              },
+              front_corners: {
+                top_left: jsonData.corners?.front?.top_left?.condition || 'N/A',
+                top_right: jsonData.corners?.front?.top_right?.condition || 'N/A',
+                bottom_left: jsonData.corners?.front?.bottom_left?.condition || 'N/A',
+                bottom_right: jsonData.corners?.front?.bottom_right?.condition || 'N/A',
+                sub_score: jsonData.raw_sub_scores?.corners_front || 0,
+                summary: jsonData.corners?.front_summary || jsonData.corners?.front?.summary || 'Corner analysis not available'
+              },
+              back_corners: {
+                top_left: jsonData.corners?.back?.top_left?.condition || 'N/A',
+                top_right: jsonData.corners?.back?.top_right?.condition || 'N/A',
+                bottom_left: jsonData.corners?.back?.bottom_left?.condition || 'N/A',
+                bottom_right: jsonData.corners?.back?.bottom_right?.condition || 'N/A',
+                sub_score: jsonData.raw_sub_scores?.corners_back || 0,
+                summary: jsonData.corners?.back_summary || jsonData.corners?.back?.summary || 'Corner analysis not available'
+              },
+              front_edges: {
+                top: jsonData.edges?.front?.top?.condition || 'N/A',
+                bottom: jsonData.edges?.front?.bottom?.condition || 'N/A',
+                left: jsonData.edges?.front?.left?.condition || 'N/A',
+                right: jsonData.edges?.front?.right?.condition || 'N/A',
+                sub_score: jsonData.raw_sub_scores?.edges_front || 0,
+                summary: jsonData.edges?.front_summary || jsonData.edges?.front?.summary || 'Edge analysis not available'
+              },
+              back_edges: {
+                top: jsonData.edges?.back?.top?.condition || 'N/A',
+                bottom: jsonData.edges?.back?.bottom?.condition || 'N/A',
+                left: jsonData.edges?.back?.left?.condition || 'N/A',
+                right: jsonData.edges?.back?.right?.condition || 'N/A',
+                sub_score: jsonData.raw_sub_scores?.edges_back || 0,
+                summary: jsonData.edges?.back_summary || jsonData.edges?.back?.summary || 'Edge analysis not available'
+              },
+              front_surface: {
+                defects: jsonData.surface?.front?.defects || [],
+                analysis: jsonData.surface?.front?.condition || jsonData.surface?.front?.analysis || 'No analysis available',
+                sub_score: jsonData.raw_sub_scores?.surface_front || 0,
+                summary: jsonData.surface?.front?.summary || jsonData.surface?.front_summary || 'Surface analysis not available'
+              },
+              back_surface: {
+                defects: jsonData.surface?.back?.defects || [],
+                analysis: jsonData.surface?.back?.condition || jsonData.surface?.back?.analysis || 'No analysis available',
+                sub_score: jsonData.raw_sub_scores?.surface_back || 0,
+                summary: jsonData.surface?.back?.summary || jsonData.surface?.back_summary || 'Surface analysis not available'
+              }
+            },
+            card_info: jsonData.card_info || null,
+            transformedDefects: {
+              front: jsonData.defect_summary?.front || null,
+              back: jsonData.defect_summary?.back || null
+            },
+            case_detection: jsonData.case_detection || null,
+            professional_grade_estimates: jsonData.professional_grade_estimates || null
+          };
+
+          // Calculate professional grade estimates if not stored in JSON
+          if (!parsedConversationalData.professional_grade_estimates && parsedConversationalData.decimal_grade && parsedConversationalData.decimal_grade !== 'N/A') {
+            try {
+              console.log('[SPORTS CACHE] 🔧 Calculating professional grade estimates...');
+
+              const parseCentering = (ratio: string): [number, number] | undefined => {
+                if (!ratio || ratio === 'N/A') return undefined;
+                const parts = ratio.split('/').map(p => parseInt(p.trim()));
+                if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                  return [parts[0], parts[1]] as [number, number];
+                }
+                return undefined;
+              };
+
+              const cardInfoData = parsedConversationalData.card_info || {};
+              const alterationDetectionData = jsonData.alteration_detection || {};
+              // Check alteration_detection.autograph.present - PRIMARY detection path
+              const hasAlterationAutograph = alterationDetectionData.autograph?.present === true;
+              const autographVerified = alterationDetectionData.autograph?.verified;
+              const hasAutographedFlag = cardInfoData.autographed === true;
+              const hasAutographRarity = cardInfoData.rarity_or_variant?.toLowerCase()?.includes('autograph');
+              const hasAutographInName = cardInfoData.card_name?.toLowerCase()?.includes('autograph');
+              const isAuthentic = cardInfoData.authentic !== false;
+              const isAuthenticatedAutograph = isAuthentic && (
+                (hasAlterationAutograph && autographVerified !== false) ||
+                hasAutographedFlag ||
+                hasAutographRarity ||
+                hasAutographInName
+              );
+
+              const mapperInput = {
+                final_grade: parsedConversationalData.decimal_grade,
+                centering: {
+                  front_lr: parseCentering(parsedConversationalData.centering_ratios?.front_lr),
+                  front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
+                  back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
+                  back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
+                },
+                corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
+                edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
+                surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
+                has_structural_damage: jsonData.structural_damage?.detected || false,
+                has_handwriting: jsonData.handwriting?.detected || false,
+                has_alterations: jsonData.alterations?.detected || false,
+                crease_detected: jsonData.structural_damage?.has_creases || false,
+                bent_corner_detected: jsonData.structural_damage?.has_bent_corners || false,
+                is_authenticated_autograph: isAuthenticatedAutograph
+              };
+
+              const professionalEstimates = estimateProfessionalGrades(mapperInput);
+              parsedConversationalData.professional_grade_estimates = professionalEstimates;
+
+              // Update card_info with derived autographed flag for frontend display
+              if (isAuthenticatedAutograph && parsedConversationalData.card_info) {
+                parsedConversationalData.card_info = {
+                  ...parsedConversationalData.card_info,
+                  autographed: true
+                };
+                console.log(`[SPORTS CACHE] ✅ Set card_info.autographed = true (authenticated autograph detected)`);
+              }
+
+              console.log(`[SPORTS CACHE] ✅ Professional estimates: PSA ${professionalEstimates.PSA.estimated_grade}, BGS ${professionalEstimates.BGS.estimated_grade}`);
+            } catch (mapperError) {
+              console.error('[SPORTS CACHE] ⚠️ Professional mapper failed:', mapperError);
+            }
+          }
+
+          // Also check autograph detection for cards that don't need professional grade recalculation
+          // This ensures autograph flag is set even for cached cards
+          if (parsedConversationalData?.card_info && !parsedConversationalData.card_info.autographed) {
+            const altDet = jsonData.alteration_detection || {};
+            const hasAutoAlt = altDet.autograph?.present === true && altDet.autograph?.verified !== false;
+            const hasAutoInRarity = parsedConversationalData.card_info.rarity_or_variant?.toLowerCase()?.includes('autograph');
+            const hasAutoInName = parsedConversationalData.card_info.card_name?.toLowerCase()?.includes('autograph');
+            const isAuth = parsedConversationalData.card_info.authentic !== false;
+
+            if (isAuth && (hasAutoAlt || hasAutoInRarity || hasAutoInName)) {
+              parsedConversationalData.card_info = {
+                ...parsedConversationalData.card_info,
+                autographed: true
+              };
+              console.log(`[SPORTS CACHE] ✅ Set card_info.autographed = true (from additional autograph check)`);
+            }
+          }
+
+          console.log('[SPORTS CACHE] ✅ Parsed cached JSON successfully');
+        } catch (error) {
+          console.error('[SPORTS CACHE] ⚠️ Failed to parse cached JSON:', error);
+        }
+      }
+
       return NextResponse.json({
         ...card,
+        // Add parsed conversational data if available
+        ...(parsedConversationalData && {
+          conversational_decimal_grade: parsedConversationalData.decimal_grade,
+          conversational_whole_grade: parsedConversationalData.whole_grade,
+          conversational_grade_uncertainty: parsedConversationalData.grade_range,
+          conversational_final_grade_summary: parsedConversationalData.final_grade_summary,
+          conversational_sub_scores: parsedConversationalData.sub_scores,
+          conversational_condition_label: parsedConversationalData.condition_label,
+          conversational_image_confidence: parsedConversationalData.image_confidence,
+          conversational_centering_ratios: parsedConversationalData.centering_ratios,
+          conversational_card_info: parsedConversationalData.card_info,
+          conversational_corners_edges_surface: parsedConversationalData.corners_edges_surface,
+          conversational_case_detection: parsedConversationalData.case_detection,
+          conversational_defects_front: parsedConversationalData.transformedDefects.front,
+          conversational_defects_back: parsedConversationalData.transformedDefects.back,
+          estimated_professional_grades: parsedConversationalData.professional_grade_estimates
+        }),
         front_url: frontUrl,
         back_url: backUrl,
         processing_time: card.processing_time  // Use stored value, not recalculated
@@ -172,7 +386,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
     if (frontUrl && backUrl) {
       try {
-        console.log(`[SPORTS CONVERSATIONAL AI v4.2] 🎯 Starting PRIMARY grading with Sports-specific prompt...`);
+        const versionLabel = process.env.USE_V5_ARCHITECTURE === 'true' ? 'v5.0' : 'v4.2';
+        console.log(`[SPORTS CONVERSATIONAL AI ${versionLabel}] 🎯 Starting PRIMARY grading with Sports-specific prompt...`);
         const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'sports');
         conversationalGradingResult = conversationalResult.markdown_report;
         conversationalResultV3_3 = conversationalResult; // Store full result
@@ -211,9 +426,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
             // Build conversationalGradingData from JSON
             conversationalGradingData = {
-              decimal_grade: parsedJSONData.final_grade?.decimal_grade ?? null,
-              whole_grade: parsedJSONData.final_grade?.whole_grade ?? null,
-              grade_uncertainty: parsedJSONData.final_grade?.grade_range || '±0.5',
+              // Handle both v5.0 (scoring.final_grade) and v4.2 (final_grade.decimal_grade) formats
+              decimal_grade: parsedJSONData.scoring?.final_grade ?? parsedJSONData.final_grade?.decimal_grade ?? null,
+              whole_grade: parsedJSONData.scoring?.rounded_grade ?? parsedJSONData.final_grade?.whole_grade ?? null,
+              grade_uncertainty: parsedJSONData.image_quality?.grade_uncertainty || parsedJSONData.scoring?.grade_range || parsedJSONData.final_grade?.grade_range || '±0.5',  // 🔧 FIX: Prioritize ± format over range
               condition_label: parsedJSONData.final_grade?.condition_label || null,
               final_grade_summary: parsedJSONData.final_grade?.summary || null,
               image_confidence: parsedJSONData.image_quality?.confidence_letter || null,
@@ -293,16 +509,16 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 // Front surface
                 front_surface: {
                   defects: parsedJSONData.surface?.front?.defects || [],
-                  analysis: parsedJSONData.surface?.front?.analysis || 'No analysis available',
+                  analysis: parsedJSONData.surface?.front?.condition || parsedJSONData.surface?.front?.analysis || 'No analysis available',
                   sub_score: parsedJSONData.raw_sub_scores?.surface_front || 0,
-                  summary: parsedJSONData.surface?.front_summary || parsedJSONData.surface?.front?.summary || 'Surface analysis not available'
+                  summary: parsedJSONData.surface?.front?.summary || parsedJSONData.surface?.front_summary || 'Surface analysis not available'
                 },
                 // Back surface
                 back_surface: {
                   defects: parsedJSONData.surface?.back?.defects || [],
-                  analysis: parsedJSONData.surface?.back?.analysis || 'No analysis available',
+                  analysis: parsedJSONData.surface?.back?.condition || parsedJSONData.surface?.back?.analysis || 'No analysis available',
                   sub_score: parsedJSONData.raw_sub_scores?.surface_back || 0,
-                  summary: parsedJSONData.surface?.back_summary || parsedJSONData.surface?.back?.summary || 'Surface analysis not available'
+                  summary: parsedJSONData.surface?.back?.summary || parsedJSONData.surface?.back_summary || 'Surface analysis not available'
                 }
               },
               card_info: parsedJSONData.card_info || null,
@@ -320,12 +536,12 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
               },
               limiting_factor: parsedJSONData.weighted_scores?.limiting_factor || null,
               preliminary_grade: parsedJSONData.weighted_scores?.preliminary_grade || null,
-              slab_detection: parsedJSONData.professional_slab?.detected ? {
+              slab_detection: parsedJSONData.slab_detection?.detected ? {  // 🔧 FIX: Master rubric outputs slab_detection, not professional_slab
                 detected: true,
-                company: parsedJSONData.professional_slab.company || null,
-                grade: parsedJSONData.professional_slab.grade || null,
-                grade_description: parsedJSONData.professional_slab.grade_description || null,
-                cert_number: parsedJSONData.professional_slab.cert_number || null
+                company: parsedJSONData.slab_detection.company || null,
+                grade: parsedJSONData.slab_detection.grade || null,
+                grade_description: parsedJSONData.slab_detection.grade_description || null,
+                cert_number: parsedJSONData.slab_detection.cert_number || null
               } : null,
               meta: {
                 version: 'conversational-v4.0-json',
@@ -337,6 +553,96 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
             console.log(`[GET /api/sports/${cardId}] ✅ Extracted conversational data from JSON`);
             console.log(`[GET /api/sports/${cardId}] Grade: ${conversationalGradingData.decimal_grade}, Confidence: ${conversationalGradingData.image_confidence}`);
+
+            // 🎯 Call backend deterministic mapper for professional grade estimates
+            if (conversationalGradingData.decimal_grade && conversationalGradingData.decimal_grade !== 'N/A') {
+              try {
+                console.log(`[GET /api/sports/${cardId}] 🔧 Calling professional grade mapper (deterministic)...`);
+
+                // Parse centering ratios from strings like "55/45" to [55, 45]
+                const parseCentering = (ratio: string): [number, number] | undefined => {
+                  if (!ratio || ratio === 'N/A') return undefined;
+                  const parts = ratio.split('/').map(p => parseInt(p.trim()));
+                  if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
+                    return [parts[0], parts[1]] as [number, number];
+                  }
+                  return undefined;
+                };
+
+                // Check if autograph is manufacturer-authenticated (not an alteration)
+                // Multiple ways to detect authenticated autographs:
+                const cardInfo = parsedJSONData.card_info || {};
+                const rarityFeatures = parsedJSONData.rarity_features || {};
+                const alterationDetection = parsedJSONData.alteration_detection || {};
+
+                // Check various indicators of authenticated autograph
+                // 1. alteration_detection.autograph.present - PRIMARY detection path from AI
+                const hasAlterationAutograph = alterationDetection.autograph?.present === true;
+                const autographVerified = alterationDetection.autograph?.verified;
+                // 2. card_info.autographed flag
+                const hasAutographedFlag = cardInfo.autographed === true;
+                // 3. rarity_or_variant contains "autograph"
+                const hasAutographRarity = cardInfo.rarity_or_variant?.toLowerCase()?.includes('autograph') ||
+                                           cardInfo.rarity_tier?.toLowerCase()?.includes('autograph');
+                // 4. card_name contains "autograph"
+                const hasAutographInName = cardInfo.card_name?.toLowerCase()?.includes('autograph');
+                // 5. rarity_features.autograph.present
+                const hasRarityAutograph = rarityFeatures.autograph?.present === true;
+                const isAuthentic = cardInfo.authentic !== false; // default to true if not specified
+
+                // Card is authenticated autograph if ANY autograph indicator is true AND card is marked authentic
+                // For alteration_detection path, also check if verified is not false
+                const isAuthenticatedAutograph = isAuthentic && (
+                  (hasAlterationAutograph && autographVerified !== false) ||
+                  hasAutographedFlag ||
+                  hasAutographRarity ||
+                  hasAutographInName ||
+                  hasRarityAutograph
+                );
+
+                console.log(`[GET /api/sports/${cardId}] 🔍 Autograph detection: alteration=${hasAlterationAutograph}, verified=${autographVerified}, flag=${hasAutographedFlag}, rarity=${hasAutographRarity}, name=${hasAutographInName}, rarityFeatures=${hasRarityAutograph}, authentic=${isAuthentic} → isAuthenticated=${isAuthenticatedAutograph}`);
+
+                const mapperInput = {
+                  final_grade: conversationalGradingData.decimal_grade,
+                  centering: {
+                    front_lr: parseCentering(conversationalGradingData.centering_ratios?.front_lr),
+                    front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
+                    back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
+                    back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
+                  },
+                  corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
+                  edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
+                  surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
+                  has_structural_damage: parsedJSONData.structural_damage?.detected || false,
+                  has_handwriting: parsedJSONData.handwriting?.detected || false,
+                  has_alterations: parsedJSONData.alterations?.detected || false,
+                  crease_detected: parsedJSONData.structural_damage?.has_creases || false,
+                  bent_corner_detected: parsedJSONData.structural_damage?.has_bent_corners || false,
+                  // If autograph is authenticated, don't treat as alteration
+                  is_authenticated_autograph: isAuthenticatedAutograph
+                };
+
+                const professionalEstimates = estimateProfessionalGrades(mapperInput);
+                conversationalGradingData.professional_grade_estimates = professionalEstimates;
+
+                // Update card_info with derived autographed flag for frontend display
+                if (isAuthenticatedAutograph && conversationalGradingData.card_info) {
+                  conversationalGradingData.card_info = {
+                    ...conversationalGradingData.card_info,
+                    autographed: true
+                  };
+                  console.log(`[GET /api/sports/${cardId}] ✅ Set card_info.autographed = true (authenticated autograph detected)`);
+                }
+
+                console.log(`[GET /api/sports/${cardId}] ✅ Professional estimates: PSA ${professionalEstimates.PSA.estimated_grade}, BGS ${professionalEstimates.BGS.estimated_grade}, SGC ${professionalEstimates.SGC.estimated_grade}, CGC ${professionalEstimates.CGC.estimated_grade}`);
+              } catch (mapperError) {
+                console.error(`[GET /api/sports/${cardId}] ⚠️ Professional mapper failed:`, mapperError);
+                conversationalGradingData.professional_grade_estimates = null;
+              }
+            } else {
+              console.log(`[GET /api/sports/${cardId}] ⏭️ Skipping professional mapper (grade is N/A or null)`);
+              conversationalGradingData.professional_grade_estimates = null;
+            }
           } catch (jsonParseError) {
             console.error(`[GET /api/sports/${cardId}] ⚠️ Failed to parse JSON, continuing without detailed fields:`, jsonParseError);
           }

@@ -6,22 +6,46 @@ import { CardGradingReport, ReportCardData } from './CardGradingReport';
 import { getAuthenticatedClient } from '../../lib/directAuth';
 import { getConditionFromGrade } from '../../lib/conditionAssessment';
 import QRCode from 'qrcode';
+import {
+  FoldableLabelData,
+  generateFoldableLabel,
+  generateQRCodeWithLogo,
+  loadLogoAsBase64
+} from '../../lib/foldableLabelGenerator';
 
 /**
  * Download Report Button Component
  * Generates and downloads a PDF grading report for a card
+ * Now includes dropdown for Full Report and Foldable Label options
  */
 
 interface DownloadReportButtonProps {
   card: any; // Card data from database
   variant?: 'default' | 'compact';
+  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'other'; // For URL generation
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   card,
-  variant = 'default'
+  variant = 'default',
+  cardType = 'sports'
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
+  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const dropdownRef = React.useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   /**
    * Extract centering summary from card data
@@ -470,52 +494,257 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       alert('Failed to generate report. Please try again or contact support if the issue persists.');
     } finally {
       setIsGenerating(false);
+      setGeneratingType(null);
     }
   };
 
-  // Compact variant (smaller button)
+  /**
+   * Handle Foldable Label generation and download
+   */
+  const handleDownloadLabel = async () => {
+    try {
+      setIsGenerating(true);
+      setGeneratingType('label');
+      setIsDropdownOpen(false);
+
+      console.log('[FOLDABLE LABEL] Starting generation...');
+
+      // Extract card info
+      const cardInfo = card.conversational_card_info || {};
+
+      // Helper: Extract English name from bilingual format
+      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
+        if (!text) return null;
+        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+        if (!hasJapanese) return text;
+        const parts = text.split(/[/()（）]/);
+        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
+        return englishPart ? englishPart.trim() : text;
+      };
+
+      // Build player/character name (prioritize player_or_character for sports cards)
+      const cardName = extractEnglishForPDF(
+        cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name
+      ) || 'Unknown Card';
+
+      // Build set name (include subset if available)
+      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
+                         (card.card_set && card.card_set !== 'null') ? card.card_set :
+                         cardInfo.set_era || 'Unknown Set';
+      const subset = cardInfo.subset || card.subset;
+      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
+      const setName = setNameWithSubset || 'Unknown Set';
+
+      // Build special features
+      const features: string[] = [];
+      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
+      if (cardInfo.autographed) features.push('Auto');
+      const serialNum = cardInfo.serial_number;
+      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+        features.push(serialNum);
+      }
+      const specialFeatures = features.length > 0 ? features.join(' • ') : undefined;
+
+      // Get subgrades
+      const weightedScores = card.conversational_weighted_sub_scores || {};
+      const subScores = card.conversational_sub_scores || {};
+
+      // Generate QR code and load logo
+      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      console.log('[FOLDABLE LABEL] Generating QR code for URL:', cardUrl);
+
+      const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+        generateQRCodeWithLogo(cardUrl),
+        loadLogoAsBase64().catch(() => undefined)
+      ]);
+
+      console.log('[FOLDABLE LABEL] QR code and logo loaded');
+
+      // Get grade and condition
+      const grade = card.conversational_decimal_grade ?? 0;
+      const conditionLabel = card.conversational_condition_label
+        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+        : (getConditionFromGrade(grade) || 'N/A');
+
+      // Build label data
+      const labelData: FoldableLabelData = {
+        cardName,
+        setName,
+        cardNumber: cardInfo.card_number || card.card_number,
+        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
+        specialFeatures,
+        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
+        grade,
+        conditionLabel,
+        subgrades: {
+          centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
+          corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
+          edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
+          surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
+        },
+        overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
+        qrCodeDataUrl,
+        cardUrl,
+        logoDataUrl,
+      };
+
+      console.log('[FOLDABLE LABEL] Generating PDF with data:', {
+        ...labelData,
+        qrCodeDataUrl: qrCodeDataUrl ? 'present' : 'missing',
+        logoDataUrl: logoDataUrl ? 'present' : 'missing',
+      });
+
+      // Generate PDF
+      const blob = await generateFoldableLabel(labelData);
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Generate filename
+      const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const cardNameClean = sanitize(cardName);
+      const serialClean = sanitize(labelData.serial);
+      const filename = `DCM-Label-${cardNameClean}-${serialClean}.pdf`;
+
+      link.download = filename;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup
+      URL.revokeObjectURL(url);
+
+      console.log('[FOLDABLE LABEL] ✅ PDF generated successfully');
+
+    } catch (error) {
+      console.error('[FOLDABLE LABEL] ❌ Error generating label:', error);
+      alert('Failed to generate foldable label. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+      setGeneratingType(null);
+    }
+  };
+
+  // Wrapper for full report download
+  const handleDownloadReport = () => {
+    setGeneratingType('report');
+    setIsDropdownOpen(false);
+    handleDownload();
+  };
+
+  // Dropdown menu items
+  const menuItems = [
+    {
+      id: 'report',
+      label: 'Full Grading Report',
+      description: 'Complete PDF with all details',
+      icon: '📄',
+      onClick: handleDownloadReport,
+    },
+    {
+      id: 'label',
+      label: 'Foldable Toploader Label',
+      description: 'Print & fold to 2.5" × 3.5"',
+      icon: '🏷️',
+      onClick: handleDownloadLabel,
+    },
+  ];
+
+  // Compact variant (smaller dropdown)
   if (variant === 'compact') {
     return (
-      <button
-        onClick={handleDownload}
-        disabled={isGenerating}
-        className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-medium"
-        title="Download PDF Report"
-      >
-        {isGenerating ? (
-          <>
-            <span className="animate-spin">⏳</span>
-            <span>Generating...</span>
-          </>
-        ) : (
-          <>
-            <span>📄</span>
-            <span>Download Report</span>
-          </>
+      <div className="relative" ref={dropdownRef}>
+        <button
+          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+          disabled={isGenerating}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-medium"
+          title="Download Options"
+        >
+          {isGenerating ? (
+            <>
+              <span className="animate-spin">⏳</span>
+              <span>Generating...</span>
+            </>
+          ) : (
+            <>
+              <span>📥</span>
+              <span>Download</span>
+              <svg className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </>
+          )}
+        </button>
+
+        {/* Dropdown Menu */}
+        {isDropdownOpen && !isGenerating && (
+          <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+            {menuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={item.onClick}
+                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-purple-50 transition-colors text-left"
+              >
+                <span className="text-lg">{item.icon}</span>
+                <div>
+                  <div className="font-medium text-gray-900 text-sm">{item.label}</div>
+                  <div className="text-xs text-gray-500">{item.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
         )}
-      </button>
+      </div>
     );
   }
 
-  // Default variant (larger button)
+  // Default variant (larger dropdown button)
   return (
-    <button
-      onClick={handleDownload}
-      disabled={isGenerating}
-      className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
-      title="Download PDF Grading Report"
-    >
-      {isGenerating ? (
-        <>
-          <span className="animate-spin text-xl">⏳</span>
-          <span>Generating Report...</span>
-        </>
-      ) : (
-        <>
-          <span className="text-xl">📄</span>
-          <span>Download Grading Report</span>
-        </>
+    <div className="relative" ref={dropdownRef}>
+      <button
+        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+        disabled={isGenerating}
+        className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
+        title="Download Options"
+      >
+        {isGenerating ? (
+          <>
+            <span className="animate-spin text-xl">⏳</span>
+            <span>{generatingType === 'label' ? 'Generating Label...' : 'Generating Report...'}</span>
+          </>
+        ) : (
+          <>
+            <span className="text-xl">📥</span>
+            <span>Download</span>
+            <svg className={`w-5 h-5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </>
+        )}
+      </button>
+
+      {/* Dropdown Menu */}
+      {isDropdownOpen && !isGenerating && (
+        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={item.onClick}
+              className="w-full flex items-start gap-3 px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+            >
+              <span className="text-xl">{item.icon}</span>
+              <div>
+                <div className="font-semibold text-gray-900">{item.label}</div>
+                <div className="text-sm text-gray-500">{item.description}</div>
+              </div>
+            </button>
+          ))}
+        </div>
       )}
-    </button>
+    </div>
   );
 };

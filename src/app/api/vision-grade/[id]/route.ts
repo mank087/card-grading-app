@@ -194,7 +194,7 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
             parsedConversationalData = {
               decimal_grade: jsonData.final_grade?.decimal_grade ?? null,
               whole_grade: jsonData.final_grade?.whole_grade ?? null,
-              grade_range: jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±0.5',
+              grade_range: jsonData.image_quality?.grade_uncertainty || jsonData.final_grade?.grade_range || '±0.5',  // 🔧 FIX: Prioritize ± format over range
               condition_label: jsonData.final_grade?.condition_label || null,
               image_confidence: jsonData.image_quality?.confidence_letter || null,
               sub_scores: {
@@ -225,13 +225,13 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
                 back_lr: jsonData.centering?.back?.left_right || 'N/A',
                 back_tb: jsonData.centering?.back?.top_bottom || 'N/A'
               },
-              professional_slab: jsonData.professional_slab?.detected ? {
+              professional_slab: jsonData.slab_detection?.detected ? {  // 🔧 FIX: Master rubric outputs slab_detection, not professional_slab
                 detected: true,
-                company: jsonData.professional_slab.company || null,
-                grade: jsonData.professional_slab.grade || null,
-                grade_description: jsonData.professional_slab.grade_description || null,
-                cert_number: jsonData.professional_slab.cert_number || null,
-                sub_grades: jsonData.professional_slab.sub_grades || null
+                company: jsonData.slab_detection.company || null,
+                grade: jsonData.slab_detection.grade || null,
+                grade_description: jsonData.slab_detection.grade_description || null,
+                cert_number: jsonData.slab_detection.cert_number || null,
+                sub_grades: jsonData.slab_detection.sub_grades || null
               } : null,
               card_info: jsonData.card_info || null,
               case_detection: jsonData.case_detection || null,
@@ -495,6 +495,9 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
               back_lr: parsedJSONData.centering?.back?.left_right || 'N/A',
               back_tb: parsedJSONData.centering?.back?.top_bottom || 'N/A'
             },
+            // Extract quality tiers (v5.0+)
+            centering_front_quality_tier: parsedJSONData.centering?.front?.quality_tier,
+            centering_back_quality_tier: parsedJSONData.centering?.back?.quality_tier,
             slab_detection: parsedJSONData.professional_slab?.detected ? {
               detected: true,
               company: parsedJSONData.professional_slab.company || null,
@@ -1596,7 +1599,10 @@ EXTRACTION RULES:
         front_top_bottom: conversationalGradingData?.centering_ratios?.front_tb || 'N/A',
         back_left_right: conversationalGradingData?.centering_ratios?.back_lr || 'N/A',
         back_top_bottom: conversationalGradingData?.centering_ratios?.back_tb || 'N/A',
-        centering_score: conversationalGradingData?.sub_scores?.centering?.weighted || 0
+        centering_score: conversationalGradingData?.sub_scores?.centering?.weighted || 0,
+        // Extract quality tiers (v5.0+)
+        front_quality_tier: conversationalGradingData?.centering_front_quality_tier,
+        back_quality_tier: conversationalGradingData?.centering_back_quality_tier
       };
 
       console.log('[CONVERSATIONAL AI JSON] ✅ Structured centering data populated from JSON:', structuredCentering);

@@ -57,6 +57,18 @@ export interface CenteringMeasurements {
   back_left_right: string;
   back_top_bottom: string;
   centering_score: number; // 0-10
+  // Quality tier fields (v5.0+)
+  front_quality_tier?: 'Perfect' | 'Excellent' | 'Good' | 'Fair' | 'Off-Center';
+  back_quality_tier?: 'Perfect' | 'Excellent' | 'Good' | 'Fair' | 'Off-Center';
+}
+
+// Case detection (protective sleeve/holder detection)
+export interface CaseDetection {
+  case_type: 'penny_sleeve' | 'top_loader' | 'semi_rigid' | 'slab' | 'none';
+  case_visibility: 'full' | 'partial' | 'unknown';
+  impact_level: 'none' | 'minor' | 'moderate' | 'high';
+  adjusted_uncertainty: '±0.0' | '±0.25' | '±0.5' | '±1.0';
+  notes: string;
 }
 
 // Sub-scores
@@ -130,7 +142,7 @@ export interface Card {
 
   // v3.2+ fields
   conversational_image_confidence: string | null; // v3.6/7: A/B/C/D letter grade
-  conversational_case_detection: string | null; // Protective case detection (penny sleeve, toploader)
+  conversational_case_detection: CaseDetection | null; // v5.0: Protective case detection (penny sleeve, toploader, etc.)
   conversational_slab_detection: any | null; // v4.0 JSON: Professional slab detection (PSA/BGS/SGC/CGC)
   conversational_validation_checklist: any | null;
   conversational_front_summary: string | null;

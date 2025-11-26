@@ -1,0 +1,240 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: OTHER/GENERIC TRADING CARDS v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY generic trading card rules.
+The master grading rubric (Sections 1-13) applies to ALL trading cards.
+This delta provides simplified extraction rules for cards that don't fit other categories.
+
+**CARD TYPES COVERED:**
+Yu-Gi-Oh!, Cardfight!! Vanguard, Flesh and Blood, Final Fantasy TCG, Dragon Ball Super, Digimon, MetaZoo, and any other trading card games not covered by specific deltas.
+
+═══════════════════════════════════════════════════════════════════════
+A. GENERIC CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from generic trading cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All Generic Cards)
+────────────────────────────────────────────────────────────────────────
+
+**card_name**: Card name/title
+• Extract main card name as printed
+• Example: "Blue-Eyes White Dragon", "Exodia the Forbidden One"
+
+**player_or_character**: Character/monster/entity name
+• Often same as card_name
+• Example: "Goku", "Naruto", "Charizard" (non-Pokemon context)
+
+**set_name**: Set/expansion name
+• Extract from card or packaging
+• Example: "Legend of Blue Eyes White Dragon", "Battle Spirits"
+• If unclear: null
+
+**card_number**: Card number
+• Format varies by game
+• Example: "LOB-001", "#45/100", "123"
+• Extract as shown on card
+
+**year**: Release year
+• 4-digit year from copyright text
+• Example: "2024", "2002"
+• If not visible: null
+
+**manufacturer**: Card publisher
+• Extract game publisher
+• Examples: Konami (Yu-Gi-Oh!), Bushiroad (Cardfight!! Vanguard, Weiss Schwarz), etc.
+• If unclear: null
+
+**authentic**: Licensed product verification (true|false)
+• true if official licensed product
+• Check for official game logos and publisher marks
+• false if proxy/counterfeit/unofficial
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS (Game-Specific, Extract If Visible)
+────────────────────────────────────────────────────────────────────────
+
+**rarity_tier**: Card rarity
+• Options: Common, Uncommon, Rare, Super Rare, Ultra Rare, Secret Rare, Promo, etc.
+• Rarity symbols vary by game
+• Extract based on visible indicators
+
+**subset**: Subset/variant
+• Options: Holographic, Foil, Parallel, Limited Edition, Promo, etc.
+• Extract if visible
+
+**serial_number**: Serial number (if present)
+• Format: "/99", "1/1", etc.
+• null if not present
+
+**card_type**: Card type classification
+• Examples: Monster, Spell, Trap (Yu-Gi-Oh!), Character, Event, Stage (One Piece), etc.
+• Extract from card type line
+• Game-specific terminology
+
+**card_front_text**: Card text and effects
+• Extract all rules text, abilities, effects
+• Include flavor text if present
+• Use line breaks between sections
+
+**card_back_text**: Card back description (if applicable)
+• Some games have descriptive card backs
+• Most trading cards: standard game back
+• Extract if unique text present, otherwise null
+
+═══════════════════════════════════════════════════════════════════════
+B. GENERIC CARD RARITY CLASSIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+Assign highest visible tier only (in priority order):
+
+**1. 1-of-1**
+• Serial numbered 1/1
+• Unique card
+
+**2. Authenticated Autograph**
+• Manufacturer-verified signature
+• Requires authentication markers
+
+**3. Memorabilia/Relic**
+• Embedded material (fabric, game pieces, etc.)
+• Must be manufacturer-authenticated
+
+**4. Serial Numbered (/2-/99)**
+• Limited print run with serial number
+• Higher rarity based on lower serial count
+
+**5. Holographic/Foil Ultra Rare**
+• Top standard rarity tier
+• Holographic or foil treatment
+
+**6. Super Rare**
+• High rarity tier
+• Game-specific designation
+
+**7. Rare**
+• Standard rare tier
+
+**8. Die-Cut/Special Shape**
+• Non-rectangular shape
+• Shaped edges intentional
+
+**9. Promo**
+• Promotional cards
+• Event exclusives
+
+**10. Uncommon**
+• Middle rarity tier
+
+**11. Common**
+• Most basic rarity
+
+═══════════════════════════════════════════════════════════════════════
+C. GENERIC CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common Generic TCG Defects:**
+
+────────────────────────────────────────────────────────────────────────
+1. HOLOGRAPHIC/FOIL DEFECTS (UNIVERSAL)
+────────────────────────────────────────────────────────────────────────
+
+**Applicable to All Foil Cards:**
+• Holo scratches disrupt reflective pattern
+• Foil peeling or separation
+• Pattern disruption
+
+**Detection:**
+• View at angles under light
+• Look for breaks in holographic effect
+
+**Grading Impact:**
+• Holo scratch: -0.5 to -1.5
+• Foil peeling: -1.5 to -3.0 (serious defect)
+
+────────────────────────────────────────────────────────────────────────
+2. EDGE WEAR ON DARK BORDERS
+────────────────────────────────────────────────────────────────────────
+
+**Many TCGs Have Dark Borders:**
+• Black, dark blue, dark purple borders common
+• Whitening shows high contrast
+• Easy to detect edge wear
+
+**Grading Impact:**
+• Same as standard edge grading
+• Dark borders make defects more visible
+
+────────────────────────────────────────────────────────────────────────
+3. GAME-SPECIFIC PRINTING ISSUES
+────────────────────────────────────────────────────────────────────────
+
+**Variable Print Quality:**
+• Some games have inconsistent print quality
+• Common issues: Print lines, color misregistration, ink spots
+
+**Detection:**
+• Examine surface for manufacturing defects
+• Note print quality issues separately from handling damage
+
+**Grading Impact:**
+• Print defects: -0.3 to -0.7 (manufacturing issue)
+• Not structural damage, doesn't trigger caps
+
+═══════════════════════════════════════════════════════════════════════
+D. GENERIC CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**CENTERING EXAMPLE:**
+"This trading card features a black border frame. Measuring visible borders: left ≈ 2.7mm, right ≈ 3.8mm, top ≈ 3.1mm, bottom ≈ 2.9mm. Left-right ratio: 71/29. Top-bottom ratio: 94/6. Worst axis: left-right at 71/29, capping centering at 6.0."
+
+**CORNER EXAMPLE:**
+"Top-left corner sits against a dark purple border. At maximum zoom, I observe minor white fiber exposure at the corner tip, approximately 0.15mm. The corner maintains relatively sharp geometry but shows slight whitening where the purple border coating has worn. Corner lies flat with no structural damage."
+
+**SURFACE EXAMPLE:**
+"This holographic trading card has a rainbow foil pattern across the artwork. Examining under angled lighting, I detect one hairline scratch in the center area running approximately 5mm. The scratch disrupts the holographic rainbow effect. Rest of surface pristine. Surface score: 9.0 due to single holo scratch."
+
+═══════════════════════════════════════════════════════════════════════
+E. NOTES FOR UNCOMMON/OBSCURE TCGs
+═══════════════════════════════════════════════════════════════════════
+
+**When Grading Unfamiliar Games:**
+
+1. **Apply Universal Grading Principles:**
+   • Use master rubric for all condition assessment
+   • Centering, corners, edges, surface rules are universal
+
+2. **Extract What's Visible:**
+   • Don't guess game-specific terminology
+   • Use descriptive language for unfamiliar elements
+   • Mark fields as null if unclear
+
+3. **Note Game Identity:**
+   • If game can be identified, note it
+   • If unknown, describe card characteristics
+   • Example: "Unknown TCG with fantasy artwork and Japanese text"
+
+4. **Conservative Approach:**
+   • When uncertain about rarity/special features, use conservative tier
+   • Focus on physical condition (universal across all cards)
+   • Document any unique characteristics in notes
+
+═══════════════════════════════════════════════════════════════════════
+END OF OTHER/GENERIC DELTA v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**TOTAL LINES:** ~240
+**ESTIMATED TOKENS:** ~1,800-2,200
+
+**COMBINED PROMPT SIZE (Master + Other Delta):**
+• Master Rubric: ~18,000-20,000 tokens
+• Other Delta: ~1,800-2,200 tokens
+• **TOTAL: ~19,800-22,200 tokens** ✓ Within target range
+
+When grading other/generic trading cards, use:
+1. Master Grading Rubric v5.0 (universal grading rules)
+2. Other Delta v5.0 (this file - generic card rules)
+
+Apply ALL instructions from BOTH files to complete grading analysis.

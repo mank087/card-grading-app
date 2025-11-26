@@ -93,6 +93,31 @@ const formatScore = (score: number): string => {
   return Math.round(score).toString(); // Show whole numbers
 };
 
+/**
+ * Truncate text to ensure it fits within PDF constraints
+ * This prevents content from overflowing to a second page
+ */
+const truncateText = (text: string | undefined, maxLength: number): string => {
+  if (!text) return '';
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength - 3) + '...';
+};
+
+/**
+ * Maximum character limits for PDF content to guarantee single-page fit
+ * These limits are calibrated for A4 page with current font sizes
+ *
+ * Subgrade summaries: Increased to 350 chars for more detailed analysis
+ * Overall summary: Increased to 500 chars for comprehensive condition description
+ */
+const PDF_LIMITS = {
+  SUBGRADE_SUMMARY: 350,      // Increased from 140 - allows more detailed subgrade analysis
+  OVERALL_SUMMARY: 500,       // Increased from 280 - allows comprehensive overall summary
+  PLAYER_NAME: 35,            // Max chars for player/card name on label
+  CARD_DETAILS: 45,           // Max chars for card details line
+  SPECIAL_FEATURES: 30,       // Max chars for special features line
+};
+
 export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }) => (
   <Document>
     <Page size="A4" style={reportStyles.page}>
@@ -122,16 +147,16 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.cardLabelCenter}>
                 {/* Line 1: Player/Card Name */}
                 <Text style={reportStyles.cardLabelPlayerName}>
-                  {cardData.playerName || cardData.cardName}
+                  {truncateText(cardData.playerName || cardData.cardName, PDF_LIMITS.PLAYER_NAME)}
                 </Text>
                 {/* Line 2: Set Name • Card # • Year */}
                 <Text style={reportStyles.cardLabelDetails}>
-                  {[cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • ')}
+                  {truncateText([cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • '), PDF_LIMITS.CARD_DETAILS)}
                 </Text>
                 {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
                 {cardData.specialFeaturesString && (
                   <Text style={reportStyles.cardLabelFeatures}>
-                    {cardData.specialFeaturesString}
+                    {truncateText(cardData.specialFeaturesString, PDF_LIMITS.SPECIAL_FEATURES)}
                   </Text>
                 )}
                 {/* Line 4: DCM Serial Number */}
@@ -167,7 +192,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.centering.frontSummary || cardData.subgrades.centering.summary}
+                {truncateText(cardData.subgrades.centering.frontSummary || cardData.subgrades.centering.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -180,7 +205,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.corners.frontSummary || cardData.subgrades.corners.summary}
+                {truncateText(cardData.subgrades.corners.frontSummary || cardData.subgrades.corners.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -193,7 +218,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.edges.frontSummary || cardData.subgrades.edges.summary}
+                {truncateText(cardData.subgrades.edges.frontSummary || cardData.subgrades.edges.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -206,7 +231,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.surface.frontSummary || cardData.subgrades.surface.summary}
+                {truncateText(cardData.subgrades.surface.frontSummary || cardData.subgrades.surface.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
           </View>
@@ -230,16 +255,16 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 <View style={reportStyles.cardLabelCenter}>
                   {/* Line 1: Player/Card Name */}
                   <Text style={reportStyles.cardLabelPlayerName}>
-                    {cardData.playerName || cardData.cardName}
+                    {truncateText(cardData.playerName || cardData.cardName, PDF_LIMITS.PLAYER_NAME)}
                   </Text>
                   {/* Line 2: Set Name • Card # • Year */}
                   <Text style={reportStyles.cardLabelDetails}>
-                    {[cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • ')}
+                    {truncateText([cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • '), PDF_LIMITS.CARD_DETAILS)}
                   </Text>
                   {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
                   {cardData.specialFeaturesString && (
                     <Text style={reportStyles.cardLabelFeatures}>
-                      {cardData.specialFeaturesString}
+                      {truncateText(cardData.specialFeaturesString, PDF_LIMITS.SPECIAL_FEATURES)}
                     </Text>
                   )}
                   {/* Line 4: DCM Serial Number */}
@@ -276,7 +301,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.centering.backSummary || cardData.subgrades.centering.summary}
+                {truncateText(cardData.subgrades.centering.backSummary || cardData.subgrades.centering.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -289,7 +314,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.corners.backSummary || cardData.subgrades.corners.summary}
+                {truncateText(cardData.subgrades.corners.backSummary || cardData.subgrades.corners.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -302,7 +327,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.edges.backSummary || cardData.subgrades.edges.summary}
+                {truncateText(cardData.subgrades.edges.backSummary || cardData.subgrades.edges.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -315,7 +340,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {cardData.subgrades.surface.backSummary || cardData.subgrades.surface.summary}
+                {truncateText(cardData.subgrades.surface.backSummary || cardData.subgrades.surface.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
           </View>
@@ -327,7 +352,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
         <View style={reportStyles.overallSummarySection}>
           <Text style={reportStyles.overallSummaryTitle}>Overall Card Condition Summary</Text>
           <Text style={reportStyles.overallSummaryText}>
-            {cardData.overallSummary}
+            {truncateText(cardData.overallSummary, PDF_LIMITS.OVERALL_SUMMARY)}
           </Text>
         </View>
       )}

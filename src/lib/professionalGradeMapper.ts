@@ -43,6 +43,8 @@ export interface DcmGradingInput {
   has_alterations?: boolean;
   crease_detected?: boolean;
   bent_corner_detected?: boolean;
+  // Autograph authentication - if true, handwriting is an authenticated autograph (not alteration)
+  is_authenticated_autograph?: boolean;
 }
 
 export interface GradeEstimate {
@@ -240,7 +242,9 @@ const PSA_MAPPING: Record<number, GradeMapping> = {
 
 function estimatePSA(input: DcmGradingInput): GradeEstimate {
   // Handwritten marking or alterations = AA (Authentic Altered) or PSA 1
-  if (input.has_handwriting || input.has_alterations) {
+  // BUT: Authenticated autographs are NOT alterations - they're card features
+  const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
+  if (hasUnverifiedHandwriting || input.has_alterations) {
     return {
       estimated_grade: 'AA Authentic Altered',
       numeric_score: 0,
@@ -389,7 +393,9 @@ const BGS_MAPPING: Record<number, GradeMapping> = {
 
 function estimateBGS(input: DcmGradingInput): GradeEstimate {
   // Handwritten marking = automatic lowest grade
-  if (input.has_handwriting || input.has_alterations) {
+  // BUT: Authenticated autographs are NOT alterations - they're card features
+  const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
+  if (hasUnverifiedHandwriting || input.has_alterations) {
     return {
       estimated_grade: '1 Poor',
       numeric_score: 1,
@@ -561,7 +567,9 @@ const SGC_MAPPING: Record<number, GradeMapping> = {
 
 function estimateSGC(input: DcmGradingInput): GradeEstimate {
   // Handwritten marking = automatic 1 POOR
-  if (input.has_handwriting || input.has_alterations) {
+  // BUT: Authenticated autographs are NOT alterations - they're card features
+  const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
+  if (hasUnverifiedHandwriting || input.has_alterations) {
     return {
       estimated_grade: '1 POOR',
       numeric_score: 1,
@@ -771,7 +779,9 @@ const CGC_MAPPING: Record<number, GradeMapping> = {
 
 function estimateCGC(input: DcmGradingInput): GradeEstimate {
   // CGC still assigns numerical grades to handwritten cards (grade 2.0)
-  if (input.has_handwriting || input.has_alterations) {
+  // BUT: Authenticated autographs are NOT alterations - they're card features
+  const hasUnverifiedHandwriting = input.has_handwriting && !input.is_authenticated_autograph;
+  if (hasUnverifiedHandwriting || input.has_alterations) {
     return {
       estimated_grade: '2.0 G',
       numeric_score: 2.0,

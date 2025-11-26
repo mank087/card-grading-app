@@ -1,0 +1,639 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: POKEMON TCG v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY Pokemon TCG card-specific rules.
+The master grading rubric (Sections 1-13) applies to ALL Pokemon cards.
+This delta provides card-specific extraction rules, defect patterns, and examples.
+
+**CARD TYPES COVERED:**
+Pokemon Trading Card Game (TCG) cards from all eras (WOTC 1999-2003, modern 2004+)
+
+═══════════════════════════════════════════════════════════════════════
+A. POKEMON CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from Pokemon TCG cards:
+
+🌐 **IMPORTANT: JAPANESE CARD HANDLING**
+If the card displays Japanese text (Hiragana, Katakana, or Kanji), you MUST extract BOTH the Japanese text AND provide the English translation using this format:
+- Format: "Japanese Text (English Translation)"
+- Example: "ピカチュウ (Pikachu)" or "みず (Water)" or "たね (Basic)"
+- Apply this format to: player_or_character, card_name, pokemon_stage, pokemon_type, rarity_tier, subset, set_name
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All Pokemon Cards)
+────────────────────────────────────────────────────────────────────────
+
+**player_or_character**: Pokemon name
+• Extract exact Pokemon name as printed on card
+• Include form variations (e.g., "Giratina Origin Forme", "Pikachu VMAX")
+• Examples: "Charizard", "Pikachu", "Mewtwo", "Rayquaza VMAX"
+• 🇯🇵 For Japanese cards: "日本語名 (English Name)" (e.g., "ガマゲロゲ (Seismitoad)")
+
+**card_name**: Card title/name
+• Usually same as Pokemon name
+• Extract the card's official title
+• 🇯🇵 For Japanese cards: "日本語 (English)" format
+
+**pokemon_stage**: Pokemon evolution stage
+• Options: "Basic", "Stage 1", "Stage 2", "VMAX", "VSTAR", "V", "GX", "EX", "ex", "Level X", "LEGEND", "BREAK", "Prism Star", "Radiant"
+• Extract from card (usually top-left of card)
+• 🇯🇵 For Japanese cards: "日本語 (English)" (e.g., "2進化 (Stage 2)", "たね (Basic)", "1進化 (Stage 1)")
+• Modern special stages: "Radiant", "Amazing Rare", "Character Rare"
+
+**pokemon_type**: Pokemon type(s)
+• Extract from energy symbols or type indicators
+• Common types: Fire, Water, Grass, Electric, Psychic, Fighting, Dark, Metal, Fairy, Dragon, Colorless
+• 🇯🇵 For Japanese cards: "日本語 (English)" (e.g., "みず (Water)", "でんき (Electric)", "くさ (Grass)")
+• If dual-type, list both separated by slash (e.g., "Fire/Flying")
+
+**hp**: Hit Points value
+• Extract numeric value from top-right corner (e.g., "120", "280", "340")
+• If no HP (Trainer, Energy cards), use null
+• HP numbers are universal, no translation needed
+
+**card_type**: Card classification
+• Options: "Pokemon", "Trainer", "Supporter", "Item", "Stadium", "Energy", "Special Energy"
+• Extract from card type designation
+• 🇯🇵 For Japanese cards: Include both if visible (e.g., "ポケモン (Pokemon)")
+
+**set_name**: Set/expansion name
+• Extract the set name from the card
+• Use Set Identification Module below for systematic detection
+• 🇯🇵 For Japanese cards: "日本語 (English)" format when both are visible
+
+**card_number**: Card number within set
+• Full number as printed (e.g., "25/102", "251/264", "GG70/GG70")
+• Includes numerator/denominator format
+• May include special prefixes (GG, TG, SV)
+
+**year**: Year from copyright or release date
+• 4-digit year format
+• Example: "2024", "2023", "1999"
+• Check card back or bottom front for copyright date (© 2024)
+
+**manufacturer**: Card publisher
+• Pokemon Company, Wizards of the Coast, Nintendo
+• Extract from card
+• Modern cards: "Pokemon Company"
+• Vintage (1999-2003): "Wizards of the Coast"
+
+**authentic**: Licensed product verification (true|false)
+• true if ALL present:
+  - Official Pokemon logo
+  - Licensed manufacturer (Pokemon Company, Wizards of the Coast)
+  - Professional print quality
+  - Correct card stock and finish
+• false if:
+  - Missing Pokemon logo
+  - Unknown manufacturer
+  - Poor print quality (bootleg indicators)
+  - Incorrect fonts or logos
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS (Pokemon TCG Specific)
+────────────────────────────────────────────────────────────────────────
+
+**subset**: Subset/insert/parallel name
+• CRITICAL: Pokemon cards frequently have subset/insert/parallel variants
+• You MUST actively search for subset indicators in small print areas on EVERY card
+• DO NOT default to null without checking borders, card number area, and back panel
+
+**Common Pokemon Subset Patterns:**
+• Holofoil Variants: "Reverse Holo", "Cosmos Holo", "Sunburst Holo", "Confetti Holo"
+• Ultra Rare Designations: "Full Art", "Alternate Art", "Special Art", "Character Rare"
+• Secret/Hyper Rare: "Rainbow Rare", "Gold Secret", "Hyper Rare", "Gold Star"
+• Limited Editions: "1st Edition", "Shadowless", "Stamped", "Promo"
+• Era-Specific: "Trainer Gallery", "Radiant Collection", "Shiny Vault"
+
+**Detection Tips:**
+• Check card back for small text at bottom, top, or sides
+• Look for foil pattern designations
+• Check card number - if > set total, it's a secret rare
+• 🇯🇵 For Japanese cards: Extract in "日本語 (English)" format (e.g., "AR (Art Rare)")
+
+**serial_number**: Serial number if present (uncommon in Pokemon)
+• Format: "/99" or "12/99" (rare in Pokemon TCG)
+• Most Pokemon cards are NOT serial numbered (null is common)
+
+**rarity_tier**: Card rarity classification
+• See Rarity Classification section below
+• Extract based on visible rarity symbols and card features
+
+**card_front_text**: Abilities, attacks, and game text
+• Extract ALL text content from FRONT of Pokemon card
+• For Pokemon Cards:
+  - Abilities: Name and full description
+  - Attacks: Name, energy cost, damage, effect
+  - Weakness: Type and multiplier (e.g., "Weakness: Water x2")
+  - Resistance: Type and reduction (e.g., "Resistance: Fighting -20")
+  - Retreat Cost: Number of energy (e.g., "Retreat Cost: 2 Colorless Energy")
+• For Trainer/Supporter/Item Cards:
+  - Full card text with instructions and effects
+• 🇯🇵 For Japanese cards: Extract Japanese text, then English translation on next line
+
+**card_back_text**: Pokedex entry or description (2-4 sentences)
+• Extract descriptive text from card back
+• Pokemon Pokedex entry or flavor text
+• Focus on biographical text, not stats
+• 🇯🇵 For Japanese cards: Extract Japanese text, then English translation on next line
+• null if no descriptive text
+
+═══════════════════════════════════════════════════════════════════════
+B. POKEMON CARD RARITY CLASSIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+Assign highest visible tier only (in priority order):
+
+────────────────────────────────────────────────────────────────────────
+RARITY TIER HIERARCHY (Check in Order, Assign First Match)
+────────────────────────────────────────────────────────────────────────
+
+**1. 1-of-1 / Unique**
+• Serial number = 1/1 (extremely rare in Pokemon)
+• Unique card, only one in existence
+• Almost never appears in Pokemon TCG
+
+**2. Trophy Card**
+• Tournament prize cards, extremely limited
+• Examples: "Pikachu Illustrator", "Tropical Mega Battle", "No. 1 Trainer", "No. 2 Trainer"
+• World Championship cards with specific player names
+• Extremely rare, highest value tier
+
+**3. Super Short Print (SSP)**
+• Numbered /2 to /25 (very rare in Pokemon TCG)
+• Very limited production run
+
+**4. Gold Star (⭐)**
+• Vintage ultra rare with gold star symbol (⭐)
+• Era: 2004-2007 (EX series)
+• Extremely valuable vintage cards
+• Distinctive gold star next to Pokemon name
+
+**5. Hyper Rare / Rainbow Rare**
+• Rainbow holographic pattern across entire card
+• Textured surface finish
+• Card number exceeds set total (secret rare)
+• Example: Card #234 in a 198-card set
+• Modern era (2016+)
+
+**6. Secret Rare**
+• Card number exceeds set total (e.g., 234/198, 199/172)
+• May be gold, silver, or rainbow pattern
+• Higher card number than maximum set number = secret rare
+
+**7. Full Art / Alternate Art**
+• Artwork extends to edges, no border or minimal border
+• Often textured/embossed surface
+• "Full Art" or "Alternate Art" designation
+• Pokemon or Trainer taking up entire card face
+• Examples: Full Art V, Full Art EX, Alternate Art VMAX
+
+**8. Ultra Rare (Modern)**
+• VMAX, VSTAR, V, GX, EX, ex cards (depends on era)
+• Modern special Pokemon cards with enhanced abilities
+• Holofoil finish, unique textures
+• Higher HP than normal Pokemon
+
+**9. Authenticated Autograph**
+• Verified manufacturer signature (artist or player)
+• REQUIRES manufacturer authentication (hologram, certification)
+• Extremely rare in Pokemon TCG
+• Examples: Artist signatures (Ken Sugimori, Mitsuhiro Arita), World Championship player autographs
+
+**10. Holofoil Rare**
+• Standard holofoil pattern on Pokemon artwork
+• Rarity symbol: ★ (star)
+• Holographic pattern over Pokemon image
+• Not Reverse Holo (which has holo on background)
+
+**11. Reverse Holofoil**
+• Holographic pattern on background/card, NOT on Pokemon image
+• Can appear at any rarity (common, uncommon, rare)
+• Distinctive reverse holo pattern (cosmos, confetti, etc.)
+• Pokemon image is NOT holographic
+
+**12. 1st Edition**
+• "1st Edition" stamp on card
+• WOTC era only (1999-2003)
+• Extremely valuable for vintage cards
+• Small "1st Edition" logo next to set symbol
+
+**13. Shadowless**
+• WOTC Base Set without shadow border around Pokemon image
+• Very early print run (1999)
+• No shadow visible around Pokemon artwork box
+• Valuable vintage cards
+
+**14. Promo**
+• Black star promo symbol (★)
+• Event/promotional cards
+• Pokemon Center exclusives
+• Not part of standard sets
+
+**15. Rare (Non-Holo)**
+• Standard rare without holofoil
+• Rarity symbol: ★ (star) but no holographic finish
+• Higher rarity than uncommon but not holofoil
+
+**16. Uncommon**
+• Rarity symbol: ◆ (diamond)
+• Middle rarity tier
+
+**17. Common**
+• Rarity symbol: ● (circle)
+• Most basic rarity tier
+
+────────────────────────────────────────────────────────────────────────
+⚡ POKEMON RARITY SYMBOL GUIDE
+────────────────────────────────────────────────────────────────────────
+
+• **●** = Common (circle)
+• **◆** = Uncommon (diamond)
+• **★** = Rare/Holo Rare (star)
+• **⭐** = Gold Star (ultra rare vintage, 2004-2007)
+• **Black ★** = Promo card
+
+────────────────────────────────────────────────────────────────────────
+🆕 MODERN POKEMON CLASSIFICATIONS (2019-2025)
+────────────────────────────────────────────────────────────────────────
+
+**Sword & Shield Era (2020-2022):**
+• V, VMAX, VSTAR
+• Radiant Pokemon
+• Amazing Rare
+• Character Rare
+• Trainer Gallery subset
+
+**Sun & Moon Era (2016-2019):**
+• GX, TAG TEAM GX
+• Prism Star
+• Rainbow Rare
+• Hyper Rare
+• Ultra Beast
+
+**XY Era (2013-2016):**
+• BREAK, EX, Mega EX
+• Full Art EX
+• Secret Rare
+
+**Black & White Era (2011-2013):**
+• EX, Full Art
+• Secret Rare
+• Ace Spec
+
+**WOTC Era (1999-2003):**
+• 1st Edition
+• Shadowless
+• Unlimited
+• Holofoil
+
+────────────────────────────────────────────────────────────────────────
+SPECIAL FINISHES & VARIANTS
+────────────────────────────────────────────────────────────────────────
+
+• **Reverse Holofoil**: Holo on background (any rarity)
+• **Cosmos Holo**: Swirling holographic pattern
+• **Sunburst Holo**: Radiating holographic pattern
+• **Confetti Holo**: Scattered holo dots pattern
+• **Cracked Ice**: Cracked glass holographic effect
+• **Gold/Silver Borders**: Secret rare gold or silver card edges
+• **Textured/Embossed**: Raised texture on Full Art cards (touch to card surface)
+
+═══════════════════════════════════════════════════════════════════════
+C. POKEMON SET IDENTIFICATION MODULE
+═══════════════════════════════════════════════════════════════════════
+
+⚡ **PURPOSE**: Accurately determine Pokemon TCG set name using observable card features.
+
+🚨 **DETECTION PRIORITY** (Execute in order, stop when confident match found):
+
+1. **Card Number Fraction Pattern** (PRIMARY METHOD)
+   - Locate "X/Y" near lower front edge (e.g., "251/264")
+   - Extract denominator "Y" (total set size)
+   - Match against lookup table below
+   - If found → Use that set name
+
+2. **Set Symbol Recognition** (STRONGEST CONFIDENCE)
+   - Detect small expansion icon on card front (usually bottom right)
+   - Near card number or rarity symbol
+   - If symbol recognized → Override numeric guess
+
+3. **Year + Border Color + Era Alignment** (TIE-BREAKER)
+   - Extract year from copyright text (e.g., "©2021")
+   - Identify border color:
+     * Yellow border → Pre-Scarlet & Violet (1999-2022)
+     * Silver border → Scarlet & Violet era (2023+)
+   - Use to disambiguate when multiple sets share same denominator
+
+4. **Printed Set Text** (DEFINITIVE IF VISIBLE)
+   - Check for explicit set name near card number
+   - Check copyright area for set abbreviations
+   - If found → Use directly (highest confidence)
+
+────────────────────────────────────────────────────────────────────────
+📊 COMMON MODERN SETS LOOKUP TABLE (2020-2025)
+────────────────────────────────────────────────────────────────────────
+
+**SWORD & SHIELD ERA (2020-2022) - Yellow Borders:**
+
+| Denominator | Set Name              | Year | Symbol Hint                |
+|-------------|-----------------------|------|----------------------------|
+| 202         | Sword & Shield Base   | 2020 | Sword & shield crossed     |
+| 192         | Sword & Shield Base   | 2020 | (variant)                  |
+| 209         | Rebel Clash           | 2020 | Fist with energy           |
+| 189         | Darkness Ablaze       | 2020 | Flame symbol               |
+| 185         | Vivid Voltage         | 2020 | Lightning bolt             |
+| 163         | Battle Styles         | 2021 | Urshifu paw                |
+| 198         | Chilling Reign        | 2021 | Snowflake crown            |
+| 237         | Chilling Reign        | 2021 | (with secret rares)        |
+| 203         | Evolving Skies        | 2021 | Dragon silhouette          |
+| 264         | Fusion Strike         | 2021 | Triple diagonal slashes    |
+| 172         | Brilliant Stars       | 2022 | Eight-pointed star         |
+| 216         | Brilliant Stars       | 2022 | (with Trainer Gallery)     |
+| 189         | Astral Radiance       | 2022 | Radiant aura circle        |
+| 196         | Lost Origin           | 2022 | Smoke/mist pattern         |
+| 245         | Lost Origin           | 2022 | (with Trainer Gallery)     |
+| 195         | Silver Tempest        | 2022 | Tornado/wind swirl         |
+| 245         | Silver Tempest        | 2022 | (with Trainer Gallery)     |
+
+**SCARLET & VIOLET ERA (2023-2025) - Silver Borders:**
+
+| Denominator | Set Name                 | Year | Symbol Hint                |
+|-------------|--------------------------|------|----------------------------|
+| 198         | Scarlet & Violet Base    | 2023 | SV monogram                |
+| 279         | Paldea Evolved           | 2023 | Leaf with Paldea design    |
+| 197         | Obsidian Flames          | 2023 | Fire/lava pattern          |
+| 266         | Paradox Rift             | 2023 | Rift/crack symbol          |
+| 162         | Paldean Fates            | 2024 | Paldea region icon         |
+| 218         | Temporal Forces          | 2024 | Clock/time symbol          |
+| 167         | Twilight Masquerade      | 2024 | Mask icon                  |
+| 142         | Stellar Crown            | 2024 | Crown with stars           |
+| 226         | Shrouded Fable           | 2024 | Mystical pattern           |
+| 195         | Surging Sparks           | 2025 | Lightning spark            |
+
+**SPECIAL SETS & SUBSETS:**
+
+| Pattern      | Set Name              | Year | Identification                        |
+|--------------|-----------------------|------|---------------------------------------|
+| GG##/GG70    | Crown Zenith          | 2023 | Gallery Gallery numbering system      |
+| 25/25        | Celebrations          | 2021 | 25th anniversary Pikachu logo         |
+| 165/165      | Pokémon 151           | 2023 | Kanto Pokédex focus, distinctive logo |
+| 73/73        | Shining Fates         | 2021 | Shiny Vault subset available          |
+| SV##         | Promo Cards           | Var. | Black star promo, SV prefix           |
+
+────────────────────────────────────────────────────────────────────────
+OUTPUT REQUIREMENTS
+────────────────────────────────────────────────────────────────────────
+
+**When set identified from table (High/Medium confidence):**
+{
+  "set_name": "Fusion Strike",
+  "set_year": 2021,
+  "set_era": "Sword & Shield",
+  "set_confidence": "high",
+  "set_identifier_source": ["number_pattern", "set_symbol", "era_alignment"],
+  "set_identifier_reason": "Matched denominator 264 to Fusion Strike. Verified with ©2021, yellow border (Sword & Shield era), and triple-slash symbol.",
+  "needs_api_lookup": false
+}
+
+**When set NOT in table OR special pattern detected:**
+{
+  "set_name": null,
+  "set_year": null,
+  "set_era": null,
+  "set_confidence": "low",
+  "set_identifier_source": [],
+  "set_identifier_reason": "Denominator 112 not found in common sets table. Requires API lookup.",
+  "needs_api_lookup": true
+}
+
+🚨 **CRITICAL MANDATORY RULE:**
+**IF `set_name` is null, YOU MUST set `needs_api_lookup: true`**
+
+═══════════════════════════════════════════════════════════════════════
+D. POKEMON CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common Pokemon TCG Defects - How They Present on Pokemon Cards:**
+
+────────────────────────────────────────────────────────────────────────
+1. HOLOFOIL BLEED
+────────────────────────────────────────────────────────────────────────
+
+**Why Pokemon Cards Show This:**
+• Holofoil Pokemon cards have holographic pattern over Pokemon artwork area
+• During manufacturing, holographic layer can extend outside intended bounds
+• "Bleed" = holographic pattern visible where it shouldn't be (borders, text areas)
+
+**Detection:**
+• View card at angle to see holographic layer
+• Check if holo pattern extends beyond Pokemon image box
+• Look for holo shimmer in border areas or text zones
+
+**Grading Impact:**
+• Minor bleed (small extension <1mm): -0.2 to -0.3
+• Moderate bleed (visible in multiple areas): -0.5 to -0.7
+• Heavy bleed (extensive, obvious): -1.0 or more
+
+────────────────────────────────────────────────────────────────────────
+2. PRINT LINES ON HOLOFOIL CARDS
+────────────────────────────────────────────────────────────────────────
+
+**Common on Pokemon Holofoil Cards:**
+• Holofoil cards show print lines more readily than non-holo
+• Roller marks from printing process appear as faint horizontal or vertical lines
+• Most visible on solid color areas or Pokemon artwork
+
+**Detection:**
+• Examine card at angles under good lighting
+• Look for parallel lines running across holographic surface
+• Check solid color areas (sky, background, energy symbols)
+
+**Differentiate from Scratches:**
+• Print line: Consistent width, straight, parallel to card edge, factory defect
+• Scratch: Variable width, any direction, surface damage, handling wear
+
+**Grading Impact:**
+• Single print line: -0.3 to -0.5 (manufacturing defect)
+• Multiple print lines: -0.7 to -1.0
+• Print lines do NOT trigger structural damage caps
+
+────────────────────────────────────────────────────────────────────────
+3. HOLO SCRATCHING
+────────────────────────────────────────────────────────────────────────
+
+**Why Pokemon Holofoil Cards Are Vulnerable:**
+• Holographic layer is softer than printed ink surface
+• Scratches disrupt rainbow pattern, highly visible
+• Even minor scratches obvious when tilting card
+
+**Detection Method:**
+• Tilt card under light at various angles
+• Scratches appear as breaks in holographic rainbow pattern
+• May show as dull lines where holo effect is disrupted
+
+**Common Scratch Locations:**
+• Center of Pokemon image (handling contact)
+• Corners (sleeve insertion wear)
+• Edges (sliding in/out of binders)
+
+**Grading Impact:**
+• Single hairline holo scratch: -0.5 minimum (high-end card expectation)
+• Multiple holo scratches: -1.0 to -1.5
+• Deep holo scratches: -1.5 to -2.0
+• Prevents 10.0 surface score
+
+────────────────────────────────────────────────────────────────────────
+4. TEXTURE WEAR ON FULL ART CARDS
+────────────────────────────────────────────────────────────────────────
+
+**Modern Full Art Pokemon Cards (V, VMAX, VSTAR, GX, EX):**
+• Textured/embossed surface finish
+• Raised pattern on card surface
+• Texture can wear down from handling
+
+**Texture Wear Indicators:**
+• Smooth spots where texture has worn flat
+• Glossy areas on otherwise textured surface
+• Loss of embossed feel (visual only in photos)
+
+**Detection:**
+• Look for shine differences (worn areas more reflective)
+• Check for pattern inconsistencies
+• Compare texture across card surface
+
+**Grading Impact:**
+• Minor texture wear (small area <5mm²): -0.3 to -0.5
+• Moderate texture wear (visible area 5-15mm²): -0.7 to -1.0
+• Heavy texture wear (extensive, obvious): -1.5 or more
+
+────────────────────────────────────────────────────────────────────────
+5. WHITENING ON COLORED BORDERS
+────────────────────────────────────────────────────────────────────────
+
+**Pokemon Card Border Colors:**
+• Yellow borders: WOTC era + Sword & Shield era (1999-2022)
+• Silver borders: Scarlet & Violet era (2023+)
+• Black borders: Some special sets (Cosmic Eclipse, etc.)
+
+**Whitening Detection:**
+• White cardstock shows through when border ink chips or wears
+• Most visible on yellow and black borders
+• Edge wear common on Pokemon cards from play/handling
+
+**Grading Impact:**
+• Same as universal edge grading (see master rubric Section 9)
+• Yellow borders: High contrast, whitening very visible
+• Silver borders: Lower contrast, whitening less obvious but still counts
+
+────────────────────────────────────────────────────────────────────────
+6. REVERSE HOLO PATTERN DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Reverse Holofoil Cards:**
+• Holographic pattern on background, NOT on Pokemon image
+• Different holo patterns: Cosmos, Confetti, Sunburst, etc.
+• Pattern defects specific to reverse holo type
+
+**Common Reverse Holo Issues:**
+• Pattern disruption (missing holo sections)
+• Scratches in reverse holo layer
+• Holo bleed into Pokemon image area
+• Print defects over holo background
+
+**Detection:**
+• Tilt card to see holographic background pattern
+• Check for breaks or disruptions in pattern
+• Look for scratches that interrupt holo effect
+
+**Grading Impact:**
+• Similar to regular holo scratches: -0.5 to -1.5 depending on severity
+
+────────────────────────────────────────────────────────────────────────
+7. VINTAGE POKEMON CARD ISSUES (WOTC Era 1999-2003)
+────────────────────────────────────────────────────────────────────────
+
+**Era-Specific Characteristics:**
+• WOTC cards have thinner cardstock than modern
+• Holofoil more susceptible to scratching
+• Centering often poor (70/30 or worse common)
+• 1st Edition stamps can be off-center
+
+**Common Vintage Defects:**
+• Holo scratching (very common on WOTC holos)
+• Edge whitening (yellow borders show wear easily)
+• Print lines (common on holofoil cards)
+• Centering issues (factory variance)
+
+**Grading Expectations:**
+• 10.0 extremely rare for WOTC cards
+• 9.0-9.5 considered excellent condition for vintage
+• Factory defects (print lines, slight centering issues) more tolerated
+
+═══════════════════════════════════════════════════════════════════════
+E. POKEMON CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**Purpose:** Demonstrate proper analysis technique with Pokemon-specific details.
+
+────────────────────────────────────────────────────────────────────────
+CENTERING EXAMPLE (Pokemon Card with Yellow Border)
+────────────────────────────────────────────────────────────────────────
+
+"This Pokemon card from the Sword & Shield era features the characteristic yellow border surrounding the artwork. Examining the front, I measure the visible borders: left border ≈ 3.2mm, right border ≈ 2.8mm, top border ≈ 3.0mm, bottom border ≈ 3.5mm. Calculating the left-right ratio: 2.8mm (narrower) ÷ 3.2mm (wider) × 100 = 87.5%, expressed as 87.5/12.5 ratio. For top-bottom: 3.0mm ÷ 3.5mm × 100 = 85.7%, expressed as 86/14 ratio. The worst axis is top-bottom at 86/14, which according to the centering caps table limits the maximum centering score to 4.0. The card shows visible off-centering with the artwork shifted toward the top edge."
+
+────────────────────────────────────────────────────────────────────────
+CORNER EXAMPLE (Pokemon Holofoil Card)
+────────────────────────────────────────────────────────────────────────
+
+**Top-Left Corner (Front):**
+"The top-left corner sits at the intersection of the yellow border and the holographic Pokemon artwork area. Examining at maximum zoom, I observe this corner maintains sharp geometry with no visible fiber exposure at the corner tip. The yellow border ink remains intact with no white cardstock showing through. The holographic foil layer in this corner area shows no cracking or peeling. The corner lies completely flat against the card surface with no signs of lift, tilt, or structural damage. This corner appears to be in pristine condition."
+
+────────────────────────────────────────────────────────────────────────
+EDGE EXAMPLE (Pokemon Card)
+────────────────────────────────────────────────────────────────────────
+
+**Right Edge (Front):**
+"The right edge of this Pokemon card runs along the yellow border characteristic of the Sword & Shield era. Scanning the full length of this edge from top to bottom, I detect 2 small white flecks where the yellow border ink has chipped away to reveal white cardstock underneath. The first fleck is located approximately one-third down from the top-right corner and measures less than 0.1mm in length. The second fleck appears near the bottom-right corner, also measuring approximately 0.1mm. These white spots are highly visible against the yellow border, creating clear contrast. The factory cut quality along this edge appears clean and straight with no roughness detected. The presence of two minor white flecks results in an edge score of 9.5 for this edge."
+
+────────────────────────────────────────────────────────────────────────
+SURFACE EXAMPLE (Pokemon Holofoil Card)
+────────────────────────────────────────────────────────────────────────
+
+**Front Surface:**
+"The front surface of this Pokemon holofoil rare card features a holographic pattern overlaying the Pokemon artwork in the center of the card, with a yellow border frame surrounding the holographic area. The card displays the traditional cosmos holographic pattern, creating a swirling rainbow effect when viewed at angles. Examining the holographic layer by tilting the card under good lighting, I detect one hairline scratch located in the upper portion of the Pokemon artwork area. This scratch runs diagonally for approximately 5mm and is visible as a break in the holographic rainbow pattern - when tilting the card, the scratch appears as a dull line where the cosmos holo effect is disrupted. The scratch does not penetrate through to the cardstock beneath; it affects only the holographic surface layer. Additionally, I observe one very faint horizontal print line running across the middle section of the card, approximately 8mm in length, visible in the solid background color area. This appears to be a manufacturing roller mark rather than handling damage. The yellow border areas show no surface defects, maintaining clean glossy finish. The combination of one holo scratch and one print line prevents a perfect 10.0 surface score, resulting in a 9.0 grade for the front surface."
+
+────────────────────────────────────────────────────────────────────────
+FULL ART VMAX EXAMPLE (Modern Textured Card)
+────────────────────────────────────────────────────────────────────────
+
+**Card with Textured Finish:**
+"This Pokemon VMAX Full Art card features a textured/embossed surface finish characteristic of modern ultra rare cards. The artwork extends to all four edges with no visible border, classifying this as a borderless/full-art card (Type C). The entire front surface has a raised texture pattern that creates a unique tactile feel.
+
+Examining the textured surface under various lighting angles, I observe the texture pattern is intact across most of the card surface. However, in the lower-right quadrant, there is a small area (approximately 4mm × 3mm) where the texture appears flattened and the surface shows more shine than the surrounding textured areas. This indicates minor texture wear from handling or contact. The texture loss is visible as a slightly glossier patch compared to the surrounding embossed surface.
+
+Additionally, I detect one very fine scratch in the upper-left area of the card, running for approximately 3mm. This scratch is visible when tilting the card and appears to affect the surface coating.
+
+For centering assessment on this borderless card, I use internal design anchors: the Pokemon's positioning and the card text elements. The Pokemon appears centered within the card frame with the text box positioned symmetrically. Estimating internal centering at approximately 55/45 left-right and 52/48 top-bottom, with left-right being the worst axis. Maximum centering score: 9.5 (borderless card).
+
+The presence of minor texture wear and one fine scratch results in a surface score of 9.0 for the front."
+
+═══════════════════════════════════════════════════════════════════════
+END OF POKEMON DELTA v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**TOTAL LINES:** ~650
+**ESTIMATED TOKENS:** ~5,000-5,500
+
+**COMBINED PROMPT SIZE (Master + Pokemon Delta):**
+• Master Rubric: ~18,000-20,000 tokens
+• Pokemon Delta: ~5,000-5,500 tokens
+• **TOTAL: ~23,000-25,500 tokens** ✓ Within target range
+
+When grading Pokemon TCG cards, use:
+1. Master Grading Rubric v5.0 (universal grading rules)
+2. Pokemon Delta v5.0 (this file - Pokemon-specific rules)
+
+Apply ALL instructions from BOTH files to complete grading analysis.

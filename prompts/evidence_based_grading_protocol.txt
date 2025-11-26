@@ -1,0 +1,428 @@
+═══════════════════════════════════════════════════════════════════════
+EVIDENCE-BASED GRADING PROTOCOL
+UNIVERSAL ANTI-HALLUCINATION SAFEGUARDS
+═══════════════════════════════════════════════════════════════════════
+
+🚨 **CRITICAL PRINCIPLE:** Every assessment claim (defect OR pristine) requires observable evidence.
+
+**PURPOSE:** Prevent both false positives (inventing defects) and false negatives (missing real defects).
+
+**SCOPE:** Applies to ALL cards, ALL scores (1.0 to 10.0), ALL components.
+
+═══════════════════════════════════════════════════════════════════════
+1. BURDEN OF PROOF (UNIVERSAL)
+═══════════════════════════════════════════════════════════════════════
+
+**RULE:** You must provide OBSERVABLE EVIDENCE for every claim you make.
+
+────────────────────────────────────────────────────────────────────────
+A. CLAIMING A DEFECT EXISTS
+────────────────────────────────────────────────────────────────────────
+
+To document ANY defect, you MUST provide ALL of the following:
+
+✅ **LOCATION** (Where is it?)
+• Specific position on card
+• Example: "Top-left corner", "Right edge center section", "Upper-right quadrant"
+• NOT acceptable: "Corner" (which corner?), "Edge" (which edge?)
+
+✅ **SIZE/EXTENT** (How big is it?)
+• Approximate measurement with qualifier
+• Example: "Approximately 0.2mm fiber exposure", "Roughly 3mm scratch", "Along 40% of edge length"
+• NOT acceptable: "Minor wear" (how minor?), "Small defect" (how small?)
+
+✅ **VISUAL CHARACTERISTICS** (What does it look like?)
+• Describe actual appearance using this card's features
+• Example: "White cardstock visible against red border", "Break in holographic rainbow pattern", "Dull line in glossy surface"
+• NOT acceptable: "Damage visible" (what kind?), "Wear present" (what does it look like?)
+
+✅ **OBSERVABLE COLORS** (What actual colors do you see?)
+• State colors from THIS card, not generic assumptions
+• Example: "Navy blue border with white fiber showing", "Scratch in green border area"
+• NOT acceptable: "Dark border" (what color?), "Border area" (what does it look like?)
+
+✅ **DETECTION METHOD** (How did you find it?)
+• Explain inspection approach
+• Example: "At maximum zoom, examining corner tip", "Scanning full edge length from top to bottom", "Viewing card at angle under lighting"
+• NOT acceptable: Silent assumption you looked, no methodology stated
+
+**VIOLATION EXAMPLES:**
+
+❌ **INSUFFICIENT - HALLUCINATION RISK:**
+"Top-left corner shows minor wear."
+- Missing: What does "wear" look like? How minor? What colors? What measurement?
+
+❌ **INSUFFICIENT - HALLUCINATION RISK:**
+"Edge has some whitening."
+- Missing: Which edge? Where on edge? How much whitening? What colors are involved?
+
+❌ **INSUFFICIENT - HALLUCINATION RISK:**
+"Surface has a small scratch."
+- Missing: Where exactly? How long? What direction? What does it look like?
+
+✅ **ACCEPTABLE - EVIDENCE-BASED:**
+"The top-left corner of this card sits against a solid red border. At maximum zoom, I observe white cardstock fiber visible at the corner tip, measuring approximately 0.2mm in length where the red border coating has worn through. The fiber exposure creates a high-contrast white spot against the red background."
+
+────────────────────────────────────────────────────────────────────────
+B. CLAIMING NO DEFECT / PRISTINE CONDITION
+────────────────────────────────────────────────────────────────────────
+
+To claim pristine condition, you MUST provide ALL of the following:
+
+✅ **INSPECTION DOCUMENTATION** (What did you check?)
+• State what areas you examined
+• Example: "At maximum zoom, I examined the entire corner tip area"
+• NOT acceptable: "Corner is perfect" (did you actually look?)
+
+✅ **NEGATIVE FINDINGS** (What defects did you look for but NOT find?)
+• List what you checked for
+• Example: "Zero white fiber exposure detected. No rounding observed. Border coating intact."
+• NOT acceptable: "No issues" (what did you check for?)
+
+✅ **OBSERVABLE FEATURES** (What positive characteristics support pristine claim?)
+• Describe what perfect condition looks like on THIS card
+• Example: "Corner maintains sharp apex geometry. Red border ink extends cleanly to corner point with no breaks or chips. Corner lies completely flat against card surface."
+• NOT acceptable: "Corner is sharp" (what does sharp look like on THIS card?)
+
+✅ **SPECIFIC CARD DETAILS** (Reference actual card characteristics)
+• Use this card's actual colors and design elements
+• Example: "The navy blue border shows no whitening or fiber exposure along its full length"
+• NOT acceptable: "Border is clean" (what border? what color?)
+
+**VIOLATION EXAMPLES:**
+
+❌ **INSUFFICIENT - HALLUCINATION RISK:**
+"Top-left corner is sharp, no defects, 10.0"
+- Missing: Evidence of inspection, what "sharp" looks like, what was checked
+
+❌ **INSUFFICIENT - HALLUCINATION RISK:**
+"Edge is perfect with no whitening."
+- Missing: Which edge? How inspected? What colors observed? What does "perfect" mean?
+
+❌ **INSUFFICIENT - HALLUCINATION RISK:**
+"Surface is flawless."
+- Missing: How inspected? What areas checked? What characteristics confirm "flawless"?
+
+✅ **ACCEPTABLE - EVIDENCE-BASED:**
+"At maximum zoom, I examined the top-left corner of this card, which sits against a navy blue border. The corner maintains sharp apex geometry with no visible fiber exposure. The navy blue border ink extends cleanly to the corner point with no breaks, chips, or white cardstock showing through. I inspected for rounding and found none - the corner point is well-defined. The corner lies completely flat against the card surface with no lift, tilt, or structural damage detected."
+
+═══════════════════════════════════════════════════════════════════════
+2. DESCRIPTION-SCORE CONSISTENCY ENFORCEMENT
+═══════════════════════════════════════════════════════════════════════
+
+🚨 **CRITICAL RULE:** Your narrative description MUST logically support your numerical score.
+
+**TWO-DIRECTIONAL VALIDATION:**
+
+────────────────────────────────────────────────────────────────────────
+A. IF YOU DESCRIBE A DEFECT → MUST DEDUCT POINTS
+────────────────────────────────────────────────────────────────────────
+
+**Before submitting response:**
+
+1. Re-read your corner/edge/surface descriptions
+2. Highlight every defect you mentioned (fiber, whitening, scratch, etc.)
+3. Verify deduction applied for EACH defect
+4. Check defects array has corresponding entry
+
+**VALIDATION QUESTIONS:**
+- Did I describe fiber exposure? → Is deduction applied? Is it in defects array?
+- Did I describe whitening? → Is deduction applied? Is it in defects array?
+- Did I describe a scratch? → Is deduction applied? Is it in defects array?
+- Did I describe ANY imperfection? → Is score reduced from 10.0?
+
+**VIOLATION EXAMPLE:**
+
+❌ **INCONSISTENT - ERROR:**
+```
+Description: "Top-left corner shows approximately 0.2mm white fiber exposure where red border has worn."
+Score: 10.0
+Defects: []
+```
+**ERROR:** Described defect but gave perfect score AND empty defects array!
+
+✅ **CONSISTENT - CORRECT:**
+```
+Description: "Top-left corner shows approximately 0.2mm white fiber exposure where red border has worn."
+Score: 9.5
+Defects: [
+  {
+    type: "fiber_exposure",
+    severity: "minor",
+    description: "0.2mm white fiber at corner tip"
+  }
+]
+```
+
+────────────────────────────────────────────────────────────────────────
+B. IF YOU GIVE IMPERFECT SCORE → MUST DESCRIBE WHY
+────────────────────────────────────────────────────────────────────────
+
+**Before submitting response:**
+
+1. Check every score <10.0
+2. Verify description explains what caused point deduction
+3. Ensure defects array matches narrative
+
+**VALIDATION QUESTIONS:**
+- Score is 9.5 - What specific defect caused -0.5 deduction?
+- Score is 8.0 - What defects total -2.0 points?
+- Is reason for deduction clearly stated in description?
+
+**VIOLATION EXAMPLE:**
+
+❌ **INCONSISTENT - ERROR:**
+```
+Description: "Top-left corner appears sharp and clean."
+Score: 8.5
+Defects: []
+```
+**ERROR:** Description claims pristine but score shows -1.5 deduction. Where are the defects?
+
+✅ **CONSISTENT - CORRECT:**
+```
+Description: "Top-left corner shows visible rounding at the corner tip, approximately 0.3mm in extent, with white fiber exposure clearly visible against the blue border."
+Score: 8.5
+Defects: [
+  {
+    type: "rounding",
+    severity: "moderate",
+    description: "0.3mm rounding with fiber exposure"
+  }
+]
+```
+
+────────────────────────────────────────────────────────────────────────
+C. DEFECTS ARRAY MUST MATCH NARRATIVE
+────────────────────────────────────────────────────────────────────────
+
+**RULE:** Every defect in your description MUST appear in defects array, and vice versa.
+
+**VALIDATION PROTOCOL:**
+1. Count defects mentioned in narrative description
+2. Count entries in defects array
+3. Verify counts match
+4. Verify each narrative defect has corresponding array entry
+
+**VIOLATION EXAMPLE:**
+
+❌ **MISMATCH - ERROR:**
+```
+Description: "Corner has 0.2mm fiber exposure and slight rounding visible at maximum zoom."
+Defects: [
+  {
+    type: "fiber_exposure",
+    severity: "minor",
+    description: "0.2mm fiber at tip"
+  }
+]
+```
+**ERROR:** Description mentions TWO defects (fiber + rounding) but array only has ONE!
+
+✅ **CONSISTENT - CORRECT:**
+```
+Description: "Corner has 0.2mm fiber exposure and slight rounding visible at maximum zoom."
+Defects: [
+  {
+    type: "fiber_exposure",
+    severity: "minor",
+    description: "0.2mm fiber at tip"
+  },
+  {
+    type: "rounding",
+    severity: "minor",
+    description: "Slight rounding at corner apex"
+  }
+]
+```
+
+═══════════════════════════════════════════════════════════════════════
+3. MANDATORY INSPECTION DOCUMENTATION
+═══════════════════════════════════════════════════════════════════════
+
+🚨 **CRITICAL RULE:** You must document your inspection process, not just results.
+
+**REQUIREMENT:** For EVERY component (centering, corners, edges, surface), state:
+
+✅ **WHAT you inspected**
+• "I examined all 8 corners at maximum zoom"
+• "I scanned the full length of the right edge from corner to corner"
+• "I inspected the front surface in all 9 zones"
+
+✅ **HOW you inspected**
+• "Viewing at maximum zoom"
+• "Tilting card at angles under lighting to detect holo scratches"
+• "Measuring border widths using visual estimation"
+
+✅ **WHAT you looked for**
+• "Checking for white fiber exposure, rounding, lift/tilt"
+• "Looking for white flecks, whitening, chipping, roughness"
+• "Searching for scratches, print defects, indentations"
+
+✅ **WHAT you found (or didn't find)**
+• "Detected 0.2mm fiber exposure at corner tip" OR
+• "Found zero defects - no fiber exposure, no rounding, no structural issues"
+
+**VIOLATION EXAMPLES:**
+
+❌ **INSUFFICIENT:**
+"Corner: 10.0"
+- Missing: ALL inspection documentation
+
+❌ **INSUFFICIENT:**
+"Corner is sharp."
+- Missing: HOW inspected, WHAT checked for, specific observable details
+
+❌ **INSUFFICIENT:**
+"No defects observed."
+- Missing: WHAT you inspected, HOW you inspected, WHAT you checked for
+
+✅ **ACCEPTABLE:**
+"At maximum zoom, I examined the top-left corner, checking for white fiber exposure, rounding, and structural issues (lift/tilt/bend). The corner sits against a red border. I observed zero white fiber at the corner tip - the red border ink extends cleanly to the corner point. The corner maintains sharp apex geometry with no rounding detected. The corner lies completely flat against the card surface with no lift or tilt observed."
+
+═══════════════════════════════════════════════════════════════════════
+4. TEMPLATE LANGUAGE PROHIBITION
+═══════════════════════════════════════════════════════════════════════
+
+🚨 **CRITICAL RULE:** Every card analysis must be unique to THAT card's observable features.
+
+**PROHIBITED PATTERNS:**
+
+❌ **COPY-PASTE REPETITION:**
+```
+Top-left corner: "Sharp, no defects, 10.0"
+Top-right corner: "Sharp, no defects, 10.0"
+Bottom-left corner: "Sharp, no defects, 10.0"
+Bottom-right corner: "Sharp, no defects, 10.0"
+```
+**VIOLATION:** Identical text = didn't actually inspect each corner individually
+
+❌ **GENERIC COLOR ASSUMPTIONS:**
+```
+"The dark border shows no whitening"
+"The border is clean"
+```
+**VIOLATION:** What color is "dark"? State actual observable color!
+
+❌ **TEMPLATE PHRASES:**
+```
+"The corner maintains factory edges"
+"Border coating intact"
+"Surface is glossy and clean"
+```
+**VIOLATION:** Generic phrases that don't describe THIS specific card
+
+**REQUIRED APPROACH:**
+
+✅ **UNIQUE DESCRIPTIONS:**
+• Each corner/edge description uses DIFFERENT wording
+• Reference ACTUAL colors you observe (not "dark border" - state "navy blue border")
+• Reference position-specific design elements
+• Vary sentence structure
+• No repeated phrases
+
+✅ **OBSERVABLE SPECIFICS:**
+```
+Top-left corner: "At the junction of the navy blue border and the player photo, the corner maintains sharp geometry. Examining at maximum zoom, I detect no white fiber exposure. The blue border ink is intact at the corner point."
+
+Top-right corner: "This corner sits where the navy blue border meets the card's orange team logo in the upper-right. At maximum zoom, I observe approximately 0.1mm white fiber exposure at the corner tip, visible as a small white spot against the blue background."
+```
+**CORRECT:** Different wording, actual colors stated, specific position details
+
+═══════════════════════════════════════════════════════════════════════
+5. VERIFICATION CHECKLIST (MANDATORY BEFORE SUBMISSION)
+═══════════════════════════════════════════════════════════════════════
+
+Before finalizing your JSON response, complete this checklist:
+
+**CONSISTENCY VERIFICATION:**
+□ Every defect in narrative appears in defects array
+□ Every entry in defects array is mentioned in narrative
+□ Scores match descriptions logically (defect described = points deducted)
+□ If score = 10.0, description explicitly states "zero defects" with evidence
+□ If score < 10.0, description explains what caused deduction
+
+**EVIDENCE VERIFICATION:**
+□ Every defect claim has: location, size, visual characteristics, colors
+□ Every "no defect" claim has: inspection method, what was checked, negative findings
+□ No template phrases used
+□ Each corner/edge/surface has unique description
+□ Actual observable colors stated (not generic "dark" or "light")
+
+**INSPECTION VERIFICATION:**
+□ Documented WHAT inspected (which areas)
+□ Documented HOW inspected (zoom level, viewing angles)
+□ Documented WHAT looked for (fiber, whitening, scratches, etc.)
+□ Documented WHAT found (defects OR confirmed absence)
+
+**MATHEMATICAL VERIFICATION:**
+□ Defect count in description matches defect array length
+□ Total deductions sum to (10.0 - score)
+□ If multiple defects, aggregation rule applied correctly
+□ Grade caps applied if structural damage detected
+
+**If ANY checkbox fails → Revise analysis before submission**
+
+═══════════════════════════════════════════════════════════════════════
+6. HALLUCINATION DETECTION EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**Common hallucination patterns to AVOID:**
+
+────────────────────────────────────────────────────────────────────────
+FALSE POSITIVE HALLUCINATIONS (Inventing Defects)
+────────────────────────────────────────────────────────────────────────
+
+❌ **HALLUCINATION TYPE 1: Assumed Wear**
+"Given the card's age, there is likely minor corner wear."
+**ERROR:** "Likely" = assumption, not observation. State only what you SEE.
+
+❌ **HALLUCINATION TYPE 2: Generic Damage Claims**
+"Minor edge wear typical for cards of this era."
+**ERROR:** Didn't describe actual defects, assumed based on era.
+
+❌ **HALLUCINATION TYPE 3: Invisible Defects**
+"Slight surface imperfections under magnification."
+**ERROR:** Vague claim with no observable evidence. What imperfections? Where?
+
+────────────────────────────────────────────────────────────────────────
+FALSE NEGATIVE HALLUCINATIONS (Claiming Perfection Without Evidence)
+────────────────────────────────────────────────────────────────────────
+
+❌ **HALLUCINATION TYPE 4: Unverified Perfection**
+"All corners are flawless, 10.0 across the board."
+**ERROR:** Didn't document inspection of each corner. Generic claim.
+
+❌ **HALLUCINATION TYPE 5: Assumed Absence**
+"No defects visible" [with confidence C or D]
+**ERROR:** How can you claim no defects if visibility is poor?
+
+❌ **HALLUCINATION TYPE 6: Template Perfect Scores**
+All 8 corners exactly identical: "Sharp, no fiber, 10.0"
+**ERROR:** Every corner has unique characteristics. Identical descriptions = didn't inspect.
+
+────────────────────────────────────────────────────────────────────────
+CORRECT EVIDENCE-BASED APPROACH
+────────────────────────────────────────────────────────────────────────
+
+✅ **OBSERVATION-BASED ASSESSMENT:**
+"At maximum zoom, examining the top-left corner which sits against a solid red border, I observe white cardstock fiber visible at the corner tip. The white fiber measures approximately 0.15mm in length where the red border coating has worn away. This creates a high-contrast white spot against the red background. The fiber exposure is the only defect detected at this corner - no rounding, no lift/tilt, no structural damage observed."
+
+**WHY THIS IS CORRECT:**
+• Describes actual observation (white fiber against red)
+• Provides measurement (0.15mm)
+• States location precisely (top-left corner, red border)
+• Uses actual colors from THIS card (red border, white cardstock)
+• Documents inspection method (maximum zoom)
+• States what was checked for (rounding, lift/tilt, structural)
+• Clearly distinguishes defect found from defects not found
+
+═══════════════════════════════════════════════════════════════════════
+END OF EVIDENCE-BASED GRADING PROTOCOL
+═══════════════════════════════════════════════════════════════════════
+
+**ENFORCEMENT:** These rules apply to ALL cards, ALL scores, ALL components.
+
+**PRINCIPLE:** Every claim (defect OR pristine) requires observable, specific evidence.
+
+**INSERT THIS SECTION:** Between master rubric Section 6 (Common Defect Reference) and Section 7 (Centering Methodology)
