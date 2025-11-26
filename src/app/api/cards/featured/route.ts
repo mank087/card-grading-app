@@ -35,25 +35,38 @@ export async function GET() {
       throw error
     }
 
-    // Create signed URLs for each card's images (like my-collection API)
-    const cardsWithUrls = await Promise.all(
-      (cards || []).map(async (card) => {
-        // Create signed URLs for front and back images
-        const { data: frontData } = await supabaseAdmin.storage
-          .from('cards')
-          .createSignedUrl(card.front_path, 60 * 60) // 1 hour
+    if (!cards || cards.length === 0) {
+      return NextResponse.json({ cards: [] }, { status: 200 })
+    }
 
-        const { data: backData } = await supabaseAdmin.storage
-          .from('cards')
-          .createSignedUrl(card.back_path, 60 * 60) // 1 hour
+    // 🚀 PERFORMANCE: Batch create signed URLs instead of one-by-one
+    const allPaths = cards.flatMap(card => [card.front_path, card.back_path])
 
-        return {
-          ...card,
-          front_url: frontData?.signedUrl || null,
-          back_url: backData?.signedUrl || null
-        }
-      })
-    )
+    const { data: signedUrls, error: signError } = await supabaseAdmin.storage
+      .from('cards')
+      .createSignedUrls(allPaths, 60 * 60) // 1 hour expiry
+
+    if (signError) {
+      console.error('Error creating signed URLs:', signError)
+      return NextResponse.json({
+        cards: cards.map(card => ({ ...card, front_url: null, back_url: null }))
+      }, { status: 200 })
+    }
+
+    // Build a map of path -> signedUrl for quick lookup
+    const urlMap = new Map<string, string>()
+    signedUrls?.forEach(item => {
+      if (item.signedUrl) {
+        urlMap.set(item.path, item.signedUrl)
+      }
+    })
+
+    // Map URLs back to cards
+    const cardsWithUrls = cards.map(card => ({
+      ...card,
+      front_url: urlMap.get(card.front_path) || null,
+      back_url: urlMap.get(card.back_path) || null
+    }))
 
     return NextResponse.json({ cards: cardsWithUrls }, { status: 200 })
   } catch (error) {
