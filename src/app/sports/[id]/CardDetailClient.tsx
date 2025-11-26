@@ -2236,8 +2236,7 @@ export function SportsCardDetails() {
   };
 
   const recommendedGrade = dvgGrading.recommended_grade || {};
-  // 🎯 Sports cards: Use conversational_centering_ratios FIRST (matches Pokemon pattern)
-  const centering = card.conversational_centering_ratios || dvgGrading.centering || {};
+  // Note: centering is now defined later using centeringData after parsedCenteringFromJSON is computed
   const imageQuality = dvgGrading.image_quality || {};
   const analysisSummary = dvgGrading.analysis_summary || {};
   const defects = dvgGrading.defects || {};
@@ -2323,6 +2322,9 @@ export function SportsCardDetails() {
     back_centering_method: centeringData.back_centering_method || centeringData.back_type || "N/A",
     ...centeringData // Include all other fields
   };
+
+  // 🎯 Sports cards: Use centeringData which has properly merged all centering sources
+  const centering = centeringData;
 
   // Debug centering data sources
   console.log('[Sports Page] 🎯 Centering Debug:');
@@ -3480,10 +3482,11 @@ export function SportsCardDetails() {
 
                             {/* DCM Analysis */}
                             {(() => {
-                              const backLRRatio = card.centering_ratios?.back_lr || centering.back_left_right || 'N/A';
-                              const backTBRatio = card.centering_ratios?.back_tb || centering.back_top_bottom || 'N/A';
+                              // Use centeringMeasurements which has properly parsed centering data
+                              const backLRRatio = centeringMeasurements.back_x_axis_ratio || 'N/A';
+                              const backTBRatio = centeringMeasurements.back_y_axis_ratio || 'N/A';
                               const backAnalysisText = card.conversational_corners_edges_surface?.back_centering?.summary || centeringAnalysisText.back || centering.back_centering_analysis || 'No analysis available';
-                              const backQualityTier = card.centering_ratios?.back_quality_tier;
+                              const backQualityTier = centeringMeasurements.back_quality_tier;
 
                               const backLRObj = parseRatio(backLRRatio);
                               const backTBObj = parseRatio(backTBRatio);
