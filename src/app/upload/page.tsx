@@ -23,7 +23,6 @@ const CARD_TYPES = {
   Sports: {
     label: 'Sports Card',
     icon: '',
-    serialPrefix: 'SPORTS',
     category: 'Sports',
     apiEndpoint: '/api/sports',
     route: '/sports',
@@ -40,7 +39,6 @@ const CARD_TYPES = {
   Pokemon: {
     label: 'Pokémon Card',
     icon: '',
-    serialPrefix: 'POKEMON',
     category: 'Pokemon',
     apiEndpoint: '/api/pokemon',
     route: '/pokemon',
@@ -57,7 +55,6 @@ const CARD_TYPES = {
   MTG: {
     label: 'Magic: The Gathering Card',
     icon: '',
-    serialPrefix: 'MTG',
     category: 'MTG',
     apiEndpoint: '/api/mtg',
     route: '/mtg',
@@ -74,7 +71,6 @@ const CARD_TYPES = {
   Lorcana: {
     label: 'Disney Lorcana Card',
     icon: '',
-    serialPrefix: 'LORCANA',
     category: 'Lorcana',
     apiEndpoint: '/api/lorcana',
     route: '/lorcana',
@@ -91,7 +87,6 @@ const CARD_TYPES = {
   Other: {
     label: 'Other Collectible Card',
     icon: '',
-    serialPrefix: 'OTHER',
     category: 'Other',
     apiEndpoint: '/api/other',
     route: '/other',
@@ -326,12 +321,32 @@ function UniversalUploadPageContent() {
         throw backError
       }
 
+      console.log('[Upload] Fetching serial number...')
+      // Fetch next sequential serial number from API
+      let serialNumber: string;
+      try {
+        const serialResponse = await fetch('/api/serial');
+        if (serialResponse.ok) {
+          const serialData = await serialResponse.json();
+          serialNumber = serialData.serial;
+          console.log('[Upload] Got serial number:', serialNumber);
+        } else {
+          // Fallback to timestamp-based if API fails
+          serialNumber = Date.now().toString().slice(-10).padStart(10, '0');
+          console.warn('[Upload] Serial API failed, using fallback:', serialNumber);
+        }
+      } catch (e) {
+        // Fallback to timestamp-based if API fails
+        serialNumber = Date.now().toString().slice(-10).padStart(10, '0');
+        console.warn('[Upload] Serial fetch error, using fallback:', serialNumber);
+      }
+
       console.log('[Upload] Saving to database...')
       // Save record in DB with selected category (use authenticated client)
       const { error: dbError } = await authClient.from('cards').insert({
         id: cardId,
         user_id: user.id,
-        serial: `${config.serialPrefix}-${Math.random().toString(36).slice(2, 8)}`,
+        serial: serialNumber,
         front_path: frontPath,
         back_path: backPath,
         category: config.category,

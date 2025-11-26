@@ -2835,6 +2835,11 @@ export function SportsCardDetails() {
 
               {/* 📄 Download Report Button & Social Sharing */}
               <div className="flex flex-col md:flex-row items-center justify-between gap-4 my-6 px-4">
+                {/* DCM Serial Number Display */}
+                <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-indigo-100 px-4 py-2 rounded-lg border border-purple-300">
+                  <span className="text-sm font-medium text-purple-700">DCM Serial#:</span>
+                  <span className="text-sm font-bold text-purple-900 font-mono">{card.serial || 'N/A'}</span>
+                </div>
                 <DownloadReportButton card={card} cardType="sports" />
 
                 {/* Social Sharing Buttons */}
