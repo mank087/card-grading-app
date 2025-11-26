@@ -475,11 +475,12 @@ function CollectionPageContent() {
               const cardNumber = cardInfo.card_number;
               const year = cardInfo.year || cardInfo.card_date || card.card_date;
 
-              // Dynamic sizing for player name (Line 1) - more aggressive scaling
-              const nameFontSize = displayName.length > 40 ? '9px'
+              // Dynamic sizing for player name (Line 1) - single line, very aggressive scaling
+              const nameFontSize = displayName.length > 45 ? '8px'
+                : displayName.length > 40 ? '9px'
                 : displayName.length > 35 ? '10px'
-                : displayName.length > 28 ? '11px'
-                : displayName.length > 20 ? '12px'
+                : displayName.length > 30 ? '11px'
+                : displayName.length > 25 ? '12px'
                 : '13px';
 
               // Build set line text
@@ -507,17 +508,10 @@ function CollectionPageContent() {
 
                       {/* Center: Card Information - New 4-Line Structure */}
                       <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-                        {/* Line 1: Player/Card Name - Dynamic Font Sizing with 2-line wrap */}
+                        {/* Line 1: Player/Card Name - Dynamic Font Sizing, single line */}
                         <div
-                          className="font-bold text-gray-900 leading-tight"
-                          style={{
-                            fontSize: nameFontSize,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            wordBreak: 'break-word'
-                          }}
+                          className="font-bold text-gray-900 leading-tight truncate whitespace-nowrap"
+                          style={{ fontSize: nameFontSize }}
                           title={displayName}
                         >
                           {displayName}
