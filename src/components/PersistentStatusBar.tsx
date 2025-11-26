@@ -199,8 +199,8 @@ export default function PersistentStatusBar() {
                   )}
 
                   <p className="text-xs text-white/70">
-                    {card.status === 'uploading' && 'Uploading images...'}
-                    {card.status === 'processing' && 'Analyzing card...'}
+                    {card.status === 'uploading' && 'Evaluating Card with DCM Optic™'}
+                    {card.status === 'processing' && 'Evaluating Card with DCM Optic™'}
                     {card.status === 'completed' && 'Grading complete!'}
                     {card.status === 'error' && (card.errorMessage || 'Failed to process')}
                   </p>
