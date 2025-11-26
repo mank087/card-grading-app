@@ -3480,7 +3480,7 @@ export function SportsCardDetails() {
                               />
                             </div>
 
-                            {/* DCM Analysis */}
+                            {/* Back Centering Analysis */}
                             {(() => {
                               // Use centeringMeasurements which has properly parsed centering data
                               const backLRRatio = centeringMeasurements.back_x_axis_ratio || 'N/A';
@@ -3493,27 +3493,30 @@ export function SportsCardDetails() {
                               const formattedBack = formatDCMAnalysis(backAnalysisText, backLRRatio, backTBRatio, backLRObj, backTBObj, backQualityTier);
 
                               return (
-                                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border-2 border-purple-300 shadow-lg min-h-[200px] flex flex-col">
-                                  <p className="text-xs text-purple-900 font-bold mb-2.5 uppercase tracking-wide">DCM Optic™ Analysis</p>
-
-                                  {/* Metrics in white semi-transparent box */}
-                                  <div className="space-y-2 mb-3 bg-white/60 rounded-lg p-3 border border-purple-200">
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-gray-700 font-medium">Horizontal (L/R):</span>
-                                      <span className="font-bold text-purple-700">{formattedBack.lrRatio}</span>
+                                <div className="w-full max-w-xs mt-3">
+                                  <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-4 border-2 border-purple-300 shadow-lg min-h-[200px] flex flex-col">
+                                    <p className="text-sm text-purple-900 font-bold mb-3 uppercase tracking-wide flex items-center gap-2">
+                                      <span>DCM Optic™ Analysis</span>
+                                      <span className={`text-xl ${formattedBack.colorClass}`}>{formattedBack.icon}</span>
+                                    </p>
+                                    <div className="space-y-2 mb-3 bg-white/60 rounded-lg p-3 border border-purple-200">
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-700 font-medium">Horizontal (L/R):</span>
+                                        <span className="font-bold text-purple-700">{formattedBack.lrRatio}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm">
+                                        <span className="text-gray-700 font-medium">Vertical (T/B):</span>
+                                        <span className="font-bold text-purple-700">{formattedBack.tbRatio}</span>
+                                      </div>
+                                      <div className="flex justify-between text-sm pt-2 border-t border-purple-200">
+                                        <span className="text-gray-700 font-medium">Quality:</span>
+                                        <span className={`font-bold ${formattedBack.colorClass} capitalize`}>{formattedBack.qualityText}</span>
+                                      </div>
                                     </div>
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-gray-700 font-medium">Vertical (T/B):</span>
-                                      <span className="font-bold text-purple-700">{formattedBack.tbRatio}</span>
-                                    </div>
-                                    <div className="flex justify-between text-sm pt-1 border-t border-purple-200">
-                                      <span className="text-gray-700 font-medium">Quality:</span>
-                                      <span className={`font-bold ${formattedBack.qualityColorClass}`}>{formattedBack.quality}</span>
-                                    </div>
+                                    <p className="text-xs text-gray-700 leading-relaxed flex-grow">
+                                      {formattedBack.text}
+                                    </p>
                                   </div>
-
-                                  {/* Summary Text */}
-                                  <p className="text-xs text-gray-700 leading-relaxed flex-grow">{formattedBack.text}</p>
                                 </div>
                               );
                             })()}
