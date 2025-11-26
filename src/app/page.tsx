@@ -126,17 +126,19 @@ export default function Home() {
         <div className="container mx-auto px-4 text-center relative z-10">
           <div className="flex justify-center mb-6">
             <Image
-              src="/DCM-logo.png"
+              src="/DCM Logo white.png"
               alt="DCM Logo"
-              width={80}
-              height={80}
+              width={100}
+              height={100}
               className="object-contain"
             />
           </div>
           <h1 className="text-5xl font-bold mb-4">Dynamic Collectibles Management</h1>
-          <p className="text-xl mb-8 max-w-2xl mx-auto">
-            Professional AI-powered card grading and authentication service.
-            Get accurate condition assessments for your Sports and Pokémon cards.
+          <p className="text-xl mb-8 max-w-3xl mx-auto leading-relaxed">
+            Powered by <span className="font-semibold">DCM Optic™</span>, our proprietary artificial intelligence
+            grading system featuring a comprehensive 50+ point inspection process and variable confidence scoring
+            for precise analysis of trading cards including Sports, Pokémon®, Magic: The Gathering®,
+            Disney Lorcana®, and more.
           </p>
 
           {user ? (
