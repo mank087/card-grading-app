@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { getStoredSession, getAuthenticatedClient } from '../lib/directAuth'
@@ -14,10 +14,14 @@ const stripMarkdown = (text: string | null | undefined): string | null => {
 
 const getCardInfo = (card: any) => {
   const dvgGrading = card.ai_grading || {}
+  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name
+  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset
+  // Combine set name with subset if available (matching foldable label format)
+  const setNameWithSubset = subset ? `${setNameRaw} - ${subset}` : setNameRaw
   return {
     card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
     player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading.card_info?.player_or_character,
-    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name,
+    set_name: setNameWithSubset,
     year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
     card_number: stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
@@ -204,150 +208,15 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Featured Cards Section */}
+      {/* Featured Cards Section - Auto-Scrolling Carousel */}
       {featuredCards.length > 0 && (
-        <section className="py-16 bg-gradient-to-br from-purple-50 to-blue-50">
-          <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center mb-8">
-              <div>
-                <h2 className="text-3xl font-bold text-gray-900">Featured Grades</h2>
-                <p className="text-gray-600 mt-2">Professionally graded cards from our community</p>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {featuredCards.map((card) => {
-                const cardInfo = getCardInfo(card)
-                const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
-                const displayName = isSportsCard
-                  ? (cardInfo.player_or_character || cardInfo.card_name || "Unknown Player")
-                  : (cardInfo.card_name || cardInfo.player_or_character || "Unknown Card")
-
-                // Build special features string
-                const features: string[] = []
-                if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC')
-                if (cardInfo.autographed) features.push('Auto')
-                const serialNum = cardInfo.serial_number
-                if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-                  features.push(serialNum)
-                }
-
-                // Build set details for Line 2 (Set Name • Card # • Year)
-                const setName = cardInfo.set_name || "Unknown Set"
-                const cardNumber = cardInfo.card_number
-                const year = cardInfo.year
-
-                // Dynamic sizing for player name (Line 1)
-                const nameFontSize = displayName.length > 35 ? '11px' : displayName.length > 25 ? '12px' : '14px'
-
-                // Dynamic sizing for set details (Line 2)
-                const setFontSize = setName.length > 30 ? '10px' : '11px'
-
-                return (
-                  <div key={card.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-                    {/* Professional Label (PSA-Style) - ABOVE IMAGE */}
-                    <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg p-3">
-                      <div className="flex items-center justify-between gap-1.5">
-                        {/* Left: DCM Logo */}
-                        <div className="flex-shrink-0 -ml-1">
-                          <img
-                            src="/DCM-logo.png"
-                            alt="DCM"
-                            className="h-9 w-auto"
-                          />
-                        </div>
-
-                        {/* Center: Card Information - New 4-Line Structure */}
-                        <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-                          {/* Line 1: Player/Card Name - Dynamic Font Sizing */}
-                          <div
-                            className="font-bold text-gray-900 leading-tight truncate"
-                            style={{ fontSize: nameFontSize }}
-                            title={displayName}
-                          >
-                            {displayName}
-                          </div>
-
-                          {/* Line 2: Set Name • Card # • Year */}
-                          <div
-                            className="text-gray-700 leading-tight"
-                            style={{
-                              fontSize: setFontSize,
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden'
-                            }}
-                            title={`${setName} • ${cardNumber || ''} • ${year || 'N/A'}`}
-                          >
-                            {[setName, cardNumber, year].filter(p => p).join(' • ')}
-                          </div>
-
-                          {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
-                          {features.length > 0 && (
-                            <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                              {features.join(' • ')}
-                            </div>
-                          )}
-
-                          {/* Line 4: DCM Serial Number */}
-                          <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
-                            {card.serial}
-                          </div>
-                        </div>
-
-                        {/* Right: Grade Display */}
-                        <div className="text-center flex-shrink-0">
-                          {(() => {
-                            const grade = getCardGrade(card)
-                            const condition = card.conversational_condition_label
-                              ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-                              : (grade ? getConditionFromGrade(grade) : '')
-
-                            return (
-                              <>
-                                <div className="font-bold text-purple-700 text-3xl leading-none">
-                                  {grade ? formatGrade(grade) : '?'}
-                                </div>
-                                {condition && (
-                                  <>
-                                    <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                                    <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                                      {condition}
-                                    </div>
-                                  </>
-                                )}
-                              </>
-                            )
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Card Image */}
-                    <div className="aspect-[3/4] relative">
-                      <CardThumbnail url={card.front_url} />
-
-                      {/* Visibility Badge */}
-                      <div className="absolute bottom-2 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 bg-green-100 text-green-800 border-green-500">
-                        🌐 Public
-                      </div>
-                    </div>
-
-                    {/* View Details Button */}
-                    <div className="p-3">
-                      <Link
-                        href={getCardLink(card)}
-                        className="inline-block w-full text-center bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                      >
-                        View Details
-                      </Link>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        </section>
+        <FeaturedCardsCarousel
+          featuredCards={featuredCards}
+          getCardInfo={getCardInfo}
+          getCardGrade={getCardGrade}
+          formatGrade={formatGrade}
+          getCardLink={getCardLink}
+        />
       )}
 
       {/* Recent Cards Section */}
@@ -392,6 +261,306 @@ export default function Home() {
         </section>
       )}
     </main>
+  )
+}
+
+// Featured Cards Carousel Component with auto-scroll and manual navigation
+function FeaturedCardsCarousel({
+  featuredCards,
+  getCardInfo,
+  getCardGrade,
+  formatGrade,
+  getCardLink
+}: {
+  featuredCards: any[]
+  getCardInfo: (card: any) => any
+  getCardGrade: (card: any) => number | null
+  formatGrade: (grade: number) => string
+  getCardLink: (card: any) => string
+}) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [isPaused, setIsPaused] = useState(false)
+  const [scrollPosition, setScrollPosition] = useState(0)
+  const animationRef = useRef<number | null>(null)
+  const lastTimeRef = useRef<number>(0)
+  const isTouchingRef = useRef(false)
+
+  // Auto-scroll speed (pixels per second) - slow enough to read
+  const scrollSpeed = 30
+
+  // Handle auto-scrolling animation
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const animate = (currentTime: number) => {
+      // Don't animate if paused or touching
+      if (isPaused || isTouchingRef.current) {
+        lastTimeRef.current = 0
+        animationRef.current = requestAnimationFrame(animate)
+        return
+      }
+
+      if (lastTimeRef.current === 0) {
+        lastTimeRef.current = currentTime
+      }
+
+      const deltaTime = (currentTime - lastTimeRef.current) / 1000
+      lastTimeRef.current = currentTime
+
+      const scrollAmount = scrollSpeed * deltaTime
+      const maxScroll = container.scrollWidth - container.clientWidth
+
+      // Only scroll if there's content to scroll
+      if (maxScroll > 0) {
+        setScrollPosition(prev => {
+          let newPosition = prev + scrollAmount
+          // Loop back to start when reaching the end
+          if (newPosition >= maxScroll) {
+            newPosition = 0
+          }
+          return newPosition
+        })
+      }
+
+      animationRef.current = requestAnimationFrame(animate)
+    }
+
+    animationRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      if (animationRef.current) {
+        cancelAnimationFrame(animationRef.current)
+      }
+    }
+  }, [isPaused])
+
+  // Apply scroll position
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (container && !isTouchingRef.current) {
+      container.scrollLeft = scrollPosition
+    }
+  }, [scrollPosition])
+
+  // Manual scroll handlers
+  const scrollLeft = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (container) {
+      const cardWidth = 280 + 24 // card width + gap
+      const newPosition = Math.max(0, scrollPosition - cardWidth * 2)
+      setScrollPosition(newPosition)
+    }
+  }, [scrollPosition])
+
+  const scrollRight = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (container) {
+      const cardWidth = 280 + 24 // card width + gap
+      const maxScroll = container.scrollWidth - container.clientWidth
+      const newPosition = Math.min(maxScroll, scrollPosition + cardWidth * 2)
+      setScrollPosition(newPosition)
+    }
+  }, [scrollPosition])
+
+  // Pause auto-scroll on hover (desktop)
+  const handleMouseEnter = () => {
+    setIsPaused(true)
+    lastTimeRef.current = 0
+  }
+
+  const handleMouseLeave = () => {
+    setIsPaused(false)
+    lastTimeRef.current = 0
+  }
+
+  // Handle touch events (mobile)
+  const handleTouchStart = () => {
+    isTouchingRef.current = true
+    lastTimeRef.current = 0
+  }
+
+  const handleTouchEnd = () => {
+    // Sync scroll position with actual container position after touch
+    const container = scrollContainerRef.current
+    if (container) {
+      setScrollPosition(container.scrollLeft)
+    }
+    // Small delay before resuming auto-scroll to let user finish interaction
+    setTimeout(() => {
+      isTouchingRef.current = false
+      lastTimeRef.current = 0
+    }, 2000)
+  }
+
+  return (
+    <section className="py-16 bg-gradient-to-br from-purple-50 to-blue-50">
+      <div className="container mx-auto px-4">
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h2 className="text-3xl font-bold text-gray-900">Featured Grades</h2>
+            <p className="text-gray-600 mt-2">Professionally graded cards from our community</p>
+          </div>
+          {/* Navigation Arrows */}
+          <div className="flex gap-2">
+            <button
+              onClick={scrollLeft}
+              className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 text-purple-700 transition-colors"
+              aria-label="Scroll left"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <button
+              onClick={scrollRight}
+              className="p-2 rounded-full bg-purple-100 hover:bg-purple-200 text-purple-700 transition-colors"
+              aria-label="Scroll right"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Scrolling Container */}
+        <div
+          ref={scrollContainerRef}
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          className="flex gap-6 overflow-x-auto pb-4 scrollbar-hide"
+          style={{
+            scrollBehavior: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none'
+          }}
+        >
+          {featuredCards.map((card) => {
+            const cardInfo = getCardInfo(card)
+            const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
+            const displayName = isSportsCard
+              ? (cardInfo.player_or_character || cardInfo.card_name || "Unknown Player")
+              : (cardInfo.card_name || cardInfo.player_or_character || "Unknown Card")
+
+            // Build special features string
+            const features: string[] = []
+            if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC')
+            if (cardInfo.autographed) features.push('Auto')
+            const serialNum = cardInfo.serial_number
+            if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+              features.push(serialNum)
+            }
+
+            // Build set details for Line 2 (Set Name • Card # • Year)
+            const setName = cardInfo.set_name || "Unknown Set"
+            const cardNumber = cardInfo.card_number
+            const year = cardInfo.year
+
+            // Dynamic sizing for player name (Line 1)
+            const nameFontSize = displayName.length > 35 ? '11px' : displayName.length > 25 ? '12px' : '14px'
+
+            // Dynamic sizing for set details (Line 2)
+            const setFontSize = setName.length > 30 ? '10px' : '11px'
+
+            return (
+              <Link
+                key={card.id}
+                href={getCardLink(card)}
+                className="flex-shrink-0 w-[280px] bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden cursor-pointer block"
+              >
+                {/* Professional Label (PSA-Style) - ABOVE IMAGE */}
+                <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg p-3">
+                  <div className="flex items-center justify-between gap-1.5">
+                    {/* Left: DCM Logo */}
+                    <div className="flex-shrink-0 -ml-1">
+                      <img
+                        src="/DCM-logo.png"
+                        alt="DCM"
+                        className="h-9 w-auto"
+                      />
+                    </div>
+
+                    {/* Center: Card Information - New 4-Line Structure */}
+                    <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
+                      {/* Line 1: Player/Card Name - Dynamic Font Sizing */}
+                      <div
+                        className="font-bold text-gray-900 leading-tight truncate"
+                        style={{ fontSize: nameFontSize }}
+                        title={displayName}
+                      >
+                        {displayName}
+                      </div>
+
+                      {/* Line 2: Set Name • Card # • Year */}
+                      <div
+                        className="text-gray-700 leading-tight"
+                        style={{
+                          fontSize: setFontSize,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}
+                        title={`${setName} • ${cardNumber || ''} • ${year || 'N/A'}`}
+                      >
+                        {[setName, cardNumber, year].filter(p => p).join(' • ')}
+                      </div>
+
+                      {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                      {features.length > 0 && (
+                        <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                          {features.join(' • ')}
+                        </div>
+                      )}
+
+                      {/* Line 4: DCM Serial Number */}
+                      <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
+                        {card.serial}
+                      </div>
+                    </div>
+
+                    {/* Right: Grade Display */}
+                    <div className="text-center flex-shrink-0">
+                      {(() => {
+                        const grade = getCardGrade(card)
+                        const condition = card.conversational_condition_label
+                          ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                          : (grade ? getConditionFromGrade(grade) : '')
+
+                        return (
+                          <>
+                            <div className="font-bold text-purple-700 text-3xl leading-none">
+                              {grade ? formatGrade(grade) : '?'}
+                            </div>
+                            {condition && (
+                              <>
+                                <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+                                <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
+                                  {condition}
+                                </div>
+                              </>
+                            )}
+                          </>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Card Image */}
+                <div className="aspect-[3/4] relative">
+                  <CardThumbnail url={card.front_url} />
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      </div>
+    </section>
   )
 }
 

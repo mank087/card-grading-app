@@ -2236,10 +2236,14 @@ export function MTGCardDetails() {
   };
 
   // 🎯 v3.2: Use conversational_card_info first, then database fields, then DVG fallback
+  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name;
+  const subsetRaw = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset;
+  // Combine set name with subset if available (matching foldable label format)
+  const setNameWithSubset = subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw;
   const cardInfo = {
     card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
     player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
-    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name,
+    set_name: setNameWithSubset,
     set_era: stripMarkdown(card.conversational_card_info?.set_era) || dvgGrading.card_info?.set_era,  // 🆕 Set era fallback when set_name is unknown
     year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
@@ -2247,7 +2251,7 @@ export function MTGCardDetails() {
     sport_or_category: stripMarkdown(card.conversational_card_info?.sport_or_category) || card.category || dvgGrading.card_info?.sport_or_category,
     serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
     rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
-    subset: stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset,
+    subset: subsetRaw, // Keep separate for special features display
     rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || card.rarity_description || dvgGrading.card_info?.rarity_tier,
     autographed: card.conversational_card_info?.autographed === true || card.autographed === true || card.autograph_type === 'authentic',
     memorabilia: card.conversational_card_info?.memorabilia === true || card.memorabilia_type !== 'none',

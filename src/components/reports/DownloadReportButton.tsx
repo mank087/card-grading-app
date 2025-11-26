@@ -338,10 +338,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
                       (card.card_set && card.card_set !== 'null') ? card.card_set :
                       cardInfo.set_era || 'Unknown Set';
-      const setName = extractEnglishForPDF(setNameRaw);
+      const setNameBase = extractEnglishForPDF(setNameRaw);
       const year = cardInfo.year || card.release_date?.match(/\d{4}/)?.[0] || 'N/A';
       const cardNumber = cardInfo.card_number || card.card_number;
       const subset = cardInfo.subset || card.subset;
+      // Combine set name with subset if available (matching foldable label format)
+      const setName = subset ? `${setNameBase} - ${subset}` : setNameBase;
 
       // Build special features
       const features: string[] = [];
