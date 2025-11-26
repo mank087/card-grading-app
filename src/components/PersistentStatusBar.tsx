@@ -1,8 +1,62 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
 import { useRouter } from 'next/navigation'
+
+// Average grading time based on typical processing (45-60 seconds)
+const ESTIMATED_GRADING_TIME = 55000 // 55 seconds - cards typically complete around this time
+
+function useAnimatedProgress(uploadedAt: number, isProcessing: boolean, isCompleted: boolean): number {
+  const [progress, setProgress] = useState(0)
+
+  useEffect(() => {
+    if (!isProcessing || isCompleted) {
+      if (isCompleted) setProgress(100)
+      return
+    }
+
+    // Calculate initial progress
+    const elapsed = Date.now() - uploadedAt
+    const initialProgress = Math.min(Math.floor((elapsed / ESTIMATED_GRADING_TIME) * 95), 95)
+    setProgress(initialProgress)
+
+    // Update progress every 500ms for smooth animation
+    const interval = setInterval(() => {
+      const currentElapsed = Date.now() - uploadedAt
+      let newProgress: number
+
+      if (currentElapsed < ESTIMATED_GRADING_TIME) {
+        // Normal progress: 0-95% over estimated time
+        newProgress = Math.min(Math.floor((currentElapsed / ESTIMATED_GRADING_TIME) * 95), 95)
+      } else {
+        // Extended processing: slowly inch towards 98%
+        const extraTime = currentElapsed - ESTIMATED_GRADING_TIME
+        const extraProgress = Math.min(extraTime / 30000, 3) // +1% every 30 seconds, max +3%
+        newProgress = Math.min(95 + extraProgress, 98)
+      }
+
+      setProgress(newProgress)
+    }, 500)
+
+    return () => clearInterval(interval)
+  }, [uploadedAt, isProcessing, isCompleted])
+
+  return progress
+}
+
+// Separate component for expanded view progress to use the hook properly
+function ExpandedCardProgress({ uploadedAt }: { uploadedAt: number }) {
+  const progress = useAnimatedProgress(uploadedAt, true, false)
+  return (
+    <div className="w-full bg-white/20 rounded-full h-1.5 mb-1">
+      <div
+        className="bg-green-400 h-1.5 rounded-full transition-all duration-500"
+        style={{ width: `${progress}%` }}
+      />
+    </div>
+  )
+}
 
 export default function PersistentStatusBar() {
   const { queue, removeFromQueue, clearCompleted } = useGradingQueue()
@@ -17,6 +71,14 @@ export default function PersistentStatusBar() {
     return true
   })
 
+  // Get the first processing card for the collapsed view progress bar
+  const firstProcessingCard = activeQueue.find(c => c.status === 'processing' || c.status === 'uploading')
+  const collapsedProgress = useAnimatedProgress(
+    firstProcessingCard?.uploadedAt || 0,
+    !!firstProcessingCard && (firstProcessingCard.status === 'processing' || firstProcessingCard.status === 'uploading'),
+    firstProcessingCard?.status === 'completed'
+  )
+
   if (activeQueue.length === 0) return null
 
   const processingCount = activeQueue.filter(c => c.status === 'processing' || c.status === 'uploading').length
@@ -27,15 +89,26 @@ export default function PersistentStatusBar() {
     <div className="sticky top-0 left-0 right-0 z-50 bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg">
       {/* Collapsed View */}
       <div
-        className="px-4 py-2 flex items-center justify-between cursor-pointer hover:bg-black/10 transition-colors"
+        className="cursor-pointer hover:bg-black/10 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
+        {/* Green progress bar for collapsed view */}
+        {processingCount > 0 && (
+          <div className="h-1 bg-black/20">
+            <div
+              className="h-full bg-green-400 transition-all duration-500 ease-out"
+              style={{ width: `${collapsedProgress}%` }}
+            />
+          </div>
+        )}
+
+        <div className="px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
           {processingCount > 0 && (
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
               <span className="text-sm font-medium">
-                {processingCount} card{processingCount > 1 ? 's' : ''} grading...
+                {processingCount} card{processingCount > 1 ? 's' : ''} grading... {Math.round(collapsedProgress)}%
               </span>
             </div>
           )}
@@ -80,6 +153,7 @@ export default function PersistentStatusBar() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
         </div>
+        </div>
       </div>
 
       {/* Expanded View */}
@@ -121,12 +195,7 @@ export default function PersistentStatusBar() {
 
                   {/* Progress bar for processing cards */}
                   {(card.status === 'uploading' || card.status === 'processing') && (
-                    <div className="w-full bg-white/20 rounded-full h-1.5 mb-1">
-                      <div
-                        className="bg-white h-1.5 rounded-full transition-all duration-500"
-                        style={{ width: `${card.progress}%` }}
-                      />
-                    </div>
+                    <ExpandedCardProgress uploadedAt={card.uploadedAt} />
                   )}
 
                   <p className="text-xs text-white/70">
