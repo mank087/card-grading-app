@@ -1709,17 +1709,28 @@ STEP 7: RAW SUB-SCORE CALCULATION (8 Component Scores)
 
 Calculate individual component scores:
 
+**🚨 CRITICAL: RAW SUB-SCORES MUST USE ONLY .0 OR .5 INCREMENTS 🚨**
+All raw_sub_scores values MUST be rounded to the nearest 0.5:
+• Valid values: 10.0, 9.5, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 6.0, etc.
+• INVALID values: 9.25, 8.63, 7.8, 9.3 (these are NOT allowed)
+
+**Rounding to nearest 0.5:**
+• x.00 to x.24 → round DOWN to x.0
+• x.25 to x.74 → round to x.5
+• x.75 to x.99 → round UP to (x+1).0
+• Example: 8.63 → 8.5, 9.25 → 9.5, 8.12 → 8.0, 8.87 → 9.0
+
 **Front Components:**
-1. front_centering_score (0.0-10.0)
-2. front_corners_score (0.0-10.0)
-3. front_edges_score (0.0-10.0)
-4. front_surface_score (0.0-10.0)
+1. front_centering_score (must be X.0 or X.5)
+2. front_corners_score (must be X.0 or X.5)
+3. front_edges_score (must be X.0 or X.5)
+4. front_surface_score (must be X.0 or X.5)
 
 **Back Components:**
-5. back_centering_score (0.0-10.0)
-6. back_corners_score (0.0-10.0)
-7. back_edges_score (0.0-10.0)
-8. back_surface_score (0.0-10.0)
+5. back_centering_score (must be X.0 or X.5)
+6. back_corners_score (must be X.0 or X.5)
+7. back_edges_score (must be X.0 or X.5)
+8. back_surface_score (must be X.0 or X.5)
 
 ────────────────────────────────────────────────────────────────────────
 STEP 8: WEIGHTED SCORING (55% Front, 45% Back)
@@ -1841,6 +1852,7 @@ STEP 13: MATHEMATICAL VALIDATION (PATCH 8)
 Verify all calculations before finalizing:
 
 **Validation Checklist:**
+□ All 8 raw_sub_scores are X.0 or X.5 ONLY (NO decimals like 8.63, 9.25)
 □ All 8 component scores are 0.0-10.0
 □ Weighted scores calculated correctly (front × 0.55, back × 0.45)
 □ Combined scores sum properly (front_weighted + back_weighted)
@@ -1877,16 +1889,19 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v4.2 COMPATIBLE)
 
 **CRITICAL:** Use this exact structure for compatibility with existing system:
 
+**🚨 REMINDER: All raw_sub_scores MUST be X.0 or X.5 (e.g., 9.0, 8.5, NOT 8.63 or 9.25) 🚨**
+
 {
   "raw_sub_scores": {
-    "centering_front": 8.5,
-    "corners_front": 9.0,
-    "edges_front": 9.5,
-    "surface_front": 9.0,
-    "centering_back": 8.0,
-    "corners_back": 8.5,
-    "edges_back": 9.0,
-    "surface_back": 8.5
+    "centering_front": 8.5,   // ✅ Valid: X.5
+    "corners_front": 9.0,     // ✅ Valid: X.0
+    "edges_front": 9.5,       // ✅ Valid: X.5
+    "surface_front": 9.0,     // ✅ Valid: X.0
+    "centering_back": 8.0,    // ✅ Valid: X.0
+    "corners_back": 8.5,      // ✅ Valid: X.5
+    "edges_back": 9.0,        // ✅ Valid: X.0
+    "surface_back": 8.5       // ✅ Valid: X.5
+    // ❌ NEVER use: 8.63, 9.25, 7.8, 9.3, etc.
   },
   "weighted_scores": {
     "centering_weighted": 8.275,  // (8.5×0.55) + (8.0×0.45)
