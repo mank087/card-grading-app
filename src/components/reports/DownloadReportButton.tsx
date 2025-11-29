@@ -12,6 +12,8 @@ import {
   generateQRCodeWithLogo,
   loadLogoAsBase64
 } from '../../lib/foldableLabelGenerator';
+import { generateAveryLabel } from '../../lib/averyLabelGenerator';
+import { AveryLabelModal } from './AveryLabelModal';
 
 /**
  * Download Report Button Component
@@ -31,8 +33,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   cardType = 'sports'
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | null>(null);
+  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [isAveryModalOpen, setIsAveryModalOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -638,20 +641,186 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     handleDownload();
   };
 
+  // Open Avery label modal
+  const handleOpenAveryModal = () => {
+    setIsDropdownOpen(false);
+    setIsAveryModalOpen(true);
+  };
+
+  /**
+   * Handle Avery Label generation with selected position
+   */
+  const handleDownloadAveryLabel = async (positionIndex: number) => {
+    try {
+      setIsGenerating(true);
+      setGeneratingType('avery');
+
+      console.log('[AVERY LABEL] Starting generation at position:', positionIndex);
+
+      // Extract card info (same logic as foldable label)
+      const cardInfo = card.conversational_card_info || {};
+
+      // Helper: Extract English name from bilingual format
+      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
+        if (!text) return null;
+        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+        if (!hasJapanese) return text;
+        const parts = text.split(/[/()（）]/);
+        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
+        return englishPart ? englishPart.trim() : text;
+      };
+
+      // Build player/character name
+      const cardName = extractEnglishForPDF(
+        cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name
+      ) || 'Unknown Card';
+
+      // Build set name
+      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
+                         (card.card_set && card.card_set !== 'null') ? card.card_set :
+                         cardInfo.set_era || 'Unknown Set';
+      const subset = cardInfo.subset || card.subset;
+      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
+      const setName = setNameWithSubset || 'Unknown Set';
+
+      // Build special features
+      const features: string[] = [];
+      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
+      if (cardInfo.autographed) features.push('Auto');
+      const serialNum = cardInfo.serial_number;
+      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+        features.push(serialNum);
+      }
+      const specialFeatures = features.length > 0 ? features.join(' • ') : undefined;
+
+      // Get subgrades
+      const weightedScores = card.conversational_weighted_sub_scores || {};
+      const subScores = card.conversational_sub_scores || {};
+
+      // Generate QR code and load logo
+      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      console.log('[AVERY LABEL] Generating QR code for URL:', cardUrl);
+
+      const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+        generateQRCodeWithLogo(cardUrl),
+        loadLogoAsBase64().catch(() => undefined)
+      ]);
+
+      // Rotate QR code 180 degrees for Avery label (so it's upside down on printed label)
+      // When the label folds over, this will appear right-side up on the back
+      let rotatedQrCodeDataUrl = qrCodeDataUrl;
+      if (qrCodeDataUrl) {
+        try {
+          const img = new Image();
+          img.src = qrCodeDataUrl;
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to load QR for rotation'));
+          });
+
+          const canvas = document.createElement('canvas');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.rotate(Math.PI); // 180 degrees
+            ctx.translate(-canvas.width / 2, -canvas.height / 2);
+            ctx.drawImage(img, 0, 0);
+            rotatedQrCodeDataUrl = canvas.toDataURL('image/png');
+            console.log('[AVERY LABEL] QR code rotated 180 degrees');
+          }
+        } catch (e) {
+          console.warn('[AVERY LABEL] Could not rotate QR code, using original');
+        }
+      }
+
+      // Get grade and condition
+      const grade = card.conversational_decimal_grade ?? 0;
+      const conditionLabel = card.conversational_condition_label
+        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+        : (getConditionFromGrade(grade) || 'N/A');
+
+      // Build label data (same interface as foldable label)
+      // Use the rotated QR code for Avery labels (appears upside down when printed,
+      // right-side up when label is folded over the back of a one-touch slab)
+      const labelData: FoldableLabelData = {
+        cardName,
+        setName,
+        cardNumber: cardInfo.card_number || card.card_number,
+        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
+        specialFeatures,
+        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
+        grade,
+        conditionLabel,
+        subgrades: {
+          centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
+          corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
+          edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
+          surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
+        },
+        overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
+        qrCodeDataUrl: rotatedQrCodeDataUrl, // Use rotated QR for Avery label
+        cardUrl,
+        logoDataUrl,
+      };
+
+      console.log('[AVERY LABEL] Generating PDF...');
+
+      // Generate PDF at selected position
+      const blob = await generateAveryLabel(labelData, positionIndex);
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Generate filename
+      const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const cardNameClean = sanitize(cardName);
+      const serialClean = sanitize(labelData.serial);
+      const filename = `DCM-AveryLabel-${cardNameClean}-${serialClean}.pdf`;
+
+      link.download = filename;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup
+      URL.revokeObjectURL(url);
+
+      console.log('[AVERY LABEL] ✅ PDF generated successfully');
+      setIsAveryModalOpen(false);
+
+    } catch (error) {
+      console.error('[AVERY LABEL] ❌ Error generating label:', error);
+      alert('Failed to generate Avery label. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+      setGeneratingType(null);
+    }
+  };
+
   // Dropdown menu items
   const menuItems = [
+    {
+      id: 'avery',
+      label: 'One-Touch Magnetic Label',
+      description: 'Avery 6871 (1-1/4" × 2-3/8")',
+      onClick: handleOpenAveryModal,
+    },
     {
       id: 'report',
       label: 'Full Grading Report',
       description: 'Complete PDF with all details',
-      icon: '📄',
       onClick: handleDownloadReport,
     },
     {
       id: 'label',
-      label: 'Foldable Toploader Label',
-      description: 'Print & fold to 2.5" × 3.5"',
-      icon: '🏷️',
+      label: 'Mini-Report',
+      description: 'Fold or cut to 2.5" × 3.5"',
       onClick: handleDownloadLabel,
     },
   ];
@@ -667,14 +836,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           title="Download Options"
         >
           {isGenerating ? (
-            <>
-              <span className="animate-spin">⏳</span>
-              <span>Generating...</span>
-            </>
+            <span>Generating...</span>
           ) : (
             <>
-              <span>📥</span>
-              <span>Download</span>
+              <span>Download Label or Report</span>
               <svg className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -684,14 +849,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
         {/* Dropdown Menu */}
         {isDropdownOpen && !isGenerating && (
-          <div className="absolute top-full left-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+          <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
             {menuItems.map((item) => (
               <button
                 key={item.id}
                 onClick={item.onClick}
-                className="w-full flex items-start gap-3 px-4 py-3 hover:bg-purple-50 transition-colors text-left"
+                className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left"
               >
-                <span className="text-lg">{item.icon}</span>
                 <div>
                   <div className="font-medium text-gray-900 text-sm">{item.label}</div>
                   <div className="text-xs text-gray-500">{item.description}</div>
@@ -700,6 +864,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
             ))}
           </div>
         )}
+
+        {/* Avery Label Position Modal */}
+        <AveryLabelModal
+          isOpen={isAveryModalOpen}
+          onClose={() => setIsAveryModalOpen(false)}
+          onConfirm={handleDownloadAveryLabel}
+          isGenerating={isGenerating && generatingType === 'avery'}
+        />
       </div>
     );
   }
@@ -714,14 +886,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         title="Download Options"
       >
         {isGenerating ? (
-          <>
-            <span className="animate-spin text-xl">⏳</span>
-            <span>{generatingType === 'label' ? 'Generating Label...' : 'Generating Report...'}</span>
-          </>
+          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : 'Generating Report...'}</span>
         ) : (
           <>
-            <span className="text-xl">📥</span>
-            <span>Download</span>
+            <span>Download Label or Report</span>
             <svg className={`w-5 h-5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
@@ -731,14 +899,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       {/* Dropdown Menu */}
       {isDropdownOpen && !isGenerating && (
-        <div className="absolute top-full left-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+        <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
           {menuItems.map((item) => (
             <button
               key={item.id}
               onClick={item.onClick}
-              className="w-full flex items-start gap-3 px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+              className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
             >
-              <span className="text-xl">{item.icon}</span>
               <div>
                 <div className="font-semibold text-gray-900">{item.label}</div>
                 <div className="text-sm text-gray-500">{item.description}</div>
@@ -747,6 +914,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           ))}
         </div>
       )}
+
+      {/* Avery Label Position Modal */}
+      <AveryLabelModal
+        isOpen={isAveryModalOpen}
+        onClose={() => setIsAveryModalOpen(false)}
+        onConfirm={handleDownloadAveryLabel}
+        isGenerating={isGenerating && generatingType === 'avery'}
+      />
     </div>
   );
 };
