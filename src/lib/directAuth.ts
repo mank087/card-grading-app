@@ -148,24 +148,32 @@ export async function signInWithOAuth(provider: OAuthProvider): Promise<{ error?
 // Get the current OAuth session (after redirect)
 export async function getOAuthSession() {
   try {
+    console.log('[OAuth] Getting session from Supabase...')
     const { data: { session }, error } = await supabaseClient.auth.getSession()
 
     if (error) {
+      console.error('[OAuth] Session error:', error)
       return { error: error.message }
     }
 
     // Store the session in localStorage for consistency with email/password auth
     if (session && typeof window !== 'undefined') {
+      console.log('[OAuth] Session found, storing in localStorage...')
+      console.log('[OAuth] User:', session.user?.email)
       localStorage.setItem('supabase.auth.token', JSON.stringify({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
         expires_at: Math.floor(new Date(session.expires_at!).getTime() / 1000),
         user: session.user
       }))
+      console.log('[OAuth] Session stored successfully')
+    } else {
+      console.warn('[OAuth] No session found or not in browser context')
     }
 
     return { session }
   } catch (err: any) {
+    console.error('[OAuth] Exception:', err)
     return { error: err.message || 'Failed to get session' }
   }
 }
