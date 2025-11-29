@@ -27,12 +27,16 @@ const LABEL_WIDTH = 2.375 * INCH;
 const LABEL_HEIGHT = 1.25 * INCH;
 const CORNER_RADIUS = 6; // Rounded corners in points
 
-// Avery 6871 margins and spacing (exact values from PDF template rectangles)
-// First label at (0.375", 1.125"), gaps calculated from label positions
+// Avery 6871 margins and spacing
+// Adjusted based on Avery's own design tool output which places content at x=0.326"
+// This provides better centering and accounts for printer variations
 const TOP_MARGIN = 1.125 * INCH;      // 1.125 inches = 1-1/8" = 81 points
-const LEFT_MARGIN = 0.375 * INCH;     // 0.375 inches = 3/8" = 27 points
-const HORIZONTAL_GAP = 0.3125 * INCH; // 0.3125 inches = 5/16" = 22.5 points (exact from PDF)
+const LEFT_MARGIN = 0.326 * INCH;     // 0.326 inches (from Avery's design tool, was 0.375")
+const HORIZONTAL_GAP = 0.3125 * INCH; // 0.3125 inches = 5/16" = 22.5 points
 const VERTICAL_GAP = 0.25 * INCH;     // 0.25 inches = 1/4" = 18 points
+
+// Border bleed - extends border beyond label edge to account for printer variations
+const BORDER_BLEED = 0.0625 * INCH;   // 1/16" = 4.5 points
 
 // Grid configuration
 const COLUMNS = 3;
@@ -59,11 +63,25 @@ export interface LabelPosition {
 }
 
 /**
- * Calculate the X,Y position of a label on the sheet
+ * Calibration offsets for printer alignment (in inches)
+ * Positive X moves content right, positive Y moves content down
  */
-function getLabelPosition(position: LabelPosition): { x: number; y: number } {
-  const x = LEFT_MARGIN + (position.column * (LABEL_WIDTH + HORIZONTAL_GAP));
-  const y = TOP_MARGIN + (position.row * (LABEL_HEIGHT + VERTICAL_GAP));
+export interface CalibrationOffsets {
+  x: number;  // Horizontal offset in inches (-0.1 to +0.1)
+  y: number;  // Vertical offset in inches (-0.1 to +0.1)
+}
+
+/**
+ * Calculate the X,Y position of a label on the sheet
+ * @param position The row/column position
+ * @param offsets Optional calibration offsets for printer alignment
+ */
+function getLabelPosition(position: LabelPosition, offsets?: CalibrationOffsets): { x: number; y: number } {
+  const offsetX = (offsets?.x || 0) * INCH;
+  const offsetY = (offsets?.y || 0) * INCH;
+
+  const x = LEFT_MARGIN + (position.column * (LABEL_WIDTH + HORIZONTAL_GAP)) + offsetX;
+  const y = TOP_MARGIN + (position.row * (LABEL_HEIGHT + VERTICAL_GAP)) + offsetY;
   return { x, y };
 }
 
@@ -123,28 +141,30 @@ function fitTextToWidth(doc: jsPDF, text: string, maxWidth: number, startFontSiz
  * │        RC • Auto    │ GEM   │
  * │        DCM-123456   │ MINT  │
  * └─────────────────────────────┘
+ *
+ * @param offsets Optional calibration offsets for printer alignment
  */
-function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition) {
-  const { x, y } = getLabelPosition(position);
+function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition, offsets?: CalibrationOffsets) {
+  const { x, y } = getLabelPosition(position, offsets);
 
   const padding = 3;
   const halfHeight = LABEL_HEIGHT / 2;
   const purpleBarHeight = 10;
 
   // ============================================
-  // PURPLE BORDER (entire label outline)
-  // Thicker border that bleeds outward (print-to-edge labels)
-  // Draw slightly inside the boundary so stroke bleeds outward
+  // PURPLE BORDER (entire label outline with bleed)
+  // Border bleeds 1/16" beyond label edge to account for printer variations
+  // This ensures the purple border is visible even if printing is slightly off
   // ============================================
   const borderWidth = 3;  // Thicker border for visibility
-  const borderInset = borderWidth / 2;  // Half stroke width to keep inner edge aligned
   doc.setDrawColor(COLORS.purplePrimary);
   doc.setLineWidth(borderWidth);
+  // Draw border with bleed extending beyond label boundaries
   doc.roundedRect(
-    x + borderInset,
-    y + borderInset,
-    LABEL_WIDTH - borderWidth,
-    LABEL_HEIGHT - borderWidth,
+    x - BORDER_BLEED + borderWidth / 2,
+    y - BORDER_BLEED + borderWidth / 2,
+    LABEL_WIDTH + (BORDER_BLEED * 2) - borderWidth,
+    LABEL_HEIGHT + (BORDER_BLEED * 2) - borderWidth,
     CORNER_RADIUS,
     CORNER_RADIUS,
     'S'
@@ -153,13 +173,13 @@ function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition)
   // ============================================
   // CENTER: Purple "Dynamic Collectibles Management" bar
   // This sits at the fold line (center of label)
-  // Extends to meet the border (no gap)
+  // Extends to the border edge (with bleed)
   // ============================================
   const purpleBarY = y + halfHeight - (purpleBarHeight / 2);
 
   doc.setFillColor(COLORS.purplePrimary);
-  // Extend bar to inner edge of border stroke
-  doc.rect(x + borderInset, purpleBarY, LABEL_WIDTH - borderWidth, purpleBarHeight, 'F');
+  // Extend bar to match border bleed on left and right
+  doc.rect(x - BORDER_BLEED, purpleBarY, LABEL_WIDTH + (BORDER_BLEED * 2), purpleBarHeight, 'F');
 
   // Header text - centered
   doc.setTextColor(COLORS.white);
@@ -353,10 +373,14 @@ export function positionToIndex(position: LabelPosition): number {
 
 /**
  * Generate an Avery 6871 label PDF with a single label at the specified position
+ * @param data The label data to render
+ * @param positionIndex The position on the sheet (0-17)
+ * @param offsets Optional calibration offsets for printer alignment
  */
 export async function generateAveryLabel(
   data: FoldableLabelData,
-  positionIndex: number
+  positionIndex: number,
+  offsets?: CalibrationOffsets
 ): Promise<Blob> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -371,21 +395,26 @@ export async function generateAveryLabel(
 
   const position = indexToPosition(positionIndex);
 
-  // Draw the label at the selected position
-  drawLabel(doc, data, position);
+  // Draw the label at the selected position with optional calibration offsets
+  drawLabel(doc, data, position, offsets);
 
   return doc.output('blob');
 }
 
 /**
  * Generate and download an Avery label
+ * @param data The label data to render
+ * @param positionIndex The position on the sheet (0-17)
+ * @param filename The filename for the downloaded PDF
+ * @param offsets Optional calibration offsets for printer alignment
  */
 export async function downloadAveryLabel(
   data: FoldableLabelData,
   positionIndex: number,
-  filename: string
+  filename: string,
+  offsets?: CalibrationOffsets
 ): Promise<void> {
-  const blob = await generateAveryLabel(data, positionIndex);
+  const blob = await generateAveryLabel(data, positionIndex, offsets);
 
   // Create download link
   const url = URL.createObjectURL(blob);

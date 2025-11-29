@@ -12,7 +12,7 @@ import {
   generateQRCodeWithLogo,
   loadLogoAsBase64
 } from '../../lib/foldableLabelGenerator';
-import { generateAveryLabel } from '../../lib/averyLabelGenerator';
+import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 
 /**
@@ -648,9 +648,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   };
 
   /**
-   * Handle Avery Label generation with selected position
+   * Handle Avery Label generation with selected position and calibration offsets
    */
-  const handleDownloadAveryLabel = async (positionIndex: number) => {
+  const handleDownloadAveryLabel = async (positionIndex: number, offsets: CalibrationOffsets) => {
     try {
       setIsGenerating(true);
       setGeneratingType('avery');
@@ -765,10 +765,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         logoDataUrl,
       };
 
-      console.log('[AVERY LABEL] Generating PDF...');
+      console.log('[AVERY LABEL] Generating PDF with offsets:', offsets);
 
-      // Generate PDF at selected position
-      const blob = await generateAveryLabel(labelData, positionIndex);
+      // Generate PDF at selected position with calibration offsets
+      const blob = await generateAveryLabel(labelData, positionIndex, offsets);
 
       // Create download link
       const url = URL.createObjectURL(blob);
@@ -807,7 +807,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   const menuItems = [
     {
       id: 'avery',
-      label: 'One-Touch Magnetic Label',
+      label: 'Label for Magnetic One-Touch',
       description: 'Avery 6871 (1-1/4" × 2-3/8")',
       onClick: handleOpenAveryModal,
     },

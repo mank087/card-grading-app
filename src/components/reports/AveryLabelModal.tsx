@@ -1,16 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getAveryConfig } from '../../lib/averyLabelGenerator';
+import { getAveryConfig, CalibrationOffsets } from '../../lib/averyLabelGenerator';
 
 interface AveryLabelModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (positionIndex: number) => void;
+  onConfirm: (positionIndex: number, offsets: CalibrationOffsets) => void;
   isGenerating?: boolean;
 }
 
 const STORAGE_KEY = 'dcm_avery_last_position';
+const CALIBRATION_STORAGE_KEY = 'dcm_avery_calibration';
 
 export const AveryLabelModal: React.FC<AveryLabelModalProps> = ({
   isOpen,
@@ -20,10 +21,14 @@ export const AveryLabelModal: React.FC<AveryLabelModalProps> = ({
 }) => {
   const config = getAveryConfig();
   const [selectedPosition, setSelectedPosition] = useState<number | null>(null);
+  const [showCalibration, setShowCalibration] = useState(false);
+  const [offsetX, setOffsetX] = useState(0); // in inches
+  const [offsetY, setOffsetY] = useState(0); // in inches
 
-  // Load last used position from localStorage on mount
+  // Load saved settings from localStorage on mount
   useEffect(() => {
     if (isOpen) {
+      // Load position
       const savedPosition = localStorage.getItem(STORAGE_KEY);
       if (savedPosition !== null) {
         const pos = parseInt(savedPosition, 10);
@@ -31,14 +36,27 @@ export const AveryLabelModal: React.FC<AveryLabelModalProps> = ({
           setSelectedPosition(pos);
         }
       }
+
+      // Load calibration offsets
+      const savedCalibration = localStorage.getItem(CALIBRATION_STORAGE_KEY);
+      if (savedCalibration) {
+        try {
+          const cal = JSON.parse(savedCalibration);
+          if (typeof cal.x === 'number') setOffsetX(cal.x);
+          if (typeof cal.y === 'number') setOffsetY(cal.y);
+        } catch (e) {
+          // Ignore parse errors
+        }
+      }
     }
   }, [isOpen, config.totalLabels]);
 
-  // Save position to localStorage when confirmed
+  // Save settings and confirm
   const handleConfirm = () => {
     if (selectedPosition !== null) {
       localStorage.setItem(STORAGE_KEY, selectedPosition.toString());
-      onConfirm(selectedPosition);
+      localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify({ x: offsetX, y: offsetY }));
+      onConfirm(selectedPosition, { x: offsetX, y: offsetY });
     }
   };
 
@@ -49,6 +67,18 @@ export const AveryLabelModal: React.FC<AveryLabelModalProps> = ({
     } else {
       setSelectedPosition(0); // Wrap to first position
     }
+  };
+
+  // Reset calibration to defaults
+  const handleResetCalibration = () => {
+    setOffsetX(0);
+    setOffsetY(0);
+  };
+
+  // Format offset for display (show + for positive values)
+  const formatOffset = (value: number): string => {
+    const formatted = value.toFixed(3);
+    return value >= 0 ? `+${formatted}` : formatted;
   };
 
   if (!isOpen) return null;
@@ -62,7 +92,7 @@ export const AveryLabelModal: React.FC<AveryLabelModalProps> = ({
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="relative bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
           <h2 className="text-xl font-bold text-white">Print Avery Label</h2>
@@ -140,10 +170,100 @@ export const AveryLabelModal: React.FC<AveryLabelModalProps> = ({
             </div>
           )}
 
+          {/* Calibration Section */}
+          <div className="border border-gray-200 rounded-lg overflow-hidden mb-4">
+            <button
+              onClick={() => setShowCalibration(!showCalibration)}
+              className="w-full px-4 py-3 bg-gray-50 hover:bg-gray-100 flex items-center justify-between text-sm font-medium text-gray-700 transition-colors"
+            >
+              <span>Printer Calibration</span>
+              <span className={`transform transition-transform ${showCalibration ? 'rotate-180' : ''}`}>
+                ▼
+              </span>
+            </button>
+
+            {showCalibration && (
+              <div className="p-4 bg-white border-t border-gray-200">
+                <p className="text-xs text-gray-500 mb-4">
+                  If labels print slightly off-center, adjust these offsets. Positive values move the label right/down, negative values move it left/up.
+                </p>
+
+                {/* Horizontal Offset */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-gray-600">
+                      Horizontal Offset
+                    </label>
+                    <span className="text-xs font-mono text-purple-600">
+                      {formatOffset(offsetX)}"
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-0.1"
+                    max="0.1"
+                    step="0.005"
+                    value={offsetX}
+                    onChange={(e) => setOffsetX(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>-0.1" (left)</span>
+                    <span>0</span>
+                    <span>+0.1" (right)</span>
+                  </div>
+                </div>
+
+                {/* Vertical Offset */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-gray-600">
+                      Vertical Offset
+                    </label>
+                    <span className="text-xs font-mono text-purple-600">
+                      {formatOffset(offsetY)}"
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="-0.1"
+                    max="0.1"
+                    step="0.005"
+                    value={offsetY}
+                    onChange={(e) => setOffsetY(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>-0.1" (up)</span>
+                    <span>0</span>
+                    <span>+0.1" (down)</span>
+                  </div>
+                </div>
+
+                {/* Reset button */}
+                <button
+                  onClick={handleResetCalibration}
+                  className="text-xs text-purple-600 hover:text-purple-800 underline"
+                >
+                  Reset to default (0, 0)
+                </button>
+
+                {/* Calibration status */}
+                {(offsetX !== 0 || offsetY !== 0) && (
+                  <div className="mt-3 bg-purple-50 border border-purple-200 rounded p-2">
+                    <p className="text-xs text-purple-700">
+                      Custom calibration active: {formatOffset(offsetX)}" horizontal, {formatOffset(offsetY)}" vertical
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Note */}
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
             <p className="text-amber-800 text-xs">
-              <strong>Tip:</strong> Your last selected position will be remembered for next time. Print at 100% scale (no scaling) for proper alignment.
+              <strong>Tip:</strong> Print at 100% scale (no scaling) for proper alignment. Your position and calibration settings are saved automatically.
             </p>
           </div>
         </div>
