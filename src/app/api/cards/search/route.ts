@@ -18,7 +18,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
  * Returns:
  * Array of matching cards with basic info:
  * - id, serial, sport_type, visibility
- * - front_url (for thumbnail)
+ * - front_url (signed URL for thumbnail)
  * - player_name, year, manufacturer, set_name
  * - dvg_decimal_grade
  */
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Check if user is authenticated (for private card search)
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // Build query
+    // Build query - use front_path instead of front_url (we'll generate signed URLs)
     let query = supabase
       .from('cards')
       .select(`
@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
         sport_type,
         category,
         visibility,
-        front_url,
+        front_path,
         player_name,
         year,
         manufacturer,
@@ -96,10 +96,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Filter out user_id from results (privacy)
+    // Generate signed URLs for card images
+    const frontPaths = cards?.map(card => card.front_path).filter(Boolean) || [];
+    let urlMap = new Map<string, string>();
+
+    if (frontPaths.length > 0) {
+      const { data: signedUrls } = await supabase.storage
+        .from('cards')
+        .createSignedUrls(frontPaths, 60 * 60); // 1 hour expiry
+
+      if (signedUrls) {
+        signedUrls.forEach((item) => {
+          if (item.signedUrl && item.path) {
+            urlMap.set(item.path, item.signedUrl);
+          }
+        });
+      }
+    }
+
+    // Filter out user_id and front_path, add front_url
     const sanitizedCards = cards?.map(card => {
-      const { user_id, ...cardWithoutUserId } = card;
-      return cardWithoutUserId;
+      const { user_id, front_path, ...cardData } = card;
+      return {
+        ...cardData,
+        front_url: front_path ? urlMap.get(front_path) || null : null,
+      };
     }) || [];
 
     console.log(`🔍 Search: serial="${serial}", sport="${sport}", visibility="${visibilityParam}", results=${sanitizedCards.length}`);
