@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
     // Check if user is authenticated (for private card search)
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // Build query - use front_path instead of front_url (we'll generate signed URLs)
+    // Build query - use correct column names from database
     let query = supabase
       .from('cards')
       .select(`
@@ -52,13 +52,15 @@ export async function GET(request: NextRequest) {
         category,
         visibility,
         front_path,
-        player_name,
-        year,
-        manufacturer,
-        set_name,
+        featured,
+        card_name,
+        release_date,
+        manufacturer_name,
+        card_set,
         subset,
         dvg_decimal_grade,
         conversational_decimal_grade,
+        conversational_card_info,
         user_id,
         created_at
       `);
@@ -84,16 +86,23 @@ export async function GET(request: NextRequest) {
     }
 
     // Execute query
+    console.log(`🔍 [Search API] Searching for serial="${serial}", visibility="${visibilityParam}"`);
+
     const { data: cards, error: searchError } = await query
       .order('created_at', { ascending: false })
       .limit(50); // Limit to 50 results
 
     if (searchError) {
-      console.error('Error searching cards:', searchError);
+      console.error('❌ [Search API] Database error:', searchError);
       return NextResponse.json(
-        { error: "Failed to search cards" },
+        { error: "Failed to search cards", details: searchError.message },
         { status: 500 }
       );
+    }
+
+    console.log(`🔍 [Search API] Found ${cards?.length || 0} cards matching serial="${serial}"`);
+    if (cards && cards.length > 0) {
+      console.log(`🔍 [Search API] First match: id=${cards[0].id}, serial=${cards[0].serial}, visibility=${cards[0].visibility}`);
     }
 
     // Generate signed URLs for card images
@@ -114,12 +123,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Filter out user_id and front_path, add front_url
+    // Map database fields to frontend expected names, filter out user_id and front_path
     const sanitizedCards = cards?.map(card => {
-      const { user_id, front_path, ...cardData } = card;
+      // Extract player name from conversational_card_info if available
+      const convInfo = card.conversational_card_info;
+      const playerOrCharacter = convInfo?.player_or_character || card.featured || card.card_name || 'Unknown';
+
       return {
-        ...cardData,
-        front_url: front_path ? urlMap.get(front_path) || null : null,
+        id: card.id,
+        serial: card.serial,
+        sport_type: card.sport_type,
+        category: card.category,
+        visibility: card.visibility,
+        front_url: card.front_path ? urlMap.get(card.front_path) || null : null,
+        player_name: playerOrCharacter, // Map to expected frontend field name
+        year: convInfo?.year || card.release_date || '',
+        manufacturer: convInfo?.manufacturer || card.manufacturer_name || '',
+        set_name: convInfo?.set_name || card.card_set || '',
+        subset: convInfo?.subset || card.subset || '',
+        dvg_decimal_grade: card.dvg_decimal_grade,
+        conversational_decimal_grade: card.conversational_decimal_grade,
+        created_at: card.created_at,
       };
     }) || [];
 
