@@ -70,11 +70,13 @@ const getCardName = (card: Card) => {
 
 const getPlayerName = (card: Card) => {
   const cardInfo = getCardInfo(card);
-  // For sports cards: show player name first
+  // For sports cards AND Other cards: show player/character name first (primary subject)
   // For TCG cards (MTG, Pokemon, Lorcana): show card name first
   const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
-  return isSportsCard
-    ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown Player')
+  const isOtherCard = card.category === 'Other';
+  // Other cards prioritize player_or_character (person, character, or subject featured)
+  return (isSportsCard || isOtherCard)
+    ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown')
     : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card');
 };
 
@@ -453,11 +455,13 @@ function CollectionPageContent() {
               const cardInfo = getCardInfo(card);
 
               // Build player/card name for display
-              // For sports cards: show player name first
+              // For sports cards AND Other cards: show player/character name first (primary subject)
               // For TCG cards (MTG, Pokemon, Lorcana): show card name first
               const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
-              const displayName = isSportsCard
-                ? (cardInfo.player_or_character || cardInfo.card_name || "Unknown Player")
+              const isOtherCard = card.category === 'Other';
+              // Other cards prioritize player_or_character (person, character, or subject featured)
+              const displayName = (isSportsCard || isOtherCard)
+                ? (cardInfo.player_or_character || cardInfo.card_name || "Unknown")
                 : (cardInfo.card_name || cardInfo.player_or_character || "Unknown Card");
 
               // Build special features string (matches detail page line 2223-2230)

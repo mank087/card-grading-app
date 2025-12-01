@@ -27,10 +27,15 @@ function isValidValue(value: any): boolean {
 }
 
 // Helper: Build dynamic title for Other cards
-// Format: Card Name | Manufacturer | Set | Year | DCM Grade X
+// Format: Primary Subject | Manufacturer | Set | Year | DCM Grade X
+// For Other cards, player_or_character is the PRIMARY identifier (person, character, or subject)
 function buildTitle(card: any): string {
   // Use conversational AI data first, then database fields
+  // PRIORITY: player_or_character is the primary subject for Other cards (e.g., "Gisele Bundchen")
+  const playerOrCharacter = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || '';
   const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
+  // Use player_or_character first, fall back to card_name if not available
+  const primarySubject = playerOrCharacter || cardName;
   const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer || '';
   const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
   const cardDate = stripMarkdown(card.conversational_card_info?.card_date) || card.card_date || '';
@@ -38,9 +43,9 @@ function buildTitle(card: any): string {
 
   const titleParts: string[] = [];
 
-  // Card name - most important
-  if (isValidValue(cardName)) {
-    titleParts.push(cardName);
+  // Primary subject (player/character) - most important for Other cards
+  if (isValidValue(primarySubject)) {
+    titleParts.push(primarySubject);
   }
 
   // Manufacturer
@@ -84,8 +89,12 @@ function buildTitle(card: any): string {
 }
 
 // Helper: Build description for Other cards
+// For Other cards, player_or_character is the PRIMARY identifier
 function buildDescription(card: any): string {
+  // PRIORITY: player_or_character is the primary subject for Other cards
+  const playerOrCharacter = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || '';
   const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
+  const primarySubject = playerOrCharacter || cardName;
   const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer || '';
   const cardDate = stripMarkdown(card.conversational_card_info?.card_date) || card.card_date || '';
   const grade = card.conversational_decimal_grade;
@@ -102,7 +111,7 @@ function buildDescription(card: any): string {
 
   let desc = '';
 
-  const cardParts = [cardName, manufacturer, cardDate].filter(p => isValidValue(p));
+  const cardParts = [primarySubject, manufacturer, cardDate].filter(p => isValidValue(p));
   const cardId = cardParts.join(' ');
 
   if (grade !== null && grade !== undefined) {

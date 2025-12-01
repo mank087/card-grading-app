@@ -337,7 +337,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Build card details string (matches detail page format)
       // Extract English-only names for PDF compatibility
-      const playerOrCharacter = extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name);
+      // For sports and other cards: prioritize player_or_character (primary subject)
+      // For TCG cards (pokemon, mtg, lorcana): prioritize card_name
+      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
+      const playerOrCharacter = shouldPrioritizePlayer
+        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name)
+        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name);
       // Handle "null" string and actual null values, then fall back to set_era
       const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
                       (card.card_set && card.card_set !== 'null') ? card.card_set :
@@ -528,10 +533,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         return englishPart ? englishPart.trim() : text;
       };
 
-      // Build player/character name (prioritize player_or_character for sports cards)
-      const cardName = extractEnglishForPDF(
-        cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name
-      ) || 'Unknown Card';
+      // Build player/character name
+      // For sports and other cards: prioritize player_or_character (primary subject)
+      // For TCG cards (pokemon, mtg, lorcana): prioritize card_name
+      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
+      const cardName = shouldPrioritizePlayer
+        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
+        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
 
       // Build set name (include subset if available)
       const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
@@ -672,9 +680,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       };
 
       // Build player/character name
-      const cardName = extractEnglishForPDF(
-        cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name
-      ) || 'Unknown Card';
+      // For sports and other cards: prioritize player_or_character (primary subject)
+      // For TCG cards (pokemon, mtg, lorcana): prioritize card_name
+      const shouldPrioritizePlayerAvery = cardType === 'sports' || cardType === 'other';
+      const cardName = shouldPrioritizePlayerAvery
+        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
+        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
 
       // Build set name
       const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
