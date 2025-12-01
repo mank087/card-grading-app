@@ -10,6 +10,7 @@ import {
   FoldableLabelData,
   generateFoldableLabel,
   generateQRCodeWithLogo,
+  generateQRCodePlain,
   loadLogoAsBase64
 } from '../../lib/foldableLabelGenerator';
 import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
@@ -697,41 +698,58 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const weightedScores = card.conversational_weighted_sub_scores || {};
       const subScores = card.conversational_sub_scores || {};
 
-      // Generate QR code and load logo
+      // Generate plain QR code (no logo) for better scannability and load logo separately
       const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
-      console.log('[AVERY LABEL] Generating QR code for URL:', cardUrl);
+      console.log('[AVERY LABEL] Generating plain QR code for URL:', cardUrl);
 
       const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-        generateQRCodeWithLogo(cardUrl),
+        generateQRCodePlain(cardUrl),  // Plain QR for better scanning on small labels
         loadLogoAsBase64().catch(() => undefined)
       ]);
 
-      // Rotate QR code 180 degrees for Avery label (so it's upside down on printed label)
-      // When the label folds over, this will appear right-side up on the back
+      // Helper function to rotate an image 180 degrees
+      const rotateImage180 = async (dataUrl: string): Promise<string> => {
+        const img = new Image();
+        img.src = dataUrl;
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error('Failed to load image for rotation'));
+        });
+
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.translate(canvas.width / 2, canvas.height / 2);
+          ctx.rotate(Math.PI); // 180 degrees
+          ctx.translate(-canvas.width / 2, -canvas.height / 2);
+          ctx.drawImage(img, 0, 0);
+          return canvas.toDataURL('image/png');
+        }
+        return dataUrl;
+      };
+
+      // Rotate QR code and logo 180 degrees for Avery label (so they're upside down on printed label)
+      // When the label folds over, both will appear right-side up on the back
       let rotatedQrCodeDataUrl = qrCodeDataUrl;
+      let rotatedLogoDataUrl: string | undefined = undefined;
+
       if (qrCodeDataUrl) {
         try {
-          const img = new Image();
-          img.src = qrCodeDataUrl;
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error('Failed to load QR for rotation'));
-          });
-
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.translate(canvas.width / 2, canvas.height / 2);
-            ctx.rotate(Math.PI); // 180 degrees
-            ctx.translate(-canvas.width / 2, -canvas.height / 2);
-            ctx.drawImage(img, 0, 0);
-            rotatedQrCodeDataUrl = canvas.toDataURL('image/png');
-            console.log('[AVERY LABEL] QR code rotated 180 degrees');
-          }
+          rotatedQrCodeDataUrl = await rotateImage180(qrCodeDataUrl);
+          console.log('[AVERY LABEL] QR code rotated 180 degrees');
         } catch (e) {
           console.warn('[AVERY LABEL] Could not rotate QR code, using original');
+        }
+      }
+
+      if (logoDataUrl) {
+        try {
+          rotatedLogoDataUrl = await rotateImage180(logoDataUrl);
+          console.log('[AVERY LABEL] Logo rotated 180 degrees');
+        } catch (e) {
+          console.warn('[AVERY LABEL] Could not rotate logo, skipping');
         }
       }
 
@@ -763,6 +781,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         qrCodeDataUrl: rotatedQrCodeDataUrl, // Use rotated QR for Avery label
         cardUrl,
         logoDataUrl,
+        rotatedLogoDataUrl, // Rotated logo for top half of Avery label
       };
 
       console.log('[AVERY LABEL] Generating PDF with offsets:', offsets);

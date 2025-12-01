@@ -91,7 +91,8 @@ export interface FoldableLabelData {
   cardUrl: string;           // URL for verification
 
   // Logo
-  logoDataUrl?: string;      // Base64 DCM logo
+  logoDataUrl?: string;         // Base64 DCM logo (right-side up)
+  rotatedLogoDataUrl?: string;  // Base64 DCM logo (rotated 180° for fold-over labels)
 }
 
 /**
@@ -149,6 +150,29 @@ export async function generateQRCodeWithLogo(url: string): Promise<string> {
 
     logo.src = '/DCM-logo.png';
   });
+}
+
+/**
+ * Generate plain QR code without logo overlay for better scannability
+ * Used for smaller labels like Avery where scanning is more challenging
+ * Must be called from browser context
+ */
+export async function generateQRCodePlain(url: string): Promise<string> {
+  // Dynamic import to avoid SSR issues
+  const QRCode = (await import('qrcode')).default;
+
+  const canvas = document.createElement('canvas');
+  await QRCode.toCanvas(canvas, url, {
+    width: 150,
+    margin: 1,
+    color: {
+      dark: '#000000',
+      light: '#FFFFFF',
+    },
+    errorCorrectionLevel: 'M', // Medium error correction (no logo obstruction)
+  });
+
+  return canvas.toDataURL('image/png');
 }
 
 /**

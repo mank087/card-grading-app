@@ -152,23 +152,8 @@ function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition,
   const purpleBarHeight = 10;
 
   // ============================================
-  // PURPLE BORDER (entire label outline with bleed)
-  // Border bleeds 1/16" beyond label edge to account for printer variations
-  // This ensures the purple border is visible even if printing is slightly off
+  // BORDER REMOVED - Clean label design without outline
   // ============================================
-  const borderWidth = 3;  // Thicker border for visibility
-  doc.setDrawColor(COLORS.purplePrimary);
-  doc.setLineWidth(borderWidth);
-  // Draw border with bleed extending beyond label boundaries
-  doc.roundedRect(
-    x - BORDER_BLEED + borderWidth / 2,
-    y - BORDER_BLEED + borderWidth / 2,
-    LABEL_WIDTH + (BORDER_BLEED * 2) - borderWidth,
-    LABEL_HEIGHT + (BORDER_BLEED * 2) - borderWidth,
-    CORNER_RADIUS,
-    CORNER_RADIUS,
-    'S'
-  );
 
   // ============================================
   // CENTER: Purple "Dynamic Collectibles Management" bar
@@ -188,18 +173,26 @@ function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition,
   doc.text('Dynamic Collectibles Management', x + LABEL_WIDTH / 2, purpleBarY + 7, { align: 'center' });
 
   // ============================================
-  // TOP HALF (BACK): QR Code upside down, centered
-  // The QR is drawn upside down so when the label folds over,
-  // it appears right-side up on the back of the slab
+  // TOP HALF (BACK): QR Code centered, DCM Logo at top-right
+  // When the label folds over the back of the one-touch slab,
+  // both will appear right-side up. The logo position mirrors
+  // the bottom-left logo on the front half.
   // ============================================
   const backAreaY = y + padding;
   const backAreaHeight = halfHeight - (purpleBarHeight / 2) - padding;
-  const qrSize = Math.min(backAreaHeight - 2, 24); // Fit within back area
-  const qrX = x + (LABEL_WIDTH - qrSize) / 2; // Centered horizontally
-  const qrY = backAreaY + (backAreaHeight - qrSize) / 2; // Centered vertically in back area
+  const qrSize = Math.min(backAreaHeight - 2, 32); // Larger QR for better scanning
+  const topLogoSize = 24; // Match the bottom logo size
 
-  // Draw QR code - the rotation will be handled by passing rotatedQrCodeDataUrl
-  // For now, draw it normally - rotation is done in the caller
+  // QR code centered horizontally, positioned near top edge
+  const qrX = x + (LABEL_WIDTH - qrSize) / 2;
+  const qrY = y + 4.5; // Moved 0.5 closer to purple bar (was y + 1, now y + 4.5)
+
+  // Logo at top-right corner (mirrors bottom-left logo position)
+  // When upside down: top-right becomes bottom-left after folding
+  const topLogoX = x + LABEL_WIDTH - padding - topLogoSize - 2;
+  const topLogoY = y + 4.5; // Aligned with QR code
+
+  // Draw QR code (already rotated 180° by caller)
   if (data.qrCodeDataUrl) {
     try {
       doc.addImage(data.qrCodeDataUrl, 'PNG', qrX, qrY, qrSize, qrSize);
@@ -211,6 +204,19 @@ function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition,
       doc.setTextColor(COLORS.textLight);
       doc.setFontSize(5);
       doc.text('QR', qrX + qrSize / 2, qrY + qrSize / 2 + 2, { align: 'center' });
+    }
+  }
+
+  // Draw DCM logo at top-right (upside down - rotation handled by rotatedLogoDataUrl)
+  if (data.rotatedLogoDataUrl) {
+    try {
+      doc.addImage(data.rotatedLogoDataUrl, 'PNG', topLogoX, topLogoY, topLogoSize, topLogoSize);
+    } catch (e) {
+      // Fallback text if logo fails
+      doc.setTextColor(COLORS.purplePrimary);
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DCM', topLogoX + topLogoSize / 2, topLogoY + topLogoSize / 2 + 2, { align: 'center' });
     }
   }
 
