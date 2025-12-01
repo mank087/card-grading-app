@@ -563,16 +563,22 @@ function CollectionPageContent() {
                             ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
                             : (grade ? getConditionFromGrade(grade) : '');
 
+                          // Check if this is an Altered/Authentic card (has AA condition label but no numeric grade)
+                          const isAlteredAuthentic = card.conversational_condition_label &&
+                            (card.conversational_condition_label.toLowerCase().includes('altered') ||
+                             card.conversational_condition_label.toLowerCase().includes('authentic altered') ||
+                             card.conversational_condition_label.includes('(AA)'));
+
                           return (
                             <>
                               <div className="font-bold text-purple-700 text-3xl leading-none">
-                                {grade ? formatGrade(grade) : '?'}
+                                {grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
                               </div>
-                              {condition && (
+                              {(condition || isAlteredAuthentic) && (
                                 <>
                                   <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
                                   <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                                    {condition}
+                                    {isAlteredAuthentic && !grade ? 'Authentic' : condition}
                                   </div>
                                 </>
                               )}
@@ -751,12 +757,18 @@ function CollectionPageContent() {
                               ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
                               : (grade ? getConditionFromGrade(grade) : '');
 
+                            // Check if this is an Altered/Authentic card
+                            const isAlteredAuthentic = card.conversational_condition_label &&
+                              (card.conversational_condition_label.toLowerCase().includes('altered') ||
+                               card.conversational_condition_label.toLowerCase().includes('authentic altered') ||
+                               card.conversational_condition_label.includes('(AA)'));
+
                             return (
                               <div>
-                                <span>{grade ? formatGrade(grade) : '-'}</span>
-                                {condition && (
-                                  <div className="text-xs text-gray-500 truncate" title={condition}>
-                                    {condition}
+                                <span>{grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : '-')}</span>
+                                {(condition || isAlteredAuthentic) && (
+                                  <div className="text-xs text-gray-500 truncate" title={isAlteredAuthentic && !grade ? 'Authentic' : condition}>
+                                    {isAlteredAuthentic && !grade ? 'Authentic' : condition}
                                   </div>
                                 )}
                               </div>
