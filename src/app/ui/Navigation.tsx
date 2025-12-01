@@ -85,9 +85,8 @@ export default function Navigation() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchSerial.trim()) {
-      // Navigate to search results or card page
-      // For now, assume it's searching for card serial in collection
-      router.push(`/collection?search=${encodeURIComponent(searchSerial.trim())}`);
+      // Navigate to public search page (works for anyone, logged in or not)
+      router.push(`/search?serial=${encodeURIComponent(searchSerial.trim())}`);
       setSearchSerial("");
     }
   };

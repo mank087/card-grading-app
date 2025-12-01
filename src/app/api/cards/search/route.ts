@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
         id,
         serial,
         sport_type,
+        category,
         visibility,
         front_url,
         player_name,
@@ -57,6 +58,7 @@ export async function GET(request: NextRequest) {
         set_name,
         subset,
         dvg_decimal_grade,
+        conversational_decimal_grade,
         user_id,
         created_at
       `);

@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -8,6 +9,7 @@ interface CardResult {
   id: string;
   serial: string;
   sport_type: string;
+  category?: string;
   visibility: string;
   front_url: string;
   player_name: string;
@@ -16,20 +18,29 @@ interface CardResult {
   set_name: string;
   subset?: string;
   dvg_decimal_grade: number;
+  conversational_decimal_grade?: number;
   created_at: string;
 }
 
-export default function SearchPage() {
-  const [searchQuery, setSearchQuery] = useState('');
+function SearchPageContent() {
+  const searchParams = useSearchParams();
+  const initialSerial = searchParams?.get('serial') || '';
+
+  const [searchQuery, setSearchQuery] = useState(initialSerial);
   const [results, setResults] = useState<CardResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Auto-search if serial provided in URL
+  useEffect(() => {
+    if (initialSerial) {
+      performSearch(initialSerial);
+    }
+  }, [initialSerial]);
 
-    if (!searchQuery.trim()) {
+  const performSearch = async (serial: string) => {
+    if (!serial.trim()) {
       setError('Please enter a serial number');
       return;
     }
@@ -39,7 +50,7 @@ export default function SearchPage() {
     setHasSearched(false);
 
     try {
-      const response = await fetch(`/api/cards/search?serial=${encodeURIComponent(searchQuery)}&visibility=public`);
+      const response = await fetch(`/api/cards/search?serial=${encodeURIComponent(serial)}&visibility=public`);
 
       if (!response.ok) {
         throw new Error('Search failed');
@@ -53,6 +64,39 @@ export default function SearchPage() {
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    performSearch(searchQuery);
+  };
+
+  // Helper to get the correct card detail link based on category
+  const getCardLink = (card: CardResult) => {
+    const category = card.category || card.sport_type;
+    const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
+
+    if (category && sportCategories.includes(category)) {
+      return `/sports/${card.id}`;
+    }
+    if (category === 'Pokemon') {
+      return `/pokemon/${card.id}`;
+    }
+    if (category === 'MTG') {
+      return `/mtg/${card.id}`;
+    }
+    if (category === 'Lorcana') {
+      return `/lorcana/${card.id}`;
+    }
+    if (category === 'Other') {
+      return `/other/${card.id}`;
+    }
+    return `/sports/${card.id}`; // Default fallback
+  };
+
+  // Helper to get the grade
+  const getGrade = (card: CardResult) => {
+    return card.conversational_decimal_grade ?? card.dvg_decimal_grade;
   };
 
   return (
@@ -121,7 +165,7 @@ export default function SearchPage() {
               {results.map((card) => (
                 <Link
                   key={card.id}
-                  href={`/sports/${card.id}`}
+                  href={getCardLink(card)}
                   className="block bg-white border-2 border-gray-200 rounded-lg overflow-hidden hover:border-blue-500 hover:shadow-lg transition-all"
                 >
                   {/* Card Image */}
@@ -145,7 +189,7 @@ export default function SearchPage() {
                   <div className="p-4">
                     {/* Player Name */}
                     <h3 className="font-bold text-lg text-gray-900 mb-1 truncate">
-                      {card.player_name || 'Unknown Player'}
+                      {card.player_name || 'Unknown'}
                     </h3>
 
                     {/* Card Details */}
@@ -159,7 +203,7 @@ export default function SearchPage() {
                       <div className="bg-purple-100 px-3 py-1 rounded-lg">
                         <p className="text-xs text-purple-700 font-semibold">DCM GRADE</p>
                         <p className="text-2xl font-bold text-purple-900">
-                          {card.dvg_decimal_grade?.toFixed(1) || 'N/A'}
+                          {getGrade(card)?.toFixed(1) || 'N/A'}
                         </p>
                       </div>
                       <div className="bg-green-100 px-3 py-1 rounded-lg">
@@ -216,5 +260,14 @@ export default function SearchPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap in Suspense for Next.js 15 useSearchParams() requirement
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center">Loading search...</div>}>
+      <SearchPageContent />
+    </Suspense>
   );
 }
