@@ -42,13 +42,12 @@ export async function GET(request: NextRequest) {
     // Check if user is authenticated (for private card search)
     const { data: { user }, error: authError } = await supabase.auth.getUser();
 
-    // Build query - use correct column names from database
+    // Build query - use correct column names from database (matching my-collection route)
     let query = supabase
       .from('cards')
       .select(`
         id,
         serial,
-        sport_type,
         category,
         visibility,
         front_path,
@@ -57,7 +56,6 @@ export async function GET(request: NextRequest) {
         release_date,
         manufacturer_name,
         card_set,
-        subset,
         dvg_decimal_grade,
         conversational_decimal_grade,
         conversational_card_info,
@@ -68,9 +66,9 @@ export async function GET(request: NextRequest) {
     // Search by serial number (case-insensitive, partial match)
     query = query.ilike('serial', `%${serial}%`);
 
-    // Filter by sport if specified
+    // Filter by category if specified
     if (sport && sport !== 'all') {
-      query = query.eq('sport_type', sport);
+      query = query.eq('category', sport);
     }
 
     // Apply visibility filter
@@ -126,13 +124,13 @@ export async function GET(request: NextRequest) {
     // Map database fields to frontend expected names, filter out user_id and front_path
     const sanitizedCards = cards?.map(card => {
       // Extract player name from conversational_card_info if available
-      const convInfo = card.conversational_card_info;
+      const convInfo = card.conversational_card_info as any;
       const playerOrCharacter = convInfo?.player_or_character || card.featured || card.card_name || 'Unknown';
 
       return {
         id: card.id,
         serial: card.serial,
-        sport_type: card.sport_type,
+        sport_type: card.category, // Map category to sport_type for frontend
         category: card.category,
         visibility: card.visibility,
         front_url: card.front_path ? urlMap.get(card.front_path) || null : null,
@@ -140,7 +138,7 @@ export async function GET(request: NextRequest) {
         year: convInfo?.year || card.release_date || '',
         manufacturer: convInfo?.manufacturer || card.manufacturer_name || '',
         set_name: convInfo?.set_name || card.card_set || '',
-        subset: convInfo?.subset || card.subset || '',
+        subset: convInfo?.subset || '',
         dvg_decimal_grade: card.dvg_decimal_grade,
         conversational_decimal_grade: card.conversational_decimal_grade,
         created_at: card.created_at,
@@ -160,10 +158,10 @@ export async function GET(request: NextRequest) {
       }
     }, { status: 200 });
 
-  } catch (error) {
-    console.error('Error in card search:', error);
+  } catch (error: any) {
+    console.error('❌ [Search API] Unexpected error:', error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", details: error?.message || String(error) },
       { status: 500 }
     );
   }
