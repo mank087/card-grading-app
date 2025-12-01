@@ -23,8 +23,9 @@ import {
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
-import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS } from '@/types/card';
+import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
+import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -620,6 +621,39 @@ const formatGradedDate = (dateString: string | undefined): string => {
     return date.toLocaleDateString('en-US', options);
   } catch (error) {
     return 'N/A';
+  }
+};
+
+// Helper: Extract DCM Optic version from prompt_version string
+// e.g., "Conversational_Grading_v5.5_THREE_PASS" -> "V5.5"
+const extractDCMOpticVersion = (promptVersion: string | undefined | null): string | null => {
+  if (!promptVersion) return null;
+
+  // Match version pattern like v5.0, v5.5, v4.2, etc.
+  const versionMatch = promptVersion.match(/v(\d+\.?\d*)/i);
+  if (versionMatch) {
+    return `V${versionMatch[1]}`;
+  }
+  return null;
+};
+
+// Helper: Get DCM Optic version from card's conversational grading JSON
+const getDCMOpticVersion = (card: SportsCard): string | null => {
+  if (!card.conversational_grading) return null;
+
+  try {
+    const parsed = JSON.parse(card.conversational_grading);
+    // Check multiple possible locations for version info
+    // Priority: prompt_version > rubric_version > model_version
+    const versionSource = parsed.prompt_version ||
+                          parsed.metadata?.prompt_version ||
+                          parsed.meta?.prompt_version ||
+                          parsed.metadata?.rubric_version ||
+                          parsed.meta?.version ||
+                          parsed.metadata?.model_version;
+    return extractDCMOpticVersion(versionSource);
+  } catch {
+    return null;
   }
 };
 
@@ -5453,6 +5487,14 @@ export function PokemonCardDetails() {
                             );
                           };
 
+                          // Three-Pass Evaluation Summary (v5.5)
+                          const renderThreePassSummary = () => {
+                            const gradingPasses = jsonData.grading_passes as GradingPasses | undefined;
+                            if (!gradingPasses) return null;
+
+                            return <ThreePassSummary gradingPasses={gradingPasses} />;
+                          };
+
                           // Set Metadata Section
                           const renderSetMetadata = () => {
                             const meta = jsonData.card_info?.set_metadata || jsonData.set_metadata;
@@ -5695,6 +5737,7 @@ export function PokemonCardDetails() {
                           return (
                             <div className="space-y-2">
                               {renderCardInfo()}
+                              {renderThreePassSummary()}
                               {renderSetMetadata()}
                               {renderCentering()}
                               {renderCorners()}
@@ -5905,8 +5948,13 @@ export function PokemonCardDetails() {
             </div>
           )}
 
-          {/* Graded Date Section */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
+          {/* DCM Optic Version and Graded Date Section */}
+          <div className="mt-6 pt-4 border-t border-gray-200 space-y-1">
+            {getDCMOpticVersion(card) && (
+              <p className="text-sm text-gray-600 text-center">
+                DCM Optic™ Version: <span className="font-semibold text-gray-800">{getDCMOpticVersion(card)}</span>
+              </p>
+            )}
             <p className="text-sm text-gray-600 text-center">
               Graded Date: <span className="font-semibold text-gray-800">{formatGradedDate(card.created_at)}</span>
             </p>

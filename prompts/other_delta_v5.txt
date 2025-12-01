@@ -1,13 +1,17 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: OTHER/GENERIC TRADING CARDS v5.0
+CARD TYPE DELTA: OTHER/GENERIC TRADING CARDS v5.5
 ═══════════════════════════════════════════════════════════════════════
 
-**DELTA PURPOSE:** This file contains ONLY generic trading card rules.
+**DELTA PURPOSE:** This file contains rules for non-sport collectible cards.
 The master grading rubric (Sections 1-13) applies to ALL trading cards.
-This delta provides simplified extraction rules for cards that don't fit other categories.
+This delta provides extraction rules for cards that don't fit other categories.
 
 **CARD TYPES COVERED:**
-Yu-Gi-Oh!, Cardfight!! Vanguard, Flesh and Blood, Final Fantasy TCG, Dragon Ball Super, Digimon, MetaZoo, and any other trading card games not covered by specific deltas.
+• Non-sport trading cards (entertainment, celebrities, movies, TV shows)
+• Yu-Gi-Oh!, Cardfight!! Vanguard, Flesh and Blood, Final Fantasy TCG
+• Dragon Ball Super, Digimon, MetaZoo, Weiss Schwarz
+• Autograph cards, memorabilia/relic cards
+• Any other trading card games not covered by specific deltas
 
 ═══════════════════════════════════════════════════════════════════════
 A. GENERIC CARD INFORMATION EXTRACTION
@@ -19,38 +23,56 @@ Extract the following fields from generic trading cards:
 REQUIRED FIELDS (All Generic Cards)
 ────────────────────────────────────────────────────────────────────────
 
+**player_or_character**: PRIMARY CARD SUBJECT (MOST IMPORTANT FIELD)
+• This is the MAIN identifier for the card - the person, character, or subject featured
+• For celebrity/entertainment cards: The person's full name (e.g., "Gisele Bundchen", "Tom Brady")
+• For character cards: The character name (e.g., "Blue-Eyes White Dragon", "Goku")
+• For team/group cards: The group name or primary figure
+• This field should ALWAYS identify WHO or WHAT the card features
+• NEVER use the set name, subset, or product line here
+
 **card_name**: Card name/title
-• Extract main card name as printed
-• Example: "Blue-Eyes White Dragon", "Exodia the Forbidden One"
+• The full card title as printed on the card
+• May include player name + subset (e.g., "Gisele Bundchen Pop Century Autograph")
+• For TCGs: Card name as printed (e.g., "Blue-Eyes White Dragon")
 
-**player_or_character**: Character/monster/entity name
-• Often same as card_name
-• Example: "Goku", "Naruto", "Charizard" (non-Pokemon context)
-
-**set_name**: Set/expansion name
-• Extract from card or packaging
-• Example: "Legend of Blue Eyes White Dragon", "Battle Spirits"
+**set_name**: Set/expansion/product line name
+• The product line or set the card belongs to
+• Examples: "Pop Century", "Donruss", "Legend of Blue Eyes White Dragon"
+• This is the COLLECTION, not the subject
 • If unclear: null
 
 **card_number**: Card number
-• Format varies by game
-• Example: "LOB-001", "#45/100", "123"
+• Format varies by game/product
+• Example: "LOB-001", "#45/100", "123", "GQ-GB"
 • Extract as shown on card
 
 **year**: Release year
-• 4-digit year from copyright text
+• 4-digit year from copyright text or card design
 • Example: "2024", "2002"
 • If not visible: null
 
-**manufacturer**: Card publisher
-• Extract game publisher
-• Examples: Konami (Yu-Gi-Oh!), Bushiroad (Cardfight!! Vanguard, Weiss Schwarz), etc.
+**manufacturer**: Card publisher/producer
+• Extract game publisher or card manufacturer
+• Examples: Panini, Upper Deck, Topps, Konami, Bushiroad, etc.
 • If unclear: null
 
 **authentic**: Licensed product verification (true|false)
 • true if official licensed product
-• Check for official game logos and publisher marks
+• Check for official logos and publisher marks
 • false if proxy/counterfeit/unofficial
+
+**autographed**: Does card contain an autograph? (true|false)
+• true if card has ANY signature/autograph (on-card, sticker, cut signature)
+• Check for handwritten signatures anywhere on the card
+• true for certified autograph cards, authenticated signatures
+• false if no signature present
+
+**memorabilia**: Does card contain memorabilia/relic? (true|false)
+• true if card has embedded material (jersey swatch, fabric, game-used item)
+• Check for relic windows or embedded materials
+• true for patch cards, jersey cards, game-used memorabilia
+• false if no embedded materials
 
 ────────────────────────────────────────────────────────────────────────
 ENHANCED FIELDS (Game-Specific, Extract If Visible)
@@ -222,19 +244,19 @@ E. NOTES FOR UNCOMMON/OBSCURE TCGs
    • Document any unique characteristics in notes
 
 ═══════════════════════════════════════════════════════════════════════
-END OF OTHER/GENERIC DELTA v5.0
+END OF OTHER/GENERIC DELTA v5.5
 ═══════════════════════════════════════════════════════════════════════
 
-**TOTAL LINES:** ~240
-**ESTIMATED TOKENS:** ~1,800-2,200
+**TOTAL LINES:** ~260
+**ESTIMATED TOKENS:** ~2,000-2,400
 
 **COMBINED PROMPT SIZE (Master + Other Delta):**
 • Master Rubric: ~18,000-20,000 tokens
-• Other Delta: ~1,800-2,200 tokens
-• **TOTAL: ~19,800-22,200 tokens** ✓ Within target range
+• Other Delta: ~2,000-2,400 tokens
+• **TOTAL: ~20,000-22,400 tokens** ✓ Within target range
 
 When grading other/generic trading cards, use:
-1. Master Grading Rubric v5.0 (universal grading rules)
-2. Other Delta v5.0 (this file - generic card rules)
+1. Master Grading Rubric v5.5 (universal grading rules)
+2. Other Delta v5.5 (this file - generic card rules)
 
 Apply ALL instructions from BOTH files to complete grading analysis.

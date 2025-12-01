@@ -117,6 +117,35 @@ export interface GradingMetadata {
   timestamp: string;
 }
 
+// Three-Pass Grading System (v5.5)
+export interface GradingPass {
+  centering: number;      // Weighted centering score (0-10)
+  corners: number;        // Weighted corners score (0-10)
+  edges: number;          // Weighted edges score (0-10)
+  surface: number;        // Weighted surface score (0-10)
+  final: number;          // Final grade for this pass (0-10)
+  defects_noted: string[]; // Key defects observed in this pass
+}
+
+export interface GradingPassAveraged {
+  centering: number;      // Averaged centering score
+  corners: number;        // Averaged corners score
+  edges: number;          // Averaged edges score
+  surface: number;        // Averaged surface score
+  final: number;          // Averaged final grade
+}
+
+export interface GradingPasses {
+  pass_1: GradingPass;
+  pass_2: GradingPass;
+  pass_3: GradingPass;
+  averaged: GradingPassAveraged;        // Raw averages before rounding
+  averaged_rounded: GradingPassAveraged; // Averages rounded to nearest 0.5
+  variance: number;                      // MAX - MIN of final grades
+  consistency: 'high' | 'moderate' | 'low';
+  consensus_notes: string[];             // Notes about 1/3 pass defects
+}
+
 // Complete card type (matches database schema)
 export interface Card {
   // IDs
@@ -165,6 +194,9 @@ export interface Card {
   conversational_defects_back?: SideDefects | null;
   conversational_centering?: CenteringMeasurements | null;
   conversational_metadata?: GradingMetadata | null;
+
+  // NEW: Three-Pass Consensus Grading (v5.5)
+  conversational_grading_passes?: GradingPasses | null;
 
   // Professional grades
   estimated_professional_grades: ProfessionalGrades | null;

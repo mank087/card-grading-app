@@ -27,6 +27,7 @@ const MetaSchema = z.object({
   model_name: z.string().describe('AI model used for grading (e.g., "gpt-4o")'),
   provider: z.string().describe('AI provider (e.g., "openai")'),
   version: z.string().describe('Schema version (e.g., "v5.0")'),
+  prompt_version: z.string().describe('Grading prompt version (e.g., "Conversational_Grading_v5.5_THREE_PASS")'),
   card_type: z.enum(['sports', 'pokemon', 'mtg', 'lorcana', 'other']).describe('Card type determines which delta rules were applied')
 });
 
@@ -239,6 +240,44 @@ const ProfessionalGradeEstimatesSchema = z.object({
 }).describe('Estimated grades across major professional grading companies');
 
 /**
+ * Three-Pass Grading System (v5.5)
+ * Each pass contains weighted sub-scores and final grade
+ */
+const GradingPassSchema = z.object({
+  centering: z.number().min(0).max(10).describe('Weighted centering score for this pass (0-10, use .0 or .5 only)'),
+  corners: z.number().min(0).max(10).describe('Weighted corners score for this pass (0-10, use .0 or .5 only)'),
+  edges: z.number().min(0).max(10).describe('Weighted edges score for this pass (0-10, use .0 or .5 only)'),
+  surface: z.number().min(0).max(10).describe('Weighted surface score for this pass (0-10, use .0 or .5 only)'),
+  final: z.number().min(0).max(10).describe('Final grade for this pass using weakest link (0-10, use .0 or .5 only)'),
+  defects_noted: z.array(z.string()).describe('Key defects observed in this pass')
+}).describe('Single grading pass with weighted sub-scores');
+
+const GradingPassAveragedSchema = z.object({
+  centering: z.number().min(0).max(10).describe('Averaged centering score across all passes'),
+  corners: z.number().min(0).max(10).describe('Averaged corners score across all passes'),
+  edges: z.number().min(0).max(10).describe('Averaged edges score across all passes'),
+  surface: z.number().min(0).max(10).describe('Averaged surface score across all passes'),
+  final: z.number().min(0).max(10).describe('Averaged final grade across all passes')
+}).describe('Averaged scores across all three passes');
+
+const GradingPassesSchema = z.object({
+  pass_1: GradingPassSchema.describe('First independent grading pass'),
+  pass_2: GradingPassSchema.describe('Second independent grading pass'),
+  pass_3: GradingPassSchema.describe('Third independent grading pass'),
+  averaged: GradingPassAveragedSchema.describe('Raw averaged scores (before rounding)'),
+  averaged_rounded: GradingPassAveragedSchema.describe('Averaged scores rounded to nearest 0.5'),
+  variance: z.number().min(0).describe('Variance between passes (MAX - MIN of final grades)'),
+  consistency: z.enum(['high', 'moderate', 'low']).describe(
+    'Consistency classification based on variance: ' +
+    'high (variance ≤ 0.5), moderate (0.5 < variance ≤ 1.0), low (variance > 1.0)'
+  ),
+  consensus_notes: z.array(z.string()).describe(
+    'Notes about defects detected in only 1 of 3 passes (not included in final score). ' +
+    'Format: "[Defect type] detected in 1 of 3 passes (not included in final score)"'
+  )
+}).describe('Three-pass consensus grading results (v5.5)');
+
+/**
  * Final grade with validation
  *
  * CRITICAL VALIDATION FROM EVIDENCE-BASED PROTOCOL:
@@ -390,14 +429,16 @@ const LorcanaCardInfoSchema = z.object({
  * Other/Generic trading card information (from other_delta_v5.txt)
  */
 const OtherCardInfoSchema = z.object({
-  // Required universal fields
-  card_name: z.string().describe('Card name/title as printed'),
-  player_or_character: z.string().describe('Character/monster/entity name'),
-  set_name: z.string().nullable().describe('Set/expansion name'),
+  // Required universal fields - player_or_character is PRIMARY identifier
+  player_or_character: z.string().describe('PRIMARY: Person, character, or subject featured on the card (e.g., "Gisele Bundchen", "Blue-Eyes White Dragon")'),
+  card_name: z.string().describe('Full card name/title as printed'),
+  set_name: z.string().nullable().describe('Set/expansion/product line name (e.g., "Pop Century", "Legend of Blue Eyes")'),
   year: z.string().nullable().describe('Release year (4 digits)'),
-  manufacturer: z.string().nullable().describe('Card publisher (Konami, Bushiroad, etc.)'),
+  manufacturer: z.string().nullable().describe('Card publisher (Panini, Upper Deck, Topps, Konami, Bushiroad, etc.)'),
   card_number: z.string().nullable().describe('Card number as shown'),
-  authentic: z.boolean().describe('Is card authentic?'),
+  authentic: z.boolean().describe('Is card authentic licensed product?'),
+  autographed: z.boolean().describe('Does card contain an autograph/signature?'),
+  memorabilia: z.boolean().describe('Does card contain memorabilia/relic material?'),
 
   // Generic/Other enhanced fields
   rarity_tier: z.string().optional().describe('Card rarity (see other_delta_v5.txt Section B)'),
@@ -536,11 +577,23 @@ export const CardGradingResponseSchemaV5 = z.object({
     back_observations: z.array(z.string()).describe('Key observations from back'),
     positives: z.array(z.string()).describe('Positive aspects of card condition'),
     negatives: z.array(z.string()).describe('Negative aspects / defects found')
-  }).optional()
-}).describe('Complete card grading analysis v5.0 with evidence-based validation');
+  }).optional(),
+
+  // Three-Pass Consensus Grading (v5.5)
+  // Contains individual pass scores, averages, and consensus notes
+  grading_passes: GradingPassesSchema.describe(
+    'Three-pass consensus grading results. Contains scores from three independent evaluations, ' +
+    'averaged results, variance/consistency metrics, and notes about defects detected in only 1 pass.'
+  )
+}).describe('Complete card grading analysis v5.5 with three-pass consensus grading');
 
 // Export type for TypeScript usage
 export type CardGradingResponseV5 = z.infer<typeof CardGradingResponseSchemaV5>;
+
+// Export Three-Pass Grading types (v5.5)
+export type GradingPass = z.infer<typeof GradingPassSchema>;
+export type GradingPassAveraged = z.infer<typeof GradingPassAveragedSchema>;
+export type GradingPasses = z.infer<typeof GradingPassesSchema>;
 
 /**
  * Create OpenAI zodResponseFormat for structured outputs

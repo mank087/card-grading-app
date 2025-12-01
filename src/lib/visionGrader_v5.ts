@@ -1,11 +1,14 @@
 /**
- * Vision Grader v5.0
- * Supports new master rubric + delta architecture with OpenAI Structured Outputs
+ * Vision Grader v5.5
+ * Supports master rubric + delta architecture with Three-Pass Consensus Grading
  *
  * Features:
  * - Master rubric + card-type delta loading
+ * - THREE-PASS CONSENSUS GRADING (v5.5): Three independent evaluations averaged for final grade
  * - OpenAI json_schema response format with Zod validation
  * - Evidence-based protocol enforcement
+ * - Defect consensus: Only include defects detected in 2+ passes
+ * - Variance/consistency metrics for confidence indication
  * - Backward compatibility with v4.2
  * - A/B testing support
  */
@@ -53,7 +56,7 @@ export interface GradeCardOptionsV5 {
  */
 export interface GradeResultV5 {
   success: boolean;
-  version: 'v5.0' | 'v4.2';
+  version: 'v5.5' | 'v5.0' | 'v4.2';
   data?: CardGradingResponseV5;
   legacyData?: ConversationalGradeResultV3_3;  // If fallback to v4.2
   validation?: {
@@ -84,7 +87,7 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
     cardType,
     model = 'gpt-4o',
     temperature = 0.2,
-    max_tokens = 6000,  // Slightly higher for structured outputs
+    max_tokens = 10000,  // Increased for three-pass consensus grading (v5.5)
     seed = 42,
     top_p = 1.0,
     useV5Architecture = process.env.USE_V5_ARCHITECTURE === 'true',
@@ -174,7 +177,7 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
 
     return {
       success: false,
-      version: 'v5.0',
+      version: 'v5.5',
       error: promptResult.error || 'Failed to load v5.0 prompts',
       metadata: {
         card_type: cardType,
@@ -227,9 +230,27 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
             },
             {
               type: 'text',
-              text: `Grade these card images following the master grading rubric and ${cardType} delta rules.
+              text: `Grade these card images following the master grading rubric v5.5 and ${cardType} delta rules.
 
-🔍 CRITICAL REQUIREMENTS (Evidence-Based Grading Protocol - Section 7):
+🔄 THREE-PASS CONSENSUS GRADING (Section 1.5):
+
+**CRITICAL: Perform THREE complete, independent evaluations of this card.**
+
+For EACH pass:
+1. Evaluate centering, corners, edges, surface independently
+2. Calculate weighted sub-scores
+3. Determine pass final grade using weakest link
+4. Note key defects observed
+
+After all three passes:
+- Calculate averaged scores (arithmetic mean)
+- Round averages to nearest 0.5 increment
+- Apply defect consensus (include defects from 2+ passes)
+- Note defects from only 1 pass in consensus_notes
+
+Output the complete grading_passes object with pass_1, pass_2, pass_3, averaged, averaged_rounded, variance, consistency, and consensus_notes.
+
+🔍 EVIDENCE-BASED GRADING PROTOCOL (Section 7):
 
 **BURDEN OF PROOF (Universal):**
 - Every defect claim requires: LOCATION, SIZE, VISUAL CHARACTERISTICS, OBSERVABLE COLORS, DETECTION METHOD
@@ -242,13 +263,13 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
 - Defects array MUST match narrative descriptions (count and content)
 
 **MANDATORY VERIFICATION BEFORE SUBMISSION:**
+□ All three passes completed with grading_passes populated
 □ Every defect in narrative appears in defects array
 □ Every defect array entry mentioned in narrative
 □ Scores match descriptions logically
-□ If score = 10.0, description states "zero defects" with evidence
-□ If score < 10.0, description explains what caused deduction
+□ Final scores use averaged_rounded values from grading_passes
 
-Return complete JSON response following the schema.`
+Return complete JSON response following the v5.5 schema with three-pass consensus grading.`
             }
           ]
         }
@@ -303,7 +324,7 @@ Return complete JSON response following the schema.`
 
     return {
       success: true,
-      version: 'v5.0',
+      version: 'v5.5',
       data: validationResult.data,
       validation: {
         schema_valid: validationResult.success,
@@ -357,7 +378,7 @@ Return complete JSON response following the schema.`
 
     return {
       success: false,
-      version: 'v5.0',
+      version: 'v5.5',
       error: `v5.0 grading failed: ${error}`,
       metadata: {
         card_type: cardType,

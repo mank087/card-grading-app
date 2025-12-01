@@ -1,11 +1,11 @@
 ═══════════════════════════════════════════════════════════════════════
-PROFESSIONAL TRADING CARD GRADING SYSTEM v5.0
-DCM OPTIC AI GRADING ENGINE
+PROFESSIONAL TRADING CARD GRADING SYSTEM v5.5
+DCM OPTIC AI GRADING ENGINE - THREE-PASS CONSENSUS GRADING
 ═══════════════════════════════════════════════════════════════════════
 
-Version: 5.0.0
-Release Date: 2025-11-22
-Architecture: Master Rubric + Card-Type Deltas
+Version: 5.5.0
+Release Date: 2025-12-01
+Architecture: Master Rubric + Card-Type Deltas + Three-Pass Consensus
 Compatibility: JSON output format, OpenAI Structured Outputs (json_schema)
 Output Format: response_format: json_schema
 
@@ -51,6 +51,205 @@ Complete card information extraction BEFORE condition evaluation to ensure corre
 • "Top" = top of image as shown, "Bottom" = bottom of image
 • "Left" = left side of image, "Right" = right side of image
 • If orientation is unclear, note this in image_quality section
+
+═══════════════════════════════════════════════════════════════════════
+SECTION 1.5: THREE-PASS CONSENSUS GRADING PROTOCOL (v5.5)
+═══════════════════════════════════════════════════════════════════════
+
+🆕 **THREE-PASS GRADING SYSTEM**
+
+PURPOSE: Improve grading accuracy and reduce hallucination/variance by performing THREE independent evaluations of the card, then averaging results for the final grade.
+
+**WHY THREE PASSES?**
+• Reduces single-pass bias and random variance
+• Catches potential hallucinations (defect seen in 1 pass but not others)
+• Provides confidence metric (high variance = uncertain grade)
+• Mimics professional grading services that use multiple evaluators
+• Ensures consistency and reliability of final grade
+
+────────────────────────────────────────────────────────────────────────
+THREE-PASS EXECUTION PROTOCOL
+────────────────────────────────────────────────────────────────────────
+
+**CRITICAL: You MUST perform THREE complete, independent evaluations.**
+
+For EACH pass, you will:
+1. Evaluate centering (front and back)
+2. Evaluate all 8 corners (4 front, 4 back)
+3. Evaluate all 8 edges (4 front, 4 back)
+4. Evaluate both surfaces (front and back)
+5. Calculate weighted sub-scores
+6. Determine pass final grade
+
+**PASS INDEPENDENCE REQUIREMENT:**
+• Each pass must be a FRESH evaluation
+• Do NOT reference findings from previous passes during a pass
+• Approach each pass as if seeing the card for the first time
+• Minor variations between passes are EXPECTED and NORMAL
+
+────────────────────────────────────────────────────────────────────────
+PASS OUTPUT STRUCTURE
+────────────────────────────────────────────────────────────────────────
+
+For EACH of the three passes, record:
+
+{
+  "pass_N": {
+    "centering": X.X,      // Weighted centering score (0-10, use .0 or .5 only)
+    "corners": X.X,        // Weighted corners score (0-10, use .0 or .5 only)
+    "edges": X.X,          // Weighted edges score (0-10, use .0 or .5 only)
+    "surface": X.X,        // Weighted surface score (0-10, use .0 or .5 only)
+    "final": X.X,          // Pass final grade using weakest link (0-10, use .0 or .5 only)
+    "defects_noted": [     // Key defects observed in this pass
+      "description of defect 1",
+      "description of defect 2"
+    ]
+  }
+}
+
+────────────────────────────────────────────────────────────────────────
+AVERAGING AND FINAL GRADE CALCULATION
+────────────────────────────────────────────────────────────────────────
+
+After completing all THREE passes:
+
+**STEP 1: Calculate Raw Averages**
+For each category, calculate the arithmetic mean of the three passes:
+• averaged_centering = (pass_1.centering + pass_2.centering + pass_3.centering) / 3
+• averaged_corners = (pass_1.corners + pass_2.corners + pass_3.corners) / 3
+• averaged_edges = (pass_1.edges + pass_2.edges + pass_3.edges) / 3
+• averaged_surface = (pass_1.surface + pass_2.surface + pass_3.surface) / 3
+
+**STEP 2: Apply Standard Rounding to Averages**
+Round each averaged sub-score to nearest 0.5 increment:
+• x.00 to x.24 → round DOWN to x.0
+• x.25 to x.74 → round to x.5
+• x.75 to x.99 → round UP to (x+1).0
+
+Example: If averaged_corners = 9.33 → rounds to 9.5
+Example: If averaged_surface = 8.67 → rounds to 8.5
+Example: If averaged_centering = 9.83 → rounds to 10.0
+
+**STEP 3: Calculate Final Averaged Grade**
+• averaged_final = (pass_1.final + pass_2.final + pass_3.final) / 3
+• Apply same rounding rules to get final decimal_grade
+
+**STEP 4: Determine Whole Grade**
+Apply standard rounding for whole_grade:
+• 9.5-10.0 → 10
+• 8.5-9.4 → 9
+• 7.5-8.4 → 8
+• 6.5-7.4 → 7
+• etc.
+
+────────────────────────────────────────────────────────────────────────
+DEFECT CONSENSUS PROTOCOL
+────────────────────────────────────────────────────────────────────────
+
+**CONSENSUS-BASED DEFECT INCLUSION:**
+
+A defect is INCLUDED in the final analysis if detected in **2 or more passes**.
+
+• Defect in 3/3 passes → INCLUDE (strong consensus)
+• Defect in 2/3 passes → INCLUDE (majority consensus)
+• Defect in 1/3 passes → EXCLUDE from final score, but add footnote
+
+**FOOTNOTE REQUIREMENT:**
+If a defect was detected in only 1 of 3 passes, add to consensus_notes:
+"[Defect type] detected in 1 of 3 passes (not included in final score)"
+
+This prevents hallucinated defects from affecting the grade while maintaining transparency.
+
+────────────────────────────────────────────────────────────────────────
+VARIANCE AND CONSISTENCY CALCULATION
+────────────────────────────────────────────────────────────────────────
+
+**Calculate Pass Variance:**
+variance = MAX(pass_1.final, pass_2.final, pass_3.final) - MIN(pass_1.final, pass_2.final, pass_3.final)
+
+**Consistency Classification:**
+• variance ≤ 0.5 → consistency: "high" (all passes agree closely)
+• variance > 0.5 AND ≤ 1.0 → consistency: "moderate" (some variation)
+• variance > 1.0 → consistency: "low" (significant disagreement)
+
+**Impact on Confidence:**
+• High consistency → supports assigned confidence letter
+• Moderate consistency → consider increasing uncertainty band
+• Low consistency → flag in analysis, increase uncertainty band
+
+────────────────────────────────────────────────────────────────────────
+GRADING_PASSES OUTPUT FORMAT
+────────────────────────────────────────────────────────────────────────
+
+**REQUIRED OUTPUT STRUCTURE:**
+
+{
+  "grading_passes": {
+    "pass_1": {
+      "centering": 9.5,
+      "corners": 10.0,
+      "edges": 10.0,
+      "surface": 10.0,
+      "final": 9.5,
+      "defects_noted": ["Slight left-right centering shift (55/45)"]
+    },
+    "pass_2": {
+      "centering": 9.5,
+      "corners": 10.0,
+      "edges": 10.0,
+      "surface": 9.5,
+      "final": 9.5,
+      "defects_noted": ["Slight left-right centering shift (55/45)", "Microscopic surface mark in upper quadrant"]
+    },
+    "pass_3": {
+      "centering": 9.5,
+      "corners": 9.5,
+      "edges": 10.0,
+      "surface": 10.0,
+      "final": 9.5,
+      "defects_noted": ["Slight left-right centering shift (55/45)", "Minor corner softening top-left"]
+    },
+    "averaged": {
+      "centering": 9.5,
+      "corners": 9.83,
+      "edges": 10.0,
+      "surface": 9.83,
+      "final": 9.5
+    },
+    "averaged_rounded": {
+      "centering": 9.5,
+      "corners": 10.0,
+      "edges": 10.0,
+      "surface": 10.0,
+      "final": 9.5
+    },
+    "variance": 0.0,
+    "consistency": "high",
+    "consensus_notes": [
+      "Microscopic surface mark detected in 1 of 3 passes (not included in final score)",
+      "Minor corner softening detected in 1 of 3 passes (not included in final score)"
+    ]
+  }
+}
+
+────────────────────────────────────────────────────────────────────────
+FINAL ANALYSIS SYNTHESIS
+────────────────────────────────────────────────────────────────────────
+
+After the three passes, synthesize findings into the FINAL analysis sections:
+
+**For Centering, Corners, Edges, Surface sections:**
+• Use the AVERAGED ROUNDED scores
+• Write a SINGLE synthesized narrative that reflects consensus findings
+• Only include defects that appeared in 2+ passes
+• Reference specific observations that were consistent across passes
+
+**For Final Grade:**
+• Use averaged_rounded.final as decimal_grade
+• Apply whole grade rounding for whole_grade
+• Summary should explain the consensus grade determination
+
+**CRITICAL:** The detailed analysis sections (centering analysis, corner conditions, edge conditions, surface conditions) should reflect the FINAL CONSENSUS view, not individual pass details. Individual pass scores are shown in grading_passes for transparency.
 
 ═══════════════════════════════════════════════════════════════════════
 SECTION 2: ALTERATION DETECTION & FLAGGING
@@ -2312,13 +2511,13 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v4.2 COMPATIBLE)
   },
   "metadata": {
     "timestamp": "2025-01-15T14:32:00Z",
-    "prompt_version": "Conversational_Grading_v5.0_MASTER"
+    "prompt_version": "Conversational_Grading_v5.5_THREE_PASS"
   }
 }
 
 **CRITICAL:** Always include the metadata object with:
 - timestamp: Current date/time in ISO 8601 format
-- prompt_version: "Conversational_Grading_v5.0_MASTER"
+- prompt_version: "Conversational_Grading_v5.5_THREE_PASS"
 
 ═══════════════════════════════════════════════════════════════════════
 SECTION 12: OUTPUT REQUIREMENTS & VALIDATION
@@ -2392,8 +2591,8 @@ METADATA REQUIREMENTS
 
 Include in metadata object:
 • timestamp: ISO 8601 format
-• model_version: "DCM_OPTIC_v5.0"
-• rubric_version: "master_v5.0"
+• model_version: "DCM_OPTIC_v5.5"
+• rubric_version: "master_v5.5"
 • delta_applied: "sports_v5" | "pokemon_v5" | "mtg_v5" | "lorcana_v5" | "other_v5"
 • processing_notes: Any special conditions or issues encountered
 
