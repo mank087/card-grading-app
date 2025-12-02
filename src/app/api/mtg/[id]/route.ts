@@ -877,6 +877,42 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       return NextResponse.json({ error: "Failed to save MTG card grading results" }, { status: 500 });
     }
 
+    // 🃏 MTG Scryfall API Verification (Post-Grading)
+    // Verify card details against Scryfall API and update with accurate data
+    let mtgApiVerification = null;
+    try {
+      console.log(`[GET /api/mtg/${cardId}] 🔍 Starting Scryfall API verification...`);
+
+      const verifyResponse = await fetch(`${request.nextUrl.origin}/api/mtg/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_id: cardId,
+          card_info: conversationalGradingData?.card_info || null
+        })
+      });
+
+      if (verifyResponse.ok) {
+        mtgApiVerification = await verifyResponse.json();
+        console.log(`[GET /api/mtg/${cardId}] ✅ Scryfall verification complete:`, {
+          verified: mtgApiVerification.verified,
+          mtg_api_id: mtgApiVerification.mtg_api_id,
+          confidence: mtgApiVerification.confidence,
+          corrections: mtgApiVerification.corrections?.length || 0
+        });
+
+        // If corrections were made, log them
+        if (mtgApiVerification.corrections?.length > 0) {
+          console.log(`[GET /api/mtg/${cardId}] 📝 Scryfall corrections applied:`, mtgApiVerification.corrections);
+        }
+      } else {
+        console.warn(`[GET /api/mtg/${cardId}] ⚠️ Scryfall verification request failed:`, verifyResponse.status);
+      }
+    } catch (verifyError: any) {
+      console.error(`[GET /api/mtg/${cardId}] ⚠️ Scryfall verification error:`, verifyError.message);
+      // Don't fail grading - Scryfall verification is optional enhancement
+    }
+
     console.log(`[GET /api/mtg/${cardId}] MTG card request completed in ${Date.now() - startTime}ms`);
 
     // Return updated MTG card data with all structured fields
@@ -907,7 +943,22 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       ...cardFields,
       front_url: frontUrl,
       back_url: backUrl,
-      processing_time: Date.now() - startTime
+      processing_time: Date.now() - startTime,
+      // 🃏 Scryfall API verification results
+      mtg_api_verification: mtgApiVerification || null,
+      // If verification succeeded, include the corrected data
+      ...(mtgApiVerification?.verified && mtgApiVerification?.metadata && {
+        mtg_api_verified: true,
+        mtg_api_id: mtgApiVerification.mtg_api_id,
+        card_set: mtgApiVerification.metadata.set_name,
+        mtg_set_code: mtgApiVerification.metadata.set_code,
+        mtg_rarity: mtgApiVerification.metadata.rarity,
+        mtg_mana_cost: mtgApiVerification.metadata.mana_cost,
+        mtg_type_line: mtgApiVerification.metadata.type_line,
+        mtg_colors: mtgApiVerification.metadata.colors,
+        scryfall_price_usd: mtgApiVerification.metadata.price_usd,
+        scryfall_price_usd_foil: mtgApiVerification.metadata.price_usd_foil,
+      })
     });
 
   } catch (error: any) {
