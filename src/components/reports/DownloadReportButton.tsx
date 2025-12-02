@@ -451,6 +451,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           autographed: cardInfo.autographed === true || card.autograph_type,
           serialNumbered: cardInfo.serial_number || card.serial_numbering || undefined,
           subset: cardInfo.subset || card.subset || undefined,
+          // MTG-specific
+          isFoil: card.is_foil || false,
+          foilType: card.foil_type || undefined,
+          isDoubleFaced: card.is_double_faced || false,
         },
         aiConfidence: card.conversational_image_confidence || 'N/A',
         imageQuality: extractImageQuality(card),

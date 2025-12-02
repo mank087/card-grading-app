@@ -4,8 +4,8 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { gradeCardConversational } from "@/lib/visionGrader";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
-// HYBRID SET IDENTIFICATION: Scryfall API for set lookup when AI doesn't have it in mini table
-import { lookupMTGCard } from "@/lib/scryfallApi";
+// Scryfall API imports (for future use when ENABLE_SCRYFALL_API = true)
+// import { searchCardByFuzzyName, getCardBySetAndNumber } from "@/lib/scryfallApi";
 
 // Track MTG cards currently being processed with timestamps
 const processingMTGCards = new Map<string, number>();
@@ -728,39 +728,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         });
 
         if (needsApiLookup) {
-          console.log(`[GET /api/mtg/${cardId}] 🔍 Calling Scryfall API for card lookup...`);
-
-          try {
-            const cardNumber = cardInfo.collector_number || cardInfo.card_number;
-            const cardName = cardInfo.card_name;
-            const setCode = cardInfo.expansion_code;
-
-            if (cardNumber || cardName) {
-              const apiResult = await lookupMTGCard(cardNumber, cardName, setCode);
-
-              if (apiResult.success) {
-                console.log(`[GET /api/mtg/${cardId}] ✅ Scryfall lookup successful:`, apiResult.set_name);
-
-                // Merge Scryfall results back into card_info
-                conversationalGradingData.card_info.set_name = apiResult.set_name;
-                conversationalGradingData.card_info.expansion_code = apiResult.set_code;
-                conversationalGradingData.card_info.collector_number = apiResult.collector_number;
-                conversationalGradingData.card_info.rarity_or_variant = apiResult.rarity;
-                conversationalGradingData.card_info.scryfall_id = apiResult.scryfall_id;
-                conversationalGradingData.card_info.artist_name = apiResult.artist;
-                conversationalGradingData.card_info.mana_cost = apiResult.mana_cost;
-                conversationalGradingData.card_info.mtg_card_type = apiResult.type_line;
-                conversationalGradingData.card_info.oracle_text = apiResult.oracle_text;
-                conversationalGradingData.card_info.power_toughness = apiResult.power_toughness;
-                conversationalGradingData.card_info.color_identity = apiResult.color_identity;
-                conversationalGradingData.card_info.needs_api_lookup = false;
-              } else {
-                console.warn(`[GET /api/mtg/${cardId}] ⚠️ Scryfall lookup failed:`, apiResult.error);
-              }
-            }
-          } catch (error: any) {
-            console.error(`[GET /api/mtg/${cardId}] ⚠️ Scryfall lookup error:`, error.message);
-          }
+          // Scryfall API lookup disabled (ENABLE_SCRYFALL_API = false)
+          // Post-grading verification now handled by /api/mtg/verify endpoint
+          console.log(`[GET /api/mtg/${cardId}] ℹ️ Scryfall lookup skipped (now handled by /api/mtg/verify)`);
         } else if (cardInfo?.set_name) {
           console.log(`[GET /api/mtg/${cardId}] ✅ AI identified set from mini table: ${cardInfo.set_name}`);
         } else {

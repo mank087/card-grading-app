@@ -230,6 +230,43 @@ export interface Card {
   slab_detected?: boolean;
   slab_company?: string | null;
   slab_grade?: string | null;
+
+  // Category
+  category?: string | null;
+
+  // 🎴 Pokemon TCG API verification
+  pokemon_api_id?: string | null;
+  pokemon_api_data?: any | null;
+  pokemon_api_verified?: boolean;
+  pokemon_api_verified_at?: string | null;
+  pokemon_api_confidence?: 'high' | 'medium' | 'low' | null;
+  pokemon_api_method?: string | null;
+
+  // 🃏 MTG Scryfall API verification
+  mtg_api_id?: string | null;
+  mtg_oracle_id?: string | null;
+  mtg_api_data?: any | null;
+  mtg_api_verified?: boolean;
+  mtg_api_verified_at?: string | null;
+  mtg_api_confidence?: 'high' | 'medium' | 'low' | null;
+  mtg_api_method?: string | null;
+
+  // MTG-specific fields
+  mtg_mana_cost?: string | null;
+  mtg_type_line?: string | null;
+  mtg_colors?: string[] | null;
+  mtg_rarity?: string | null;
+  mtg_set_code?: string | null;
+  card_language?: string | null;
+  is_foil?: boolean;
+  foil_type?: string | null;
+  is_double_faced?: boolean;
+
+  // Market pricing (Scryfall)
+  scryfall_price_usd?: number | null;
+  scryfall_price_usd_foil?: number | null;
+  scryfall_price_eur?: number | null;
+  scryfall_price_updated_at?: string | null;
 }
 
 // Default/empty defects structure

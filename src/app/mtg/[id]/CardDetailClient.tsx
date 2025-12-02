@@ -527,6 +527,32 @@ interface SportsCard {
   // Timestamps
   created_at?: string;
   updated_at?: string;
+
+  // 🃏 MTG Scryfall API verification
+  mtg_api_id?: string | null;
+  mtg_oracle_id?: string | null;
+  mtg_api_data?: any | null;
+  mtg_api_verified?: boolean;
+  mtg_api_verified_at?: string | null;
+  mtg_api_confidence?: 'high' | 'medium' | 'low' | null;
+  mtg_api_method?: string | null;
+
+  // MTG-specific fields from Scryfall
+  mtg_mana_cost?: string | null;
+  mtg_type_line?: string | null;
+  mtg_colors?: string[] | null;
+  mtg_rarity?: string | null;
+  mtg_set_code?: string | null;
+  card_language?: string | null;
+  is_foil?: boolean;
+  foil_type?: string | null;
+  is_double_faced?: boolean;
+
+  // Market pricing (Scryfall)
+  scryfall_price_usd?: number | null;
+  scryfall_price_usd_foil?: number | null;
+  scryfall_price_eur?: number | null;
+  scryfall_price_updated_at?: string | null;
 }
 
 const renderValue = (value: any) => {
@@ -3302,6 +3328,111 @@ export function MTGCardDetails() {
                     </div>
                   )}
 
+                  {/* Foil Status - from Scryfall API */}
+                  {card.is_foil && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Foil</p>
+                      <div className="flex items-center gap-2">
+                        <span className="px-3 py-1 rounded-lg text-sm font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 text-white shadow-md">
+                          ✨ FOIL
+                        </span>
+                        {card.foil_type && (
+                          <span className="text-sm text-gray-600">
+                            ({card.foil_type})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Language - from Scryfall API */}
+                  {card.card_language && card.card_language !== 'English' && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Language</p>
+                      <p className="text-lg text-gray-900">
+                        {card.card_language}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Double-Faced Card Indicator */}
+                  {card.is_double_faced && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Card Type</p>
+                      <span className="px-3 py-1 rounded-lg text-sm font-bold bg-indigo-100 text-indigo-800">
+                        🔄 Double-Faced Card
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Mana Cost from Scryfall API */}
+                  {card.mtg_mana_cost && !cardInfo.mana_cost && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Mana Cost</p>
+                      <p className="text-lg font-bold text-gray-900 font-mono">
+                        {card.mtg_mana_cost}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Type Line from Scryfall API */}
+                  {card.mtg_type_line && !cardInfo.mtg_card_type && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Type</p>
+                      <p className="text-lg font-bold text-gray-900">
+                        {card.mtg_type_line}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Colors from Scryfall API */}
+                  {card.mtg_colors && card.mtg_colors.length > 0 && !cardInfo.color_identity && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Colors</p>
+                      <div className="flex gap-1">
+                        {card.mtg_colors.map((color: string, idx: number) => {
+                          const colorMap: {[key: string]: {name: string, bg: string, text: string}} = {
+                            'W': {name: 'White', bg: 'bg-yellow-100', text: 'text-yellow-800'},
+                            'U': {name: 'Blue', bg: 'bg-blue-100', text: 'text-blue-800'},
+                            'B': {name: 'Black', bg: 'bg-gray-800', text: 'text-white'},
+                            'R': {name: 'Red', bg: 'bg-red-100', text: 'text-red-800'},
+                            'G': {name: 'Green', bg: 'bg-green-100', text: 'text-green-800'}
+                          };
+                          const colorInfo = colorMap[color] || {name: color, bg: 'bg-gray-200', text: 'text-gray-700'};
+                          return (
+                            <span
+                              key={idx}
+                              className={`px-2 py-1 rounded-lg text-xs font-bold ${colorInfo.bg} ${colorInfo.text}`}
+                              title={colorInfo.name}
+                            >
+                              {color}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rarity from Scryfall API */}
+                  {card.mtg_rarity && !cardInfo.rarity_or_variant && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Rarity</p>
+                      <p className="text-lg text-gray-900 capitalize">
+                        {card.mtg_rarity === 'mythic' ? 'Mythic Rare' : card.mtg_rarity}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Set Code from Scryfall API */}
+                  {card.mtg_set_code && !cardInfo.expansion_code && (
+                    <div>
+                      <p className="text-sm font-semibold text-gray-600 mb-1">Set Code</p>
+                      <p className="text-lg text-gray-900 font-mono uppercase">
+                        {card.mtg_set_code}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Foil Badge */}
                   {(cardInfo.is_foil || card.is_foil) && (
                     <div>
@@ -4646,6 +4777,60 @@ export function MTGCardDetails() {
                 </h2>
               </div>
 
+              {/* Scryfall Market Pricing - Show if we have API pricing data */}
+              {(card.scryfall_price_usd || card.scryfall_price_usd_foil || card.scryfall_price_eur) && (
+                <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-gray-800">Scryfall Market Prices</h2>
+                    {card.mtg_api_verified && (
+                      <span className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-800 rounded-full">
+                        ✓ API Verified
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {/* USD Price (Non-Foil) */}
+                    {card.scryfall_price_usd && (
+                      <div className="bg-gray-50 rounded-lg p-4 text-center">
+                        <p className="text-xs text-gray-500 mb-1">USD (Non-Foil)</p>
+                        <p className="text-2xl font-bold text-gray-900">${card.scryfall_price_usd.toFixed(2)}</p>
+                      </div>
+                    )}
+
+                    {/* USD Price (Foil) */}
+                    {card.scryfall_price_usd_foil && (
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-4 text-center border border-purple-200">
+                        <p className="text-xs text-purple-600 mb-1">USD (Foil) ✨</p>
+                        <p className="text-2xl font-bold text-purple-900">${card.scryfall_price_usd_foil.toFixed(2)}</p>
+                      </div>
+                    )}
+
+                    {/* EUR Price */}
+                    {card.scryfall_price_eur && (
+                      <div className="bg-blue-50 rounded-lg p-4 text-center">
+                        <p className="text-xs text-blue-600 mb-1">EUR</p>
+                        <p className="text-2xl font-bold text-blue-900">€{card.scryfall_price_eur.toFixed(2)}</p>
+                      </div>
+                    )}
+
+                    {/* Price Updated */}
+                    {card.scryfall_price_updated_at && (
+                      <div className="bg-gray-50 rounded-lg p-4 text-center flex flex-col justify-center">
+                        <p className="text-xs text-gray-500 mb-1">Last Updated</p>
+                        <p className="text-sm text-gray-700">
+                          {new Date(card.scryfall_price_updated_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-3 text-center">
+                    Prices from Scryfall daily market data
+                  </p>
+                </div>
+              )}
+
               {/* Find and Price This Card */}
               <div className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-lg font-bold mb-3 text-gray-800">Market Listings</h2>
@@ -4755,10 +4940,10 @@ export function MTGCardDetails() {
                     </div>
                   </a>
 
-                  {/* Scryfall */}
-                  {(card.scryfall_id || cardInfo.scryfall_id) && (
+                  {/* Scryfall - Link to verified card page */}
+                  {(card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id) && (
                     <a
-                      href={`https://scryfall.com/card/${card.scryfall_id || cardInfo.scryfall_id}`}
+                      href={`https://scryfall.com/card/${card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
@@ -4770,7 +4955,9 @@ export function MTGCardDetails() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <h3 className="font-semibold text-purple-900 text-sm">Scryfall</h3>
-                        <p className="text-xs text-purple-700 truncate">Card database</p>
+                        <p className="text-xs text-purple-700 truncate">
+                          {card.mtg_api_verified ? '✓ Verified card' : 'Card database'}
+                        </p>
                       </div>
                     </a>
                   )}

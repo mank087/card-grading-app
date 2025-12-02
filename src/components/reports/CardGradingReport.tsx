@@ -66,6 +66,10 @@ export interface ReportCardData {
     autographed?: boolean;
     serialNumbered?: string;
     subset?: string;
+    // MTG-specific
+    isFoil?: boolean;
+    foilType?: string;
+    isDoubleFaced?: boolean;
   };
   aiConfidence: string;
   imageQuality: string;

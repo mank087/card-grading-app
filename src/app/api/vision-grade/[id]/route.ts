@@ -1964,6 +1964,45 @@ EXTRACTION RULES:
       }
     }
 
+    // 🃏 MTG Scryfall API Verification (Post-Grading)
+    // For MTG cards, verify card details against Scryfall API and persist
+    let mtgApiVerification = null;
+
+    if (cardCategory === 'MTG') {
+      console.log(`[MTG API] Starting post-grading verification for MTG card`);
+      try {
+        // Call the MTG verify API endpoint
+        const verifyResponse = await fetch(`${request.nextUrl.origin}/api/mtg/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            card_id: cardId,
+            card_info: conversationalGradingData?.card_info || null
+          })
+        });
+
+        if (verifyResponse.ok) {
+          mtgApiVerification = await verifyResponse.json();
+          console.log(`[MTG API] Verification complete:`, {
+            verified: mtgApiVerification.verified,
+            mtg_api_id: mtgApiVerification.mtg_api_id,
+            confidence: mtgApiVerification.confidence,
+            corrections: mtgApiVerification.corrections?.length || 0
+          });
+
+          // If corrections were made, log them
+          if (mtgApiVerification.corrections?.length > 0) {
+            console.log(`[MTG API] Card info corrections applied:`, mtgApiVerification.corrections);
+          }
+        } else {
+          console.warn(`[MTG API] Verification request failed:`, verifyResponse.status);
+        }
+      } catch (mtgError: any) {
+        console.error(`[MTG API] Verification error:`, mtgError.message);
+        // Don't fail grading - MTG verification is optional enhancement
+      }
+    }
+
     const processingTime = Date.now() - startTime;
     console.log(`[CONVERSATIONAL AI] Complete grading process finished in ${processingTime}ms`);
     console.log(`[CONVERSATIONAL AI] About to return professional grades:`, professionalGrades ? 'EXISTS' : 'NULL');
@@ -2048,7 +2087,10 @@ EXTRACTION RULES:
       image_quality: visionResult.image_quality.grade,
 
       // 🎴 Pokemon API Verification (for Pokemon cards only)
-      pokemon_api_verification: pokemonApiVerification || null
+      pokemon_api_verification: pokemonApiVerification || null,
+
+      // 🃏 MTG Scryfall API Verification (for MTG cards only)
+      mtg_api_verification: mtgApiVerification || null
     });
 
   } catch (error: any) {

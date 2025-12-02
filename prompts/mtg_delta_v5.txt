@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: MAGIC: THE GATHERING v5.0
+CARD TYPE DELTA: MAGIC: THE GATHERING v5.1
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Magic: The Gathering card-specific rules.
@@ -9,6 +9,9 @@ This delta provides card-specific extraction rules, defect patterns, and example
 **CARD TYPES COVERED:**
 Magic: The Gathering cards from all sets (Alpha 1993 - present)
 
+**v5.1 UPDATES:** Added Scryfall API verification fields (sport_or_category, set_code,
+is_foil, foil_type, language, is_double_faced)
+
 ═══════════════════════════════════════════════════════════════════════
 A. MTG CARD INFORMATION EXTRACTION
 ═══════════════════════════════════════════════════════════════════════
@@ -16,11 +19,71 @@ A. MTG CARD INFORMATION EXTRACTION
 Extract the following fields from MTG cards:
 
 ────────────────────────────────────────────────────────────────────────
+CRITICAL API FIELDS (Required for Scryfall Verification)
+────────────────────────────────────────────────────────────────────────
+
+**sport_or_category**: Card category identifier
+• MUST be exactly: "MTG"
+• This exact value triggers Scryfall API verification after grading
+• Do NOT use: "Magic", "Magic: The Gathering", "magic", or any variation
+• CRITICAL: Incorrect value = no API verification
+
+**set_code**: 3-letter set code (PRIMARY identifier for API lookup)
+• Look for 3-letter code at bottom of card near collector number
+• Format: 3 uppercase letters (e.g., "MKM", "OTJ", "MH3", "LEA")
+• Location: Usually printed as "MKM • EN" or similar format
+• Example: "MKM" for Murders at Karlov Manor
+• Example: "OTJ" for Outlaws of Thunder Junction
+• Example: "LEA" for Alpha, "LEB" for Beta
+• If not visible or obscured: null (API will use fuzzy name matching)
+
+**is_foil**: Foil card detection (boolean - REQUIRED)
+• true: Card has holographic/metallic/rainbow finish
+• false: Standard non-foil printing
+• Detection methods:
+  - Rainbow shimmer visible across card surface
+  - Holographic pattern in artwork or frame
+  - Reflective/metallic appearance when tilted
+  - Text/borders have metallic sheen
+• If card is in holder and finish cannot be determined with confidence: false
+
+**foil_type**: Specific foil variant (if is_foil = true)
+• Options: "Traditional", "Etched", "Galaxy", "Surge", "Textured", "Gilded", "Confetti", null
+• "Traditional": Standard holographic foil (most common, rainbow shimmer)
+• "Etched": Matte textured holographic (no curl tendency, subtle texture)
+• "Galaxy": Sparkle/star pattern scattered in foil
+• "Surge": Special booster variant (Collector Booster exclusive)
+• "Textured": Raised physical texture pattern
+• "Gilded": Gold-foil treatment on edges/frame
+• "Confetti": Scattered reflective particles
+• null: If non-foil OR specific type cannot be determined
+
+**language**: Card language (REQUIRED)
+• Determine from card text (name, type line, rules text)
+• Options: "English", "Japanese", "German", "French", "Italian", "Spanish",
+           "Portuguese", "Korean", "Chinese Simplified", "Chinese Traditional",
+           "Russian", "Phyrexian"
+• Default: "English" if card uses English text
+• Detection: Look at card name, type line, and rules text language
+• "Phyrexian": Special language used on some cards (Elesh Norn, etc.)
+
+**is_double_faced**: Double-faced card detection (boolean)
+• true: Card has two playable faces (transform, modal, etc.)
+• false: Standard single-faced card
+• Detection:
+  - Back shows different card face instead of standard MTG back
+  - Card has transform symbol (sun/moon icons)
+  - Card has modal double-faced card (MDFC) indicator
+• Types: Transform, Modal DFC, Meld, Flip
+• If true, note the card type in special_features
+
+────────────────────────────────────────────────────────────────────────
 REQUIRED FIELDS (All MTG Cards)
 ────────────────────────────────────────────────────────────────────────
 
 **card_name**: Card name (top of card)
 • Extract exact card name as printed
+• For double-faced cards: Extract name of the FRONT face being graded
 • Example: "Lightning Bolt", "Black Lotus", "Jace, the Mind Sculptor"
 
 **mtg_card_type**: Card type line
@@ -88,9 +151,15 @@ REQUIRED FIELDS (All MTG Cards)
 ENHANCED FIELDS (MTG Specific)
 ────────────────────────────────────────────────────────────────────────
 
-**rarity_tier**: Card rarity
-• See Rarity Classification section below
-• Based on set symbol color and card features
+**rarity**: Card rarity (from set symbol color)
+• Options: "mythic", "rare", "uncommon", "common", "special", "bonus"
+• Detection: Look at expansion symbol color
+  - Orange/Red = Mythic Rare
+  - Gold = Rare
+  - Silver = Uncommon
+  - Black = Common
+  - Purple = Special/Timeshifted
+• Example: "mythic", "rare", "uncommon"
 
 **subset**: Treatment/variant type
 • Options: Borderless, Extended Art, Showcase, Retro Frame, Full Art, Etched Foil, etc.
@@ -114,97 +183,60 @@ ENHANCED FIELDS (MTG Specific)
 • Use: "Standard Magic: The Gathering card back" or null
 
 ═══════════════════════════════════════════════════════════════════════
-B. MTG CARD RARITY CLASSIFICATION
+B. MTG CARD RARITY & SPECIAL FEATURES
 ═══════════════════════════════════════════════════════════════════════
 
-Assign highest visible tier only (in priority order):
-
 ────────────────────────────────────────────────────────────────────────
-RARITY TIER HIERARCHY
+RARITY DETECTION (Set Symbol Color)
 ────────────────────────────────────────────────────────────────────────
 
-**1. 1-of-1**
-• Serial numbered 1/1
-• Extremely rare special editions
-• Examples: Serialized Showcase treatments, The One Ring (001/001)
-
-**2. Power Nine**
-• The 9 most powerful/valuable cards from Alpha/Beta/Unlimited
-• Black Lotus, Moxes (5), Ancestral Recall, Time Walk, Timetwister
-• Only applicable to vintage cards
-
-**3. Super Short Print**
-• Serial numbered /2 to /25
-• Extremely limited special editions
-
-**4. Mythic Rare Serialized**
-• Mythic rare with serial number /500 or similar
-• Modern special treatments
-
-**5. Mythic Rare**
-• Set symbol color: Orange/Red
-• Highest standard rarity tier
-• Approximately 1 per 8 packs
-
-**6. Rare**
-• Set symbol color: Gold
-• Standard rare tier
-• Approximately 1 per pack
-
-**7. Borderless**
-• No border frame treatment
-• Art extends to edges
-• Special showcase variant
-
-**8. Extended Art**
-• Artwork extends beyond normal frame
-• Larger art area than normal
-• Collector Booster exclusive
-
-**9. Showcase Frame**
-• Special alternate frame treatment
-• Set-specific showcase style
-• Examples: Storybook (Eldraine), Ninja (Kamigawa), Art Deco (New Capenna)
-
-**10. Authenticated Autograph**
-• Artist signature with authentication
-• Artist Proof cards
-• Convention exclusives with verified signatures
-
-**11. Foil Mythic/Rare**
-• Foil treatment on mythic or rare card
-• Holographic finish
-
-**12. Uncommon**
-• Set symbol color: Silver
-• Middle rarity tier
-
-**13. Common**
-• Set symbol color: Black
-• Most basic rarity
-
-**14. Promo**
-• Special promotional printing
-• Promo stamp or set code
-• Event exclusives, buy-a-box promos, etc.
-
-**15. Retro Frame**
-• Old-school card frame style on modern card
-• Nostalgia treatment
-
-**16. Special Guest**
-• Cards from other artists/IPs in MTG sets
-• Example: Special Guest cards in Bloomburrow
-
-────────────────────────────────────────────────────────────────────────
-SET SYMBOL COLOR GUIDE
-────────────────────────────────────────────────────────────────────────
-
+Determine rarity from expansion symbol color:
 • **Black** = Common
 • **Silver** = Uncommon
 • **Gold** = Rare
 • **Orange/Red** = Mythic Rare
-• **Purple** = Special (timeshifted, etc.)
+• **Purple** = Special (timeshifted, bonus sheet, etc.)
+
+Store in **rarity** field: "common", "uncommon", "rare", "mythic", "special"
+
+────────────────────────────────────────────────────────────────────────
+SPECIAL FEATURES (Card Information Section)
+────────────────────────────────────────────────────────────────────────
+
+Document any special features in **special_features** array:
+
+**Foil Treatments** (also set is_foil = true):
+• "Foil" - Standard holographic foil
+• "Etched Foil" - Matte textured holographic
+• "Galaxy Foil" - Sparkle/star pattern
+• "Textured Foil" - Raised physical texture
+• "Gilded" - Gold-foil edges
+
+**Frame Variants** (also set in subset field):
+• "Borderless" - Art extends to card edges
+• "Extended Art" - Larger art area
+• "Showcase" - Set-specific special frame
+• "Retro Frame" - Old-school frame style
+• "Full Art" - Artwork covers most of card
+
+**Special Printings**:
+• "Serialized" - Has serial number (note in serial_number field)
+• "Promo" - Promotional printing
+• "Buy-a-Box Promo" - Store exclusive
+• "Prerelease Promo" - Event exclusive
+• "Special Guest" - Crossover/guest artist
+
+**Card Types**:
+• "Double-Faced Card" - Two playable faces (also set is_double_faced = true)
+• "Transform" - Transforms between faces
+• "Modal DFC" - Choose which face to play
+• "Meld" - Combines with another card
+• "Split Card" - Two spells on one card
+• "Adventure" - Creature with adventure spell
+
+**Authenticated**:
+• "Artist Signature" - Signed by artist
+• "Authenticated Autograph" - Verified signature
 
 ═══════════════════════════════════════════════════════════════════════
 C. MTG SET IDENTIFICATION MODULE

@@ -34,6 +34,15 @@ type Card = {
   conversational_image_confidence?: string | null
   conversational_card_info?: any  // JSON field containing card details
   dvg_decimal_grade?: number | null
+  // 🃏 MTG Scryfall API fields
+  is_foil?: boolean
+  foil_type?: string | null
+  mtg_api_verified?: boolean
+  mtg_rarity?: string | null
+  mtg_set_code?: string | null
+  card_language?: string | null
+  scryfall_price_usd?: number | null
+  scryfall_price_usd_foil?: number | null
 }
 
 // 🎯 Helper: Strip markdown formatting from text
@@ -475,6 +484,10 @@ function CollectionPageContent() {
               if (cardInfo.facsimile_autograph) features.push('Facsimile');
               // Add official reprint indicator
               if (cardInfo.official_reprint) features.push('Reprint');
+              // Add foil indicator for MTG cards
+              if (card.is_foil) {
+                features.push(card.foil_type ? `✨${card.foil_type}` : '✨Foil');
+              }
               const serialNum = cardInfo.serial_number;
               if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
                 features.push(serialNum);

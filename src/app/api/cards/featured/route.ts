@@ -22,7 +22,15 @@ export async function GET() {
         card_number,
         front_path,
         back_path,
-        created_at
+        created_at,
+        is_foil,
+        foil_type,
+        mtg_api_verified,
+        mtg_rarity,
+        mtg_set_code,
+        card_language,
+        scryfall_price_usd,
+        scryfall_price_usd_foil
       `)
       .eq('visibility', 'public')
       .eq('is_featured', true)
