@@ -31,6 +31,7 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
         card_name,
         card_set,
         card_number,
+        featured,
         mtg_set_code,
         expansion_code,
         scryfall_price_usd,
@@ -71,13 +72,20 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
     const scryfallId = card.mtg_api_id || cardInfo.mtg_api_id || cardInfo.scryfall_id;
     const setCode = card.mtg_set_code || card.expansion_code || cardInfo.expansion_code || cardInfo.mtg_set_code;
     const cardNumber = card.card_number || cardInfo.collector_number || cardInfo.card_number;
-    const cardName = card.card_name || cardInfo.card_name;
+    // Try multiple sources for card name - it might be stored in different places
+    const cardName = card.card_name || cardInfo.card_name || cardInfo.player_or_character || card.featured;
 
     console.log(`[refresh-price] Looking up card:`, {
       scryfallId,
       cardName,
       setCode,
-      cardNumber
+      cardNumber,
+      // Debug: show all available fields
+      debug_card_name: card.card_name,
+      debug_cardInfo_card_name: cardInfo.card_name,
+      debug_cardInfo_player: cardInfo.player_or_character,
+      debug_featured: card.featured,
+      debug_cardInfo_set: cardInfo.set_name
     });
 
     // Try to fetch fresh data from Scryfall
