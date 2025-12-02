@@ -3199,8 +3199,8 @@ export function MTGCardDetails() {
 
                   {/* Card Name with bilingual support */}
                   {(cardInfo.card_name || card.card_name) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Card Name</p>
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Card Name</p>
                       {(() => {
                         const cardName = cardInfo.card_name || card.card_name;
                         const hasJapanese = /[぀-ゟ゠-ヿ一-龯]/.test(cardName);
@@ -3213,29 +3213,29 @@ export function MTGCardDetails() {
                           if (japanesePart && englishPart) {
                             return (
                               <div>
-                                <p className="text-lg font-bold text-gray-900 font-noto-sans-jp">
+                                <p className="font-semibold text-gray-900 font-noto-sans-jp">
                                   {japanesePart?.trim()}
                                 </p>
-                                <p className="text-sm text-gray-600 mt-0.5">
+                                <p className="text-xs text-gray-600 mt-0.5">
                                   {englishPart.trim()}
                                 </p>
                               </div>
                             );
                           }
 
-                          return <p className="text-lg font-bold text-gray-900 font-noto-sans-jp">{cardName}</p>;
+                          return <p className="font-semibold text-gray-900 font-noto-sans-jp">{cardName}</p>;
                         }
 
-                        return <p className="text-lg font-bold text-gray-900">{cardName}</p>;
+                        return <p className="font-semibold text-gray-900">{cardName}</p>;
                       })()}
                     </div>
                   )}
 
                   {/* Mana Cost */}
                   {(cardInfo.mana_cost || card.mana_cost) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Mana Cost</p>
-                      <p className="text-lg font-bold text-gray-900 font-mono">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Mana Cost</p>
+                      <p className="font-semibold text-gray-900 font-mono">
                         {cardInfo.mana_cost || card.mana_cost}
                       </p>
                     </div>
@@ -3243,9 +3243,9 @@ export function MTGCardDetails() {
 
                   {/* Card Type */}
                   {(cardInfo.mtg_card_type || card.mtg_card_type) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Type</p>
-                      <p className="text-lg font-bold text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Type</p>
+                      <p className="font-semibold text-gray-900">
                         {cardInfo.mtg_card_type || card.mtg_card_type}
                       </p>
                     </div>
@@ -3253,9 +3253,9 @@ export function MTGCardDetails() {
 
                   {/* Creature Type */}
                   {(cardInfo.creature_type || card.creature_type) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Creature Type</p>
-                      <p className="text-lg text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Creature Type</p>
+                      <p className="font-semibold text-gray-900">
                         {cardInfo.creature_type || card.creature_type}
                       </p>
                     </div>
@@ -3263,9 +3263,9 @@ export function MTGCardDetails() {
 
                   {/* Power/Toughness */}
                   {(cardInfo.power_toughness || card.power_toughness) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Power / Toughness</p>
-                      <p className="text-lg font-bold text-green-700">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Power / Toughness</p>
+                      <p className="font-semibold text-green-700">
                         {cardInfo.power_toughness || card.power_toughness}
                       </p>
                     </div>
@@ -3273,8 +3273,8 @@ export function MTGCardDetails() {
 
                   {/* Color Identity */}
                   {(cardInfo.color_identity || card.color_identity) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Color Identity</p>
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Color Identity</p>
                       <div className="flex gap-1">
                         {(cardInfo.color_identity || card.color_identity).split('').map((color: string, idx: number) => {
                           const colorMap: {[key: string]: {name: string, bg: string, text: string}} = {
@@ -3307,11 +3307,11 @@ export function MTGCardDetails() {
                                    cardInfo.set_era || card.card_set || 'Unknown Set';
 
                     return setName !== 'Unknown Set' && (
-                      <div>
-                        <p className="text-sm font-semibold text-gray-600 mb-1">Expansion</p>
-                        <p className="text-lg text-gray-900">{setName}</p>
+                      <div className="space-y-1">
+                        <p className="text-gray-500 text-xs uppercase tracking-wide">Set</p>
+                        <p className="font-semibold text-gray-900">{setName}</p>
                         {(cardInfo.expansion_code || card.expansion_code) && (
-                          <p className="text-xs text-gray-500 font-mono mt-0.5">
+                          <p className="text-xs text-gray-500 font-mono">
                             [{cardInfo.expansion_code || card.expansion_code}]
                           </p>
                         )}
@@ -3319,11 +3319,11 @@ export function MTGCardDetails() {
                     );
                   })()}
 
-                  {/* Collector Number */}
+                  {/* Card Number */}
                   {(cardInfo.collector_number || cardInfo.card_number || card.card_number) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Collector Number</p>
-                      <p className="text-lg text-gray-900 font-mono">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Card Number</p>
+                      <p className="font-semibold text-gray-900">
                         {cardInfo.collector_number || cardInfo.card_number || card.card_number}
                       </p>
                     </div>
@@ -3331,9 +3331,9 @@ export function MTGCardDetails() {
 
                   {/* Rarity */}
                   {(cardInfo.rarity_or_variant || card.rarity_description) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Rarity</p>
-                      <p className="text-lg text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Rarity</p>
+                      <p className="font-semibold text-gray-900 capitalize">
                         {cardInfo.rarity_or_variant || card.rarity_description}
                       </p>
                     </div>
@@ -3341,9 +3341,9 @@ export function MTGCardDetails() {
 
                   {/* Artist */}
                   {(cardInfo.artist_name || card.artist_name) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Artist</p>
-                      <p className="text-lg text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Artist</p>
+                      <p className="font-semibold text-gray-900">
                         {cardInfo.artist_name || card.artist_name}
                       </p>
                     </div>
@@ -3351,8 +3351,8 @@ export function MTGCardDetails() {
 
                   {/* Foil Status - from Scryfall API */}
                   {card.is_foil && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Foil</p>
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Finish</p>
                       <div className="flex items-center gap-2">
                         <span className="px-3 py-1 rounded-lg text-sm font-bold bg-gradient-to-r from-purple-500 via-pink-500 to-yellow-500 text-white shadow-md">
                           ✨ FOIL
@@ -3368,9 +3368,9 @@ export function MTGCardDetails() {
 
                   {/* Language - from Scryfall API */}
                   {card.card_language && card.card_language !== 'English' && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Language</p>
-                      <p className="text-lg text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Language</p>
+                      <p className="font-semibold text-gray-900">
                         {card.card_language}
                       </p>
                     </div>
@@ -3378,38 +3378,38 @@ export function MTGCardDetails() {
 
                   {/* Double-Faced Card Indicator */}
                   {card.is_double_faced && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Card Type</p>
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Card Layout</p>
                       <span className="px-3 py-1 rounded-lg text-sm font-bold bg-indigo-100 text-indigo-800">
                         🔄 Double-Faced Card
                       </span>
                     </div>
                   )}
 
-                  {/* Mana Cost from Scryfall API */}
+                  {/* Mana Cost from Scryfall API (fallback if not in cardInfo) */}
                   {card.mtg_mana_cost && !cardInfo.mana_cost && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Mana Cost</p>
-                      <p className="text-lg font-bold text-gray-900 font-mono">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Mana Cost</p>
+                      <p className="font-semibold text-gray-900 font-mono">
                         {card.mtg_mana_cost}
                       </p>
                     </div>
                   )}
 
-                  {/* Type Line from Scryfall API */}
+                  {/* Type Line from Scryfall API (fallback if not in cardInfo) */}
                   {card.mtg_type_line && !cardInfo.mtg_card_type && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Type</p>
-                      <p className="text-lg font-bold text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Type</p>
+                      <p className="font-semibold text-gray-900">
                         {card.mtg_type_line}
                       </p>
                     </div>
                   )}
 
-                  {/* Colors from Scryfall API */}
+                  {/* Colors from Scryfall API (fallback if not in cardInfo) */}
                   {card.mtg_colors && card.mtg_colors.length > 0 && !cardInfo.color_identity && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Colors</p>
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Colors</p>
                       <div className="flex gap-1">
                         {card.mtg_colors.map((color: string, idx: number) => {
                           const colorMap: {[key: string]: {name: string, bg: string, text: string}} = {
@@ -3434,21 +3434,21 @@ export function MTGCardDetails() {
                     </div>
                   )}
 
-                  {/* Rarity from Scryfall API */}
+                  {/* Rarity from Scryfall API (fallback) */}
                   {card.mtg_rarity && !cardInfo.rarity_or_variant && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Rarity</p>
-                      <p className="text-lg text-gray-900 capitalize">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Rarity</p>
+                      <p className="font-semibold text-gray-900 capitalize">
                         {card.mtg_rarity === 'mythic' ? 'Mythic Rare' : card.mtg_rarity}
                       </p>
                     </div>
                   )}
 
-                  {/* Set Code from Scryfall API */}
+                  {/* Set Code from Scryfall API (fallback) */}
                   {card.mtg_set_code && !cardInfo.expansion_code && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Set Code</p>
-                      <p className="text-lg text-gray-900 font-mono uppercase">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Set Code</p>
+                      <p className="font-semibold text-gray-900 font-mono uppercase">
                         {card.mtg_set_code}
                       </p>
                     </div>
@@ -3456,18 +3456,19 @@ export function MTGCardDetails() {
 
                   {/* Promo Badge */}
                   {(cardInfo.is_promo || card.is_promo) && (
-                    <div>
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Promo</p>
                       <span className="inline-flex items-center gap-2 px-3 py-1 bg-yellow-500 text-yellow-900 rounded-lg text-sm font-bold">
                         ⭐ Promo
                       </span>
                     </div>
                   )}
 
-                  {/* Language */}
+                  {/* Language (fallback) */}
                   {(cardInfo.language || card.language) && (cardInfo.language || card.language) !== 'English' && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Language</p>
-                      <p className="text-lg text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Language</p>
+                      <p className="font-semibold text-gray-900">
                         {cardInfo.language || card.language}
                       </p>
                     </div>
@@ -3475,9 +3476,9 @@ export function MTGCardDetails() {
 
                   {/* Border Color */}
                   {(cardInfo.border_color || card.border_color) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Border</p>
-                      <p className="text-lg text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Border</p>
+                      <p className="font-semibold text-gray-900 capitalize">
                         {cardInfo.border_color || card.border_color}
                       </p>
                     </div>
@@ -3485,17 +3486,18 @@ export function MTGCardDetails() {
 
                   {/* Frame Version */}
                   {(cardInfo.frame_version || card.frame_version) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Frame</p>
-                      <p className="text-lg text-gray-900">
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Frame</p>
+                      <p className="font-semibold text-gray-900">
                         {cardInfo.frame_version || card.frame_version}
                       </p>
                     </div>
                   )}
 
-                  {/* Double-Faced Card Badge */}
-                  {(cardInfo.is_double_faced || card.is_double_faced) && (
-                    <div>
+                  {/* Double-Faced Card Badge - only show if not already showing above */}
+                  {(cardInfo.is_double_faced || card.is_double_faced) && !card.is_double_faced && (
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Card Layout</p>
                       <span className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500 text-white rounded-lg text-sm font-bold">
                         🔄 Double-Faced
                       </span>
@@ -5530,26 +5532,49 @@ export function MTGCardDetails() {
                             </span>
                           );
 
-                          // Card Information Section
+                          // Card Information Section - Enhanced for MTG with Scryfall API data
                           const renderCardInfo = () => {
-                            const info = jsonData.card_info;
-                            if (!info) return null;
+                            // 🎴 MTG: Use conversational_card_info (has merged Scryfall data) as primary source
+                            const apiInfo = card.conversational_card_info || {};
+                            const info = jsonData.card_info || {};
+
+                            // Merge API data with fallback to AI data
+                            const cardName = apiInfo.card_name || info.card_name;
+                            const setName = apiInfo.set_name || info.set_name;
+                            const cardNumber = apiInfo.card_number || apiInfo.collector_number || info.card_number;
+                            const year = apiInfo.year || info.year;
+                            const manufacturer = apiInfo.manufacturer || info.manufacturer || 'Wizards of the Coast';
+                            const rarity = apiInfo.rarity_or_variant || apiInfo.rarity_tier || info.rarity_tier;
+
+                            // MTG-specific fields from Scryfall API
+                            const manaCost = apiInfo.mana_cost;
+                            const typeLine = apiInfo.mtg_card_type;
+                            const creatureType = apiInfo.creature_type;
+                            const powerToughness = apiInfo.power_toughness;
+                            const colorIdentity = apiInfo.color_identity;
+                            const expansionCode = apiInfo.expansion_code;
+                            const artistName = apiInfo.artist_name;
+
+                            if (!cardName && !info.card_name) return null;
 
                             return (
                               <>
                                 <SectionHeader title="Card Information" isFirst={true} />
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-2 mt-4">
-                                  {renderField('Card Name', info.card_name)}
-                                  {renderField('Set Name', info.set_name)}
-                                  {renderField('Year', info.year)}
-                                  {renderField('Manufacturer', info.manufacturer)}
-                                  {renderField('Card Number', info.card_number)}
+                                  {renderField('Card Name', cardName)}
+                                  {renderField('Set Name', setName)}
+                                  {expansionCode && renderField('Set Code', expansionCode)}
+                                  {renderField('Card Number', cardNumber)}
+                                  {renderField('Year', year)}
+                                  {renderField('Manufacturer', manufacturer)}
+                                  {renderField('Rarity', rarity)}
+                                  {manaCost && renderField('Mana Cost', manaCost)}
+                                  {typeLine && renderField('Type', typeLine)}
+                                  {creatureType && renderField('Creature Type', creatureType)}
+                                  {powerToughness && renderField('Power/Toughness', powerToughness)}
+                                  {colorIdentity && renderField('Color Identity', colorIdentity)}
+                                  {artistName && renderField('Artist', artistName)}
                                   {renderField('Authentic', info.authentic)}
-                                  {renderField('Player Or Character', info.player_or_character)}
-                                  {renderField('Card Type', info.card_type)}
-                                  {renderField('Subset', info.subset)}
-                                  {renderField('Serial Number', info.serial_number)}
-                                  {renderField('Rarity Tier', info.rarity_tier)}
                                 </div>
 
                                 {info.card_front_text && (
