@@ -142,6 +142,12 @@ export async function GET(request: NextRequest) {
         dvg_decimal_grade: card.dvg_decimal_grade,
         conversational_decimal_grade: card.conversational_decimal_grade,
         created_at: card.created_at,
+        // Special features for card display
+        rookie_or_first: convInfo?.rookie_or_first || false,
+        autographed: convInfo?.autographed || false,
+        serial_number: convInfo?.serial_number || null,
+        facsimile_autograph: convInfo?.facsimile_autograph || false,
+        official_reprint: convInfo?.official_reprint || false,
       };
     }) || [];
 

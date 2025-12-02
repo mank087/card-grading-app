@@ -60,6 +60,9 @@ const getCardInfo = (card: Card) => {
     rookie_or_first: card.conversational_card_info?.rookie_or_first || dvgGrading.card_info?.rookie_or_first,
     subset: subset, // Keep separate for special features display
     autographed: card.conversational_card_info?.autographed || false,
+    facsimile_autograph: card.conversational_card_info?.facsimile_autograph || false,
+    official_reprint: card.conversational_card_info?.official_reprint || false,
+    special_features: card.conversational_card_info?.special_features || null,
   };
 };
 
@@ -468,6 +471,10 @@ function CollectionPageContent() {
               const features: string[] = [];
               if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
               if (cardInfo.autographed) features.push('Auto');
+              // Add facsimile autograph indicator (official printed signature)
+              if (cardInfo.facsimile_autograph) features.push('Facsimile');
+              // Add official reprint indicator
+              if (cardInfo.official_reprint) features.push('Reprint');
               const serialNum = cardInfo.serial_number;
               if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
                 features.push(serialNum);

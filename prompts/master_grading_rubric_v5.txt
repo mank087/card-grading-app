@@ -260,14 +260,16 @@ SECTION 2: ALTERATION DETECTION & FLAGGING
 PURPOSE: Determine if card can receive numeric grade or must be marked N/A (Authentic Altered).
 
 EXECUTION REQUIREMENTS:
-• Complete ALL subsections below (Autograph, Handwritten Markings, Trimming, Image Completeness)
+• Complete ALL subsections below (Autograph, Facsimile/Reprint Detection, Handwritten Markings, Trimming, Image Completeness)
 • Do not skip or rush - alterations invalidate numeric grading
 • Flag all issues found but continue full evaluation through all steps
 • Document findings clearly - be specific about what you observe
 • When uncertain - default to flagging (safer interpretation)
+• NOTE: Facsimile autographs and official reprints are NOT alterations - grade normally with special features notation
 
 CRITICAL: If ANY alteration flagged, final grade MUST be N/A (enforced later in scoring).
 Do not stop analysis; flag issues and continue full evaluation.
+EXCEPTION: Facsimile autographs and official reprints with manufacturer disclosure are legitimate cards - grade normally.
 
 ────────────────────────────────────────────────────────────────────────
 [STEP 0A] AUTOGRAPH VERIFICATION PROTOCOL
@@ -312,6 +314,60 @@ An autograph is a signature, typically of a player, athlete, or character, appli
 • Manufacturer authenticated: Grade normally, autograph is a feature
 • Unverified signature: Apply N/A grade (card has been altered post-production)
 • Sticker autograph (authenticated): Note as "sticker" type, grade normally
+
+────────────────────────────────────────────────────────────────────────
+[STEP 0A-2] FACSIMILE AUTOGRAPH & OFFICIAL REPRINT DETECTION
+────────────────────────────────────────────────────────────────────────
+
+PURPOSE: Identify official reprints and facsimile autograph cards that should be graded normally (NOT marked as AA/N/A). These are manufacturer-produced cards with disclosed reproduction features.
+
+🚨 CRITICAL: Facsimile autographs and official reprints are NOT alterations. They are legitimate, manufacturer-produced cards that should receive numeric grades with special feature notation.
+
+**FACSIMILE AUTOGRAPH INDICATORS (Card IS Official):**
+✅ Card back explicitly states "Facsimile Autograph" or "Facsimile Signature"
+✅ Text indicates "Printed Autograph" or "Reproduced Signature"
+✅ Signature is machine-printed (identical across all cards in set)
+✅ No claim of being hand-signed (manufacturer is transparent about reproduction)
+✅ Part of official product line (not aftermarket addition)
+
+**OFFICIAL REPRINT INDICATORS (Card IS Official):**
+✅ Card back states "The front of this card is a reproduction..."
+✅ Text indicates "Reprint", "Reprinted", or "Official Reproduction"
+✅ Different card stock or finish from original (intentionally distinguishable)
+✅ Year on card differs from copyright year (e.g., "1952 Topps" reprinted in 2002)
+✅ Part of official reprint series (e.g., Topps Archives, commemorative sets)
+✅ Manufacturer logo present on reprint card
+
+**DETECTION PROTOCOL:**
+1. Check card back for "facsimile", "reproduction", "reprint" text
+2. Look for disclosure statements about signature or card reproduction
+3. Verify signature is machine-printed (consistent, not hand-signed variations)
+4. Check if card is part of known reprint/commemorative series
+5. Compare to original design - reprints often have subtle differences
+
+**DISTINGUISHING FROM COUNTERFEITS/ALTERATIONS:**
+• Facsimile/Reprint: Manufacturer DISCLOSES reproduction status
+• Counterfeit/Fake: Attempts to HIDE reproduction status
+• Official cards have proper licensing, logos, and quality
+• Counterfeits lack proper markings and often have print quality issues
+
+**OUTPUT:**
+• facsimile_autograph: true|false
+• official_reprint: true|false
+• reprint_indicators: Array of disclosure text found (or [])
+• reprint_notes: Brief explanation of determination
+
+**GRADING IMPACT:**
+• Facsimile autograph detected: Grade normally, add "Facsimile Autograph" to special_features
+• Official reprint detected: Grade normally, add "Official Reprint" to special_features
+• Both features detected: Grade normally, add both to special_features
+• autographed field = false for facsimile autographs (not hand-signed)
+• These cards can achieve any numeric grade based on condition
+
+**SPECIAL FEATURES NOTATION:**
+When facsimile_autograph = true: special_features includes "Facsimile Autograph"
+When official_reprint = true: special_features includes "Official Reprint"
+When both = true: special_features includes "Facsimile Autograph, Official Reprint"
 
 ────────────────────────────────────────────────────────────────────────
 [STEP 0B] HANDWRITTEN MARKINGS DETECTION

@@ -2266,7 +2266,11 @@ export function SportsCardDetails() {
     rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || dvgGrading.card_info?.rarity_tier,
     autographed: (card.conversational_card_info?.autographed === true || card.conversational_card_info?.autographed === 'Yes' || card.conversational_card_info?.autographed === 'yes' || (card.autograph_type && card.autograph_type !== 'none' && card.autograph_type !== 'false')) ? true : false,
     memorabilia: (card.conversational_card_info?.memorabilia === true || card.conversational_card_info?.memorabilia === 'Yes' || card.conversational_card_info?.memorabilia === 'yes' || (card.memorabilia_type && card.memorabilia_type !== 'none' && card.memorabilia_type !== 'false')) ? true : false,
-    card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text  // 🆕 Card back description
+    card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text,  // 🆕 Card back description
+    // 🆕 Facsimile autograph and official reprint detection
+    facsimile_autograph: card.conversational_card_info?.facsimile_autograph || false,
+    official_reprint: card.conversational_card_info?.official_reprint || false,
+    special_features: card.conversational_card_info?.special_features || null
   };
 
   const recommendedGrade = dvgGrading.recommended_grade || {};
@@ -2512,11 +2516,15 @@ export function SportsCardDetails() {
                       ].filter(p => p).join(' • ')}
                     </div>
 
-                    {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                    {/* Line 3: Special Features (RC, Auto, Facsimile, Reprint, Serial #) - Only if present */}
                     {(() => {
                       const features: string[] = [];
                       if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
                       if (cardInfo.autographed) features.push('Auto');
+                      // Add facsimile autograph indicator (official printed signature)
+                      if (cardInfo.facsimile_autograph) features.push('Facsimile');
+                      // Add official reprint indicator
+                      if (cardInfo.official_reprint) features.push('Reprint');
                       const serialNum = cardInfo.serial_number;
                       if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
                         features.push(serialNum);

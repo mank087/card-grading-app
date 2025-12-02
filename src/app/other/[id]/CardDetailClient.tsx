@@ -2303,7 +2303,10 @@ export function OtherCardDetails() {
     memorabilia: (card.conversational_card_info?.memorabilia === true || card.conversational_card_info?.memorabilia === 'Yes' || card.conversational_card_info?.memorabilia === 'yes') ? true : false,
     special_features: stripMarkdown(card.conversational_card_info?.special_features) || card.special_features || null,
     front_text: card.conversational_card_info?.front_text || card.front_text || null,
-    back_text: card.conversational_card_info?.back_text || card.back_text || null
+    back_text: card.conversational_card_info?.back_text || card.back_text || null,
+    // 🆕 Facsimile autograph and official reprint detection
+    facsimile_autograph: card.conversational_card_info?.facsimile_autograph || false,
+    official_reprint: card.conversational_card_info?.official_reprint || false
   };
 
   // 🎯 Other cards use conversational grading as PRIMARY source
@@ -2552,11 +2555,15 @@ export function OtherCardDetails() {
                       ].filter(p => p).join(' • ')}
                     </div>
 
-                    {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                    {/* Line 3: Special Features (RC, Auto, Facsimile, Reprint, Serial #) - Only if present */}
                     {(() => {
                       const features: string[] = [];
                       if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
                       if (cardInfo.autographed) features.push('Auto');
+                      // Add facsimile autograph indicator (official printed signature)
+                      if (cardInfo.facsimile_autograph) features.push('Facsimile');
+                      // Add official reprint indicator
+                      if (cardInfo.official_reprint) features.push('Reprint');
                       const serialNum = cardInfo.serial_number;
                       if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
                         features.push(serialNum);

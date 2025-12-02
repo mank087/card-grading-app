@@ -20,6 +20,12 @@ interface CardResult {
   dvg_decimal_grade: number;
   conversational_decimal_grade?: number;
   created_at: string;
+  // Special features
+  rookie_or_first?: boolean;
+  autographed?: boolean;
+  serial_number?: string;
+  facsimile_autograph?: boolean;
+  official_reprint?: boolean;
 }
 
 // Helper: Format grade for display
@@ -207,6 +213,16 @@ function SearchPageContent() {
                 const grade = getGrade(card);
                 const condition = grade ? getConditionFromGrade(grade) : '';
 
+                // Build special features array
+                const features: string[] = [];
+                if (card.rookie_or_first === true || card.rookie_or_first === 'true') features.push('RC');
+                if (card.autographed) features.push('Auto');
+                if (card.facsimile_autograph) features.push('Facsimile');
+                if (card.official_reprint) features.push('Reprint');
+                if (card.serial_number && card.serial_number !== 'N/A' && !card.serial_number.toLowerCase().includes('not present') && !card.serial_number.toLowerCase().includes('none')) {
+                  features.push(card.serial_number);
+                }
+
                 // Calculate scale for name to fit on single line
                 const nameScaleX = displayName.length > 25
                   ? Math.max(0.6, 25 / displayName.length)
@@ -263,7 +279,14 @@ function SearchPageContent() {
                             {setLineText}
                           </div>
 
-                          {/* Line 3: DCM Serial Number */}
+                          {/* Line 3: Special Features (RC, Auto, Facsimile, Reprint, Serial #) - Only if present */}
+                          {features.length > 0 && (
+                            <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                              {features.join(' • ')}
+                            </div>
+                          )}
+
+                          {/* Line 4: DCM Serial Number */}
                           <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
                             {card.serial}
                           </div>
