@@ -268,6 +268,19 @@ export function getMTGApiUpdateFields(verificationResult: MTGApiVerificationResu
   const apiCard = verificationResult.mtg_api_data;
   const metadata = extractMTGMetadata(apiCard);
 
+  // Extract creature type from type_line (e.g., "Creature — Human Monk" -> "Human Monk")
+  const creatureType = apiCard.type_line?.includes('—')
+    ? apiCard.type_line.split('—')[1]?.trim() || null
+    : null;
+
+  // Format power/toughness
+  const powerToughness = apiCard.power && apiCard.toughness
+    ? `${apiCard.power}/${apiCard.toughness}`
+    : null;
+
+  // Format color identity for display (array to string like "R" or "WU")
+  const colorIdentityStr = apiCard.color_identity?.join('') || null;
+
   return {
     // API verification fields
     mtg_api_id: verificationResult.mtg_api_id,
@@ -278,7 +291,7 @@ export function getMTGApiUpdateFields(verificationResult: MTGApiVerificationResu
     mtg_api_confidence: verificationResult.confidence,
     mtg_api_method: verificationResult.verification_method,
 
-    // MTG-specific fields from API
+    // MTG-specific fields from API (prefixed for API data)
     mtg_mana_cost: metadata.mtg_mana_cost,
     mtg_type_line: metadata.mtg_type_line,
     mtg_colors: metadata.mtg_colors,
@@ -289,18 +302,25 @@ export function getMTGApiUpdateFields(verificationResult: MTGApiVerificationResu
     foil_type: metadata.foil_type,
     is_double_faced: metadata.is_double_faced,
 
+    // 🔧 FRONTEND-COMPATIBLE FIELDS (what CardDetailClient expects)
+    // These populate the Card Information section on the frontend
+    card_name: apiCard.name,
+    card_set: apiCard.set_name,
+    card_number: apiCard.collector_number,
+    mana_cost: metadata.mtg_mana_cost,           // Frontend reads card.mana_cost
+    mtg_card_type: apiCard.type_line,            // Frontend reads card.mtg_card_type
+    creature_type: creatureType,                  // Frontend reads card.creature_type
+    power_toughness: powerToughness,              // Frontend reads card.power_toughness
+    color_identity: colorIdentityStr,             // Frontend reads card.color_identity
+    expansion_code: metadata.mtg_set_code,        // Frontend reads card.expansion_code
+    rarity_description: apiCard.rarity,           // Frontend reads card.rarity_description
+    artist_name: apiCard.artist || null,          // Frontend reads card.artist_name
+
     // Pricing from Scryfall
     scryfall_price_usd: metadata.scryfall_price_usd,
     scryfall_price_usd_foil: metadata.scryfall_price_usd_foil,
     scryfall_price_eur: metadata.scryfall_price_eur,
     scryfall_price_updated_at: new Date().toISOString(),
-
-    // Override card info with verified data (if corrections needed)
-    ...(verificationResult.corrections.length > 0 && {
-      card_name: apiCard.name,
-      card_set: apiCard.set_name,
-      card_number: apiCard.collector_number,
-    })
   };
 }
 

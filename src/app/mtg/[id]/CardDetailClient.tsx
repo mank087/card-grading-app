@@ -2306,7 +2306,8 @@ export function MTGCardDetails() {
     : aiSetName || card.card_set || dvgGrading.card_info?.set_name;
   const subsetRaw = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset;
   // Combine set name with subset if available (matching foldable label format)
-  const setNameWithSubset = subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw;
+  // 🔧 FIX: Only combine if setNameRaw is truthy to avoid "undefined - Showcase"
+  const setNameWithSubset = setNameRaw && subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw || null;
   const cardInfo = {
     card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
     player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
