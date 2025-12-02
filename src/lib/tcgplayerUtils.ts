@@ -79,8 +79,8 @@ export function generateTCGPlayerSearchUrl(cardData: MTGCardData): string {
 
   // Detect if this is an MTG card
   if (cardData.category === 'MTG') {
-    // MTG-specific search - optimized for accuracy
-    // Priority: Card Name + Set > Collector Number > Foil > Variant
+    // MTG-specific search (simplified - card name + number only)
+    // User requested: Just card name and card number, no other details
 
     // 1. Card name (REQUIRED - most important)
     if (cardData.card_name) {
@@ -89,27 +89,9 @@ export function generateTCGPlayerSearchUrl(cardData: MTGCardData): string {
       searchTerms.push(cardData.featured);
     }
 
-    // 2. Set name (CRITICAL for MTG - differentiates printings)
-    // Use full set name if available, otherwise expansion code
-    if (cardData.card_set && cardData.card_set !== 'Unknown') {
-      searchTerms.push(cardData.card_set);
-    } else if (cardData.expansion_code) {
-      searchTerms.push(cardData.expansion_code);
-    }
-
-    // 3. Collector number (helps narrow to exact variant)
+    // 2. Card number (for precise identification)
     if (cardData.card_number) {
       searchTerms.push(cardData.card_number);
-    }
-
-    // 4. Special variant/treatment (Borderless, Extended Art, etc.)
-    if (cardData.subset && !cardData.subset.toLowerCase().includes('null')) {
-      searchTerms.push(cardData.subset);
-    }
-
-    // 5. Foil indicator (IMPORTANT - huge price difference)
-    if (cardData.is_foil) {
-      searchTerms.push('foil');
     }
 
     const searchQuery = searchTerms.join(' ');
@@ -208,7 +190,7 @@ export function generateTCGPlayerSetSearchUrl(cardData: MTGCardData): string | n
     return null;
   }
 
-  // MTG cards - enhanced search with set information
+  // MTG cards (simplified - card name + number only)
   if (cardData.category === 'MTG') {
     const searchTerms: string[] = [];
 
@@ -219,31 +201,14 @@ export function generateTCGPlayerSetSearchUrl(cardData: MTGCardData): string | n
       searchTerms.push(cardData.featured);
     }
 
-    // 2. Set name (most reliable for MTG)
-    if (cardData.card_set && cardData.card_set !== 'Unknown') {
-      searchTerms.push(cardData.card_set);
-    } else if (cardData.expansion_code) {
-      searchTerms.push(cardData.expansion_code);
-    }
-
-    // 3. Collector number
+    // 2. Card number (for precise identification)
     if (cardData.card_number) {
       searchTerms.push(cardData.card_number);
     }
 
-    // 4. Special variant/treatment
-    if (cardData.subset && !cardData.subset.toLowerCase().includes('null')) {
-      searchTerms.push(cardData.subset);
-    }
-
-    // 5. Foil indicator
-    if (cardData.is_foil) {
-      searchTerms.push('foil');
-    }
-
     const searchQuery = searchTerms.join(' ');
 
-    // MTG search with set information
+    // MTG search - simplified
     const baseUrl = 'https://www.tcgplayer.com/search/magic/product';
     const params = new URLSearchParams({
       productLineName: 'magic',

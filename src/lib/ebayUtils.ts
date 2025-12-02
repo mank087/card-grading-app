@@ -91,8 +91,8 @@ export function generatePokemonEbaySoldListingsUrl(cardData: CardData): string {
 }
 
 /**
- * Generate eBay search URL for MTG cards (optimized for Magic: The Gathering)
- * Priority: Card Name + Set Name > Foil > Variant > Collector Number
+ * Generate eBay search URL for MTG cards (simplified - card name + number only)
+ * User requested: Just card name and card number, no other details
  */
 export function generateMTGEbaySearchUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
@@ -104,41 +104,9 @@ export function generateMTGEbaySearchUrl(cardData: CardData): string {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Set name (CRITICAL for MTG pricing)
-  if (cardData.card_set && cardData.card_set !== 'Unknown') {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 3. Foil indicator (IMPORTANT - huge price difference)
-  if (cardData.is_foil) {
-    searchTerms.push('foil');
-  } else {
-    // Explicitly add "non-foil" or "nonfoil" to exclude foil results
-    searchTerms.push('nonfoil');
-  }
-
-  // 4. Special variant/treatment (Borderless, Extended Art, Showcase, etc.)
-  if (cardData.subset && !cardData.subset.toLowerCase().includes('null')) {
-    searchTerms.push(cardData.subset);
-  }
-
-  // 5. Collector number (helps narrow results)
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
-  }
-
-  // 6. Language (if non-English)
-  if (cardData.language && cardData.language !== 'English') {
-    searchTerms.push(cardData.language);
-  }
-
-  // 7. Add condition hint based on grade
-  if (cardData.dcm_grade_whole) {
-    if (cardData.dcm_grade_whole >= 9) {
-      searchTerms.push('NM'); // Near Mint
-    } else if (cardData.dcm_grade_whole >= 7) {
-      searchTerms.push('LP'); // Lightly Played
-    }
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -157,8 +125,8 @@ export function generateMTGEbaySearchUrl(cardData: CardData): string {
 }
 
 /**
- * Generate eBay sold listings URL for MTG cards
- * Shows completed sales for pricing reference
+ * Generate eBay sold listings URL for MTG cards (simplified - card name + number only)
+ * User requested: Just card name and card number, no other details
  */
 export function generateMTGEbaySoldListingsUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
@@ -170,31 +138,9 @@ export function generateMTGEbaySoldListingsUrl(cardData: CardData): string {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Set name
-  if (cardData.card_set && cardData.card_set !== 'Unknown') {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 3. Foil indicator
-  if (cardData.is_foil) {
-    searchTerms.push('foil');
-  } else {
-    searchTerms.push('nonfoil');
-  }
-
-  // 4. Special variant
-  if (cardData.subset && !cardData.subset.toLowerCase().includes('null')) {
-    searchTerms.push(cardData.subset);
-  }
-
-  // 5. Collector number
+  // 2. Card number
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
-  }
-
-  // 6. Language (if non-English)
-  if (cardData.language && cardData.language !== 'English') {
-    searchTerms.push(cardData.language);
   }
 
   const searchQuery = searchTerms.join(' ');
