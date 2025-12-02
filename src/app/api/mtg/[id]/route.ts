@@ -883,7 +883,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     try {
       console.log(`[GET /api/mtg/${cardId}] 🔍 Starting Scryfall API verification...`);
 
-      const verifyResponse = await fetch(`${request.nextUrl.origin}/api/mtg/verify`, {
+      // Always force verification to ensure we get fresh metadata for merge
+      // This ensures conversational_card_info always gets updated with API data
+      const verifyResponse = await fetch(`${request.nextUrl.origin}/api/mtg/verify?force=true`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
