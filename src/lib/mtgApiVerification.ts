@@ -306,7 +306,9 @@ export function getMTGApiUpdateFields(verificationResult: MTGApiVerificationResu
     // These populate the Card Information section on the frontend
     card_name: apiCard.name,
     card_set: apiCard.set_name,
-    card_number: apiCard.collector_number,
+    // NOTE: Don't overwrite card_number - AI-detected value (what's printed on card) should be preserved
+    // Scryfall's collector_number can differ for variants (e.g., Showcase cards)
+    // card_number is intentionally NOT set here - preserve AI detection
     mana_cost: metadata.mtg_mana_cost,           // Frontend reads card.mana_cost
     mtg_card_type: apiCard.type_line,            // Frontend reads card.mtg_card_type
     creature_type: creatureType,                  // Frontend reads card.creature_type

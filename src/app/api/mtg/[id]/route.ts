@@ -915,10 +915,15 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
             : null;
 
           // Merge API data into card_info (following Pokemon pattern)
+          // NOTE: Preserve AI-detected card_number (what's printed on the card)
+          // Scryfall's collector_number can differ for variants (e.g., Showcase)
           conversationalGradingData.card_info.set_name = m.set_name;
           conversationalGradingData.card_info.card_name = m.card_name || conversationalGradingData.card_info.card_name;
-          conversationalGradingData.card_info.collector_number = m.collector_number;
-          conversationalGradingData.card_info.card_number = m.collector_number;
+          conversationalGradingData.card_info.scryfall_collector_number = m.collector_number;
+          // Keep original AI-detected card_number if it exists, only use Scryfall as fallback
+          if (!conversationalGradingData.card_info.card_number) {
+            conversationalGradingData.card_info.card_number = m.collector_number;
+          }
           conversationalGradingData.card_info.mana_cost = m.mana_cost;
           conversationalGradingData.card_info.mtg_card_type = m.type_line;
           conversationalGradingData.card_info.creature_type = m.creature_type;  // Now from metadata
