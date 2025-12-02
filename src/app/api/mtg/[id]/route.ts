@@ -946,16 +946,29 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       processing_time: Date.now() - startTime,
       // 🃏 Scryfall API verification results
       mtg_api_verification: mtgApiVerification || null,
-      // If verification succeeded, include the corrected data
+      // 🔧 ALWAYS include API verified fields if verification succeeded
+      // These override the conversational_card_info values from AI
+      mtg_api_verified: mtgApiVerification?.verified === true,
       ...(mtgApiVerification?.verified && mtgApiVerification?.metadata && {
-        mtg_api_verified: true,
         mtg_api_id: mtgApiVerification.mtg_api_id,
+        // Core card identification - MUST override AI data for frontend display
         card_set: mtgApiVerification.metadata.set_name,
+        card_name: mtgApiVerification.metadata.card_name,
+        card_number: mtgApiVerification.metadata.collector_number,
+        // MTG-specific fields
         mtg_set_code: mtgApiVerification.metadata.set_code,
         mtg_rarity: mtgApiVerification.metadata.rarity,
         mtg_mana_cost: mtgApiVerification.metadata.mana_cost,
         mtg_type_line: mtgApiVerification.metadata.type_line,
         mtg_colors: mtgApiVerification.metadata.colors,
+        // Additional fields for frontend Card Information section
+        mana_cost: mtgApiVerification.metadata.mana_cost,
+        mtg_card_type: mtgApiVerification.metadata.type_line,
+        color_identity: mtgApiVerification.metadata.color_identity?.join('') || null,
+        expansion_code: mtgApiVerification.metadata.set_code,
+        rarity_description: mtgApiVerification.metadata.rarity,
+        artist_name: mtgApiVerification.metadata.artist,
+        // Pricing
         scryfall_price_usd: mtgApiVerification.metadata.price_usd,
         scryfall_price_usd_foil: mtgApiVerification.metadata.price_usd_foil,
       })
