@@ -429,7 +429,8 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           conversational_condition_label: parsedConversationalData.condition_label,
           conversational_image_confidence: parsedConversationalData.image_confidence,
           conversational_centering_ratios: parsedConversationalData.centering_ratios,
-          conversational_card_info: parsedConversationalData.card_info,
+          // 🔧 FIX: Use database field (has merged Scryfall data) NOT parsed JSON (old AI data)
+          conversational_card_info: card.conversational_card_info || parsedConversationalData.card_info,
           conversational_corners_edges_surface: parsedConversationalData.corners_edges_surface,
           conversational_case_detection: parsedConversationalData.case_detection,
           conversational_defects_front: parsedConversationalData.transformedDefects.front,
