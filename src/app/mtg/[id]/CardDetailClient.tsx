@@ -2298,7 +2298,12 @@ export function MTGCardDetails() {
   };
 
   // 🎯 v3.2: Use conversational_card_info first, then database fields, then DVG fallback
-  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name;
+  // 🃏 MTG API Override: If card was verified by Scryfall API, prefer the API-verified card_set
+  const aiSetName = stripMarkdown(card.conversational_card_info?.set_name);
+  const isUnknownSet = !aiSetName || aiSetName === 'Unknown' || aiSetName === 'Unknown Set' || aiSetName === 'null';
+  const setNameRaw = (card.mtg_api_verified && card.card_set) ? card.card_set
+    : (isUnknownSet && card.card_set) ? card.card_set
+    : aiSetName || card.card_set || dvgGrading.card_info?.set_name;
   const subsetRaw = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset;
   // Combine set name with subset if available (matching foldable label format)
   const setNameWithSubset = subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw;
