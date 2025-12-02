@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { getCardById, getCardBySetAndNumber, searchCardByFuzzyName } from "@/lib/scryfallApi";
 
+// Helper to extract set code from strings like "Marvel's Spider-Man [SPM]" or just "[SPM]"
+function extractSetCodeFromBrackets(setName: string | null | undefined): string | null {
+  if (!setName) return null;
+  const match = setName.match(/\[([A-Z0-9]{2,5})\]/i);
+  return match ? match[1].toUpperCase() : null;
+}
+
 /**
  * POST /api/mtg/[id]/refresh-price
  * Fetches fresh pricing data from Scryfall API and updates the card
@@ -70,7 +77,11 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
     // Extract card info for Scryfall lookup
     const cardInfo = card.conversational_card_info as any || {};
     const scryfallId = card.mtg_api_id || cardInfo.mtg_api_id || cardInfo.scryfall_id;
-    const setCode = card.mtg_set_code || card.expansion_code || cardInfo.expansion_code || cardInfo.mtg_set_code;
+    // Try multiple keys for set code - different grading versions use different keys
+    const setCode = card.mtg_set_code || card.expansion_code ||
+                    cardInfo.expansion_code || cardInfo.mtg_set_code ||
+                    cardInfo.set_code || extractSetCodeFromBrackets(cardInfo.set_name);
+    // Try multiple keys for card number
     const cardNumber = card.card_number || cardInfo.collector_number || cardInfo.card_number;
     // Try multiple sources for card name - it might be stored in different places
     const cardName = card.card_name || cardInfo.card_name || cardInfo.player_or_character || card.featured;
@@ -85,7 +96,9 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
       debug_cardInfo_card_name: cardInfo.card_name,
       debug_cardInfo_player: cardInfo.player_or_character,
       debug_featured: card.featured,
-      debug_cardInfo_set: cardInfo.set_name
+      debug_cardInfo_set_name: cardInfo.set_name,
+      debug_cardInfo_expansion_code: cardInfo.expansion_code,
+      debug_cardInfo_all_keys: Object.keys(cardInfo)
     });
 
     // Try to fetch fresh data from Scryfall
