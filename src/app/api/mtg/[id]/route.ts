@@ -901,6 +901,60 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           corrections: mtgApiVerification.corrections?.length || 0
         });
 
+        // 🔧 KEY FIX: Merge Scryfall API data INTO conversationalGradingData.card_info
+        // This matches the Pokemon pattern - frontend reads conversational_card_info
+        if (mtgApiVerification.verified && mtgApiVerification.metadata && conversationalGradingData?.card_info) {
+          const m = mtgApiVerification.metadata;
+
+          // Format power/toughness from Scryfall data
+          const powerToughness = (m.power && m.toughness)
+            ? `${m.power}/${m.toughness}`
+            : null;
+
+          // Merge API data into card_info (following Pokemon pattern)
+          conversationalGradingData.card_info.set_name = m.set_name;
+          conversationalGradingData.card_info.card_name = m.card_name || conversationalGradingData.card_info.card_name;
+          conversationalGradingData.card_info.collector_number = m.collector_number;
+          conversationalGradingData.card_info.card_number = m.collector_number;
+          conversationalGradingData.card_info.mana_cost = m.mana_cost;
+          conversationalGradingData.card_info.mtg_card_type = m.type_line;
+          conversationalGradingData.card_info.creature_type = m.creature_type;  // Now from metadata
+          conversationalGradingData.card_info.power_toughness = powerToughness;
+          conversationalGradingData.card_info.color_identity = m.color_identity?.join('') || null;
+          conversationalGradingData.card_info.expansion_code = m.set_code;
+          conversationalGradingData.card_info.rarity_or_variant = m.rarity;
+          conversationalGradingData.card_info.artist_name = m.artist;
+          conversationalGradingData.card_info.is_foil = m.is_foil || false;
+          conversationalGradingData.card_info.language = m.language || 'English';
+          conversationalGradingData.card_info.is_double_faced = m.is_double_faced || false;
+
+          // Mark as API verified
+          conversationalGradingData.card_info.mtg_api_verified = true;
+          conversationalGradingData.card_info.mtg_api_id = mtgApiVerification.mtg_api_id;
+          conversationalGradingData.card_info.scryfall_price_usd = m.price_usd;
+          conversationalGradingData.card_info.scryfall_price_usd_foil = m.price_usd_foil;
+
+          console.log(`[GET /api/mtg/${cardId}] 📝 Merged Scryfall data into conversational_card_info:`, {
+            set_name: conversationalGradingData.card_info.set_name,
+            mana_cost: conversationalGradingData.card_info.mana_cost,
+            mtg_card_type: conversationalGradingData.card_info.mtg_card_type,
+            rarity: conversationalGradingData.card_info.rarity_or_variant
+          });
+
+          // Update database with merged conversational_card_info
+          const { error: mergeUpdateError } = await supabase
+            .from("cards")
+            .update({
+              conversational_card_info: conversationalGradingData.card_info,
+              mtg_api_verified: true
+            })
+            .eq("id", cardId);
+
+          if (mergeUpdateError) {
+            console.error(`[GET /api/mtg/${cardId}] ⚠️ Failed to update merged card_info:`, mergeUpdateError);
+          }
+        }
+
         // If corrections were made, log them
         if (mtgApiVerification.corrections?.length > 0) {
           console.log(`[GET /api/mtg/${cardId}] 📝 Scryfall corrections applied:`, mtgApiVerification.corrections);
@@ -916,20 +970,21 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     console.log(`[GET /api/mtg/${cardId}] MTG card request completed in ${Date.now() - startTime}ms`);
 
     // Return updated MTG card data with all structured fields
+    // NOTE: conversational_card_info now contains merged Scryfall API data
     return NextResponse.json({
       ...card,
       ai_grading: gradingResult,
       conversational_grading: conversationalGradingResult,
-      // Structured conversational fields
+      // Structured conversational fields - card_info now has API data merged in
       conversational_decimal_grade: conversationalGradingData?.decimal_grade || null,
       conversational_whole_grade: conversationalGradingData?.whole_grade || null,
       conversational_grade_uncertainty: conversationalGradingData?.grade_range || null,
-      conversational_final_grade_summary: conversationalGradingData?.final_grade_summary || null,  // 🆕 Overall summary
+      conversational_final_grade_summary: conversationalGradingData?.final_grade_summary || null,
       conversational_sub_scores: conversationalGradingData?.sub_scores || null,
       conversational_condition_label: conversationalGradingData?.condition_label || null,
       conversational_image_confidence: conversationalGradingData?.image_confidence || null,
       conversational_centering_ratios: conversationalGradingData?.centering_ratios || null,
-      conversational_card_info: conversationalGradingData?.card_info || null,
+      conversational_card_info: conversationalGradingData?.card_info || null,  // Now has Scryfall data!
       conversational_corners_edges_surface: conversationalGradingData?.corners_edges_surface || null,
       conversational_case_detection: conversationalGradingData?.case_detection || null,
       conversational_defects_front: conversationalGradingData?.transformedDefects?.front || null,
@@ -946,32 +1001,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       processing_time: Date.now() - startTime,
       // 🃏 Scryfall API verification results
       mtg_api_verification: mtgApiVerification || null,
-      // 🔧 ALWAYS include API verified fields if verification succeeded
-      // These override the conversational_card_info values from AI
-      mtg_api_verified: mtgApiVerification?.verified === true,
-      ...(mtgApiVerification?.verified && mtgApiVerification?.metadata && {
-        mtg_api_id: mtgApiVerification.mtg_api_id,
-        // Core card identification - MUST override AI data for frontend display
-        card_set: mtgApiVerification.metadata.set_name,
-        card_name: mtgApiVerification.metadata.card_name,
-        card_number: mtgApiVerification.metadata.collector_number,
-        // MTG-specific fields
-        mtg_set_code: mtgApiVerification.metadata.set_code,
-        mtg_rarity: mtgApiVerification.metadata.rarity,
-        mtg_mana_cost: mtgApiVerification.metadata.mana_cost,
-        mtg_type_line: mtgApiVerification.metadata.type_line,
-        mtg_colors: mtgApiVerification.metadata.colors,
-        // Additional fields for frontend Card Information section
-        mana_cost: mtgApiVerification.metadata.mana_cost,
-        mtg_card_type: mtgApiVerification.metadata.type_line,
-        color_identity: mtgApiVerification.metadata.color_identity?.join('') || null,
-        expansion_code: mtgApiVerification.metadata.set_code,
-        rarity_description: mtgApiVerification.metadata.rarity,
-        artist_name: mtgApiVerification.metadata.artist,
-        // Pricing
-        scryfall_price_usd: mtgApiVerification.metadata.price_usd,
-        scryfall_price_usd_foil: mtgApiVerification.metadata.price_usd_foil,
-      })
+      mtg_api_verified: mtgApiVerification?.verified === true
     });
 
   } catch (error: any) {

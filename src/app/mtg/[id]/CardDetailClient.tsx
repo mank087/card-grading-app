@@ -2297,71 +2297,62 @@ export function MTGCardDetails() {
     return englishPart ? englishPart.trim() : text;
   };
 
-  // 🎴 MTG CARD INFO: Scryfall API data takes priority when verified
-  // If mtg_api_verified is true, use database fields (populated by Scryfall) FIRST
-  // Otherwise fall back to AI conversational_card_info
-  const isApiVerified = card.mtg_api_verified === true;
+  // 🎴 MTG CARD INFO: Read from conversational_card_info
+  // Following Pokemon pattern: Scryfall API data is merged into card_info by the API route
+  // So we just read from conversational_card_info and it will have accurate API data
+  const convInfo = card.conversational_card_info || {};
 
-  // Helper: Get MTG field with API priority
-  const getMtgField = (apiField: any, aiField: string, fallback: any = null) => {
-    if (isApiVerified && apiField !== null && apiField !== undefined) {
-      return apiField;
-    }
-    const aiValue = stripMarkdown(card.conversational_card_info?.[aiField]);
-    return aiValue || apiField || fallback;
-  };
-
-  // Set name: API verified data takes absolute priority
-  const setNameRaw = isApiVerified && card.card_set
-    ? card.card_set
-    : stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name;
-  const subsetRaw = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset;
-  // Only combine if setNameRaw is truthy to avoid "undefined - Showcase"
+  // Set name with optional subset
+  const setNameRaw = stripMarkdown(convInfo.set_name) || card.card_set || dvgGrading.card_info?.set_name;
+  const subsetRaw = stripMarkdown(convInfo.subset) || card.subset || dvgGrading.card_info?.subset;
   const setNameWithSubset = setNameRaw && subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw || null;
 
   const cardInfo = {
-    // Core identification - API data preferred when verified
-    card_name: getMtgField(card.card_name, 'card_name', dvgGrading.card_info?.card_name),
-    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
+    // Core identification - from conversational_card_info (Scryfall data merged in by API)
+    card_name: stripMarkdown(convInfo.card_name) || card.card_name || dvgGrading.card_info?.card_name,
+    player_or_character: stripMarkdown(convInfo.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
     set_name: setNameWithSubset,
-    set_era: stripMarkdown(card.conversational_card_info?.set_era) || dvgGrading.card_info?.set_era,
-    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
-    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || 'Wizards of the Coast',
-    card_number: getMtgField(card.card_number, 'card_number', dvgGrading.card_info?.card_number),
-    sport_or_category: stripMarkdown(card.conversational_card_info?.sport_or_category) || card.category || dvgGrading.card_info?.sport_or_category,
-    serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
-    rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
+    set_era: stripMarkdown(convInfo.set_era) || dvgGrading.card_info?.set_era,
+    year: stripMarkdown(convInfo.year) || card.release_date || dvgGrading.card_info?.year,
+    manufacturer: stripMarkdown(convInfo.manufacturer) || card.manufacturer_name || 'Wizards of the Coast',
+    card_number: stripMarkdown(convInfo.card_number) || stripMarkdown(convInfo.collector_number) || card.card_number || dvgGrading.card_info?.card_number,
+    sport_or_category: stripMarkdown(convInfo.sport_or_category) || card.category || dvgGrading.card_info?.sport_or_category,
+    serial_number: stripMarkdown(convInfo.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
+    rookie_or_first: convInfo.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
     subset: subsetRaw,
-    rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || card.rarity_description || dvgGrading.card_info?.rarity_tier,
-    autographed: card.conversational_card_info?.autographed === true || card.autographed === true || card.autograph_type === 'authentic',
-    memorabilia: card.conversational_card_info?.memorabilia === true || card.memorabilia_type !== 'none',
-    card_front_text: card.conversational_card_info?.card_front_text || dvgGrading.card_info?.card_front_text,
-    card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text,
-    // Pokemon-specific fields (not API verified)
-    pokemon_type: stripMarkdown(card.conversational_card_info?.pokemon_type) || card.pokemon_type || null,
-    pokemon_stage: stripMarkdown(card.conversational_card_info?.pokemon_stage) || card.pokemon_stage || null,
-    hp: stripMarkdown(card.conversational_card_info?.hp) || card.hp || null,
-    card_type: stripMarkdown(card.conversational_card_info?.card_type) || card.card_type || null,
+    rarity_tier: stripMarkdown(convInfo.rarity_tier) || card.rarity_tier || card.rarity_description || dvgGrading.card_info?.rarity_tier,
+    autographed: convInfo.autographed === true || card.autographed === true || card.autograph_type === 'authentic',
+    memorabilia: convInfo.memorabilia === true || card.memorabilia_type !== 'none',
+    card_front_text: convInfo.card_front_text || dvgGrading.card_info?.card_front_text,
+    card_back_text: convInfo.card_back_text || dvgGrading.card_info?.card_back_text,
+    // Pokemon-specific fields
+    pokemon_type: stripMarkdown(convInfo.pokemon_type) || card.pokemon_type || null,
+    pokemon_stage: stripMarkdown(convInfo.pokemon_stage) || card.pokemon_stage || null,
+    hp: stripMarkdown(convInfo.hp) || card.hp || null,
+    card_type: stripMarkdown(convInfo.card_type) || card.card_type || null,
 
-    // 🎴 MTG-SPECIFIC FIELDS - Scryfall API data takes priority when verified
-    mana_cost: getMtgField(card.mana_cost, 'mana_cost'),
-    color_identity: getMtgField(card.color_identity, 'color_identity'),
-    mtg_card_type: getMtgField(card.mtg_card_type, 'mtg_card_type'),
-    creature_type: getMtgField(card.creature_type, 'creature_type'),
-    power_toughness: getMtgField(card.power_toughness, 'power_toughness'),
-    expansion_code: getMtgField(card.expansion_code, 'expansion_code'),
-    collector_number: getMtgField(card.card_number, 'collector_number'),
-    artist_name: getMtgField(card.artist_name, 'artist_name'),
-    rarity_or_variant: getMtgField(card.rarity_description, 'rarity_or_variant'),
-    // Boolean fields - API takes priority
-    is_foil: isApiVerified ? (card.is_foil || false) : (card.conversational_card_info?.is_foil ?? card.is_foil ?? false),
-    is_promo: isApiVerified ? (card.is_promo || false) : (card.conversational_card_info?.is_promo ?? card.is_promo ?? false),
-    is_double_faced: isApiVerified ? (card.is_double_faced || false) : (card.conversational_card_info?.is_double_faced ?? card.is_double_faced ?? false),
+    // 🎴 MTG-SPECIFIC FIELDS - From conversational_card_info (Scryfall data merged in by API)
+    mana_cost: stripMarkdown(convInfo.mana_cost) || card.mana_cost || null,
+    color_identity: stripMarkdown(convInfo.color_identity) || card.color_identity || null,
+    mtg_card_type: stripMarkdown(convInfo.mtg_card_type) || card.mtg_card_type || null,
+    creature_type: stripMarkdown(convInfo.creature_type) || card.creature_type || null,
+    power_toughness: stripMarkdown(convInfo.power_toughness) || card.power_toughness || null,
+    expansion_code: stripMarkdown(convInfo.expansion_code) || card.expansion_code || null,
+    collector_number: stripMarkdown(convInfo.collector_number) || stripMarkdown(convInfo.card_number) || card.card_number || null,
+    artist_name: stripMarkdown(convInfo.artist_name) || card.artist_name || null,
+    rarity_or_variant: stripMarkdown(convInfo.rarity_or_variant) || card.rarity_description || null,
+    // Boolean fields
+    is_foil: convInfo.is_foil ?? card.is_foil ?? false,
+    is_promo: convInfo.is_promo ?? card.is_promo ?? false,
+    is_double_faced: convInfo.is_double_faced ?? card.is_double_faced ?? false,
     // Other MTG fields
-    border_color: getMtgField(card.border_color, 'border_color'),
-    frame_version: getMtgField(card.frame_version, 'frame_version'),
-    language: getMtgField(card.card_language, 'language', 'English'),
-    keywords: card.keywords || card.conversational_card_info?.keywords || null
+    border_color: stripMarkdown(convInfo.border_color) || card.border_color || null,
+    frame_version: stripMarkdown(convInfo.frame_version) || card.frame_version || null,
+    language: stripMarkdown(convInfo.language) || card.card_language || 'English',
+    keywords: convInfo.keywords || card.keywords || null,
+    // Scryfall pricing (if available from merged API data)
+    scryfall_price_usd: convInfo.scryfall_price_usd || card.scryfall_price_usd || null,
+    scryfall_price_usd_foil: convInfo.scryfall_price_usd_foil || card.scryfall_price_usd_foil || null
   };
 
   // 🎯 MTG cards use conversational grading as PRIMARY source

@@ -329,16 +329,25 @@ export function getMTGApiUpdateFields(verificationResult: MTGApiVerificationResu
  * For UI display purposes
  */
 export function extractMTGDisplayMetadata(apiCard: ScryfallCard) {
+  // Extract creature type from type_line (e.g., "Creature — Human Monk" -> "Human Monk")
+  const creatureType = apiCard.type_line?.includes('—')
+    ? apiCard.type_line.split('—')[1]?.trim()
+    : null;
+
   return {
     // Card details
     card_name: apiCard.name,
     mana_cost: apiCard.mana_cost || apiCard.card_faces?.[0]?.mana_cost || null,
     cmc: apiCard.cmc,
     type_line: apiCard.type_line,
+    creature_type: creatureType,
     oracle_text: apiCard.oracle_text || apiCard.card_faces?.[0]?.oracle_text || null,
     colors: apiCard.colors || apiCard.card_faces?.[0]?.colors || [],
     color_identity: apiCard.color_identity,
     keywords: apiCard.keywords,
+    // Power/Toughness for creatures
+    power: apiCard.power || null,
+    toughness: apiCard.toughness || null,
 
     // Set details
     set_code: apiCard.set.toUpperCase(),
