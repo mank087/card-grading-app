@@ -1,12 +1,15 @@
 ═══════════════════════════════════════════════════════════════════════
-PROFESSIONAL TRADING CARD GRADING SYSTEM v5.6
+PROFESSIONAL TRADING CARD GRADING SYSTEM v5.7
 DCM OPTIC AI GRADING ENGINE - THREE-PASS CONSENSUS GRADING
 ═══════════════════════════════════════════════════════════════════════
 
-Version: 5.6.0
+Version: 5.7.0
 Release Date: 2025-12-02
-Change Log: Stricter deduction values, defect-to-grade correlation,
-            visual damage ceiling, floor drag formula, independent language
+Change Log v5.7: Description-score validation with keyword caps,
+                 cumulative corner/edge count penalties,
+                 strengthened "visible without zoom" enforcement
+Change Log v5.6: Stricter deduction values, defect-to-grade correlation,
+                 visual damage ceiling, floor drag formula, independent language
 Architecture: Master Rubric + Card-Type Deltas + Three-Pass Consensus
 Compatibility: JSON output format, OpenAI Structured Outputs (json_schema)
 Output Format: response_format: json_schema
@@ -1287,7 +1290,7 @@ DEFECT COUNT GRADE CAPS (Hard Limits)
 • Multiple heavy defects → 5.0 maximum final grade
 
 ────────────────────────────────────────────────────────────────────────
-VISUAL DAMAGE GRADE CEILING ("First Glance Test")
+VISUAL DAMAGE GRADE CEILING ("First Glance Test") - UPDATED v5.7
 ────────────────────────────────────────────────────────────────────────
 
 🚨 **CRITICAL:** If defects are visible WITHOUT zooming (at normal viewing distance of 12 inches),
@@ -1306,6 +1309,30 @@ Ask: "Can I see ANY defects when looking at the card at normal distance?"
 
 **Rationale:** A card that "appears Mint at first glance" is the definition of NM-MT (8.0).
 If defects are immediately visible, the card cannot meet that standard.
+
+🚨 **LANGUAGE TRIGGER - "VISIBLE WITHOUT ZOOM" RULE (v5.7):**
+
+If you write ANY of these phrases in your description, the ceiling AUTOMATICALLY applies:
+
+| Phrase in Your Description | Automatic Ceiling |
+|---------------------------|-------------------|
+| "visible without zoom" | **7.5 max for that category** |
+| "visible without magnification" | **7.5 max for that category** |
+| "visible at normal distance" | **7.5 max for that category** |
+| "can be seen without close inspection" | **7.5 max for that category** |
+| "whitening is visible in a few spots" | **7.5 max for that category** |
+| "clearly visible against the [color]" | **7.5 max for that category** |
+| "ink loss is clearly visible" | **7.0 max for that category** |
+| "obvious whitening" | **7.0 max for that category** |
+
+**WHY THIS MATTERS:**
+PSA 8 definition: Card "appears Near Mint-Mint at FIRST GLANCE"
+→ If you can see defects without zooming, it does NOT appear NM-MT at first glance
+→ Therefore it CANNOT be 8.0 or higher
+
+**SELF-CHECK:** Before assigning 8.0+ to any category, ask:
+"Did I describe anything as visible without zoom/magnification?"
+If YES → Score must be 7.5 or lower
 
 ────────────────────────────────────────────────────────────────────────
 DCM GRADE CALIBRATION TABLE (Internal Reference)
@@ -1333,6 +1360,90 @@ DO NOT mention these correlations in your output - grade independently.
 
 **VALIDATION:** Your grade should match the defect profile. If you're grading 8.5 but
 the card has 5+ defects, re-evaluate - you're likely grading too high.
+
+────────────────────────────────────────────────────────────────────────
+🚨 DESCRIPTION-SCORE VALIDATION (MANDATORY - v5.7)
+────────────────────────────────────────────────────────────────────────
+
+**CRITICAL:** Your score MUST match your description. If you describe severe defects
+but assign a high score, you are WRONG. Validate BEFORE finalizing.
+
+**KEYWORD SCORE CAPS - If your description contains these phrases:**
+
+| If Description Contains... | Maximum Score Allowed |
+|----------------------------|----------------------|
+| "material loss" / "ink broken" / "worn through" / "coating loss" | **7.5** |
+| "blunted" / "rounded profile" / "softened point" | **7.5** |
+| "noticeable" / "obvious" / "clearly visible" / "distinct" | **8.0** |
+| "visible without zoom" / "visible at distance" / "visible without magnification" | **7.5** |
+| "multiple white spots" / "scattered whitening" / "continuous whitening" | **7.5** |
+| "patch" (larger than dot/speck) | **7.5** |
+| "heaviest wear" / "most visible wear" / "worst corner/edge" | **7.0** |
+| "moderate rounding" / "moderate wear" | **7.0** |
+| "several" + any defect type | **7.5** |
+| "exposed cardstock" / "revealing cardstock" | **7.0** |
+
+**VALIDATION PROCESS:**
+1. Write your defect description first
+2. Check description against keyword table above
+3. If ANY keyword is present, cap score at that maximum
+4. If multiple keywords present, use the LOWEST cap
+
+**EXAMPLE VALIDATION:**
+Description: "The corner shows a noticeable white patch with the blue border ink broken, revealing underlying cardstock."
+Keywords found:
+- "noticeable" → max 8.0
+- "patch" → max 7.5
+- "ink broken" → max 7.5
+- "revealing cardstock" → max 7.0
+**Correct Score: 7.0** (lowest cap applies)
+
+❌ INVALID: Describing "material loss" or "ink broken" but scoring 8.0+
+❌ INVALID: Describing "noticeable white patch" but scoring 8.5+
+❌ INVALID: Describing "visible without zoom" but scoring 8.0+
+✅ VALID: "Tiny speck of white at extreme tip" → 9.0-9.5 (minor defect language)
+✅ VALID: "Small but distinct white dot" → 8.5-9.0 (minor-moderate language)
+
+────────────────────────────────────────────────────────────────────────
+CUMULATIVE DEFECT COUNT PENALTIES (v5.7)
+────────────────────────────────────────────────────────────────────────
+
+**CORNER COUNT PENALTY:**
+When multiple corners show defects, apply additional penalty to corner score:
+
+| Corners with Defects | Additional Penalty |
+|---------------------|-------------------|
+| 1-2 corners | No additional penalty |
+| 3-4 corners | **−0.5** from calculated average |
+| 5-6 corners | **−1.0** from calculated average |
+| 7-8 corners (all) | **−1.5** from calculated average |
+
+**EDGE COUNT PENALTY:**
+When multiple edges show defects, apply additional penalty to edge score:
+
+| Edges with Defects | Additional Penalty |
+|-------------------|-------------------|
+| 1-2 edges | No additional penalty |
+| 3-4 edges | **−0.5** from calculated average |
+| 5-6 edges | **−1.0** from calculated average |
+| 7-8 edges (all) | **−1.5** from calculated average |
+
+**APPLICATION:**
+1. Calculate individual corner/edge scores
+2. Average them for category score
+3. Count how many have ANY defect documented
+4. Apply penalty from table above
+5. This is your final category score
+
+**EXAMPLE:**
+- 8 corners scored: 9.0, 8.5, 7.5, 7.0, 8.5, 7.5, 8.5, 7.0
+- Average: 7.9
+- Corners with defects: ALL 8 (every corner has documented whitening/wear)
+- Penalty: −1.5
+- **Final Corner Score: 7.9 − 1.5 = 6.4 → 6.5**
+
+This reflects professional grading reality: a card where ALL corners show wear
+is in worse condition than a card with one bad corner and seven perfect ones.
 
 ════════════════════════════════════════════════════════════════════════
 ═══════════════════════════════════════════════════════════════════════
