@@ -102,9 +102,10 @@ export async function POST(request: NextRequest) {
       card_name: overrideCardInfo?.card_name || convInfo.card_name || card.card_name,
       player_or_character: overrideCardInfo?.player_or_character || convInfo.player_or_character || card.featured,
       set_name: overrideCardInfo?.set_name || convInfo.set_name || card.card_set,
-      card_number: overrideCardInfo?.card_number || convInfo.card_number || card.card_number,
+      // 🔧 MTG uses collector_number in AI output, card_number in database
+      card_number: overrideCardInfo?.card_number || convInfo.collector_number || convInfo.card_number || card.card_number,
       year: overrideCardInfo?.year || convInfo.year || card.release_date,
-      set_code: overrideCardInfo?.set_code || convInfo.set_code || null,
+      set_code: overrideCardInfo?.set_code || convInfo.set_code || convInfo.expansion_code || null,
       language: overrideCardInfo?.language || convInfo.language || 'English',
       is_foil: overrideCardInfo?.is_foil ?? convInfo.is_foil ?? false,
       foil_type: overrideCardInfo?.foil_type || convInfo.foil_type || null
