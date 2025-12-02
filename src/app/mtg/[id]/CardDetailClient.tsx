@@ -2302,10 +2302,19 @@ export function MTGCardDetails() {
   // So we just read from conversational_card_info and it will have accurate API data
   const convInfo = card.conversational_card_info || {};
 
-  // Set name with optional subset
+  // Set name - DON'T append frame treatments like "Showcase", "Borderless", "Extended Art"
+  // These are NOT subsets, they're card variants/treatments
   const setNameRaw = stripMarkdown(convInfo.set_name) || card.card_set || dvgGrading.card_info?.set_name;
   const subsetRaw = stripMarkdown(convInfo.subset) || card.subset || dvgGrading.card_info?.subset;
-  const setNameWithSubset = setNameRaw && subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw || null;
+
+  // Frame treatments that should NOT be appended to set name
+  const frameTreatments = ['showcase', 'borderless', 'extended art', 'full art', 'etched', 'retro', 'anime'];
+  const isFrameTreatment = subsetRaw && frameTreatments.some(t => subsetRaw.toLowerCase().includes(t));
+
+  // Only append subset if it's a real subset (not a frame treatment)
+  const setNameWithSubset = setNameRaw && subsetRaw && !isFrameTreatment
+    ? `${setNameRaw} - ${subsetRaw}`
+    : setNameRaw || null;
 
   const cardInfo = {
     // Core identification - from conversational_card_info (Scryfall data merged in by API)
@@ -3442,16 +3451,6 @@ export function MTGCardDetails() {
                       <p className="text-lg text-gray-900 font-mono uppercase">
                         {card.mtg_set_code}
                       </p>
-                    </div>
-                  )}
-
-                  {/* Foil Badge */}
-                  {(cardInfo.is_foil || card.is_foil) && (
-                    <div>
-                      <p className="text-sm font-semibold text-gray-600 mb-1">Finish</p>
-                      <span className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-lg text-sm font-bold shadow-md">
-                        ✨ Foil
-                      </span>
                     </div>
                   )}
 
