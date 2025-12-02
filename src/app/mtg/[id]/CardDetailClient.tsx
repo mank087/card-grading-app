@@ -1748,6 +1748,16 @@ export function MTGCardDetails() {
           setPriceRefreshError(data.message || 'Please wait before refreshing again.');
           return;
         }
+        // Handle card not found - provide helpful message
+        if (response.status === 404) {
+          const debugInfo = data.debug;
+          if (debugInfo && !debugInfo.had_card_name) {
+            setPriceRefreshError('Card information is incomplete. Try re-grading the card to establish card identity.');
+          } else {
+            setPriceRefreshError(data.message || 'Could not find this card in Scryfall. The card may not be in their database yet.');
+          }
+          return;
+        }
         throw new Error(data.error || 'Failed to refresh prices');
       }
 

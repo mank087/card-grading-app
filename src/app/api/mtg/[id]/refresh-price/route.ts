@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
-import { getCardBySetAndNumber, searchCardByFuzzyName } from "@/lib/scryfallApi";
+import { getCardById, getCardBySetAndNumber, searchCardByFuzzyName } from "@/lib/scryfallApi";
 
 /**
  * POST /api/mtg/[id]/refresh-price
@@ -68,17 +68,32 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
 
     // Extract card info for Scryfall lookup
     const cardInfo = card.conversational_card_info as any || {};
-    const setCode = card.mtg_set_code || card.expansion_code || cardInfo.expansion_code;
+    const scryfallId = card.mtg_api_id || cardInfo.mtg_api_id || cardInfo.scryfall_id;
+    const setCode = card.mtg_set_code || card.expansion_code || cardInfo.expansion_code || cardInfo.mtg_set_code;
     const cardNumber = card.card_number || cardInfo.collector_number || cardInfo.card_number;
     const cardName = card.card_name || cardInfo.card_name;
 
-    console.log(`[refresh-price] Looking up: ${cardName} from ${setCode} #${cardNumber}`);
+    console.log(`[refresh-price] Looking up card:`, {
+      scryfallId,
+      cardName,
+      setCode,
+      cardNumber
+    });
 
     // Try to fetch fresh data from Scryfall
     let scryfallCard = null;
 
+    // Strategy 0: Direct Scryfall ID lookup (most reliable - already verified)
+    if (scryfallId) {
+      console.log(`[refresh-price] Strategy 0: Direct Scryfall ID lookup: ${scryfallId}`);
+      scryfallCard = await getCardById(scryfallId);
+      if (scryfallCard) {
+        console.log(`[refresh-price] ✅ Found via Scryfall ID`);
+      }
+    }
+
     // Strategy 1: Set code + collector number (most accurate)
-    if (setCode && cardNumber) {
+    if (!scryfallCard && setCode && cardNumber) {
       // Clean the card number (remove leading zeros, handle /xxx format)
       let cleanNumber = cardNumber;
       if (cardNumber.includes('/')) {
@@ -103,10 +118,21 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
     }
 
     if (!scryfallCard) {
-      console.warn(`[refresh-price] Could not find card in Scryfall API`);
+      console.warn(`[refresh-price] Could not find card in Scryfall API. Tried:`, {
+        scryfallId: scryfallId || 'none',
+        setCode: setCode || 'none',
+        cardNumber: cardNumber || 'none',
+        cardName: cardName || 'none'
+      });
       return NextResponse.json({
         error: "Card not found in Scryfall",
-        message: "Could not find this card in Scryfall API to refresh pricing."
+        message: "Could not find this card in Scryfall API. Try re-grading the card to establish Scryfall verification.",
+        debug: {
+          had_scryfall_id: !!scryfallId,
+          had_set_code: !!setCode,
+          had_card_number: !!cardNumber,
+          had_card_name: !!cardName
+        }
       }, { status: 404 });
     }
 
@@ -125,10 +151,32 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
       eur: newPrices.scryfall_price_eur
     });
 
-    // Update database with new prices
+    // Build update object - include Scryfall ID and card info if we found them
+    const updateData: any = {
+      ...newPrices,
+      // Save Scryfall ID for future lookups (most reliable method)
+      mtg_api_id: scryfallCard.id,
+      mtg_api_verified: true
+    };
+
+    // If card_name was empty, populate it from Scryfall
+    if (!card.card_name && scryfallCard.name) {
+      updateData.card_name = scryfallCard.name;
+    }
+    // If card_set was empty, populate it from Scryfall
+    if (!card.card_set && scryfallCard.set_name) {
+      updateData.card_set = scryfallCard.set_name;
+    }
+    // If expansion_code was empty, populate it from Scryfall
+    if (!card.expansion_code && scryfallCard.set) {
+      updateData.expansion_code = scryfallCard.set.toUpperCase();
+      updateData.mtg_set_code = scryfallCard.set.toUpperCase();
+    }
+
+    // Update database with new prices and card info
     const { error: updateError } = await supabase
       .from("cards")
-      .update(newPrices)
+      .update(updateData)
       .eq("id", cardId);
 
     if (updateError) {
@@ -136,19 +184,29 @@ export async function POST(request: NextRequest, { params }: RefreshPriceRequest
       return NextResponse.json({ error: "Failed to update prices" }, { status: 500 });
     }
 
-    // Also update conversational_card_info if it exists
-    if (card.conversational_card_info) {
-      const updatedCardInfo = {
-        ...card.conversational_card_info,
-        scryfall_price_usd: newPrices.scryfall_price_usd,
-        scryfall_price_usd_foil: newPrices.scryfall_price_usd_foil
-      };
+    // Also update conversational_card_info with Scryfall data
+    const existingCardInfo = card.conversational_card_info || {};
+    const updatedCardInfo = {
+      ...existingCardInfo,
+      scryfall_price_usd: newPrices.scryfall_price_usd,
+      scryfall_price_usd_foil: newPrices.scryfall_price_usd_foil,
+      mtg_api_id: scryfallCard.id,
+      mtg_api_verified: true,
+      // Fill in missing card info from Scryfall
+      card_name: existingCardInfo.card_name || scryfallCard.name,
+      set_name: existingCardInfo.set_name || scryfallCard.set_name,
+      expansion_code: existingCardInfo.expansion_code || scryfallCard.set.toUpperCase(),
+      collector_number: existingCardInfo.collector_number || scryfallCard.collector_number,
+      rarity_or_variant: existingCardInfo.rarity_or_variant || scryfallCard.rarity,
+      mana_cost: existingCardInfo.mana_cost || scryfallCard.mana_cost,
+      mtg_card_type: existingCardInfo.mtg_card_type || scryfallCard.type_line,
+      artist_name: existingCardInfo.artist_name || scryfallCard.artist
+    };
 
-      await supabase
-        .from("cards")
-        .update({ conversational_card_info: updatedCardInfo })
-        .eq("id", cardId);
-    }
+    await supabase
+      .from("cards")
+      .update({ conversational_card_info: updatedCardInfo })
+      .eq("id", cardId);
 
     const processingTime = Date.now() - startTime;
     console.log(`[refresh-price] Price refresh completed in ${processingTime}ms`);
