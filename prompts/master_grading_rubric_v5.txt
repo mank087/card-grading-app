@@ -575,7 +575,7 @@ Actual field extraction rules are defined in the card-type delta files.
 **CARD-TYPE-SPECIFIC FIELDS:**
 → Refer to delta file for detailed field extraction rules:
   • Sports: player_or_character, sport_or_category, subset, serial_number, rookie_or_first
-  • Pokemon: pokemon_stage, pokemon_type, hp, card_type, rarity, set_number
+  • Pokemon: pokemon_stage, pokemon_type, hp, card_type, rarity, set_number, set_code (3-letter code for modern cards)
   • MTG: mtg_card_type, mana_cost, color_identity, power_toughness, creature_type
   • Lorcana: ink_color, character_version, inkwell, strength, willpower, lore_value
   • Other: generic fields (card_name, set_name, manufacturer, year)

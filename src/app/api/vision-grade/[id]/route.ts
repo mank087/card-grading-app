@@ -1924,6 +1924,46 @@ EXTRACTION RULES:
       console.log(`[CONVERSATIONAL AI] Skipping professional grade estimation for N/A grade (no AI estimates provided)`);
     }
 
+    // 🎴 Pokemon API Verification (Post-Grading)
+    // For Pokemon cards, verify card details against Pokemon TCG API and persist
+    let pokemonApiVerification = null;
+    const cardCategory = conversationalGradingData?.card_info?.sport_or_category || card.category;
+
+    if (cardCategory === 'Pokemon') {
+      console.log(`[POKEMON API] Starting post-grading verification for Pokemon card`);
+      try {
+        // Call the Pokemon verify API endpoint
+        const verifyResponse = await fetch(`${request.nextUrl.origin}/api/pokemon/verify`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            card_id: cardId,
+            card_info: conversationalGradingData?.card_info || null
+          })
+        });
+
+        if (verifyResponse.ok) {
+          pokemonApiVerification = await verifyResponse.json();
+          console.log(`[POKEMON API] Verification complete:`, {
+            verified: pokemonApiVerification.verified,
+            pokemon_api_id: pokemonApiVerification.pokemon_api_id,
+            confidence: pokemonApiVerification.confidence,
+            corrections: pokemonApiVerification.corrections?.length || 0
+          });
+
+          // If corrections were made, log them
+          if (pokemonApiVerification.corrections?.length > 0) {
+            console.log(`[POKEMON API] Card info corrections applied:`, pokemonApiVerification.corrections);
+          }
+        } else {
+          console.warn(`[POKEMON API] Verification request failed:`, verifyResponse.status);
+        }
+      } catch (pokemonError: any) {
+        console.error(`[POKEMON API] Verification error:`, pokemonError.message);
+        // Don't fail grading - Pokemon verification is optional enhancement
+      }
+    }
+
     const processingTime = Date.now() - startTime;
     console.log(`[CONVERSATIONAL AI] Complete grading process finished in ${processingTime}ms`);
     console.log(`[CONVERSATIONAL AI] About to return professional grades:`, professionalGrades ? 'EXISTS' : 'NULL');
@@ -2005,7 +2045,10 @@ EXTRACTION RULES:
       processing_time: processingTime,
       grading_system: 'dvg-v2',
       reshoot_required: metrics.reshootRequired,
-      image_quality: visionResult.image_quality.grade
+      image_quality: visionResult.image_quality.grade,
+
+      // 🎴 Pokemon API Verification (for Pokemon cards only)
+      pokemon_api_verification: pokemonApiVerification || null
     });
 
   } catch (error: any) {

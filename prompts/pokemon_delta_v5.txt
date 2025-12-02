@@ -63,6 +63,14 @@ REQUIRED FIELDS (All Pokemon Cards)
 • Use Set Identification Module below for systematic detection
 • 🇯🇵 For Japanese cards: "日本語 (English)" format when both are visible
 
+**set_code**: 3-letter set code (Scarlet & Violet era)
+• IMPORTANT: Modern cards (2023+) display a 3-letter set code
+• Look for small 3-letter code near card number or in copyright area
+• Common codes: SVI, PAL, OBF, MEW, PAR, PAF, TEF, TWM, SFA, SCR, SSP, SVP
+• For Sword & Shield era: SSH, RCL, DAA, VIV, BST, CRE, EVS, FST, BRS, ASR, LOR, SIT, CRZ
+• Extract exactly as printed (e.g., "SVI", "PAF", "SVP")
+• null if not visible or not present (older cards pre-2020)
+
 **card_number**: Card number within set
 • Full number as printed (e.g., "25/102", "251/264", "GG70/GG70")
 • Includes numerator/denominator format
