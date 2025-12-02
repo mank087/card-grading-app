@@ -350,12 +350,25 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const setNameBase = extractEnglishForPDF(setNameRaw);
       const year = cardInfo.year || card.release_date?.match(/\d{4}/)?.[0] || 'N/A';
       const cardNumber = cardInfo.card_number || card.card_number;
-      const subset = cardInfo.subset || card.subset;
+      const subsetRaw = cardInfo.subset || card.subset;
+      // Filter out frame treatments (Showcase, Borderless, etc. are NOT subsets)
+      const frameTreatments = ['showcase', 'borderless', 'extended art', 'full art', 'etched', 'retro', 'anime'];
+      const isFrameTreatment = subsetRaw && frameTreatments.some(t => subsetRaw.toLowerCase().includes(t));
+      const subset = isFrameTreatment ? null : subsetRaw;
       // Combine set name with subset if available (matching foldable label format)
       const setName = subset ? `${setNameBase} - ${subset}` : setNameBase;
 
-      // Build special features
+      // Build special features (MTG features first, then standard)
       const features: string[] = [];
+      // MTG-specific features (no emojis)
+      if (card.is_foil) features.push(card.foil_type || 'Foil');
+      if (card.mtg_rarity) {
+        const rarity = card.mtg_rarity === 'mythic' ? 'Mythic' :
+                      card.mtg_rarity.charAt(0).toUpperCase() + card.mtg_rarity.slice(1);
+        features.push(rarity);
+      }
+      if (card.is_double_faced) features.push('Double-Faced');
+      // Standard features
       if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
       if (cardInfo.autographed) features.push('Auto');
       const serialNum = cardInfo.serial_number;
@@ -455,6 +468,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           isFoil: card.is_foil || false,
           foilType: card.foil_type || undefined,
           isDoubleFaced: card.is_double_faced || false,
+          rarity: card.mtg_rarity || undefined,
         },
         aiConfidence: card.conversational_image_confidence || 'N/A',
         imageQuality: extractImageQuality(card),

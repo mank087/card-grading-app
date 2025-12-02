@@ -70,6 +70,7 @@ export interface ReportCardData {
     isFoil?: boolean;
     foilType?: string;
     isDoubleFaced?: boolean;
+    rarity?: string;
   };
   aiConfidence: string;
   imageQuality: string;

@@ -37,6 +37,7 @@ type Card = {
   // 🃏 MTG Scryfall API fields
   is_foil?: boolean
   foil_type?: string | null
+  is_double_faced?: boolean
   mtg_api_verified?: boolean
   mtg_rarity?: string | null
   mtg_set_code?: string | null
@@ -484,9 +485,19 @@ function CollectionPageContent() {
               if (cardInfo.facsimile_autograph) features.push('Facsimile');
               // Add official reprint indicator
               if (cardInfo.official_reprint) features.push('Reprint');
-              // Add foil indicator for MTG cards
+              // Add foil indicator for MTG cards (no emoji)
               if (card.is_foil) {
-                features.push(card.foil_type ? `✨${card.foil_type}` : '✨Foil');
+                features.push(card.foil_type || 'Foil');
+              }
+              // Add double-faced indicator for MTG cards
+              if (card.is_double_faced) {
+                features.push('Double-Faced');
+              }
+              // Add rarity for MTG cards (capitalize first letter)
+              if (card.mtg_rarity) {
+                const rarity = card.mtg_rarity === 'mythic' ? 'Mythic' :
+                              card.mtg_rarity.charAt(0).toUpperCase() + card.mtg_rarity.slice(1);
+                features.push(rarity);
               }
               const serialNum = cardInfo.serial_number;
               if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {

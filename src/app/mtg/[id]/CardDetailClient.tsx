@@ -2610,9 +2610,18 @@ export function MTGCardDetails() {
                       ].filter(p => p).join(' • ')}
                     </div>
 
-                    {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                    {/* Line 3: Special Features (Foil, Rarity, Double-Faced, RC, Auto, Serial #) - Only if present */}
                     {(() => {
                       const features: string[] = [];
+                      // MTG-specific features from Scryfall API
+                      if (card.is_foil) features.push(card.foil_type || 'Foil');
+                      if (card.mtg_rarity) {
+                        const rarity = card.mtg_rarity === 'mythic' ? 'Mythic' :
+                                      card.mtg_rarity.charAt(0).toUpperCase() + card.mtg_rarity.slice(1);
+                        features.push(rarity);
+                      }
+                      if (card.is_double_faced) features.push('Double-Faced');
+                      // Standard features
                       if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
                       if (cardInfo.autographed) features.push('Auto');
                       const serialNum = cardInfo.serial_number;
@@ -3543,18 +3552,57 @@ export function MTGCardDetails() {
               </div>
 
                 {/* Special Features Section */}
-                {(dvgGrading.rarity_features || cardInfo.serial_number || cardInfo.rookie_or_first || dvgGrading.autograph || cardInfo.subset || cardInfo.autographed || cardInfo.memorabilia) && (
+                {(() => {
+                  // Filter out frame treatments from subset (Showcase, Borderless, etc. are NOT special features)
+                  const frameTreatments = ['showcase', 'borderless', 'extended art', 'full art', 'etched', 'retro', 'anime'];
+                  const subsetValue = cardInfo.subset;
+                  const isFrameTreatment = subsetValue && frameTreatments.some(t => subsetValue.toLowerCase().includes(t));
+                  const displaySubset = isFrameTreatment ? null : subsetValue;
+
+                  // Check if we have any special features to show
+                  const hasSpecialFeatures = dvgGrading.rarity_features || cardInfo.serial_number ||
+                    cardInfo.rookie_or_first || dvgGrading.autograph || displaySubset ||
+                    cardInfo.autographed || cardInfo.memorabilia || card.is_foil ||
+                    card.is_double_faced || card.mtg_rarity;
+
+                  return hasSpecialFeatures && (
                   <div className="border-t pt-5">
                     <div className="flex items-center gap-2 mb-4">
                       <h3 className="text-lg font-bold text-gray-800">Special Features</h3>
                     </div>
 
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {/* Subset/Insert */}
-                      {cardInfo.subset && (
+                      {/* Foil - MTG specific */}
+                      {card.is_foil && (
+                        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-200">
+                          <p className="text-purple-700 text-xs font-semibold mb-1">FOIL</p>
+                          <p className="font-bold text-purple-900">{card.foil_type || 'Foil'}</p>
+                        </div>
+                      )}
+
+                      {/* Rarity - MTG specific */}
+                      {card.mtg_rarity && (
+                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                          <p className="text-orange-700 text-xs font-semibold mb-1">RARITY</p>
+                          <p className="font-bold text-orange-900 capitalize">
+                            {card.mtg_rarity === 'mythic' ? 'Mythic Rare' : card.mtg_rarity}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Double-Faced - MTG specific */}
+                      {card.is_double_faced && (
+                        <div className="bg-indigo-50 rounded-lg p-3 border border-indigo-200">
+                          <p className="text-indigo-700 text-xs font-semibold mb-1">CARD LAYOUT</p>
+                          <p className="font-bold text-indigo-900">Double-Faced</p>
+                        </div>
+                      )}
+
+                      {/* Subset/Insert - Only show if NOT a frame treatment */}
+                      {displaySubset && (
                         <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
                           <p className="text-amber-700 text-xs font-semibold mb-1">SUBSET/INSERT</p>
-                          <p className="font-bold text-amber-900">{cardInfo.subset}</p>
+                          <p className="font-bold text-amber-900">{displaySubset}</p>
                         </div>
                       )}
                       {/* Serial Number - 🎯 Exclude "Not present", "None visible", etc. */}
@@ -3660,7 +3708,8 @@ export function MTGCardDetails() {
                       </div>
                     )}
                   </div>
-                )}
+                );
+                })()}
 
                 {/* MTG Card Text Section - Abilities, Rules, Flavor Text */}
                 {cardInfo.card_front_text && (

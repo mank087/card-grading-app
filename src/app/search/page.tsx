@@ -26,6 +26,11 @@ interface CardResult {
   serial_number?: string;
   facsimile_autograph?: boolean;
   official_reprint?: boolean;
+  // MTG-specific features
+  is_foil?: boolean;
+  foil_type?: string;
+  is_double_faced?: boolean;
+  mtg_rarity?: string;
 }
 
 // Helper: Format grade for display
@@ -215,6 +220,15 @@ function SearchPageContent() {
 
                 // Build special features array
                 const features: string[] = [];
+                // MTG-specific features (no emojis)
+                if (card.is_foil) features.push(card.foil_type || 'Foil');
+                if (card.mtg_rarity) {
+                  const rarity = card.mtg_rarity === 'mythic' ? 'Mythic' :
+                                card.mtg_rarity.charAt(0).toUpperCase() + card.mtg_rarity.slice(1);
+                  features.push(rarity);
+                }
+                if (card.is_double_faced) features.push('Double-Faced');
+                // Standard features
                 if (card.rookie_or_first === true || card.rookie_or_first === 'true') features.push('RC');
                 if (card.autographed) features.push('Auto');
                 if (card.facsimile_autograph) features.push('Facsimile');

@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     // Query cards for this user
     let query = supabase
       .from('cards')
-      .select('id, serial, front_path, back_path, card_name, featured, category, card_set, manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score, ai_grading, dcm_grade_whole, dvg_image_quality, created_at, visibility, conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence, conversational_card_info, dvg_decimal_grade, is_foil, foil_type, mtg_api_verified, mtg_rarity, mtg_set_code, card_language, scryfall_price_usd, scryfall_price_usd_foil')
+      .select('id, serial, front_path, back_path, card_name, featured, category, card_set, manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score, ai_grading, dcm_grade_whole, dvg_image_quality, created_at, visibility, conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence, conversational_card_info, dvg_decimal_grade, is_foil, foil_type, is_double_faced, mtg_api_verified, mtg_rarity, mtg_set_code, card_language, scryfall_price_usd, scryfall_price_usd_foil')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 

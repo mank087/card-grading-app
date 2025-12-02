@@ -60,7 +60,11 @@ export async function GET(request: NextRequest) {
         conversational_decimal_grade,
         conversational_card_info,
         user_id,
-        created_at
+        created_at,
+        is_foil,
+        foil_type,
+        is_double_faced,
+        mtg_rarity
       `);
 
     // Search by serial number (case-insensitive, partial match)
@@ -148,6 +152,11 @@ export async function GET(request: NextRequest) {
         serial_number: convInfo?.serial_number || null,
         facsimile_autograph: convInfo?.facsimile_autograph || false,
         official_reprint: convInfo?.official_reprint || false,
+        // MTG-specific features from Scryfall API
+        is_foil: card.is_foil || false,
+        foil_type: card.foil_type || null,
+        is_double_faced: card.is_double_faced || false,
+        mtg_rarity: card.mtg_rarity || null,
       };
     }) || [];
 
