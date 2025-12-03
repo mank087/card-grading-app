@@ -26,6 +26,7 @@ import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } fr
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
+import { useGradingQueue } from '@/contexts/GradingQueueContext';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1333,6 +1334,7 @@ export function SportsCardDetails() {
   const params = useParams<{ id: string }>();
   const cardId = params?.id;
   const router = useRouter();
+  const { addToQueue, updateCardStatus } = useGradingQueue();
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1715,14 +1717,26 @@ export function SportsCardDetails() {
 
   // Re-grade card function - forces fresh grading with latest model
   const regradeCard = async () => {
+    let queueId: string | null = null;
     try {
-      if (!card) return;
+      if (!card || !cardId) return;
 
       setShowRegradeConfirm(false); // Close modal
       setRegradingImageUrl(card.front_url); // Store image URL before clearing card
       setLoading(true);
       setError(null);
       setCard(null); // Clear current card to show loading screen
+
+      // Add to grading queue for status bar notification
+      queueId = addToQueue({
+        cardId: cardId,
+        category: 'sports',
+        categoryLabel: 'Sports Card (Re-grade)',
+        frontImageUrl: card.front_url,
+        status: 'processing',
+        resultUrl: `/sports/${cardId}`
+      });
+      console.log('[REGRADE] Added to queue:', queueId);
 
       // Call sports API with force_regrade parameter to bypass cache
       console.log('[REGRADE] Forcing fresh grading for card:', cardId);
@@ -1745,12 +1759,31 @@ export function SportsCardDetails() {
       const data = await res.json();
       console.log('[REGRADE] Fresh grading completed:', data);
 
+      // Update queue status to completed
+      if (queueId) {
+        updateCardStatus(queueId, {
+          status: 'completed',
+          completedAt: Date.now(),
+          resultUrl: `/sports/${cardId}`
+        });
+      }
+
       // Update card state with fresh data (triggers re-render with new grading)
       setCard(data);
       setRegradingImageUrl(null); // Clear re-grading state
       setLoading(false);
     } catch (error: any) {
       console.error('Error re-grading card:', error);
+
+      // Update queue status to error
+      if (queueId) {
+        updateCardStatus(queueId, {
+          status: 'error',
+          errorMessage: error.name === 'AbortError'
+            ? 'Re-grading timed out'
+            : (error.message || 'Failed to re-grade card')
+        });
+      }
 
       // Handle timeout specifically
       if (error.name === 'AbortError') {
