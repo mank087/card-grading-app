@@ -380,7 +380,23 @@ function CollectionPageContent() {
   }
 
   if (loading) return <p className="p-6 text-center">Loading your collection...</p>
-  if (error) return <p className="p-6 text-center text-red-600">{error}</p>
+  if (error) {
+    // Check if error is about not being logged in
+    const isAuthError = error.includes('logged in');
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-600 mb-6">{error}</p>
+        {isAuthError && (
+          <Link
+            href="/login"
+            className="inline-block bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+          >
+            Login or Create Account
+          </Link>
+        )}
+      </div>
+    );
+  }
   if (cards.length === 0) return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
 
   return (
