@@ -2780,97 +2780,108 @@ export function SportsCardDetails() {
               })()}
 
               {/* 📄 Download Report Button & Social Sharing */}
-              <div className="flex flex-col md:flex-row items-center justify-between gap-4 my-6 px-4">
-                {/* DCM Serial Number Display */}
-                <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-indigo-100 px-4 py-2 rounded-lg border border-purple-300">
-                  <span className="text-sm font-medium text-purple-700">DCM Serial#:</span>
-                  <span className="text-sm font-bold text-purple-900 font-mono">{card.serial || 'N/A'}</span>
-                </div>
-                <DownloadReportButton card={card} cardType="sports" />
+              {(() => {
+                const session = getStoredSession();
+                const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
 
-                {/* Social Sharing Buttons */}
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm text-gray-600 font-medium">Share your card and grade:</span>
-                  {/* Facebook */}
-                  <button
-                    onClick={() => {
-                      const shareData: CardSharingData = {
-                        cardName: dvgGrading?.card_info?.card_name || card.card_name,
-                        playerName: dvgGrading?.card_info?.player_or_character || card.featured,
-                        setName: dvgGrading?.card_info?.set_name || card.card_set,
-                        year: dvgGrading?.card_info?.year || card.release_date,
-                        manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? (recommendedGrade.recommended_decimal_grade || undefined),
-                        gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
-                        url: currentUrl
-                      };
-                      const fbUrl = generateFacebookShareUrl(shareData);
-                      openSocialShare(fbUrl);
-                    }}
-                    className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg shadow-md transition-all duration-200 hover:scale-105"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                    </svg>
-                    <span>Facebook</span>
-                  </button>
+                return (
+                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 my-6 px-4">
+                    {/* DCM Serial Number Display */}
+                    <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-indigo-100 px-4 py-2 rounded-lg border border-purple-300">
+                      <span className="text-sm font-medium text-purple-700">DCM Serial#:</span>
+                      <span className="text-sm font-bold text-purple-900 font-mono">{card.serial || 'N/A'}</span>
+                    </div>
 
-                  {/* X (Twitter) */}
-                  <button
-                    onClick={() => {
-                      const shareData: CardSharingData = {
-                        cardName: dvgGrading?.card_info?.card_name || card.card_name,
-                        playerName: dvgGrading?.card_info?.player_or_character || card.featured,
-                        setName: dvgGrading?.card_info?.set_name || card.card_set,
-                        year: dvgGrading?.card_info?.year || card.release_date,
-                        manufacturer: dvgGrading?.card_info?.manufacturer,
-                        grade: card.conversational_decimal_grade ?? (recommendedGrade.recommended_decimal_grade || undefined),
-                        gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
-                        url: currentUrl
-                      };
-                      const twitterUrl = generateTwitterShareUrl(shareData);
-                      openSocialShare(twitterUrl);
-                    }}
-                    className="flex items-center justify-center bg-black hover:bg-gray-800 text-white font-semibold px-4 py-2.5 rounded-lg shadow-md transition-all duration-200 hover:scale-105 w-12"
-                    title="Share on X"
-                  >
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                    </svg>
-                  </button>
+                    {/* Only show download button to card owner */}
+                    {isOwner && <DownloadReportButton card={card} cardType="sports" />}
 
-                  {/* Copy Link */}
-                  <button
-                    onClick={async () => {
-                      try {
-                        if (navigator.clipboard && window.isSecureContext) {
-                          await navigator.clipboard.writeText(currentUrl);
-                        } else {
-                          // Fallback for older browsers
-                          const textArea = document.createElement('textarea');
-                          textArea.value = currentUrl;
-                          textArea.style.position = 'fixed';
-                          textArea.style.left = '-999999px';
-                          document.body.appendChild(textArea);
-                          textArea.select();
-                          document.execCommand('copy');
-                          textArea.remove();
-                        }
-                        alert('✅ Link copied to clipboard!');
-                      } catch (err) {
-                        alert('❌ Failed to copy link. Please try again.');
-                        console.error('Copy failed:', err);
-                      }
-                    }}
-                    className="flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white font-semibold px-4 py-2.5 rounded-lg shadow-md transition-all duration-200 hover:scale-105"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
-                    </svg>
-                    <span>Copy Link</span>
-                  </button>
-                </div>
-              </div>
+                    {/* Social Sharing Buttons */}
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm text-gray-600 font-medium">
+                        {isOwner ? 'Share your card and grade:' : 'Share this card:'}
+                      </span>
+                      {/* Facebook */}
+                      <button
+                        onClick={() => {
+                          const shareData: CardSharingData = {
+                            cardName: dvgGrading?.card_info?.card_name || card.card_name,
+                            playerName: dvgGrading?.card_info?.player_or_character || card.featured,
+                            setName: dvgGrading?.card_info?.set_name || card.card_set,
+                            year: dvgGrading?.card_info?.year || card.release_date,
+                            manufacturer: dvgGrading?.card_info?.manufacturer,
+                            grade: card.conversational_decimal_grade ?? (recommendedGrade.recommended_decimal_grade || undefined),
+                            gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
+                            url: currentUrl
+                          };
+                          const fbUrl = generateFacebookShareUrl(shareData, isOwner);
+                          openSocialShare(fbUrl);
+                        }}
+                        className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-4 py-2.5 rounded-lg shadow-md transition-all duration-200 hover:scale-105"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                        </svg>
+                        <span>Facebook</span>
+                      </button>
+
+                      {/* X (Twitter) */}
+                      <button
+                        onClick={() => {
+                          const shareData: CardSharingData = {
+                            cardName: dvgGrading?.card_info?.card_name || card.card_name,
+                            playerName: dvgGrading?.card_info?.player_or_character || card.featured,
+                            setName: dvgGrading?.card_info?.set_name || card.card_set,
+                            year: dvgGrading?.card_info?.year || card.release_date,
+                            manufacturer: dvgGrading?.card_info?.manufacturer,
+                            grade: card.conversational_decimal_grade ?? (recommendedGrade.recommended_decimal_grade || undefined),
+                            gradeUncertainty: card.conversational_image_confidence || card.dvg_image_quality || imageQuality.grade || card.ai_confidence_score || 'B',
+                            url: currentUrl
+                          };
+                          const twitterUrl = generateTwitterShareUrl(shareData, isOwner);
+                          openSocialShare(twitterUrl);
+                        }}
+                        className="flex items-center justify-center bg-black hover:bg-gray-800 text-white font-semibold px-4 py-2.5 rounded-lg shadow-md transition-all duration-200 hover:scale-105 w-12"
+                        title="Share on X"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                        </svg>
+                      </button>
+
+                      {/* Copy Link */}
+                      <button
+                        onClick={async () => {
+                          try {
+                            if (navigator.clipboard && window.isSecureContext) {
+                              await navigator.clipboard.writeText(currentUrl);
+                            } else {
+                              // Fallback for older browsers
+                              const textArea = document.createElement('textarea');
+                              textArea.value = currentUrl;
+                              textArea.style.position = 'fixed';
+                              textArea.style.left = '-999999px';
+                              document.body.appendChild(textArea);
+                              textArea.select();
+                              document.execCommand('copy');
+                              textArea.remove();
+                            }
+                            alert('✅ Link copied to clipboard!');
+                          } catch (err) {
+                            alert('❌ Failed to copy link. Please try again.');
+                            console.error('Copy failed:', err);
+                          }
+                        }}
+                        className="flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white font-semibold px-4 py-2.5 rounded-lg shadow-md transition-all duration-200 hover:scale-105"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                        </svg>
+                        <span>Copy Link</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* 📄 Scrollable Content Sections */}
               <div className="space-y-8">

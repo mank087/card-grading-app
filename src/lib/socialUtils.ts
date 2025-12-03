@@ -34,10 +34,12 @@ export function isMobile(): boolean {
 /**
  * Generate Facebook share URL with pre-populated quote
  * Uses the 'quote' parameter which Facebook displays as suggested text
+ * @param cardData - Card data for generating share content
+ * @param isOwner - Whether the current user owns this card (affects message wording)
  */
-export function generateFacebookShareUrl(cardData: CardSharingData): string {
+export function generateFacebookShareUrl(cardData: CardSharingData, isOwner: boolean = true): string {
   const cardUrl = cardData.url || `https://dcmgrading.com/sports/${cardData.id}`;
-  const quote = generateFacebookQuote(cardData);
+  const quote = generateFacebookQuote(cardData, isOwner);
 
   const params = new URLSearchParams({
     u: cardUrl,
@@ -49,19 +51,28 @@ export function generateFacebookShareUrl(cardData: CardSharingData): string {
 
 /**
  * Generate the pre-populated Facebook quote/message
- * Format: My "Card Name" just graded on DCM as a "score". Check it out here:
+ * Owner format: My "Card Name" just graded on DCM as a "score". Check it out here:
+ * Non-owner format: Check out this "Card Name" that graded as a "score" on DCM:
  */
-function generateFacebookQuote(cardData: CardSharingData): string {
+function generateFacebookQuote(cardData: CardSharingData, isOwner: boolean): string {
   // Build the card name from available fields
   const cardName = buildCardDisplayName(cardData);
 
   // Get the grade score
   const grade = cardData.grade || cardData.dcm_grade_whole;
 
-  if (grade) {
-    return `My "${cardName}" just graded on DCM as a ${grade}. Check it out here:`;
+  if (isOwner) {
+    if (grade) {
+      return `My "${cardName}" just graded on DCM as a ${grade}. Check it out here:`;
+    } else {
+      return `My "${cardName}" just graded on DCM. Check it out here:`;
+    }
   } else {
-    return `My "${cardName}" just graded on DCM. Check it out here:`;
+    if (grade) {
+      return `Check out this "${cardName}" that graded as a ${grade} on DCM:`;
+    } else {
+      return `Check out this "${cardName}" graded on DCM:`;
+    }
   }
 }
 
@@ -99,10 +110,12 @@ function buildCardDisplayName(cardData: CardSharingData): string {
 
 /**
  * Generate Twitter share URL
+ * @param cardData - Card data for generating share content
+ * @param isOwner - Whether the current user owns this card (affects message wording)
  */
-export function generateTwitterShareUrl(cardData: CardSharingData): string {
+export function generateTwitterShareUrl(cardData: CardSharingData, isOwner: boolean = true): string {
   const cardUrl = cardData.url || `https://dcmgrading.com/sports/${cardData.id}`;
-  const text = generateTwitterText(cardData);
+  const text = generateTwitterText(cardData, isOwner);
 
   const params = new URLSearchParams({
     url: cardUrl,
@@ -115,16 +128,25 @@ export function generateTwitterShareUrl(cardData: CardSharingData): string {
 
 /**
  * Generate the pre-populated Twitter text
- * Format: My "Card Name" just graded on DCM as a "score". Check it out here:
+ * Owner format: My "Card Name" just graded on DCM as a "score". Check it out here:
+ * Non-owner format: Check out this "Card Name" that graded as a "score" on DCM:
  */
-function generateTwitterText(cardData: CardSharingData): string {
+function generateTwitterText(cardData: CardSharingData, isOwner: boolean): string {
   const cardName = buildCardDisplayName(cardData);
   const grade = cardData.grade || cardData.dcm_grade_whole;
 
-  if (grade) {
-    return `My "${cardName}" just graded on DCM as a ${grade}. Check it out here:`;
+  if (isOwner) {
+    if (grade) {
+      return `My "${cardName}" just graded on DCM as a ${grade}. Check it out here:`;
+    } else {
+      return `My "${cardName}" just graded on DCM. Check it out here:`;
+    }
   } else {
-    return `My "${cardName}" just graded on DCM. Check it out here:`;
+    if (grade) {
+      return `Check out this "${cardName}" that graded as a ${grade} on DCM:`;
+    } else {
+      return `Check out this "${cardName}" graded on DCM:`;
+    }
   }
 }
 
