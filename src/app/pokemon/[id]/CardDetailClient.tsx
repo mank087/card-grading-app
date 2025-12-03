@@ -4800,9 +4800,12 @@ export function PokemonCardDetails() {
 
                 {/* All Marketplace Buttons in One Row */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Smart TCGPlayer Search */}
+                  {/* Smart TCGPlayer Link - Direct product URL if available, fallback to search */}
                   {(() => {
-                    // Extract English names for US marketplace search
+                    // Check for direct TCGPlayer URL from Pokemon TCG API (most accurate)
+                    const directTcgplayerUrl = cardInfo.tcgplayer_url || (card as any).tcgplayer_url;
+
+                    // Fallback: Build search URL
                     const pokemonName = extractEnglishForSearch(cardInfo.player_or_character) ||
                                        extractEnglishForSearch(card.featured) ||
                                        card.pokemon_featured;
@@ -4818,13 +4821,16 @@ export function PokemonCardDetails() {
                     } as CardData;
 
                     const setSearchUrl = generateTCGPlayerSetSearchUrl(cardData);
-                    const searchUrl = setSearchUrl || generateTCGPlayerSearchUrl(cardData);
-                    const isSetSpecific = !!setSearchUrl;
+                    const fallbackSearchUrl = setSearchUrl || generateTCGPlayerSearchUrl(cardData);
+
+                    // Use direct URL if available, otherwise fallback to search
+                    const tcgplayerUrl = directTcgplayerUrl || fallbackSearchUrl;
+                    const isDirectLink = !!directTcgplayerUrl;
                     const displaySetName = cardInfo.set_name || cardInfo.set_era || card.card_set;
 
                     return (
                       <a
-                        href={searchUrl}
+                        href={tcgplayerUrl}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="flex items-center p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200 group"
@@ -4837,7 +4843,7 @@ export function PokemonCardDetails() {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-orange-900 text-sm">TCGPlayer</h3>
                           <p className="text-xs text-orange-700 truncate">
-                            {isSetSpecific && displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Current listings'}
+                            {isDirectLink ? 'View product page' : (displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Search listings')}
                           </p>
                         </div>
                       </a>

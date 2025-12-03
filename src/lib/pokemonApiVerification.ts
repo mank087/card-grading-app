@@ -465,6 +465,9 @@ export function getPokemonApiUpdateFields(verificationResult: PokemonApiVerifica
     pokemon_api_confidence: verificationResult.confidence,
     pokemon_api_method: verificationResult.verification_method,
 
+    // TCGPlayer direct product URL from Pokemon TCG API
+    tcgplayer_url: apiCard.tcgplayer?.url || null,
+
     // Override card info with verified data (only if corrections needed)
     ...(verificationResult.corrections.length > 0 && {
       // Update card info with verified values

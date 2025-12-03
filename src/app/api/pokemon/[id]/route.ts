@@ -881,6 +881,70 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       return NextResponse.json({ error: "Failed to save Pokemon card grading results" }, { status: 500 });
     }
 
+    // 🎴 Pokemon TCG API Verification (Post-Grading)
+    // Verify card details against Pokemon TCG API and get TCGPlayer direct URL
+    let pokemonApiVerification = null;
+    try {
+      console.log(`[GET /api/pokemon/${cardId}] 🔍 Starting Pokemon TCG API verification...`);
+
+      // Call verify endpoint to get API data including TCGPlayer URL
+      const verifyResponse = await fetch(`${request.nextUrl.origin}/api/pokemon/verify?force=true`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          card_id: cardId,
+          card_info: conversationalGradingData?.card_info || null
+        })
+      });
+
+      if (verifyResponse.ok) {
+        pokemonApiVerification = await verifyResponse.json();
+        console.log(`[GET /api/pokemon/${cardId}] ✅ Pokemon TCG API verification complete:`, {
+          verified: pokemonApiVerification.verified,
+          pokemon_api_id: pokemonApiVerification.pokemon_api_id,
+          confidence: pokemonApiVerification.confidence,
+          corrections: pokemonApiVerification.corrections?.length || 0
+        });
+
+        // Merge Pokemon API data into conversationalGradingData.card_info
+        if (pokemonApiVerification.verified && pokemonApiVerification.metadata && conversationalGradingData?.card_info) {
+          const m = pokemonApiVerification.metadata;
+
+          // Merge API data into card_info
+          conversationalGradingData.card_info.set_name = m.set_name || conversationalGradingData.card_info.set_name;
+          conversationalGradingData.card_info.pokemon_api_verified = true;
+          conversationalGradingData.card_info.pokemon_api_id = pokemonApiVerification.pokemon_api_id;
+          conversationalGradingData.card_info.rarity_or_variant = m.rarity || conversationalGradingData.card_info.rarity_or_variant;
+
+          // TCGPlayer direct product URL from Pokemon TCG API
+          conversationalGradingData.card_info.tcgplayer_url = m.tcgplayer_url || null;
+
+          console.log(`[GET /api/pokemon/${cardId}] 📝 Merged Pokemon TCG API data:`, {
+            set_name: conversationalGradingData.card_info.set_name,
+            tcgplayer_url: conversationalGradingData.card_info.tcgplayer_url ? 'present' : 'not found'
+          });
+
+          // Update database with merged conversational_card_info
+          const { error: mergeUpdateError } = await supabase
+            .from("cards")
+            .update({
+              conversational_card_info: conversationalGradingData.card_info,
+              pokemon_api_verified: true
+            })
+            .eq("id", cardId);
+
+          if (mergeUpdateError) {
+            console.error(`[GET /api/pokemon/${cardId}] ⚠️ Failed to update merged card_info:`, mergeUpdateError);
+          }
+        }
+      } else {
+        console.warn(`[GET /api/pokemon/${cardId}] ⚠️ Pokemon TCG API verification failed:`, await verifyResponse.text());
+      }
+    } catch (verifyError: any) {
+      // Non-fatal error - card grading succeeded, just API verification failed
+      console.error(`[GET /api/pokemon/${cardId}] ⚠️ Pokemon TCG API verification error (non-fatal):`, verifyError.message);
+    }
+
     console.log(`[GET /api/pokemon/${cardId}] Pokemon card request completed in ${Date.now() - startTime}ms`);
 
     // Return updated Pokemon card data with all structured fields
