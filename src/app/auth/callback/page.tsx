@@ -7,27 +7,63 @@ export default function AuthCallbackPage() {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('Completing authentication...')
+  const [debugInfo, setDebugInfo] = useState<string>('')
 
   useEffect(() => {
     const handleOAuthCallback = async () => {
       try {
-        // Log what we received
-        console.log('[OAuth Callback] Current URL:', window.location.href)
-        console.log('[OAuth Callback] Hash:', window.location.hash ? 'Present' : 'Not present')
+        // Log what we received - VERY IMPORTANT for debugging
+        const fullUrl = window.location.href
+        const hash = window.location.hash
+        const search = window.location.search
 
-        // Check if we have tokens in the URL hash
-        if (!window.location.hash && !window.location.search) {
-          console.error('[OAuth Callback] No tokens in URL')
-          setError('No authentication tokens received. Please try again.')
-          setTimeout(() => router.push('/login'), 3000)
+        console.log('[OAuth Callback] ====== CALLBACK PAGE LOADED ======')
+        console.log('[OAuth Callback] Full URL:', fullUrl)
+        console.log('[OAuth Callback] Hash:', hash || '(empty)')
+        console.log('[OAuth Callback] Search:', search || '(empty)')
+
+        // Show debug info on page temporarily
+        setDebugInfo(`URL: ${fullUrl.substring(0, 100)}...`)
+
+        // Check if we have tokens in the URL hash OR search params (Supabase can use either)
+        const hasHash = hash && hash.length > 1
+        const hasSearch = search && search.length > 1
+
+        if (!hasHash && !hasSearch) {
+          console.error('[OAuth Callback] No tokens in URL - neither hash nor search params')
+          setError('No authentication tokens received. The OAuth redirect may not be configured correctly.')
+          setDebugInfo(`No tokens found. URL: ${fullUrl}`)
+          setTimeout(() => router.push('/login'), 5000)
           return
         }
 
         setStatus('Processing authentication...')
 
-        // Get the OAuth session - this will parse tokens from URL hash
-        console.log('[OAuth Callback] Getting OAuth session...')
+        // If tokens are in search params (code flow), we need to exchange them
+        if (hasSearch && !hasHash) {
+          console.log('[OAuth Callback] Tokens in search params (code flow)')
+          const params = new URLSearchParams(search)
+          const code = params.get('code')
+          const errorParam = params.get('error')
+          const errorDescription = params.get('error_description')
+
+          if (errorParam) {
+            console.error('[OAuth Callback] OAuth error:', errorParam, errorDescription)
+            setError(errorDescription || errorParam)
+            setTimeout(() => router.push('/login'), 3000)
+            return
+          }
+
+          if (code) {
+            console.log('[OAuth Callback] Authorization code received, exchanging...')
+            setStatus('Exchanging authorization code...')
+          }
+        }
+
+        // Get the OAuth session - this will parse tokens from URL
+        console.log('[OAuth Callback] Calling getOAuthSession...')
         const result = await getOAuthSession()
+        console.log('[OAuth Callback] getOAuthSession result:', result.error ? `Error: ${result.error}` : 'Success')
 
         if (result.error) {
           console.error('[OAuth Callback] Session error:', result.error)
@@ -89,6 +125,9 @@ export default function AuthCallbackPage() {
           <div className="text-red-500 text-5xl mb-4">!</div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Authentication Failed</h1>
           <p className="text-gray-600 mb-4">{error}</p>
+          {debugInfo && (
+            <p className="text-xs text-gray-400 mb-4 break-all">{debugInfo}</p>
+          )}
           <p className="text-sm text-gray-500">Redirecting to login page...</p>
         </div>
       </main>
@@ -100,6 +139,9 @@ export default function AuthCallbackPage() {
       <div className="w-full max-w-md bg-white shadow-lg rounded-xl p-8 text-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
         <p className="text-gray-700 font-medium">{status}</p>
+        {debugInfo && (
+          <p className="text-xs text-gray-400 mt-4 break-all">{debugInfo}</p>
+        )}
       </div>
     </main>
   )
