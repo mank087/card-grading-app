@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational } from "@/lib/visionGrader";
 // Professional grade estimation (deterministic backend mapper)
@@ -861,7 +862,29 @@ export async function PATCH(request: NextRequest, { params }: LorcanaCardGrading
   console.log(`[PATCH /api/lorcana/${cardId}] Starting Lorcana card update request`);
 
   try {
+    // Verify authentication
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.userId) {
+      return NextResponse.json({ error: auth.error || "Authentication required" }, { status: 401 });
+    }
+
     const supabase = supabaseServer();
+
+    // Verify user owns this card
+    const { data: card, error: cardError } = await supabase
+      .from("cards")
+      .select("user_id")
+      .eq("id", cardId)
+      .single();
+
+    if (cardError || !card) {
+      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+    }
+
+    if (card.user_id !== auth.userId) {
+      return NextResponse.json({ error: "You can only update your own cards" }, { status: 403 });
+    }
+
     const body = await request.json();
 
     console.log(`[PATCH /api/lorcana/${cardId}] Update data:`, body);
@@ -898,18 +921,29 @@ export async function DELETE(request: NextRequest, { params }: LorcanaCardGradin
   console.log(`[DELETE /api/lorcana/${cardId}] Starting Lorcana card deletion request`);
 
   try {
+    // Verify authentication
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.userId) {
+      return NextResponse.json({ error: auth.error || "Authentication required" }, { status: 401 });
+    }
+
     const supabase = supabaseServer();
 
-    // Delete the Lorcana card and its associated images
+    // Get the Lorcana card and verify ownership
     const { data: card, error: fetchError } = await supabase
       .from("cards")
-      .select("front_path, back_path")
+      .select("front_path, back_path, user_id")
       .eq("id", cardId)
       .single();
 
     if (fetchError || !card) {
       console.error(`[DELETE /api/lorcana/${cardId}] Lorcana card not found:`, fetchError);
       return NextResponse.json({ error: "Lorcana card not found" }, { status: 404 });
+    }
+
+    // Verify user owns this card
+    if (card.user_id !== auth.userId) {
+      return NextResponse.json({ error: "You can only delete your own cards" }, { status: 403 });
     }
 
     // Delete images from storage
