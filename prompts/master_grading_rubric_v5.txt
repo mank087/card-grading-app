@@ -1,10 +1,15 @@
 ═══════════════════════════════════════════════════════════════════════
-PROFESSIONAL TRADING CARD GRADING SYSTEM v5.8
+PROFESSIONAL TRADING CARD GRADING SYSTEM v5.9
 DCM OPTIC AI GRADING ENGINE - THREE-PASS CONSENSUS GRADING
 ═══════════════════════════════════════════════════════════════════════
 
-Version: 5.8.0
+Version: 5.9.0
 Release Date: 2025-12-03
+Change Log v5.9: CENTERING ANTI-HALLUCINATION PROTOCOL - Mandatory step-by-step
+                 calculation protocol to prevent quality tier misassignment,
+                 explicit directional consistency rules (left/right accuracy),
+                 detailed examples showing 47/53 = "Good" NOT "Excellent",
+                 self-check verification steps before output
 Change Log v5.8: MAJOR CENTERING OVERHAUL - Tightened centering thresholds,
                  stricter quality tier definitions (6 tiers now),
                  visual validation requirements, multi-point verification,
@@ -2038,33 +2043,179 @@ For EACH side (front and back):
   }
 }
 
-🚨 QUALITY TIER SELECTION RULES (STRICT v5.8 - NO EXCEPTIONS):
-1. Measure BOTH axes (L/R and T/B) for the side being evaluated
-2. Find the WORST axis (highest deviation from 50)
-3. Look up the quality tier using these EXACT thresholds:
-   • 0% deviation (50/50 only) → quality_tier: "Perfect" → score: 10.0
-   • 1-2% deviation (51/49, 52/48) → quality_tier: "Excellent" → score: 10.0
-   • 3-5% deviation (53/47, 54/46, 55/45) → quality_tier: "Good" → score: 9.5
-   • 6-10% deviation (56/44 to 60/40) → quality_tier: "Fair" → score: 9.0-8.5
-   • 11-15% deviation (61/39 to 65/35) → quality_tier: "Off-Center" → score: 8.0-7.5
-   • 16%+ deviation (66/34 or worse) → quality_tier: "Severely Off-Center" → score: 7.0 or lower
-4. The quality_tier MUST match the ratios mathematically - NO EXCEPTIONS
-5. The score MUST match the quality tier - NO EXCEPTIONS
-6. The first word of "analysis" MUST be the same as "quality_tier"
+🚨 QUALITY TIER SELECTION RULES (STRICT v5.9 - MANDATORY CALCULATION PROTOCOL):
 
-Example: If back centering is 48/52 L/R and 46/54 T/B:
-• Worst axis = T/B at 46/54 (4% deviation)
-• 4% deviation = "Good" tier
-• quality_tier: "Good"
-• analysis: "Good centering with 48/52 horizontal and 46/54 vertical..."
-• score: 9.5 (Good tier = 9.5, NOT 10.0)
+═════════════════════════════════════════════════════════════════════════
+CENTERING ANTI-HALLUCINATION PROTOCOL (v5.9 NEW) - READ CAREFULLY
+═════════════════════════════════════════════════════════════════════════
 
-Example: If front centering is 47/53 L/R and 47/53 T/B:
-• Worst axis = both at 47/53 (3% deviation)
-• 3% deviation = "Good" tier (NOT Excellent!)
-• quality_tier: "Good"
-• analysis: "Good centering with 47/53 on both axes..."
-• score: 9.5
+**PURPOSE:** Prevent the AI from assigning wrong quality tiers by forcing explicit calculation.
+
+**THE PROBLEM THIS SOLVES:**
+The AI sometimes outputs "Excellent" quality tier with a 47/53 ratio when the correct tier is "Good".
+This is a HALLUCINATION - the AI is not performing the required calculation.
+
+**MANDATORY CALCULATION PROTOCOL - YOU MUST FOLLOW EVERY STEP:**
+
+STEP A: MEASURE BORDERS WITH EXPLICIT POSITION LABELS
+───────────────────────────────────────────────────────
+For EACH side (front and back), measure borders in this EXACT format:
+• "LEFT border width ≈ X.Xmm (this is the border on the LEFT side of the image)"
+• "RIGHT border width ≈ X.Xmm (this is the border on the RIGHT side of the image)"
+• "TOP border width ≈ X.Xmm (this is the border at the TOP of the image)"
+• "BOTTOM border width ≈ X.Xmm (this is the border at the BOTTOM of the image)"
+
+🚨 DIRECTIONAL ACCURACY REQUIREMENT:
+• LEFT = the side of the card that appears on the LEFT of the image as you view it
+• RIGHT = the side of the card that appears on the RIGHT of the image as you view it
+• If the LEFT border measures LARGER than the RIGHT border, the card is shifted RIGHT
+• If the RIGHT border measures LARGER than the LEFT border, the card is shifted LEFT
+• VERIFY: "Is my description of which border is larger consistent with my measurements?"
+
+STEP B: CALCULATE RATIO FROM MEASUREMENTS (MANDATORY)
+───────────────────────────────────────────────────────
+You MUST show your calculation explicitly:
+
+For Left/Right axis:
+• Total width = left_border + right_border = Xmm
+• Left percentage = (left_border / total) × 100 = XX%
+• Right percentage = (right_border / total) × 100 = XX%
+• Smaller percentage is first in ratio: XX/YY
+
+For Top/Bottom axis:
+• Total height = top_border + bottom_border = Xmm
+• Top percentage = (top_border / total) × 100 = XX%
+• Bottom percentage = (bottom_border / total) × 100 = XX%
+• Smaller percentage is first in ratio: XX/YY
+
+STEP C: DETERMINE WORST AXIS (MANDATORY)
+───────────────────────────────────────────────────────
+• L/R ratio = XX/YY (smaller number is XX)
+• T/B ratio = XX/YY (smaller number is XX)
+• Worst axis = the axis with the SMALLER first number (more deviation from 50)
+
+STEP D: CALCULATE DEVIATION PERCENTAGE (MANDATORY)
+───────────────────────────────────────────────────────
+• Deviation = 50 - (smaller percentage in worst ratio)
+• Example: 47/53 → Deviation = 50 - 47 = 3%
+• Example: 45/55 → Deviation = 50 - 45 = 5%
+• Example: 42/58 → Deviation = 50 - 42 = 8%
+
+STEP E: LOOK UP QUALITY TIER FROM DEVIATION (MANDATORY - NO DISCRETION)
+───────────────────────────────────────────────────────
+Use this EXACT lookup table - you have NO discretion to choose differently:
+
+| Deviation | Quality Tier          | Score  |
+|-----------|----------------------|--------|
+| 0%        | "Perfect"            | 10.0   |
+| 1-2%      | "Excellent"          | 10.0   |
+| 3-5%      | "Good"               | 9.5    |
+| 6-10%     | "Fair"               | 9.0-8.5|
+| 11-15%    | "Off-Center"         | 8.0-7.5|
+| 16%+      | "Severely Off-Center"| ≤7.0   |
+
+STEP F: VERIFY BEFORE OUTPUT (MANDATORY SELF-CHECK)
+───────────────────────────────────────────────────────
+Before outputting quality_tier and score, verify:
+
+□ "My worst ratio is XX/YY"
+□ "My deviation is 50 - XX = Y%"
+□ "Y% deviation maps to [TIER] in the lookup table"
+□ "I am assigning quality_tier: [TIER]"
+□ "I am assigning score: [SCORE]"
+□ "The first word of my analysis is [TIER]"
+□ "My directional descriptions match my measurements (larger border = that side)"
+
+═════════════════════════════════════════════════════════════════════════
+CRITICAL EXAMPLES WITH FULL CALCULATIONS (v5.9)
+═════════════════════════════════════════════════════════════════════════
+
+EXAMPLE 1: Card with 47/53 centering
+───────────────────────────────────
+Measurements: Left = 2.5mm, Right = 3.2mm
+Calculation: Total = 5.7mm, Left = 44%, Right = 56% → Ratio = 44/56
+Wait, let me recalculate for 47/53:
+If ratio is 47/53, then deviation = 50 - 47 = 3%
+3% deviation → Look up table → "Good" tier
+quality_tier: "Good" (NOT "Excellent" - Excellent requires 1-2% deviation)
+score: 9.5 (NOT 10.0)
+analysis: "Good centering with 47/53 ratio..." (MUST start with "Good")
+
+❌ WRONG: quality_tier: "Excellent", analysis: "Good centering with 47/53..."
+   This is WRONG because:
+   1. 47/53 = 3% deviation = "Good" tier, not "Excellent"
+   2. quality_tier says "Excellent" but analysis says "Good" - CONTRADICTION
+
+✅ CORRECT: quality_tier: "Good", analysis: "Good centering with 47/53..."
+   score: 9.5
+
+EXAMPLE 2: Card with 52/48 centering
+───────────────────────────────────
+Ratio = 52/48 (smaller number first: 48/52)
+Deviation = 50 - 48 = 2%
+2% deviation → Look up table → "Excellent" tier
+quality_tier: "Excellent"
+score: 10.0
+analysis: "Excellent centering with 48/52 ratio..."
+
+EXAMPLE 3: Card with 45/55 centering
+───────────────────────────────────
+Ratio = 45/55
+Deviation = 50 - 45 = 5%
+5% deviation → Look up table → "Good" tier (NOT "Fair" - Fair starts at 6%)
+quality_tier: "Good"
+score: 9.5
+analysis: "Good centering with 45/55 ratio..."
+
+EXAMPLE 4: Card with 42/58 centering
+───────────────────────────────────
+Ratio = 42/58
+Deviation = 50 - 42 = 8%
+8% deviation → Look up table → "Fair" tier
+quality_tier: "Fair"
+score: 9.0 to 8.5
+analysis: "Fair centering with 42/58 ratio..."
+
+═════════════════════════════════════════════════════════════════════════
+DIRECTIONAL CONSISTENCY RULES (v5.9 NEW)
+═════════════════════════════════════════════════════════════════════════
+
+When describing which border is wider, you MUST be consistent with your measurements:
+
+If LEFT border > RIGHT border:
+• The card is shifted to the RIGHT (more space on left)
+• Say: "The left border is wider than the right"
+• DO NOT say: "The right border is wider" (this contradicts your measurements)
+
+If RIGHT border > LEFT border:
+• The card is shifted to the LEFT (more space on right)
+• Say: "The right border is wider than the left"
+• DO NOT say: "The left border is wider" (this contradicts your measurements)
+
+If TOP border > BOTTOM border:
+• The card is shifted DOWN (more space on top)
+• Say: "The top border is wider than the bottom"
+
+If BOTTOM border > TOP border:
+• The card is shifted UP (more space on bottom)
+• Say: "The bottom border is wider than the top"
+
+🚨 SELF-CHECK: After writing your analysis, verify:
+"Does my description of 'which border is wider' match my measured values?"
+If not, correct your description before finalizing.
+
+═════════════════════════════════════════════════════════════════════════
+SUMMARY: THE 4 RULES YOU MUST NEVER BREAK
+═════════════════════════════════════════════════════════════════════════
+
+1. quality_tier MUST be derived from the deviation lookup table - NO DISCRETION
+2. score MUST match the quality_tier - NO EXCEPTIONS
+3. First word of analysis MUST equal quality_tier - NO EXCEPTIONS
+4. Directional descriptions MUST match measurements - NO CONTRADICTIONS
+
+If you assign quality_tier: "Excellent" but your ratio is 47/53 → YOU ARE WRONG
+If you assign quality_tier: "Good" but your score is 10.0 → YOU ARE WRONG
+If you say "right border is wider" but measured left > right → YOU ARE WRONG
 
 ═══════════════════════════════════════════════════════════════════════
 SECTION 8: GRADING METHODOLOGY - CORNERS
