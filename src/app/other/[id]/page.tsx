@@ -27,7 +27,7 @@ function isValidValue(value: any): boolean {
 }
 
 // Helper: Build dynamic title for Other cards
-// Format: Primary Subject | Manufacturer | Set | Year | DCM Grade X
+// Format matches Sports cards: Primary Subject Year Manufacturer Set - DCM Grade X
 // For Other cards, player_or_character is the PRIMARY identifier (person, character, or subject)
 function buildTitle(card: any): string {
   // Use conversational AI data first, then database fields
@@ -48,6 +48,11 @@ function buildTitle(card: any): string {
     titleParts.push(primarySubject);
   }
 
+  // Date/Year (matches Sports pattern - year comes after name)
+  if (isValidValue(cardDate)) {
+    titleParts.push(cardDate);
+  }
+
   // Manufacturer
   if (isValidValue(manufacturer)) {
     titleParts.push(manufacturer);
@@ -58,24 +63,19 @@ function buildTitle(card: any): string {
     titleParts.push(setName);
   }
 
-  // Date/Year
-  if (isValidValue(cardDate)) {
-    titleParts.push(cardDate);
-  }
-
-  // Build title
-  let title = titleParts.filter(p => p && p.trim()).join(' | ');
+  // Build title with space separator (matches Sports)
+  let title = titleParts.filter(p => p && p.trim()).join(' ');
 
   // If title is empty, use fallback
   if (!title || title.trim() === '') {
     title = 'Other Collectible Card';
   }
 
-  // Add grade
+  // Add grade with dash separator (matches Sports pattern)
   if (grade !== null && grade !== undefined && !isNaN(grade)) {
-    title += ` | DCM Grade ${grade}`;
+    title += ` - DCM Grade ${grade}`;
   } else {
-    title += ' | DCM Grading';
+    title += ' - DCM Grading';
   }
 
   // Ensure title isn't too long (60 characters recommended, 70 max)

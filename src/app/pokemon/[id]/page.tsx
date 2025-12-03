@@ -97,30 +97,36 @@ function isValidValue(value: any): boolean {
 }
 
 // Helper: Build enhanced title for Pokemon cards
+// Format matches Sports cards: Name Year Set Subset Features - DCM Grade X
 function buildTitle(card: any): string {
   // Use conversational AI data first, then database fields
   const pokemonName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || card.pokemon_featured || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
   const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || '';
+  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
   const cardNumber = stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
   const rarity = stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || '';
   const grade = card.conversational_decimal_grade;
 
+  // Special features
+  const isFirstEdition = card.conversational_card_info?.rookie_or_first || card.first_print_rookie;
+  const serialNum = stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering;
+
   const titleParts: string[] = [];
 
-  // Pokemon name - only add if valid
+  // Pokemon name - primary identifier
   if (isValidValue(pokemonName)) titleParts.push(pokemonName);
 
-  // Set name and year
-  if (isValidValue(setName)) titleParts.push(setName);
+  // Year (matches Sports pattern)
   if (isValidValue(year)) titleParts.push(year);
 
-  // Card number
+  // Set name
+  if (isValidValue(setName)) titleParts.push(setName);
+
+  // Card number as subset equivalent
   if (isValidValue(cardNumber)) titleParts.push(`#${cardNumber}`);
 
-  // Rarity
+  // Rarity (shortened)
   if (isValidValue(rarity)) {
-    // Shorten common rarities
     if (rarity.toLowerCase().includes('holo')) {
       titleParts.push('Holo');
     } else if (rarity.toLowerCase().includes('rare')) {
@@ -130,7 +136,13 @@ function buildTitle(card: any): string {
     }
   }
 
-  // Build title
+  // Special features (matches Sports: RC, Auto, Serial)
+  const features: string[] = [];
+  if (isFirstEdition) features.push('1st Ed');
+  if (isValidValue(serialNum)) features.push(serialNum);
+  if (features.length > 0) titleParts.push(features.join(' '));
+
+  // Build title with space separator (matches Sports)
   let title = titleParts.filter(p => p && p.trim()).join(' ');
 
   // If title is empty, try harder
@@ -139,7 +151,7 @@ function buildTitle(card: any): string {
     title = isValidValue(cardName) ? cardName : 'Pokemon Card';
   }
 
-  // Add grade
+  // Add grade with dash separator (matches Sports pattern)
   if (grade !== null && grade !== undefined && !isNaN(grade)) {
     title += ` - DCM Grade ${grade}`;
   } else {

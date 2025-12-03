@@ -27,7 +27,7 @@ function isValidValue(value: any): boolean {
 }
 
 // Helper: Build dynamic title for Lorcana cards
-// Format: Card Name | Set | Card Number | Year | DCM Grade X
+// Format matches Sports cards: Card Name Year Set #Number - DCM Grade X
 function buildTitle(card: any): string {
   // Use conversational AI data first, then database fields
   const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
@@ -43,6 +43,11 @@ function buildTitle(card: any): string {
     titleParts.push(cardName);
   }
 
+  // Year (matches Sports pattern)
+  if (year && !isNaN(year)) {
+    titleParts.push(String(year));
+  }
+
   // Set name
   if (isValidValue(setName)) {
     titleParts.push(setName);
@@ -53,24 +58,19 @@ function buildTitle(card: any): string {
     titleParts.push(`#${cardNumber}`);
   }
 
-  // Year
-  if (year && !isNaN(year)) {
-    titleParts.push(String(year));
-  }
-
-  // Build title
-  let title = titleParts.filter(p => p && p.trim()).join(' | ');
+  // Build title with space separator (matches Sports)
+  let title = titleParts.filter(p => p && p.trim()).join(' ');
 
   // If title is empty, use fallback
   if (!title || title.trim() === '') {
     title = 'Lorcana Card';
   }
 
-  // Add grade
+  // Add grade with dash separator (matches Sports pattern)
   if (grade !== null && grade !== undefined && !isNaN(grade)) {
-    title += ` | DCM Grade ${grade}`;
+    title += ` - DCM Grade ${grade}`;
   } else {
-    title += ' | DCM Grading';
+    title += ' - DCM Grading';
   }
 
   // Ensure title isn't too long (60 characters recommended, 70 max)
