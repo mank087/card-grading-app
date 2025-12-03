@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { verifyAuth } from "@/lib/serverAuth";
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify authentication - user must be logged in
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.userId) {
+      return NextResponse.json({ error: auth.error || "Authentication required" }, { status: 401 });
+    }
+
     const supabase = supabaseServer();
 
-    // Get user_id from query params (passed from client)
+    // Use the authenticated user's ID - NOT from query params
+    const userId = auth.userId;
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('user_id');
     const search = searchParams.get('search');
-
-    if (!userId) {
-      return NextResponse.json({ error: "User ID required" }, { status: 400 });
-    }
 
     // Query cards for this user
     let query = supabase

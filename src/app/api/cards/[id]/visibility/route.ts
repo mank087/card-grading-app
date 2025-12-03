@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { verifyAuth } from "@/lib/serverAuth";
 
 type VisibilityToggleRequest = {
   params: Promise<{ id: string }>;
@@ -15,7 +16,7 @@ type VisibilityToggleRequest = {
  * }
  *
  * Security:
- * - Requires authentication
+ * - Requires authentication via Bearer token
  * - Only card owner can change visibility
  * - Validates visibility value
  */
@@ -35,16 +36,15 @@ export async function PATCH(
       );
     }
 
-    // Get user ID from query parameter (client-side auth uses localStorage)
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('user_id');
-
-    if (!userId) {
+    // Verify authentication - get user ID from token, not query params
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.userId) {
       return NextResponse.json(
-        { error: "Unauthorized - Please log in" },
+        { error: auth.error || "Unauthorized - Please log in" },
         { status: 401 }
       );
     }
+    const userId = auth.userId;
 
     const supabase = supabaseServer();
 

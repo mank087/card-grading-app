@@ -236,8 +236,13 @@ function CollectionPageContent() {
         const user = session.user
 
         // Call server-side API that creates signed URLs (same approach as card detail pages)
-        const url = `/api/cards/my-collection?user_id=${user.id}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`
-        const res = await fetch(url)
+        // Pass the access token in Authorization header for secure authentication
+        const url = `/api/cards/my-collection${searchQuery ? `?search=${encodeURIComponent(searchQuery)}` : ''}`
+        const res = await fetch(url, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        })
 
         if (!res.ok) {
           throw new Error('Failed to load cards.')

@@ -5,7 +5,8 @@
 import { PokemonCard, getPokemonCardById } from './pokemonTcgApi';
 
 const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
-const POKEMON_API_KEY = 'a69e2947-6080-4a50-84ae-9f91e054f33e';
+// Get API key from environment variable - NO HARDCODED FALLBACKS
+const POKEMON_API_KEY = process.env.POKEMON_TCG_API_KEY || '';
 
 export interface PokemonApiVerificationResult {
   success: boolean;

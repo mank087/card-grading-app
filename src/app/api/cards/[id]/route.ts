@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseServer } from '@/lib/supabaseServer'
+import { verifyAuth } from '@/lib/serverAuth'
 
 // Delete card
 export async function DELETE(
@@ -9,13 +10,12 @@ export async function DELETE(
   try {
     const { id } = await params
 
-    // Get user_id from query params (passed from client)
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('user_id')
-
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 })
+    // Verify authentication - get user ID from token, not query params
+    const auth = await verifyAuth(request)
+    if (!auth.authenticated || !auth.userId) {
+      return NextResponse.json({ error: auth.error || 'Authentication required' }, { status: 401 })
     }
+    const userId = auth.userId
 
     const supabase = supabaseServer()
 
