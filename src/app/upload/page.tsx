@@ -150,13 +150,38 @@ function UniversalUploadPageContent() {
   const [originalUploadMethod, setOriginalUploadMethod] = useState<'camera' | 'gallery'>('camera')
   const { showCameraOption } = useDeviceDetection()
 
-  // Update selected type when URL param changes
+  // Track the navigation timestamp to detect when user clicks nav to grade another card
+  const [lastNavTimestamp, setLastNavTimestamp] = useState<string | null>(null);
+
+  // Update selected type when URL param changes AND reset upload state if navigating to grade a new card
   useEffect(() => {
     const categoryParam = searchParams?.get('category');
+    const navTimestamp = searchParams?.get('t'); // Timestamp added by nav links
+
     if (categoryParam && categoryParam in CARD_TYPES) {
+      // If timestamp changed (user clicked nav link), reset upload state if currently uploading
+      // This allows users to grade another card by clicking the nav while on the loading screen
+      if (navTimestamp && navTimestamp !== lastNavTimestamp && isUploading) {
+        console.log('[Upload] Navigation detected while uploading - resetting state for new card');
+        setFrontFile(null);
+        setBackFile(null);
+        setFrontCompressed(null);
+        setBackCompressed(null);
+        setFrontCompressionInfo(null);
+        setBackCompressionInfo(null);
+        setFrontHash(null);
+        setBackHash(null);
+        setIsUploading(false);
+        setIsCompressing(false);
+        setStatus('');
+        setUploadedCardId(null);
+        setUploadedCardCategory(null);
+        setUploadMode('select');
+      }
+      setLastNavTimestamp(navTimestamp || null);
       setSelectedType(categoryParam as CardType);
     }
-  }, [searchParams]);
+  }, [searchParams, lastNavTimestamp, isUploading]);
 
   // Scroll to top when returning to main upload screen
   useEffect(() => {

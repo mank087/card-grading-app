@@ -143,35 +143,35 @@ export default function Navigation() {
                 <div className="absolute top-full left-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
                   <div className="py-1">
                     <Link
-                      href="/upload?category=Sports"
+                      href={`/upload?category=Sports&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       Sports Cards
                     </Link>
                     <Link
-                      href="/upload?category=Pokemon"
+                      href={`/upload?category=Pokemon&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       Pokémon Cards
                     </Link>
                     <Link
-                      href="/upload?category=MTG"
+                      href={`/upload?category=MTG&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       MTG Cards
                     </Link>
                     <Link
-                      href="/upload?category=Lorcana"
+                      href={`/upload?category=Lorcana&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       Lorcana Cards
                     </Link>
                     <Link
-                      href="/upload?category=Other"
+                      href={`/upload?category=Other&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-800 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
@@ -272,35 +272,35 @@ export default function Navigation() {
                 <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
                   <div className="py-1">
                     <Link
-                      href="/upload?category=Sports"
+                      href={`/upload?category=Sports&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       Sports Cards
                     </Link>
                     <Link
-                      href="/upload?category=Pokemon"
+                      href={`/upload?category=Pokemon&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-red-50 hover:text-red-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       Pokémon Cards
                     </Link>
                     <Link
-                      href="/upload?category=MTG"
+                      href={`/upload?category=MTG&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       MTG Cards
                     </Link>
                     <Link
-                      href="/upload?category=Lorcana"
+                      href={`/upload?category=Lorcana&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
                       Lorcana Cards
                     </Link>
                     <Link
-                      href="/upload?category=Other"
+                      href={`/upload?category=Other&t=${Date.now()}`}
                       className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-800 transition-colors"
                       onClick={() => setUploadDropdownOpen(false)}
                     >
