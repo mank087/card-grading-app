@@ -145,6 +145,9 @@ export async function POST(request: NextRequest) {
 
     const processingTime = Date.now() - startTime;
 
+    // Include set card_count for proper "X/Y" formatting
+    const setData = verificationResult.mtg_set_data;
+
     return NextResponse.json({
       success: verificationResult.success,
       verified: verificationResult.verified,
@@ -156,6 +159,7 @@ export async function POST(request: NextRequest) {
       metadata: verificationResult.mtg_api_data
         ? extractMTGDisplayMetadata(verificationResult.mtg_api_data)
         : null,
+      set_card_count: setData?.card_count || setData?.printed_size || null,
       error: verificationResult.error || null,
       processing_time_ms: processingTime
     });

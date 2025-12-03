@@ -5,7 +5,9 @@
 
 import {
   ScryfallCard,
+  ScryfallSet,
   getCardBySetAndNumber,
+  getSetByCode,
   searchCardByFuzzyName,
   searchCardByExactName,
   searchCardsAdvanced,
@@ -22,6 +24,7 @@ export interface MTGApiVerificationResult {
   mtg_api_id: string | null;
   mtg_oracle_id: string | null;
   mtg_api_data: ScryfallCard | null;
+  mtg_set_data: ScryfallSet | null;  // Set info with card_count
   verification_method: 'set_collector_number' | 'fuzzy_name_set' | 'fuzzy_name' | 'advanced_search' | 'none';
   confidence: 'high' | 'medium' | 'low';
   corrections: {
@@ -108,6 +111,7 @@ export async function verifyMTGCard(cardInfo: MTGCardInfoForVerification): Promi
     mtg_api_id: null,
     mtg_oracle_id: null,
     mtg_api_data: null,
+    mtg_set_data: null,
     verification_method: 'none',
     confidence: 'low',
     corrections: []
@@ -204,6 +208,17 @@ export async function verifyMTGCard(cardInfo: MTGCardInfoForVerification): Promi
     result.mtg_api_id = apiCard.id;
     result.mtg_oracle_id = apiCard.oracle_id;
     result.mtg_api_data = apiCard;
+
+    // Fetch set info for card_count (to format "X/Y" numbers properly)
+    try {
+      const setData = await getSetByCode(apiCard.set);
+      if (setData) {
+        result.mtg_set_data = setData;
+        console.log(`[MTG API Verification] Set info: ${setData.name} (${setData.card_count} cards)`);
+      }
+    } catch (setError) {
+      console.warn('[MTG API Verification] Failed to fetch set info:', setError);
+    }
 
     // Check for corrections
     const apiSetName = apiCard.set_name;

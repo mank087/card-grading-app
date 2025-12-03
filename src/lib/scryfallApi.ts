@@ -120,6 +120,19 @@ export interface ScryfallError {
   details: string;
 }
 
+// Scryfall set response interface
+export interface ScryfallSet {
+  id: string;
+  code: string;
+  name: string;
+  set_type: string;
+  released_at: string;
+  card_count: number;  // Total cards in set (for "X/Y" format)
+  printed_size?: number;  // Printed size if different from card_count
+  digital: boolean;
+  icon_svg_uri: string;
+}
+
 // Rate limiting - Scryfall allows 10 req/sec, we use 100ms between requests
 let lastRequestTime = 0;
 const MIN_REQUEST_INTERVAL = 100;
@@ -182,6 +195,15 @@ export async function getCardBySetAndNumber(
 export async function getCardById(scryfallId: string): Promise<ScryfallCard | null> {
   const url = `https://api.scryfall.com/cards/${scryfallId}`;
   return scryfallFetch<ScryfallCard>(url);
+}
+
+/**
+ * Get set info by set code
+ * Returns set details including card_count for formatting "X/Y" numbers
+ */
+export async function getSetByCode(setCode: string): Promise<ScryfallSet | null> {
+  const url = `https://api.scryfall.com/sets/${setCode.toLowerCase()}`;
+  return scryfallFetch<ScryfallSet>(url);
 }
 
 /**
