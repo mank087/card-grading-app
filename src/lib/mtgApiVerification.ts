@@ -323,6 +323,9 @@ export function getMTGApiUpdateFields(verificationResult: MTGApiVerificationResu
     scryfall_price_usd_foil: metadata.scryfall_price_usd_foil,
     scryfall_price_eur: metadata.scryfall_price_eur,
     scryfall_price_updated_at: new Date().toISOString(),
+
+    // TCGPlayer direct product URL from Scryfall
+    tcgplayer_url: apiCard.purchase_uris?.tcgplayer || null,
   };
 }
 

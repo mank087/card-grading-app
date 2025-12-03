@@ -942,6 +942,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           conversationalGradingData.card_info.scryfall_price_usd = m.price_usd;
           conversationalGradingData.card_info.scryfall_price_usd_foil = m.price_usd_foil;
 
+          // TCGPlayer direct product URL from Scryfall
+          conversationalGradingData.card_info.tcgplayer_url = m.purchase_uris?.tcgplayer || null;
+
           console.log(`[GET /api/mtg/${cardId}] 📝 Merged Scryfall data into conversational_card_info:`, {
             set_name: conversationalGradingData.card_info.set_name,
             mana_cost: conversationalGradingData.card_info.mana_cost,
