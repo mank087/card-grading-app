@@ -125,16 +125,33 @@ export async function POST(request: NextRequest) {
       const updateFields = getPokemonApiUpdateFields(verificationResult);
 
       if (updateFields) {
+        // Also merge TCGPlayer URL into conversational_card_info for cached loads
+        const tcgplayerUrl = verificationResult.pokemon_api_data.tcgplayer?.url || null;
+        const metadata = extractPokemonMetadata(verificationResult.pokemon_api_data);
+
+        // Merge into existing conversational_card_info
+        const updatedCardInfo = {
+          ...(convInfo || {}),
+          set_name: metadata.set_name || convInfo.set_name,
+          pokemon_api_verified: true,
+          pokemon_api_id: verificationResult.pokemon_api_id,
+          rarity_or_variant: metadata.rarity || convInfo.rarity_or_variant,
+          tcgplayer_url: tcgplayerUrl
+        };
+
         const { error: updateError } = await supabase
           .from("cards")
-          .update(updateFields)
+          .update({
+            ...updateFields,
+            conversational_card_info: updatedCardInfo
+          })
           .eq("id", card_id);
 
         if (updateError) {
           console.error(`[Pokemon Verify API] Failed to update card:`, updateError);
           // Don't fail the request, verification was successful
         } else {
-          console.log(`[Pokemon Verify API] Card updated with API data`);
+          console.log(`[Pokemon Verify API] Card updated with API data and TCGPlayer URL: ${tcgplayerUrl ? 'present' : 'not found'}`);
         }
       }
     }
