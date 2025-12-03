@@ -1,10 +1,13 @@
 // Direct authentication using fetch - bypasses Supabase client library
 // This works around the "Invalid value" fetch error in the Supabase library
 
-import { createClient } from '@supabase/supabase-js'
+import { createClient, Session } from '@supabase/supabase-js'
 
 const SUPABASE_URL = 'https://zyxtqcvwkbpvsjsszbzg.supabase.co'
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5eHRxY3Z3a2JwdnNqc3N6YnpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5NjI2NTUsImV4cCI6MjA3MzUzODY1NX0.-U0WoZvZSPpbeZ6w4H9t3MH3EsIkMO_hs4CKB9sJ858'
+
+// Custom localStorage key for our app's session storage
+const SESSION_STORAGE_KEY = 'supabase.auth.token'
 
 export interface AuthResponse {
   access_token?: string
@@ -15,13 +18,14 @@ export interface AuthResponse {
 
 type OAuthProvider = 'google' | 'facebook'
 
-// Create a Supabase client for OAuth (OAuth requires the client library)
+// Create a Supabase client for OAuth
+// Using implicit flow (not PKCE) for simpler callback handling
 const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true,
-    flowType: 'pkce'
+    flowType: 'implicit'  // Use implicit flow - tokens come back in URL hash
   }
 })
 
@@ -45,7 +49,7 @@ export async function signInWithPassword(email: string, password: string): Promi
 
     // Store tokens in localStorage for persistence
     if (typeof window !== 'undefined' && data.access_token) {
-      localStorage.setItem('supabase.auth.token', JSON.stringify({
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
         access_token: data.access_token,
         refresh_token: data.refresh_token,
         expires_at: data.expires_at,
@@ -95,14 +99,15 @@ export function getStoredSession() {
   if (typeof window === 'undefined') return null
 
   try {
-    const stored = localStorage.getItem('supabase.auth.token')
+    const stored = localStorage.getItem(SESSION_STORAGE_KEY)
     if (!stored) return null
 
     const session = JSON.parse(stored)
 
     // Check if token is expired
-    if (session.expires_at && session.expires_at * 1000 < Date.now()) {
-      localStorage.removeItem('supabase.auth.token')
+    if (session.expires_at && session.expires_at < Math.floor(Date.now() / 1000)) {
+      console.log('[Auth] Session expired, clearing...')
+      localStorage.removeItem(SESSION_STORAGE_KEY)
       return null
     }
 
@@ -114,7 +119,7 @@ export function getStoredSession() {
 
 export function signOut() {
   if (typeof window !== 'undefined') {
-    localStorage.removeItem('supabase.auth.token')
+    localStorage.removeItem(SESSION_STORAGE_KEY)
     // Also sign out from Supabase client (for OAuth sessions)
     supabaseClient.auth.signOut()
   }
@@ -149,6 +154,57 @@ export async function signInWithOAuth(provider: OAuthProvider): Promise<{ error?
 export async function getOAuthSession() {
   try {
     console.log('[OAuth] Getting session from Supabase...')
+
+    // For implicit flow, tokens are in the URL hash
+    // Supabase client with detectSessionInUrl:true should parse them automatically
+    // But we need to give it a moment to process
+
+    // First, check if there are tokens in the URL hash
+    if (typeof window !== 'undefined' && window.location.hash) {
+      console.log('[OAuth] URL hash detected, parsing tokens...')
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const expiresIn = hashParams.get('expires_in')
+
+      if (accessToken) {
+        console.log('[OAuth] Found access_token in URL hash')
+
+        // Get user info from Supabase using the token
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser(accessToken)
+
+        if (userError) {
+          console.error('[OAuth] Error getting user:', userError)
+          return { error: userError.message }
+        }
+
+        if (user) {
+          console.log('[OAuth] User retrieved:', user.email)
+
+          // Calculate expires_at
+          const expiresAt = Math.floor(Date.now() / 1000) + (parseInt(expiresIn || '3600'))
+
+          // Store session in our custom localStorage key
+          const sessionData = {
+            access_token: accessToken,
+            refresh_token: refreshToken,
+            expires_at: expiresAt,
+            user: user
+          }
+
+          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData))
+          console.log('[OAuth] Session stored successfully in localStorage')
+
+          // Clear the hash from URL to prevent re-processing
+          window.history.replaceState(null, '', window.location.pathname)
+
+          return { session: sessionData }
+        }
+      }
+    }
+
+    // Fallback: try to get session from Supabase client
+    console.log('[OAuth] No hash tokens, checking Supabase client session...')
     const { data: { session }, error } = await supabaseClient.auth.getSession()
 
     if (error) {
@@ -158,20 +214,20 @@ export async function getOAuthSession() {
 
     // Store the session in localStorage for consistency with email/password auth
     if (session && typeof window !== 'undefined') {
-      console.log('[OAuth] Session found, storing in localStorage...')
+      console.log('[OAuth] Session found from Supabase client, storing in localStorage...')
       console.log('[OAuth] User:', session.user?.email)
-      localStorage.setItem('supabase.auth.token', JSON.stringify({
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
         access_token: session.access_token,
         refresh_token: session.refresh_token,
-        expires_at: Math.floor(new Date(session.expires_at!).getTime() / 1000),
+        expires_at: Math.floor(Date.now() / 1000) + 3600, // Default 1 hour if not provided
         user: session.user
       }))
       console.log('[OAuth] Session stored successfully')
+      return { session }
     } else {
-      console.warn('[OAuth] No session found or not in browser context')
+      console.warn('[OAuth] No session found')
+      return { error: 'No session found. Please try again.' }
     }
-
-    return { session }
   } catch (err: any) {
     console.error('[OAuth] Exception:', err)
     return { error: err.message || 'Failed to get session' }

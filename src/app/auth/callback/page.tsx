@@ -11,11 +11,21 @@ export default function AuthCallbackPage() {
   useEffect(() => {
     const handleOAuthCallback = async () => {
       try {
-        // Wait for Supabase SDK to process URL hash (contains access_token, refresh_token)
-        setStatus('Processing authentication...')
-        await new Promise(resolve => setTimeout(resolve, 500))
+        // Log what we received
+        console.log('[OAuth Callback] Current URL:', window.location.href)
+        console.log('[OAuth Callback] Hash:', window.location.hash ? 'Present' : 'Not present')
 
-        // Get the OAuth session after redirect
+        // Check if we have tokens in the URL hash
+        if (!window.location.hash && !window.location.search) {
+          console.error('[OAuth Callback] No tokens in URL')
+          setError('No authentication tokens received. Please try again.')
+          setTimeout(() => router.push('/login'), 3000)
+          return
+        }
+
+        setStatus('Processing authentication...')
+
+        // Get the OAuth session - this will parse tokens from URL hash
         console.log('[OAuth Callback] Getting OAuth session...')
         const result = await getOAuthSession()
 
@@ -30,21 +40,27 @@ export default function AuthCallbackPage() {
           setStatus('Verifying session...')
           console.log('[OAuth Callback] Session received, verifying storage...')
 
+          // Small delay to ensure localStorage write is complete
+          await new Promise(resolve => setTimeout(resolve, 100))
+
           // Verify session was actually stored before navigating
           const storedSession = getStoredSession()
 
-          if (storedSession) {
-            console.log('[OAuth Callback] Session verified in localStorage, redirecting...')
-            router.push('/collection')
+          if (storedSession && storedSession.user) {
+            console.log('[OAuth Callback] Session verified in localStorage, user:', storedSession.user.email)
+            setStatus('Success! Redirecting...')
+
+            // Use replace to prevent back-button issues
+            router.replace('/collection')
           } else {
             // Retry once after a short delay
             console.log('[OAuth Callback] Session not found in localStorage, retrying...')
-            await new Promise(resolve => setTimeout(resolve, 300))
+            await new Promise(resolve => setTimeout(resolve, 500))
 
             const retrySession = getStoredSession()
-            if (retrySession) {
+            if (retrySession && retrySession.user) {
               console.log('[OAuth Callback] Session found on retry, redirecting...')
-              router.push('/collection')
+              router.replace('/collection')
             } else {
               console.error('[OAuth Callback] Session storage failed after retry')
               setError('Session storage failed. Please try again.')
