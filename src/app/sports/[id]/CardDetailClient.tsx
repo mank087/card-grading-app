@@ -25,6 +25,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
+import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1336,6 +1337,7 @@ export function SportsCardDetails() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [regradingImageUrl, setRegradingImageUrl] = useState<string | null>(null);
+  const [showRegradeConfirm, setShowRegradeConfirm] = useState(false);
   const [origin, setOrigin] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1706,11 +1708,17 @@ export function SportsCardDetails() {
   };
 
 
+  // Re-grade card - show confirmation modal first
+  const handleRegradeClick = () => {
+    setShowRegradeConfirm(true);
+  };
+
   // Re-grade card function - forces fresh grading with latest model
   const regradeCard = async () => {
     try {
       if (!card) return;
 
+      setShowRegradeConfirm(false); // Close modal
       setRegradingImageUrl(card.front_url); // Store image URL before clearing card
       setLoading(true);
       setError(null);
@@ -1739,6 +1747,7 @@ export function SportsCardDetails() {
 
       // Update card state with fresh data (triggers re-render with new grading)
       setCard(data);
+      setRegradingImageUrl(null); // Clear re-grading state
       setLoading(false);
     } catch (error: any) {
       console.error('Error re-grading card:', error);
@@ -1750,6 +1759,7 @@ export function SportsCardDetails() {
         setError(error.message || 'Failed to re-grade card');
       }
 
+      setRegradingImageUrl(null); // Clear re-grading state on error
       setLoading(false);
     }
   };
@@ -1835,149 +1845,11 @@ export function SportsCardDetails() {
   // Show full animated re-grade screen ONLY when regradingImageUrl is set
   if (regradingImageUrl && (loading || isProcessing)) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-black">
-        <div className="text-center max-w-md mx-auto p-6">
-          {/* Navigation Buttons */}
-          <div className="mb-6">
-            <p className="text-sm text-gray-300 mb-4">
-              Card re-grading in process, this may take 1-2 minutes. You may grade another card or view your collection while the card processes.
-            </p>
-
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => router.push('/upload')}
-                className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-all shadow-lg flex items-center justify-center gap-1.5 text-sm cursor-pointer"
-              >
-                <span className="text-lg">📸</span>
-                <span>Grade Another</span>
-              </button>
-
-              <button
-                onClick={() => router.push('/collection')}
-                className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2.5 rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 text-sm cursor-pointer"
-              >
-                <span className="text-lg">📚</span>
-                <span>My Collection</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Animated Card Container */}
-          <div className="relative w-72 h-96 mx-auto mb-8 overflow-hidden rounded-lg shadow-2xl">
-            {/* Green Glowing Border */}
-            <div
-              className="absolute inset-0 rounded-lg animate-pulse"
-              style={{
-                border: '3px solid #00ff00',
-                boxShadow: '0 0 20px rgba(0,255,0,0.5), inset 0 0 20px rgba(0,255,0,0.1)'
-              }}
-            />
-
-            {/* Card Image */}
-            <img
-              src={regradingImageUrl}
-              alt="Card being re-graded"
-              className="w-full h-full object-cover rounded-lg"
-            />
-
-            {/* Radar Sweep Effect */}
-            <div
-              className="absolute -top-1/2 -left-1/2 w-[200%] h-[200%] rounded-full pointer-events-none"
-              style={{
-                background: 'conic-gradient(rgba(0,255,0,0.3) 0deg, rgba(0,255,0,0) 60deg, rgba(0,255,0,0) 360deg)',
-                animation: 'spin 4s linear infinite'
-              }}
-            />
-
-            {/* X-ray Scanning Bar (Cyan) */}
-            <div
-              className="absolute left-0 w-full h-1/2 pointer-events-none"
-              style={{
-                background: 'linear-gradient(rgba(0, 255, 255, 0.2), rgba(0, 255, 255, 0.6), rgba(0, 255, 255, 0.2))',
-                animation: 'scan 3s linear infinite'
-              }}
-            />
-
-            {/* Corner Detection Points */}
-            <div className="absolute top-2 left-2 w-3 h-3 bg-red-500 rounded-full animate-ping" />
-            <div className="absolute top-2 right-2 w-3 h-3 bg-red-500 rounded-full animate-ping" style={{ animationDelay: '0.5s' }} />
-            <div className="absolute bottom-2 left-2 w-3 h-3 bg-red-500 rounded-full animate-ping" style={{ animationDelay: '1s' }} />
-            <div className="absolute bottom-2 right-2 w-3 h-3 bg-red-500 rounded-full animate-ping" style={{ animationDelay: '1.5s' }} />
-
-            {/* Center Point */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-yellow-400 rounded-full animate-bounce" />
-          </div>
-
-          {/* Analysis Status */}
-          <div className="text-white">
-            <h2 className="text-2xl font-bold mb-2 text-green-400">
-              🔍 Re-analyzing Sports Card
-            </h2>
-
-            {/* Progress Steps */}
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center">
-                  <div className="w-2 h-2 rounded-full mr-2 bg-yellow-500 animate-pulse" />
-                  Detecting card boundaries
-                </span>
-                <span className="text-yellow-400">⟳</span>
-              </div>
-              <div className="flex items-center justify-between text-sm opacity-40">
-                <span className="flex items-center">
-                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
-                  Measuring centering ratios
-                </span>
-                <span className="text-gray-400">⏳</span>
-              </div>
-              <div className="flex items-center justify-between text-sm opacity-40">
-                <span className="flex items-center">
-                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
-                  Evaluating corners & edges
-                </span>
-                <span className="text-gray-400">⏳</span>
-              </div>
-              <div className="flex items-center justify-between text-sm opacity-40">
-                <span className="flex items-center">
-                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
-                  Assessing surface condition
-                </span>
-                <span className="text-gray-400">⏳</span>
-              </div>
-              <div className="flex items-center justify-between text-sm opacity-40">
-                <span className="flex items-center">
-                  <div className="w-2 h-2 rounded-full mr-2 bg-gray-500" />
-                  Generating final grade
-                </span>
-                <span className="text-gray-400">⏳</span>
-              </div>
-            </div>
-
-            <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mb-4">
-              <p className="text-sm text-blue-300">
-                <strong>DCM Optic™ Analysis</strong>
-                <br />
-                Advanced algorithms examining every detail of your card
-              </p>
-            </div>
-
-            <p className="text-xs text-gray-400">
-              Professional grading in progress
-            </p>
-          </div>
-
-          <style jsx>{`
-            @keyframes spin {
-              from { transform: rotate(0deg); }
-              to { transform: rotate(360deg); }
-            }
-            @keyframes scan {
-              0% { top: -100%; }
-              100% { top: 100%; }
-            }
-          `}</style>
-        </div>
-      </div>
+      <CardAnalysisAnimation
+        frontImageUrl={regradingImageUrl}
+        cardName="Sports Card"
+        allowNavigation={true}
+      />
     );
   }
 
@@ -2447,7 +2319,7 @@ export function SportsCardDetails() {
                   <span>{isTogglingVisibility ? 'Updating...' : visibility === 'public' ? 'Public' : 'Private'}</span>
                 </button>
                 <button
-                  onClick={regradeCard}
+                  onClick={handleRegradeClick}
                   disabled={loading}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                   title="Re-grade this card with the latest model"
@@ -5599,6 +5471,48 @@ export function SportsCardDetails() {
                 ) : (
                   'Delete Card'
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Re-grade Confirmation Modal */}
+      {showRegradeConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 rounded-full">
+              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+              Re-grade This Card?
+            </h3>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              This will re-analyze your card using the <strong>same uploaded images</strong> (front and back) with the latest DCM Optic™ grading system.
+            </p>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              The new grade will <strong>replace</strong> the current grade for this card.
+            </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+              <p className="text-xs text-blue-800 text-center">
+                <strong>Want to use different photos?</strong><br />
+                Start a new grading submission instead of re-grading.
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowRegradeConfirm(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={regradeCard}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center justify-center"
+              >
+                Re-grade Card
               </button>
             </div>
           </div>
