@@ -32,19 +32,69 @@ export function isMobile(): boolean {
 }
 
 /**
- * Generate Facebook share URL
- * Note: Facebook requires Open Graph meta tags on the page for pre-filled content
- * The 'quote' parameter is deprecated and may not work
+ * Generate Facebook share URL with pre-populated quote
+ * Uses the 'quote' parameter which Facebook displays as suggested text
  */
 export function generateFacebookShareUrl(cardData: CardSharingData): string {
   const cardUrl = cardData.url || `https://dcmgrading.com/sports/${cardData.id}`;
+  const quote = generateFacebookQuote(cardData);
 
-  // Facebook Share Dialog - simpler and more reliable
   const params = new URLSearchParams({
-    u: cardUrl
+    u: cardUrl,
+    quote: quote
   });
 
   return `https://www.facebook.com/sharer/sharer.php?${params.toString()}`;
+}
+
+/**
+ * Generate the pre-populated Facebook quote/message
+ * Format: My "Card Name" just graded on DCM as a "score". Check it out here:
+ */
+function generateFacebookQuote(cardData: CardSharingData): string {
+  // Build the card name from available fields
+  const cardName = buildCardDisplayName(cardData);
+
+  // Get the grade score
+  const grade = cardData.grade || cardData.dcm_grade_whole;
+
+  if (grade) {
+    return `My "${cardName}" just graded on DCM as a ${grade}. Check it out here:`;
+  } else {
+    return `My "${cardName}" just graded on DCM. Check it out here:`;
+  }
+}
+
+/**
+ * Build a display name for the card from available data
+ */
+function buildCardDisplayName(cardData: CardSharingData): string {
+  const parts: string[] = [];
+
+  // Add player/featured name if available
+  const playerName = cardData.playerName || cardData.featured;
+  if (playerName) parts.push(playerName);
+
+  // Add card name if different from player name
+  const cardName = cardData.cardName || cardData.card_name;
+  if (cardName && cardName !== playerName) parts.push(cardName);
+
+  // Add year and set info
+  const year = cardData.year || cardData.release_date;
+  const set = cardData.setName || cardData.card_set;
+  const manufacturer = cardData.manufacturer;
+
+  const setInfo: string[] = [];
+  if (year) setInfo.push(year);
+  if (manufacturer) setInfo.push(manufacturer);
+  if (set) setInfo.push(set);
+
+  if (setInfo.length > 0) {
+    parts.push(setInfo.join(' '));
+  }
+
+  // Return combined name or fallback
+  return parts.length > 0 ? parts.join(' - ') : 'Card';
 }
 
 /**
@@ -52,15 +102,30 @@ export function generateFacebookShareUrl(cardData: CardSharingData): string {
  */
 export function generateTwitterShareUrl(cardData: CardSharingData): string {
   const cardUrl = cardData.url || `https://dcmgrading.com/sports/${cardData.id}`;
-  const text = generateShareText(cardData);
+  const text = generateTwitterText(cardData);
 
   const params = new URLSearchParams({
     url: cardUrl,
     text: text,
-    hashtags: 'DCMGrading,SportsCards,CardGrading'
+    hashtags: 'DCMGrading,CardGrading'
   });
 
   return `https://twitter.com/intent/tweet?${params.toString()}`;
+}
+
+/**
+ * Generate the pre-populated Twitter text
+ * Format: My "Card Name" just graded on DCM as a "score". Check it out here:
+ */
+function generateTwitterText(cardData: CardSharingData): string {
+  const cardName = buildCardDisplayName(cardData);
+  const grade = cardData.grade || cardData.dcm_grade_whole;
+
+  if (grade) {
+    return `My "${cardName}" just graded on DCM as a ${grade}. Check it out here:`;
+  } else {
+    return `My "${cardName}" just graded on DCM. Check it out here:`;
+  }
 }
 
 /**
