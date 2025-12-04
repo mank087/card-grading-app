@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // Verify admin session
@@ -19,7 +19,7 @@ export async function PATCH(
     }
 
     const { is_featured } = await request.json()
-    const cardId = params.id
+    const { id: cardId } = await params
 
     // Update the card's featured status
     const { error } = await supabaseAdmin
