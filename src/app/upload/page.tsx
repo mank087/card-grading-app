@@ -143,7 +143,11 @@ function UniversalUploadPageContent() {
   const [frontHash, setFrontHash] = useState<string | null>(null)
   const [backHash, setBackHash] = useState<string | null>(null)
   const [status, setStatus] = useState('')
-  const [isCompressing, setIsCompressing] = useState(false)
+  const [isCompressingFront, setIsCompressingFront] = useState(false)
+  const [isCompressingBack, setIsCompressingBack] = useState(false)
+
+  // Computed compression state - true if either side is compressing
+  const isCompressing = isCompressingFront || isCompressingBack
   const [isUploading, setIsUploading] = useState(false)
   const [uploadedCardId, setUploadedCardId] = useState<string | null>(null)
   const [uploadedCardCategory, setUploadedCardCategory] = useState<string | null>(null)
@@ -176,7 +180,8 @@ function UniversalUploadPageContent() {
         setFrontHash(null);
         setBackHash(null);
         setIsUploading(false);
-        setIsCompressing(false);
+        setIsCompressingFront(false);
+        setIsCompressingBack(false);
         setStatus('');
         setUploadedCardId(null);
         setUploadedCardCategory(null);
@@ -206,8 +211,10 @@ function UniversalUploadPageContent() {
 
   // Handle file selection and compression
   const handleFileSelect = async (file: File, side: 'front' | 'back') => {
+    console.log('[Upload] handleFileSelect started:', side, 'size:', file.size)
+    const setCompressingState = side === 'front' ? setIsCompressingFront : setIsCompressingBack
     try {
-      setIsCompressing(true)
+      setCompressingState(true)
       setStatus(`🔄 Compressing ${side} image...`)
 
       // Generate hash for duplicate detection
@@ -269,17 +276,30 @@ function UniversalUploadPageContent() {
         })
       }
 
+      console.log('[Upload] handleFileSelect completed:', side, 'compressed size:', result.compressedSize)
       setStatus(`✅ ${side} image compressed: ${result.compressionRatio.toFixed(1)}% smaller`)
     } catch (error) {
       console.error(`Failed to compress ${side} image:`, error)
       setStatus(`❌ Failed to compress ${side} image`)
     } finally {
-      setIsCompressing(false)
+      console.log('[Upload] handleFileSelect finished for:', side)
+      setCompressingState(false)
     }
   }
 
   const handleUpload = async () => {
+    console.log('[Upload] handleUpload called')
+    console.log('[Upload] State check:', {
+      frontFile: !!frontFile,
+      backFile: !!backFile,
+      frontCompressed: !!frontCompressed,
+      backCompressed: !!backCompressed,
+      isCompressing,
+      isUploading
+    })
+
     if (!frontCompressed || !backCompressed || !frontFile) {
+      console.log('[Upload] Validation failed - missing compressed images')
       setStatus('❌ Please select both front and back images and wait for compression')
       return
     }
@@ -497,7 +517,8 @@ function UniversalUploadPageContent() {
     setFrontHash(null)
     setBackHash(null)
     setIsUploading(false)
-    setIsCompressing(false)
+    setIsCompressingFront(false)
+    setIsCompressingBack(false)
     setStatus('')
     setUploadedCardId(null)
     setUploadedCardCategory(null)
@@ -506,23 +527,30 @@ function UniversalUploadPageContent() {
   }
 
   const handleCameraCapture = (file: File) => {
-    // Process captured image
+    console.log('[Upload] Camera captured:', currentSide, 'file size:', file.size)
+
+    // Process captured image (async - will set isCompressing)
     handleFileSelect(file, currentSide)
 
     // Determine next step based on what photos we have
     const willHaveFront = currentSide === 'front' || frontFile
     const willHaveBack = currentSide === 'back' || backFile
 
+    console.log('[Upload] After capture - willHaveFront:', willHaveFront, 'willHaveBack:', willHaveBack)
+
     if (currentSide === 'front' && !willHaveBack) {
       // Initial upload: after capturing front, go to back camera
+      console.log('[Upload] Moving to back camera')
       setCurrentSide('back')
       setUploadMode('camera')
     } else if (currentSide === 'back' && !willHaveFront) {
       // Initial upload (back first): after capturing back, go to front camera
+      console.log('[Upload] Moving to front camera')
       setCurrentSide('front')
       setUploadMode('camera')
     } else {
       // Retake scenario OR both photos captured: go to review screen
+      console.log('[Upload] Moving to review screen')
       setUploadMode('review')
     }
   }
@@ -793,12 +821,20 @@ function UniversalUploadPageContent() {
 
         {/* Action Buttons */}
         <div className="bg-white border-t border-gray-200 px-4 py-4 space-y-3">
+          {/* Processing indicator */}
+          {isCompressing && (
+            <div className="flex items-center justify-center gap-2 text-indigo-600 py-2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+              <span className="text-sm font-medium">Processing images...</span>
+            </div>
+          )}
+
           <button
             onClick={handleUpload}
-            disabled={!frontCompressed || !backCompressed || isCompressing}
+            disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
             className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
           >
-            ✓ Submit for Grading
+            {isCompressing ? 'Processing Images...' : isUploading ? 'Uploading...' : '✓ Submit for Grading'}
           </button>
 
           <div className="grid grid-cols-2 gap-3">

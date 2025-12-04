@@ -199,7 +199,7 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
   const edgeStrength = detectEdges(imageData, centerX, centerY, centerWidth, centerHeight);
 
   // CRITERION 5: Color saturation (cards usually have some color)
-  const saturation = calculateSaturation(data, centerX, centerY, centerWidth, centerHeight);
+  const saturation = calculateSaturation(data, centerX, centerY, centerWidth, centerHeight, width);
 
   // Log diagnostics every 30 frames (~1.5 seconds)
   if (frameCount % 30 === 0) {
@@ -300,13 +300,13 @@ function detectEdges(imageData: ImageData, cx: number, cy: number, cw: number, c
 /**
  * Calculate color saturation
  */
-function calculateSaturation(data: Uint8ClampedArray, cx: number, cy: number, cw: number, ch: number): number {
+function calculateSaturation(data: Uint8ClampedArray, cx: number, cy: number, cw: number, ch: number, imageWidth: number): number {
   let saturation = 0;
   let count = 0;
 
   for (let y = cy; y < cy + ch; y += 8) {
     for (let x = cx; x < cx + cw; x += 8) {
-      const idx = (y * 1000 + x) * 4; // Approximate width
+      const idx = (y * imageWidth + x) * 4;
       if (idx + 2 < data.length) {
         const r = data[idx];
         const g = data[idx + 1];
