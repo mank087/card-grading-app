@@ -51,10 +51,8 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, 
     if (queueCard && queueCard.status === 'completed' && queueCard.resultUrl) {
       console.log('[PokemonCardAnalysisAnimation] Card grading completed! Auto-redirecting to:', queueCard.resultUrl)
 
-      // Add a small delay before redirect to ensure the notification shows
-      setTimeout(() => {
-        router.push(queueCard.resultUrl!)
-      }, 500)
+      // Redirect immediately for faster UX
+      router.push(queueCard.resultUrl!)
     }
   }, [queue, cardId, category, router])
 

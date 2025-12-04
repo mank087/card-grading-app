@@ -161,8 +161,8 @@ export function useBackgroundGrading() {
       }
     }
 
-    // Start polling every 5 seconds (reduced from 2s to minimize API load with multiple users)
-    pollingIntervalRef.current = setInterval(checkCardStatus, 5000)
+    // Start polling every 3 seconds (balance between responsiveness and API load)
+    pollingIntervalRef.current = setInterval(checkCardStatus, 3000)
 
     // Check immediately
     checkCardStatus()

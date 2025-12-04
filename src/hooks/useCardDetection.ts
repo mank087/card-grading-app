@@ -143,7 +143,7 @@ export const useCardDetection = (
 /**
  * Enhanced multi-criteria card detection
  * Uses weighted scoring for robust detection across lighting conditions
- * Adjusted for card backs (uniform surfaces, lower saturation)
+ * STRICTER thresholds to prevent false positives (green when no card)
  */
 function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'front' | 'back' = 'front'): DetectionResult {
   const { data, width, height } = imageData;
@@ -151,7 +151,7 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
   const isBack = side === 'back';
 
   // Define regions more precisely
-  const centerWidth = Math.floor(width * 0.7); // Larger center region
+  const centerWidth = Math.floor(width * 0.7);
   const centerHeight = Math.floor(height * 0.7);
   const centerX = Math.floor((width - centerWidth) / 2);
   const centerY = Math.floor((height - centerHeight) / 2);
@@ -161,7 +161,6 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
   const centerPixels: number[] = [];
   const allPixels: number[] = [];
 
-  // Sample every 6 pixels for better detection (was 8)
   for (let y = 0; y < height; y += 6) {
     for (let x = 0; x < width; x += 6) {
       const idx = (y * width + x) * 4;
@@ -182,17 +181,18 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
   const centerMean = centerPixels.reduce((a, b) => a + b, 0) / centerPixels.length;
 
   // Check for lighting issues
-  if (overallMean < 30) {
+  if (overallMean < 40) {
     hints.push('Too dark - add more light');
-  } else if (overallMean > 220) {
+  } else if (overallMean > 210) {
     hints.push('Too bright - reduce glare');
   }
 
-  // CRITERION 2: Texture/Detail analysis
+  // CRITERION 2: Texture/Detail analysis (variance in center region)
   const centerVariance = centerPixels.reduce((sum, val) => sum + Math.pow(val - centerMean, 2), 0) / centerPixels.length;
   const centerStdDev = Math.sqrt(centerVariance);
 
-  // CRITERION 3: Edge contrast (card vs background)
+  // CRITERION 3: Edge contrast (card vs background) - CRITICAL for detection
+  // A card should have a distinct boundary from the background
   const colorDifference = Math.abs(centerMean - edgeMean);
 
   // CRITERION 4: Edge detection (look for rectangular edges)
@@ -206,50 +206,69 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
     console.log('[CardDetection] Brightness:', overallMean.toFixed(1),
                 '| Detail:', centerStdDev.toFixed(1),
                 '| Contrast:', colorDifference.toFixed(1),
-                '| Edges:', edgeStrength.toFixed(1),
+                '| Edges:', edgeStrength.toFixed(2),
                 '| Saturation:', saturation.toFixed(1));
   }
 
-  // WEIGHTED SCORING (not all-or-nothing)
-  // Adjust weights and thresholds for card backs (more uniform, less colorful)
+  // STRICTER SCORING - require multiple criteria to pass
   let score = 0;
-  const weights = isBack
-    ? { detail: 20, contrast: 30, edges: 35, saturation: 15 }  // Back: focus on shape/edges
-    : { detail: 30, contrast: 25, edges: 25, saturation: 20 }; // Front: balanced
+  let criteriaMetCount = 0;
 
-  // Detail score (texture variance) - more lenient for backs
-  const detailThreshold = isBack ? 8 : 15;  // Backs can be more uniform
+  // Weights adjusted - contrast and edges are most important for distinguishing card from background
+  const weights = isBack
+    ? { detail: 15, contrast: 35, edges: 35, saturation: 15 }  // Back: focus on shape/edges/contrast
+    : { detail: 25, contrast: 30, edges: 30, saturation: 15 }; // Front: balanced but contrast/edges matter
+
+  // Detail score - STRICTER thresholds
+  const detailThreshold = isBack ? 12 : 20;  // Increased from 8/15
   if (centerStdDev > detailThreshold) {
-    const detailScore = Math.min(100, (centerStdDev - detailThreshold) * 2);
+    const detailScore = Math.min(100, (centerStdDev - detailThreshold) * 1.5);
     score += (detailScore / 100) * weights.detail;
-  } else if (!isBack) {
+    criteriaMetCount++;
+  } else {
     hints.push('No card detail detected');
   }
 
-  // Contrast score (card vs background)
-  if (colorDifference > 10) {
-    const contrastScore = Math.min(100, (colorDifference - 10) * 3);
+  // Contrast score - MUCH STRICTER (this is key to detecting card vs empty frame)
+  // A card should have significant contrast with the background
+  const contrastThreshold = 15;  // Increased from 10 - require more distinct boundary
+  if (colorDifference > contrastThreshold) {
+    const contrastScore = Math.min(100, (colorDifference - contrastThreshold) * 2.5);
     score += (contrastScore / 100) * weights.contrast;
+    criteriaMetCount++;
   } else {
     hints.push('Card not distinct from background');
   }
 
-  // Edge score (rectangular shape) - MORE important for backs
-  if (edgeStrength > 0.3) {
-    const edgeScore = Math.min(100, edgeStrength * 100);
+  // Edge score - STRICTER threshold
+  const edgeThreshold = 0.4;  // Increased from 0.3
+  if (edgeStrength > edgeThreshold) {
+    const edgeScore = Math.min(100, (edgeStrength - edgeThreshold) * 150);
     score += (edgeScore / 100) * weights.edges;
+    criteriaMetCount++;
+  } else {
+    hints.push('No card edges detected');
   }
 
-  // Saturation score (cards have color) - less important for backs
-  const saturationThreshold = isBack ? 5 : 10;  // Backs can be white/gray
+  // Saturation score - STRICTER
+  const saturationThreshold = isBack ? 8 : 15;  // Increased from 5/10
   if (saturation > saturationThreshold) {
-    const satScore = Math.min(100, saturation * 2);
+    const satScore = Math.min(100, (saturation - saturationThreshold) * 1.5);
     score += (satScore / 100) * weights.saturation;
+    criteriaMetCount++;
   }
 
-  // Boost score if brightness is good
-  if (overallMean >= 50 && overallMean <= 200) {
-    score *= 1.2; // 20% bonus for good lighting
+  // PENALTY: If fewer than 2 criteria are met, heavily penalize the score
+  // This prevents false positives when pointing at uniform surfaces
+  if (criteriaMetCount < 2) {
+    score *= 0.3;  // 70% penalty
+  } else if (criteriaMetCount < 3) {
+    score *= 0.6;  // 40% penalty
+  }
+
+  // Moderate boost for good lighting (reduced from 1.2 to 1.1)
+  if (overallMean >= 60 && overallMean <= 190) {
+    score *= 1.1;
   }
 
   const confidence = Math.min(100, Math.max(0, Math.round(score)));
