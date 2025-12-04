@@ -40,6 +40,7 @@ export default function AccountPage() {
   // Delete account state
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deletePassword, setDeletePassword] = useState('')
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
@@ -208,8 +209,18 @@ export default function AccountPage() {
       return
     }
 
-    if (newPassword.length < 6) {
-      setPasswordError('Password must be at least 6 characters')
+    if (newPassword.length < 8) {
+      setPasswordError('Password must be at least 8 characters')
+      return
+    }
+
+    // Check password strength
+    const hasUppercase = /[A-Z]/.test(newPassword)
+    const hasLowercase = /[a-z]/.test(newPassword)
+    const hasNumber = /[0-9]/.test(newPassword)
+
+    if (!hasUppercase || !hasLowercase || !hasNumber) {
+      setPasswordError('Password must contain uppercase, lowercase, and a number')
       return
     }
 
@@ -267,6 +278,11 @@ export default function AccountPage() {
       return
     }
 
+    if (!deletePassword) {
+      setDeleteError('Please enter your password')
+      return
+    }
+
     setDeleteError(null)
     setIsDeleting(true)
 
@@ -277,12 +293,14 @@ export default function AccountPage() {
         return
       }
 
-      // Call the delete account API
+      // Call the delete account API with password confirmation
       const response = await fetch('/api/account/delete', {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ password: deletePassword }),
       })
 
       if (!response.ok) {
@@ -711,6 +729,20 @@ export default function AccountPage() {
             )}
 
             <div className="mb-4">
+              <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 mb-1">
+                Enter your password
+              </label>
+              <input
+                type="password"
+                id="deletePassword"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                placeholder="Your password"
+              />
+            </div>
+
+            <div className="mb-4">
               <label htmlFor="deleteConfirm" className="block text-sm font-medium text-gray-700 mb-1">
                 Type <strong>DELETE</strong> to confirm
               </label>
@@ -729,6 +761,7 @@ export default function AccountPage() {
                 onClick={() => {
                   setShowDeleteModal(false)
                   setDeleteConfirmText('')
+                  setDeletePassword('')
                   setDeleteError(null)
                 }}
                 className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"

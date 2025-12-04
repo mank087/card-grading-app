@@ -1,13 +1,53 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { supabaseServer } from "@/lib/supabaseServer";
+import { verifyAuth } from "@/lib/serverAuth";
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
+    // Verify user is authenticated
+    const authResult = await verifyAuth(req);
+    if (!authResult.authenticated || !authResult.userId) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 }
+      );
+    }
+
     const supabase = supabaseServer();
     const formData = await req.formData();
     const frontImage = formData.get("frontImage") as File | null;
     const backImage = formData.get("backImage") as File | null;
+
+    // Validate file types
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (frontImage && !allowedTypes.includes(frontImage.type)) {
+      return NextResponse.json(
+        { error: "Invalid front image type. Only JPEG, PNG, and WebP are allowed." },
+        { status: 400 }
+      );
+    }
+    if (backImage && !allowedTypes.includes(backImage.type)) {
+      return NextResponse.json(
+        { error: "Invalid back image type. Only JPEG, PNG, and WebP are allowed." },
+        { status: 400 }
+      );
+    }
+
+    // Validate file sizes (max 10MB each)
+    const maxSize = 10 * 1024 * 1024;
+    if (frontImage && frontImage.size > maxSize) {
+      return NextResponse.json(
+        { error: "Front image too large. Maximum size is 10MB." },
+        { status: 400 }
+      );
+    }
+    if (backImage && backImage.size > maxSize) {
+      return NextResponse.json(
+        { error: "Back image too large. Maximum size is 10MB." },
+        { status: 400 }
+      );
+    }
 
     if (!frontImage || !backImage) {
       return NextResponse.json(
@@ -54,9 +94,10 @@ export async function POST(req: Request) {
     const cardId = data.id;
 
     // 3. **Crucial Step:** Trigger the AI grading API route
-    // Use an explicit URL to ensure the request is made correctly.
-    // For development, use `http://localhost:3000`. In production, this would be your domain.
-    const gradingApiUrl = `http://localhost:3000/api/card/${cardId}`;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://dcmgrading.com';
+    const gradingApiUrl = `${baseUrl}/api/card/${cardId}`;
     
     console.log(`Triggering AI grading for card ID: ${cardId}`);
     fetch(gradingApiUrl).catch(err => {

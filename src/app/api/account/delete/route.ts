@@ -25,6 +25,31 @@ export async function DELETE(request: NextRequest) {
     }
 
     const userId = authResult.userId;
+
+    // Require password confirmation for account deletion
+    const body = await request.json().catch(() => ({}));
+    const { password } = body as { password?: string };
+
+    if (!password) {
+      return NextResponse.json(
+        { error: 'Password confirmation required to delete account' },
+        { status: 400 }
+      );
+    }
+
+    // Verify password by attempting to sign in
+    const { error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+      email: authResult.user?.email || '',
+      password: password,
+    });
+
+    if (signInError) {
+      return NextResponse.json(
+        { error: 'Incorrect password' },
+        { status: 401 }
+      );
+    }
+
     console.log(`[Account Delete] Starting deletion for user: ${userId}`);
 
     // Step 1: Delete all user's cards

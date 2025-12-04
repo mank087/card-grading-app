@@ -42,8 +42,8 @@ export async function POST(request: NextRequest) {
     // Set secure cookie with session token
     response.cookies.set('admin_token', result.token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: true, // Always use secure in production
+      sameSite: 'strict', // Strict to prevent CSRF
       maxAge: 60 * 60, // 1 hour
       path: '/'
     })

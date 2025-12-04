@@ -60,8 +60,20 @@ export async function POST(request: NextRequest) {
       stripeCustomerId = customer.id;
     }
 
-    // Determine success/cancel URLs
-    const origin = request.headers.get('origin') || 'https://dcmgrading.com';
+    // Determine success/cancel URLs with origin validation
+    const allowedOrigins = [
+      'https://dcmgrading.com',
+      'https://www.dcmgrading.com',
+      // Allow localhost only in development
+      ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : [])
+    ];
+
+    const requestOrigin = request.headers.get('origin');
+    // Validate origin against allowlist, default to production domain
+    const origin = requestOrigin && allowedOrigins.includes(requestOrigin)
+      ? requestOrigin
+      : 'https://www.dcmgrading.com';
+
     const successUrl = `${origin}/credits/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${origin}/credits?canceled=true`;
 
