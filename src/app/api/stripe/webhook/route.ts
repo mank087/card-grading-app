@@ -10,6 +10,12 @@ import Stripe from 'stripe';
 
 // Disable body parsing - we need raw body for signature verification
 export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+// Health check endpoint
+export async function GET() {
+  return NextResponse.json({ status: 'Webhook endpoint active' });
+}
 
 export async function POST(request: NextRequest) {
   try {
