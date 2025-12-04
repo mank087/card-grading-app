@@ -10,6 +10,10 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 export interface AuthResult {
   authenticated: boolean;
   userId: string | null;
+  user?: {
+    id: string;
+    email?: string;
+  } | null;
   error?: string;
 }
 
@@ -29,13 +33,13 @@ export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
     const authHeader = request.headers.get('authorization');
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return { authenticated: false, userId: null, error: 'Missing authorization header' };
+      return { authenticated: false, userId: null, user: null, error: 'Missing authorization header' };
     }
 
     const token = authHeader.split(' ')[1];
 
     if (!token) {
-      return { authenticated: false, userId: null, error: 'No token provided' };
+      return { authenticated: false, userId: null, user: null, error: 'No token provided' };
     }
 
     // Create a Supabase client and verify the token
@@ -45,13 +49,20 @@ export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      return { authenticated: false, userId: null, error: error?.message || 'Invalid token' };
+      return { authenticated: false, userId: null, user: null, error: error?.message || 'Invalid token' };
     }
 
-    return { authenticated: true, userId: user.id };
+    return {
+      authenticated: true,
+      userId: user.id,
+      user: {
+        id: user.id,
+        email: user.email
+      }
+    };
   } catch (error: any) {
     console.error('[ServerAuth] Exception:', error);
-    return { authenticated: false, userId: null, error: 'Server error during authentication' };
+    return { authenticated: false, userId: null, user: null, error: 'Server error during authentication' };
   }
 }
 

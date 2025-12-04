@@ -2,8 +2,10 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
-import { getStoredSession } from '@/lib/directAuth'
+import { getStoredSession, signOut } from '@/lib/directAuth'
 import { useRouter } from 'next/navigation'
+import { useCredits } from '@/contexts/CreditsContext'
+import Link from 'next/link'
 
 type AccountStats = {
   totalCards: number
@@ -24,6 +26,22 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { balance, isLoading: creditsLoading, isFirstPurchase } = useCredits()
+
+  // Password change state
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+
+  // Delete account state
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchAccountData = async () => {
@@ -177,6 +195,108 @@ export default function AccountPage() {
     if (category === 'Other') return `/other/${cardId}`
 
     return `/card/${cardId}`
+  }
+
+  // Handle password change
+  const handleChangePassword = async () => {
+    setPasswordError(null)
+    setPasswordSuccess(false)
+
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      setPasswordError('Please fill in all fields')
+      return
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters')
+      return
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match')
+      return
+    }
+
+    setIsChangingPassword(true)
+
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        setPasswordError('Not authenticated')
+        setIsChangingPassword(false)
+        return
+      }
+
+      // Call the change password API
+      const response = await fetch('/api/account/change-password', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ newPassword }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        setPasswordError(data.error || 'Failed to change password')
+      } else {
+        setPasswordSuccess(true)
+        setNewPassword('')
+        setConfirmPassword('')
+        setCurrentPassword('')
+        // Close modal after 2 seconds
+        setTimeout(() => {
+          setShowPasswordModal(false)
+          setPasswordSuccess(false)
+        }, 2000)
+      }
+    } catch (err: any) {
+      setPasswordError(err.message || 'Failed to change password')
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
+  // Handle account deletion
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'DELETE') {
+      setDeleteError('Please type DELETE to confirm')
+      return
+    }
+
+    setDeleteError(null)
+    setIsDeleting(true)
+
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        setDeleteError('Not authenticated')
+        return
+      }
+
+      // Call the delete account API
+      const response = await fetch('/api/account/delete', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to delete account')
+      }
+
+      // Sign out and redirect to home
+      signOut()
+      router.push('/?deleted=true')
+    } catch (err: any) {
+      setDeleteError(err.message || 'Failed to delete account')
+      setIsDeleting(false)
+    }
   }
 
   if (loading) {
@@ -351,60 +471,74 @@ export default function AccountPage() {
           )}
         </div>
 
-        {/* Subscription & Billing Section (Placeholder) */}
+        {/* Grading Credits Section */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-            <svg className="w-6 h-6 mr-2 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            <svg className="w-6 h-6 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Subscription & Billing
+            Grading Credits
           </h2>
 
-          <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-lg p-6 border-2 border-indigo-300">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-lg font-semibold text-indigo-900 mb-2">Current Plan: Free</p>
-                <p className="text-sm text-indigo-700 mb-4">
-                  Unlimited card grading with AI-powered analysis
-                </p>
-                <div className="space-y-2">
-                  <div className="flex items-center text-sm text-indigo-800">
-                    <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Unlimited card uploads
-                  </div>
-                  <div className="flex items-center text-sm text-indigo-800">
-                    <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    AI-powered grading
-                  </div>
-                  <div className="flex items-center text-sm text-indigo-800">
-                    <svg className="w-5 h-5 mr-2 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    Public & private collections
-                  </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Credit Balance Card */}
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-100 rounded-xl p-6 border-2 border-purple-300">
+              <p className="text-sm text-purple-700 font-medium mb-2">Available Credits</p>
+              {creditsLoading ? (
+                <div className="animate-pulse bg-purple-200 rounded h-12 w-24"></div>
+              ) : (
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-bold text-purple-900">{balance}</span>
+                  <span className="text-xl text-purple-700">credit{balance !== 1 ? 's' : ''}</span>
                 </div>
+              )}
+              <p className="text-sm text-purple-600 mt-3">
+                1 credit = 1 card grade or re-grade
+              </p>
+            </div>
+
+            {/* Buy Credits CTA */}
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 border-2 border-gray-200 flex flex-col justify-between">
+              <div>
+                <p className="text-lg font-semibold text-gray-900 mb-2">Need More Credits?</p>
+                <p className="text-sm text-gray-600 mb-4">
+                  Purchase credits to grade more cards with our AI-powered system.
+                </p>
+                {isFirstPurchase && (
+                  <div className="inline-flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full mb-4">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    First purchase bonus: +1 FREE credit
+                  </div>
+                )}
               </div>
-              <div className="ml-4">
-                <button
-                  disabled
-                  className="bg-gray-300 text-gray-500 px-6 py-2 rounded-lg font-semibold cursor-not-allowed"
-                  title="Premium plans coming soon!"
-                >
-                  Upgrade (Coming Soon)
-                </button>
-              </div>
+              <Link
+                href="/credits"
+                className="inline-block text-center bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+              >
+                Buy Credits
+              </Link>
             </div>
           </div>
 
-          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              <strong>💡 Premium plans coming soon!</strong> Get access to advanced features like bulk grading,
-              market value tracking, collection insurance estimates, and more.
-            </p>
+          {/* Pricing Info */}
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800 font-medium mb-2">Credit Packages:</p>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="font-bold text-blue-900">Basic</p>
+                <p className="text-sm text-blue-700">1 credit - $2.99</p>
+              </div>
+              <div>
+                <p className="font-bold text-blue-900">Pro</p>
+                <p className="text-sm text-blue-700">5 credits - $9.99</p>
+              </div>
+              <div>
+                <p className="font-bold text-blue-900">Elite</p>
+                <p className="text-sm text-blue-700">20 credits - $19.99</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -420,22 +554,198 @@ export default function AccountPage() {
 
           <div className="space-y-3">
             <button
-              disabled
-              className="w-full sm:w-auto bg-gray-300 text-gray-500 px-6 py-2 rounded-lg font-medium cursor-not-allowed"
-              title="Feature coming soon"
+              onClick={() => setShowPasswordModal(true)}
+              className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors"
             >
-              Change Password (Coming Soon)
+              Change Password
             </button>
             <button
-              disabled
-              className="w-full sm:w-auto bg-gray-300 text-gray-500 px-6 py-2 rounded-lg font-medium ml-0 sm:ml-3 cursor-not-allowed"
-              title="Feature coming soon"
+              onClick={() => setShowDeleteModal(true)}
+              className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-medium ml-0 sm:ml-3 transition-colors"
             >
-              Delete Account (Coming Soon)
+              Delete Account
             </button>
           </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Change Password</h3>
+              <button
+                onClick={() => {
+                  setShowPasswordModal(false)
+                  setPasswordError(null)
+                  setPasswordSuccess(false)
+                  setNewPassword('')
+                  setConfirmPassword('')
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {passwordSuccess ? (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <p className="text-lg font-semibold text-gray-900">Password Changed!</p>
+                <p className="text-gray-600 mt-1">Your password has been updated successfully.</p>
+              </div>
+            ) : (
+              <>
+                <p className="text-gray-600 mb-4">
+                  Enter your new password below. It must be at least 6 characters long.
+                </p>
+
+                {passwordError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700">{passwordError}</p>
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Enter new password"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="confirmPassword"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex space-x-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setShowPasswordModal(false)
+                      setPasswordError(null)
+                      setNewPassword('')
+                      setConfirmPassword('')
+                    }}
+                    className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={isChangingPassword}
+                    className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isChangingPassword ? 'Changing...' : 'Change Password'}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Delete Account Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-red-100 rounded-full">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Delete Account</h3>
+            <p className="text-gray-600 text-center mb-4">
+              This action is <strong>permanent and cannot be undone</strong>. All your data including:
+            </p>
+
+            <ul className="text-sm text-gray-600 mb-4 space-y-1">
+              <li className="flex items-center">
+                <svg className="w-4 h-4 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                All your graded cards ({stats?.totalCards || 0} cards)
+              </li>
+              <li className="flex items-center">
+                <svg className="w-4 h-4 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                Your remaining credits ({balance} credits)
+              </li>
+              <li className="flex items-center">
+                <svg className="w-4 h-4 text-red-500 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                </svg>
+                Your account information
+              </li>
+            </ul>
+
+            {deleteError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{deleteError}</p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <label htmlFor="deleteConfirm" className="block text-sm font-medium text-gray-700 mb-1">
+                Type <strong>DELETE</strong> to confirm
+              </label>
+              <input
+                type="text"
+                id="deleteConfirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                placeholder="DELETE"
+              />
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false)
+                  setDeleteConfirmText('')
+                  setDeleteError(null)
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={isDeleting || deleteConfirmText !== 'DELETE'}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete My Account'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   )
 }

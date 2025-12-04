@@ -27,6 +27,7 @@ import { DownloadReportButton } from '@/components/reports/DownloadReportButton'
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
+import { useCredits } from '@/contexts/CreditsContext';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1335,6 +1336,7 @@ export function MTGCardDetails() {
   const cardId = params?.id;
   const router = useRouter();
   const { addToQueue, updateCardStatus } = useGradingQueue();
+  const { balance, deductLocalCredit } = useCredits();
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1361,6 +1363,8 @@ export function MTGCardDetails() {
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
+  // 💰 Insufficient credits modal
+  const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
 
   // Fetch Lorcana Card Details using MTG-specific API
   const fetchMTGCardDetails = useCallback(async () => {
@@ -1559,8 +1563,13 @@ export function MTGCardDetails() {
   };
 
 
-  // Re-grade card - show confirmation modal first
+  // Re-grade card - check credits first, then show confirmation modal
   const handleRegradeClick = () => {
+    // Check if user has enough credits
+    if (balance < 1) {
+      setShowInsufficientCredits(true);
+      return;
+    }
     setShowRegradeConfirm(true);
   };
 
@@ -1607,6 +1616,28 @@ export function MTGCardDetails() {
 
       const data = await res.json();
       console.log('[REGRADE] Fresh grading completed:', data);
+
+      // Deduct credit for re-grade
+      try {
+        const session = getStoredSession();
+        if (session?.access_token) {
+          const deductRes = await fetch('/api/stripe/deduct', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ cardId: cardId }),
+          });
+          if (deductRes.ok) {
+            deductLocalCredit(); // Update local state
+            console.log('[REGRADE] Credit deducted successfully');
+          }
+        }
+      } catch (creditError) {
+        console.error('[REGRADE] Failed to deduct credit:', creditError);
+        // Don't fail the re-grade if credit deduction fails
+      }
 
       // Update queue status to completed
       if (queueId) {
@@ -5803,6 +5834,42 @@ export function MTGCardDetails() {
         </div>
       )}
 
+      {/* Insufficient Credits Modal */}
+      {showInsufficientCredits && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-red-100 rounded-full">
+              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 text-center mb-2">
+              Insufficient Credits
+            </h3>
+            <p className="text-sm text-gray-600 text-center mb-4">
+              You need <strong>1 credit</strong> to re-grade this card. Your current balance is <strong>{balance} credits</strong>.
+            </p>
+            <p className="text-sm text-gray-600 text-center mb-6">
+              Purchase more credits to continue grading cards.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowInsufficientCredits(false)}
+                className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => router.push('/credits')}
+                className="flex-1 px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700"
+              >
+                Buy Credits
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Re-grade Confirmation Modal */}
       {showRegradeConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -5821,6 +5888,12 @@ export function MTGCardDetails() {
             <p className="text-sm text-gray-600 text-center mb-4">
               The new grade will <strong>replace</strong> the current grade for this card.
             </p>
+            {/* Credit Warning */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-amber-800 text-center">
+                <strong>This will use 1 credit</strong> (Balance: {balance} credit{balance !== 1 ? 's' : ''})
+              </p>
+            </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
               <p className="text-xs text-blue-800 text-center">
                 <strong>Want to use different photos?</strong><br />

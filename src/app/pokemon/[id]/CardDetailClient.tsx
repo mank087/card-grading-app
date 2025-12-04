@@ -27,6 +27,7 @@ import { DownloadReportButton } from '@/components/reports/DownloadReportButton'
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
+import { useCredits } from '@/contexts/CreditsContext';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1335,11 +1336,13 @@ export function PokemonCardDetails() {
   const cardId = params?.id;
   const router = useRouter();
   const { addToQueue, updateCardStatus } = useGradingQueue();
+  const { balance, deductLocalCredit } = useCredits();
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [regradingImageUrl, setRegradingImageUrl] = useState<string | null>(null);
   const [showRegradeConfirm, setShowRegradeConfirm] = useState(false);
+  const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   const [origin, setOrigin] = useState<string>('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -1559,8 +1562,12 @@ export function PokemonCardDetails() {
   };
 
 
-  // Re-grade card - show confirmation modal first
+  // Re-grade card - check credits and show confirmation modal
   const handleRegradeClick = () => {
+    if (balance < 1) {
+      setShowInsufficientCredits(true);
+      return;
+    }
     setShowRegradeConfirm(true);
   };
 
@@ -1607,6 +1614,31 @@ export function PokemonCardDetails() {
 
       const data = await res.json();
       console.log('[REGRADE] Fresh grading completed:', data);
+
+      // Deduct credit after successful re-grade
+      console.log('[REGRADE] Deducting credit...');
+      const session = getStoredSession();
+      if (session?.access_token) {
+        try {
+          const creditResponse = await fetch('/api/stripe/deduct', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ cardId, isRegrade: true }),
+          });
+
+          if (creditResponse.ok) {
+            deductLocalCredit();
+            console.log('[REGRADE] Credit deducted successfully');
+          } else {
+            console.error('[REGRADE] Failed to deduct credit:', await creditResponse.text());
+          }
+        } catch (creditErr) {
+          console.error('[REGRADE] Credit deduction error:', creditErr);
+        }
+      }
 
       // Update queue status to completed
       if (queueId) {
@@ -5914,6 +5946,43 @@ export function PokemonCardDetails() {
         </div>
       )}
 
+      {/* Insufficient Credits Modal */}
+      {showInsufficientCredits && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">Insufficient Credits</h2>
+              <p className="text-gray-600 mb-4">
+                You need 1 credit to re-grade this card.
+              </p>
+              <div className="bg-gray-100 rounded-lg p-3 mb-4">
+                <p className="text-sm text-gray-600">Current Balance</p>
+                <p className="text-2xl font-bold text-gray-900">{balance} credits</p>
+              </div>
+              <div className="space-y-2">
+                <Link
+                  href="/credits"
+                  className="block w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-all duration-200"
+                >
+                  Purchase Credits
+                </Link>
+                <button
+                  onClick={() => setShowInsufficientCredits(false)}
+                  className="block w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-6 rounded-xl transition-all duration-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Re-grade Confirmation Modal */}
       {showRegradeConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -5932,6 +6001,15 @@ export function PokemonCardDetails() {
             <p className="text-sm text-gray-600 text-center mb-4">
               The new grade will <strong>replace</strong> the current grade for this card.
             </p>
+            {/* Credit Warning */}
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+              <p className="text-sm text-amber-800 text-center font-medium">
+                This will use 1 credit from your balance.
+              </p>
+              <p className="text-xs text-amber-600 text-center mt-1">
+                Current balance: {balance} credit{balance !== 1 ? 's' : ''}
+              </p>
+            </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
               <p className="text-xs text-blue-800 text-center">
                 <strong>Want to use different photos?</strong><br />
@@ -5949,7 +6027,7 @@ export function PokemonCardDetails() {
                 onClick={regradeCard}
                 className="flex-1 px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 flex items-center justify-center"
               >
-                Re-grade Card
+                Re-grade Card (1 Credit)
               </button>
             </div>
           </div>
