@@ -1,9 +1,12 @@
 /**
  * Contact Form API
- * Sends contact form submissions via email
+ * Sends contact form submissions via email using Resend
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Resend } from 'resend';
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,31 +30,61 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // For now, we'll log the submission and return success
-    // In production, you would integrate with an email service like:
-    // - SendGrid, Resend, AWS SES, etc.
-    console.log('[Contact Form] New submission:', {
-      name,
-      email,
-      subject: subject || 'No subject',
-      message,
-      timestamp: new Date().toISOString(),
+    const subjectLine = subject ? `Contact Form: ${subject}` : 'Contact Form: New Message';
+
+    // Send email via Resend
+    const { data, error } = await resend.emails.send({
+      from: 'DCM Grading <noreply@dcmgrading.com>',
+      to: ['admin@dcmgrading.com'],
+      replyTo: email,
+      subject: subjectLine,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #7c3aed; border-bottom: 2px solid #7c3aed; padding-bottom: 10px;">
+            New Contact Form Submission
+          </h2>
+
+          <table style="width: 100%; margin: 20px 0;">
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #374151;">From:</td>
+              <td style="padding: 8px 0; color: #1f2937;">${name}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #374151;">Email:</td>
+              <td style="padding: 8px 0;">
+                <a href="mailto:${email}" style="color: #7c3aed;">${email}</a>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 0; font-weight: bold; color: #374151;">Subject:</td>
+              <td style="padding: 8px 0; color: #1f2937;">${subject || 'No subject selected'}</td>
+            </tr>
+          </table>
+
+          <div style="margin-top: 20px;">
+            <h3 style="color: #374151; margin-bottom: 10px;">Message:</h3>
+            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; white-space: pre-wrap; color: #1f2937;">
+${message}
+            </div>
+          </div>
+
+          <hr style="margin-top: 30px; border: none; border-top: 1px solid #e5e7eb;" />
+          <p style="color: #6b7280; font-size: 12px; margin-top: 15px;">
+            This message was sent from the contact form on dcmgrading.com
+          </p>
+        </div>
+      `,
     });
 
-    // TODO: Integrate with email service
-    // Example with Resend:
-    // await resend.emails.send({
-    //   from: 'noreply@dcmgrading.com',
-    //   to: 'admin@dcmgrading.com',
-    //   subject: `Contact Form: ${subject || 'New Message'}`,
-    //   html: `
-    //     <h2>New Contact Form Submission</h2>
-    //     <p><strong>From:</strong> ${name} (${email})</p>
-    //     <p><strong>Subject:</strong> ${subject || 'No subject'}</p>
-    //     <p><strong>Message:</strong></p>
-    //     <p>${message}</p>
-    //   `,
-    // });
+    if (error) {
+      console.error('[Contact Form] Resend error:', error);
+      return NextResponse.json(
+        { error: 'Failed to send message. Please try again.' },
+        { status: 500 }
+      );
+    }
+
+    console.log('[Contact Form] Email sent successfully:', data?.id);
 
     return NextResponse.json({
       success: true,
