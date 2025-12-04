@@ -50,9 +50,11 @@ function CreditsPageContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showWelcome, setShowWelcome] = useState(false)
 
-  // Check for canceled payment
+  // Check for canceled payment and welcome parameter
   const canceled = searchParams.get('canceled')
+  const welcome = searchParams.get('welcome')
 
   useEffect(() => {
     const session = getStoredSession()
@@ -70,6 +72,15 @@ function CreditsPageContent() {
       router.replace('/credits')
     }
   }, [canceled, router])
+
+  // Show welcome message for new users
+  useEffect(() => {
+    if (welcome === 'true') {
+      setShowWelcome(true)
+      // Clear the query param without losing state
+      router.replace('/credits')
+    }
+  }, [welcome, router])
 
   const handlePurchase = async (tier: PricingTier) => {
     setError(null)
@@ -123,10 +134,65 @@ function CreditsPageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
+        {/* Welcome Banner for New Users */}
+        {showWelcome && (
+          <div className="mb-8 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl shadow-xl overflow-hidden">
+            <div className="relative px-6 py-8 sm:px-10 sm:py-10">
+              {/* Close button */}
+              <button
+                onClick={() => setShowWelcome(false)}
+                className="absolute top-4 right-4 text-white/70 hover:text-white transition-colors"
+                aria-label="Dismiss welcome message"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              <div className="text-center text-white">
+                <div className="text-5xl mb-4">🎉</div>
+                <h2 className="text-2xl sm:text-3xl font-bold mb-3">
+                  Welcome to DCM Grading!
+                </h2>
+                <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
+                  Your account is ready! Get started by purchasing credits to grade your first card.
+                  Our AI-powered grading system analyzes centering, corners, edges, and surface quality.
+                </p>
+
+                {/* How It Works Steps */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-6">
+                  <div className="bg-white/10 rounded-xl p-4">
+                    <div className="text-3xl mb-2">1️⃣</div>
+                    <p className="font-semibold">Purchase Credits</p>
+                    <p className="text-sm text-white/70">Choose a package below</p>
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-4">
+                    <div className="text-3xl mb-2">2️⃣</div>
+                    <p className="font-semibold">Upload Card Photos</p>
+                    <p className="text-sm text-white/70">Front and back images</p>
+                  </div>
+                  <div className="bg-white/10 rounded-xl p-4">
+                    <div className="text-3xl mb-2">3️⃣</div>
+                    <p className="font-semibold">Get Your Grade</p>
+                    <p className="text-sm text-white/70">Results in seconds</p>
+                  </div>
+                </div>
+
+                <div className="inline-flex items-center gap-2 bg-white/20 rounded-full px-4 py-2 text-sm font-medium">
+                  <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                  </svg>
+                  <span>First-time buyers get +1 FREE bonus credit!</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Purchase Grading Credits
+            {showWelcome ? 'Choose Your Credit Package' : 'Purchase Grading Credits'}
           </h1>
           <p className="text-xl text-gray-600 mb-6">
             Get professional AI-powered card grading in seconds

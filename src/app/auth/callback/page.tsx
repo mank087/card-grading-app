@@ -86,8 +86,19 @@ export default function AuthCallbackPage() {
             console.log('[OAuth Callback] Session verified in localStorage, user:', storedSession.user.email)
             setStatus('Success! Redirecting...')
 
+            // Check if this is a new user (created within last 60 seconds)
+            const createdAt = new Date(storedSession.user.created_at || 0).getTime()
+            const now = Date.now()
+            const isNewUser = (now - createdAt) < 60000 // Created within last 60 seconds
+
             // Use replace to prevent back-button issues
-            router.replace('/collection')
+            // New users go to credits page for onboarding, existing users go to collection
+            if (isNewUser) {
+              console.log('[OAuth Callback] New user detected, redirecting to credits page')
+              router.replace('/credits?welcome=true')
+            } else {
+              router.replace('/collection')
+            }
           } else {
             // Retry once after a short delay
             console.log('[OAuth Callback] Session not found in localStorage, retrying...')
@@ -96,7 +107,16 @@ export default function AuthCallbackPage() {
             const retrySession = getStoredSession()
             if (retrySession && retrySession.user) {
               console.log('[OAuth Callback] Session found on retry, redirecting...')
-              router.replace('/collection')
+              // Check if this is a new user
+              const createdAt = new Date(retrySession.user.created_at || 0).getTime()
+              const now = Date.now()
+              const isNewUser = (now - createdAt) < 60000
+
+              if (isNewUser) {
+                router.replace('/credits?welcome=true')
+              } else {
+                router.replace('/collection')
+              }
             } else {
               console.error('[OAuth Callback] Session storage failed after retry')
               setError('Session storage failed. Please try again.')

@@ -38,8 +38,17 @@ export default function LoginPage() {
         if (result.error) {
           setError(result.error)
         } else if (result.user) {
-          // Success! Redirect to collection
-          router.push('/collection')
+          // Check if this is a new user (created within last 60 seconds)
+          const createdAt = new Date(result.user.created_at || 0).getTime()
+          const now = Date.now()
+          const isNewUser = (now - createdAt) < 60000
+
+          // New users go to credits page for onboarding, existing users go to collection
+          if (isNewUser) {
+            router.push('/credits?welcome=true')
+          } else {
+            router.push('/collection')
+          }
         }
       }
     } catch (error: any) {
