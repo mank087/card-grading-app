@@ -26,6 +26,74 @@ function isValidValue(value: any): boolean {
   return true;
 }
 
+// Helper: Generate meta keywords for MTG cards
+function generateMetaKeywords(card: any): string {
+  const keywords: string[] = [];
+
+  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
+  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
+  const expansionCode = stripMarkdown(card.conversational_card_info?.expansion_code) || card.expansion_code || '';
+  const year = card.conversational_card_info?.set_year || card.set_year || '';
+  const collectorNumber = stripMarkdown(card.conversational_card_info?.collector_number) || card.card_number || '';
+  const rarity = stripMarkdown(card.conversational_card_info?.rarity) || card.rarity || '';
+  const cardType = stripMarkdown(card.conversational_card_info?.card_type) || card.card_type || '';
+  const colors = card.conversational_card_info?.colors || card.colors || '';
+  const grade = card.conversational_decimal_grade;
+
+  // Core keywords - card name variations
+  if (cardName) {
+    keywords.push(cardName.toLowerCase());
+    keywords.push(`${cardName} mtg`.toLowerCase());
+    if (setName) keywords.push(`${setName} ${cardName}`.toLowerCase());
+    if (year) keywords.push(`${year} ${cardName}`.toLowerCase());
+  }
+
+  // Set and expansion
+  if (setName) {
+    keywords.push(setName.toLowerCase());
+    keywords.push(`${setName} mtg`.toLowerCase());
+  }
+  if (expansionCode) keywords.push(expansionCode.toLowerCase());
+  if (year && setName) keywords.push(`${year} ${setName}`.toLowerCase());
+
+  // MTG-specific
+  keywords.push('magic the gathering', 'mtg', 'mtg cards', 'magic cards');
+  if (cardType) keywords.push(cardType.toLowerCase());
+  if (colors) {
+    const colorArray = Array.isArray(colors) ? colors : [colors];
+    colorArray.forEach((color: string) => {
+      if (color) keywords.push(`${color.toLowerCase()} mtg card`);
+    });
+  }
+
+  // Card number and rarity
+  if (collectorNumber) keywords.push(`collector number ${collectorNumber}`);
+  if (rarity) {
+    keywords.push(rarity.toLowerCase());
+    if (rarity.toLowerCase() === 'mythic') keywords.push('mythic rare');
+    if (rarity.toLowerCase() === 'rare') keywords.push('rare mtg card');
+  }
+
+  // Grading keywords
+  keywords.push('graded mtg card', 'dcm grading', 'professional grading', 'mtg card authentication');
+
+  // PSA/BGS equivalent
+  if (grade !== null && grade !== undefined) {
+    const psaGrade = Math.floor(grade);
+    keywords.push(`psa ${psaGrade}`, `bgs ${grade}`);
+    if (grade >= 9) keywords.push('gem mint mtg');
+    if (grade >= 8) keywords.push('near mint mtg');
+  }
+
+  // Special features
+  if (card.conversational_card_info?.foil || card.foil) {
+    keywords.push('foil', 'foil mtg card');
+  }
+
+  // Remove duplicates and return
+  return [...new Set(keywords)].join(', ');
+}
+
 // Helper: Build dynamic title for MTG cards
 // Format matches Sports cards: Card Name Year Set #Number - DCM Grade X
 function buildTitle(card: any): string {
@@ -140,19 +208,77 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {
       title: 'MTG Card Not Found | DCM Grading',
       description: 'Professional Magic: The Gathering card grading and authentication by DCM',
+      keywords: 'mtg card grading, magic the gathering, professional grading, DCM, authentication',
+      openGraph: {
+        title: 'MTG Card Not Found | DCM Grading',
+        description: 'Professional Magic: The Gathering card grading and authentication by DCM',
+        type: 'website',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: 'MTG Card Not Found | DCM Grading',
+        description: 'Professional Magic: The Gathering card grading and authentication by DCM',
+      },
     };
   }
 
-  // Build dynamic title and description
+  // Build enhanced SEO components
   const title = buildTitle(card);
   const description = buildDescription(card);
+  const keywords = generateMetaKeywords(card);
+  const isPrivate = card.visibility === 'private';
 
   console.log('[METADATA] MTG card title:', title);
   console.log('[METADATA] MTG card description:', description);
 
+  const imageUrl = card.front_url;
+  const cardUrl = `https://dcmgrading.com/mtg/${id}`;
+  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || 'MTG Card';
+
+  // Return enhanced metadata with full SEO optimization
   return {
     title,
     description,
+    keywords,
+    alternates: {
+      canonical: cardUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      images: imageUrl ? [
+        {
+          url: imageUrl,
+          width: 800,
+          height: 1120,
+          alt: `${cardName} - DCM Graded MTG Card`,
+        },
+      ] : undefined,
+      url: cardUrl,
+      type: 'website',
+      siteName: 'DCM Card Grading',
+      locale: 'en_US',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: imageUrl ? [imageUrl] : undefined,
+      creator: '@DCMGrading',
+    },
+    robots: isPrivate ? {
+      index: false,
+      follow: false,
+    } : {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
   };
 }
 

@@ -1309,7 +1309,8 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
     });
   }
 
-  return {
+  // Product schema
+  const productSchema = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: fullCardName,
@@ -1318,7 +1319,11 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
     brand: manufacturer ? {
       '@type': 'Brand',
       name: manufacturer
-    } : undefined,
+    } : {
+      '@type': 'Brand',
+      name: 'Pokemon'
+    },
+    category: 'Pokemon Trading Cards',
     aggregateRating: grade !== null && grade !== undefined ? {
       '@type': 'AggregateRating',
       ratingValue: grade,
@@ -1329,6 +1334,34 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
     additionalProperty: additionalProperties,
     url: cardUrl
   };
+
+  // BreadcrumbList schema for navigation
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://dcmgrading.com'
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Pokemon Cards',
+        item: 'https://dcmgrading.com/upload/pokemon'
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: fullCardName || 'Pokemon Card',
+        item: cardUrl
+      }
+    ]
+  };
+
+  return [productSchema, breadcrumbSchema];
 }
 
 export function PokemonCardDetails() {

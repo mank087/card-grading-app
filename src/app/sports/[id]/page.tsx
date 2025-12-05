@@ -374,6 +374,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const imageUrl = card.front_url;
   const cardUrl = `https://dcmgrading.com/sports/${id}`;
+  const isPrivate = card.visibility === 'private';
 
   // 🎯 Use database fields first (populated by conversational AI)
   const playerName = card.featured || dvgGrading?.card_info?.player_or_character || 'Card';
@@ -389,14 +390,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title,
       description,
-      images: [
+      images: imageUrl ? [
         {
           url: imageUrl,
           width: 800,
           height: 1200,
           alt: `${playerName} - DCM Graded Card`,
         },
-      ],
+      ] : undefined,
       url: cardUrl,
       type: 'website',
       siteName: 'DCM Card Grading',
@@ -406,10 +407,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: 'summary_large_image',
       title,
       description,
-      images: [imageUrl],
-      creator: '@DCMGrading', // Update with your actual Twitter handle
+      images: imageUrl ? [imageUrl] : undefined,
+      creator: '@DCMGrading',
     },
-    robots: {
+    // Privacy-aware robots: noindex/nofollow for private cards
+    robots: isPrivate ? {
+      index: false,
+      follow: false,
+    } : {
       index: true,
       follow: true,
       googleBot: {

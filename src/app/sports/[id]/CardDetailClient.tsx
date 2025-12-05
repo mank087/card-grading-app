@@ -1308,7 +1308,8 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
     });
   }
 
-  return {
+  // Product schema
+  const productSchema = {
     '@context': 'https://schema.org',
     '@type': 'Product',
     name: fullCardName,
@@ -1318,6 +1319,7 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
       '@type': 'Brand',
       name: manufacturer
     } : undefined,
+    category: 'Sports Trading Cards',
     aggregateRating: grade !== null && grade !== undefined ? {
       '@type': 'AggregateRating',
       ratingValue: grade,
@@ -1328,6 +1330,34 @@ function generateStructuredData(card: any, dvgGrading: any, cardUrl: string) {
     additionalProperty: additionalProperties,
     url: cardUrl
   };
+
+  // BreadcrumbList schema for navigation
+  const breadcrumbSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'Home',
+        item: 'https://dcmgrading.com'
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Sports Cards',
+        item: 'https://dcmgrading.com/upload/sports'
+      },
+      {
+        '@type': 'ListItem',
+        position: 3,
+        name: fullCardName || 'Sports Card',
+        item: cardUrl
+      }
+    ]
+  };
+
+  return [productSchema, breadcrumbSchema];
 }
 
 export function SportsCardDetails() {

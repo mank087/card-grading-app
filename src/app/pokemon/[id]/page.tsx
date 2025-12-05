@@ -297,6 +297,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   const imageUrl = card.front_url;
   const cardUrl = `https://dcmgrading.com/pokemon/${id}`;
+  const isPrivate = card.visibility === 'private';
 
   const pokemonName = card.conversational_card_info?.player_or_character || card.featured || card.pokemon_featured || 'Pokemon Card';
 
@@ -311,14 +312,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     openGraph: {
       title,
       description,
-      images: [
+      images: imageUrl ? [
         {
           url: imageUrl,
           width: 800,
           height: 1120,
           alt: `${pokemonName} - DCM Graded Pokemon Card`,
         },
-      ],
+      ] : undefined,
       url: cardUrl,
       type: 'website',
       siteName: 'DCM Card Grading',
@@ -328,10 +329,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       card: 'summary_large_image',
       title,
       description,
-      images: [imageUrl],
+      images: imageUrl ? [imageUrl] : undefined,
       creator: '@DCMGrading',
     },
-    robots: {
+    // Privacy-aware robots: noindex/nofollow for private cards
+    robots: isPrivate ? {
+      index: false,
+      follow: false,
+    } : {
       index: true,
       follow: true,
       googleBot: {

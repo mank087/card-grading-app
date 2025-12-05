@@ -26,6 +26,66 @@ function isValidValue(value: any): boolean {
   return true;
 }
 
+// Helper: Generate meta keywords for Other cards
+function generateMetaKeywords(card: any): string {
+  const keywords: string[] = [];
+
+  const playerOrCharacter = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || '';
+  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
+  const primarySubject = playerOrCharacter || cardName;
+  const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer || '';
+  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
+  const cardDate = stripMarkdown(card.conversational_card_info?.card_date) || card.card_date || '';
+  const category = stripMarkdown(card.conversational_card_info?.category) || card.category || '';
+  const grade = card.conversational_decimal_grade;
+
+  // Core keywords - subject/character variations
+  if (primarySubject) {
+    keywords.push(primarySubject.toLowerCase());
+    keywords.push(`${primarySubject} card`.toLowerCase());
+    if (manufacturer) keywords.push(`${manufacturer} ${primarySubject}`.toLowerCase());
+  }
+
+  // Manufacturer and set
+  if (manufacturer) {
+    keywords.push(manufacturer.toLowerCase());
+    keywords.push(`${manufacturer} cards`.toLowerCase());
+  }
+  if (setName) {
+    keywords.push(setName.toLowerCase());
+  }
+  if (cardDate && manufacturer) keywords.push(`${cardDate} ${manufacturer}`.toLowerCase());
+
+  // Category-specific
+  if (category) {
+    keywords.push(category.toLowerCase());
+    keywords.push(`${category.toLowerCase()} cards`);
+  }
+  keywords.push('collectible cards', 'trading cards', 'non-sport cards');
+
+  // Grading keywords
+  keywords.push('graded card', 'dcm grading', 'professional grading', 'card authentication');
+
+  // PSA/BGS equivalent
+  if (grade !== null && grade !== undefined) {
+    const psaGrade = Math.floor(grade);
+    keywords.push(`psa ${psaGrade}`, `bgs ${grade}`);
+    if (grade >= 9) keywords.push('gem mint');
+    if (grade >= 8) keywords.push('near mint');
+  }
+
+  // Special features
+  if (card.conversational_card_info?.autographed || card.autograph_type) {
+    keywords.push('autograph', 'auto', 'signed card');
+  }
+  if (card.conversational_card_info?.serial_number || card.serial_numbering) {
+    keywords.push('serial numbered', 'limited edition');
+  }
+
+  // Remove duplicates and return
+  return [...new Set(keywords)].join(', ');
+}
+
 // Helper: Build dynamic title for Other cards
 // Format matches Sports cards: Primary Subject Year Manufacturer Set - DCM Grade X
 // For Other cards, player_or_character is the PRIMARY identifier (person, character, or subject)
@@ -146,19 +206,79 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return {
       title: 'Other Card Not Found | DCM Grading',
       description: 'Professional collectible card grading and authentication by DCM',
+      keywords: 'card grading, collectible cards, professional grading, DCM, authentication',
+      openGraph: {
+        title: 'Other Card Not Found | DCM Grading',
+        description: 'Professional collectible card grading and authentication by DCM',
+        type: 'website',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: 'Other Card Not Found | DCM Grading',
+        description: 'Professional collectible card grading and authentication by DCM',
+      },
     };
   }
 
-  // Build dynamic title and description
+  // Build enhanced SEO components
   const title = buildTitle(card);
   const description = buildDescription(card);
+  const keywords = generateMetaKeywords(card);
+  const isPrivate = card.visibility === 'private';
 
   console.log('[METADATA] Other card title:', title);
   console.log('[METADATA] Other card description:', description);
 
+  const imageUrl = card.front_url;
+  const cardUrl = `https://dcmgrading.com/other/${id}`;
+  const primarySubject = stripMarkdown(card.conversational_card_info?.player_or_character) ||
+                         stripMarkdown(card.conversational_card_info?.card_name) ||
+                         card.featured || card.card_name || 'Collectible Card';
+
+  // Return enhanced metadata with full SEO optimization
   return {
     title,
     description,
+    keywords,
+    alternates: {
+      canonical: cardUrl,
+    },
+    openGraph: {
+      title,
+      description,
+      images: imageUrl ? [
+        {
+          url: imageUrl,
+          width: 800,
+          height: 1120,
+          alt: `${primarySubject} - DCM Graded Card`,
+        },
+      ] : undefined,
+      url: cardUrl,
+      type: 'website',
+      siteName: 'DCM Card Grading',
+      locale: 'en_US',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: imageUrl ? [imageUrl] : undefined,
+      creator: '@DCMGrading',
+    },
+    robots: isPrivate ? {
+      index: false,
+      follow: false,
+    } : {
+      index: true,
+      follow: true,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
   };
 }
 
