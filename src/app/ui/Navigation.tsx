@@ -13,6 +13,7 @@ export default function Navigation() {
   const [uploadDropdownOpen, setUploadDropdownOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [resourcesDropdownOpen, setResourcesDropdownOpen] = useState(false);
   const router = useRouter();
   const { balance, isLoading: creditsLoading } = useCredits();
 
@@ -68,6 +69,10 @@ export default function Navigation() {
         setAccountDropdownOpen(false);
       }
 
+      if (resourcesDropdownOpen && !target.closest('.resources-dropdown')) {
+        setResourcesDropdownOpen(false);
+      }
+
       if (mobileMenuOpen && !target.closest('.mobile-menu') && !target.closest('.mobile-menu-button')) {
         setMobileMenuOpen(false);
       }
@@ -75,7 +80,7 @@ export default function Navigation() {
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [uploadDropdownOpen, accountDropdownOpen, mobileMenuOpen]);
+  }, [uploadDropdownOpen, accountDropdownOpen, resourcesDropdownOpen, mobileMenuOpen]);
 
   const handleLogout = () => {
     // Clear the session using the directAuth signOut function
@@ -400,6 +405,59 @@ export default function Navigation() {
           {/* Desktop Auth Section - Right Side (only shown when logged out) */}
           {!user && (
             <div className="hidden md:flex items-center space-x-3">
+              {/* Resources Dropdown (hamburger-style) */}
+              <div className="relative resources-dropdown">
+                <button
+                  onClick={() => setResourcesDropdownOpen(!resourcesDropdownOpen)}
+                  className="text-gray-700 hover:text-purple-600 p-2 rounded-md transition-colors flex items-center"
+                  aria-label="Resources menu"
+                >
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+
+                {resourcesDropdownOpen && (
+                  <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                    <div className="py-1">
+                      <Link
+                        href="/credits"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                        onClick={() => setResourcesDropdownOpen(false)}
+                      >
+                        Pricing
+                      </Link>
+                      <Link
+                        href="/grading-rubric"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                        onClick={() => setResourcesDropdownOpen(false)}
+                      >
+                        Grading Rubric
+                      </Link>
+                      <Link
+                        href="/faq"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                        onClick={() => setResourcesDropdownOpen(false)}
+                      >
+                        FAQ
+                      </Link>
+                      <Link
+                        href="/about"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                        onClick={() => setResourcesDropdownOpen(false)}
+                      >
+                        About Us
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <Link
                 href="/login?mode=login"
                 className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
