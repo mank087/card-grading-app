@@ -216,22 +216,27 @@ export default function Navigation() {
             </form>
 
             {/* Credits Display - Only show when logged in */}
+            {/* Colors: Green (2+ credits), Red (0-1 credits) */}
             {user && (
               <Link
                 href="/credits"
-                className="flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 border border-amber-200 px-3 py-1.5 rounded-full text-sm font-medium transition-all group"
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium transition-all group ${
+                  balance <= 1
+                    ? 'bg-gradient-to-r from-red-50 to-red-100 hover:from-red-100 hover:to-red-150 border border-red-200'
+                    : 'bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 border border-green-200'
+                }`}
                 title="View credits"
               >
                 <svg
-                  className="w-4 h-4 text-amber-500"
+                  className={`w-4 h-4 ${balance <= 1 ? 'text-red-500' : 'text-green-500'}`}
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
                   <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.736 6.979C9.208 6.193 9.696 6 10 6c.304 0 .792.193 1.264.979a1 1 0 001.715-1.029C12.279 4.784 11.232 4 10 4s-2.279.784-2.979 1.95c-.285.475-.507 1-.67 1.55H6a1 1 0 000 2h.013a9.358 9.358 0 000 1H6a1 1 0 100 2h.351c.163.55.385 1.075.67 1.55C7.721 15.216 8.768 16 10 16s2.279-.784 2.979-1.95a1 1 0 10-1.715-1.029c-.472.786-.96.979-1.264.979-.304 0-.792-.193-1.264-.979a4.265 4.265 0 01-.264-.521H10a1 1 0 100-2H8.017a7.36 7.36 0 010-1H10a1 1 0 100-2H8.472c.08-.185.167-.36.264-.521z" />
                 </svg>
-                <span className="text-amber-700 group-hover:text-amber-800">
+                <span className={balance <= 1 ? 'text-red-700 group-hover:text-red-800' : 'text-green-700 group-hover:text-green-800'}>
                   {creditsLoading ? (
-                    <span className="inline-block w-4 h-4 border-2 border-amber-300 border-t-amber-600 rounded-full animate-spin"></span>
+                    <span className={`inline-block w-4 h-4 border-2 rounded-full animate-spin ${balance <= 1 ? 'border-red-300 border-t-red-600' : 'border-green-300 border-t-green-600'}`}></span>
                   ) : (
                     <>{balance} {balance === 1 ? 'Credit' : 'Credits'}</>
                   )}
@@ -338,16 +343,21 @@ export default function Navigation() {
             </div>
 
             {/* Credits Badge - Mobile (logged in only) */}
+            {/* Colors: Green (2+ credits), Red (0-1 credits) */}
             {user && (
               <Link
                 href="/credits"
-                className="flex items-center gap-1 bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 px-2 py-1 rounded-full text-xs font-medium"
+                className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+                  balance <= 1
+                    ? 'bg-gradient-to-r from-red-50 to-red-100 border border-red-200'
+                    : 'bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200'
+                }`}
                 title="View credits"
               >
-                <svg className="w-3 h-3 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
+                <svg className={`w-3 h-3 ${balance <= 1 ? 'text-red-500' : 'text-green-500'}`} fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.736 6.979C9.208 6.193 9.696 6 10 6c.304 0 .792.193 1.264.979a1 1 0 001.715-1.029C12.279 4.784 11.232 4 10 4s-2.279.784-2.979 1.95c-.285.475-.507 1-.67 1.55H6a1 1 0 000 2h.013a9.358 9.358 0 000 1H6a1 1 0 100 2h.351c.163.55.385 1.075.67 1.55C7.721 15.216 8.768 16 10 16s2.279-.784 2.979-1.95a1 1 0 10-1.715-1.029c-.472.786-.96.979-1.264.979-.304 0-.792-.193-1.264-.979a4.265 4.265 0 01-.264-.521H10a1 1 0 100-2H8.017a7.36 7.36 0 010-1H10a1 1 0 100-2H8.472c.08-.185.167-.36.264-.521z" />
                 </svg>
-                <span className="text-amber-700">{creditsLoading ? '...' : balance}</span>
+                <span className={balance <= 1 ? 'text-red-700' : 'text-green-700'}>{creditsLoading ? '...' : balance}</span>
               </Link>
             )}
 
