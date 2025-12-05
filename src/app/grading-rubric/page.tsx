@@ -11,7 +11,7 @@ export default function GradingRubricPage() {
             DCM Grading Rubric
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Precision grading powered by DCM Optic™ — our proprietary 30-point evaluation system that delivers professional-grade assessments with unmatched consistency
+            Precision grading powered by DCM Optic™ — our proprietary multi-point inspection system with three-pass consensus technology that delivers professional-grade assessments with unmatched accuracy
           </p>
         </div>
 
@@ -23,16 +23,88 @@ export default function GradingRubricPage() {
               Traditional grading services can take weeks or months. DCM Optic™ combines advanced artificial intelligence with decades of industry grading standards to deliver accurate, consistent results in under 60 seconds.
             </p>
             <p className="text-lg">
-              Every card receives the same meticulous 30-point evaluation, whether it's your first submission or your thousandth. Our evidence-based grading protocol ensures every assessment is backed by observable, documented findings.
+              Every card receives the same meticulous multi-point evaluation with our revolutionary <strong>three-pass consensus technology</strong>. This means your card is analyzed three independent times, with results averaged and cross-validated to eliminate errors and ensure the highest possible accuracy.
             </p>
           </div>
         </section>
 
-        {/* 30-Point Process */}
+        {/* Three-Pass Technology Highlight */}
+        <section className="mb-16">
+          <div className="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-2xl p-8 border border-blue-200">
+            <div className="flex items-center mb-6">
+              <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mr-4">
+                <span className="text-white text-2xl font-bold">3×</span>
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900">Three-Pass Consensus Technology</h2>
+            </div>
+            <p className="text-lg text-gray-700 mb-6">
+              Unlike single-pass grading systems, DCM Optic™ performs <strong>three complete, independent evaluations</strong> of every card. This revolutionary approach significantly improves grading accuracy and reliability.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-blue-600 font-bold">1</span>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">First Pass</h3>
+                <p className="text-sm text-gray-600">Complete evaluation of all corners, edges, surface, and centering with detailed defect documentation.</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-blue-600 font-bold">2</span>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">Second Pass</h3>
+                <p className="text-sm text-gray-600">Independent re-examination as if seeing the card for the first time, catching anything that may have been missed.</p>
+              </div>
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                  <span className="text-blue-600 font-bold">3</span>
+                </div>
+                <h3 className="font-bold text-gray-900 mb-2">Third Pass</h3>
+                <p className="text-sm text-gray-600">Final independent verification with fresh perspective, followed by consensus calculation.</p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-xl p-6 border border-blue-200">
+              <h4 className="font-bold text-gray-900 mb-3">Why Three Passes Matter</h4>
+              <ul className="space-y-2 text-gray-700">
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span><strong>Reduces variance:</strong> Averaging three independent evaluations produces more consistent, reliable grades</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span><strong>Consensus-based defects:</strong> Only defects confirmed in 2+ passes affect the final grade</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span><strong>Consistency scoring:</strong> High agreement between passes indicates higher confidence in the final grade</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span><strong>Mimics professional services:</strong> Top grading companies use multiple evaluators — our three-pass system achieves the same rigor</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        {/* Comprehensive Inspection Protocol */}
         <section className="mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-            Our 30-Point Grading Protocol
+            Comprehensive Inspection Protocol
           </h2>
+          <p className="text-center text-gray-600 mb-8 max-w-3xl mx-auto">
+            Every card undergoes a rigorous multi-phase evaluation examining dozens of individual inspection points across corners, edges, surface, and centering — all performed three times for maximum accuracy.
+          </p>
 
           <div className="space-y-6">
             {/* Phase 0: Pre-Grading Verification */}
@@ -115,9 +187,12 @@ export default function GradingRubricPage() {
               </div>
             </div>
 
-            {/* Phase 3: Centering */}
+            {/* Phase 3: Centering - 3x */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 3: Centering Evaluation</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xl font-bold text-gray-900">Phase 3: Centering Evaluation</h3>
+                <span className="bg-yellow-100 text-yellow-800 text-xs font-semibold px-2 py-1 rounded">×3 Passes</span>
+              </div>
               <p className="text-sm text-gray-600 mb-4">Independent front and back centering analysis with PSA-aligned standards</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -144,10 +219,13 @@ export default function GradingRubricPage() {
               </div>
             </div>
 
-            {/* Phase 4: Corners */}
+            {/* Phase 4: Corners - 3x */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-green-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 4: Corner Inspection</h3>
-              <p className="text-sm text-gray-600 mb-4">Two-phase protocol examining all 8 corners individually</p>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xl font-bold text-gray-900">Phase 4: Corner Inspection</h3>
+                <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-1 rounded">×3 Passes</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Two-phase protocol examining all 8 corners individually (4 front, 4 back)</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="font-semibold text-green-600">Structural Integrity Check</p>
@@ -168,10 +246,13 @@ export default function GradingRubricPage() {
               </div>
             </div>
 
-            {/* Phase 5: Edges */}
+            {/* Phase 5: Edges - 3x */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-teal-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 5: Edge Inspection</h3>
-              <p className="text-sm text-gray-600 mb-4">Two-phase protocol examining all 8 edges individually</p>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xl font-bold text-gray-900">Phase 5: Edge Inspection</h3>
+                <span className="bg-teal-100 text-teal-800 text-xs font-semibold px-2 py-1 rounded">×3 Passes</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Two-phase protocol examining all 8 edges individually (4 front, 4 back)</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="font-semibold text-teal-600">Edge Roughness/Texture Check</p>
@@ -192,10 +273,13 @@ export default function GradingRubricPage() {
               </div>
             </div>
 
-            {/* Phase 6: Surface */}
+            {/* Phase 6: Surface - 3x */}
             <div className="bg-white rounded-xl shadow-md p-6 border-l-4 border-purple-500">
-              <h3 className="text-xl font-bold text-gray-900 mb-3">Phase 6: Surface Inspection</h3>
-              <p className="text-sm text-gray-600 mb-4">Systematic 9-zone grid analysis of both front and back surfaces</p>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-xl font-bold text-gray-900">Phase 6: Surface Inspection</h3>
+                <span className="bg-purple-100 text-purple-800 text-xs font-semibold px-2 py-1 rounded">×3 Passes</span>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">Systematic 9-zone grid analysis of both front and back surfaces (18 total zones)</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="font-semibold text-purple-600">Microscopic Defect Scan</p>
@@ -301,7 +385,7 @@ export default function GradingRubricPage() {
             8-Component Scoring System
           </h2>
           <p className="text-center text-gray-600 mb-8 max-w-2xl mx-auto">
-            Every card receives 8 individual component scores — 4 for the front and 4 for the back — with weighted averaging (55% front, 45% back) to calculate the final grade.
+            Every card receives 8 individual component scores — 4 for the front and 4 for the back — each evaluated three times and averaged. Weighted averaging (55% front, 45% back) calculates the final grade.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -373,7 +457,7 @@ export default function GradingRubricPage() {
 
           <div className="bg-white rounded-xl shadow-md p-8 mb-8">
             <p className="text-lg text-gray-700 mb-6">
-              Every DCM grade includes an <strong>Image Confidence Rating</strong> (A-D) and <strong>Grade Uncertainty Range</strong>. This transparency helps you understand how confident the assessment is based on your submitted photos.
+              Every DCM grade includes an <strong>Image Confidence Rating</strong> (A-D), <strong>Grade Uncertainty Range</strong>, and now a <strong>Three-Pass Consistency Score</strong>. This transparency helps you understand how confident the assessment is based on your submitted photos and how well the three independent passes agreed.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
@@ -423,9 +507,9 @@ export default function GradingRubricPage() {
               </div>
 
               <div>
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Grade Uncertainty Ranges</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-4">Grade Uncertainty & Consistency</h3>
                 <p className="text-gray-700 mb-4">
-                  The uncertainty range indicates how much the actual grade might vary based on image quality. Higher quality images = lower uncertainty.
+                  The uncertainty range indicates how much the actual grade might vary. The consistency score shows how well all three evaluation passes agreed.
                 </p>
 
                 <div className="space-y-3">
@@ -447,10 +531,13 @@ export default function GradingRubricPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-                  <p className="text-sm text-purple-800">
-                    <strong>Example:</strong> A card graded 9.0 with ±0.5 uncertainty (Grade B) means the grade likely falls between 8.5 and 9.5 based on image quality.
-                  </p>
+                <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                  <h4 className="font-bold text-indigo-900 mb-2">Three-Pass Consistency</h4>
+                  <ul className="text-sm text-indigo-800 space-y-1">
+                    <li><strong>High:</strong> All 3 passes agree within ±0.5 points</li>
+                    <li><strong>Moderate:</strong> Passes vary by 0.5-1.0 points</li>
+                    <li><strong>Low:</strong> Passes vary by more than 1.0 point</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -481,7 +568,7 @@ export default function GradingRubricPage() {
             Card Type Specialization
           </h2>
           <p className="text-center text-gray-600 mb-8 max-w-2xl mx-auto">
-            DCM Optic™ uses specialized evaluation criteria (deltas) optimized for each card type
+            DCM Optic™ uses specialized evaluation criteria optimized for each card type
           </p>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -523,12 +610,12 @@ export default function GradingRubricPage() {
               DCM Optic™ is our proprietary grading engine that combines advanced AI vision technology with industry-standard evaluation criteria. Our evidence-based protocol ensures every assessment is backed by observable, documented findings — no assumptions, no guesswork.
             </p>
             <p className="text-lg text-gray-700 mb-4">
-              Every submission is processed through the same rigorous 30-point evaluation, ensuring fairness and consistency across all card types and conditions.
+              With our revolutionary three-pass consensus system, every card receives not just one evaluation, but three independent analyses that are averaged and cross-validated. This delivers the most accurate and reliable grades possible from photo-based grading.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mt-6">
               <div className="bg-white rounded-lg p-4 text-center">
-                <p className="text-3xl font-bold text-purple-600 mb-2">30</p>
-                <p className="text-sm text-gray-600">Evaluation Points</p>
+                <p className="text-3xl font-bold text-purple-600 mb-2">3×</p>
+                <p className="text-sm text-gray-600">Independent Passes</p>
               </div>
               <div className="bg-white rounded-lg p-4 text-center">
                 <p className="text-3xl font-bold text-purple-600 mb-2">8</p>
@@ -558,7 +645,16 @@ export default function GradingRubricPage() {
                 How does DCM compare to professional grading services?
               </h3>
               <p className="text-gray-700">
-                DCM Optic™ uses PSA-aligned grading criteria and provides comparable assessments. While we provide accurate, evidence-based evaluations, DCM grades are for informational purposes and don't replace official third-party grading for authentication or resale value certification.
+                DCM Optic™ uses PSA-aligned grading criteria and provides comparable assessments. Our three-pass consensus system mimics how professional services use multiple evaluators. While we provide accurate, evidence-based evaluations, DCM grades are for informational purposes and don't replace official third-party grading for authentication or resale value certification.
+              </p>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-md p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                What is three-pass consensus grading?
+              </h3>
+              <p className="text-gray-700">
+                Three-pass consensus means every card is evaluated three independent times, with the results averaged to produce the final grade. Defects must be confirmed in at least 2 of 3 passes to affect the grade, which eliminates false positives and ensures only real defects impact your score. This approach significantly improves accuracy and reliability compared to single-pass systems.
               </p>
             </div>
 
@@ -567,7 +663,7 @@ export default function GradingRubricPage() {
                 What does "evidence-based grading" mean?
               </h3>
               <p className="text-gray-700">
-                Every defect or pristine assessment must be backed by observable evidence. We document specific locations, measurements, and visual characteristics for every finding. No assumptions — only deductions for defects we can actually see.
+                Every defect or pristine assessment must be backed by observable evidence. We document specific locations, measurements, and visual characteristics for every finding. No assumptions — only deductions for defects we can actually see and confirm across multiple passes.
               </p>
             </div>
 
@@ -605,7 +701,7 @@ export default function GradingRubricPage() {
           <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-2xl p-12 text-white shadow-xl">
             <h2 className="text-3xl font-bold mb-4">Ready to Grade Your Cards?</h2>
             <p className="text-xl mb-8 max-w-2xl mx-auto">
-              Experience the precision of DCM Optic™ grading technology. Get professional-grade assessments in under 60 seconds.
+              Experience the precision of DCM Optic™ three-pass grading technology. Get professional-grade assessments in under 60 seconds.
             </p>
             <a
               href="/login"
