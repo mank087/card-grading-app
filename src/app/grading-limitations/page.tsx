@@ -1,6 +1,7 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
 import Image from 'next/image'
+import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
 export const metadata: Metadata = {
   title: 'Grading Limitations | DCM Grading',
@@ -9,7 +10,8 @@ export const metadata: Metadata = {
 
 export default function GradingLimitationsPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 relative">
+      <FloatingCardsBackground />
       {/* Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">

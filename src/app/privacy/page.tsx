@@ -1,7 +1,10 @@
+import FloatingCardsBackground from '../ui/FloatingCardsBackground';
+
 export default function PrivacyPolicyPage() {
   return (
-    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12">
+    <main className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 relative">
+      <FloatingCardsBackground />
+      <div className="max-w-4xl mx-auto bg-white shadow-md rounded-lg p-8 sm:p-12 relative z-10">
         <h1 className="text-4xl font-bold text-gray-900 mb-2">Privacy Policy</h1>
         <p className="text-sm text-gray-600 mb-8">Last Updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
