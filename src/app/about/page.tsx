@@ -1,7 +1,10 @@
+import FloatingCardsBackground from '../ui/FloatingCardsBackground';
+
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <main className="min-h-screen bg-gradient-to-b from-gray-50 to-white relative">
+      <FloatingCardsBackground />
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 relative z-10">
         {/* Hero Section */}
         <div className="text-center mb-12">
           <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4">
