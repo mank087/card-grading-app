@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
-import { getStoredSession } from '@/lib/directAuth'
+import { getStoredSession, AUTH_STATE_CHANGE_EVENT } from '@/lib/directAuth'
 
 interface CreditsContextType {
   balance: number
@@ -57,15 +57,25 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     refreshCredits()
 
-    // Listen for storage events (auth changes)
+    // Listen for storage events (auth changes from other tabs)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'supabase.auth.token') {
         refreshCredits()
       }
     }
 
+    // Listen for custom auth event (auth changes from same tab)
+    const handleAuthChange = () => {
+      console.log('[CreditsContext] Auth state changed, refreshing credits...')
+      refreshCredits()
+    }
+
     window.addEventListener('storage', handleStorageChange)
-    return () => window.removeEventListener('storage', handleStorageChange)
+    window.addEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange)
+    return () => {
+      window.removeEventListener('storage', handleStorageChange)
+      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange)
+    }
   }, [refreshCredits])
 
   // Also refresh when window gains focus (in case user completed purchase in another tab)

@@ -10,6 +10,16 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 // Custom localStorage key for our app's session storage
 const SESSION_STORAGE_KEY = 'supabase.auth.token'
 
+// Custom event name for auth state changes (works within same tab)
+export const AUTH_STATE_CHANGE_EVENT = 'dcm-auth-state-change'
+
+// Dispatch auth state change event (for same-tab updates)
+function dispatchAuthChange() {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(AUTH_STATE_CHANGE_EVENT))
+  }
+}
+
 export interface AuthResponse {
   access_token?: string
   refresh_token?: string
@@ -56,6 +66,8 @@ export async function signInWithPassword(email: string, password: string): Promi
         expires_at: data.expires_at,
         user: data.user
       }))
+      // Notify other components of auth change
+      dispatchAuthChange()
     }
 
     return {
@@ -123,6 +135,8 @@ export function signOut() {
     localStorage.removeItem(SESSION_STORAGE_KEY)
     // Also sign out from Supabase client (for OAuth sessions)
     supabaseClient.auth.signOut()
+    // Notify other components of auth change
+    dispatchAuthChange()
   }
 }
 
@@ -195,6 +209,8 @@ export async function getOAuthSession() {
 
           localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(sessionData))
           console.log('[OAuth] Session stored successfully in localStorage')
+          // Notify other components of auth change
+          dispatchAuthChange()
 
           // Clear the hash from URL to prevent re-processing
           window.history.replaceState(null, '', window.location.pathname)
@@ -224,6 +240,8 @@ export async function getOAuthSession() {
         user: session.user
       }))
       console.log('[OAuth] Session stored successfully')
+      // Notify other components of auth change
+      dispatchAuthChange()
       return { session }
     } else {
       console.warn('[OAuth] No session found')

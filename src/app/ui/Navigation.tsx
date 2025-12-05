@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getStoredSession, signOut } from "@/lib/directAuth";
+import { getStoredSession, signOut, AUTH_STATE_CHANGE_EVENT } from "@/lib/directAuth";
 import { useCredits } from "@/contexts/CreditsContext";
 
 export default function Navigation() {
@@ -39,20 +39,29 @@ export default function Navigation() {
     // Check auth immediately
     checkAuth();
 
-    // Re-check auth periodically (every 5 seconds) to catch login/logout
+    // Re-check auth periodically (every 5 seconds) as a fallback
     const interval = setInterval(checkAuth, 5000);
 
-    // Also listen for storage events (in case user logs in/out in another tab)
+    // Listen for storage events (in case user logs in/out in another tab)
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'supabase.auth.token') {
         checkAuth();
       }
     };
+
+    // Listen for custom auth event (auth changes from same tab - immediate)
+    const handleAuthChange = () => {
+      console.log('[Navigation] Auth state change event received');
+      checkAuth();
+    };
+
     window.addEventListener('storage', handleStorageChange);
+    window.addEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange);
     };
   }, []);
 
