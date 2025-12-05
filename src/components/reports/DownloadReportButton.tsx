@@ -13,6 +13,7 @@ import {
   generateQRCodePlain,
   loadLogoAsBase64
 } from '../../lib/foldableLabelGenerator';
+import { generateMiniReportJpg } from '../../lib/miniReportJpgGenerator';
 import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 
@@ -34,7 +35,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   cardType = 'sports'
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | null>(null);
+  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'mini-jpg' | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [isAveryModalOpen, setIsAveryModalOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -675,6 +676,138 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   };
 
   /**
+   * Handle Mini-Report JPG generation and download
+   */
+  const handleDownloadMiniJpg = async () => {
+    try {
+      setIsGenerating(true);
+      setGeneratingType('mini-jpg');
+      setIsDropdownOpen(false);
+
+      console.log('[MINI-REPORT JPG] Starting generation...');
+
+      // Extract card info
+      const cardInfo = card.conversational_card_info || {};
+
+      // Helper: Extract English name from bilingual format
+      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
+        if (!text) return null;
+        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+        if (!hasJapanese) return text;
+        const parts = text.split(/[/()（）]/);
+        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
+        return englishPart ? englishPart.trim() : text;
+      };
+
+      // Build player/character name
+      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
+      const cardName = shouldPrioritizePlayer
+        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
+        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
+
+      // Build set name (include subset if available)
+      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
+                         (card.card_set && card.card_set !== 'null') ? card.card_set :
+                         cardInfo.set_era || 'Unknown Set';
+      const subset = cardInfo.subset || card.subset;
+      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
+      const setName = setNameWithSubset || 'Unknown Set';
+
+      // Build special features
+      const features: string[] = [];
+      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
+      if (cardInfo.autographed) features.push('Auto');
+      const serialNum = cardInfo.serial_number;
+      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+        features.push(serialNum);
+      }
+      const specialFeatures = features.length > 0 ? features.join(' • ') : undefined;
+
+      // Get subgrades
+      const weightedScores = card.conversational_weighted_sub_scores || {};
+      const subScores = card.conversational_sub_scores || {};
+
+      // Generate QR code and load logo
+      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      console.log('[MINI-REPORT JPG] Generating QR code for URL:', cardUrl);
+
+      const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+        generateQRCodeWithLogo(cardUrl),
+        loadLogoAsBase64().catch(() => undefined)
+      ]);
+
+      console.log('[MINI-REPORT JPG] QR code and logo loaded');
+
+      // Get grade and condition
+      const grade = card.conversational_decimal_grade ?? 0;
+      const conditionLabel = card.conversational_condition_label
+        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+        : (getConditionFromGrade(grade) || 'N/A');
+
+      // Build label data
+      const labelData: FoldableLabelData = {
+        cardName,
+        setName,
+        cardNumber: cardInfo.card_number || card.card_number,
+        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
+        specialFeatures,
+        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
+        grade,
+        conditionLabel,
+        subgrades: {
+          centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
+          corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
+          edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
+          surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
+        },
+        overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
+        qrCodeDataUrl,
+        cardUrl,
+        logoDataUrl,
+      };
+
+      console.log('[MINI-REPORT JPG] Generating JPG with data:', {
+        ...labelData,
+        qrCodeDataUrl: qrCodeDataUrl ? 'present' : 'missing',
+        logoDataUrl: logoDataUrl ? 'present' : 'missing',
+      });
+
+      // Generate JPG
+      const blob = await generateMiniReportJpg(labelData);
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      // Generate filename
+      const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const cardNameClean = sanitize(cardName);
+      const serialClean = sanitize(labelData.serial);
+      const filename = `DCM-MiniReport-${cardNameClean}-${serialClean}.jpg`;
+
+      link.download = filename;
+
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Cleanup
+      URL.revokeObjectURL(url);
+
+      console.log('[MINI-REPORT JPG] ✅ JPG generated successfully');
+
+    } catch (error) {
+      console.error('[MINI-REPORT JPG] ❌ Error generating JPG:', error);
+      alert('Failed to generate mini-report image. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+      setGeneratingType(null);
+    }
+  };
+
+  /**
    * Handle Avery Label generation with selected position and calibration offsets
    */
   const handleDownloadAveryLabel = async (positionIndex: number, offsets: CalibrationOffsets) => {
@@ -867,9 +1000,15 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     },
     {
       id: 'label',
-      label: 'Mini-Report',
+      label: 'Mini-Report (PDF)',
       description: 'Fold or cut to 2.5" × 3.5"',
       onClick: handleDownloadLabel,
+    },
+    {
+      id: 'mini-jpg',
+      label: 'Mini-Report Image',
+      description: 'JPG for eBay/auction listings',
+      onClick: handleDownloadMiniJpg,
     },
   ];
 
@@ -934,7 +1073,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         title="Download Options"
       >
         {isGenerating ? (
-          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : 'Generating Report...'}</span>
+          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : generatingType === 'mini-jpg' ? 'Generating Image...' : 'Generating Report...'}</span>
         ) : (
           <>
             <span>Download Label or Report</span>
