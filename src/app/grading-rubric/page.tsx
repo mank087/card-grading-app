@@ -314,39 +314,44 @@ export default function GradingRubricPage() {
             </p>
 
             <div className="space-y-3">
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-yellow-50 to-yellow-100 rounded-lg border-l-4 border-yellow-500">
-                <div className="text-3xl font-bold text-yellow-800 w-16">10</div>
+              {/* 10 - Gold Metallic */}
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #fef3c7, #fcd34d)', borderLeftColor: '#d97706' }}>
+                <div className="text-3xl font-bold w-16" style={{ color: '#92400e', textShadow: '0 1px 2px rgba(251, 191, 36, 0.5)' }}>10</div>
                 <div>
                   <p className="font-bold text-gray-900">Gem Mint</p>
                   <p className="text-sm text-gray-600">Zero defects. Sharp corners, pristine surface, perfect centering (55/45 or better). No fiber exposure, no scratches, no whitening.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-l-4 border-green-500">
-                <div className="text-3xl font-bold text-green-800 w-16">9.5</div>
+              {/* 9.5 - Silver Metallic */}
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #f3f4f6, #d1d5db)', borderLeftColor: '#6b7280' }}>
+                <div className="text-3xl font-bold w-16" style={{ color: '#374151', textShadow: '0 1px 2px rgba(156, 163, 175, 0.5)' }}>9.5</div>
                 <div>
                   <p className="font-bold text-gray-900">Gem Mint</p>
                   <p className="text-sm text-gray-600">Near-perfect with only microscopic imperfections visible at maximum zoom</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-lg border-l-4 border-green-400">
-                <div className="text-3xl font-bold text-green-700 w-16">9</div>
+              {/* 9 - Silver Metallic */}
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #f9fafb, #e5e7eb)', borderLeftColor: '#9ca3af' }}>
+                <div className="text-3xl font-bold w-16" style={{ color: '#4b5563', textShadow: '0 1px 2px rgba(156, 163, 175, 0.5)' }}>9</div>
                 <div>
                   <p className="font-bold text-gray-900">Mint</p>
                   <p className="text-sm text-gray-600">Minor imperfections under close inspection. Slight corner softening or minor edge whitening.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
-                <div className="text-2xl font-bold text-blue-800 w-20">8.5-8</div>
+              {/* 8.5-8 - Bronze Metallic */}
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #fef3e2, #f5d0a9)', borderLeftColor: '#b45309' }}>
+                <div className="text-2xl font-bold w-20" style={{ color: '#78350f', textShadow: '0 1px 2px rgba(180, 83, 9, 0.3)' }}>8.5-8</div>
                 <div>
                   <p className="font-bold text-gray-900">Near Mint-Mint</p>
                   <p className="text-sm text-gray-600">Slight wear visible upon close examination. Minor rounding, light whitening, or small surface imperfections.</p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-400">
+              {/* 7.5-7 - Blue */}
+              <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
                 <div className="text-2xl font-bold text-blue-700 w-20">7.5-7</div>
                 <div>
                   <p className="font-bold text-gray-900">Near Mint</p>
@@ -354,6 +359,7 @@ export default function GradingRubricPage() {
                 </div>
               </div>
 
+              {/* 6.5-6 - Purple (unchanged) */}
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-l-4 border-purple-500">
                 <div className="text-2xl font-bold text-purple-800 w-20">6.5-6</div>
                 <div>
@@ -362,6 +368,7 @@ export default function GradingRubricPage() {
                 </div>
               </div>
 
+              {/* 5.5-1 - Gray (unchanged) */}
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border-l-4 border-gray-500">
                 <div className="text-2xl font-bold text-gray-800 w-20">5.5-1</div>
                 <div>
@@ -376,76 +383,6 @@ export default function GradingRubricPage() {
                 <strong>Grade Caps:</strong> Structural damage (creases, corner lift, tears) triggers automatic grade caps regardless of other component scores. This ensures consistency with professional grading standards.
               </p>
             </div>
-          </div>
-        </section>
-
-        {/* Component Scores */}
-        <section className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-            8-Component Scoring System
-          </h2>
-          <p className="text-center text-gray-600 mb-8 max-w-2xl mx-auto">
-            Every card receives 8 individual component scores — 4 for the front and 4 for the back — each evaluated three times and averaged. Weighted averaging (55% front, 45% back) calculates the final grade.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-yellow-500 rounded-full mr-3"></span>
-                Centering Score (Front & Back)
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Measures border distribution using precise ratios. PSA-aligned standards: 55/45 for Gem Mint 10 on front, 75/25 acceptable on back.
-              </p>
-              <p className="text-sm text-gray-600">
-                Quality tiers: Perfect (50/50-51/49), Excellent (52/48-53/47), Good (54/46-55/45), Fair (56/44-60/40), Off-Center (61/39+)
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-green-500 rounded-full mr-3"></span>
-                Corners Score (Front & Back)
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Evaluates all 8 corners individually for sharpness, fiber exposure, rounding, and structural integrity.
-              </p>
-              <p className="text-sm text-gray-600">
-                10.0 requires ZERO defects on all 8 corners — no fiber, no rounding, no lift
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-teal-500 rounded-full mr-3"></span>
-                Edges Score (Front & Back)
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Examines all 8 edges for whitening, chipping, roughness, and factory cut quality.
-              </p>
-              <p className="text-sm text-gray-600">
-                10.0 requires ZERO white flecks, ZERO chipping, smooth factory cuts on all edges
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                <span className="w-2 h-2 bg-purple-500 rounded-full mr-3"></span>
-                Surface Score (Front & Back)
-              </h3>
-              <p className="text-gray-700 mb-3">
-                Detects scratches, white dots, print defects, stains, and surface damage using 9-zone grid analysis.
-              </p>
-              <p className="text-sm text-gray-600">
-                10.0 requires ZERO scratches, ZERO white dots, ZERO pattern disruption (holographic)
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-            <p className="text-sm text-purple-800">
-              <strong>Weakest Link Scoring:</strong> The final grade cannot exceed the lowest weighted category score. A card with 10.0 centering, 10.0 corners, 10.0 edges, but 8.0 surface will receive a grade reflecting the surface condition.
-            </p>
           </div>
         </section>
 
