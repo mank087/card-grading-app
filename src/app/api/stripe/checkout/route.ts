@@ -42,6 +42,14 @@ export async function POST(request: NextRequest) {
 
     const priceConfig = STRIPE_PRICES[tier];
 
+    // Tier-specific bonus credits for DCM Launch Special
+    const bonusCreditsMap: Record<StripePriceTier, number> = {
+      basic: 1,
+      pro: 2,
+      elite: 5,
+    };
+    const bonusCredits = bonusCreditsMap[tier];
+
     // Check if this is first purchase (for bonus credit)
     const firstPurchase = await isFirstPurchase(userId);
 
@@ -94,6 +102,7 @@ export async function POST(request: NextRequest) {
         userId: userId,
         tier: tier,
         credits: priceConfig.credits.toString(),
+        bonusCredits: bonusCredits.toString(),
         isFirstPurchase: firstPurchase.toString(),
       },
       payment_intent_data: {
@@ -101,6 +110,7 @@ export async function POST(request: NextRequest) {
           userId: userId,
           tier: tier,
           credits: priceConfig.credits.toString(),
+          bonusCredits: bonusCredits.toString(),
           isFirstPurchase: firstPurchase.toString(),
         },
       },
@@ -108,7 +118,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate what user will receive
     const creditsToReceive = firstPurchase
-      ? priceConfig.credits + 1
+      ? priceConfig.credits + bonusCredits
       : priceConfig.credits;
 
     return NextResponse.json({
@@ -116,7 +126,7 @@ export async function POST(request: NextRequest) {
       url: session.url,
       tier: tier,
       credits: priceConfig.credits,
-      bonusCredits: firstPurchase ? 1 : 0,
+      bonusCredits: firstPurchase ? bonusCredits : 0,
       totalCredits: creditsToReceive,
       price: priceConfig.price,
     });

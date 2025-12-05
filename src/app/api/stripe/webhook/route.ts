@@ -82,6 +82,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const userId = session.metadata?.userId;
   const tier = session.metadata?.tier;
   const credits = parseInt(session.metadata?.credits || '0', 10);
+  const bonusCredits = parseInt(session.metadata?.bonusCredits || '1', 10); // Default to 1 for backwards compatibility
   const isFirstPurchase = session.metadata?.isFirstPurchase === 'true';
 
   if (!userId || !credits) {
@@ -93,6 +94,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     userId,
     tier,
     credits,
+    bonusCredits,
     isFirstPurchase,
     sessionId: session.id,
     paymentIntentId: session.payment_intent,
@@ -111,6 +113,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       : undefined,
     description: `Purchased ${tier} package (${credits} credits)`,
     isFirstPurchase,
+    bonusCredits, // Tier-specific bonus: Basic=1, Pro=2, Elite=5
   });
 
   if (result.success) {
@@ -118,6 +121,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       userId,
       newBalance: result.newBalance,
       bonusAdded: result.bonusAdded,
+      bonusAmount: result.bonusAmount,
     });
   } else {
     console.error('Failed to add credits:', { userId, result });

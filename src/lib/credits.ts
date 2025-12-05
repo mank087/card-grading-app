@@ -101,22 +101,26 @@ export async function addCredits(
     stripePaymentIntentId?: string;
     description?: string;
     isFirstPurchase?: boolean;
+    bonusCredits?: number; // Tier-specific bonus credits (Basic: 1, Pro: 2, Elite: 5)
   } = {}
-): Promise<{ success: boolean; newBalance: number; bonusAdded: boolean }> {
+): Promise<{ success: boolean; newBalance: number; bonusAdded: boolean; bonusAmount: number }> {
   const supabase = getServiceClient();
 
   // Get current credits
   const credits = await getUserCredits(userId);
   if (!credits) {
-    return { success: false, newBalance: 0, bonusAdded: false };
+    return { success: false, newBalance: 0, bonusAdded: false, bonusAmount: 0 };
   }
 
-  // Check if this is first purchase and add bonus
+  // Check if this is first purchase and add tier-specific bonus
   let totalToAdd = amount;
   let bonusAdded = false;
+  let bonusAmount = 0;
 
   if (options.isFirstPurchase && !credits.first_purchase_bonus_claimed) {
-    totalToAdd += 1; // Add bonus credit
+    // Use tier-specific bonus if provided, otherwise default to 1
+    bonusAmount = options.bonusCredits ?? 1;
+    totalToAdd += bonusAmount;
     bonusAdded = true;
   }
 
@@ -134,7 +138,7 @@ export async function addCredits(
 
   if (updateError) {
     console.error('Error updating credits:', updateError);
-    return { success: false, newBalance: credits.balance, bonusAdded: false };
+    return { success: false, newBalance: credits.balance, bonusAdded: false, bonusAmount: 0 };
   }
 
   // Record the purchase transaction
@@ -142,7 +146,7 @@ export async function addCredits(
     user_id: userId,
     type: 'purchase',
     amount: amount,
-    balance_after: newBalance - (bonusAdded ? 1 : 0), // Balance after purchase, before bonus
+    balance_after: newBalance - (bonusAdded ? bonusAmount : 0), // Balance after purchase, before bonus
     description: options.description || `Purchased ${amount} credit(s)`,
     stripe_session_id: options.stripeSessionId,
     stripe_payment_intent_id: options.stripePaymentIntentId,
@@ -153,14 +157,14 @@ export async function addCredits(
     await supabase.from('credit_transactions').insert({
       user_id: userId,
       type: 'bonus',
-      amount: 1,
+      amount: bonusAmount,
       balance_after: newBalance,
-      description: 'First purchase bonus credit',
+      description: `DCM Launch Special - ${bonusAmount} bonus credit${bonusAmount !== 1 ? 's' : ''}`,
       stripe_session_id: options.stripeSessionId,
     });
   }
 
-  return { success: true, newBalance, bonusAdded };
+  return { success: true, newBalance, bonusAdded, bonusAmount };
 }
 
 /**
