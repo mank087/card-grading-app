@@ -520,6 +520,47 @@ export default function Navigation() {
                 />
               </form>
 
+              {/* Resources Section - Divider */}
+              <div className="border-t border-gray-200 mt-2 pt-2">
+                <p className="px-3 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Resources</p>
+              </div>
+
+              {/* Pricing - Shows "Pricing" for logged out, "Buy Credits" for logged in */}
+              <Link
+                href="/credits"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                {user ? 'Buy Credits' : 'Pricing'}
+              </Link>
+
+              {/* Grading Rubric */}
+              <Link
+                href="/grading-rubric"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                Grading Rubric
+              </Link>
+
+              {/* FAQ */}
+              <Link
+                href="/faq"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                FAQ
+              </Link>
+
+              {/* About Us */}
+              <Link
+                href="/about"
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                About Us
+              </Link>
+
               {/* Logout - Only show when logged in */}
               {user && (
                 <button
