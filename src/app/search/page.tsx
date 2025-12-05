@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { CardSlabGrid } from '@/components/CardSlab';
 
 interface CardResult {
   id: string;
@@ -237,109 +238,18 @@ function SearchPageContent() {
                   features.push(card.serial_number);
                 }
 
-                // Calculate scale for name to fit on single line
-                const nameScaleX = displayName.length > 25
-                  ? Math.max(0.6, 25 / displayName.length)
-                  : 1;
-
-                // Calculate font size for set line
-                const setFontSize = setLineText.length > 50 ? '8px'
-                  : setLineText.length > 40 ? '9px'
-                  : setLineText.length > 30 ? '10px'
-                  : '11px';
-
                 return (
-                  <div key={card.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-                    {/* Professional Label (PSA-Style) - ABOVE IMAGE */}
-                    <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg p-3">
-                      <div className="flex items-center justify-between gap-1.5">
-                        {/* Left: DCM Logo */}
-                        <div className="flex-shrink-0 -ml-1">
-                          <img
-                            src="/DCM-logo.png"
-                            alt="DCM"
-                            className="h-9 w-auto"
-                          />
-                        </div>
-
-                        {/* Center: Card Information - 4-Line Structure */}
-                        <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-                          {/* Line 1: Player/Card Name - Scale to fit on single line */}
-                          <div
-                            className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
-                            style={{
-                              fontSize: '13px',
-                              transform: `scaleX(${nameScaleX})`,
-                              lineHeight: '1.2'
-                            }}
-                            title={displayName}
-                          >
-                            {displayName}
-                          </div>
-
-                          {/* Line 2: Set Name • Year */}
-                          <div
-                            className="text-gray-700 leading-tight"
-                            style={{
-                              fontSize: setFontSize,
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden',
-                              wordBreak: 'break-word'
-                            }}
-                            title={setLineText}
-                          >
-                            {setLineText}
-                          </div>
-
-                          {/* Line 3: Special Features (RC, Auto, Facsimile, Reprint, Serial #) - Only if present */}
-                          {features.length > 0 && (
-                            <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                              {features.join(' • ')}
-                            </div>
-                          )}
-
-                          {/* Line 4: DCM Serial Number */}
-                          <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
-                            {card.serial}
-                          </div>
-                        </div>
-
-                        {/* Right: Grade Display */}
-                        <div className="text-center flex-shrink-0">
-                          <div className="font-bold text-purple-700 text-3xl leading-none">
-                            {grade ? formatGrade(grade) : 'N/A'}
-                          </div>
-                          {condition && (
-                            <>
-                              <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                              <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                                {condition}
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Card Image */}
-                    <div className="aspect-[3/4] relative bg-gray-100">
-                      {card.front_url ? (
-                        <Image
-                          src={card.front_url}
-                          alt={displayName}
-                          fill
-                          className="object-contain"
-                          sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-gray-400">
-                          No Image
-                        </div>
-                      )}
-                    </div>
-
+                  <CardSlabGrid
+                    key={card.id}
+                    displayName={displayName}
+                    setLineText={setLineText}
+                    features={features}
+                    serial={card.serial}
+                    grade={grade}
+                    condition={condition}
+                    frontImageUrl={card.front_url}
+                    className="hover:shadow-xl transition-shadow duration-200"
+                  >
                     {/* View Details Button */}
                     <div className="p-3">
                       <Link
@@ -349,7 +259,7 @@ function SearchPageContent() {
                         View Details
                       </Link>
                     </div>
-                  </div>
+                  </CardSlabGrid>
                 );
               })}
             </div>

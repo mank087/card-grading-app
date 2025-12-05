@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { getStoredSession, getAuthenticatedClient } from '../lib/directAuth'
 import ScrollingCardBackground from './ui/ScrollingCardBackground'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
+import { CardSlabGrid } from '@/components/CardSlab'
 
 // Helper functions to extract card info (matching collection page)
 const stripMarkdown = (text: string | null | undefined): string | null => {
@@ -459,178 +460,35 @@ function FeaturedCardsCarousel({
             const setName = cardInfo.set_name || "Unknown Set"
             const cardNumber = cardInfo.card_number
             const year = cardInfo.year
+            const setLineText = [setName, cardNumber, year].filter(p => p).join(' • ')
 
-            // Dynamic sizing for player name (Line 1)
-            const nameFontSize = displayName.length > 35 ? '11px' : displayName.length > 25 ? '12px' : '14px'
-
-            // Dynamic sizing for set details (Line 2)
-            const setFontSize = setName.length > 30 ? '10px' : '11px'
+            // Get grade and condition
+            const grade = getCardGrade(card)
+            const condition = card.conversational_condition_label
+              ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+              : (grade ? getConditionFromGrade(grade) : '')
 
             return (
               <Link
                 key={card.id}
                 href={getCardLink(card)}
-                className="flex-shrink-0 w-[280px] bg-white rounded-lg shadow-md hover:shadow-xl transition-shadow duration-200 overflow-hidden cursor-pointer block"
+                className="flex-shrink-0 w-[280px] cursor-pointer block"
               >
-                {/* Professional Label (PSA-Style) - ABOVE IMAGE */}
-                <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg p-3">
-                  <div className="flex items-center justify-between gap-1.5">
-                    {/* Left: DCM Logo */}
-                    <div className="flex-shrink-0 -ml-1">
-                      <img
-                        src="/DCM-logo.png"
-                        alt="DCM"
-                        className="h-9 w-auto"
-                      />
-                    </div>
-
-                    {/* Center: Card Information - New 4-Line Structure */}
-                    <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-                      {/* Line 1: Player/Card Name - Dynamic Font Sizing */}
-                      <div
-                        className="font-bold text-gray-900 leading-tight truncate"
-                        style={{ fontSize: nameFontSize }}
-                        title={displayName}
-                      >
-                        {displayName}
-                      </div>
-
-                      {/* Line 2: Set Name • Card # • Year */}
-                      <div
-                        className="text-gray-700 leading-tight"
-                        style={{
-                          fontSize: setFontSize,
-                          display: '-webkit-box',
-                          WebkitLineClamp: 2,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden'
-                        }}
-                        title={`${setName} • ${cardNumber || ''} • ${year || 'N/A'}`}
-                      >
-                        {[setName, cardNumber, year].filter(p => p).join(' • ')}
-                      </div>
-
-                      {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
-                      {features.length > 0 && (
-                        <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                          {features.join(' • ')}
-                        </div>
-                      )}
-
-                      {/* Line 4: DCM Serial Number */}
-                      <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
-                        {card.serial}
-                      </div>
-                    </div>
-
-                    {/* Right: Grade Display */}
-                    <div className="text-center flex-shrink-0">
-                      {(() => {
-                        const grade = getCardGrade(card)
-                        const condition = card.conversational_condition_label
-                          ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-                          : (grade ? getConditionFromGrade(grade) : '')
-
-                        return (
-                          <>
-                            <div className="font-bold text-purple-700 text-3xl leading-none">
-                              {grade ? formatGrade(grade) : '?'}
-                            </div>
-                            {condition && (
-                              <>
-                                <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                                <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                                  {condition}
-                                </div>
-                              </>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Card Image */}
-                <div className="aspect-[3/4] relative">
-                  <CardThumbnail url={card.front_url} />
-                </div>
+                <CardSlabGrid
+                  displayName={displayName}
+                  setLineText={setLineText}
+                  features={features}
+                  serial={card.serial}
+                  grade={grade}
+                  condition={condition}
+                  frontImageUrl={card.front_url}
+                  className="hover:shadow-xl transition-shadow duration-200"
+                />
               </Link>
             )
           })}
         </div>
       </div>
     </section>
-  )
-}
-
-function CardThumbnail({ url }: { url: string | null }) {
-  const [imageError, setImageError] = useState(false)
-  const [retryCount, setRetryCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
-  const maxRetries = 2
-
-  // Reset error state when URL changes
-  useEffect(() => {
-    setImageError(false)
-    setRetryCount(0)
-    setIsLoading(true)
-  }, [url])
-
-  // Handle image load error with retry logic
-  const handleError = () => {
-    if (retryCount < maxRetries) {
-      // Retry loading the image after a delay
-      setTimeout(() => {
-        setRetryCount(prev => prev + 1)
-        setImageError(false)
-        setIsLoading(true)
-      }, 1000 * (retryCount + 1)) // Exponential backoff: 1s, 2s
-    } else {
-      setImageError(true)
-      setIsLoading(false)
-    }
-  }
-
-  if (!url) {
-    return (
-      <div className="w-full h-full border grid place-items-center text-sm text-gray-500 bg-gray-100">
-        No image
-      </div>
-    )
-  }
-
-  if (imageError) {
-    return (
-      <div className="w-full h-full border grid place-items-center text-sm text-gray-500 bg-gray-100">
-        <div className="text-center p-4">
-          <div className="text-2xl mb-2">🖼️</div>
-          <div className="text-xs">Image unavailable</div>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="w-full h-full relative bg-gray-100">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-          <div className="animate-pulse text-gray-400">
-            <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-          </div>
-        </div>
-      )}
-      <Image
-        src={`${url}${retryCount > 0 ? `&retry=${retryCount}` : ''}`}
-        alt="Card"
-        fill
-        className="object-contain"
-        onLoad={() => setIsLoading(false)}
-        onError={handleError}
-        unoptimized
-      />
-    </div>
   )
 }

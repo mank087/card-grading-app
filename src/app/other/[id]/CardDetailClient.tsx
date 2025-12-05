@@ -2462,13 +2462,20 @@ export function OtherCardDetails() {
 
       {/* Main Layout */}
       <div className="space-y-8">
-        {/* Card Images with Professional-Style Labels */}
+        {/* Card Images with Professional-Style Labels in Metallic Slab */}
         <div className="flex justify-center">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
-            {/* Front Card with Label */}
-            <div>
+            {/* Front Card with Label - Metallic Slab */}
+            <div
+              className="rounded-xl p-1 overflow-hidden"
+              style={{
+                background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
+                boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
+              }}
+            >
+              <div className="bg-white rounded-lg overflow-hidden">
               {/* Front Label - PSA Style */}
-              <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg shadow-md p-3 mb-3 h-[110px]">
+              <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[110px]">
                 <div className="flex items-center justify-between h-full">
                   {/* Left: DCM Logo */}
                   <div className="flex-shrink-0">
@@ -2584,27 +2591,43 @@ export function OtherCardDetails() {
                 </div>
               </div>
 
+              {/* Purple Separator - mimics slab divider */}
+              <div
+                className="h-1"
+                style={{
+                  background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
+                }}
+              />
+
               {/* Front Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-105"
-                onClick={() => openZoomModal(card.front_url, "Lorcana card front", "Card Front - Click for detailed view")}
+                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                onClick={() => openZoomModal(card.front_url, "Other card front", "Card Front - Click for detailed view")}
               >
                 <Image
                   src={card.front_url}
-                  alt="Lorcana card front"
+                  alt="Other card front"
                   width={400}
                   height={560}
-                  className="rounded-lg shadow-lg w-full"
+                  className="w-full"
                   priority
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-2 text-center">Click to zoom</p>
+              </div>
+              <p className="text-xs text-white/80 mt-1 text-center">Click to zoom</p>
             </div>
 
-            {/* Back Card with Label */}
-            <div>
+            {/* Back Card with Label - Metallic Slab */}
+            <div
+              className="rounded-xl p-1 overflow-hidden"
+              style={{
+                background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
+                boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
+              }}
+            >
+              <div className="bg-white rounded-lg overflow-hidden">
               {/* Back Label - QR Code Centered */}
-              <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg shadow-md mb-3 h-[110px] flex items-center justify-center p-3">
+              <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] flex items-center justify-center p-3">
                 {/* QR Code with Logo Overlay */}
                 <div className="bg-white p-1 rounded relative">
                   <QRCodeCanvas
@@ -2626,20 +2649,29 @@ export function OtherCardDetails() {
                 </div>
               </div>
 
+              {/* Purple Separator - mimics slab divider */}
+              <div
+                className="h-1"
+                style={{
+                  background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
+                }}
+              />
+
               {/* Back Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-105"
-                onClick={() => openZoomModal(card.back_url, "Lorcana card back", "Card Back - Click for detailed view")}
+                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                onClick={() => openZoomModal(card.back_url, "Other card back", "Card Back - Click for detailed view")}
               >
                 <Image
                   src={card.back_url}
-                  alt="Lorcana card back"
+                  alt="Other card back"
                   width={400}
                   height={560}
-                  className="rounded-lg shadow-lg w-full"
+                  className="w-full"
                 />
               </div>
-              <p className="text-xs text-gray-500 mt-2 text-center">Click to zoom</p>
+              </div>
+              <p className="text-xs text-white/80 mt-1 text-center">Click to zoom</p>
             </div>
           </div>
         </div>

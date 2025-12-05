@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getStoredSession } from '../../lib/directAuth'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
+import { CardSlabGrid } from '@/components/CardSlab'
 
 type Card = {
   id: string
@@ -531,122 +532,35 @@ function CollectionPageContent() {
               const cardNumber = cardInfo.card_number;
               const year = cardInfo.year || cardInfo.card_date || card.card_date;
 
-              // Dynamic sizing for player name (Line 1) - single line, scale to fit
-              // Use transform scaleX to compress longer names horizontally
-              // At ~18 chars, text fits at full size. Beyond that, compress proportionally.
-              const maxCharsAtFullSize = 20;
-              const nameScaleX = displayName.length <= maxCharsAtFullSize
-                ? 1
-                : Math.max(0.55, maxCharsAtFullSize / displayName.length);
-
               // Build set line text
               const setLineText = [setName, cardNumber, year].filter(p => p).join(' • ');
 
-              // Dynamic sizing for set details (Line 2) - more aggressive scaling
-              const setFontSize = setLineText.length > 50 ? '8px'
-                : setLineText.length > 40 ? '9px'
-                : setLineText.length > 30 ? '10px'
-                : '11px';
+              // Get grade and condition for CardSlab
+              const grade = getCardGrade(card);
+              const condition = card.conversational_condition_label
+                ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                : (grade ? getConditionFromGrade(grade) : '');
+              const isAlteredAuthentic = card.conversational_condition_label &&
+                (card.conversational_condition_label.toLowerCase().includes('altered') ||
+                 card.conversational_condition_label.toLowerCase().includes('authentic altered') ||
+                 card.conversational_condition_label.includes('(AA)'));
 
               return (
-                <div key={card.id} className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden">
-                  {/* Professional Label (PSA-Style) - ABOVE IMAGE */}
-                  <div className="bg-gradient-to-b from-gray-50 to-white border-2 border-purple-600 rounded-lg p-3">
-                    <div className="flex items-center justify-between gap-1.5">
-                      {/* Left: DCM Logo */}
-                      <div className="flex-shrink-0 -ml-1">
-                        <img
-                          src="/DCM-logo.png"
-                          alt="DCM"
-                          className="h-9 w-auto"
-                        />
-                      </div>
-
-                      {/* Center: Card Information - New 4-Line Structure */}
-                      <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-                        {/* Line 1: Player/Card Name - Scale to fit on single line */}
-                        <div
-                          className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
-                          style={{
-                            fontSize: '13px',
-                            transform: `scaleX(${nameScaleX})`,
-                            lineHeight: '1.2'
-                          }}
-                          title={displayName}
-                        >
-                          {displayName}
-                        </div>
-
-                        {/* Line 2: Set Name • Card # • Year */}
-                        <div
-                          className="text-gray-700 leading-tight"
-                          style={{
-                            fontSize: setFontSize,
-                            display: '-webkit-box',
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: 'vertical',
-                            overflow: 'hidden',
-                            wordBreak: 'break-word'
-                          }}
-                          title={setLineText}
-                        >
-                          {setLineText}
-                        </div>
-
-                        {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
-                        {features.length > 0 && (
-                          <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                            {features.join(' • ')}
-                          </div>
-                        )}
-
-                        {/* Line 4: DCM Serial Number */}
-                        <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
-                          {card.serial}
-                        </div>
-                      </div>
-
-                      {/* Right: Grade Display */}
-                      <div className="text-center flex-shrink-0">
-                        {(() => {
-                          const grade = getCardGrade(card);
-                          // Use actual AI-generated condition label, stripping abbreviation
-                          const condition = card.conversational_condition_label
-                            ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-                            : (grade ? getConditionFromGrade(grade) : '');
-
-                          // Check if this is an Altered/Authentic card (has AA condition label but no numeric grade)
-                          const isAlteredAuthentic = card.conversational_condition_label &&
-                            (card.conversational_condition_label.toLowerCase().includes('altered') ||
-                             card.conversational_condition_label.toLowerCase().includes('authentic altered') ||
-                             card.conversational_condition_label.includes('(AA)'));
-
-                          return (
-                            <>
-                              <div className="font-bold text-purple-700 text-3xl leading-none">
-                                {grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
-                              </div>
-                              {(condition || isAlteredAuthentic) && (
-                                <>
-                                  <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                                  <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                                    {isAlteredAuthentic && !grade ? 'Authentic' : condition}
-                                  </div>
-                                </>
-                              )}
-                            </>
-                          );
-                        })()}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Card Image */}
-                  <div className="aspect-[3/4] relative">
-                    <CardThumbnail url={card.front_url} />
-
-                    {/* Visibility Badge */}
-                    <div className={`absolute bottom-2 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 ${
+                <CardSlabGrid
+                  key={card.id}
+                  displayName={displayName}
+                  setLineText={setLineText}
+                  features={features}
+                  serial={card.serial}
+                  grade={grade}
+                  condition={condition}
+                  frontImageUrl={card.front_url || null}
+                  isAlteredAuthentic={isAlteredAuthentic}
+                  className="hover:shadow-xl transition-shadow duration-200"
+                >
+                  {/* Visibility Badge */}
+                  <div className="relative">
+                    <div className={`absolute -top-8 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 ${
                       card.visibility === 'public'
                         ? 'bg-green-100 text-green-800 border-green-500'
                         : 'bg-gray-100 text-gray-800 border-gray-400'
@@ -664,7 +578,7 @@ function CollectionPageContent() {
                       View Details
                     </Link>
                   </div>
-                </div>
+                </CardSlabGrid>
               );
                 })}
               </div>
