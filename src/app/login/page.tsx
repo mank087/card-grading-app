@@ -1,19 +1,24 @@
 'use client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { signInWithPassword, signUp, getStoredSession, signInWithOAuth } from '../../lib/directAuth'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
-export default function LoginPage() {
+// Inner component that uses useSearchParams
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
   const [error, setError] = useState('')
-  const [isSignUp, setIsSignUp] = useState(false)
+
+  // Default to signup mode, unless mode=login is specified in URL
+  const modeParam = searchParams.get('mode')
+  const [isSignUp, setIsSignUp] = useState(modeParam !== 'login')
 
   useEffect(() => {
     // Check if user is already signed in
@@ -22,6 +27,11 @@ export default function LoginPage() {
       router.push('/collection')
     }
   }, [router])
+
+  // Update mode when URL parameter changes
+  useEffect(() => {
+    setIsSignUp(modeParam !== 'login')
+  }, [modeParam])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -307,12 +317,12 @@ export default function LoginPage() {
 
             {/* Toggle Sign In / Sign Up */}
             <div className="mt-6 text-center">
-              <button
-                onClick={() => setIsSignUp(!isSignUp)}
+              <Link
+                href={isSignUp ? '/login?mode=login' : '/login?mode=signup'}
                 className="text-sm text-purple-600 hover:text-purple-800 font-medium"
               >
                 {isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Create one"}
-              </button>
+              </Link>
             </div>
           </div>
 
@@ -357,5 +367,26 @@ export default function LoginPage() {
         </div>
       </div>
     </main>
+  )
+}
+
+// Loading fallback for Suspense
+function LoginPageLoading() {
+  return (
+    <main className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="text-center">
+        <div className="inline-block w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mb-4"></div>
+        <p className="text-gray-600">Loading...</p>
+      </div>
+    </main>
+  )
+}
+
+// Wrapper component with Suspense boundary
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageLoading />}>
+      <LoginPageContent />
+    </Suspense>
   )
 }

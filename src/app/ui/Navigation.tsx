@@ -351,20 +351,20 @@ export default function Navigation() {
               </Link>
             )}
 
-            {/* Login or My Collection Button - Mobile */}
+            {/* Login/Sign Up or My Collection Button - Mobile */}
             {user ? (
               <Link
                 href="/collection"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
               >
                 Collection
               </Link>
             ) : (
               <Link
-                href="/login"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
+                href="/login?mode=signup"
+                className="bg-purple-700 hover:bg-purple-800 text-white px-3 py-1.5 rounded-md text-xs font-medium transition-colors"
               >
-                Login
+                Sign Up
               </Link>
             )}
 
@@ -388,14 +388,22 @@ export default function Navigation() {
           </div>
 
           {/* Desktop Auth Section - Right Side */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-3">
             {!user && (
-              <Link
-                href="/login"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Login
-              </Link>
+              <>
+                <Link
+                  href="/login"
+                  className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/login?mode=signup"
+                  className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-md"
+                >
+                  Sign Up Free
+                </Link>
+              </>
             )}
           </div>
         </div>
