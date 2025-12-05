@@ -410,6 +410,17 @@ export default function Navigation() {
         {mobileMenuOpen && (
           <div className="md:hidden pb-4 border-t border-gray-200 mt-2 mobile-menu">
             <div className="flex flex-col space-y-2 pt-2">
+              {/* Login - Only show when logged out */}
+              {!user && (
+                <Link
+                  href="/login?mode=login"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-50 transition-colors"
+                >
+                  Login
+                </Link>
+              )}
+
               {/* My Account - Only show when logged in */}
               {user && (
                 <Link
