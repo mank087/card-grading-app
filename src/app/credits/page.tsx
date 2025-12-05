@@ -16,6 +16,7 @@ interface PricingTier {
   name: string
   price: number
   credits: number
+  bonusCredits: number
   description: string
   popular?: boolean
 }
@@ -26,6 +27,7 @@ const pricingTiers: PricingTier[] = [
     name: 'Basic',
     price: 2.99,
     credits: 1,
+    bonusCredits: 1,
     description: 'Perfect for trying out DCM Grading',
   },
   {
@@ -33,6 +35,7 @@ const pricingTiers: PricingTier[] = [
     name: 'Pro',
     price: 9.99,
     credits: 5,
+    bonusCredits: 2,
     description: 'Best value for casual collectors',
     popular: true,
   },
@@ -41,6 +44,7 @@ const pricingTiers: PricingTier[] = [
     name: 'Elite',
     price: 19.99,
     credits: 20,
+    bonusCredits: 5,
     description: 'For serious collectors and dealers',
   },
 ]
@@ -148,24 +152,24 @@ function CreditsPageContent() {
               <div className="relative px-6 py-8 sm:px-10 sm:py-10">
                 <div className="text-center text-white">
                   <h2 className="text-2xl sm:text-3xl font-bold mb-3">
-                    AI-Powered Card Grading
+                    DCM Optic™ Card Grading
                   </h2>
                   <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
                     Get professional-quality grades for your trading cards in seconds.
-                    Our DCM Optic technology analyzes centering, corners, edges, and surface quality.
+                    Our DCM Optic™ technology analyzes centering, corners, edges, and surface quality.
                   </p>
 
                   {/* How It Works Steps */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-6">
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">1</div>
-                      <p className="font-semibold">Sign Up Free</p>
-                      <p className="text-sm text-white/70">Create your account</p>
+                      <p className="font-semibold">Create Your Account</p>
+                      <p className="text-sm text-white/70">Sign up free</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">2</div>
-                      <p className="font-semibold">Upload Card Photos</p>
-                      <p className="text-sm text-white/70">Front and back images</p>
+                      <p className="font-semibold">Fund Your Account</p>
+                      <p className="text-sm text-white/70">Purchase credits</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">3</div>
@@ -178,7 +182,7 @@ function CreditsPageContent() {
                     <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
-                    <span>First-time buyers get +1 FREE bonus credit!</span>
+                    <span>DCM Launch Special - New Users get FREE bonus Credits!</span>
                   </div>
                 </div>
               </div>
@@ -206,14 +210,14 @@ function CreditsPageContent() {
                   </h2>
                   <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
                     Your account is ready! Get started by purchasing credits to grade your first card.
-                    Our AI-powered grading system analyzes centering, corners, edges, and surface quality.
+                    Our DCM Optic™ grading system analyzes centering, corners, edges, and surface quality.
                   </p>
 
                   {/* How It Works Steps */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-6">
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">1</div>
-                      <p className="font-semibold">Purchase Credits</p>
+                      <p className="font-semibold">Fund Your Account</p>
                       <p className="text-sm text-white/70">Choose a package below</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
@@ -232,7 +236,7 @@ function CreditsPageContent() {
                     <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
-                    <span>First-time buyers get +1 FREE bonus credit!</span>
+                    <span>DCM Launch Special - New Users get FREE bonus Credits!</span>
                   </div>
                 </div>
               </div>
@@ -267,7 +271,7 @@ function CreditsPageContent() {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                 </svg>
-                <span className="font-semibold">First Purchase Bonus: +1 FREE Credit!</span>
+                <span className="font-semibold">DCM Launch Special - New Users get FREE bonus Credits!</span>
               </div>
             )}
           </div>
@@ -313,7 +317,7 @@ function CreditsPageContent() {
                   </div>
                   {(isAuthenticated ? isFirstPurchase : true) && (
                     <div className="mt-2 text-sm text-green-600 font-semibold">
-                      + 1 bonus = {tier.credits + 1} total
+                      + {tier.bonusCredits} bonus = {tier.credits + tier.bonusCredits} total
                     </div>
                   )}
                 </div>
@@ -368,7 +372,7 @@ function CreditsPageContent() {
           <h2 className="text-2xl font-bold text-gray-900 mb-8">What You Get</h2>
           <div className="grid md:grid-cols-4 gap-6">
             {[
-              { icon: '🎯', title: 'AI Grading', desc: 'Professional-grade analysis' },
+              { icon: '🎯', title: 'DCM Optic™ Grading', desc: 'Professional-grade analysis' },
               { icon: '⚡', title: 'Instant Results', desc: 'Grade cards in seconds' },
               { icon: '📊', title: 'Detailed Reports', desc: 'Comprehensive breakdown' },
               { icon: '🔒', title: 'Secure', desc: 'Your data is protected' },
@@ -394,7 +398,7 @@ function CreditsPageContent() {
             </div>
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h3 className="font-bold text-gray-900 mb-2">What counts as 1 credit?</h3>
-              <p className="text-gray-600">One credit = one card grade. Re-grading a card also costs 1 credit.</p>
+              <p className="text-gray-600">One credit = one card grade.</p>
             </div>
             <div className="bg-white rounded-xl p-6 shadow-md">
               <h3 className="font-bold text-gray-900 mb-2">Is my payment secure?</h3>

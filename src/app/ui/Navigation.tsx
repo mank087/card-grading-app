@@ -405,6 +405,19 @@ export default function Navigation() {
           {/* Desktop Auth Section - Right Side (only shown when logged out) */}
           {!user && (
             <div className="hidden md:flex items-center space-x-3">
+              <Link
+                href="/login?mode=login"
+                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+              >
+                Login
+              </Link>
+              <Link
+                href="/login?mode=signup"
+                className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-md"
+              >
+                Sign Up
+              </Link>
+
               {/* Resources Dropdown (hamburger-style) */}
               <div className="relative resources-dropdown">
                 <button
@@ -457,19 +470,6 @@ export default function Navigation() {
                   </div>
                 )}
               </div>
-
-              <Link
-                href="/login?mode=login"
-                className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-              >
-                Login
-              </Link>
-              <Link
-                href="/login?mode=signup"
-                className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-md"
-              >
-                Sign Up
-              </Link>
             </div>
           )}
         </div>
