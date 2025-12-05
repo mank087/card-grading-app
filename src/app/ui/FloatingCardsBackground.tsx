@@ -6,10 +6,13 @@
  * A subtle animated background component featuring floating trading card shapes.
  * Cards slowly rotate at different speeds for visual interest without distracting
  * from page content.
+ *
+ * Uses z-index: -1 to ensure it always stays behind all page content including
+ * the footer and form elements.
  */
 export default function FloatingCardsBackground() {
   return (
-    <div className="fixed inset-0 overflow-hidden pointer-events-none z-0" aria-hidden="true">
+    <div className="fixed inset-0 overflow-hidden pointer-events-none" style={{ zIndex: -1 }} aria-hidden="true">
       {/* Card 1 - Large, top right */}
       <div
         className="absolute w-32 h-44 rounded-lg bg-purple-600/[0.06] blur-[1px]"

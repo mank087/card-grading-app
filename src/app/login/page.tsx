@@ -196,7 +196,7 @@ function LoginPageContent() {
       </div>
 
       {/* Right Panel - Auth Form */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 sm:px-12 lg:px-16 xl:px-24 py-12 bg-gray-50">
+      <div className="w-full lg:w-1/2 flex flex-col justify-center px-6 sm:px-12 lg:px-16 xl:px-24 py-12 bg-gray-50 relative z-10">
         {/* Mobile Logo (shown only on small screens) */}
         <div className="lg:hidden mb-8 text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
