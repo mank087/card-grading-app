@@ -1,6 +1,5 @@
 import { Metadata } from 'next'
 import Link from 'next/link'
-import Image from 'next/image'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
 export const metadata: Metadata = {
@@ -12,30 +11,8 @@ export default function GradingLimitationsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50 relative">
       <FloatingCardsBackground />
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <Image
-              src="/DCM-logo.png"
-              alt="DCM Grading"
-              width={40}
-              height={40}
-              className="object-contain"
-            />
-            <span className="font-bold text-xl text-gray-900">DCM Grading</span>
-          </Link>
-          <Link
-            href="/upload"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
-          >
-            Grade a Card
-          </Link>
-        </div>
-      </header>
-
       {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 py-12">
+      <main className="max-w-4xl mx-auto px-4 py-12 relative z-10">
         {/* Page Title */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
@@ -77,7 +54,7 @@ export default function GradingLimitationsPage() {
               </svg>
             </div>
             <h2 className="text-2xl font-bold text-gray-900">
-              What DCM Optic™ Grades Reliably
+              Why DCM Optic™ Grades are Reliable
             </h2>
           </div>
 
@@ -461,18 +438,6 @@ export default function GradingLimitationsPage() {
           </Link>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-8 mt-12">
-        <div className="max-w-4xl mx-auto px-4 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} DCM Grading. All rights reserved.</p>
-          <div className="flex justify-center gap-6 mt-4">
-            <Link href="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
-            <Link href="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-            <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }
