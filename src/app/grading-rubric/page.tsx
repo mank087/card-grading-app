@@ -633,66 +633,24 @@ export default function GradingRubricPage() {
           </div>
         </section>
 
-        {/* FAQ */}
+        {/* FAQ Link */}
         <section className="mb-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-            Frequently Asked Questions
-          </h2>
-
-          <div className="space-y-4">
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                How does DCM compare to professional grading services?
-              </h3>
-              <p className="text-gray-700">
-                DCM Optic™ uses PSA-aligned grading criteria and provides comparable assessments. Our three-pass consensus system mimics how professional services use multiple evaluators. While we provide accurate, evidence-based evaluations, DCM grades are for informational purposes and don't replace official third-party grading for authentication or resale value certification.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                What is three-pass consensus grading?
-              </h3>
-              <p className="text-gray-700">
-                Three-pass consensus means every card is evaluated three independent times, with the results averaged to produce the final grade. Defects must be confirmed in at least 2 of 3 passes to affect the grade, which eliminates false positives and ensures only real defects impact your score. This approach significantly improves accuracy and reliability compared to single-pass systems.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                What does "evidence-based grading" mean?
-              </h3>
-              <p className="text-gray-700">
-                Every defect or pristine assessment must be backed by observable evidence. We document specific locations, measurements, and visual characteristics for every finding. No assumptions — only deductions for defects we can actually see and confirm across multiple passes.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                Can DCM grade cards already in slabs?
-              </h3>
-              <p className="text-gray-700">
-                Yes! DCM Optic™ can detect professionally graded slabs from PSA, BGS, CGC, SGC, and other services. The system performs its own independent assessment while acknowledging visibility limitations from the holder.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                Why do front and back have separate scores?
-              </h3>
-              <p className="text-gray-700">
-                Following industry standards, we evaluate front and back independently with weighted averaging (55% front, 45% back). Front condition is weighted more heavily as it's the primary display side of the card.
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl shadow-md p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-2">
-                How should I photograph my cards for best results?
-              </h3>
-              <p className="text-gray-700">
-                Use good lighting without glare, keep the card flat and centered, ensure the entire card is visible, and capture both front and back. Remove from holders when possible. Higher quality images (Grade A) result in ±0.25 uncertainty vs ±1.5 for Grade D images.
-              </p>
-            </div>
+          <div className="bg-white rounded-xl shadow-md p-8 text-center">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+              Have Questions?
+            </h2>
+            <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
+              Visit our comprehensive FAQ for answers about three-pass grading, image quality tips, pricing, supported card types, and more.
+            </p>
+            <a
+              href="/faq"
+              className="inline-flex items-center px-6 py-3 bg-purple-600 text-white font-bold rounded-lg hover:bg-purple-700 transition-colors"
+            >
+              View FAQ
+              <svg className="w-5 h-5 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+              </svg>
+            </a>
           </div>
         </section>
 
