@@ -10,7 +10,7 @@ export default function Footer() {
     <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
-        <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
 
           {/* Company Info & Logo */}
           <div className="lg:col-span-1">
@@ -48,6 +48,31 @@ export default function Footer() {
                 </svg>
               </a>
             </div>
+          </div>
+
+          {/* Get Started */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Get Started</h3>
+            <ul className="space-y-3 text-sm">
+              <li>
+                <Link
+                  href="/login?mode=signup"
+                  className="inline-block bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors shadow-md"
+                >
+                  Sign Up
+                </Link>
+              </li>
+              <li>
+                <Link href="/login?mode=login" className="text-gray-400 hover:text-white transition-colors">
+                  Login
+                </Link>
+              </li>
+              <li>
+                <Link href="/credits" className="text-gray-400 hover:text-white transition-colors">
+                  Buy Credits
+                </Link>
+              </li>
+            </ul>
           </div>
 
           {/* Grade a Card */}
