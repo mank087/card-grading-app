@@ -8,6 +8,11 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // HYBRID SET IDENTIFICATION: Pokemon TCG API for set lookup when AI doesn't have it in mini table
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 
+// Vercel serverless function configuration
+// maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
+// GPT-5.1 with large prompts + vision can take 60-90 seconds, with retries up to 3 minutes
+export const maxDuration = 180;
+
 // Track Pokemon cards currently being processed with timestamps
 const processingPokemonCards = new Map<string, number>();
 

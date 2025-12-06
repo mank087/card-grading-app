@@ -552,10 +552,35 @@ Return your observations in the required JSON format.`;
 
     console.log('[DVG v2] Received API response');
 
-    // Extract response
+    // Extract response with detailed error logging
     const responseMessage = response.choices[0]?.message;
+    const finishReason = response.choices[0]?.finish_reason;
+
     if (!responseMessage || !responseMessage.content) {
-      throw new Error('No response content from API');
+      // Log detailed diagnostic information
+      console.error('[DVG v2] ❌ Empty response from OpenAI API');
+      console.error('[DVG v2] Response object:', JSON.stringify({
+        id: response.id,
+        model: response.model,
+        finish_reason: finishReason,
+        choices_count: response.choices?.length || 0,
+        has_message: !!responseMessage,
+        message_role: responseMessage?.role,
+        content_type: typeof responseMessage?.content,
+        content_length: responseMessage?.content?.length || 0,
+        refusal: responseMessage?.refusal || null
+      }, null, 2));
+
+      // Check for specific failure reasons
+      if (finishReason === 'length') {
+        throw new Error('OpenAI response truncated - max_tokens limit reached');
+      } else if (finishReason === 'content_filter') {
+        throw new Error('OpenAI content filter blocked the response');
+      } else if (responseMessage?.refusal) {
+        throw new Error(`OpenAI refused to respond: ${responseMessage.refusal}`);
+      }
+
+      throw new Error(`No response content from API (finish_reason: ${finishReason || 'unknown'})`);
     }
 
     const responseText = responseMessage.content;
@@ -1449,8 +1474,13 @@ export async function gradeCardConversational(
   const { text: promptText, format: outputFormat } = loadConversationalPrompt(cardType);
   console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Output format: ${outputFormat.toUpperCase()}`);
 
-  try {
-    console.log('[CONVERSATIONAL] Calling Chat Completions API...');
+  // Retry configuration for transient failures
+  const MAX_RETRIES = 3;
+  const INITIAL_RETRY_DELAY = 2000; // 2 seconds
+
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      console.log(`[CONVERSATIONAL] Calling Chat Completions API... (attempt ${attempt}/${MAX_RETRIES})`);
 
     // Build API call configuration
     const apiConfig: any = {
@@ -1520,12 +1550,40 @@ Provide detailed analysis as markdown with all required sections.`
 
     console.log('[CONVERSATIONAL] Received API response');
 
+    // Extract response with detailed error logging
     const responseMessage = response.choices[0]?.message;
+    const finishReason = response.choices[0]?.finish_reason;
+
     if (!responseMessage || !responseMessage.content) {
-      throw new Error('No response content from API');
+      // Log detailed diagnostic information
+      console.error('[CONVERSATIONAL] ❌ Empty response from OpenAI API');
+      console.error('[CONVERSATIONAL] Response object:', JSON.stringify({
+        id: response.id,
+        model: response.model,
+        finish_reason: finishReason,
+        choices_count: response.choices?.length || 0,
+        has_message: !!responseMessage,
+        message_role: responseMessage?.role,
+        content_type: typeof responseMessage?.content,
+        content_length: responseMessage?.content?.length || 0,
+        refusal: responseMessage?.refusal || null,
+        usage: response.usage
+      }, null, 2));
+
+      // Check for specific failure reasons
+      if (finishReason === 'length') {
+        throw new Error('OpenAI response truncated - max_tokens limit reached. Try reducing prompt size.');
+      } else if (finishReason === 'content_filter') {
+        throw new Error('OpenAI content filter blocked the response. The card image may have been flagged.');
+      } else if (responseMessage?.refusal) {
+        throw new Error(`OpenAI refused to respond: ${responseMessage.refusal}`);
+      }
+
+      throw new Error(`No response content from API (finish_reason: ${finishReason || 'unknown'})`);
     }
 
     const responseContent = responseMessage.content;
+    console.log(`[CONVERSATIONAL] Response length: ${responseContent.length} chars, finish_reason: ${finishReason}`);
 
     // Handle response based on format
     if (outputFormat === 'json') {
@@ -1669,12 +1727,38 @@ Provide detailed analysis as markdown with all required sections.`
       return result;
     }
 
-  } catch (error) {
-    console.error('[CONVERSATIONAL] Conversational grading failed:', error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[CONVERSATIONAL] Attempt ${attempt}/${MAX_RETRIES} failed:`, errorMessage);
 
-    if (error instanceof Error) {
-      throw new Error(`Conversational grading failed: ${error.message}`);
+      // Check if this is a retryable error
+      const isRetryable =
+        errorMessage.includes('No response content from API') ||
+        errorMessage.includes('finish_reason: unknown') ||
+        errorMessage.includes('ECONNRESET') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('rate limit') ||
+        errorMessage.includes('503') ||
+        errorMessage.includes('502') ||
+        errorMessage.includes('500');
+
+      if (isRetryable && attempt < MAX_RETRIES) {
+        const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`[CONVERSATIONAL] ⏳ Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue; // Try again
+      }
+
+      // Not retryable or max retries reached
+      console.error('[CONVERSATIONAL] ❌ Conversational grading failed after all retries:', error);
+
+      if (error instanceof Error) {
+        throw new Error(`Conversational grading failed: ${error.message}`);
+      }
+      throw error;
     }
-    throw error;
   }
+
+  // This should never be reached due to the throw in the catch block
+  throw new Error('Conversational grading failed: unexpected end of retry loop');
 }

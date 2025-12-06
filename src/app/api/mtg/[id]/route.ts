@@ -8,6 +8,11 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // Scryfall API imports (for future use when ENABLE_SCRYFALL_API = true)
 // import { searchCardByFuzzyName, getCardBySetAndNumber } from "@/lib/scryfallApi";
 
+// Vercel serverless function configuration
+// maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
+// GPT-5.1 with large prompts + vision can take 60-90 seconds, with retries up to 3 minutes
+export const maxDuration = 180;
+
 // Track MTG cards currently being processed with timestamps
 const processingMTGCards = new Map<string, number>();
 
