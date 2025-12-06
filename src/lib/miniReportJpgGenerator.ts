@@ -13,14 +13,18 @@ import { FoldableLabelData } from './foldableLabelGenerator';
 const CANVAS_WIDTH = 750;   // 2.5" at 300 DPI
 const CANVAS_HEIGHT = 1050; // 3.5" at 300 DPI
 
-// Scale factor (PDF uses 72 DPI, we use 300 DPI equivalent)
-const SCALE = CANVAS_WIDTH / (2.5 * 72); // ~4.17
-
 // Colors (matching existing DCM branding)
 const COLORS = {
   purplePrimary: '#7c3aed',    // Purple-600
   purpleDark: '#6b46c1',       // Purple-700
   purpleLight: '#f3e8ff',      // Purple-100
+
+  // Metallic slab gradient colors
+  slabGradient1: '#9333ea',    // Purple-600
+  slabGradient2: '#6b21a8',    // Purple-800
+  slabGradient3: '#a855f7',    // Purple-500
+  slabGradient4: '#7c3aed',    // Purple-600
+  slabGradient5: '#581c87',    // Purple-900
 
   // Subgrade colors
   centeringBlue: '#3b82f6',    // Blue-500
@@ -128,19 +132,94 @@ function drawSubgradeCircle(
   const gradeText = formatGradeDisplay(grade);
   const hasDecimal = gradeText.includes('.');
 
-  // Draw grade text (white, bold, centered)
+  // Draw grade text (white, bold, centered) - FIXED: use fixed font sizes, not scaled
   ctx.fillStyle = COLORS.white;
-  ctx.font = `bold ${hasDecimal ? 40 * SCALE : 48 * SCALE}px 'Helvetica Neue', Arial, sans-serif`;
+  ctx.font = `bold ${hasDecimal ? 36 : 44}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(gradeText, centerX, centerY + 2 * SCALE);
+  ctx.fillText(gradeText, centerX, centerY);
 
   // Draw label below circle
   ctx.fillStyle = COLORS.textDark;
-  ctx.font = `bold ${20 * SCALE}px 'Helvetica Neue', Arial, sans-serif`;
+  ctx.font = 'bold 18px "Helvetica Neue", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(label, centerX, centerY + radius + 6 * SCALE);
+  ctx.fillText(label, centerX, centerY + radius + 8);
+}
+
+/**
+ * Draw metallic purple slab border (gradient effect)
+ */
+function drawMetallicSlabBorder(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  borderWidth: number,
+  cornerRadius: number
+) {
+  // Create gradient for metallic effect
+  const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+  gradient.addColorStop(0, COLORS.slabGradient1);
+  gradient.addColorStop(0.25, COLORS.slabGradient2);
+  gradient.addColorStop(0.5, COLORS.slabGradient3);
+  gradient.addColorStop(0.75, COLORS.slabGradient4);
+  gradient.addColorStop(1, COLORS.slabGradient5);
+
+  ctx.fillStyle = gradient;
+
+  // Draw outer rounded rect
+  ctx.beginPath();
+  ctx.moveTo(x + cornerRadius, y);
+  ctx.lineTo(x + width - cornerRadius, y);
+  ctx.quadraticCurveTo(x + width, y, x + width, y + cornerRadius);
+  ctx.lineTo(x + width, y + height - cornerRadius);
+  ctx.quadraticCurveTo(x + width, y + height, x + width - cornerRadius, y + height);
+  ctx.lineTo(x + cornerRadius, y + height);
+  ctx.quadraticCurveTo(x, y + height, x, y + height - cornerRadius);
+  ctx.lineTo(x, y + cornerRadius);
+  ctx.quadraticCurveTo(x, y, x + cornerRadius, y);
+  ctx.closePath();
+
+  // Cut out inner area
+  const innerX = x + borderWidth;
+  const innerY = y + borderWidth;
+  const innerWidth = width - borderWidth * 2;
+  const innerHeight = height - borderWidth * 2;
+  const innerRadius = Math.max(0, cornerRadius - borderWidth);
+
+  ctx.moveTo(innerX + innerRadius, innerY);
+  ctx.lineTo(innerX + innerWidth - innerRadius, innerY);
+  ctx.quadraticCurveTo(innerX + innerWidth, innerY, innerX + innerWidth, innerY + innerRadius);
+  ctx.lineTo(innerX + innerWidth, innerY + innerHeight - innerRadius);
+  ctx.quadraticCurveTo(innerX + innerWidth, innerY + innerHeight, innerX + innerWidth - innerRadius, innerY + innerHeight);
+  ctx.lineTo(innerX + innerRadius, innerY + innerHeight);
+  ctx.quadraticCurveTo(innerX, innerY + innerHeight, innerX, innerY + innerHeight - innerRadius);
+  ctx.lineTo(innerX, innerY + innerRadius);
+  ctx.quadraticCurveTo(innerX, innerY, innerX + innerRadius, innerY);
+  ctx.closePath();
+
+  ctx.fill('evenodd');
+}
+
+/**
+ * Draw purple separator line (gradient)
+ */
+function drawPurpleSeparator(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number
+) {
+  const gradient = ctx.createLinearGradient(x, y, x + width, y);
+  gradient.addColorStop(0, COLORS.slabGradient1);
+  gradient.addColorStop(0.5, COLORS.slabGradient3);
+  gradient.addColorStop(1, COLORS.slabGradient1);
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(x, y, width, height);
 }
 
 /**
@@ -174,36 +253,43 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   ctx.imageSmoothingQuality = 'high';
 
   // ============================================
-  // BACKGROUND AND BORDER
+  // BACKGROUND AND METALLIC SLAB BORDER
   // ============================================
 
   // White background
   ctx.fillStyle = COLORS.white;
   ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-  // Purple border
-  ctx.strokeStyle = COLORS.purplePrimary;
-  ctx.lineWidth = 6;
-  ctx.strokeRect(3, 3, CANVAS_WIDTH - 6, CANVAS_HEIGHT - 6);
+  // Outer metallic purple slab border
+  const outerBorderWidth = 8;
+  const outerCornerRadius = 16;
+  drawMetallicSlabBorder(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, outerBorderWidth, outerCornerRadius);
 
   // ============================================
-  // HEADER SECTION
+  // HEADER SECTION WITH SLAB BORDER
   // ============================================
 
-  const headerHeight = 230;
-  const headerPadding = 20;
+  const headerHeight = 210;
+  const headerMargin = outerBorderWidth + 4;
+  const headerWidth = CANVAS_WIDTH - headerMargin * 2;
 
-  // Header background (white with purple border)
+  // Draw metallic slab border around header
+  const headerBorderWidth = 6;
+  const headerCornerRadius = 12;
+  drawMetallicSlabBorder(ctx, headerMargin, headerMargin, headerWidth, headerHeight, headerBorderWidth, headerCornerRadius);
+
+  // White background inside header slab
   ctx.fillStyle = COLORS.white;
-  ctx.strokeStyle = COLORS.purplePrimary;
-  ctx.lineWidth = 4;
-  ctx.fillRect(6, 6, CANVAS_WIDTH - 12, headerHeight);
-  ctx.strokeRect(6, 6, CANVAS_WIDTH - 12, headerHeight);
+  const innerHeaderX = headerMargin + headerBorderWidth;
+  const innerHeaderY = headerMargin + headerBorderWidth;
+  const innerHeaderWidth = headerWidth - headerBorderWidth * 2;
+  const innerHeaderHeight = headerHeight - headerBorderWidth * 2;
+  drawRoundedRect(ctx, innerHeaderX, innerHeaderY, innerHeaderWidth, innerHeaderHeight, headerCornerRadius - headerBorderWidth, { fill: true });
 
-  // DCM Logo
-  const logoX = 24;
-  const logoY = 40;
-  const logoSize = 150;
+  // DCM Logo - positioned inside the header slab
+  const logoX = innerHeaderX + 12;
+  const logoY = innerHeaderY + 12;
+  const logoSize = 130;
 
   if (data.logoDataUrl) {
     try {
@@ -212,112 +298,118 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
     } catch {
       // Fallback text
       ctx.fillStyle = COLORS.purplePrimary;
-      ctx.font = `bold ${48}px 'Helvetica Neue', Arial, sans-serif`;
+      ctx.font = 'bold 42px "Helvetica Neue", Arial, sans-serif';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText('DCM', logoX + 30, logoY + 75);
+      ctx.fillText('DCM', logoX + 20, logoY + 65);
     }
   } else {
     // Fallback text
     ctx.fillStyle = COLORS.purplePrimary;
-    ctx.font = `bold ${48}px 'Helvetica Neue', Arial, sans-serif`;
+    ctx.font = 'bold 42px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.fillText('DCM', logoX + 30, logoY + 75);
+    ctx.fillText('DCM', logoX + 20, logoY + 65);
   }
 
-  // Card info (center)
-  const infoX = 185;
-  const infoMaxWidth = CANVAS_WIDTH - 300;
+  // Card info (center) - adjusted for new layout
+  const infoX = logoX + logoSize + 15;
+  const infoMaxWidth = CANVAS_WIDTH - 280;
 
   // Line 1: Card Name (dark, bold, dynamic font size)
   ctx.fillStyle = COLORS.textDark;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
-  let playerFontSize = 36;
+  let playerFontSize = 32;
   ctx.font = `bold ${playerFontSize}px 'Helvetica Neue', Arial, sans-serif`;
-  while (ctx.measureText(data.cardName).width > infoMaxWidth && playerFontSize > 20) {
+  while (ctx.measureText(data.cardName).width > infoMaxWidth && playerFontSize > 18) {
     playerFontSize -= 2;
     ctx.font = `bold ${playerFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   }
-  ctx.fillText(data.cardName, infoX, 28);
+  ctx.fillText(data.cardName, infoX, innerHeaderY + 18);
 
   // Line 2: Set Name • Card Number • Year
   ctx.fillStyle = COLORS.textMedium;
   const setInfo = [data.setName, data.cardNumber, data.year].filter(Boolean).join(' • ');
 
-  let setFontSize = 24;
+  let setFontSize = 20;
   ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
-  while (ctx.measureText(setInfo).width > infoMaxWidth && setFontSize > 18) {
+  while (ctx.measureText(setInfo).width > infoMaxWidth && setFontSize > 14) {
     setFontSize -= 1;
     ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   }
 
-  let currentY = 70;
+  let currentY = innerHeaderY + 55;
   if (ctx.measureText(setInfo).width > infoMaxWidth) {
     // Wrap to multiple lines
     const setLines = wrapText(ctx, setInfo, infoMaxWidth);
     setLines.slice(0, 2).forEach((line, i) => {
-      ctx.fillText(line, infoX, currentY + (i * 28));
+      ctx.fillText(line, infoX, currentY + (i * 24));
     });
-    currentY += (Math.min(setLines.length, 2)) * 28;
+    currentY += (Math.min(setLines.length, 2)) * 24;
   } else {
     ctx.fillText(setInfo, infoX, currentY);
-    currentY += 32;
+    currentY += 28;
   }
 
   // Line 3: Special features (if any) - blue text
   if (data.specialFeatures) {
     ctx.fillStyle = COLORS.featureBlue;
-    ctx.font = `bold ${22}px 'Helvetica Neue', Arial, sans-serif`;
+    ctx.font = 'bold 18px "Helvetica Neue", Arial, sans-serif';
     ctx.fillText(data.specialFeatures, infoX, currentY);
-    currentY += 28;
+    currentY += 24;
   }
 
   // Line 4: Serial number (gray, monospace style)
   ctx.fillStyle = COLORS.textLight;
-  ctx.font = `${20}px 'Courier New', monospace`;
+  ctx.font = '16px "Courier New", monospace';
   ctx.fillText(data.serial, infoX, currentY);
 
-  // Grade display (right side)
-  const gradeX = CANVAS_WIDTH - 100;
+  // Grade display (right side) - adjusted for new layout
+  const gradeX = CANVAS_WIDTH - 85;
   const gradeText = formatGradeDisplay(data.grade);
   const hasDecimal = gradeText.includes('.');
 
   ctx.fillStyle = COLORS.purplePrimary;
-  ctx.font = `bold ${hasDecimal ? 64 : 80}px 'Helvetica Neue', Arial, sans-serif`;
+  ctx.font = `bold ${hasDecimal ? 56 : 72}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(gradeText, gradeX, 50);
+  ctx.fillText(gradeText, gradeX, innerHeaderY + 30);
 
   // Divider line under grade
   ctx.strokeStyle = COLORS.purplePrimary;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 3;
   ctx.beginPath();
-  ctx.moveTo(gradeX - 55, 130);
-  ctx.lineTo(gradeX + 55, 130);
+  ctx.moveTo(gradeX - 50, innerHeaderY + 105);
+  ctx.lineTo(gradeX + 50, innerHeaderY + 105);
   ctx.stroke();
 
   // Condition label
   ctx.fillStyle = COLORS.purplePrimary;
-  ctx.font = `bold ${20}px 'Helvetica Neue', Arial, sans-serif`;
+  ctx.font = 'bold 16px "Helvetica Neue", Arial, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(data.conditionLabel.toUpperCase(), gradeX, 145);
+  ctx.fillText(data.conditionLabel.toUpperCase(), gradeX, innerHeaderY + 115);
+
+  // ============================================
+  // PURPLE SEPARATOR BETWEEN HEADER AND SUBGRADES
+  // ============================================
+  const separatorY = headerMargin + headerHeight + 4;
+  drawPurpleSeparator(ctx, headerMargin, separatorY, headerWidth, 6);
 
   // ============================================
   // SUBGRADES SECTION (2x2 grid with QR in center)
   // ============================================
 
-  const subgradesY = headerHeight + 35;
-  const circleRadius = 65;
+  const subgradesY = separatorY + 20;
+  const circleRadius = 60;
 
   // Position circles in corners with QR code in center
-  const leftColX = 115;
-  const rightColX = CANVAS_WIDTH - 115;
-  const row1Y = subgradesY + 75;
-  const row2Y = subgradesY + 245;
+  const leftColX = 100;
+  const rightColX = CANVAS_WIDTH - 100;
+  const row1Y = subgradesY + 70;
+  const row2Y = subgradesY + 220;
 
   // Row 1: Centering (left), Corners (right)
   drawSubgradeCircle(ctx, leftColX, row1Y, circleRadius, COLORS.centeringBlue, data.subgrades.centering, 'CENTERING');
@@ -328,7 +420,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   drawSubgradeCircle(ctx, rightColX, row2Y, circleRadius, COLORS.surfaceAmber, data.subgrades.surface, 'SURFACE');
 
   // QR Code in center of subgrades
-  const qrSize = 170;
+  const qrSize = 150;
   const qrX = (CANVAS_WIDTH - qrSize) / 2;
   const qrY = subgradesY + 70;
 
@@ -348,9 +440,9 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   // OVERALL SUMMARY SECTION
   // ============================================
 
-  const summaryY = row2Y + 130;
-  const summaryHeight = CANVAS_HEIGHT - summaryY - 20;
-  const summaryPadding = 24;
+  const summaryY = row2Y + 100;
+  const summaryHeight = CANVAS_HEIGHT - summaryY - outerBorderWidth - 12;
+  const summaryPadding = 20;
 
   // Summary background
   ctx.fillStyle = COLORS.bgSummary;
