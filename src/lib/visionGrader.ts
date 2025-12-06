@@ -1457,7 +1457,7 @@ export async function gradeCardConversational(
   const {
     model = 'gpt-5.1',  // 🆕 GPT-5.1 - Latest model (November 2025) with improved vision + accuracy
     temperature = 0.2,  // 🔑 Low temperature for strict instruction adherence (v3.5 PATCHED v3)
-    max_tokens = 5500,  // 🆕 Increased for STEP 13 Professional Commentary (was 4000)
+    max_tokens = 16000, // 🔧 Increased to 16K - v5.11 rubric requires extensive JSON output
     seed = 42,          // Fixed seed for reproducibility
     top_p = 1.0         // 🔑 Full probability space - allows nuanced descriptions while temp maintains consistency
   } = options || {};
