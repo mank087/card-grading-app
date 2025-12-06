@@ -109,7 +109,7 @@ type CardType = keyof typeof CARD_TYPES;
 function UniversalUploadPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { addToQueue } = useGradingQueue();
+  const { addToQueue, updateCardStatus } = useGradingQueue();
   const { balance, isLoading: creditsLoading, deductLocalCredit, refreshCredits } = useCredits();
 
   // 🔒 Authentication state
@@ -438,6 +438,9 @@ function UniversalUploadPageContent() {
 
       console.log('[Upload] Upload complete! Card is now processing.')
       setStatus(`✅ ${config.label} uploaded successfully! Processing in background...`)
+
+      // Update card status from 'uploading' to 'processing' so background polling can start
+      updateCardStatus(queueId, { status: 'processing' })
 
       // Card is now processing - background polling will handle status updates
       // The loading animation will show with navigation buttons allowing user to leave

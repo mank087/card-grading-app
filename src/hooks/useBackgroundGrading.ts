@@ -132,8 +132,9 @@ export function useBackgroundGrading() {
       }
     })
 
-    // Only poll if there are cards being processed
-    const processingCards = queue.filter(c => c.status === 'processing' || c.status === 'uploading')
+    // Only poll cards that are actively being graded (not still uploading)
+    // Cards in 'uploading' status haven't been inserted into the database yet
+    const processingCards = queue.filter(c => c.status === 'processing')
 
     if (processingCards.length === 0) {
       if (pollingTimeoutRef.current) {
