@@ -436,11 +436,18 @@ function UniversalUploadPageContent() {
         // Don't fail the upload if credit deduction fails - it can be handled later
       }
 
-      console.log('[Upload] Upload complete! Card is now processing.')
+      console.log('[Upload] Upload complete! Triggering grading...')
       setStatus(`✅ ${config.label} uploaded successfully! Processing in background...`)
 
       // Update card status from 'uploading' to 'processing' so background polling can start
       updateCardStatus(queueId, { status: 'processing' })
+
+      // CRITICAL: Trigger the grading API (fire-and-forget)
+      // This starts the actual AI grading process in the background
+      console.log(`[Upload] Triggering AI grading for ${config.category} card: ${cardId}`)
+      fetch(`${config.apiEndpoint}/${cardId}`).catch(err => {
+        console.error(`[Upload] Failed to trigger grading for ${cardId}:`, err)
+      })
 
       // Card is now processing - background polling will handle status updates
       // The loading animation will show with navigation buttons allowing user to leave
