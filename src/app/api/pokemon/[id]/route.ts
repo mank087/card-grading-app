@@ -164,7 +164,8 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       .single();
 
     if (cardError || !card) {
-      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+      console.log(`[GET /api/pokemon/${cardId}] Status-only 404: error=${cardError?.message || 'none'}, code=${cardError?.code || 'none'}, card exists=${!!card}`);
+      return NextResponse.json({ error: "Card not found", debug: cardError?.message }, { status: 404 });
     }
 
     // Check if card has complete grading
@@ -181,6 +182,10 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       has_grading: hasCompleteGrading,
       is_processing: isProcessing,
       grading_error: card.grading_error || null
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+      }
     });
   }
 
