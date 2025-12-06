@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { getStoredSession, getAuthenticatedClient } from '../lib/directAuth'
+import { getStoredSession } from '../lib/directAuth'
 import ScrollingCardBackground from './ui/ScrollingCardBackground'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
 import { CardSlabGrid } from '@/components/CardSlab'
@@ -71,7 +71,6 @@ const getCardLink = (card: any) => {
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
-  const [recentCards, setRecentCards] = useState<any[]>([])
   const [featuredCards, setFeaturedCards] = useState<any[]>([])
 
   useEffect(() => {
@@ -79,25 +78,7 @@ export default function Home() {
       // Use direct auth session instead of Supabase client
       const session = getStoredSession()
       const sessionUser = session?.user
-
       setUser(sessionUser)
-
-      if (sessionUser) {
-        try {
-          // Use authenticated client for database queries
-          const authClient = getAuthenticatedClient()
-          const { data } = await authClient
-            .from('cards')
-            .select('id, card_name, category, grade_numeric, ai_confidence_score, created_at')
-            .eq('user_id', sessionUser.id)
-            .order('created_at', { ascending: false })
-            .limit(4)
-
-          setRecentCards(data || [])
-        } catch (err) {
-          console.error('Error fetching recent cards:', err)
-        }
-      }
     }
 
     getUser()
@@ -172,38 +153,106 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* DCM Launch Special Section */}
+      <section className="py-12 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-700">
+        <div className="container mx-auto px-4">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
+              <span className="text-yellow-300 text-xl">✨</span>
+              <span className="text-white font-semibold">Limited Time Offer</span>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              DCM Launch Special
+            </h2>
+            <p className="text-2xl md:text-3xl text-purple-100 font-semibold mb-4">
+              Free Bonus Credits for First-Time Graders!
+            </p>
+            <p className="text-lg text-purple-200 mb-8 max-w-2xl mx-auto">
+              Sign up today and receive bonus credits with your first purchase.
+              Start grading your collection with DCM Optic™ AI technology at an unbeatable value.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+              <Link
+                href="/credits"
+                className="bg-white text-purple-700 px-8 py-4 rounded-lg font-bold text-lg hover:bg-purple-50 transition-colors shadow-lg hover:shadow-xl"
+              >
+                Claim Your Bonus Credits
+              </Link>
+              <Link
+                href="/login?mode=signup"
+                className="border-2 border-white text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-white/10 transition-colors"
+              >
+                Create Free Account
+              </Link>
+            </div>
+            <p className="text-purple-200 text-sm mt-6">
+              No subscription required • Pay only for what you use
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section - Why Choose DCM */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-12">Why Choose DCM?</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="text-center">
+          <h2 className="text-3xl font-bold text-center mb-4">Why Choose DCM?</h2>
+          <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
+            The complete solution for grading, managing, and showcasing your trading card collection
+          </p>
+          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-6">
+            {/* 1. Machine Learning Accuracy */}
+            <div className="text-center p-4">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Machine Learning Accuracy</h3>
-              <p className="text-gray-600">Advanced AI technology delivers consistent, detailed, and reliable condition assessments you can trust.</p>
+              <h3 className="text-lg font-semibold mb-2">Machine Learning</h3>
+              <p className="text-gray-600 text-sm">Advanced AI technology delivers consistent, detailed, and reliable condition assessments.</p>
             </div>
-            <div className="text-center">
+
+            {/* 2. Detailed Card Condition */}
+            <div className="text-center p-4">
               <div className="bg-yellow-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Showcase Card Condition</h3>
-              <p className="text-gray-600">Whether collecting, reselling, or enjoying the hobby, get instant physical card condition analysis at your fingertips.</p>
+              <h3 className="text-lg font-semibold mb-2">Detailed Card Condition</h3>
+              <p className="text-gray-600 text-sm">Comprehensive 30-point inspection across centering, corners, edges, and surface.</p>
             </div>
-            <div className="text-center">
+
+            {/* 3. Build Your Collection */}
+            <div className="text-center p-4">
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Build Your Collection</h3>
+              <p className="text-gray-600 text-sm">Manage your collection with your actual card images—not stock photos. DCM and third-party graded cards welcome.</p>
+            </div>
+
+            {/* 4. Accurate Market Pricing */}
+            <div className="text-center p-4">
               <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold mb-2">Accurate Market Pricing</h3>
-              <p className="text-gray-600">Graded cards include direct links to eBay and TCGPlayer for real-time, up-to-date market pricing.</p>
+              <h3 className="text-lg font-semibold mb-2">Accurate Market Pricing</h3>
+              <p className="text-gray-600 text-sm">Direct links to eBay and TCGPlayer for real-time, up-to-date market pricing.</p>
+            </div>
+
+            {/* 5. Downloadable Labels & Reports */}
+            <div className="text-center p-4">
+              <div className="bg-indigo-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Labels & Reports</h3>
+              <p className="text-gray-600 text-sm">Download professional grading labels and analysis reports for display, online auctions, or in-person sales.</p>
             </div>
           </div>
         </div>
@@ -220,47 +269,6 @@ export default function Home() {
         />
       )}
 
-      {/* Recent Cards Section */}
-      {user && recentCards.length > 0 && (
-        <section className="py-16 bg-gray-50">
-          <div className="container mx-auto px-4">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-3xl font-bold">Recent Grades</h2>
-              <Link
-                href="/collection"
-                className="text-blue-600 hover:text-blue-800 font-medium"
-              >
-                View All →
-              </Link>
-            </div>
-            <div className="grid md:grid-cols-4 gap-6">
-              {recentCards.map((card) => (
-                <Link
-                  key={card.id}
-                  href={`/card/${card.id}`}
-                  className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-4"
-                >
-                  <div className={`inline-block px-2 py-1 rounded-full text-xs font-medium mb-2 ${
-                    card.category === 'Pokemon'
-                      ? 'bg-yellow-100 text-yellow-800'
-                      : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {card.category || 'Sports'}
-                  </div>
-                  <h3 className="font-semibold text-gray-900 truncate">
-                    {card.card_name || 'Untitled Card'}
-                  </h3>
-                  {card.grade_numeric && (
-                    <p className="text-lg font-bold text-blue-600 mt-2">
-                      Grade: {card.grade_numeric}/{card.ai_confidence_score}
-                    </p>
-                  )}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
     </main>
   )
 }
