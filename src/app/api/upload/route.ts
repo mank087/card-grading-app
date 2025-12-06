@@ -60,16 +60,28 @@ export async function POST(req: NextRequest) {
     const frontPath = `${filePrefix}-front.jpeg`;
     const backPath = `${filePrefix}-back.jpeg`;
 
-    // 1. Upload images to Supabase Storage
-    const { error: frontError } = await supabase.storage
-      .from("cards")
-      .upload(frontPath, frontImage);
-    const { error: backError } = await supabase.storage
-      .from("cards")
-      .upload(backPath, backImage);
+    // 1. Upload images to Supabase Storage (parallel for speed)
+    const [frontResult, backResult] = await Promise.all([
+      supabase.storage.from("cards").upload(frontPath, frontImage),
+      supabase.storage.from("cards").upload(backPath, backImage)
+    ]);
+
+    const frontError = frontResult.error;
+    const backError = backResult.error;
 
     if (frontError || backError) {
       console.error("Supabase Storage Upload Error:", frontError, backError);
+
+      // Clean up partial uploads if one succeeded and the other failed
+      if (!frontError && backError) {
+        await supabase.storage.from("cards").remove([frontPath]);
+        console.log("Cleaned up front image after back upload failed");
+      }
+      if (frontError && !backError) {
+        await supabase.storage.from("cards").remove([backPath]);
+        console.log("Cleaned up back image after front upload failed");
+      }
+
       return NextResponse.json(
         { error: "Failed to upload images." },
         { status: 500 }
