@@ -314,7 +314,10 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
 
   // Card info (center) - adjusted for new layout
   const infoX = logoX + logoSize + 15;
-  const infoMaxWidth = CANVAS_WIDTH - 280;
+  // Leave space for grade display on right side (grade starts around x=600)
+  // infoX is around 157, so max width should stop well before grade area
+  const gradeAreaStart = CANVAS_WIDTH - 150; // Where grade display begins
+  const infoMaxWidth = gradeAreaStart - infoX - 20; // Leave 20px padding before grade
 
   // Line 1: Card Name (dark, bold, dynamic font size)
   ctx.fillStyle = COLORS.textDark;
@@ -335,11 +338,8 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
 
   let setFontSize = 20;
   ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
-  while (ctx.measureText(setInfo).width > infoMaxWidth && setFontSize > 14) {
-    setFontSize -= 1;
-    ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
-  }
 
+  // Always wrap if text is too wide - don't just shrink font
   let currentY = innerHeaderY + 55;
   if (ctx.measureText(setInfo).width > infoMaxWidth) {
     // Wrap to multiple lines
