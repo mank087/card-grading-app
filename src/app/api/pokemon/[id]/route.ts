@@ -159,7 +159,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
     const supabase = supabaseServer();
     const { data: card, error: cardError } = await supabase
       .from("cards")
-      .select("id, conversational_grading, raw_decimal_grade, dcm_grade_whole, grading_error, category")
+      .select("id, conversational_grading, raw_decimal_grade, dcm_grade_whole, category")
       .eq("id", cardId)
       .single();
 
@@ -176,12 +176,13 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
     // Check if currently processing (in the lock map)
     const isProcessing = processingPokemonCards.has(cardId);
 
+    console.log(`[GET /api/pokemon/${cardId}] Status-only result: complete=${hasCompleteGrading}, processing=${isProcessing}`);
+
     return NextResponse.json({
       id: cardId,
       status: hasCompleteGrading ? 'complete' : (isProcessing ? 'processing' : 'pending'),
       has_grading: hasCompleteGrading,
-      is_processing: isProcessing,
-      grading_error: card.grading_error || null
+      is_processing: isProcessing
     }, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate',

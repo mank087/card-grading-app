@@ -107,11 +107,12 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     const supabase = supabaseServer();
     const { data: card, error: cardError } = await supabase
       .from("cards")
-      .select("id, conversational_grading, raw_decimal_grade, dcm_grade_whole, grading_error, category")
+      .select("id, conversational_grading, raw_decimal_grade, dcm_grade_whole, category")
       .eq("id", cardId)
       .single();
 
     if (cardError || !card) {
+      console.log(`[GET /api/other/${cardId}] Status-only 404: error=${cardError?.message || 'No card'}, code=${cardError?.code || 'N/A'}, card exists=${!!card}`);
       return NextResponse.json({ error: "Card not found" }, { status: 404 });
     }
 
@@ -132,8 +133,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       id: cardId,
       status: hasCompleteGrading ? 'complete' : (isProcessing ? 'processing' : 'pending'),
       has_grading: hasCompleteGrading,
-      is_processing: isProcessing,
-      grading_error: card.grading_error || null
+      is_processing: isProcessing
     });
   }
 
