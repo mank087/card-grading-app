@@ -52,7 +52,8 @@ export function useBackgroundGrading() {
           }
 
           console.log(`[BackgroundGrading] Checking status for card ${card.cardId} (elapsed: ${Math.floor(elapsed/1000)}s)`)
-          const response = await fetch(`${config.apiEndpoint}/${card.cardId}`)
+          // Use status_only mode to check completion without triggering grading lock
+          const response = await fetch(`${config.apiEndpoint}/${card.cardId}?status_only=true`)
 
           // Handle error responses (500, 404, etc.)
           if (!response.ok) {
@@ -80,37 +81,27 @@ export function useBackgroundGrading() {
           if (response.ok) {
             const data = await response.json()
 
-            console.log(`[BackgroundGrading] Card ${card.cardId} raw data:`, {
-              has_ai_grading: !!data.ai_grading,
-              ai_grading_keys: data.ai_grading ? Object.keys(data.ai_grading) : [],
-              raw_decimal_grade: data.raw_decimal_grade,
-              raw_decimal_grade_type: typeof data.raw_decimal_grade,
-              dcm_grade_whole: data.dcm_grade_whole,
-              dcm_grade_whole_type: typeof data.dcm_grade_whole,
-              grading_status: data.grading_status
+            console.log(`[BackgroundGrading] Card ${card.cardId} status:`, {
+              status: data.status,
+              has_grading: data.has_grading,
+              is_processing: data.is_processing,
+              grading_error: data.grading_error
             })
 
-            // Check if grading is 100% complete and ready to view
-            // Requirements: Either has numeric grades OR has N/A grade with conversational report
-            const hasValidNumericGrade = (
-              (typeof data.raw_decimal_grade === 'number' && !isNaN(data.raw_decimal_grade)) ||
-              (typeof data.dcm_grade_whole === 'number' && !isNaN(data.dcm_grade_whole)) ||
-              (typeof data.conversational_decimal_grade === 'number' && !isNaN(data.conversational_decimal_grade)) ||
-              (typeof data.conversational_whole_grade === 'number' && !isNaN(data.conversational_whole_grade))
-            )
+            // Check if there's a grading error stored in the database
+            if (data.grading_error) {
+              console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} has grading error: ${data.grading_error}`)
+              updateCardStatus(card.id, {
+                status: 'error',
+                errorMessage: `Grading failed: ${data.grading_error}`
+              })
+              continue
+            }
 
-            // Check if card was graded as N/A (alterations, etc.) but has a complete conversational report
-            const hasNAGradeWithReport = (
-              data.conversational_grading &&
-              typeof data.conversational_grading === 'string' &&
-              data.conversational_grading.length > 100 // Must have substantial content
-            )
-
-            // Card is complete if it has valid numeric grade OR N/A with report
-            if (hasValidNumericGrade || hasNAGradeWithReport) {
+            // Card is complete when status is 'complete' and has_grading is true
+            if (data.status === 'complete' && data.has_grading) {
               // Grading is 100% complete!
-              const gradeType = hasValidNumericGrade ? 'with numeric grade' : 'with N/A grade (alteration/damage)'
-              console.log(`[BackgroundGrading] ✅ Card ${card.cardId} is 100% COMPLETE and ready to view! (${gradeType})`)
+              console.log(`[BackgroundGrading] ✅ Card ${card.cardId} is 100% COMPLETE and ready to view!`)
 
               updateCardStatus(card.id, {
                 status: 'completed',
@@ -144,7 +135,7 @@ export function useBackgroundGrading() {
                 progress = 95 + extraProgress
               }
 
-              console.log(`[BackgroundGrading] ⏳ Card ${card.cardId} still processing... (${Math.floor(elapsed/1000)}s, progress: ${progress}%, hasValidNumericGrade: ${hasValidNumericGrade}, hasNAGradeWithReport: ${hasNAGradeWithReport})`)
+              console.log(`[BackgroundGrading] ⏳ Card ${card.cardId} still processing... (${Math.floor(elapsed/1000)}s, progress: ${progress}%, status: ${data.status}, is_processing: ${data.is_processing})`)
 
               updateCardStatus(card.id, {
                 progress,

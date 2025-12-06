@@ -11,14 +11,14 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // Track MTG cards currently being processed with timestamps
 const processingMTGCards = new Map<string, number>();
 
-// Clean up stuck processing cards (older than 5 minutes)
+// Clean up stuck processing cards (older than 2 minutes - reduced from 5 to prevent long lock-outs)
 const cleanupStuckCards = () => {
   const now = Date.now();
-  const fiveMinutesAgo = now - (5 * 60 * 1000);
+  const twoMinutesAgo = now - (2 * 60 * 1000);
 
   for (const [cardId, timestamp] of processingMTGCards.entries()) {
-    if (timestamp < fiveMinutesAgo) {
-      console.log(`[CLEANUP] Removing stuck card ${cardId} from processing set`);
+    if (timestamp < twoMinutesAgo) {
+      console.log(`[CLEANUP] Removing stuck card ${cardId} from processing set (was locked for ${Math.round((now - timestamp) / 1000)}s)`);
       processingMTGCards.delete(cardId);
     }
   }
@@ -149,14 +149,53 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
   const { id: cardId } = await params;
   const startTime = Date.now();
 
-  // Check for force_regrade query parameter
+  // Check for query parameters
   const { searchParams } = new URL(request.url);
   const forceRegrade = searchParams.get('force_regrade') === 'true';
+  const statusOnly = searchParams.get('status_only') === 'true';
 
-  console.log(`[GET /api/mtg/${cardId}] Starting MTG card grading request (force_regrade: ${forceRegrade})`);
+  console.log(`[GET /api/mtg/${cardId}] Starting MTG card request (force_regrade: ${forceRegrade}, status_only: ${statusOnly})`);
 
   // Clean up any stuck processing cards first
   cleanupStuckCards();
+
+  // STATUS-ONLY MODE: Just return the current card state without acquiring lock or starting grading
+  // This is used by the background polling system to check if grading is complete
+  if (statusOnly) {
+    console.log(`[GET /api/mtg/${cardId}] Status-only check requested`);
+
+    const supabase = supabaseServer();
+    const { data: card, error: cardError } = await supabase
+      .from("cards")
+      .select("id, conversational_grading, raw_decimal_grade, dcm_grade_whole, grading_error, category")
+      .eq("id", cardId)
+      .single();
+
+    if (cardError || !card) {
+      return NextResponse.json({ error: "Card not found" }, { status: 404 });
+    }
+
+    // Verify it's an MTG card
+    if (card.category !== 'MTG') {
+      return NextResponse.json({ error: "Not an MTG card" }, { status: 404 });
+    }
+
+    // Check if card has complete grading
+    const hasCompleteGrading =
+      (card.conversational_grading && card.conversational_grading.length > 0) ||
+      (card.raw_decimal_grade && card.dcm_grade_whole);
+
+    // Check if currently processing (in the lock map)
+    const isProcessing = processingMTGCards.has(cardId);
+
+    return NextResponse.json({
+      id: cardId,
+      status: hasCompleteGrading ? 'complete' : (isProcessing ? 'processing' : 'pending'),
+      has_grading: hasCompleteGrading,
+      is_processing: isProcessing,
+      grading_error: card.grading_error || null
+    });
+  }
 
   // Check if already processing this MTG card
   if (processingMTGCards.has(cardId)) {
