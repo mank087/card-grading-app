@@ -266,25 +266,17 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   drawMetallicSlabBorder(ctx, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, outerBorderWidth, outerCornerRadius);
 
   // ============================================
-  // HEADER SECTION WITH SLAB BORDER
+  // HEADER SECTION (no inner border - just outer slab border + separator)
   // ============================================
 
   const headerHeight = 210;
-  const headerMargin = outerBorderWidth + 4;
-  const headerWidth = CANVAS_WIDTH - headerMargin * 2;
+  const headerMargin = outerBorderWidth + 8;
 
-  // Draw metallic slab border around header
-  const headerBorderWidth = 6;
-  const headerCornerRadius = 12;
-  drawMetallicSlabBorder(ctx, headerMargin, headerMargin, headerWidth, headerHeight, headerBorderWidth, headerCornerRadius);
-
-  // White background inside header slab
-  ctx.fillStyle = COLORS.white;
-  const innerHeaderX = headerMargin + headerBorderWidth;
-  const innerHeaderY = headerMargin + headerBorderWidth;
-  const innerHeaderWidth = headerWidth - headerBorderWidth * 2;
-  const innerHeaderHeight = headerHeight - headerBorderWidth * 2;
-  drawRoundedRect(ctx, innerHeaderX, innerHeaderY, innerHeaderWidth, innerHeaderHeight, headerCornerRadius - headerBorderWidth, { fill: true });
+  // Header content area (no additional border, just uses outer slab border)
+  const innerHeaderX = headerMargin;
+  const innerHeaderY = headerMargin;
+  const innerHeaderWidth = CANVAS_WIDTH - headerMargin * 2;
+  const innerHeaderHeight = headerHeight;
 
   // DCM Logo - positioned inside the header slab
   const logoX = innerHeaderX + 12;
@@ -395,8 +387,8 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   // ============================================
   // PURPLE SEPARATOR BETWEEN HEADER AND SUBGRADES
   // ============================================
-  const separatorY = headerMargin + headerHeight + 4;
-  drawPurpleSeparator(ctx, headerMargin, separatorY, headerWidth, 6);
+  const separatorY = innerHeaderY + headerHeight;
+  drawPurpleSeparator(ctx, outerBorderWidth, separatorY, CANVAS_WIDTH - outerBorderWidth * 2, 6);
 
   // ============================================
   // SUBGRADES SECTION (2x2 grid with QR in center)
