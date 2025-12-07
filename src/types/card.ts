@@ -3,8 +3,9 @@
  * Ensures type safety across backend and frontend
  */
 
-// Defect severity levels
-export type DefectSeverity = 'none' | 'microscopic' | 'minor' | 'moderate' | 'heavy';
+// Defect severity levels (v5.12 - aligned with Human Eye Standard)
+// Note: "microscopic" removed to align with visible-defect-only grading philosophy
+export type DefectSeverity = 'none' | 'minor' | 'moderate' | 'heavy';
 
 // Single defect detail
 export interface DefectDetail {
@@ -117,6 +118,14 @@ export interface GradingMetadata {
   timestamp: string;
 }
 
+// Card presence validation (v5.12) - verifies images contain actual trading cards
+export interface CardPresenceValidation {
+  front_card_detected: boolean;
+  back_card_detected: boolean;
+  front_validation_notes: string;
+  back_validation_notes: string;
+}
+
 // Three-Pass Grading System (v5.5)
 export interface GradingPass {
   centering: number;      // Weighted centering score (0-10)
@@ -197,6 +206,9 @@ export interface Card {
 
   // NEW: Three-Pass Consensus Grading (v5.5)
   conversational_grading_passes?: GradingPasses | null;
+
+  // NEW: Card Presence Validation (v5.12)
+  conversational_card_presence_validation?: CardPresenceValidation | null;
 
   // Professional grades
   estimated_professional_grades: ProfessionalGrades | null;

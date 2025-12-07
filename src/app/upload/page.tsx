@@ -445,8 +445,24 @@ function UniversalUploadPageContent() {
       console.log('[Upload] Upload complete! Triggering grading...')
       setStatus(`✅ ${config.label} uploaded successfully! Processing in background...`)
 
+      // Generate a signed URL for the thumbnail (persists across page refreshes)
+      // The blob URL created earlier is only valid in the current session
+      let persistentImageUrl = frontImageUrl // fallback to blob URL
+      try {
+        const { data: signedUrlData } = await authClient.storage
+          .from('cards')
+          .createSignedUrl(frontPath, 3600) // 1 hour expiry
+        if (signedUrlData?.signedUrl) {
+          persistentImageUrl = signedUrlData.signedUrl
+          console.log('[Upload] Generated signed URL for queue thumbnail')
+        }
+      } catch (e) {
+        console.warn('[Upload] Could not generate signed URL, using blob URL:', e)
+      }
+
       // Update card status from 'uploading' to 'processing' so background polling can start
-      updateCardStatus(queueId, { status: 'processing' })
+      // Also update the image URL to the persistent signed URL
+      updateCardStatus(queueId, { status: 'processing', frontImageUrl: persistentImageUrl })
 
       // CRITICAL: Trigger the grading API (fire-and-forget)
       // This starts the actual AI grading process in the background

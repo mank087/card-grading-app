@@ -26,6 +26,10 @@ export function useBackgroundGrading() {
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const notifiedCardsRef = useRef<Set<string>>(new Set())
   const isPollingRef = useRef(false) // Prevent overlapping polls
+  const queueRef = useRef(queue) // Keep latest queue in ref to avoid stale closures
+
+  // Update ref whenever queue changes
+  queueRef.current = queue
 
   // Check status of a single card - memoized to avoid recreating on each render
   const checkSingleCardStatus = useCallback(async (card: any) => {
@@ -158,12 +162,22 @@ export function useBackgroundGrading() {
         isPollingRef.current = false
       }
 
+      // Re-check processing cards using ref to get LATEST queue state (avoid stale closure)
+      // Cards that just completed will no longer be in this filtered list
+      const stillProcessing = queueRef.current.filter(c => c.status === 'processing')
+
+      if (stillProcessing.length === 0) {
+        console.log('[BackgroundGrading] All cards complete, stopping polling')
+        pollingTimeoutRef.current = null
+        return
+      }
+
       // Calculate next polling interval based on oldest card's elapsed time
       // This implements progressive backoff
-      const oldestCardElapsed = Math.max(...processingCards.map(c => Date.now() - c.uploadedAt))
+      const oldestCardElapsed = Math.max(...stillProcessing.map(c => Date.now() - c.uploadedAt))
       const nextInterval = getPollingInterval(oldestCardElapsed)
 
-      console.log(`[BackgroundGrading] Next poll in ${nextInterval/1000}s (oldest card: ${Math.floor(oldestCardElapsed/1000)}s)`)
+      console.log(`[BackgroundGrading] Next poll in ${nextInterval/1000}s (oldest card: ${Math.floor(oldestCardElapsed/1000)}s, ${stillProcessing.length} cards processing)`)
 
       // Schedule next poll with dynamic interval
       pollingTimeoutRef.current = setTimeout(pollAllCards, nextInterval)

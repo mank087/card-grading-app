@@ -201,6 +201,17 @@ const SlabDetectionSchema = z.object({
 }).describe('Professional grading slab detection results');
 
 /**
+ * Card Presence Validation (v5.12)
+ * Validates that submitted images actually contain trading cards
+ */
+const CardPresenceValidationSchema = z.object({
+  front_card_detected: z.boolean().describe('Is a valid trading card detected in the front image?'),
+  back_card_detected: z.boolean().describe('Is a valid trading card detected in the back image?'),
+  front_validation_notes: z.string().describe('Description of what was detected in front image - explain if no card found'),
+  back_validation_notes: z.string().describe('Description of what was detected in back image - explain if no card found')
+}).describe('Card presence validation - verifies images contain actual trading cards before grading');
+
+/**
  * Alteration/tampering detection
  */
 const AlterationDetectionSchema = z.object({
@@ -499,6 +510,12 @@ const CardInfoSchema = z.union([
 export const CardGradingResponseSchemaV5 = z.object({
   // Meta information
   meta: MetaSchema,
+
+  // Card presence validation (v5.12) - MUST check first before any grading
+  card_presence_validation: CardPresenceValidationSchema.optional().describe(
+    'Card presence validation - verifies images contain actual trading cards. ' +
+    'If front_card_detected or back_card_detected is false, corresponding scores should be null.'
+  ),
 
   // Card information (structure varies by card type)
   card_info: CardInfoSchema,
