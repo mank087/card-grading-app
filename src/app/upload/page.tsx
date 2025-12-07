@@ -162,7 +162,7 @@ function UniversalUploadPageContent() {
   // Photo tips popup state
   const shouldShowPhotoTips = useShouldShowPhotoTips()
   const [showPhotoTipsPopup, setShowPhotoTipsPopup] = useState(false)
-  const [pendingUploadAction, setPendingUploadAction] = useState<'camera' | 'gallery' | null>(null)
+  const [pendingUploadAction, setPendingUploadAction] = useState<'camera' | 'gallery' | 'desktop-front' | 'desktop-back' | null>(null)
 
   // Track the navigation timestamp to detect when user clicks nav to grade another card
   const [lastNavTimestamp, setLastNavTimestamp] = useState<string | null>(null);
@@ -511,6 +511,10 @@ function UniversalUploadPageContent() {
       proceedWithCamera()
     } else if (pendingUploadAction === 'gallery') {
       proceedWithGallery()
+    } else if (pendingUploadAction === 'desktop-front') {
+      document.getElementById('front-input')?.click()
+    } else if (pendingUploadAction === 'desktop-back') {
+      document.getElementById('back-input')?.click()
     }
     setPendingUploadAction(null)
   }
@@ -518,6 +522,18 @@ function UniversalUploadPageContent() {
   const handlePhotoTipsClose = () => {
     setShowPhotoTipsPopup(false)
     setPendingUploadAction(null)
+  }
+
+  // Handle desktop file selection (shows tips popup on first upload)
+  const handleDesktopFileSelect = (side: 'front' | 'back') => {
+    // Show tips popup on first upload attempt (no images yet)
+    if (shouldShowPhotoTips && !frontFile && !backFile) {
+      setPendingUploadAction(side === 'front' ? 'desktop-front' : 'desktop-back')
+      setShowPhotoTipsPopup(true)
+      return
+    }
+    // Otherwise directly open file picker
+    document.getElementById(side === 'front' ? 'front-input' : 'back-input')?.click()
   }
 
   const handleGalleryFileSelect = (side: 'front' | 'back') => {
@@ -1071,7 +1087,7 @@ function UniversalUploadPageContent() {
                       setCurrentSide('front')
                       setUploadMode('camera')
                     } else {
-                      document.getElementById('front-input')?.click()
+                      handleDesktopFileSelect('front')
                     }
                   }}
                   disabled={isCompressing}
@@ -1148,7 +1164,7 @@ function UniversalUploadPageContent() {
                       setCurrentSide('back')
                       setUploadMode('camera')
                     } else {
-                      document.getElementById('back-input')?.click()
+                      handleDesktopFileSelect('back')
                     }
                   }}
                   disabled={isCompressing}
