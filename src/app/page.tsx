@@ -154,30 +154,52 @@ export default function Home() {
       </section>
 
       {/* DCM Launch Special Section */}
-      <section className="py-12 bg-gradient-to-r from-amber-500 via-orange-500 to-yellow-500">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="inline-flex items-center gap-2 bg-white/25 backdrop-blur-sm rounded-full px-4 py-2 mb-6">
-              <span className="text-white text-xl">✨</span>
+      <section className="py-12 relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        {/* Background Card Image - Styled with rotation and zoom, focusing on label and top of card */}
+        <div className="absolute inset-0 flex items-center justify-end pointer-events-none overflow-hidden">
+          <div
+            className="absolute right-[-10%] md:right-[0%] lg:right-[5%] top-[-20%] w-[400px] md:w-[500px] lg:w-[600px] opacity-30 md:opacity-40"
+            style={{
+              transform: 'rotate(-12deg)',
+            }}
+          >
+            <Image
+              src="/promo-umbreon.png"
+              alt=""
+              width={600}
+              height={840}
+              className="object-contain object-top drop-shadow-2xl"
+              priority
+            />
+          </div>
+        </div>
+
+        {/* Gradient overlay for text readability */}
+        <div className="absolute inset-0 bg-gradient-to-r from-slate-900/95 via-purple-900/80 to-transparent"></div>
+
+        <div className="container mx-auto px-4 relative z-10">
+          <div className="max-w-2xl">
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-6 border border-white/20">
+              <span className="text-yellow-400 text-xl">✨</span>
               <span className="text-white font-semibold">Limited Time Offer</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
               DCM Launch Special
             </h2>
-            <p className="text-2xl md:text-3xl text-white font-semibold mb-4">
+            <p className="text-2xl md:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400 font-semibold mb-4">
               Free Bonus Credits for First-Time Graders!
             </p>
-            <p className="text-lg text-amber-100 mb-8 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-300 mb-8 max-w-xl">
               Sign up today and receive bonus credits with your first purchase.
               Start grading your collection with DCM Optic™ AI technology at an unbeatable value.
             </p>
             <Link
               href="/login?mode=signup"
-              className="inline-block bg-white text-orange-600 px-8 py-4 rounded-lg font-bold text-lg hover:bg-orange-50 transition-colors shadow-lg hover:shadow-xl"
+              className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-4 rounded-lg font-bold text-lg hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg hover:shadow-orange-500/25 hover:shadow-xl"
             >
               Claim Your Bonus Credits
             </Link>
-            <p className="text-amber-100 text-sm mt-6">
+            <p className="text-gray-400 text-sm mt-6">
               No subscription required • Pay only for what you use
             </p>
           </div>
