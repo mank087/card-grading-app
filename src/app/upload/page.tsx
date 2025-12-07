@@ -11,6 +11,7 @@ import UploadMethodSelector from '@/components/camera/UploadMethodSelector'
 import MobileCamera from '@/components/camera/MobileCamera'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
 import { useCredits } from '@/contexts/CreditsContext'
+import PhotoTipsPopup, { useShouldShowPhotoTips } from '@/components/PhotoTipsPopup'
 import Link from 'next/link'
 
 interface CompressionInfo {
@@ -157,6 +158,11 @@ function UniversalUploadPageContent() {
   const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front')
   const [originalUploadMethod, setOriginalUploadMethod] = useState<'camera' | 'gallery'>('camera')
   const { showCameraOption } = useDeviceDetection()
+
+  // Photo tips popup state
+  const shouldShowPhotoTips = useShouldShowPhotoTips()
+  const [showPhotoTipsPopup, setShowPhotoTipsPopup] = useState(false)
+  const [pendingUploadAction, setPendingUploadAction] = useState<'camera' | 'gallery' | null>(null)
 
   // Track the navigation timestamp to detect when user clicks nav to grade another card
   const [lastNavTimestamp, setLastNavTimestamp] = useState<string | null>(null);
@@ -462,6 +468,16 @@ function UniversalUploadPageContent() {
 
   // Handle camera/gallery selection
   const handleCameraSelect = () => {
+    // Show tips popup on first upload attempt (no images yet)
+    if (shouldShowPhotoTips && !frontFile && !backFile) {
+      setPendingUploadAction('camera')
+      setShowPhotoTipsPopup(true)
+      return
+    }
+    proceedWithCamera()
+  }
+
+  const proceedWithCamera = () => {
     setOriginalUploadMethod('camera')
     setUploadMode('camera')
     // Determine which side to capture next
@@ -473,9 +489,35 @@ function UniversalUploadPageContent() {
   }
 
   const handleGallerySelect = () => {
+    // Show tips popup on first upload attempt (no images yet)
+    if (shouldShowPhotoTips && !frontFile && !backFile) {
+      setPendingUploadAction('gallery')
+      setShowPhotoTipsPopup(true)
+      return
+    }
+    proceedWithGallery()
+  }
+
+  const proceedWithGallery = () => {
     setOriginalUploadMethod('gallery')
     // Show gallery selection screen instead of immediately opening file picker
     setUploadMode('gallery')
+  }
+
+  // Handle photo tips popup actions
+  const handlePhotoTipsProceed = () => {
+    setShowPhotoTipsPopup(false)
+    if (pendingUploadAction === 'camera') {
+      proceedWithCamera()
+    } else if (pendingUploadAction === 'gallery') {
+      proceedWithGallery()
+    }
+    setPendingUploadAction(null)
+  }
+
+  const handlePhotoTipsClose = () => {
+    setShowPhotoTipsPopup(false)
+    setPendingUploadAction(null)
   }
 
   const handleGalleryFileSelect = (side: 'front' | 'back') => {
@@ -877,6 +919,13 @@ function UniversalUploadPageContent() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 pt-20">
       {hiddenFileInputs}
+
+      {/* Photo Tips Popup */}
+      <PhotoTipsPopup
+        isOpen={showPhotoTipsPopup}
+        onClose={handlePhotoTipsClose}
+        onProceed={handlePhotoTipsProceed}
+      />
 
       {/* Insufficient Credits Modal */}
       {showInsufficientCredits && (
