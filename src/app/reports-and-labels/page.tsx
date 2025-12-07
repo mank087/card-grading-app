@@ -100,23 +100,16 @@ export default function ReportsAndLabelsPage() {
                 </div>
               </div>
 
-              <div className="bg-gray-100 rounded-xl p-6 flex items-center justify-center min-h-[300px]">
+              <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-48 h-64 bg-gradient-to-b from-purple-100 to-purple-200 rounded-lg mx-auto mb-4 flex items-center justify-center border-2 border-purple-300 shadow-inner">
-                    <div className="text-center px-4">
-                      <div className="w-full h-8 bg-purple-600 rounded mb-2 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">DCM LABEL</span>
-                      </div>
-                      <div className="text-xs text-purple-600 font-medium">Charizard</div>
-                      <div className="text-xs text-purple-500">Base Set</div>
-                      <div className="text-2xl font-bold text-purple-700 my-2">9.5</div>
-                      <div className="text-xs text-purple-600">Gem Mint</div>
-                      <div className="w-8 h-8 bg-white rounded mx-auto mt-2 flex items-center justify-center">
-                        <span className="text-[6px] text-gray-400">QR</span>
-                      </div>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500">Label preview (actual label shown on card detail page)</p>
+                  <Image
+                    src="/DCM-Label-Mag-OneTouch.png"
+                    alt="DCM Foldable Slab Label Example - Umbreon ex Gem Mint 10"
+                    width={400}
+                    height={300}
+                    className="rounded-lg shadow-lg mx-auto"
+                  />
+                  <p className="text-sm text-gray-500 mt-4">Actual DCM label on magnetic one-touch slab</p>
                 </div>
               </div>
             </div>
@@ -191,54 +184,16 @@ export default function ReportsAndLabelsPage() {
                 </ul>
               </div>
 
-              <div className="bg-gray-100 rounded-xl p-6 flex items-center justify-center min-h-[300px]">
+              <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-56 h-72 bg-white rounded-lg mx-auto mb-4 shadow-lg border border-gray-200 p-3">
-                    <div className="w-full h-6 bg-blue-600 rounded mb-2 flex items-center px-2">
-                      <span className="text-white text-[8px] font-bold">DCM GRADING REPORT</span>
-                    </div>
-                    <div className="flex gap-2 mb-2">
-                      <div className="w-12 h-16 bg-gray-200 rounded"></div>
-                      <div className="w-12 h-16 bg-gray-200 rounded"></div>
-                      <div className="flex-1">
-                        <div className="text-[6px] text-left text-gray-600 space-y-0.5">
-                          <div className="font-bold">Card Name</div>
-                          <div>Set • Year</div>
-                          <div className="text-lg font-bold text-blue-600">9.5</div>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <div className="flex justify-between text-[6px]">
-                        <span>Centering</span>
-                        <span className="font-bold">9.5</span>
-                      </div>
-                      <div className="flex justify-between text-[6px]">
-                        <span>Corners</span>
-                        <span className="font-bold">9.5</span>
-                      </div>
-                      <div className="flex justify-between text-[6px]">
-                        <span>Edges</span>
-                        <span className="font-bold">10</span>
-                      </div>
-                      <div className="flex justify-between text-[6px]">
-                        <span>Surface</span>
-                        <span className="font-bold">9.5</span>
-                      </div>
-                    </div>
-                    <div className="mt-2 pt-2 border-t border-gray-200">
-                      <div className="text-[5px] text-gray-500 text-left">
-                        Professional estimates: PSA 10 • BGS 9.5
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-end mt-2">
-                      <div className="w-8 h-8 bg-gray-100 rounded flex items-center justify-center">
-                        <span className="text-[5px] text-gray-400">QR</span>
-                      </div>
-                      <div className="text-[5px] text-gray-400">Serial: 123456</div>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500">Report preview (actual report shown on card detail page)</p>
+                  <Image
+                    src="/DCM-full-downloadable-report.png"
+                    alt="DCM Full Grading Report Example - Umbreon ex Gem Mint 10"
+                    width={500}
+                    height={650}
+                    className="rounded-lg shadow-lg mx-auto"
+                  />
+                  <p className="text-sm text-gray-500 mt-4">Actual DCM full grading report</p>
                 </div>
               </div>
             </div>
@@ -326,47 +281,16 @@ export default function ReportsAndLabelsPage() {
                 </ul>
               </div>
 
-              <div className="bg-gray-100 rounded-xl p-6 flex items-center justify-center min-h-[300px]">
+              <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center">
                 <div className="text-center">
-                  <div className="flex gap-4 items-end justify-center mb-4">
-                    {/* Folded standing version */}
-                    <div className="text-center">
-                      <div className="w-20 h-28 bg-white rounded shadow-lg border border-gray-200 p-2 transform -rotate-3">
-                        <div className="w-full h-3 bg-orange-500 rounded mb-1"></div>
-                        <div className="text-[6px] font-bold text-gray-800">Pokemon Card</div>
-                        <div className="text-xl font-bold text-orange-600">9</div>
-                        <div className="text-[5px] text-gray-500">Near Mint</div>
-                        <div className="w-6 h-6 bg-gray-100 rounded mx-auto mt-1">
-                          <span className="text-[4px] text-gray-400">QR</span>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2">Standing</p>
-                    </div>
-
-                    {/* Top loader version */}
-                    <div className="text-center">
-                      <div className="w-16 h-24 bg-gradient-to-b from-transparent to-gray-200 rounded border-2 border-gray-300 relative">
-                        <div className="absolute bottom-1 left-1 right-1 h-8 bg-white rounded shadow-inner p-1">
-                          <div className="text-[5px] font-bold">DCM 9.5</div>
-                          <div className="text-[4px] text-gray-500">#123456</div>
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2">In Top Loader</p>
-                    </div>
-
-                    {/* Digital version */}
-                    <div className="text-center">
-                      <div className="w-20 h-20 bg-white rounded-lg shadow-lg border border-gray-200 p-2">
-                        <div className="text-[6px] font-bold text-gray-800 mb-1">eBay Listing</div>
-                        <div className="w-full h-10 bg-orange-100 rounded flex items-center justify-center">
-                          <span className="text-orange-600 font-bold text-sm">9.5</span>
-                        </div>
-                        <div className="text-[5px] text-gray-500 mt-1">Verified Grade</div>
-                      </div>
-                      <p className="text-[10px] text-gray-500 mt-2">Online Image</p>
-                    </div>
-                  </div>
-                  <p className="text-sm text-gray-500">Mini report versatility (actual format shown on card detail page)</p>
+                  <Image
+                    src="/DCM-MiniReport-Umbreon-ex-309396.jpg"
+                    alt="DCM Mini Report Example - Umbreon ex Gem Mint 10"
+                    width={350}
+                    height={500}
+                    className="rounded-lg shadow-lg mx-auto"
+                  />
+                  <p className="text-sm text-gray-500 mt-4">Actual DCM mini report - perfect for online listings</p>
                 </div>
               </div>
             </div>
