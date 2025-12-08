@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all cards
-    const { data: cards, error: cardsError } = await supabase
+    const { data: cards, error: cardsError } = await supabaseAdmin
       .from('cards')
       .select('id, category, created_at, is_public, visibility')
 

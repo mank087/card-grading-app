@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Build query - OPTIMIZED: select only needed fields to reduce egress
     // Previously used SELECT * which fetched all columns including large response payloads
-    let query = supabase
+    let query = supabaseAdmin
       .from('api_usage_log')
       .select('id, service, operation, user_id, card_id, input_tokens, output_tokens, cost_usd, status, created_at', { count: 'exact' })
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // Get user emails if user_id is present
     const userIds = apiLogs?.map(log => log.user_id).filter(Boolean) || []
-    const { data: users } = await supabase
+    const { data: users } = await supabaseAdmin
       .from('users')
       .select('id, email')
       .in('id', userIds)

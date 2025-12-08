@@ -22,6 +22,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || ''
     const category = searchParams.get('category') || 'all'
     const graded = searchParams.get('graded') || 'all' // all, graded, ungraded
+    const featured = searchParams.get('featured') || 'all' // all, featured, not_featured
     const sortBy = searchParams.get('sortBy') || 'created_at'
     const sortOrder = searchParams.get('sortOrder') || 'desc'
 
@@ -61,6 +62,13 @@ export async function GET(request: NextRequest) {
       query = query.not('conversational_decimal_grade', 'is', null)
     } else if (graded === 'ungraded') {
       query = query.is('conversational_decimal_grade', null)
+    }
+
+    // Apply featured filter
+    if (featured === 'featured') {
+      query = query.eq('is_featured', true)
+    } else if (featured === 'not_featured') {
+      query = query.or('is_featured.is.null,is_featured.eq.false')
     }
 
     // Apply search filter (search by card ID)

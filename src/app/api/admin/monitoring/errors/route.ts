@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     // Build query - OPTIMIZED: select only needed fields to reduce egress
     // Previously used SELECT * which fetched all columns including large stack traces
-    let query = supabase
+    let query = supabaseAdmin
       .from('error_log')
       .select('id, error_type, error_message, severity, user_id, card_id, created_at', { count: 'exact' })
 
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // Get user emails if user_id is present
     const userIds = errors?.map(e => e.user_id).filter(Boolean) || []
-    const { data: users } = await supabase
+    const { data: users } = await supabaseAdmin
       .from('users')
       .select('id, email')
       .in('id', userIds)

@@ -99,6 +99,7 @@ function CardsContent() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState<string>('all')
   const [graded, setGraded] = useState<'all' | 'graded' | 'ungraded'>('all')
+  const [featured, setFeatured] = useState<'all' | 'featured' | 'not_featured'>('all')
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteCardId, setDeleteCardId] = useState<string | null>(null)
   const [deleteCardName, setDeleteCardName] = useState<string>('')
@@ -107,7 +108,7 @@ function CardsContent() {
 
   useEffect(() => {
     fetchCards()
-  }, [pagination.page, search, category, graded])
+  }, [pagination.page, search, category, graded, featured])
 
   const fetchCards = async () => {
     setLoading(true)
@@ -117,7 +118,8 @@ function CardsContent() {
         limit: pagination.limit.toString(),
         search,
         category,
-        graded
+        graded,
+        featured
       })
 
       const response = await fetch(`/api/admin/cards?${params}`)
@@ -251,6 +253,22 @@ function CardsContent() {
               <option value="all">All Cards</option>
               <option value="graded">Graded Only</option>
               <option value="ungraded">Ungraded Only</option>
+            </select>
+          </div>
+
+          {/* Featured Filter */}
+          <div>
+            <select
+              value={featured}
+              onChange={(e) => {
+                setFeatured(e.target.value as 'all' | 'featured' | 'not_featured')
+                setPagination(prev => ({ ...prev, page: 1 }))
+              }}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="all">All Featured Status</option>
+              <option value="featured">Featured Only</option>
+              <option value="not_featured">Not Featured</option>
             </select>
           </div>
         </div>

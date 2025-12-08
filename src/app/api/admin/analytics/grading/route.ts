@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all graded cards
-    const { data: cards, error: cardsError } = await supabase
+    const { data: cards, error: cardsError } = await supabaseAdmin
       .from('cards')
       .select('conversational_decimal_grade, category, created_at')
       .not('conversational_decimal_grade', 'is', null)

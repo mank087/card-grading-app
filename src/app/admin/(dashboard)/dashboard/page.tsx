@@ -219,17 +219,18 @@ export default function AdminDashboardPage() {
           </Link>
 
           <Link
-            href="/admin/moderation"
+            href="/admin/analytics"
             className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
           >
-            <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mr-3">
-              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+            <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center mr-3">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
               </svg>
             </div>
             <div>
-              <p className="font-medium text-gray-900">Moderation Queue</p>
-              <p className="text-sm text-gray-500">Review flagged content</p>
+              <p className="font-medium text-gray-900">Analytics</p>
+              <p className="text-sm text-gray-500">View platform statistics</p>
             </div>
           </Link>
 

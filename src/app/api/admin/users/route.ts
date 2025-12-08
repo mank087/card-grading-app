@@ -69,10 +69,22 @@ export async function GET(request: NextRequest) {
       cardCountMap[card.user_id] = (cardCountMap[card.user_id] || 0) + 1
     })
 
+    // Get credits for each user
+    const { data: userCredits } = await supabaseAdmin
+      .from('user_credits')
+      .select('user_id, balance')
+      .in('user_id', userIds)
+
+    const creditsMap: Record<string, number> = {}
+    userCredits?.forEach(credit => {
+      creditsMap[credit.user_id] = credit.balance
+    })
+
     // Enrich user data
     const enrichedUsers = users?.map(user => ({
       ...user,
       card_count: cardCountMap[user.id] || 0,
+      credits_balance: creditsMap[user.id] ?? 0,
       is_suspended: false // Will be determined by suspended_at field when we add it
     }))
 

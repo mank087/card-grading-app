@@ -9,6 +9,7 @@ interface User {
   created_at: string
   updated_at: string
   card_count: number
+  credits_balance: number
   is_suspended: boolean
 }
 
@@ -258,7 +259,13 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                       Cards
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Credits
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joined
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Last Active
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
@@ -279,8 +286,18 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                         <div className="text-sm text-gray-900">{user.card_count}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className={`text-sm font-medium ${user.credits_balance > 0 ? 'text-green-600' : 'text-gray-400'}`}>
+                          {user.credits_balance}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
                           {new Date(user.created_at).toLocaleDateString()}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-500">
+                          {user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A'}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

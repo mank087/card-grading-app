@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     startDate.setDate(startDate.getDate() - days)
 
     // Fetch all users for calculations
-    const { data: allUsers, error: usersError } = await supabase
+    const { data: allUsers, error: usersError } = await supabaseAdmin
       .from('users')
       .select('id, email, created_at')
       .order('created_at', { ascending: true })
@@ -59,21 +59,21 @@ export async function GET(request: NextRequest) {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
     // Get users who have uploaded cards (active users)
-    const { data: activeUsersData } = await supabase
+    const { data: activeUsersData } = await supabaseAdmin
       .from('cards')
       .select('user_id, created_at')
       .gte('created_at', sevenDaysAgo.toISOString())
 
     const activeUsers7Days = new Set(activeUsersData?.map(c => c.user_id) || []).size
 
-    const { data: activeUsers30Data } = await supabase
+    const { data: activeUsers30Data } = await supabaseAdmin
       .from('cards')
       .select('user_id')
       .gte('created_at', thirtyDaysAgo.toISOString())
 
     const activeUsers30Days = new Set(activeUsers30Data?.map(c => c.user_id) || []).size
 
-    const { data: activeUsers90Data } = await supabase
+    const { data: activeUsers90Data } = await supabaseAdmin
       .from('cards')
       .select('user_id')
       .gte('created_at', ninetyDaysAgo.toISOString())
@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     // Calculate engagement metrics
     const totalUsers = allUsers?.length || 0
-    const usersWithCards = await supabase
+    const usersWithCards = await supabaseAdmin
       .from('cards')
       .select('user_id')
       .then(({ data }) => new Set(data?.map(c => c.user_id) || []).size)

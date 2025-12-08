@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 // OpenAI GPT-4o pricing (as of Nov 2025)
 const PRICING = {
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if api_usage_log has data
-    const { data: apiLogs, error: apiError } = await supabase
+    const { data: apiLogs, error: apiError } = await supabaseAdmin
       .from('api_usage_log')
       .select('cost_usd, created_at, service')
       .order('created_at', { ascending: false })
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Otherwise, estimate based on card gradings
-    const { data: cards, error: cardsError } = await supabase
+    const { data: cards, error: cardsError } = await supabaseAdmin
       .from('cards')
       .select('id, category, created_at')
       .not('conversational_decimal_grade', 'is', null)
