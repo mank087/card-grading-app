@@ -140,29 +140,22 @@ export function generateTCGPlayerSearchUrl(cardData: MTGCardData): string {
   }
 
   // Pokemon-specific search (default)
+  // SIMPLIFIED: Just Pokemon name + card number (matches eBay approach)
+  // This produces the most reliable search results
+
   // 1. Pokemon name (most important)
   if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
 
   // 2. Card number (for precise identification)
-  // TCGPlayer works better without set name in general search
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
   }
 
-  // 3. Add rarity/variant if available (Full Art, Rainbow Rare, etc.)
-  // This helps narrow down to the specific version
-  if (cardData.subset) {
-    // Common Pokemon variants that TCGPlayer recognizes
-    const variantKeywords = ['full art', 'rainbow', 'secret', 'ultra rare', 'reverse holo', 'holo', 'vmax', 'vstar', 'v', 'gx', 'ex'];
-    const subsetLower = cardData.subset.toLowerCase();
-
-    // Only add if it contains a recognized variant keyword
-    if (variantKeywords.some(keyword => subsetLower.includes(keyword))) {
-      searchTerms.push(cardData.subset);
-    }
-  }
+  // NOTE: We intentionally don't add subset/rarity_tier anymore
+  // as it often causes cards not to be found (e.g., "Special Features" text)
+  // The combination of Pokemon name + card number is sufficient for TCGPlayer
 
   // Build search query (simpler is better for TCGPlayer)
   const searchQuery = searchTerms.join(' ');
@@ -267,15 +260,9 @@ export function generateTCGPlayerSetSearchUrl(cardData: MTGCardData): string | n
     searchTerms.push(cardData.card_number);
   }
 
-  // Add rarity/variant only if it's a recognized type
-  if (cardData.subset) {
-    const variantKeywords = ['full art', 'rainbow', 'secret', 'ultra rare', 'reverse holo', 'holo', 'vmax', 'vstar', 'v', 'gx', 'ex'];
-    const subsetLower = cardData.subset.toLowerCase();
-
-    if (variantKeywords.some(keyword => subsetLower.includes(keyword))) {
-      searchTerms.push(cardData.subset);
-    }
-  }
+  // NOTE: We intentionally don't add subset/rarity_tier anymore
+  // as it often causes cards not to be found (e.g., "Special Features" text)
+  // The set slug in the URL path + Pokemon name + card number is sufficient
 
   const searchQuery = searchTerms.join(' ');
 
