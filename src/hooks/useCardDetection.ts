@@ -73,8 +73,9 @@ export const useCardDetection = (
       // Draw current frame
       ctx.drawImage(video, 0, 0);
 
-      // Define guide frame area (centered, 80% width, card aspect ratio 2.5:3.5)
-      const frameWidth = Math.floor(canvas.width * 0.8);
+      // Define guide frame area (centered, 82% width, card aspect ratio 2.5:3.5)
+      // Matches CameraGuideOverlay.tsx dimensions
+      const frameWidth = Math.floor(canvas.width * 0.82);
       const frameHeight = Math.floor(frameWidth * (3.5 / 2.5)); // Card aspect ratio
       const frameX = Math.floor((canvas.width - frameWidth) / 2);
       const frameY = Math.floor((canvas.height - frameHeight) / 2);
@@ -87,12 +88,12 @@ export const useCardDetection = (
       frameCountRef.current++;
 
       // Faster smoothing for quicker response
-      const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current, 0.5);
+      const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current, 0.6);
       lastConfidenceRef.current = smoothedConfidence;
 
       // Use hysteresis to prevent flickering (different thresholds for entering vs exiting detected state)
-      const ENTER_THRESHOLD = 50; // Threshold to become "detected"
-      const EXIT_THRESHOLD = 35;  // Threshold to lose "detected" status (lower = stickier)
+      const ENTER_THRESHOLD = 35; // Threshold to become "detected" (lowered from 50)
+      const EXIT_THRESHOLD = 25;  // Threshold to lose "detected" status (lowered from 35)
 
       let isCardDetected: boolean;
       if (lastDetectedStateRef.current) {
@@ -136,21 +137,20 @@ export const useCardDetection = (
   return {
     ...detection,
     stableFrames: stableFramesRef.current,
-    isStable: stableFramesRef.current >= 10 // Faster response time
+    isStable: stableFramesRef.current >= 3 // Very fast response - 3 frames (~150ms)
   };
 };
 
 /**
- * Enhanced multi-criteria card detection
- * Uses weighted scoring for robust detection across lighting conditions
- * STRICTER thresholds to prevent false positives (green when no card)
+ * Simplified card detection
+ * Uses relaxed thresholds for better user experience
+ * Detection is informational only - users can always capture
  */
 function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'front' | 'back' = 'front'): DetectionResult {
   const { data, width, height } = imageData;
   const hints: string[] = [];
-  const isBack = side === 'back';
 
-  // Define regions more precisely
+  // Define center region (where card should be)
   const centerWidth = Math.floor(width * 0.7);
   const centerHeight = Math.floor(height * 0.7);
   const centerX = Math.floor((width - centerWidth) / 2);
@@ -161,8 +161,8 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
   const centerPixels: number[] = [];
   const allPixels: number[] = [];
 
-  for (let y = 0; y < height; y += 6) {
-    for (let x = 0; x < width; x += 6) {
+  for (let y = 0; y < height; y += 8) {
+    for (let x = 0; x < width; x += 8) {
       const idx = (y * width + x) * 4;
       const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
       allPixels.push(gray);
@@ -175,171 +175,72 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
     }
   }
 
-  // CRITERION 1: Brightness analysis
+  // Basic lighting check
   const overallMean = allPixels.reduce((a, b) => a + b, 0) / allPixels.length;
-  const edgeMean = edgePixels.reduce((a, b) => a + b, 0) / edgePixels.length;
   const centerMean = centerPixels.reduce((a, b) => a + b, 0) / centerPixels.length;
+  const edgeMean = edgePixels.reduce((a, b) => a + b, 0) / edgePixels.length;
 
-  // Check for lighting issues
-  if (overallMean < 40) {
-    hints.push('Too dark - add more light');
-  } else if (overallMean > 210) {
+  // Only show lighting hints for extreme conditions
+  if (overallMean < 30) {
+    hints.push('Try adding more light');
+  } else if (overallMean > 220) {
     hints.push('Too bright - reduce glare');
   }
 
-  // CRITERION 2: Texture/Detail analysis (variance in center region)
+  // Simple texture detection (variance in center)
   const centerVariance = centerPixels.reduce((sum, val) => sum + Math.pow(val - centerMean, 2), 0) / centerPixels.length;
   const centerStdDev = Math.sqrt(centerVariance);
 
-  // CRITERION 3: Edge contrast (card vs background) - CRITICAL for detection
-  // A card should have a distinct boundary from the background
+  // Simple contrast detection
   const colorDifference = Math.abs(centerMean - edgeMean);
 
-  // CRITERION 4: Edge detection (look for rectangular edges)
-  const edgeStrength = detectEdges(imageData, centerX, centerY, centerWidth, centerHeight);
-
-  // CRITERION 5: Color saturation (cards usually have some color)
-  const saturation = calculateSaturation(data, centerX, centerY, centerWidth, centerHeight, width);
-
-  // Log diagnostics every 30 frames (~1.5 seconds)
-  if (frameCount % 30 === 0) {
+  // Log diagnostics every 60 frames (~3 seconds)
+  if (frameCount % 60 === 0) {
     console.log('[CardDetection] Brightness:', overallMean.toFixed(1),
                 '| Detail:', centerStdDev.toFixed(1),
-                '| Contrast:', colorDifference.toFixed(1),
-                '| Edges:', edgeStrength.toFixed(2),
-                '| Saturation:', saturation.toFixed(1));
+                '| Contrast:', colorDifference.toFixed(1));
   }
 
-  // STRICTER SCORING - require multiple criteria to pass
+  // RELAXED SCORING - More forgiving detection
   let score = 0;
-  let criteriaMetCount = 0;
 
-  // Weights adjusted - contrast and edges are most important for distinguishing card from background
-  const weights = isBack
-    ? { detail: 15, contrast: 35, edges: 35, saturation: 15 }  // Back: focus on shape/edges/contrast
-    : { detail: 25, contrast: 30, edges: 30, saturation: 15 }; // Front: balanced but contrast/edges matter
-
-  // Detail score - STRICTER thresholds
-  const detailThreshold = isBack ? 12 : 20;  // Increased from 8/15
+  // Detail/texture score - RELAXED threshold
+  const detailThreshold = 8;
   if (centerStdDev > detailThreshold) {
-    const detailScore = Math.min(100, (centerStdDev - detailThreshold) * 1.5);
-    score += (detailScore / 100) * weights.detail;
-    criteriaMetCount++;
-  } else {
-    hints.push('No card detail detected');
+    score += Math.min(40, (centerStdDev - detailThreshold) * 2);
   }
 
-  // Contrast score - MUCH STRICTER (this is key to detecting card vs empty frame)
-  // A card should have significant contrast with the background
-  const contrastThreshold = 15;  // Increased from 10 - require more distinct boundary
+  // Contrast score - RELAXED threshold
+  const contrastThreshold = 5;
   if (colorDifference > contrastThreshold) {
-    const contrastScore = Math.min(100, (colorDifference - contrastThreshold) * 2.5);
-    score += (contrastScore / 100) * weights.contrast;
-    criteriaMetCount++;
-  } else {
-    hints.push('Card not distinct from background');
+    score += Math.min(40, (colorDifference - contrastThreshold) * 3);
   }
 
-  // Edge score - STRICTER threshold
-  const edgeThreshold = 0.4;  // Increased from 0.3
-  if (edgeStrength > edgeThreshold) {
-    const edgeScore = Math.min(100, (edgeStrength - edgeThreshold) * 150);
-    score += (edgeScore / 100) * weights.edges;
-    criteriaMetCount++;
-  } else {
-    hints.push('No card edges detected');
+  // Brightness bonus - good lighting helps
+  if (overallMean >= 50 && overallMean <= 200) {
+    score += 20;
   }
 
-  // Saturation score - STRICTER
-  const saturationThreshold = isBack ? 8 : 15;  // Increased from 5/10
-  if (saturation > saturationThreshold) {
-    const satScore = Math.min(100, (saturation - saturationThreshold) * 1.5);
-    score += (satScore / 100) * weights.saturation;
-    criteriaMetCount++;
-  }
-
-  // PENALTY: If fewer than 2 criteria are met, heavily penalize the score
-  // This prevents false positives when pointing at uniform surfaces
-  if (criteriaMetCount < 2) {
-    score *= 0.3;  // 70% penalty
-  } else if (criteriaMetCount < 3) {
-    score *= 0.6;  // 40% penalty
-  }
-
-  // Moderate boost for good lighting (reduced from 1.2 to 1.1)
-  if (overallMean >= 60 && overallMean <= 190) {
-    score *= 1.1;
-  }
+  // NO PENALTIES - just additive scoring
 
   const confidence = Math.min(100, Math.max(0, Math.round(score)));
 
+  // Lower threshold for detection (was 50, now 35)
+  const isDetected = confidence > 35;
+
+  // Simple hint if not detected and no lighting issue
+  if (!isDetected && hints.length === 0) {
+    hints.push('Center the card in the frame');
+  }
+
   return {
-    isCardDetected: confidence > 50,
+    isCardDetected: isDetected,
     confidence,
     message: '',
     hints: hints.length > 0 ? hints : undefined
   };
 }
 
-/**
- * Simple edge detection using gradient analysis
- */
-function detectEdges(imageData: ImageData, cx: number, cy: number, cw: number, ch: number): number {
-  const { data, width } = imageData;
-  let edgeStrength = 0;
-  let edgeCount = 0;
-
-  // Sample horizontal and vertical gradients
-  for (let y = cy; y < cy + ch; y += 10) {
-    for (let x = cx; x < cx + cw; x += 10) {
-      if (x + 1 >= width || y + 1 >= imageData.height) continue;
-
-      const idx = (y * width + x) * 4;
-      const idxRight = (y * width + (x + 1)) * 4;
-      const idxDown = ((y + 1) * width + x) * 4;
-
-      const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-      const grayRight = (data[idxRight] + data[idxRight + 1] + data[idxRight + 2]) / 3;
-      const grayDown = (data[idxDown] + data[idxDown + 1] + data[idxDown + 2]) / 3;
-
-      const gx = Math.abs(gray - grayRight);
-      const gy = Math.abs(gray - grayDown);
-      const gradient = Math.sqrt(gx * gx + gy * gy);
-
-      if (gradient > 20) { // Edge threshold
-        edgeStrength += gradient;
-        edgeCount++;
-      }
-    }
-  }
-
-  return edgeCount > 0 ? edgeStrength / edgeCount / 100 : 0;
-}
-
-/**
- * Calculate color saturation
- */
-function calculateSaturation(data: Uint8ClampedArray, cx: number, cy: number, cw: number, ch: number, imageWidth: number): number {
-  let saturation = 0;
-  let count = 0;
-
-  for (let y = cy; y < cy + ch; y += 8) {
-    for (let x = cx; x < cx + cw; x += 8) {
-      const idx = (y * imageWidth + x) * 4;
-      if (idx + 2 < data.length) {
-        const r = data[idx];
-        const g = data[idx + 1];
-        const b = data[idx + 2];
-        const max = Math.max(r, g, b);
-        const min = Math.min(r, g, b);
-        saturation += (max - min);
-        count++;
-      }
-    }
-  }
-
-  return count > 0 ? saturation / count : 0;
-}
 
 /**
  * Smooth confidence changes with configurable responsiveness

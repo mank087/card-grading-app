@@ -103,6 +103,14 @@ export function useBackgroundGrading() {
             icon: card.frontImageUrl
           })
         }
+      } else if (data.status === 'pending' && !data.is_processing && elapsed > 120000) {
+        // Card is stuck: API says 'pending' but we've been waiting over 2 minutes
+        // This means grading never started or the processing lock was lost
+        console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} stuck in pending state after ${Math.floor(elapsed/1000)}s`)
+        updateCardStatus(card.id, {
+          status: 'error',
+          errorMessage: 'Grading failed to start. Please try re-uploading the card.'
+        })
       } else {
         // Still processing, update progress based on elapsed time
         const estimatedTotal = 90000 // 90 seconds base estimate

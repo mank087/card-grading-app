@@ -74,7 +74,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
       try {
         const cropResult = await cropToGuideFrame(captured.file, {
-          paddingPercent: 0.05, // 5% padding for positioning tolerance
+          paddingPercent: 0.08, // 8% padding (~1 inch buffer) for positioning tolerance
           maintainAspectRatio: true
         });
 
@@ -279,60 +279,51 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         <CameraGuideOverlay side={side} cardDetected={detection.isCardDetected} />
       </div>
 
-      {/* Controls */}
-      <div className="bg-gray-900 border-t border-gray-700 px-4 py-6 relative z-10">
-        <div className="flex items-center justify-center gap-8">
-          {/* Capture Button */}
+      {/* Controls - Fixed height to prevent layout jumping */}
+      <div className="bg-gray-900 border-t border-gray-700 px-4 py-4 relative z-10">
+        {/* Detection feedback - Fixed height container */}
+        <div className="h-12 flex items-center justify-center mb-3">
+          <div className="text-center">
+            <p className={`text-sm font-medium transition-colors ${
+              detection.isCardDetected ? 'text-green-400' : 'text-gray-400'
+            }`}>
+              {detection.isCardDetected ? '✓ Card detected - Ready!' : 'Position card in frame'}
+            </p>
+            {/* Show hint if available and not detected */}
+            {!detection.isCardDetected && detection.hints && detection.hints.length > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                {detection.hints[0]}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Capture Button - Always enabled */}
+        <div className="flex items-center justify-center">
           <button
             onClick={handleCapture}
             disabled={isProcessing}
-            className={`w-20 h-20 rounded-full border-4 border-white bg-white/20 hover:bg-white/30 transition-all shadow-lg ${
-              isProcessing ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'
-            }`}
+            className={`w-20 h-20 rounded-full border-4 transition-all shadow-lg ${
+              detection.isCardDetected
+                ? 'border-green-400 bg-green-400/20 hover:bg-green-400/30'
+                : 'border-white bg-white/20 hover:bg-white/30'
+            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
             aria-label="Capture photo"
           >
             {isProcessing ? (
               <div className="w-full h-full rounded-full bg-gray-400 animate-pulse"></div>
             ) : (
-              <div className="w-full h-full rounded-full bg-white"></div>
+              <div className={`w-full h-full rounded-full ${
+                detection.isCardDetected ? 'bg-green-400' : 'bg-white'
+              }`}></div>
             )}
           </button>
         </div>
 
-        <div className="text-center mt-4 space-y-2">
-          <p className={`text-sm font-medium transition-colors ${
-            detection.isStable ? 'text-green-400' : detection.isCardDetected ? 'text-yellow-400' : 'text-gray-400'
-          }`}>
-            {detection.message}
-          </p>
-
-          {/* Show detection hints when not fully detected */}
-          {detection.hints && detection.hints.length > 0 && !detection.isStable && (
-            <div className="bg-orange-900/50 border border-orange-500/50 rounded-lg px-3 py-2 max-w-xs mx-auto">
-              <p className="text-xs text-orange-200 font-medium">
-                {detection.hints[0]}
-              </p>
-            </div>
-          )}
-
-          {/* Simplified detection indicator - only show when actively detecting */}
-          {!detection.isStable && (
-            <div className="flex items-center justify-center gap-2">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">Detection</p>
-              <div className="flex gap-1">
-                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                  detection.confidence > 20 ? 'bg-green-400' : 'bg-gray-600'
-                }`} />
-                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                  detection.confidence > 50 ? 'bg-green-400' : 'bg-gray-600'
-                }`} />
-                <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                  detection.confidence > 80 ? 'bg-green-400' : 'bg-gray-600'
-                }`} />
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Tip text - Fixed position */}
+        <p className="text-center text-xs text-gray-500 mt-3">
+          Tap to capture • You can always retake
+        </p>
       </div>
     </div>
   );

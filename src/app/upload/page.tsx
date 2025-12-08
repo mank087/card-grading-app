@@ -696,6 +696,58 @@ function UniversalUploadPageContent() {
     return null;
   }
 
+  // 💳 Show no-credits screen if user has 0 credits (block upload flow early)
+  if (!creditsLoading && balance === 0 && !isUploading) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-gradient-to-br from-gray-50 to-purple-50">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
+          {/* Icon */}
+          <div className="mx-auto w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mb-6">
+            <svg className="w-10 h-10 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+
+          {/* Title */}
+          <h1 className="text-2xl font-bold text-gray-900 mb-3">
+            Credits Required
+          </h1>
+
+          {/* Description */}
+          <p className="text-gray-600 mb-6">
+            You need at least 1 credit to grade a card. Purchase credits to start grading your collection.
+          </p>
+
+          {/* Current Balance */}
+          <div className="bg-gray-100 rounded-xl p-4 mb-6">
+            <p className="text-sm text-gray-500 mb-1">Current Balance</p>
+            <p className="text-3xl font-bold text-gray-900">0 credits</p>
+          </div>
+
+          {/* CTA Buttons */}
+          <Link
+            href="/credits"
+            className="block w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl font-semibold text-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg mb-3"
+          >
+            Purchase Credits
+          </Link>
+
+          <Link
+            href="/"
+            className="block w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+          >
+            Back to Home
+          </Link>
+
+          {/* Info text */}
+          <p className="text-xs text-gray-500 mt-6">
+            Each card grading costs 1 credit. Credits never expire.
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   // Show loading animation when uploading (check this FIRST before other modes)
   if (isUploading && frontFile) {
     return (
@@ -837,6 +889,46 @@ function UniversalUploadPageContent() {
 
         {/* Action Buttons */}
         <div className="bg-white border-t border-gray-200 px-4 py-4 space-y-3">
+          {/* Category Selection - Prominent Display */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">Card Category</p>
+                <p className="text-lg font-bold text-gray-900">{CARD_TYPES[selectedType].label}</p>
+              </div>
+              <button
+                onClick={() => {
+                  const types = Object.keys(CARD_TYPES) as CardType[];
+                  const currentIndex = types.indexOf(selectedType);
+                  const nextIndex = (currentIndex + 1) % types.length;
+                  setSelectedType(types[nextIndex]);
+                }}
+                className="px-4 py-2 bg-white border-2 border-purple-300 text-purple-700 rounded-lg font-semibold text-sm hover:bg-purple-50 hover:border-purple-400 transition-all shadow-sm"
+              >
+                Change
+              </button>
+            </div>
+            {/* Category Options (shown when tapping change) */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {(Object.keys(CARD_TYPES) as CardType[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setSelectedType(type)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedType === type
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                  }`}
+                >
+                  {CARD_TYPES[type].label.replace(' Card', '')}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-purple-600 mt-2 text-center">
+              Make sure this matches your card type for accurate grading
+            </p>
+          </div>
+
           <button
             onClick={handleUpload}
             disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
@@ -905,6 +997,46 @@ function UniversalUploadPageContent() {
 
         {/* Action Buttons */}
         <div className="bg-white border-t border-gray-200 px-4 py-4 space-y-3">
+          {/* Category Selection - Prominent Display */}
+          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">Card Category</p>
+                <p className="text-lg font-bold text-gray-900">{CARD_TYPES[selectedType].label}</p>
+              </div>
+              <button
+                onClick={() => {
+                  const types = Object.keys(CARD_TYPES) as CardType[];
+                  const currentIndex = types.indexOf(selectedType);
+                  const nextIndex = (currentIndex + 1) % types.length;
+                  setSelectedType(types[nextIndex]);
+                }}
+                className="px-4 py-2 bg-white border-2 border-purple-300 text-purple-700 rounded-lg font-semibold text-sm hover:bg-purple-50 hover:border-purple-400 transition-all shadow-sm"
+              >
+                Change
+              </button>
+            </div>
+            {/* Category Options */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {(Object.keys(CARD_TYPES) as CardType[]).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setSelectedType(type)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedType === type
+                      ? 'bg-purple-600 text-white shadow-md'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:border-purple-300 hover:bg-purple-50'
+                  }`}
+                >
+                  {CARD_TYPES[type].label.replace(' Card', '')}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-purple-600 mt-2 text-center">
+              Make sure this matches your card type for accurate grading
+            </p>
+          </div>
+
           {/* Processing indicator */}
           {isCompressing && (
             <div className="flex items-center justify-center gap-2 text-indigo-600 py-2">
@@ -1087,6 +1219,7 @@ function UniversalUploadPageContent() {
             side="front"
             onCameraSelect={handleCameraSelect}
             onGallerySelect={handleGallerySelect}
+            creditsBalance={balance}
           />
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -33,34 +33,35 @@ function checkBlur(imageData: ImageData): QualityCheckResult {
   }
   variance = sum / count;
 
-  // Thresholds (tuned for card images - stricter for better discrimination)
-  const BLUR_THRESHOLD_EXCELLENT = 500;  // Very sharp
-  const BLUR_THRESHOLD_GOOD = 250;       // Sharp enough
-  const BLUR_THRESHOLD_ACCEPTABLE = 100; // Minimum acceptable
+  // Thresholds (relaxed for better UX - most phone cameras produce usable images)
+  const BLUR_THRESHOLD_EXCELLENT = 400;  // Very sharp
+  const BLUR_THRESHOLD_GOOD = 150;       // Sharp enough for accurate grading
+  const BLUR_THRESHOLD_ACCEPTABLE = 50;  // Minimum acceptable (lowered from 100)
 
   if (variance >= BLUR_THRESHOLD_EXCELLENT) {
     return {
       passed: true,
       score: 100,
-      message: 'Excellent sharpness - crystal clear'
+      message: 'Excellent sharpness'
     };
   } else if (variance >= BLUR_THRESHOLD_GOOD) {
     return {
       passed: true,
-      score: Math.round(70 + ((variance - BLUR_THRESHOLD_GOOD) / (BLUR_THRESHOLD_EXCELLENT - BLUR_THRESHOLD_GOOD) * 30)),
-      message: 'Good sharpness - details clear'
+      score: Math.round(75 + ((variance - BLUR_THRESHOLD_GOOD) / (BLUR_THRESHOLD_EXCELLENT - BLUR_THRESHOLD_GOOD) * 25)),
+      message: 'Good sharpness'
     };
   } else if (variance >= BLUR_THRESHOLD_ACCEPTABLE) {
     return {
       passed: true,
-      score: Math.round(60 + ((variance - BLUR_THRESHOLD_ACCEPTABLE) / (BLUR_THRESHOLD_GOOD - BLUR_THRESHOLD_ACCEPTABLE) * 10)),
-      message: 'Acceptable sharpness - may affect grading'
+      score: Math.round(60 + ((variance - BLUR_THRESHOLD_ACCEPTABLE) / (BLUR_THRESHOLD_GOOD - BLUR_THRESHOLD_ACCEPTABLE) * 15)),
+      message: 'Acceptable sharpness'
     };
   } else {
+    // Even "failed" blur still passes - we just warn the user
     return {
-      passed: false,
-      score: Math.round((variance / BLUR_THRESHOLD_ACCEPTABLE) * 60),
-      message: 'Too blurry - hold camera steady and tap to focus'
+      passed: variance >= 25, // Only fail for severely blurry images
+      score: Math.max(40, Math.round((variance / BLUR_THRESHOLD_ACCEPTABLE) * 60)),
+      message: variance >= 25 ? 'Slightly blurry - may affect accuracy' : 'Image is blurry - consider retaking'
     };
   }
 }
@@ -85,13 +86,13 @@ function checkBrightness(imageData: ImageData): QualityCheckResult {
 
   const avgBrightness = sum / sampleSize;
 
-  // Stricter thresholds for better discrimination
-  const EXCELLENT_MIN = 100;
-  const EXCELLENT_MAX = 160;
-  const GOOD_MIN = 85;
-  const GOOD_MAX = 180;
-  const ACCEPTABLE_MIN = 70;
-  const ACCEPTABLE_MAX = 200;
+  // Relaxed thresholds for better UX while still providing useful feedback
+  const EXCELLENT_MIN = 90;
+  const EXCELLENT_MAX = 170;
+  const GOOD_MIN = 70;
+  const GOOD_MAX = 190;
+  const ACCEPTABLE_MIN = 50;
+  const ACCEPTABLE_MAX = 220;
 
   if (avgBrightness >= EXCELLENT_MIN && avgBrightness <= EXCELLENT_MAX) {
     return {
@@ -202,8 +203,12 @@ export function validateImageQuality(imageData: ImageData): ImageQualityValidati
     suggestions.push('Fair image quality - grade may vary by ±1.0 grade');
   }
 
+  // More forgiving validation - only mark invalid for severely poor quality
+  // This aligns with our philosophy that users should always be able to proceed
+  const isValid = overallScore >= 50 || (blurCheck.passed && brightnessCheck.passed);
+
   return {
-    isValid: allPassed && overallScore >= 60,
+    isValid,
     overallScore,
     confidenceLetter,
     gradeUncertainty,

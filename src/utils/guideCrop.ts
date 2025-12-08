@@ -30,7 +30,7 @@ export async function cropToGuideFrame(
   options: CropOptions = {}
 ): Promise<CropResult> {
   const {
-    paddingPercent = 0.05, // 5% padding by default
+    paddingPercent = 0.08, // 8% padding by default (~1 inch buffer at card size)
     maintainAspectRatio = true
   } = options;
 
@@ -44,17 +44,17 @@ export async function cropToGuideFrame(
         const originalHeight = img.height;
 
         // Calculate guide frame dimensions (matches CameraGuideOverlay.tsx)
-        // Guide is 80% of width, centered, with 2.5:3.5 aspect ratio
-        const guideWidth = originalWidth * 0.80;
+        // Guide is 82% of width, centered, with 2.5:3.5 aspect ratio
+        const guideWidth = originalWidth * 0.82;
         const guideHeight = maintainAspectRatio
           ? guideWidth * (3.5 / 2.5) // Card aspect ratio
-          : originalHeight * 0.80;
+          : originalHeight * 0.82;
 
         // Calculate guide position (centered)
         const guideX = (originalWidth - guideWidth) / 2;
         const guideY = (originalHeight - guideHeight) / 2;
 
-        // Apply padding (expand crop area slightly)
+        // Apply padding (expand crop area slightly for positioning tolerance)
         const paddingX = guideWidth * paddingPercent;
         const paddingY = guideHeight * paddingPercent;
 

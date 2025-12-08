@@ -21,7 +21,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Get card
+    // Get card - admin detail view needs most fields for full inspection
+    // Keep SELECT * here since admins need access to all card data for moderation
     const { data: card, error: cardError } = await supabase
       .from('cards')
       .select('*')

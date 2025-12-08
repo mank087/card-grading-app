@@ -15,6 +15,7 @@ import {
 } from '../../lib/foldableLabelGenerator';
 import { generateMiniReportJpg } from '../../lib/miniReportJpgGenerator';
 import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
+import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 
 /**
@@ -35,7 +36,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   cardType = 'sports'
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'mini-jpg' | null>(null);
+  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'mini-jpg' | 'card-images' | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [isAveryModalOpen, setIsAveryModalOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -808,6 +809,133 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   };
 
   /**
+   * Handle Card Images (Front & Back with Labels) generation and download
+   * Downloads two separate JPG files - one for front, one for back
+   */
+  const handleDownloadCardImages = async () => {
+    try {
+      setIsGenerating(true);
+      setGeneratingType('card-images');
+      setIsDropdownOpen(false);
+
+      console.log('[CARD IMAGES] Starting generation...');
+
+      // Extract card info
+      const cardInfo = card.conversational_card_info || {};
+
+      // Helper: Extract English name from bilingual format
+      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
+        if (!text) return null;
+        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
+        if (!hasJapanese) return text;
+        const parts = text.split(/[/()（）]/);
+        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
+        return englishPart ? englishPart.trim() : text;
+      };
+
+      // Build player/character name
+      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
+      const cardName = shouldPrioritizePlayer
+        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
+        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
+
+      // Build set name (include subset if available)
+      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
+                         (card.card_set && card.card_set !== 'null') ? card.card_set :
+                         cardInfo.set_era || 'Unknown Set';
+      const subset = cardInfo.subset || card.subset;
+      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
+      const setName = setNameWithSubset || 'Unknown Set';
+
+      // Build special features
+      const features: string[] = [];
+      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
+      if (cardInfo.autographed) features.push('Auto');
+      const serialNum = cardInfo.serial_number;
+      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
+        features.push(serialNum);
+      }
+      const specialFeatures = features.length > 0 ? features.join(' \u2022 ') : undefined;
+
+      // Get grade and condition
+      const grade = card.conversational_decimal_grade ?? 0;
+      const conditionLabel = card.conversational_condition_label
+        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+        : (getConditionFromGrade(grade) || 'N/A');
+
+      // Get image URLs - use existing signed URLs or generate new ones
+      let frontImageUrl = card.front_url;
+      let backImageUrl = card.back_url;
+
+      if (!frontImageUrl || !backImageUrl) {
+        console.log('[CARD IMAGES] No signed URLs found, generating from storage paths...');
+
+        if (!card.front_path || !card.back_path) {
+          throw new Error('Card images not found. Missing both URLs and storage paths.');
+        }
+
+        const authClient = getAuthenticatedClient();
+
+        const { data: frontUrlData } = await authClient
+          .storage
+          .from('cards')
+          .createSignedUrl(card.front_path, 60 * 60);
+
+        const { data: backUrlData } = await authClient
+          .storage
+          .from('cards')
+          .createSignedUrl(card.back_path, 60 * 60);
+
+        if (!frontUrlData?.signedUrl || !backUrlData?.signedUrl) {
+          throw new Error('Failed to generate signed URLs for card images');
+        }
+
+        frontImageUrl = frontUrlData.signedUrl;
+        backImageUrl = backUrlData.signedUrl;
+      }
+
+      // Build card image data
+      const cardImageData: CardImageData = {
+        cardName,
+        setName,
+        cardNumber: cardInfo.card_number || card.card_number,
+        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
+        specialFeatures,
+        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
+        grade,
+        conditionLabel,
+        cardUrl: `${window.location.origin}/${cardType}/${card.id}`,
+        frontImageUrl,
+        backImageUrl,
+      };
+
+      console.log('[CARD IMAGES] Generating images with data:', {
+        ...cardImageData,
+        frontImageUrl: 'present',
+        backImageUrl: 'present',
+      });
+
+      // Generate filename base
+      const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const cardNameClean = sanitize(cardName);
+      const serialClean = sanitize(cardImageData.serial);
+      const filenameBase = `DCM-Card-${cardNameClean}-${serialClean}`;
+
+      // Download both images
+      await downloadCardImages(cardImageData, filenameBase);
+
+      console.log('[CARD IMAGES] ✅ Images generated successfully');
+
+    } catch (error) {
+      console.error('[CARD IMAGES] ❌ Error generating images:', error);
+      alert('Failed to generate card images. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+      setGeneratingType(null);
+    }
+  };
+
+  /**
    * Handle Avery Label generation with selected position and calibration offsets
    */
   const handleDownloadAveryLabel = async (positionIndex: number, offsets: CalibrationOffsets) => {
@@ -1010,6 +1138,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       description: 'JPG for eBay/auction listings',
       onClick: handleDownloadMiniJpg,
     },
+    {
+      id: 'card-images',
+      label: 'Card Images (Front & Back)',
+      description: 'JPG images for eBay/marketplace',
+      onClick: handleDownloadCardImages,
+    },
   ];
 
   // Compact variant (smaller dropdown)
@@ -1073,7 +1207,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         title="Download Options"
       >
         {isGenerating ? (
-          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : generatingType === 'mini-jpg' ? 'Generating Image...' : 'Generating Report...'}</span>
+          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : generatingType === 'mini-jpg' ? 'Generating Image...' : generatingType === 'card-images' ? 'Generating Images...' : 'Generating Report...'}</span>
         ) : (
           <>
             <span>Download Label or Report</span>

@@ -33,12 +33,30 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
   const router = useRouter()
 
   // Load queue from localStorage on mount
+  // Also cleanup stale cards that were processing from a previous session
   useEffect(() => {
     const saved = localStorage.getItem('gradingQueue')
     if (saved) {
       try {
-        const parsed = JSON.parse(saved)
-        setQueue(parsed)
+        const parsed: GradingCard[] = JSON.parse(saved)
+        const now = Date.now()
+        const STALE_THRESHOLD = 10 * 60 * 1000 // 10 minutes
+
+        // Mark stale processing/uploading cards as errors
+        const cleanedQueue = parsed.map(card => {
+          if ((card.status === 'processing' || card.status === 'uploading') &&
+              (now - card.uploadedAt) > STALE_THRESHOLD) {
+            console.log(`[GradingQueue] Marking stale card ${card.cardId} as error (uploaded ${Math.floor((now - card.uploadedAt) / 1000)}s ago)`)
+            return {
+              ...card,
+              status: 'error' as const,
+              errorMessage: 'Session expired. Please re-upload this card to grade it.'
+            }
+          }
+          return card
+        })
+
+        setQueue(cleanedQueue)
       } catch (e) {
         console.error('Failed to parse grading queue:', e)
       }

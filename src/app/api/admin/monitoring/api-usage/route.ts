@@ -23,10 +23,11 @@ export async function GET(request: NextRequest) {
 
     const offset = (page - 1) * limit
 
-    // Build query
+    // Build query - OPTIMIZED: select only needed fields to reduce egress
+    // Previously used SELECT * which fetched all columns including large response payloads
     let query = supabase
       .from('api_usage_log')
-      .select('*', { count: 'exact' })
+      .select('id, service, operation, user_id, card_id, input_tokens, output_tokens, cost_usd, status, created_at', { count: 'exact' })
 
     // Apply service filter
     if (service !== 'all') {
