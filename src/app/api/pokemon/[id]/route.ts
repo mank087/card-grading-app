@@ -7,6 +7,8 @@ import { gradeCardConversational } from "@/lib/visionGrader";
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // HYBRID SET IDENTIFICATION: Pokemon TCG API for set lookup when AI doesn't have it in mini table
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
+// Label data generation for consistent display across all contexts
+import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -908,6 +910,35 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       // Processing metadata
       processing_time: Date.now() - startTime
     };
+
+    // Generate standardized label data for consistent display across all contexts
+    const cardForLabel: CardForLabel = {
+      id: cardId,
+      category: 'Pokemon',
+      serial: card.serial,
+      conversational_decimal_grade: decimalGrade,
+      conversational_whole_grade: wholeGrade,
+      conversational_condition_label: conditionLabel,
+      conversational_card_info: cardInfo,
+      card_name: cardFields.card_name || card.card_name,
+      card_set: cardFields.card_set || card.card_set,
+      card_number: cardFields.card_number || card.card_number,
+      featured: cardFields.pokemon_featured || card.featured,
+      pokemon_featured: cardFields.pokemon_featured || card.pokemon_featured,
+      release_date: cardFields.release_date || card.release_date,
+      serial_numbering: cardInfo?.serial_number || card.serial_numbering,
+      first_print_rookie: cardInfo?.rookie_or_first === true ? 'true' : card.first_print_rookie,
+      holofoil: cardFields.holofoil || card.holofoil,
+    };
+    const labelData = generateLabelData(cardForLabel);
+    (updateData as any).label_data = labelData;
+
+    console.log(`[GET /api/pokemon/${cardId}] Generated label data:`, {
+      primaryName: labelData.primaryName,
+      contextLine: labelData.contextLine,
+      featuresLine: labelData.featuresLine,
+      grade: labelData.gradeFormatted
+    });
 
     console.log(`[GET /api/pokemon/${cardId}] Updating database with extracted Pokemon fields:`, {
       card_name: cardFields.card_name,

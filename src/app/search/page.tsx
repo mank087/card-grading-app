@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { CardSlabGrid } from '@/components/CardSlab';
+import { getCardLabelData } from '@/lib/useLabelData';
 
 interface CardResult {
   id: string;
@@ -20,6 +21,8 @@ interface CardResult {
   subset?: string;
   dvg_decimal_grade: number;
   conversational_decimal_grade?: number;
+  conversational_condition_label?: string;
+  label_data?: any; // Pre-generated label data for unified display
   created_at: string;
   // Special features
   rookie_or_first?: boolean;
@@ -214,40 +217,20 @@ function SearchPageContent() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {results.map((card) => {
-                const displayName = getDisplayName(card);
-                const setLineText = getSetLineText(card);
-                const grade = getGrade(card);
-                const condition = grade ? getConditionFromGrade(grade) : '';
-
-                // Build special features array
-                const features: string[] = [];
-                // MTG-specific features (no emojis)
-                if (card.is_foil) features.push(card.foil_type || 'Foil');
-                if (card.mtg_rarity) {
-                  const rarity = card.mtg_rarity === 'mythic' ? 'Mythic' :
-                                card.mtg_rarity.charAt(0).toUpperCase() + card.mtg_rarity.slice(1);
-                  features.push(rarity);
-                }
-                if (card.is_double_faced) features.push('Double-Faced');
-                // Standard features
-                if (card.rookie_or_first === true || card.rookie_or_first === 'true') features.push('RC');
-                if (card.autographed) features.push('Auto');
-                if (card.facsimile_autograph) features.push('Facsimile');
-                if (card.official_reprint) features.push('Reprint');
-                if (card.serial_number && card.serial_number !== 'N/A' && !card.serial_number.toLowerCase().includes('not present') && !card.serial_number.toLowerCase().includes('none')) {
-                  features.push(card.serial_number);
-                }
+                // 🎯 Use unified label data for consistent display
+                const labelData = getCardLabelData(card);
 
                 return (
                   <CardSlabGrid
                     key={card.id}
-                    displayName={displayName}
-                    setLineText={setLineText}
-                    features={features}
-                    serial={card.serial}
-                    grade={grade}
-                    condition={condition}
+                    displayName={labelData.primaryName}
+                    setLineText={labelData.contextLine}
+                    features={labelData.features}
+                    serial={labelData.serial}
+                    grade={labelData.grade}
+                    condition={labelData.condition}
                     frontImageUrl={card.front_url}
+                    isAlteredAuthentic={labelData.isAlteredAuthentic}
                     className="hover:shadow-xl transition-shadow duration-200"
                   >
                     {/* View Details Button */}

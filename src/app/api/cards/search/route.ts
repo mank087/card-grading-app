@@ -59,6 +59,8 @@ export async function GET(request: NextRequest) {
         dvg_decimal_grade,
         conversational_decimal_grade,
         conversational_card_info,
+        conversational_condition_label,
+        label_data,
         user_id,
         created_at,
         is_foil,
@@ -145,6 +147,8 @@ export async function GET(request: NextRequest) {
         subset: convInfo?.subset || '',
         dvg_decimal_grade: card.dvg_decimal_grade,
         conversational_decimal_grade: card.conversational_decimal_grade,
+        conversational_condition_label: card.conversational_condition_label,
+        label_data: card.label_data, // Pre-generated label data for unified display
         created_at: card.created_at,
         // Special features for card display
         rookie_or_first: convInfo?.rookie_or_first || false,

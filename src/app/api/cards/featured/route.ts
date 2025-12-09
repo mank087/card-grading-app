@@ -33,6 +33,7 @@ export async function GET() {
         conversational_decimal_grade,
         conversational_condition_label,
         conversational_card_info,
+        label_data,
         featured,
         card_set,
         release_date,

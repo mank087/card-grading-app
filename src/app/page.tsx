@@ -6,6 +6,7 @@ import { getStoredSession } from '../lib/directAuth'
 import ScrollingCardBackground from './ui/ScrollingCardBackground'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
 import { CardSlabGrid } from '@/components/CardSlab'
+import { getCardLabelData } from '@/lib/useLabelData'
 
 // Helper functions to extract card info (matching collection page)
 const stripMarkdown = (text: string | null | undefined): string | null => {
@@ -463,32 +464,8 @@ function FeaturedCardsCarousel({
           }}
         >
           {featuredCards.map((card) => {
-            const cardInfo = getCardInfo(card)
-            const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
-            const displayName = isSportsCard
-              ? (cardInfo.player_or_character || cardInfo.card_name || "Unknown Player")
-              : (cardInfo.card_name || cardInfo.player_or_character || "Unknown Card")
-
-            // Build special features string
-            const features: string[] = []
-            if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC')
-            if (cardInfo.autographed) features.push('Auto')
-            const serialNum = cardInfo.serial_number
-            if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-              features.push(serialNum)
-            }
-
-            // Build set details for Line 2 (Set Name • Card # • Year)
-            const setName = cardInfo.set_name || "Unknown Set"
-            const cardNumber = cardInfo.card_number
-            const year = cardInfo.year
-            const setLineText = [setName, cardNumber, year].filter(p => p).join(' • ')
-
-            // Get grade and condition
-            const grade = getCardGrade(card)
-            const condition = card.conversational_condition_label
-              ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-              : (grade ? getConditionFromGrade(grade) : '')
+            // 🎯 Use unified label data for consistent display
+            const labelData = getCardLabelData(card)
 
             return (
               <Link
@@ -497,13 +474,14 @@ function FeaturedCardsCarousel({
                 className="flex-shrink-0 w-[280px] cursor-pointer block"
               >
                 <CardSlabGrid
-                  displayName={displayName}
-                  setLineText={setLineText}
-                  features={features}
-                  serial={card.serial}
-                  grade={grade}
-                  condition={condition}
+                  displayName={labelData.primaryName}
+                  setLineText={labelData.contextLine}
+                  features={labelData.features}
+                  serial={labelData.serial}
+                  grade={labelData.grade}
+                  condition={labelData.condition}
                   frontImageUrl={card.front_url}
+                  isAlteredAuthentic={labelData.isAlteredAuthentic}
                   className="hover:shadow-xl transition-shadow duration-200"
                 />
               </Link>

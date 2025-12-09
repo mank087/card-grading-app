@@ -142,7 +142,7 @@ export default function Navigation() {
 
           {/* Logo - Left Side */}
           <div className="flex-shrink-0">
-            <Link href="/" className="flex items-center space-x-2">
+            <Link href="/" className="flex items-center">
               <Image
                 src="/DCM-logo.png"
                 alt="DCM Logo"
@@ -150,9 +150,6 @@ export default function Navigation() {
                 height={40}
                 className="object-contain"
               />
-              <span className="text-base sm:text-lg font-bold text-gray-800 hidden lg:inline">
-                DCM Grading
-              </span>
             </Link>
           </div>
 
@@ -357,7 +354,7 @@ export default function Navigation() {
                     href="/login?mode=signup"
                     className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors shadow-md"
                   >
-                    Sign Up Free
+                    Sign Up
                   </Link>
                 </>
               )}
@@ -378,7 +375,7 @@ export default function Navigation() {
                       : 'bg-green-100 text-green-700'
                   }`}
                 >
-                  {creditsLoading ? '...' : <>{balance}</>}
+                  {creditsLoading ? '...' : <>{balance} {balance === 1 ? 'Credit' : 'Credits'}</>}
                 </Link>
 
                 {/* Logged In: Grade Button */}

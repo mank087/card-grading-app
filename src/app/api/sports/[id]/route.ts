@@ -5,6 +5,8 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational } from "@/lib/visionGrader";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+// Label data generation for consistent display across all contexts
+import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -800,6 +802,34 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       // Processing metadata
       processing_time: Date.now() - startTime
     };
+
+    // Generate standardized label data for consistent display across all contexts
+    const cardForLabel: CardForLabel = {
+      id: cardId,
+      category: card.category || 'Sports',
+      serial: card.serial,
+      conversational_decimal_grade: conversationalGradingData?.decimal_grade || null,
+      conversational_whole_grade: conversationalGradingData?.whole_grade || null,
+      conversational_condition_label: conversationalGradingData?.condition_label || null,
+      conversational_card_info: conversationalGradingData?.card_info || null,
+      card_name: conversationalGradingData?.card_info?.card_name || card.card_name,
+      card_set: conversationalGradingData?.card_info?.set_name || card.card_set,
+      card_number: conversationalGradingData?.card_info?.card_number || card.card_number,
+      featured: conversationalGradingData?.card_info?.player_or_character || card.featured,
+      release_date: conversationalGradingData?.card_info?.year || card.release_date,
+      serial_numbering: conversationalGradingData?.card_info?.serial_number || card.serial_numbering,
+      autographed: conversationalGradingData?.card_info?.autographed || card.autographed,
+      rookie_card: conversationalGradingData?.card_info?.rookie_or_first === true || card.rookie_card,
+    };
+    const labelData = generateLabelData(cardForLabel);
+    (updateData as any).label_data = labelData;
+
+    console.log(`[GET /api/sports/${cardId}] Generated label data:`, {
+      primaryName: labelData.primaryName,
+      contextLine: labelData.contextLine,
+      featuresLine: labelData.featuresLine,
+      grade: labelData.gradeFormatted
+    });
 
     console.log(`[GET /api/sports/${cardId}] Updating database with conversational grading:`, {
       card_name: conversationalGradingData?.card_info?.card_name,

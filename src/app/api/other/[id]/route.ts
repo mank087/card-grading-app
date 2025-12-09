@@ -4,6 +4,8 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { gradeCardConversational } from "@/lib/visionGrader";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+// Label data generation for consistent display across all contexts
+import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -647,14 +649,42 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     const processingTime = Date.now() - startTime;
     console.log(`[GET /api/other/${cardId}] ⏱️ Total processing time: ${processingTime}ms`);
 
+    // Generate standardized label data for consistent display across all contexts
+    const parsedCardInfo = conversationalGradingResult ? JSON.parse(conversationalGradingResult).card_info : null;
+    const cardForLabel: CardForLabel = {
+      id: cardId,
+      category: 'Other',
+      serial: card.serial,
+      conversational_decimal_grade: gradingData.conversational_decimal_grade,
+      conversational_whole_grade: gradingData.conversational_whole_grade,
+      conversational_condition_label: gradingData.conversational_condition_label,
+      conversational_card_info: parsedCardInfo,
+      card_name: otherFields.card_name || card.card_name,
+      card_set: otherFields.card_set || card.card_set,
+      card_number: otherFields.card_number || card.card_number,
+      featured: otherFields.featured || card.featured,
+      release_date: otherFields.release_date || card.release_date,
+      serial_numbering: parsedCardInfo?.serial_number || card.serial_numbering,
+      autographed: parsedCardInfo?.autographed || card.autographed,
+    };
+    const labelData = generateLabelData(cardForLabel);
+
+    console.log(`[GET /api/other/${cardId}] Generated label data:`, {
+      primaryName: labelData.primaryName,
+      contextLine: labelData.contextLine,
+      featuresLine: labelData.featuresLine,
+      grade: labelData.gradeFormatted
+    });
+
     // Update database with grading results
     const { error: updateError } = await supabase
       .from('cards')
       .update({
         ai_grading: conversationalGradingResult,
         conversational_grading: conversationalGradingResult,
-        conversational_card_info: conversationalGradingResult ? JSON.parse(conversationalGradingResult).card_info : null,
+        conversational_card_info: parsedCardInfo,
         processing_time: processingTime,
+        label_data: labelData,
         ...gradingData,
         ...otherFields
       })

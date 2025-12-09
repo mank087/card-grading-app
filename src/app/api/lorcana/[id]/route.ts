@@ -5,6 +5,8 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational } from "@/lib/visionGrader";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+// Label data generation for consistent display across all contexts
+import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -841,6 +843,31 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       // Processing metadata
       processing_time: Date.now() - startTime
     };
+
+    // Generate standardized label data for consistent display across all contexts
+    const cardForLabel: CardForLabel = {
+      id: cardId,
+      category: 'Lorcana',
+      serial: card.serial,
+      conversational_decimal_grade: decimalGrade,
+      conversational_whole_grade: wholeGrade,
+      conversational_condition_label: conditionLabel,
+      conversational_card_info: cardInfo,
+      card_name: cardFields.card_name || card.card_name,
+      card_set: cardFields.card_set || card.card_set,
+      card_number: cardFields.card_number || card.card_number,
+      featured: cardFields.featured || card.featured,
+      release_date: cardFields.release_date || card.release_date,
+    };
+    const labelData = generateLabelData(cardForLabel);
+    (updateData as any).label_data = labelData;
+
+    console.log(`[GET /api/lorcana/${cardId}] Generated label data:`, {
+      primaryName: labelData.primaryName,
+      contextLine: labelData.contextLine,
+      featuresLine: labelData.featuresLine,
+      grade: labelData.gradeFormatted
+    });
 
     console.log(`[GET /api/lorcana/${cardId}] Updating database with extracted Lorcana fields:`, {
       card_name: cardFields.card_name,
