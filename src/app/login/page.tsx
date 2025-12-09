@@ -108,7 +108,7 @@ function LoginPageContent() {
                 className="object-contain"
               />
               <div>
-                <h1 className="text-3xl font-bold text-white">DCM Grading</h1>
+                <h1 className="text-2xl font-bold text-white leading-tight">Dynamic Collectibles<br />Management</h1>
                 <p className="text-purple-200">Professional Card Grading</p>
               </div>
             </div>
@@ -207,7 +207,9 @@ function LoginPageContent() {
               height={48}
               className="object-contain"
             />
-            <h1 className="text-2xl font-bold text-gray-900">DCM Grading</h1>
+            <div className="text-left">
+              <h1 className="text-xl font-bold text-gray-900 leading-tight">Dynamic Collectibles<br />Management</h1>
+            </div>
           </div>
           <p className="text-gray-600">Professional card grading in seconds</p>
         </div>
@@ -336,31 +338,78 @@ function LoginPageContent() {
 
           {/* Mobile Benefits (shown only on small screens) */}
           <div className="lg:hidden mt-10 pt-8 border-t border-gray-200">
-            <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Why DCM Grading?</h3>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-gray-700">Three-pass AI grading</span>
+            <h3 className="text-lg font-bold text-gray-900 mb-4 text-center">Why Dynamic Collectibles Management?</h3>
+
+            {/* Benefits List - Expanded to match desktop */}
+            <div className="space-y-4 mb-6">
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-gray-900 font-semibold">Three-Pass AI Consensus</p>
+                  <p className="text-gray-600 text-sm">Every card graded 3 times independently for maximum accuracy</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-gray-700">Under 60 seconds</span>
+
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-gray-900 font-semibold">Results in Under 60 Seconds</p>
+                  <p className="text-gray-600 text-sm">No waiting weeks or months for professional grading</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-gray-700">All card types</span>
+
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-gray-900 font-semibold">8-Component Analysis</p>
+                  <p className="text-gray-600 text-sm">Centering, corners, edges & surface for front and back</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-                <span className="text-gray-700">Free credits to start</span>
+
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-gray-900 font-semibold">All Card Types Supported</p>
+                  <p className="text-gray-600 text-sm">Sports, Pokémon, MTG, Lorcana, and more</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="flex-shrink-0 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center mt-0.5">
+                  <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-gray-900 font-semibold">Free Credits with Signup</p>
+                  <p className="text-gray-600 text-sm">Try DCM grading when you create your account</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Social Proof - Matching desktop */}
+            <div className="border-t border-gray-200 pt-6">
+              <p className="text-gray-500 text-sm mb-3 text-center">Trusted by collectors for:</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">Pre-submission screening</span>
+                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">Collection management</span>
+                <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm">Selling preparation</span>
               </div>
             </div>
           </div>
