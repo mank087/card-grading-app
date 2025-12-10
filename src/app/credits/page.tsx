@@ -19,7 +19,15 @@ interface PricingTier {
   bonusCredits: number
   description: string
   popular?: boolean
+  icon: string
+  color: string
+  bgGradient: string
+  savingsPercent?: number
+  perGradeCost: number
 }
+
+// Base price per credit (Basic tier: $2.99/credit)
+const BASE_PRICE_PER_CREDIT = 2.99
 
 const pricingTiers: PricingTier[] = [
   {
@@ -29,6 +37,10 @@ const pricingTiers: PricingTier[] = [
     credits: 1,
     bonusCredits: 1,
     description: 'Perfect for trying out DCM Grading',
+    icon: '⭐',
+    color: 'blue',
+    bgGradient: 'from-blue-500 to-blue-600',
+    perGradeCost: 2.99,
   },
   {
     id: 'pro',
@@ -38,6 +50,11 @@ const pricingTiers: PricingTier[] = [
     bonusCredits: 2,
     description: 'Best value for casual collectors',
     popular: true,
+    icon: '🚀',
+    color: 'purple',
+    bgGradient: 'from-purple-600 to-indigo-600',
+    savingsPercent: 33,
+    perGradeCost: 2.00,
   },
   {
     id: 'elite',
@@ -46,6 +63,11 @@ const pricingTiers: PricingTier[] = [
     credits: 20,
     bonusCredits: 5,
     description: 'For serious collectors and dealers',
+    icon: '👑',
+    color: 'amber',
+    bgGradient: 'from-amber-500 to-orange-600',
+    savingsPercent: 67,
+    perGradeCost: 1.00,
   },
 ]
 
@@ -249,7 +271,7 @@ function CreditsPageContent() {
               {!isAuthenticated ? 'Pricing' : (showWelcome ? 'Choose Your Credit Package' : 'Purchase Grading Credits')}
             </h1>
             <p className="text-xl text-gray-600 mb-6">
-              Get professional AI-powered card grading in seconds
+              Get professional DCM Optic™ card grading in seconds
             </p>
 
             {/* Current Balance - Only for logged-in users */}
@@ -284,59 +306,102 @@ function CreditsPageContent() {
         )}
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-6 items-center">
           {pricingTiers.map((tier) => (
             <div
               key={tier.id}
               className={`relative bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-105 ${
-                tier.popular ? 'ring-4 ring-purple-500 ring-opacity-50' : ''
+                tier.popular
+                  ? 'ring-4 ring-purple-500 md:scale-110 md:hover:scale-115 z-10 shadow-2xl'
+                  : 'hover:shadow-2xl'
               }`}
             >
-              {/* Popular Badge */}
-              {tier.popular && (
-                <div className="absolute top-0 right-0 bg-purple-500 text-white text-xs font-bold px-3 py-1 rounded-bl-lg">
-                  MOST POPULAR
+              {/* Colored Header Bar */}
+              <div className={`bg-gradient-to-r ${tier.bgGradient} px-6 py-4`}>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{tier.icon}</span>
+                    <h3 className="text-2xl font-bold text-white">{tier.name}</h3>
+                  </div>
+                  {tier.savingsPercent && (
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
+                      <span className="text-white font-bold text-sm">Save {tier.savingsPercent}%</span>
+                    </div>
+                  )}
                 </div>
-              )}
+                {/* Popular Badge */}
+                {tier.popular && (
+                  <div className="mt-2 inline-block bg-white text-purple-600 text-xs font-bold px-3 py-1 rounded-full">
+                    ⭐ MOST POPULAR
+                  </div>
+                )}
+              </div>
 
-              <div className="p-8">
-                {/* Tier Name */}
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">{tier.name}</h3>
-                <p className="text-gray-500 mb-6">{tier.description}</p>
+              <div className="p-6">
+                {/* Description */}
+                <p className="text-gray-500 mb-4 text-sm">{tier.description}</p>
 
                 {/* Price */}
-                <div className="mb-6">
-                  <span className="text-5xl font-bold text-gray-900">${tier.price}</span>
+                <div className="mb-4">
+                  <span className="text-4xl font-bold text-gray-900">${tier.price}</span>
                 </div>
 
-                {/* Credits */}
-                <div className="mb-6 p-4 bg-purple-50 rounded-xl">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className="text-3xl font-bold text-purple-600">{tier.credits}</span>
-                    <span className="text-gray-600">credit{tier.credits !== 1 ? 's' : ''}</span>
+                {/* Per Grade Cost - Prominent */}
+                <div className={`mb-4 p-3 rounded-lg ${
+                  tier.color === 'blue' ? 'bg-blue-50 border border-blue-200' :
+                  tier.color === 'purple' ? 'bg-purple-50 border border-purple-200' :
+                  'bg-amber-50 border border-amber-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-sm font-medium">Cost per grade:</span>
+                    <span className={`text-xl font-bold ${
+                      tier.color === 'blue' ? 'text-blue-600' :
+                      tier.color === 'purple' ? 'text-purple-600' :
+                      'text-amber-600'
+                    }`}>
+                      ${tier.perGradeCost.toFixed(2)}
+                    </span>
                   </div>
-                  {(isAuthenticated ? isFirstPurchase : true) && (
-                    <div className="mt-2 text-sm text-green-600 font-semibold">
-                      + {tier.bonusCredits} bonus = {tier.credits + tier.bonusCredits} total
+                  {tier.savingsPercent && (
+                    <div className="text-green-600 text-xs font-semibold mt-1">
+                      You save ${((BASE_PRICE_PER_CREDIT - tier.perGradeCost) * tier.credits).toFixed(2)} vs Basic
                     </div>
                   )}
                 </div>
 
-                {/* Per Credit Cost */}
-                <p className="text-sm text-gray-500 mb-6 text-center">
-                  ${(tier.price / tier.credits).toFixed(2)} per grade
-                </p>
+                {/* Credits */}
+                <div className="mb-4 p-4 bg-gray-50 rounded-xl text-center">
+                  <div className="flex items-center justify-center gap-2">
+                    <span className={`text-3xl font-bold ${
+                      tier.color === 'blue' ? 'text-blue-600' :
+                      tier.color === 'purple' ? 'text-purple-600' :
+                      'text-amber-600'
+                    }`}>{tier.credits}</span>
+                    <span className="text-gray-600">credit{tier.credits !== 1 ? 's' : ''}</span>
+                  </div>
+                </div>
 
-                {/* Purchase Button - Different for logged in vs logged out */}
+                {/* First Purchase Bonus - Enhanced visibility */}
+                {(isAuthenticated ? isFirstPurchase : true) && (
+                  <div className="mb-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-green-500 text-xl">🎁</span>
+                      <div className="text-center">
+                        <div className="text-green-700 font-bold text-sm">First Purchase Bonus!</div>
+                        <div className="text-green-600 text-lg font-bold">
+                          +{tier.bonusCredits} FREE = {tier.credits + tier.bonusCredits} total
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Purchase Button */}
                 {isAuthenticated ? (
                   <button
                     onClick={() => handlePurchase(tier)}
                     disabled={purchaseLoading !== null}
-                    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 ${
-                      tier.popular
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl'
-                        : 'bg-gray-900 hover:bg-gray-800 text-white'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 bg-gradient-to-r ${tier.bgGradient} hover:opacity-90 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {purchaseLoading === tier.id ? (
                       <span className="flex items-center justify-center gap-2">
@@ -353,11 +418,7 @@ function CreditsPageContent() {
                 ) : (
                   <Link
                     href="/login?mode=signup&redirect=/credits"
-                    className={`block w-full py-4 px-6 rounded-xl font-bold text-lg text-center transition-all duration-200 ${
-                      tier.popular
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl'
-                        : 'bg-gray-900 hover:bg-gray-800 text-white'
-                    }`}
+                    className={`block w-full py-4 px-6 rounded-xl font-bold text-lg text-center transition-all duration-200 bg-gradient-to-r ${tier.bgGradient} hover:opacity-90 text-white shadow-lg hover:shadow-xl`}
                   >
                     Sign Up to Purchase
                   </Link>
