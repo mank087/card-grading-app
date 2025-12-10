@@ -281,20 +281,15 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
       {/* Controls - Fixed height to prevent layout jumping */}
       <div className="bg-gray-900 border-t border-gray-700 px-4 py-4 relative z-10">
-        {/* Detection feedback - Fixed height container */}
+        {/* Instruction text - Fixed height container */}
         <div className="h-12 flex items-center justify-center mb-3">
           <div className="text-center">
-            <p className={`text-sm font-medium transition-colors ${
-              detection.isCardDetected ? 'text-green-400' : 'text-gray-400'
-            }`}>
-              {detection.isCardDetected ? '✓ Card detected - Ready!' : 'Position card in frame'}
+            <p className="text-sm font-medium text-gray-300">
+              {side === 'front' ? 'Capture Front of Card' : 'Capture Back of Card'}
             </p>
-            {/* Show hint if available and not detected */}
-            {!detection.isCardDetected && detection.hints && detection.hints.length > 0 && (
-              <p className="text-xs text-gray-500 mt-1">
-                {detection.hints[0]}
-              </p>
-            )}
+            <p className="text-xs text-gray-500 mt-1">
+              Position card within the frame
+            </p>
           </div>
         </div>
 

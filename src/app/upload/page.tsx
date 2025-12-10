@@ -958,89 +958,85 @@ function UniversalUploadPageContent() {
         {hiddenFileInputs}
         <div className="fixed inset-0 bg-white z-50 flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-4">
-          <h2 className="text-lg font-bold text-center">Review Your Images</h2>
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3">
+          <h2 className="text-lg font-bold text-center">Review & Submit</h2>
         </div>
 
-        {/* Images Preview */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-          <div className="max-w-2xl mx-auto space-y-4">
-            {/* Front Image */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gray-100 px-4 py-2 border-b">
-                <h3 className="font-semibold text-gray-900">Front of Card</h3>
-              </div>
-              <div className="p-4">
-                <img
-                  src={URL.createObjectURL(frontFile)}
-                  alt="Front of card"
-                  className="w-full rounded-lg"
-                />
-              </div>
-            </div>
-
-            {/* Back Image */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gray-100 px-4 py-2 border-b">
-                <h3 className="font-semibold text-gray-900">Back of Card</h3>
-              </div>
-              <div className="p-4">
-                <img
-                  src={URL.createObjectURL(backFile)}
-                  alt="Back of card"
-                  className="w-full rounded-lg"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="bg-white border-t border-gray-200 px-4 py-4 space-y-3">
-          {/* Category Selection - Prominent Display */}
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">Card Category</p>
-                <p className="text-lg font-bold text-gray-900">{CARD_TYPES[selectedType].label}</p>
-              </div>
-              <button
-                onClick={() => {
-                  const types = Object.keys(CARD_TYPES) as CardType[];
-                  const currentIndex = types.indexOf(selectedType);
-                  const nextIndex = (currentIndex + 1) % types.length;
-                  setSelectedType(types[nextIndex]);
-                }}
-                className="px-4 py-2 bg-white border-2 border-purple-300 text-purple-700 rounded-lg font-semibold text-sm hover:bg-purple-50 hover:border-purple-400 transition-all shadow-sm"
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Category Selector - Compact at top */}
+          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Card Type:</label>
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as CardType)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
               >
-                Change
-              </button>
+                {Object.entries(CARD_TYPES).map(([key, value]) => (
+                  <option key={key} value={key}>
+                    {value.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            {/* Category Options */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {(Object.keys(CARD_TYPES) as CardType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedType === type
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-                  }`}
-                >
-                  {CARD_TYPES[type].label.replace(' Card', '')}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-purple-600 mt-2 text-center">
+            <p className="text-xs text-gray-500 mt-1.5 text-center">
               Make sure this matches your card type for accurate grading
             </p>
           </div>
 
+          {/* Images Preview - Side by side on larger screens */}
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
+              {/* Front Image */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="bg-gray-100 px-3 py-1.5 border-b">
+                  <h3 className="font-semibold text-gray-900 text-sm text-center">Front</h3>
+                </div>
+                <div className="p-2">
+                  <img
+                    src={URL.createObjectURL(frontFile)}
+                    alt="Front of card"
+                    className="w-full rounded-lg"
+                  />
+                  <button
+                    onClick={() => handleRetakePhoto('front')}
+                    className="w-full mt-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    🔄 Retake
+                  </button>
+                </div>
+              </div>
+
+              {/* Back Image */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="bg-gray-100 px-3 py-1.5 border-b">
+                  <h3 className="font-semibold text-gray-900 text-sm text-center">Back</h3>
+                </div>
+                <div className="p-2">
+                  <img
+                    src={URL.createObjectURL(backFile)}
+                    alt="Back of card"
+                    className="w-full rounded-lg"
+                  />
+                  <button
+                    onClick={() => handleRetakePhoto('back')}
+                    className="w-full mt-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                  >
+                    🔄 Retake
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons - Fixed at bottom */}
+        <div className="bg-white border-t border-gray-200 px-4 py-3 space-y-2">
           {/* Processing indicator */}
           {isCompressing && (
-            <div className="flex items-center justify-center gap-2 text-indigo-600 py-2">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+            <div className="flex items-center justify-center gap-2 text-indigo-600 py-1">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
               <span className="text-sm font-medium">Processing images...</span>
             </div>
           )}
@@ -1053,26 +1049,11 @@ function UniversalUploadPageContent() {
             {isCompressing ? 'Processing Images...' : isUploading ? 'Uploading...' : '✓ Submit for Grading'}
           </button>
 
-          <div className="grid grid-cols-2 gap-3">
-            <button
-              onClick={() => handleRetakePhoto('front')}
-              className="px-4 py-3 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-            >
-              🔄 Retake Front
-            </button>
-            <button
-              onClick={() => handleRetakePhoto('back')}
-              className="px-4 py-3 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-            >
-              🔄 Retake Back
-            </button>
-          </div>
-
           <button
             onClick={() => setUploadMode('select')}
-            className="w-full px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
           >
-            ← Back to Upload
+            ← Back
           </button>
         </div>
       </div>
