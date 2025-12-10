@@ -2302,7 +2302,7 @@ export function OtherCardDetails() {
   }
 
   // Construct current URL for QR code
-  const currentUrl = `${origin}/sports/${cardId}`;
+  const currentUrl = `${origin}/other/${cardId}`;
 
   // DEBUG: Check if professional grades exist
   console.log('[Professional Grades Debug] estimated_professional_grades exists?', !!professionalGrades);

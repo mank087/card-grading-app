@@ -2295,7 +2295,7 @@ export function PokemonCardDetails() {
   }
 
   // Construct current URL for QR code
-  const currentUrl = `${origin}/sports/${cardId}`;
+  const currentUrl = `${origin}/pokemon/${cardId}`;
 
   // DEBUG: Check if professional grades exist
   console.log('[Professional Grades Debug] estimated_professional_grades exists?', !!professionalGrades);
