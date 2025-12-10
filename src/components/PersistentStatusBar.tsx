@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useGradingQueue, GradingStage, GradingCard } from '@/contexts/GradingQueueContext'
+import { useState } from 'react'
+import { useGradingQueue, GradingStage } from '@/contexts/GradingQueueContext'
 import { useRouter } from 'next/navigation'
 
 // Stage labels with DCM Optic™ branding
@@ -40,53 +40,17 @@ function getStageMessage(stage: GradingStage, cardName?: string): string {
   }
 }
 
-// Hook to poll for card status updates - polls every 1 second for responsive updates
-function useCardStatusPolling(cards: GradingCard[], updateCardStage: (id: string, stage: GradingStage, progress: number, extras?: Partial<GradingCard>) => void) {
-  useEffect(() => {
-    const processingCards = cards.filter(c => c.status === 'processing' || c.status === 'uploading')
-    if (processingCards.length === 0) return
-
-    const pollStatus = async () => {
-      for (const card of processingCards) {
-        try {
-          const response = await fetch(`/api/cards/${card.cardId}/status`)
-          if (!response.ok) continue
-
-          const data = await response.json()
-          if (data.stage && data.progress !== undefined) {
-            updateCardStage(card.id, data.stage, data.progress, {
-              cardName: data.cardName,
-              estimatedTimeRemaining: data.estimatedTimeRemaining,
-              ...(data.stage === 'completed' ? {
-                status: 'completed',
-                completedAt: Date.now(),
-                resultUrl: `/card/${card.cardId}`
-              } : {})
-            })
-          }
-        } catch (error) {
-          // Silently ignore polling errors
-        }
-      }
-    }
-
-    // Initial poll immediately
-    pollStatus()
-
-    // Poll every 1 second for more responsive updates
-    const interval = setInterval(pollStatus, 1000)
-
-    return () => clearInterval(interval)
-  }, [cards, updateCardStage])
-}
+// Note: Polling has been consolidated into useBackgroundGrading hook
+// This component now reads directly from the GradingQueueContext
+// which is updated by the background hook with stage, progress, and estimatedTimeRemaining
 
 export default function PersistentStatusBar() {
-  const { queue, removeFromQueue, clearCompleted, updateCardStage } = useGradingQueue()
+  const { queue, removeFromQueue, clearCompleted } = useGradingQueue()
   const [isExpanded, setIsExpanded] = useState(false)
   const router = useRouter()
 
-  // Poll for status updates on processing cards
-  useCardStatusPolling(queue, updateCardStage)
+  // Note: Status updates now come from useBackgroundGrading hook in ClientLayout
+  // No polling needed here - we just read from the queue context
 
   // Filter out completed cards older than 5 minutes
   const activeQueue = queue.filter(card => {

@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useRef, useCallback } from 'react'
-import { useGradingQueue } from '@/contexts/GradingQueueContext'
+import { useEffect, useRef, useCallback, useMemo } from 'react'
+import { useGradingQueue, GradingStage } from '@/contexts/GradingQueueContext'
 
 const CARD_TYPES_CONFIG = {
   Sports: { apiEndpoint: '/api/sports', route: '/sports' },
@@ -21,12 +21,47 @@ function getPollingInterval(oldestCardElapsed: number): number {
   return 30000                                     // 300s+: poll every 30s (error threshold)
 }
 
+// Calculate grading stage based on elapsed time and progress
+// This matches the stage timing from the unified status endpoint
+function calculateStage(elapsed: number, progress: number): { stage: GradingStage; estimatedTimeRemaining: number | null } {
+  // Stage timing (approximate):
+  // 0-5s: uploading (0-15%)
+  // 5-10s: queued (15-20%)
+  // 10-20s: identifying (20-35%)
+  // 20-50s: grading (35-80%)
+  // 50-55s: calculating (80-95%)
+  // 55-90s: saving (95-99%)
+  // 90s+: grading (stuck)
+
+  if (progress >= 100) {
+    return { stage: 'completed', estimatedTimeRemaining: null }
+  }
+
+  if (elapsed < 5000) {
+    return { stage: 'uploading', estimatedTimeRemaining: 85 }
+  } else if (elapsed < 10000) {
+    return { stage: 'queued', estimatedTimeRemaining: 80 }
+  } else if (elapsed < 20000) {
+    return { stage: 'identifying', estimatedTimeRemaining: 70 }
+  } else if (elapsed < 50000) {
+    return { stage: 'grading', estimatedTimeRemaining: Math.max(10, Math.ceil((90000 - elapsed) / 1000)) }
+  } else if (elapsed < 55000) {
+    return { stage: 'calculating', estimatedTimeRemaining: Math.max(5, Math.ceil((90000 - elapsed) / 1000)) }
+  } else if (elapsed < 90000) {
+    return { stage: 'saving', estimatedTimeRemaining: Math.max(1, Math.ceil((90000 - elapsed) / 1000)) }
+  } else {
+    // Very long processing - likely stuck but still trying
+    return { stage: 'grading', estimatedTimeRemaining: null }
+  }
+}
+
 export function useBackgroundGrading() {
   const { queue, updateCardStatus } = useGradingQueue()
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const notifiedCardsRef = useRef<Set<string>>(new Set())
   const isPollingRef = useRef(false) // Prevent overlapping polls
   const queueRef = useRef(queue) // Keep latest queue in ref to avoid stale closures
+  const hasStartedPollingRef = useRef(false) // Track if we've started polling for current processing cards
 
   // Update ref whenever queue changes
   queueRef.current = queue
@@ -53,11 +88,13 @@ export function useBackgroundGrading() {
             console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} failed after ${Math.floor(elapsed/1000)}s:`, errorData.error)
             updateCardStatus(card.id, {
               status: 'error',
+              stage: 'error',
               errorMessage: `Grading failed: ${errorData.error || 'Unknown error'}. The card may have complex alterations or damage that require manual review.`
             })
           } catch (e) {
             updateCardStatus(card.id, {
               status: 'error',
+              stage: 'error',
               errorMessage: 'Grading failed after multiple attempts. Please try re-uploading the card.'
             })
           }
@@ -79,6 +116,7 @@ export function useBackgroundGrading() {
         console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} has grading error: ${data.grading_error}`)
         updateCardStatus(card.id, {
           status: 'error',
+          stage: 'error',
           errorMessage: `Grading failed: ${data.grading_error}`
         })
         return
@@ -90,9 +128,11 @@ export function useBackgroundGrading() {
 
         updateCardStatus(card.id, {
           status: 'completed',
+          stage: 'completed',
           progress: 100,
           completedAt: Date.now(),
-          resultUrl: `${config.route}/${card.cardId}`
+          resultUrl: `${config.route}/${card.cardId}`,
+          estimatedTimeRemaining: null
         })
 
         // Show notification only ONCE per card
@@ -109,6 +149,7 @@ export function useBackgroundGrading() {
         console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} stuck in pending state after ${Math.floor(elapsed/1000)}s`)
         updateCardStatus(card.id, {
           status: 'error',
+          stage: 'error',
           errorMessage: 'Grading failed to start. Please try re-uploading the card.'
         })
       } else {
@@ -124,8 +165,13 @@ export function useBackgroundGrading() {
           progress = 95 + extraProgress
         }
 
+        // Calculate stage based on elapsed time
+        const { stage, estimatedTimeRemaining } = calculateStage(elapsed, progress)
+
         updateCardStatus(card.id, {
           progress,
+          stage,
+          estimatedTimeRemaining,
           status: 'processing'
         })
       }
@@ -143,19 +189,38 @@ export function useBackgroundGrading() {
         notifiedCardsRef.current.delete(cardId)
       }
     })
+  }, [queue])
 
-    // Only poll cards that are actively being graded (not still uploading)
-    // Cards in 'uploading' status haven't been inserted into the database yet
-    const processingCards = queue.filter(c => c.status === 'processing')
+  // Create a stable key that only changes when the SET of processing card IDs changes
+  // This prevents re-triggering the polling effect when only progress/stage updates
+  const processingCardIdsKey = useMemo(() => {
+    return queue
+      .filter(c => c.status === 'processing')
+      .map(c => c.cardId)
+      .sort()
+      .join(',')
+  }, [queue])
 
-    if (processingCards.length === 0) {
+  // Separate effect for polling - only triggers when processing cards list changes
+  // This prevents the infinite loop caused by updateCardStatus triggering re-renders
+  useEffect(() => {
+    // If no processing cards, stop polling
+    if (!processingCardIdsKey) {
       if (pollingTimeoutRef.current) {
         clearTimeout(pollingTimeoutRef.current)
         pollingTimeoutRef.current = null
       }
       isPollingRef.current = false
+      hasStartedPollingRef.current = false
       return
     }
+
+    // If already polling for these cards, don't restart
+    if (hasStartedPollingRef.current && pollingTimeoutRef.current) {
+      return
+    }
+
+    hasStartedPollingRef.current = true
 
     // Main polling function with parallel status checks
     const pollAllCards = async () => {
@@ -163,25 +228,35 @@ export function useBackgroundGrading() {
       if (isPollingRef.current) return
       isPollingRef.current = true
 
+      // Get current processing cards from ref (always fresh)
+      const currentProcessingCards = queueRef.current.filter(c => c.status === 'processing')
+
+      if (currentProcessingCards.length === 0) {
+        console.log('[BackgroundGrading] All cards complete, stopping polling')
+        pollingTimeoutRef.current = null
+        isPollingRef.current = false
+        hasStartedPollingRef.current = false
+        return
+      }
+
       try {
         // Check all processing cards in PARALLEL (not sequential)
-        await Promise.all(processingCards.map(card => checkSingleCardStatus(card)))
+        await Promise.all(currentProcessingCards.map(card => checkSingleCardStatus(card)))
       } finally {
         isPollingRef.current = false
       }
 
-      // Re-check processing cards using ref to get LATEST queue state (avoid stale closure)
-      // Cards that just completed will no longer be in this filtered list
+      // Re-check processing cards using ref to get LATEST queue state
       const stillProcessing = queueRef.current.filter(c => c.status === 'processing')
 
       if (stillProcessing.length === 0) {
         console.log('[BackgroundGrading] All cards complete, stopping polling')
         pollingTimeoutRef.current = null
+        hasStartedPollingRef.current = false
         return
       }
 
       // Calculate next polling interval based on oldest card's elapsed time
-      // This implements progressive backoff
       const oldestCardElapsed = Math.max(...stillProcessing.map(c => Date.now() - c.uploadedAt))
       const nextInterval = getPollingInterval(oldestCardElapsed)
 
@@ -200,8 +275,9 @@ export function useBackgroundGrading() {
         pollingTimeoutRef.current = null
       }
       isPollingRef.current = false
+      hasStartedPollingRef.current = false
     }
-  }, [queue, checkSingleCardStatus])
+  }, [processingCardIdsKey, checkSingleCardStatus])
 
   // Request notification permission on mount
   useEffect(() => {

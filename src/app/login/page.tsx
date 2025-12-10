@@ -15,6 +15,7 @@ function LoginPageContent() {
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showExistingAccountError, setShowExistingAccountError] = useState(false)
 
   // Default to signup mode, unless mode=login is specified in URL
   const modeParam = searchParams.get('mode')
@@ -31,18 +32,44 @@ function LoginPageContent() {
   // Update mode when URL parameter changes
   useEffect(() => {
     setIsSignUp(modeParam !== 'login')
+    // Clear the existing account error when switching modes
+    setShowExistingAccountError(false)
   }, [modeParam])
+
+  // Helper to check if error indicates existing account
+  const isExistingAccountError = (errorMsg: string) => {
+    const lowerError = errorMsg.toLowerCase()
+    return lowerError.includes('already registered') ||
+           lowerError.includes('already exists') ||
+           lowerError.includes('user already') ||
+           lowerError.includes('email already')
+  }
+
+  // Handle switching to login with pre-filled credentials
+  const handleSwitchToLogin = () => {
+    setShowExistingAccountError(false)
+    setError('')
+    setIsSignUp(false)
+    // Update URL without full navigation to preserve form state
+    router.push('/login?mode=login', { scroll: false })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setError('')
+    setShowExistingAccountError(false)
 
     try {
       if (isSignUp) {
         const result = await signUp(email, password)
         if (result.error) {
-          setError(result.error)
+          // Check if this is an "already exists" error
+          if (isExistingAccountError(result.error)) {
+            setShowExistingAccountError(true)
+          } else {
+            setError(result.error)
+          }
         } else {
           alert('Account created! Check your email for the confirmation link.')
         }
@@ -302,7 +329,22 @@ function LoginPageContent() {
                 />
               </div>
 
-              {error && (
+              {showExistingAccountError && (
+                <div className="bg-amber-50 border border-amber-200 text-amber-800 px-4 py-3 rounded-xl text-sm">
+                  <p className="mb-2">
+                    That email is already associated with an existing DCM account.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleSwitchToLogin}
+                    className="text-purple-600 hover:text-purple-800 font-medium underline"
+                  >
+                    Try logging in instead
+                  </button>
+                </div>
+              )}
+
+              {error && !showExistingAccountError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
                   {error}
                 </div>
