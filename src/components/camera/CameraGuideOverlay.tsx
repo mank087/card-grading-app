@@ -66,20 +66,11 @@ export default function CameraGuideOverlay({ cardDetected = false, side }: Camer
       {/* Bottom instructions */}
       <div className="absolute bottom-36 left-0 right-0 text-center px-4">
         <div className="space-y-2">
-          {cardDetected ? (
-            <div className="bg-green-600/90 text-white px-5 py-2.5 rounded-lg inline-block shadow-lg">
-              <p className="text-sm font-bold flex items-center gap-2 justify-center">
-                <span className="text-lg">✓</span>
-                Card Detected - Tap to Capture
-              </p>
-            </div>
-          ) : (
-            <div className="bg-black/70 text-white px-4 py-2 rounded-lg inline-block">
-              <p className="text-sm font-medium">
-                Align card with frame
-              </p>
-            </div>
-          )}
+          <div className="bg-black/70 text-white px-4 py-2 rounded-lg inline-block">
+            <p className="text-sm font-medium">
+              Align card within frame
+            </p>
+          </div>
           <div className="bg-black/60 text-white/90 px-4 py-1.5 rounded-lg inline-block">
             <p className="text-xs">💡 Good lighting, avoid glare</p>
           </div>

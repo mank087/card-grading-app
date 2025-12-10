@@ -783,152 +783,121 @@ function UniversalUploadPageContent() {
         {hiddenFileInputs}
         <div className="fixed inset-0 bg-white z-50 flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-4">
-          <h2 className="text-lg font-bold text-center">Select Images from Gallery</h2>
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3">
+          <h2 className="text-lg font-bold text-center">Select from Gallery</h2>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
-          <div className="max-w-2xl mx-auto space-y-4">
-            <p className="text-center text-gray-600 mb-6">
-              Select photos of the front and back of your card
-            </p>
-
-            {/* Front Image Selection */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Front of Card</h3>
-                {frontFile && <span className="text-green-600 text-sm">✓ Selected</span>}
-              </div>
-              <div className="p-4">
-                {frontFile ? (
-                  <div className="space-y-3">
-                    <img
-                      src={URL.createObjectURL(frontFile)}
-                      alt="Front of card"
-                      className="w-full rounded-lg"
-                    />
-                    <button
-                      onClick={() => handleGalleryFileSelect('front')}
-                      className="w-full px-4 py-2 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-                    >
-                      Change Front Image
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleGalleryFileSelect('front')}
-                    className="w-full px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
-                  >
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">🖼️</div>
-                      <div className="text-lg font-semibold text-gray-900 mb-1">
-                        Select Front Image
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Tap to choose from gallery
-                      </div>
-                    </div>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Back Image Selection */}
-            <div className="bg-white rounded-lg shadow-md overflow-hidden">
-              <div className="bg-gray-100 px-4 py-3 border-b flex items-center justify-between">
-                <h3 className="font-semibold text-gray-900">Back of Card</h3>
-                {backFile && <span className="text-green-600 text-sm">✓ Selected</span>}
-              </div>
-              <div className="p-4">
-                {backFile ? (
-                  <div className="space-y-3">
-                    <img
-                      src={URL.createObjectURL(backFile)}
-                      alt="Back of card"
-                      className="w-full rounded-lg"
-                    />
-                    <button
-                      onClick={() => handleGalleryFileSelect('back')}
-                      className="w-full px-4 py-2 bg-gray-100 text-gray-900 rounded-lg font-medium hover:bg-gray-200 transition-colors"
-                    >
-                      Change Back Image
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleGalleryFileSelect('back')}
-                    className="w-full px-6 py-8 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
-                  >
-                    <div className="text-center">
-                      <div className="text-4xl mb-2">🖼️</div>
-                      <div className="text-lg font-semibold text-gray-900 mb-1">
-                        Select Back Image
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        Tap to choose from gallery
-                      </div>
-                    </div>
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Tips */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-              <p className="text-sm text-blue-800 font-semibold mb-2">💡 Tips for Best Results:</p>
-              <ul className="text-xs text-blue-700 space-y-1">
-                <li>• Use good lighting - avoid shadows and glare</li>
-                <li>• Ensure all 4 corners are visible</li>
-                <li>• Keep the card flat and in focus</li>
-                <li>• Capture against a plain background</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Action Buttons */}
-        <div className="bg-white border-t border-gray-200 px-4 py-4 space-y-3">
-          {/* Category Selection - Prominent Display */}
-          <div className="bg-gradient-to-r from-purple-50 to-indigo-50 border-2 border-purple-200 rounded-xl p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs font-medium text-purple-600 uppercase tracking-wide mb-1">Card Category</p>
-                <p className="text-lg font-bold text-gray-900">{CARD_TYPES[selectedType].label}</p>
-              </div>
-              <button
-                onClick={() => {
-                  const types = Object.keys(CARD_TYPES) as CardType[];
-                  const currentIndex = types.indexOf(selectedType);
-                  const nextIndex = (currentIndex + 1) % types.length;
-                  setSelectedType(types[nextIndex]);
-                }}
-                className="px-4 py-2 bg-white border-2 border-purple-300 text-purple-700 rounded-lg font-semibold text-sm hover:bg-purple-50 hover:border-purple-400 transition-all shadow-sm"
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Category Selector - Compact at top */}
+          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
+            <div className="flex items-center justify-between gap-3">
+              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Card Type:</label>
+              <select
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value as CardType)}
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
               >
-                Change
-              </button>
+                {Object.entries(CARD_TYPES).map(([key, value]) => (
+                  <option key={key} value={key}>
+                    {value.label}
+                  </option>
+                ))}
+              </select>
             </div>
-            {/* Category Options (shown when tapping change) */}
-            <div className="mt-3 grid grid-cols-2 gap-2">
-              {(Object.keys(CARD_TYPES) as CardType[]).map((type) => (
-                <button
-                  key={type}
-                  onClick={() => setSelectedType(type)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedType === type
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:border-purple-300 hover:bg-purple-50'
-                  }`}
-                >
-                  {CARD_TYPES[type].label.replace(' Card', '')}
-                </button>
-              ))}
-            </div>
-            <p className="text-xs text-purple-600 mt-2 text-center">
+            <p className="text-xs text-gray-500 mt-1.5 text-center">
               Make sure this matches your card type for accurate grading
             </p>
           </div>
 
+          {/* Images - Side by side */}
+          <div className="p-4">
+            <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
+              {/* Front Image Selection */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="bg-gray-100 px-3 py-1.5 border-b flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 text-sm">Front</h3>
+                  {frontFile && <span className="text-green-600 text-xs">✓</span>}
+                </div>
+                <div className="p-2">
+                  {frontFile ? (
+                    <div className="space-y-2">
+                      <img
+                        src={URL.createObjectURL(frontFile)}
+                        alt="Front of card"
+                        className="w-full rounded-lg"
+                      />
+                      <button
+                        onClick={() => handleGalleryFileSelect('front')}
+                        className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleGalleryFileSelect('front')}
+                      className="w-full px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+                    >
+                      <div className="text-center">
+                        <div className="text-2xl mb-1">🖼️</div>
+                        <div className="text-sm font-medium text-gray-700">
+                          Select Front
+                        </div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Back Image Selection */}
+              <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                <div className="bg-gray-100 px-3 py-1.5 border-b flex items-center justify-between">
+                  <h3 className="font-semibold text-gray-900 text-sm">Back</h3>
+                  {backFile && <span className="text-green-600 text-xs">✓</span>}
+                </div>
+                <div className="p-2">
+                  {backFile ? (
+                    <div className="space-y-2">
+                      <img
+                        src={URL.createObjectURL(backFile)}
+                        alt="Back of card"
+                        className="w-full rounded-lg"
+                      />
+                      <button
+                        onClick={() => handleGalleryFileSelect('back')}
+                        className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleGalleryFileSelect('back')}
+                      className="w-full px-4 py-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 transition-colors"
+                    >
+                      <div className="text-center">
+                        <div className="text-2xl mb-1">🖼️</div>
+                        <div className="text-sm font-medium text-gray-700">
+                          Select Back
+                        </div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Tips */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4 max-w-lg mx-auto">
+              <p className="text-xs text-blue-800 font-semibold mb-1">💡 Tips:</p>
+              <p className="text-xs text-blue-700">Good lighting, all corners visible, plain background</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons - Fixed at bottom */}
+        <div className="bg-white border-t border-gray-200 px-4 py-3 space-y-2">
           <button
             onClick={handleUpload}
             disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
@@ -937,14 +906,12 @@ function UniversalUploadPageContent() {
             {isCompressing ? 'Processing Images...' : isUploading ? 'Uploading...' : !frontFile || !backFile ? 'Select Both Images' : '✓ Submit for Grading'}
           </button>
 
-          {frontFile && backFile && (
-            <button
-              onClick={() => setUploadMode('select')}
-              className="w-full px-4 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors"
-            >
-              ← Back to Upload
-            </button>
-          )}
+          <button
+            onClick={() => setUploadMode('select')}
+            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
+          >
+            ← Back
+          </button>
         </div>
       </div>
       </>
