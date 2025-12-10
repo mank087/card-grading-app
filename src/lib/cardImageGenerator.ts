@@ -468,24 +468,32 @@ export async function downloadCardImages(
 ): Promise<void> {
   const { front, back } = await generateCardImages(data);
 
-  // Create download links for both
-  const downloadBlob = (blob: Blob, filename: string) => {
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+  // Create download link and trigger it
+  const downloadBlob = (blob: Blob, filename: string): Promise<void> => {
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup after a short delay to ensure download starts
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        resolve();
+      }, 150);
+    });
   };
 
-  // Download front image
-  downloadBlob(front, `${filenameBase}-front.jpg`);
+  // Download front image first
+  await downloadBlob(front, `${filenameBase}-front.jpg`);
 
-  // Small delay between downloads to ensure both trigger
-  await new Promise(resolve => setTimeout(resolve, 100));
+  // Longer delay between downloads to prevent browser blocking
+  await new Promise(resolve => setTimeout(resolve, 500));
 
   // Download back image
-  downloadBlob(back, `${filenameBase}-back.jpg`);
+  await downloadBlob(back, `${filenameBase}-back.jpg`);
 }
