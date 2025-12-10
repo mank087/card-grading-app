@@ -1,11 +1,8 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useGradingQueue, GradingStage, GradingCard } from '@/contexts/GradingQueueContext'
 import { useRouter } from 'next/navigation'
-
-// Average grading time based on typical processing (45-60 seconds)
-const ESTIMATED_GRADING_TIME = 55000 // 55 seconds - cards typically complete around this time
 
 // Stage labels with DCM Optic™ branding
 const STAGE_CONFIG: Record<GradingStage, { label: string; shortLabel: string; color: string }> = {
@@ -25,57 +22,6 @@ const STAGE_ORDER: GradingStage[] = ['uploading', 'queued', 'identifying', 'grad
 function getStageIndex(stage: GradingStage): number {
   const idx = STAGE_ORDER.indexOf(stage)
   return idx === -1 ? 0 : idx
-}
-
-function useAnimatedProgress(uploadedAt: number, isProcessing: boolean, isCompleted: boolean): number {
-  const [progress, setProgress] = useState(0)
-
-  useEffect(() => {
-    if (!isProcessing || isCompleted) {
-      if (isCompleted) setProgress(100)
-      return
-    }
-
-    // Calculate initial progress
-    const elapsed = Date.now() - uploadedAt
-    const initialProgress = Math.min(Math.floor((elapsed / ESTIMATED_GRADING_TIME) * 95), 95)
-    setProgress(initialProgress)
-
-    // Update progress every 500ms for smooth animation
-    const interval = setInterval(() => {
-      const currentElapsed = Date.now() - uploadedAt
-      let newProgress: number
-
-      if (currentElapsed < ESTIMATED_GRADING_TIME) {
-        // Normal progress: 0-95% over estimated time
-        newProgress = Math.min(Math.floor((currentElapsed / ESTIMATED_GRADING_TIME) * 95), 95)
-      } else {
-        // Extended processing: slowly inch towards 98%
-        const extraTime = currentElapsed - ESTIMATED_GRADING_TIME
-        const extraProgress = Math.min(extraTime / 30000, 3) // +1% every 30 seconds, max +3%
-        newProgress = Math.min(95 + extraProgress, 98)
-      }
-
-      setProgress(newProgress)
-    }, 500)
-
-    return () => clearInterval(interval)
-  }, [uploadedAt, isProcessing, isCompleted])
-
-  return progress
-}
-
-// Separate component for expanded view progress to use the hook properly
-function ExpandedCardProgress({ uploadedAt }: { uploadedAt: number }) {
-  const progress = useAnimatedProgress(uploadedAt, true, false)
-  return (
-    <div className="w-full bg-white/20 rounded-full h-1.5 mb-1">
-      <div
-        className="bg-green-400 h-1.5 rounded-full transition-all duration-500"
-        style={{ width: `${progress}%` }}
-      />
-    </div>
-  )
 }
 
 // Stage indicator dots showing progress through grading stages
@@ -125,7 +71,6 @@ function StageIndicator({ stage, compact = false }: { stage: GradingStage; compa
 
 // Get stage-specific status message
 function getStageMessage(stage: GradingStage, cardName?: string): string {
-  const config = STAGE_CONFIG[stage]
   switch (stage) {
     case 'uploading':
       return 'Uploading images...'
@@ -144,11 +89,11 @@ function getStageMessage(stage: GradingStage, cardName?: string): string {
     case 'error':
       return 'Failed to process'
     default:
-      return config.label
+      return STAGE_CONFIG[stage]?.label || 'Processing...'
   }
 }
 
-// Hook to poll for card status updates
+// Hook to poll for card status updates - polls every 1 second for responsive updates
 function useCardStatusPolling(cards: GradingCard[], updateCardStage: (id: string, stage: GradingStage, progress: number, extras?: Partial<GradingCard>) => void) {
   useEffect(() => {
     const processingCards = cards.filter(c => c.status === 'processing' || c.status === 'uploading')
@@ -178,11 +123,11 @@ function useCardStatusPolling(cards: GradingCard[], updateCardStage: (id: string
       }
     }
 
-    // Initial poll
+    // Initial poll immediately
     pollStatus()
 
-    // Poll every 2 seconds
-    const interval = setInterval(pollStatus, 2000)
+    // Poll every 1 second for more responsive updates
+    const interval = setInterval(pollStatus, 1000)
 
     return () => clearInterval(interval)
   }, [cards, updateCardStage])
@@ -204,14 +149,12 @@ export default function PersistentStatusBar() {
     return true
   })
 
-  // Get the first processing card for the collapsed view progress bar
+  // Get the first processing card for the collapsed view
   const firstProcessingCard = activeQueue.find(c => c.status === 'processing' || c.status === 'uploading')
   const isAnyProcessing = !!firstProcessingCard
-  const collapsedProgress = useAnimatedProgress(
-    firstProcessingCard?.uploadedAt || 0,
-    isAnyProcessing,
-    false // Never pass completed - we hide the bar instead
-  )
+
+  // Use the API-polled progress value (unified source of truth)
+  const displayProgress = firstProcessingCard?.progress ?? 0
 
   if (activeQueue.length === 0) return null
 
@@ -226,12 +169,12 @@ export default function PersistentStatusBar() {
         className="cursor-pointer hover:bg-black/10 transition-colors"
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        {/* Green progress bar for collapsed view - only show when actively processing */}
+        {/* Progress bar for collapsed view - uses API-polled progress */}
         {isAnyProcessing && (
           <div className="h-1 bg-black/20">
             <div
-              className="h-full bg-green-400 transition-all duration-500 ease-out"
-              style={{ width: `${collapsedProgress}%` }}
+              className="h-full bg-green-400 transition-all duration-700 ease-out"
+              style={{ width: `${displayProgress}%` }}
             />
           </div>
         )}
@@ -247,8 +190,8 @@ export default function PersistentStatusBar() {
               }`} />
               <span className="text-sm font-medium">
                 {processingCount === 1 && firstProcessingCard?.stage
-                  ? `${STAGE_CONFIG[firstProcessingCard.stage].label}... ${Math.round(collapsedProgress)}%`
-                  : `${processingCount} card${processingCount > 1 ? 's' : ''} grading... ${Math.round(collapsedProgress)}%`
+                  ? `${STAGE_CONFIG[firstProcessingCard.stage].label}... ${Math.round(displayProgress)}%`
+                  : `${processingCount} card${processingCount > 1 ? 's' : ''} grading... ${Math.round(displayProgress)}%`
                 }
               </span>
               {processingCount === 1 && (
@@ -345,19 +288,23 @@ export default function PersistentStatusBar() {
                     </span>
                   </div>
 
-                  {/* Stage indicator for processing cards */}
-                  {card.status !== 'completed' && card.status !== 'error' && (
-                    <div className="flex items-center gap-2 mb-1">
-                      <StageIndicator stage={card.stage || 'uploading'} />
-                      <span className="text-xs text-white/50">
-                        {card.progress}%
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Progress bar for processing cards */}
+                  {/* Progress bar and stage indicator for processing cards */}
                   {(card.status === 'uploading' || card.status === 'processing') && (
-                    <ExpandedCardProgress uploadedAt={card.uploadedAt} />
+                    <>
+                      <div className="flex items-center gap-2 mb-1">
+                        <StageIndicator stage={card.stage || 'uploading'} />
+                        <span className="text-xs text-white/60 font-medium">
+                          {card.progress}%
+                        </span>
+                      </div>
+                      {/* Progress bar - uses API-polled card.progress */}
+                      <div className="w-full bg-white/20 rounded-full h-1.5 mb-1">
+                        <div
+                          className="bg-green-400 h-1.5 rounded-full transition-all duration-700 ease-out"
+                          style={{ width: `${card.progress}%` }}
+                        />
+                      </div>
+                    </>
                   )}
 
                   <p className="text-xs text-white/70">
@@ -365,7 +312,7 @@ export default function PersistentStatusBar() {
                       ? (card.errorMessage || 'Failed to process')
                       : getStageMessage(card.stage || 'uploading', card.cardName)}
                     {card.estimatedTimeRemaining && card.status !== 'completed' && card.status !== 'error' && (
-                      <span className="ml-2 text-white/50">~{card.estimatedTimeRemaining}s</span>
+                      <span className="ml-2 text-white/50">~{card.estimatedTimeRemaining}s remaining</span>
                     )}
                   </p>
                 </div>
