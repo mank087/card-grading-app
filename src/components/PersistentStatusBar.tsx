@@ -16,59 +16,6 @@ const STAGE_CONFIG: Record<GradingStage, { label: string; shortLabel: string; co
   error: { label: 'Error', shortLabel: 'Error', color: 'bg-red-400' },
 }
 
-// Stage order for progress visualization
-const STAGE_ORDER: GradingStage[] = ['uploading', 'queued', 'identifying', 'grading', 'calculating', 'saving', 'completed']
-
-function getStageIndex(stage: GradingStage): number {
-  const idx = STAGE_ORDER.indexOf(stage)
-  return idx === -1 ? 0 : idx
-}
-
-// Stage indicator dots showing progress through grading stages
-function StageIndicator({ stage, compact = false }: { stage: GradingStage; compact?: boolean }) {
-  const currentIndex = getStageIndex(stage)
-  const displayStages = compact
-    ? ['uploading', 'grading', 'completed'] as GradingStage[]
-    : STAGE_ORDER.slice(0, -1) // Exclude 'completed' from dots, show checkmark instead
-
-  return (
-    <div className="flex items-center gap-1">
-      {displayStages.map((s, idx) => {
-        const stageIdx = getStageIndex(s)
-        const isCompleted = currentIndex > stageIdx
-        const isCurrent = stage === s
-        const config = STAGE_CONFIG[s]
-
-        return (
-          <div key={s} className="flex items-center">
-            {idx > 0 && (
-              <div className={`w-2 h-0.5 ${isCompleted ? 'bg-green-400' : 'bg-white/20'}`} />
-            )}
-            <div
-              className={`w-2 h-2 rounded-full transition-all ${
-                isCompleted ? 'bg-green-400' :
-                isCurrent ? `${config.color} animate-pulse` :
-                'bg-white/20'
-              }`}
-              title={config.label}
-            />
-          </div>
-        )
-      })}
-      {stage === 'completed' && (
-        <>
-          <div className="w-2 h-0.5 bg-green-400" />
-          <div className="w-2 h-2 rounded-full bg-green-400 flex items-center justify-center">
-            <svg className="w-1.5 h-1.5 text-white" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-        </>
-      )}
-    </div>
-  )
-}
-
 // Get stage-specific status message
 function getStageMessage(stage: GradingStage, cardName?: string): string {
   switch (stage) {
@@ -194,9 +141,6 @@ export default function PersistentStatusBar() {
                   : `${processingCount} card${processingCount > 1 ? 's' : ''} grading... ${Math.round(displayProgress)}%`
                 }
               </span>
-              {processingCount === 1 && (
-                <StageIndicator stage={firstProcessingCard?.stage || 'uploading'} compact />
-              )}
             </div>
           )}
 
@@ -288,23 +232,14 @@ export default function PersistentStatusBar() {
                     </span>
                   </div>
 
-                  {/* Progress bar and stage indicator for processing cards */}
+                  {/* Progress bar for processing cards */}
                   {(card.status === 'uploading' || card.status === 'processing') && (
-                    <>
-                      <div className="flex items-center gap-2 mb-1">
-                        <StageIndicator stage={card.stage || 'uploading'} />
-                        <span className="text-xs text-white/60 font-medium">
-                          {card.progress}%
-                        </span>
-                      </div>
-                      {/* Progress bar - uses API-polled card.progress */}
-                      <div className="w-full bg-white/20 rounded-full h-1.5 mb-1">
-                        <div
-                          className="bg-green-400 h-1.5 rounded-full transition-all duration-700 ease-out"
-                          style={{ width: `${card.progress}%` }}
-                        />
-                      </div>
-                    </>
+                    <div className="w-full bg-white/20 rounded-full h-1.5 mb-1">
+                      <div
+                        className="bg-green-400 h-1.5 rounded-full transition-all duration-700 ease-out"
+                        style={{ width: `${card.progress}%` }}
+                      />
+                    </div>
                   )}
 
                   <p className="text-xs text-white/70">
