@@ -1,4 +1,14 @@
+import { Metadata } from 'next';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
+
+export const metadata: Metadata = {
+  title: 'Privacy Policy',
+  description: 'DCM Grading Privacy Policy. Learn how we collect, use, and protect your personal information when using our AI card grading service.',
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default function PrivacyPolicyPage() {
   return (

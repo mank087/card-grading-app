@@ -620,7 +620,7 @@ FULL ART VMAX EXAMPLE (Modern Textured Card)
 **Card with Textured Finish:**
 "This Pokemon VMAX Full Art card features a textured/embossed surface finish characteristic of modern ultra rare cards. The artwork extends to all four edges with no visible border, classifying this as a borderless/full-art card (Type C). The entire front surface has a raised texture pattern that creates a unique tactile feel.
 
-Examining the textured surface under various lighting angles, I observe the texture pattern is intact across most of the card surface. However, in the lower-right quadrant, there is a small area (approximately 4mm × 3mm) where the texture appears flattened and the surface shows more shine than the surrounding textured areas. This indicates minor texture wear from handling or contact. The texture loss is visible as a slightly glossier patch compared to the surrounding embossed surface.
+Examining the textured surface under various lighting angles, I observe the texture pattern is intact across most of the card surface. However, in the lower-right area near the Pokemon's tail, there is a small area (approximately 4mm × 3mm) where the texture appears flattened and the surface shows more shine than the surrounding textured areas. This indicates minor texture wear from handling or contact. The texture loss is visible as a slightly glossier patch compared to the surrounding embossed surface.
 
 Additionally, I detect one very fine scratch in the upper-left area of the card, running for approximately 3mm. This scratch is visible when tilting the card and appears to affect the surface coating.
 

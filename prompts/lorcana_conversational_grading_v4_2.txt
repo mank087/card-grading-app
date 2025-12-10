@@ -1274,7 +1274,7 @@ Inspect entire surface systematically. Document all defects found.
 For each defect, provide:
 • **Type**: scratch, crease, print_line, white_dot, indentation, etc.
 • **Severity**: microscopic, minor, moderate, heavy
-• **Location**: Specific location on card (e.g., "top-left quadrant near ink splash")
+• **Location**: Specific location on card (e.g., "top-left area near the character's ink splash")
 • **Size**: Measurement unique to this defect
 • **Description**: Detailed description including how card finish affects visibility
 

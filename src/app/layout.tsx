@@ -5,6 +5,7 @@ import "./globals.css";
 import Navigation from "./ui/Navigation";
 import Footer from "./ui/Footer";
 import ClientLayout from "@/components/ClientLayout";
+import { homeMetadata } from "./metadata";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -23,8 +24,13 @@ const notoSansJP = Noto_Sans_JP({
 });
 
 export const metadata: Metadata = {
-  title: "Dynamic Collectibles Management",
-  description: "Professional card grading and authentication service",
+  metadataBase: new URL('https://dcmgrading.com'),
+  ...homeMetadata,
+  // Default metadata that can be overridden by child pages
+  title: {
+    default: 'DCM Grading - AI-Powered Trading Card Grading',
+    template: '%s | DCM Grading',
+  },
 };
 
 export default function RootLayout({

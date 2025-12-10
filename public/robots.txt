@@ -1,0 +1,23 @@
+# DCM Grading - Robots.txt
+# https://dcmgrading.com
+
+User-agent: *
+Allow: /
+
+# Block authenticated/private areas
+Disallow: /api/
+Disallow: /account
+Disallow: /collection
+Disallow: /upload/
+Disallow: /admin/
+Disallow: /auth/
+Disallow: /login
+
+# Block utility pages
+Disallow: /data-deletion-status
+
+# Allow search engines to find our sitemap
+Sitemap: https://dcmgrading.com/sitemap.xml
+
+# Crawl-delay for polite crawling (optional, respected by some bots)
+Crawl-delay: 1

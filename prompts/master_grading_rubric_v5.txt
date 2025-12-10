@@ -3124,55 +3124,53 @@ METHODOLOGY FOR SURFACE ANALYSIS
 • Lower-left | Lower-center | Lower-right
 • Note defects by zone for precise location documentation
 ---
-🆕 QUADRANT-BASED SURFACE SCANNING (v5.11 ENHANCEMENT)
+SYSTEMATIC SURFACE SCANNING (v5.12 ENHANCED)
 ---
 To ensure complete surface coverage and prevent missed defects,
-you MUST systematically scan each surface using the quadrant method.
+you MUST systematically scan each surface area by area.
 
-**QUADRANT DEFINITIONS:**
+**SCANNING ZONES (Internal Process):**
 ┌─────────────┬─────────────┐
-│     Q1      │     Q2      │
-│  Upper-Left │ Upper-Right │
-│             │             │
+│ Upper-Left  │ Upper-Right │
+│    Area     │    Area     │
 ├─────────────┼─────────────┤
-│     Q3      │     Q4      │
 │ Lower-Left  │ Lower-Right │
-│             │             │
+│    Area     │    Area     │
 └─────────────┴─────────────┘
 
 **MANDATORY SCANNING PROTOCOL:**
-For EACH surface (front and back), execute in this order:
+For EACH surface (front and back), mentally scan in this order:
 
-1. **Q1 (Upper-Left)**: Scan for scratches, white dots, print defects
-   - Document findings or confirm "Q1: No defects detected"
+1. **Upper-Left Area**: Scan for scratches, white dots, print defects
+2. **Upper-Right Area**: Scan for scratches, white dots, print defects
+3. **Lower-Left Area**: Scan for scratches, white dots, print defects
+4. **Lower-Right Area**: Scan for scratches, white dots, print defects
+5. **Center Area**: Check where all areas meet (HIGH-TRAFFIC handling zone)
+6. **HOLOGRAPHIC CHECK** (if applicable): Verify pattern uniformity across surface
 
-2. **Q2 (Upper-Right)**: Scan for scratches, white dots, print defects
-   - Document findings or confirm "Q2: No defects detected"
+🚨 **OUTPUT FORMAT - HUMAN-FRIENDLY LOCATIONS ONLY:**
+When documenting defects, NEVER use technical notation (Q1, Q2, Q3, Q4).
+Instead, use natural language and artwork-relative descriptions:
 
-3. **Q3 (Lower-Left)**: Scan for scratches, white dots, print defects
-   - Document findings or confirm "Q3: No defects detected"
+**LOCATION PRIORITY (Best to Acceptable):**
+1. Artwork-relative: "near the character's shoulder", "below the attack text"
+2. Card-element relative: "above the card name", "along the energy symbol border"
+3. Natural position: "upper-left area", "center-right portion", "bottom section"
+4. Edge/corner references: "top-left corner region", "right edge area"
 
-4. **Q4 (Lower-Right)**: Scan for scratches, white dots, print defects
-   - Document findings or confirm "Q4: No defects detected"
+**EXAMPLE (CORRECT - Human-Friendly):**
+"Upper-left area clean with no defects. Upper-right area near the player's jersey
+number shows a faint hairline scratch approximately 2mm long, visible at angle
+against the blue sky artwork. Lower-left area has a minor print line artifact
+~0.5mm near the card border. Lower-right area and center are clean."
 
-5. **CENTER INTERSECTION**: Check where all quadrants meet
-   - This is a HIGH-TRAFFIC handling area - inspect carefully
+**EXAMPLE (INCORRECT - Technical Notation):**
+❌ "Q1: Clean. Q2: Faint scratch. Q3: Print line. Q4: Clean."
+❌ "Surface defect in Q3 at 35% from left edge"
+❌ "Q2 quadrant shows whitening"
 
-6. **HOLOGRAPHIC CHECK** (if applicable):
-   - Verify pattern uniformity across all quadrants
-   - Note any disruptions by quadrant location
-
-**DOCUMENTATION REQUIREMENT:**
-In your surface analysis, you MUST reference observations from specific quadrants.
-Use quadrant labels (Q1, Q2, Q3, Q4, center) for defect location.
-
-**EXAMPLE (CORRECT):**
-"Q1 (upper-left): Clean, no defects. Q2 (upper-right): Faint hairline scratch
-approximately 2mm long visible at angle against the blue sky artwork. Q3 (lower-left):
-Minor print line artifact ~0.5mm. Q4 (lower-right): Clean. Center intersection: No defects."
-
-**EXAMPLE (INCORRECT):**
-"Surface is clean with no visible defects." (No quadrant-specific inspection documented)
+**EXAMPLE (INCORRECT - No Location Specificity):**
+❌ "Surface is clean with no visible defects." (Must specify which areas inspected)
 ---
 
 **3. OBSERVE ACTUAL COLORS AND DESIGN**

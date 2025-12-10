@@ -1,6 +1,18 @@
+import { Metadata } from 'next';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 import Link from 'next/link';
 import Image from 'next/image';
+
+export const metadata: Metadata = {
+  title: 'Reports & Labels',
+  description: 'Download professional grading labels and reports for your DCM-graded cards. Foldable slab labels for magnetic one-touch holders, full grading reports, and mini reports for online sales.',
+  keywords: 'card grading labels, grading reports, slab labels, Avery 6871, card authentication, downloadable labels, grading certificate',
+  openGraph: {
+    title: 'DCM Reports & Labels - Professional Card Documentation',
+    description: 'Professional grading labels and reports for your trading cards. Display, share, and sell with confidence.',
+    type: 'website',
+  },
+};
 
 export default function ReportsAndLabelsPage() {
   return (

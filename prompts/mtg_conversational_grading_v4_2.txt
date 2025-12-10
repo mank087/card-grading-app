@@ -1532,7 +1532,7 @@ Provide detailed, context-aware surface analysis:
 
 1. **Specific Observable Details**:
    - Length and width of scratches (estimate in mm, describe extent)
-   - Location and distribution (specific areas like "upper left quadrant")
+   - Location and distribution (specific areas like "upper-left area near the creature's artwork")
    - Type and severity (fine hairline vs deep scratch, print line vs damage)
    - Visual impact (how defect contrasts with surrounding area)
    - Interaction with card finish (how does refractor/chrome/matte affect visibility?)
@@ -1647,7 +1647,7 @@ Before finalizing surface analysis, verify:
 🆕 SURFACE SUMMARIES (Required for front_summary and back_summary fields):
 After evaluating both front and back surfaces, provide:
 • front_summary: REQUIRED - Write a concise 1-2 sentence summary of the front surface quality (e.g., "Clean holographic surface with no scratches, print lines, or whitening visible")
-• back_summary: REQUIRED - Write a concise 1-2 sentence summary of the back surface quality (e.g., "Light surface wear with minor scratches visible in upper-left quadrant under magnification")
+• back_summary: REQUIRED - Write a concise 1-2 sentence summary of the back surface quality (e.g., "Light surface wear with minor scratches visible in upper-left area under magnification")
 
 🔍 CRITICAL REMINDERS:
 • Refractor/holographic patterns are INTENTIONAL - only mark scratches that disrupt these patterns
@@ -2595,7 +2595,7 @@ Return valid JSON object with this EXACT structure:
       "analysis": "MINIMUM 2 SENTENCES - Independent back surface analysis"
     },
     "front_summary": "REQUIRED - 1-2 sentence summary of front surface quality (e.g., 'Clean holographic surface with no scratches, print lines, or whitening visible')",
-    "back_summary": "REQUIRED - 1-2 sentence summary of back surface quality (e.g., 'Light surface wear with minor scratches visible in upper-left quadrant under magnification')"
+    "back_summary": "REQUIRED - 1-2 sentence summary of back surface quality (e.g., 'Light surface wear with minor scratches visible in upper-left area under magnification')"
   },
 
   "cross_verification": {

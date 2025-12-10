@@ -1,4 +1,14 @@
+import { Metadata } from 'next';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
+
+export const metadata: Metadata = {
+  title: 'Terms and Conditions',
+  description: 'DCM Grading Terms and Conditions. Review our terms of service for using the AI-powered card grading platform.',
+  robots: {
+    index: true,
+    follow: true,
+  },
+};
 
 export default function TermsPage() {
   return (
