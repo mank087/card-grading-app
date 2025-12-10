@@ -3,6 +3,16 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
+export type GradingStage =
+  | 'uploading'    // 0-15%: Images being uploaded
+  | 'queued'       // 15-20%: In queue, waiting
+  | 'identifying'  // 20-35%: Card identification
+  | 'grading'      // 35-80%: DCM Optic™ analyzing
+  | 'calculating'  // 80-95%: Computing final grade
+  | 'saving'       // 95-99%: Saving to database
+  | 'completed'    // 100%: Done
+  | 'error'        // Error state
+
 export interface GradingCard {
   id: string
   cardId: string
@@ -10,20 +20,24 @@ export interface GradingCard {
   categoryLabel: string
   frontImageUrl: string
   status: 'uploading' | 'processing' | 'completed' | 'error'
+  stage: GradingStage
   progress: number
   uploadedAt: number
   completedAt?: number
   errorMessage?: string
   resultUrl?: string
+  cardName?: string
+  estimatedTimeRemaining?: number | null
 }
 
 interface GradingQueueContextType {
   queue: GradingCard[]
-  addToQueue: (card: Omit<GradingCard, 'id' | 'uploadedAt' | 'progress'>) => string
+  addToQueue: (card: Omit<GradingCard, 'id' | 'uploadedAt' | 'progress' | 'stage'>) => string
   updateCardStatus: (id: string, updates: Partial<GradingCard>) => void
   removeFromQueue: (id: string) => void
   getCard: (id: string) => GradingCard | undefined
   clearCompleted: () => void
+  updateCardStage: (id: string, stage: GradingStage, progress: number, extras?: Partial<GradingCard>) => void
 }
 
 const GradingQueueContext = createContext<GradingQueueContextType | undefined>(undefined)
@@ -72,13 +86,14 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
     }
   }, [queue])
 
-  const addToQueue = useCallback((card: Omit<GradingCard, 'id' | 'uploadedAt' | 'progress'>) => {
+  const addToQueue = useCallback((card: Omit<GradingCard, 'id' | 'uploadedAt' | 'progress' | 'stage'>) => {
     const id = `grading-${Date.now()}-${Math.random().toString(36).slice(2)}`
     const newCard: GradingCard = {
       ...card,
       id,
       uploadedAt: Date.now(),
       progress: 0,
+      stage: 'uploading',
     }
     setQueue(prev => [...prev, newCard])
     return id
@@ -102,6 +117,12 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
     setQueue(prev => prev.filter(card => card.status !== 'completed'))
   }, [])
 
+  const updateCardStage = useCallback((id: string, stage: GradingStage, progress: number, extras?: Partial<GradingCard>) => {
+    setQueue(prev => prev.map(card =>
+      card.id === id ? { ...card, stage, progress, ...extras } : card
+    ))
+  }, [])
+
   return (
     <GradingQueueContext.Provider value={{
       queue,
@@ -109,7 +130,8 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
       updateCardStatus,
       removeFromQueue,
       getCard,
-      clearCompleted
+      clearCompleted,
+      updateCardStage
     }}>
       {children}
     </GradingQueueContext.Provider>

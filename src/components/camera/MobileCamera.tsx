@@ -2,13 +2,51 @@
 
 import { useState, useEffect } from 'react';
 import { useCamera } from '@/hooks/useCamera';
-import { useCardDetection } from '@/hooks/useCardDetection';
+import { useCardDetection, LightingInfo } from '@/hooks/useCardDetection';
 import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
 import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality';
 import { cropToGuideFrame } from '@/utils/guideCrop';
 import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
+import { useToast } from '@/hooks/useToast';
+
+// Lighting indicator component
+function LightingIndicator({ lighting }: { lighting: LightingInfo }) {
+  const getIcon = () => {
+    switch (lighting.level) {
+      case 'too_dark': return '🌑';
+      case 'dim': return '🌒';
+      case 'good': return '☀️';
+      case 'bright': return '🌤️';
+      case 'too_bright': return '⚡';
+      default: return '☀️';
+    }
+  };
+
+  const getColor = () => {
+    switch (lighting.level) {
+      case 'too_dark': return 'bg-red-500/80 text-white';
+      case 'dim': return 'bg-yellow-500/80 text-white';
+      case 'good': return 'bg-green-500/80 text-white';
+      case 'bright': return 'bg-yellow-400/80 text-gray-900';
+      case 'too_bright': return 'bg-red-500/80 text-white';
+      default: return 'bg-green-500/80 text-white';
+    }
+  };
+
+  // Only show indicator if lighting isn't good
+  if (lighting.level === 'good') {
+    return null;
+  }
+
+  return (
+    <div className={`absolute top-4 right-4 px-3 py-2 rounded-lg flex items-center gap-2 ${getColor()} backdrop-blur-sm shadow-lg`}>
+      <span className="text-lg">{getIcon()}</span>
+      <span className="text-xs font-medium">{lighting.message}</span>
+    </div>
+  );
+}
 
 interface MobileCameraProps {
   side: 'front' | 'back';
@@ -23,6 +61,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [isProcessing, setIsProcessing] = useState(false);
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const toast = useToast();
 
   // Auto card detection - pass side to adjust detection for card backs
   const detection = useCardDetection(videoRef, !!stream, side);
@@ -61,7 +100,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     try {
       const captured = await captureImage();
       if (!captured) {
-        alert('Failed to capture image. Please try again.');
+        toast.error('Failed to capture image. Please try again.');
         setIsProcessing(false);
         return;
       }
@@ -102,7 +141,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       }
     } catch (err) {
       console.error('Capture error:', err);
-      alert('Failed to capture image. Please try again.');
+      toast.error('Failed to capture image. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -277,6 +316,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
         {/* Guide Overlay */}
         <CameraGuideOverlay side={side} cardDetected={detection.isCardDetected} />
+
+        {/* Lighting Indicator */}
+        <LightingIndicator lighting={detection.lighting} />
       </div>
 
       {/* Controls - Fixed height to prevent layout jumping */}

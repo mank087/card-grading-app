@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
+import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,6 +12,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { error: "Authentication required" },
         { status: 401 }
+      );
+    }
+
+    // Check rate limit
+    const rateLimitId = getRateLimitIdentifier(authResult.userId, req);
+    const rateLimitResult = checkRateLimit(rateLimitId, RATE_LIMITS.UPLOAD);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        createRateLimitResponse(rateLimitResult),
+        { status: 429 }
       );
     }
 

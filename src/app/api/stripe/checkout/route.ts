@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe, STRIPE_PRICES, StripePriceTier } from '@/lib/stripe';
 import { getUserCredits, isFirstPurchase } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
+import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +24,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: authResult.error || 'Authentication required' },
         { status: 401 }
+      );
+    }
+
+    // Check rate limit for payment endpoints
+    const rateLimitId = getRateLimitIdentifier(authResult.userId, request);
+    const rateLimitResult = checkRateLimit(rateLimitId, RATE_LIMITS.PAYMENT);
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        createRateLimitResponse(rateLimitResult),
+        { status: 429 }
       );
     }
 

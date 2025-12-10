@@ -1905,10 +1905,11 @@ export function SportsCardDetails() {
         throw new Error('You must be logged in to change visibility');
       }
 
-      const response = await fetch(`/api/cards/${card.id}/visibility?user_id=${session.user.id}`, {
+      const response = await fetch(`/api/cards/${card.id}/visibility`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ visibility: newVisibility }),
       });

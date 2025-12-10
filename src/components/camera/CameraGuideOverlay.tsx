@@ -66,13 +66,28 @@ export default function CameraGuideOverlay({ cardDetected = false, side }: Camer
       {/* Bottom instructions */}
       <div className="absolute bottom-36 left-0 right-0 text-center px-4">
         <div className="space-y-2">
-          <div className="bg-black/70 text-white px-4 py-2 rounded-lg inline-block">
-            <p className="text-sm font-medium">
-              Align card within frame
-            </p>
-          </div>
-          <div className="bg-black/60 text-white/90 px-4 py-1.5 rounded-lg inline-block">
-            <p className="text-xs">💡 Good lighting, avoid glare</p>
+          {cardDetected ? (
+            <div className="bg-green-600/90 text-white px-4 py-2 rounded-lg inline-flex items-center gap-2 animate-pulse">
+              <span className="text-lg">✓</span>
+              <p className="text-sm font-medium">Card detected - Ready to capture!</p>
+            </div>
+          ) : (
+            <div className="bg-black/70 text-white px-4 py-2 rounded-lg inline-block">
+              <p className="text-sm font-medium">
+                Align card within frame
+              </p>
+            </div>
+          )}
+          <div className="flex flex-wrap justify-center gap-2">
+            <div className="bg-black/60 text-white/90 px-3 py-1.5 rounded-lg inline-block">
+              <p className="text-xs">💡 Even lighting</p>
+            </div>
+            <div className="bg-black/60 text-white/90 px-3 py-1.5 rounded-lg inline-block">
+              <p className="text-xs">🚫 No glare</p>
+            </div>
+            <div className="bg-black/60 text-white/90 px-3 py-1.5 rounded-lg inline-block">
+              <p className="text-xs">📐 Fill the frame</p>
+            </div>
           </div>
         </div>
       </div>

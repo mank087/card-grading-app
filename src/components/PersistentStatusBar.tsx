@@ -1,11 +1,31 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { useGradingQueue } from '@/contexts/GradingQueueContext'
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useGradingQueue, GradingStage, GradingCard } from '@/contexts/GradingQueueContext'
 import { useRouter } from 'next/navigation'
 
 // Average grading time based on typical processing (45-60 seconds)
 const ESTIMATED_GRADING_TIME = 55000 // 55 seconds - cards typically complete around this time
+
+// Stage labels with DCM Optic™ branding
+const STAGE_CONFIG: Record<GradingStage, { label: string; shortLabel: string; color: string }> = {
+  uploading: { label: 'Uploading', shortLabel: 'Upload', color: 'bg-blue-400' },
+  queued: { label: 'Queued', shortLabel: 'Queue', color: 'bg-yellow-400' },
+  identifying: { label: 'Identifying', shortLabel: 'ID', color: 'bg-orange-400' },
+  grading: { label: 'DCM Optic™ Analyzing', shortLabel: 'DCM Optic™', color: 'bg-purple-400' },
+  calculating: { label: 'Calculating Grade', shortLabel: 'Calculate', color: 'bg-indigo-400' },
+  saving: { label: 'Saving Results', shortLabel: 'Save', color: 'bg-cyan-400' },
+  completed: { label: 'Complete', shortLabel: 'Done', color: 'bg-green-400' },
+  error: { label: 'Error', shortLabel: 'Error', color: 'bg-red-400' },
+}
+
+// Stage order for progress visualization
+const STAGE_ORDER: GradingStage[] = ['uploading', 'queued', 'identifying', 'grading', 'calculating', 'saving', 'completed']
+
+function getStageIndex(stage: GradingStage): number {
+  const idx = STAGE_ORDER.indexOf(stage)
+  return idx === -1 ? 0 : idx
+}
 
 function useAnimatedProgress(uploadedAt: number, isProcessing: boolean, isCompleted: boolean): number {
   const [progress, setProgress] = useState(0)
@@ -58,10 +78,123 @@ function ExpandedCardProgress({ uploadedAt }: { uploadedAt: number }) {
   )
 }
 
+// Stage indicator dots showing progress through grading stages
+function StageIndicator({ stage, compact = false }: { stage: GradingStage; compact?: boolean }) {
+  const currentIndex = getStageIndex(stage)
+  const displayStages = compact
+    ? ['uploading', 'grading', 'completed'] as GradingStage[]
+    : STAGE_ORDER.slice(0, -1) // Exclude 'completed' from dots, show checkmark instead
+
+  return (
+    <div className="flex items-center gap-1">
+      {displayStages.map((s, idx) => {
+        const stageIdx = getStageIndex(s)
+        const isCompleted = currentIndex > stageIdx
+        const isCurrent = stage === s
+        const config = STAGE_CONFIG[s]
+
+        return (
+          <div key={s} className="flex items-center">
+            {idx > 0 && (
+              <div className={`w-2 h-0.5 ${isCompleted ? 'bg-green-400' : 'bg-white/20'}`} />
+            )}
+            <div
+              className={`w-2 h-2 rounded-full transition-all ${
+                isCompleted ? 'bg-green-400' :
+                isCurrent ? `${config.color} animate-pulse` :
+                'bg-white/20'
+              }`}
+              title={config.label}
+            />
+          </div>
+        )
+      })}
+      {stage === 'completed' && (
+        <>
+          <div className="w-2 h-0.5 bg-green-400" />
+          <div className="w-2 h-2 rounded-full bg-green-400 flex items-center justify-center">
+            <svg className="w-1.5 h-1.5 text-white" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// Get stage-specific status message
+function getStageMessage(stage: GradingStage, cardName?: string): string {
+  const config = STAGE_CONFIG[stage]
+  switch (stage) {
+    case 'uploading':
+      return 'Uploading images...'
+    case 'queued':
+      return 'In queue, starting soon...'
+    case 'identifying':
+      return cardName ? `Identifying: ${cardName}` : 'Identifying card...'
+    case 'grading':
+      return 'DCM Optic™ analyzing condition...'
+    case 'calculating':
+      return 'Computing final grade...'
+    case 'saving':
+      return 'Saving results...'
+    case 'completed':
+      return 'Grading complete!'
+    case 'error':
+      return 'Failed to process'
+    default:
+      return config.label
+  }
+}
+
+// Hook to poll for card status updates
+function useCardStatusPolling(cards: GradingCard[], updateCardStage: (id: string, stage: GradingStage, progress: number, extras?: Partial<GradingCard>) => void) {
+  useEffect(() => {
+    const processingCards = cards.filter(c => c.status === 'processing' || c.status === 'uploading')
+    if (processingCards.length === 0) return
+
+    const pollStatus = async () => {
+      for (const card of processingCards) {
+        try {
+          const response = await fetch(`/api/cards/${card.cardId}/status`)
+          if (!response.ok) continue
+
+          const data = await response.json()
+          if (data.stage && data.progress !== undefined) {
+            updateCardStage(card.id, data.stage, data.progress, {
+              cardName: data.cardName,
+              estimatedTimeRemaining: data.estimatedTimeRemaining,
+              ...(data.stage === 'completed' ? {
+                status: 'completed',
+                completedAt: Date.now(),
+                resultUrl: `/card/${card.cardId}`
+              } : {})
+            })
+          }
+        } catch (error) {
+          // Silently ignore polling errors
+        }
+      }
+    }
+
+    // Initial poll
+    pollStatus()
+
+    // Poll every 2 seconds
+    const interval = setInterval(pollStatus, 2000)
+
+    return () => clearInterval(interval)
+  }, [cards, updateCardStage])
+}
+
 export default function PersistentStatusBar() {
-  const { queue, removeFromQueue, clearCompleted } = useGradingQueue()
+  const { queue, removeFromQueue, clearCompleted, updateCardStage } = useGradingQueue()
   const [isExpanded, setIsExpanded] = useState(false)
   const router = useRouter()
+
+  // Poll for status updates on processing cards
+  useCardStatusPolling(queue, updateCardStage)
 
   // Filter out completed cards older than 5 minutes
   const activeQueue = queue.filter(card => {
@@ -107,10 +240,20 @@ export default function PersistentStatusBar() {
         <div className="flex items-center gap-3">
           {processingCount > 0 && (
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              <div className={`w-2 h-2 rounded-full animate-pulse ${
+                firstProcessingCard?.stage
+                  ? STAGE_CONFIG[firstProcessingCard.stage].color
+                  : 'bg-green-400'
+              }`} />
               <span className="text-sm font-medium">
-                {processingCount} card{processingCount > 1 ? 's' : ''} grading... {Math.round(collapsedProgress)}%
+                {processingCount === 1 && firstProcessingCard?.stage
+                  ? `${STAGE_CONFIG[firstProcessingCard.stage].label}... ${Math.round(collapsedProgress)}%`
+                  : `${processingCount} card${processingCount > 1 ? 's' : ''} grading... ${Math.round(collapsedProgress)}%`
+                }
               </span>
+              {processingCount === 1 && (
+                <StageIndicator stage={firstProcessingCard?.stage || 'uploading'} compact />
+              )}
             </div>
           )}
 
@@ -191,20 +334,26 @@ export default function PersistentStatusBar() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm font-semibold truncate">
-                      {card.categoryLabel}
+                      {card.cardName || card.categoryLabel}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded-full ${
-                      card.status === 'uploading' ? 'bg-blue-400/20 text-blue-200' :
-                      card.status === 'processing' ? 'bg-yellow-400/20 text-yellow-200' :
-                      card.status === 'completed' ? 'bg-green-400/20 text-green-200' :
-                      'bg-red-400/20 text-red-200'
+                      card.stage === 'error' ? 'bg-red-400/20 text-red-200' :
+                      card.stage === 'completed' ? 'bg-green-400/20 text-green-200' :
+                      `${STAGE_CONFIG[card.stage || 'uploading'].color}/20 text-white`
                     }`}>
-                      {card.status === 'uploading' ? 'Uploading' :
-                       card.status === 'processing' ? 'Processing' :
-                       card.status === 'completed' ? 'Ready' :
-                       'Error'}
+                      {STAGE_CONFIG[card.stage || 'uploading'].shortLabel}
                     </span>
                   </div>
+
+                  {/* Stage indicator for processing cards */}
+                  {card.status !== 'completed' && card.status !== 'error' && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <StageIndicator stage={card.stage || 'uploading'} />
+                      <span className="text-xs text-white/50">
+                        {card.progress}%
+                      </span>
+                    </div>
+                  )}
 
                   {/* Progress bar for processing cards */}
                   {(card.status === 'uploading' || card.status === 'processing') && (
@@ -212,10 +361,12 @@ export default function PersistentStatusBar() {
                   )}
 
                   <p className="text-xs text-white/70">
-                    {card.status === 'uploading' && 'Evaluating Card with DCM Optic™'}
-                    {card.status === 'processing' && 'Evaluating Card with DCM Optic™'}
-                    {card.status === 'completed' && 'Grading complete!'}
-                    {card.status === 'error' && (card.errorMessage || 'Failed to process')}
+                    {card.status === 'error'
+                      ? (card.errorMessage || 'Failed to process')
+                      : getStageMessage(card.stage || 'uploading', card.cardName)}
+                    {card.estimatedTimeRemaining && card.status !== 'completed' && card.status !== 'error' && (
+                      <span className="ml-2 text-white/50">~{card.estimatedTimeRemaining}s</span>
+                    )}
                   </p>
                 </div>
 

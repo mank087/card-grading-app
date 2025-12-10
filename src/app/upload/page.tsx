@@ -13,6 +13,7 @@ import { useGradingQueue } from '@/contexts/GradingQueueContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import PhotoTipsPopup, { useShouldShowPhotoTips } from '@/components/PhotoTipsPopup'
 import Link from 'next/link'
+import { useToast } from '@/hooks/useToast'
 
 interface CompressionInfo {
   originalSize: number;
@@ -112,6 +113,7 @@ function UniversalUploadPageContent() {
   const router = useRouter();
   const { addToQueue, updateCardStatus } = useGradingQueue();
   const { balance, isLoading: creditsLoading, deductLocalCredit, refreshCredits } = useCredits();
+  const toast = useToast();
 
   // 🔒 Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
@@ -315,7 +317,7 @@ function UniversalUploadPageContent() {
 
     if (!session || !session.user) {
       setStatus('❌ You must be logged in to upload')
-      alert('You must be logged in to upload cards. Please log in and try again.')
+      toast.error('You must be logged in to upload cards. Please log in and try again.')
       return
     }
 
@@ -477,7 +479,7 @@ function UniversalUploadPageContent() {
     } catch (err: any) {
       console.error('[Upload] Upload failed:', err)
       setStatus(`❌ Upload failed: ${err.message}`)
-      alert(`Upload failed: ${err.message}`)
+      toast.error(`Upload failed: ${err.message}`)
       setIsUploading(false)
     }
   }
@@ -1211,14 +1213,7 @@ function UniversalUploadPageContent() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-green-600 font-medium truncate">✓ {frontFile.name}</p>
-                      {frontCompressionInfo && (
-                        <div className="text-xs text-gray-600 space-y-1 mt-1">
-                          <p>Original: {formatFileSize(frontCompressionInfo.originalSize)}</p>
-                          <p>Compressed: {formatFileSize(frontCompressionInfo.compressedSize)} ({frontCompressionInfo.compressionRatio.toFixed(1)}% smaller)</p>
-                          <p>Dimensions: {frontCompressionInfo.dimensions.width}×{frontCompressionInfo.dimensions.height}px</p>
-                        </div>
-                      )}
+                      <p className="text-sm text-green-600 font-medium">✓ Front image ready</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -1288,14 +1283,7 @@ function UniversalUploadPageContent() {
                       />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-green-600 font-medium truncate">✓ {backFile.name}</p>
-                      {backCompressionInfo && (
-                        <div className="text-xs text-gray-600 space-y-1 mt-1">
-                          <p>Original: {formatFileSize(backCompressionInfo.originalSize)}</p>
-                          <p>Compressed: {formatFileSize(backCompressionInfo.compressedSize)} ({backCompressionInfo.compressionRatio.toFixed(1)}% smaller)</p>
-                          <p>Dimensions: {backCompressionInfo.dimensions.width}×{backCompressionInfo.dimensions.height}px</p>
-                        </div>
-                      )}
+                      <p className="text-sm text-green-600 font-medium">✓ Back image ready</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -1333,15 +1321,8 @@ function UniversalUploadPageContent() {
           disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
           className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
         >
-          {isCompressing ? 'Compressing Images...' : isUploading ? 'Grading Card...' : 'Upload & Grade Card'}
+          {isCompressing ? 'Processing...' : isUploading ? 'Grading Card...' : 'Upload & Grade Card'}
         </button>
-
-        {/* Status Message */}
-        {status && (
-          <div className="text-center">
-            <p className="text-sm mt-4 p-3 rounded-md bg-gray-50">{status}</p>
-          </div>
-        )}
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-500">

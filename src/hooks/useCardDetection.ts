@@ -2,11 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+export interface LightingInfo {
+  level: 'too_dark' | 'dim' | 'good' | 'bright' | 'too_bright';
+  brightness: number; // 0-255
+  message: string;
+}
+
 interface DetectionResult {
   isCardDetected: boolean;
   confidence: number; // 0-100
   message: string;
   hints?: string[]; // Specific feedback about what's wrong
+  lighting: LightingInfo;
 }
 
 /**
@@ -22,7 +29,8 @@ export const useCardDetection = (
     isCardDetected: false,
     confidence: 0,
     message: 'Position card in frame',
-    hints: []
+    hints: [],
+    lighting: { level: 'good', brightness: 128, message: 'Checking lighting...' }
   });
   const animationFrameRef = useRef<number>();
   const canvasRef = useRef<HTMLCanvasElement>();
@@ -116,7 +124,8 @@ export const useCardDetection = (
         isCardDetected,
         confidence: smoothedConfidence,
         message: getDetectionMessage(smoothedConfidence, stableFramesRef.current),
-        hints: result.hints
+        hints: result.hints,
+        lighting: result.lighting
       });
 
       // Continue detection loop (aim for ~20 FPS to save battery)
@@ -180,10 +189,19 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
   const centerMean = centerPixels.reduce((a, b) => a + b, 0) / centerPixels.length;
   const edgeMean = edgePixels.reduce((a, b) => a + b, 0) / edgePixels.length;
 
-  // Only show lighting hints for extreme conditions
+  // Determine lighting level
+  let lighting: LightingInfo;
   if (overallMean < 30) {
+    lighting = { level: 'too_dark', brightness: overallMean, message: 'Too dark - add more light' };
     hints.push('Try adding more light');
-  } else if (overallMean > 220) {
+  } else if (overallMean < 60) {
+    lighting = { level: 'dim', brightness: overallMean, message: 'Dim - more light recommended' };
+  } else if (overallMean < 200) {
+    lighting = { level: 'good', brightness: overallMean, message: 'Good lighting' };
+  } else if (overallMean < 230) {
+    lighting = { level: 'bright', brightness: overallMean, message: 'Bright - watch for glare' };
+  } else {
+    lighting = { level: 'too_bright', brightness: overallMean, message: 'Too bright - reduce glare' };
     hints.push('Too bright - reduce glare');
   }
 
@@ -237,7 +255,8 @@ function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'fr
     isCardDetected: isDetected,
     confidence,
     message: '',
-    hints: hints.length > 0 ? hints : undefined
+    hints: hints.length > 0 ? hints : undefined,
+    lighting
   };
 }
 

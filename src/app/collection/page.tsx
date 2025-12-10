@@ -8,6 +8,7 @@ import { getStoredSession } from '../../lib/directAuth'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
+import { useToast } from '@/hooks/useToast'
 
 type Card = {
   id: string
@@ -221,6 +222,7 @@ function CollectionPageContent() {
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
+  const toast = useToast()
 
 
   useEffect(() => {
@@ -375,10 +377,10 @@ function CollectionPageContent() {
       setCards(prevCards => prevCards.filter(card => card.id !== cardId))
 
       // Show success message
-      alert('Card deleted successfully!')
+      toast.success('Card deleted successfully!')
     } catch (error: any) {
       console.error('Delete error:', error)
-      alert(`Failed to delete card: ${error.message}`)
+      toast.error(`Failed to delete card: ${error.message}`)
     } finally {
       setDeletingCardId(null)
     }

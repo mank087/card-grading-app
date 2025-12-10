@@ -1785,10 +1785,11 @@ export function MTGCardDetails() {
         throw new Error('You must be logged in to change visibility');
       }
 
-      const response = await fetch(`/api/cards/${card.id}/visibility?user_id=${session.user.id}`, {
+      const response = await fetch(`/api/cards/${card.id}/visibility`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({ visibility: newVisibility }),
       });
@@ -4830,12 +4831,9 @@ export function MTGCardDetails() {
 
                 {/* All Marketplace Buttons in One Row */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* Smart TCGPlayer Link - Direct product URL if available, fallback to search */}
+                  {/* TCGPlayer Search Link - Always use search URL (direct API URLs often timeout) */}
                   {(() => {
-                    // Check for direct TCGPlayer URL from Scryfall API (most accurate)
-                    const directTcgplayerUrl = cardInfo.tcgplayer_url || (card as any).tcgplayer_url;
-
-                    // Fallback: Build search URL
+                    // Build search URL using card name + number (most reliable)
                     const cardName = extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name);
                     const setName = extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set);
 
@@ -4852,11 +4850,7 @@ export function MTGCardDetails() {
                     } as CardData;
 
                     const setSearchUrl = generateTCGPlayerSetSearchUrl(cardData);
-                    const fallbackSearchUrl = setSearchUrl || generateTCGPlayerSearchUrl(cardData);
-
-                    // Use direct URL if available, otherwise fallback to search
-                    const tcgplayerUrl = directTcgplayerUrl || fallbackSearchUrl;
-                    const isDirectLink = !!directTcgplayerUrl;
+                    const tcgplayerUrl = setSearchUrl || generateTCGPlayerSearchUrl(cardData);
                     const displaySetName = cardInfo.set_name || card.card_set;
 
                     return (
@@ -4874,7 +4868,7 @@ export function MTGCardDetails() {
                         <div className="flex-1 min-w-0">
                           <h3 className="font-semibold text-orange-900 text-sm">TCGPlayer</h3>
                           <p className="text-xs text-orange-700 truncate">
-                            {isDirectLink ? 'View product page' : (displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Search listings')}
+                            {displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Search listings'}
                           </p>
                         </div>
                       </a>
