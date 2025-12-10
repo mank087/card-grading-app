@@ -98,6 +98,13 @@ export async function signUp(email: string, password: string): Promise<AuthRespo
       return { error: data.error_description || data.msg || 'Sign up failed' }
     }
 
+    // Supabase returns 200 OK even when user already exists (to prevent email enumeration)
+    // But when user exists, the identities array is empty
+    // Check for this case and return a user-friendly error
+    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      return { error: 'User already registered' }
+    }
+
     return {
       access_token: data.access_token,
       refresh_token: data.refresh_token,
