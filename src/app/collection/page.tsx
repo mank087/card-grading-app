@@ -360,12 +360,15 @@ function CollectionPageContent() {
     try {
       // Get user session
       const session = getStoredSession()
-      if (!session || !session.user) {
+      if (!session || !session.user || !session.access_token) {
         throw new Error('You must be logged in to delete cards')
       }
 
-      const response = await fetch(`/api/cards/${cardId}?user_id=${session.user.id}`, {
+      const response = await fetch(`/api/cards/${cardId}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
       })
 
       if (!response.ok) {
