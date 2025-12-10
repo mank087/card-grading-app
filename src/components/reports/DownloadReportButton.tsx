@@ -1115,10 +1115,16 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   // Dropdown menu items
   const menuItems = [
     {
-      id: 'avery',
-      label: 'Label for Magnetic One-Touch',
-      description: 'Avery 6871 (1-1/4" × 2-3/8")',
-      onClick: handleOpenAveryModal,
+      id: 'card-images',
+      label: 'Card Images with Grade Label (Front & Back)',
+      description: 'Images for Online Marketplaces and Social Media Sharing',
+      onClick: handleDownloadCardImages,
+    },
+    {
+      id: 'mini-jpg',
+      label: 'Mini-Report Image',
+      description: 'For Online Marketplaces and Social Media Sharing',
+      onClick: handleDownloadMiniJpg,
     },
     {
       id: 'report',
@@ -1133,16 +1139,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       onClick: handleDownloadLabel,
     },
     {
-      id: 'mini-jpg',
-      label: 'Mini-Report Image',
-      description: 'JPG for eBay/auction listings',
-      onClick: handleDownloadMiniJpg,
-    },
-    {
-      id: 'card-images',
-      label: 'Card Images (Front & Back)',
-      description: 'JPG images for eBay/marketplace',
-      onClick: handleDownloadCardImages,
+      id: 'avery',
+      label: 'Label for Magnetic One-Touch Slab',
+      description: 'Avery 6871 (1-1/4" × 2-3/8")',
+      onClick: handleOpenAveryModal,
     },
   ];
 
