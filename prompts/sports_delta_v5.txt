@@ -58,11 +58,22 @@ REQUIRED FIELDS (All Sports Cards)
   - Score (vintage, various)
 
 **card_number**: Card number within set
-• Full number as printed
-• Example: "#123"
-• Example: "RC-45" (Rookie Card subset)
-• Example: "AU-TB" (Autograph designation)
-• May include set code: "2024 Topps Chrome #150"
+🚨 **CRITICAL - NUMBER ONLY, NOT SUBSET**:
+• Extract ONLY the numeric card number - DO NOT include subset/parallel names
+• If card shows "123 Silver Prizm" → card_number: "123", subset: "Silver Prizm"
+• If card shows "#45 Refractor" → card_number: "45", subset: "Refractor"
+• If card shows "RC-45 Gold" → card_number: "RC-45", subset: "Gold"
+• SEPARATE the number from any variant/parallel/subset text
+• Common patterns to EXCLUDE from card_number:
+  - Color names: Silver, Gold, Red, Blue, Green, Purple, Orange, Pink, Black
+  - Parallel names: Prizm, Refractor, Holo, Chrome, Mosaic, Optic
+  - Pattern names: Wave, Shimmer, Disco, Tiger Stripe, Cracked Ice
+• Prefixes like "RC-", "AU-", "RPA-" ARE part of the card number
+• Examples:
+  - "150" → card_number: "150"
+  - "#RC-25" → card_number: "RC-25"
+  - "AU-TB" → card_number: "AU-TB"
+  - "45/299 Silver Prizm" → card_number: "45/299", subset: "Silver Prizm"
 
 **sport_or_category**: Sport category
 • Primary sport type
