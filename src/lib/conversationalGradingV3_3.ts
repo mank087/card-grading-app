@@ -185,12 +185,17 @@ export function applyCenteringCap(
 
 /**
  * Deduction ranges by severity level from v3.3 specification
+ *
+ * v5.13 UPDATE: Increased deductions by ~50% for stricter grading
+ * - Visible defects should receive harsher penalties
+ * - "Minor" now reserved for defects requiring magnification
+ * - "Moderate" is minimum for any clearly visible defect
  */
 const SEVERITY_DEDUCTIONS = {
-  'Microscopic': { min: 0.1, max: 0.2, avg: 0.15 },
-  'Minor': { min: 0.3, max: 0.5, avg: 0.4 },
-  'Moderate': { min: 0.6, max: 1.0, avg: 0.8 },
-  'Heavy': { min: 1.1, max: 2.0, avg: 1.5 },
+  'Microscopic': { min: 0.2, max: 0.3, avg: 0.25 },   // Was 0.15 avg
+  'Minor': { min: 0.5, max: 0.8, avg: 0.65 },         // Was 0.40 avg
+  'Moderate': { min: 0.9, max: 1.5, avg: 1.20 },      // Was 0.80 avg
+  'Heavy': { min: 1.8, max: 3.0, avg: 2.50 },         // Was 1.50 avg
   'none': { min: 0, max: 0, avg: 0 },
 } as const;
 

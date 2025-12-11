@@ -28,7 +28,12 @@ export interface ScoringBreakdown {
 
 /**
  * Calculate corner deductions from defect data
- * Max deduction: -2.0 total
+ * Max deduction: -3.0 total (increased from -2.0 in v5.13)
+ *
+ * v5.13 UPDATE: Increased deductions for stricter grading
+ * - Minor: 0.1 → 0.25
+ * - Moderate: 0.25 → 0.50
+ * - Heavy: 0.5 → 1.00
  */
 function calculateCornerDeductions(defects: any): { deductions: number; details: string[] } {
   const details: string[] = [];
@@ -41,14 +46,14 @@ function calculateCornerDeductions(defects: any): { deductions: number; details:
     const description = corner.description || 'No description';
 
     if (severity === 'minor') {
-      deductions += 0.1;
-      details.push(`${side} ${location}: Minor whitening (-0.1)`);
+      deductions += 0.25;  // Was 0.1
+      details.push(`${side} ${location}: Minor whitening (-0.25)`);
     } else if (severity === 'moderate') {
-      deductions += 0.25;
-      details.push(`${side} ${location}: Moderate whitening (-0.25)`);
+      deductions += 0.50;  // Was 0.25
+      details.push(`${side} ${location}: Moderate whitening (-0.50)`);
     } else if (severity === 'heavy') {
-      deductions += 0.5;
-      details.push(`${side} ${location}: Heavy wear (-0.5)`);
+      deductions += 1.00;  // Was 0.5
+      details.push(`${side} ${location}: Heavy wear (-1.00)`);
     }
   };
 
@@ -70,10 +75,10 @@ function calculateCornerDeductions(defects: any): { deductions: number; details:
     processCorner(corners.bottom_right, 'Bottom-Right', 'Back');
   }
 
-  // Cap at -2.0 maximum
-  if (deductions > 2.0) {
-    details.push(`Corner deductions capped at -2.0 (was -${deductions.toFixed(2)})`);
-    deductions = 2.0;
+  // Cap at -3.0 maximum (increased from -2.0 in v5.13)
+  if (deductions > 3.0) {
+    details.push(`Corner deductions capped at -3.0 (was -${deductions.toFixed(2)})`);
+    deductions = 3.0;
   }
 
   return { deductions, details };
@@ -81,7 +86,12 @@ function calculateCornerDeductions(defects: any): { deductions: number; details:
 
 /**
  * Calculate edge deductions from defect data
- * Max deduction: -1.5 total
+ * Max deduction: -2.5 total (increased from -1.5 in v5.13)
+ *
+ * v5.13 UPDATE: Increased deductions for stricter grading
+ * - Minor: 0.1 → 0.25
+ * - Moderate: 0.25 → 0.50
+ * - Heavy: 0.5 → 1.00
  */
 function calculateEdgeDeductions(defects: any): { deductions: number; details: string[] } {
   const details: string[] = [];
@@ -94,14 +104,14 @@ function calculateEdgeDeductions(defects: any): { deductions: number; details: s
     const description = edge.description || 'No description';
 
     if (severity === 'minor') {
-      deductions += 0.1;
-      details.push(`${side} ${location} Edge: Minor roughness (-0.1)`);
+      deductions += 0.25;  // Was 0.1
+      details.push(`${side} ${location} Edge: Minor roughness (-0.25)`);
     } else if (severity === 'moderate') {
-      deductions += 0.25;
-      details.push(`${side} ${location} Edge: Moderate chipping/dots (-0.25)`);
+      deductions += 0.50;  // Was 0.25
+      details.push(`${side} ${location} Edge: Moderate chipping/dots (-0.50)`);
     } else if (severity === 'heavy') {
-      deductions += 0.5;
-      details.push(`${side} ${location} Edge: Heavy wear (-0.5)`);
+      deductions += 1.00;  // Was 0.5
+      details.push(`${side} ${location} Edge: Heavy wear (-1.00)`);
     }
   };
 
@@ -123,10 +133,10 @@ function calculateEdgeDeductions(defects: any): { deductions: number; details: s
     processEdge(edges.right, 'Right', 'Back');
   }
 
-  // Cap at -1.5 maximum
-  if (deductions > 1.5) {
-    details.push(`Edge deductions capped at -1.5 (was -${deductions.toFixed(2)})`);
-    deductions = 1.5;
+  // Cap at -2.5 maximum (increased from -1.5 in v5.13)
+  if (deductions > 2.5) {
+    details.push(`Edge deductions capped at -2.5 (was -${deductions.toFixed(2)})`);
+    deductions = 2.5;
   }
 
   return { deductions, details };
@@ -134,7 +144,7 @@ function calculateEdgeDeductions(defects: any): { deductions: number; details: s
 
 /**
  * Calculate surface deductions from defect data
- * Max deduction: -2.5 total (excluding structural damage)
+ * Max deduction: -3.5 total (increased from -2.5 in v5.13, excluding structural damage)
  */
 function calculateSurfaceDeductions(defects: any): { deductions: number; details: string[] } {
   const details: string[] = [];
@@ -402,7 +412,25 @@ export function calculateDeterministicGrade(result: any): ScoringBreakdown {
   const surface = calculateSurfaceDeductions(result.defects);
   const centering = calculateCenteringDeductions(result.centering);
 
-  const totalDeductions = corners.deductions + edges.deductions + surface.deductions + centering.deductions;
+  // v5.13: Calculate cumulative penalty for widespread wear
+  // Cards with defects in multiple categories receive additional penalty
+  let categoriesWithDefects = 0;
+  if (corners.deductions > 0) categoriesWithDefects++;
+  if (edges.deductions > 0) categoriesWithDefects++;
+  if (surface.deductions > 0) categoriesWithDefects++;
+  if (centering.deductions > 0) categoriesWithDefects++;
+
+  let cumulativePenalty = 0;
+  let cumulativePenaltyNote = '';
+  if (categoriesWithDefects >= 4) {
+    cumulativePenalty = 1.0;
+    cumulativePenaltyNote = ` Cumulative penalty (-1.0) applied for defects in all 4 categories.`;
+  } else if (categoriesWithDefects >= 3) {
+    cumulativePenalty = 0.5;
+    cumulativePenaltyNote = ` Cumulative penalty (-0.5) applied for defects in 3 categories.`;
+  }
+
+  const totalDeductions = corners.deductions + edges.deductions + surface.deductions + centering.deductions + cumulativePenalty;
   const calculatedGrade = Math.max(1.0, BASE_SCORE - totalDeductions); // Never below 1.0
 
   // Round to nearest 0.5
@@ -411,7 +439,8 @@ export function calculateDeterministicGrade(result: any): ScoringBreakdown {
   // Build explanation
   const gradeExplanation = `Grade calculated from base 10.0 with ${totalDeductions.toFixed(2)} points in deductions: ` +
     `Corners (-${corners.deductions.toFixed(2)}), Edges (-${edges.deductions.toFixed(2)}), ` +
-    `Surface (-${surface.deductions.toFixed(2)}), Centering (-${centering.deductions.toFixed(2)}). ` +
+    `Surface (-${surface.deductions.toFixed(2)}), Centering (-${centering.deductions.toFixed(2)}).` +
+    `${cumulativePenaltyNote} ` +
     `Calculated: ${calculatedGrade.toFixed(2)}, Final: ${finalGrade} (rounded to nearest 0.5).`;
 
   return {
