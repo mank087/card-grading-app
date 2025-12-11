@@ -1950,7 +1950,118 @@ If you assign 10.0 to ANY component, your description MUST contain:
 □ Positive description of what perfection looks like on THIS card
 
 If ANY element is missing from a 10.0 claim → Reduce score to 9.5 or add required evidence.
+---
+SECTION 7.9: CENTERING PREREQUISITES - CARD BOUNDARY & ORIENTATION (v5.13)
+---
+🚨 **CRITICAL: COMPLETE THESE STEPS BEFORE ANY CENTERING MEASUREMENT**
 
+**PURPOSE:** Ensure all centering measurements assess the CARD'S internal geometry, not the card's position within the photograph.
+---
+[PREREQUISITE A] CARD BOUNDARY IDENTIFICATION (MANDATORY)
+---
+**FUNDAMENTAL PRINCIPLE:** Centering is a MANUFACTURING property of the card itself - how the printed design was positioned relative to where the card was cut. It has NOTHING to do with how the card is positioned in the uploaded photograph.
+
+**STEP 1: LOCATE THE PHYSICAL CARD EDGES**
+
+Before ANY centering measurement, identify the card's FOUR PHYSICAL EDGES:
+• These are the cut lines where the cardboard ends
+• They separate the card from the background/surface in the photograph
+• The background (table, sleeve, holder, scanning surface) is IRRELEVANT to centering
+
+**TERMINOLOGY - UNDERSTAND THE DIFFERENCE:**
+
+| Term | Definition | Relevance to Centering |
+|------|------------|----------------------|
+| **IMAGE FRAME** | The boundaries of the uploaded photograph | ❌ IGNORE - Not relevant |
+| **BACKGROUND** | Surface visible around/behind the card | ❌ IGNORE - Not relevant |
+| **CARD EDGE** | Physical cut line where cardboard ends | ✅ This is your OUTER reference |
+| **PRINTED BORDER** | Colored frame printed INSIDE the card | ✅ This is your INNER reference |
+| **CENTERING** | Printed border position relative to card edges | ✅ THIS IS WHAT YOU MEASURE |
+
+**WHAT CENTERING ACTUALLY MEASURES:**
+• The width of printed border from the PHYSICAL CARD EDGE to the PRINTED BORDER LINE
+• A perfectly centered card has equal printed border widths on opposite sides
+• An off-center card was cut unevenly during manufacturing (design shifted relative to cut)
+
+**DO NOT MEASURE (COMMON ERRORS):**
+❌ Card position within the photograph/image frame
+❌ Distance from card edge to image boundary
+❌ How "centered" the card appears in the photo composition
+❌ Background visible around the card
+❌ Space between card and edge of uploaded image
+
+**DO MEASURE (CORRECT APPROACH):**
+✅ Left printed border width = distance from LEFT card edge inward to artwork frame
+✅ Right printed border width = distance from RIGHT card edge inward to artwork frame
+✅ Top printed border width = distance from TOP card edge inward to artwork frame
+✅ Bottom printed border width = distance from BOTTOM card edge inward to artwork frame
+
+**INTERNAL VERIFICATION:**
+Before proceeding to measurement, confirm internally:
+• "I have identified all four physical card edges"
+• "I can distinguish the card from the background"
+• "I will measure borders WITHIN the card, not the card's position in the photo"
+---
+[PREREQUISITE B] PHOTOGRAPHIC ANGLE COMPENSATION (INTERNAL PROCESSING)
+---
+**SITUATION:** Cards may be photographed at slight angles (not perfectly perpendicular to camera).
+
+**RECOGNITION INDICATORS:**
+• Card edges not perfectly parallel to each other in the image
+• One side of card appears very slightly larger than opposite side
+• Mild perspective effect visible
+
+**INTERNAL COMPENSATION PROTOCOL:**
+
+When slight angle is detected (< ~15° from perpendicular):
+
+1. **Recognize the perspective effect** - One border may APPEAR larger due to being closer to camera
+2. **Focus on RATIOS, not absolute sizes** - A 52/48 ratio remains approximately 52/48 regardless of slight angle
+3. **Use symmetric design elements as anchors** - Text boxes, logos, and centered design elements help validate true centering
+4. **Cross-reference opposing borders** - If left border appears 2.5mm and right appears 2.7mm, the RATIO (48/52) is what matters
+
+**KEY PRINCIPLE:** Slight photographic angles affect how LARGE each border appears in pixels, but they do NOT significantly change the RATIO between opposing borders. The ratio is the centering measurement.
+
+**WHEN TO APPLY FULL DISTORTION PROTOCOL:**
+If the angle is severe enough that:
+• Card appears clearly trapezoidal (not rectangular)
+• Corners visibly deviate from 90°
+• One edge appears dramatically foreshortened
+→ Apply the full Camera Distortion Safeguards in STEP C4 below
+
+**OUTPUT GUIDANCE:** Do not comment on photographic angle in the centering analysis output. Report the card's actual centering based on measured ratios.
+---
+[PREREQUISITE C] HORIZONTAL/LANDSCAPE PHOTOGRAPH HANDLING
+---
+**SITUATION:** Card photographed rotated 90° (appearing horizontal/landscape in the image).
+
+**RECOGNITION:**
+• Card appears wider than tall in the uploaded image
+• Card name/text appears sideways
+• This is a PHOTO ORIENTATION choice, not a property of the card
+
+**INTERNAL ORIENTATION PROTOCOL:**
+
+1. **Establish the card's natural orientation** using these cues:
+   - Text direction: Card name and stats should read left-to-right, top-to-bottom
+   - Artwork orientation: Character/subject should appear upright
+   - Set symbol: Usually positioned in lower-right when card is correctly oriented
+   - Energy symbols/mana cost: Usually in upper-right or left side
+
+2. **Map image directions to card directions:**
+   - Determine which edge of the IMAGE corresponds to the TOP of the CARD
+   - Example: "The left edge of the image is the top of the card (based on text orientation)"
+
+3. **Apply centering measurements relative to CARD orientation:**
+   - "Left/Right centering" = the card's left and right when held normally
+   - "Top/Bottom centering" = the card's top and bottom when held normally
+   - These may correspond to different directions in the image
+
+**CRITICAL UNDERSTANDING:**
+The card's centering is a MANUFACTURING property that exists regardless of how the photo was taken. A card that is 55/45 left-right centered remains 55/45 whether photographed vertically, horizontally, or at any angle. Your job is to assess the card's true centering as it would be evaluated when held in standard orientation.
+
+**OUTPUT GUIDANCE:** Report centering using standard card-relative terms (Left/Right, Top/Bottom) without commenting on photo orientation.
+---
 SECTION 8: GRADING METHODOLOGY - CENTERING
 ---
 [STEP 3A & 4A] CENTERING EVALUATION
