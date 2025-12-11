@@ -106,6 +106,11 @@ function CardsContent() {
   const [deleteReason, setDeleteReason] = useState('')
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
 
+  // Selection state for bulk actions
+  const [selectedCards, setSelectedCards] = useState<Set<string>>(new Set())
+  const [regeneratingLabels, setRegeneratingLabels] = useState(false)
+  const [regenerateResult, setRegenerateResult] = useState<{ success: number; errors: number } | null>(null)
+
   useEffect(() => {
     fetchCards()
   }, [pagination.page, search, category, graded, featured])
@@ -173,6 +178,65 @@ function CardsContent() {
     setDeleteCardId(cardId)
     setDeleteCardName(cardName)
     setShowDeleteModal(true)
+  }
+
+  // Selection handlers
+  const toggleCardSelection = (cardId: string) => {
+    setSelectedCards(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId)
+      } else {
+        newSet.add(cardId)
+      }
+      return newSet
+    })
+  }
+
+  const selectAllOnPage = () => {
+    const allIds = cards.map(c => c.id)
+    setSelectedCards(new Set(allIds))
+  }
+
+  const clearSelection = () => {
+    setSelectedCards(new Set())
+  }
+
+  // Regenerate labels for selected cards
+  const handleRegenerateLabels = async () => {
+    if (selectedCards.size === 0) {
+      alert('Please select at least one card')
+      return
+    }
+
+    setRegeneratingLabels(true)
+    setRegenerateResult(null)
+
+    let success = 0
+    let errors = 0
+
+    for (const cardId of selectedCards) {
+      try {
+        const response = await fetch(`/api/admin/cards/${cardId}/regenerate-label`, {
+          method: 'POST'
+        })
+        if (response.ok) {
+          success++
+        } else {
+          errors++
+        }
+      } catch {
+        errors++
+      }
+    }
+
+    setRegenerateResult({ success, errors })
+    setRegeneratingLabels(false)
+
+    // Clear selection after successful regeneration
+    if (errors === 0) {
+      setSelectedCards(new Set())
+    }
   }
 
   const handleToggleFeatured = async (cardId: string, currentFeatured: boolean) => {
@@ -274,6 +338,57 @@ function CardsContent() {
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      {selectedCards.size > 0 && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-purple-800 font-medium">
+              {selectedCards.size} card{selectedCards.size !== 1 ? 's' : ''} selected
+            </span>
+            <button
+              onClick={clearSelection}
+              className="text-sm text-purple-600 hover:text-purple-800 underline"
+            >
+              Clear selection
+            </button>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRegenerateLabels}
+              disabled={regeneratingLabels}
+              className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {regeneratingLabels ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Regenerating...
+                </>
+              ) : (
+                'Regenerate Labels'
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Regenerate Result */}
+      {regenerateResult && (
+        <div className={`rounded-lg p-4 mb-4 ${regenerateResult.errors > 0 ? 'bg-yellow-50 border border-yellow-200' : 'bg-green-50 border border-green-200'}`}>
+          <p className={regenerateResult.errors > 0 ? 'text-yellow-800' : 'text-green-800'}>
+            Labels regenerated: {regenerateResult.success} success, {regenerateResult.errors} errors
+          </p>
+          <button
+            onClick={() => setRegenerateResult(null)}
+            className="text-sm underline mt-1"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Cards Table */}
       {loading ? (
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">Loading cards...</div>
@@ -285,6 +400,15 @@ function CardsContent() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <input
+                      type="checkbox"
+                      checked={cards.length > 0 && cards.every(c => selectedCards.has(c.id))}
+                      onChange={(e) => e.target.checked ? selectAllOnPage() : clearSelection()}
+                      className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                      title="Select all on page"
+                    />
+                  </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Card Name
                   </th>
@@ -336,7 +460,15 @@ function CardsContent() {
                   const route = categoryRoutes[card.category || ''] || '/other'
 
                   return (
-                    <tr key={card.id} className="hover:bg-gray-50 transition-colors">
+                    <tr key={card.id} className={`hover:bg-gray-50 transition-colors ${selectedCards.has(card.id) ? 'bg-purple-50' : ''}`}>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedCards.has(card.id)}
+                          onChange={() => toggleCardSelection(card.id)}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="text-sm font-medium text-gray-900">
