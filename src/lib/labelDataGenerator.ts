@@ -177,15 +177,40 @@ function isValidSerialNumber(serial: string | null | undefined): boolean {
 
 /**
  * Check if a string value is valid (not empty or placeholder)
+ * Filters out: null, undefined, "unknown", "n/a", "??", values starting with "Unknown", etc.
  */
 function isValidValue(value: string | null | undefined): boolean {
   if (!value) return false;
-  const lower = value.toLowerCase().trim();
-  return lower !== '' &&
-         lower !== 'n/a' &&
-         lower !== 'unknown' &&
-         lower !== 'null' &&
-         lower !== 'undefined';
+  const trimmed = value.trim();
+  const lower = trimmed.toLowerCase();
+
+  // Reject empty
+  if (lower === '') return false;
+
+  // Reject exact placeholder values
+  if (lower === 'n/a' ||
+      lower === 'unknown' ||
+      lower === 'null' ||
+      lower === 'undefined' ||
+      lower === 'none' ||
+      lower === 'not available' ||
+      lower === 'not specified' ||
+      lower === 'tbd' ||
+      lower === '??' ||
+      lower === '?') {
+    return false;
+  }
+
+  // Reject values that START with "Unknown" (e.g., "Unknown Lorcana Set (card number...)")
+  if (lower.startsWith('unknown')) return false;
+
+  // Reject values that contain question marks (e.g., "Set Name??")
+  if (trimmed.includes('??')) return false;
+
+  // Reject values that are just placeholders in parentheses
+  if (lower.startsWith('(') && lower.endsWith(')')) return false;
+
+  return true;
 }
 
 /**
@@ -237,9 +262,10 @@ function checkAlteredAuthentic(card: CardForLabel): boolean {
  * Sports: Player name is primary, card_name might be subset
  */
 function getSportsName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
-  return stripMarkdown(cardInfo.player_or_character) ||
-         card.featured ||
-         'Unknown Player';
+  const playerName = stripMarkdown(cardInfo.player_or_character);
+  if (isValidValue(playerName)) return playerName!;
+  if (isValidValue(card.featured)) return card.featured!;
+  return 'Card';
 }
 
 /**
@@ -247,19 +273,21 @@ function getSportsName(cardInfo: ConversationalCardInfo, card: CardForLabel): st
  * Pokemon: Use card_name if it includes variant (VMAX, GX, etc.), else pokemon name
  */
 function getPokemonName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
-  const cardName = stripMarkdown(cardInfo.card_name) || '';
+  const cardName = stripMarkdown(cardInfo.card_name);
   const pokemonName = stripMarkdown(cardInfo.player_or_character) ||
                       card.pokemon_featured ||
-                      card.featured || '';
+                      card.featured;
 
   // Check if card_name has a variant suffix that makes it more specific
   const variantPattern = /\b(VMAX|VSTAR|V|GX|EX|ex|Prime|LV\.X|LEGEND|BREAK|δ|Star|Gold Star|Shining|Crystal|Radiant)\b/i;
 
-  if (cardName && cardName !== pokemonName && variantPattern.test(cardName)) {
-    return cardName;
+  if (isValidValue(cardName) && cardName !== pokemonName && variantPattern.test(cardName!)) {
+    return cardName!;
   }
 
-  return pokemonName || cardName || 'Unknown Pokemon';
+  if (isValidValue(pokemonName)) return pokemonName!;
+  if (isValidValue(cardName)) return cardName!;
+  return 'Card';
 }
 
 /**
@@ -267,11 +295,13 @@ function getPokemonName(cardInfo: ConversationalCardInfo, card: CardForLabel): s
  * MTG: Full card name is primary (e.g., "Jace, the Mind Sculptor")
  */
 function getMTGName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
-  return stripMarkdown(cardInfo.card_name) ||
-         stripMarkdown(cardInfo.player_or_character) ||
-         card.card_name ||
-         card.featured ||
-         'Unknown Card';
+  const cardName = stripMarkdown(cardInfo.card_name);
+  const characterName = stripMarkdown(cardInfo.player_or_character);
+  if (isValidValue(cardName)) return cardName!;
+  if (isValidValue(characterName)) return characterName!;
+  if (isValidValue(card.card_name)) return card.card_name!;
+  if (isValidValue(card.featured)) return card.featured!;
+  return 'Card';
 }
 
 /**
@@ -284,25 +314,29 @@ function getLorcanaName(cardInfo: ConversationalCardInfo, card: CardForLabel): s
   const version = stripMarkdown(cardInfo.character_version);
 
   // If we have a full card_name, use it
-  if (cardName) return cardName;
+  if (isValidValue(cardName)) return cardName!;
 
   // Otherwise build from character + version
-  if (characterName && version) {
+  if (isValidValue(characterName) && isValidValue(version)) {
     return `${characterName} - ${version}`;
   }
 
-  return characterName || card.featured || 'Unknown Card';
+  if (isValidValue(characterName)) return characterName!;
+  if (isValidValue(card.featured)) return card.featured!;
+  return 'Card';
 }
 
 /**
  * Get the primary name for Other cards
  */
 function getOtherName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
-  return stripMarkdown(cardInfo.player_or_character) ||
-         stripMarkdown(cardInfo.card_name) ||
-         card.featured ||
-         card.card_name ||
-         'Unknown Card';
+  const characterName = stripMarkdown(cardInfo.player_or_character);
+  const cardName = stripMarkdown(cardInfo.card_name);
+  if (isValidValue(characterName)) return characterName!;
+  if (isValidValue(cardName)) return cardName!;
+  if (isValidValue(card.featured)) return card.featured!;
+  if (isValidValue(card.card_name)) return card.card_name!;
+  return 'Card';
 }
 
 // ============================================================================
