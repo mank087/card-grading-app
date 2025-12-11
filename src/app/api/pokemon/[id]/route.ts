@@ -818,6 +818,21 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
     const cardFieldsLegacy = extractPokemonCardFields(gradingResult);
 
     // Extract Pokemon-specific fields from conversational v4.2 JSON
+    // Helper to parse HP value - handles ranges like "300-360" by taking first number
+    const parseHpValue = (hp: any): number | null => {
+      if (hp === null || hp === undefined) return null;
+      if (typeof hp === 'number') return hp;
+      if (typeof hp === 'string') {
+        // Extract first number from string (handles "300-360", "300+", "300 HP", etc.)
+        const match = hp.match(/(\d+)/);
+        if (match) {
+          const parsed = parseInt(match[1], 10);
+          return isNaN(parsed) ? null : parsed;
+        }
+      }
+      return null;
+    };
+
     const cardFieldsConversational = conversationalGradingData?.card_info
       ? {
           card_name: conversationalGradingData.card_info.card_name || null,
@@ -829,7 +844,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
           authentic: conversationalGradingData.card_info.authentic !== undefined ? conversationalGradingData.card_info.authentic : null,
           pokemon_type: conversationalGradingData.card_info.pokemon_type || null,
           pokemon_stage: conversationalGradingData.card_info.pokemon_stage || null,
-          hp: conversationalGradingData.card_info.hp || null,
+          hp: parseHpValue(conversationalGradingData.card_info.hp),
           card_type: conversationalGradingData.card_info.card_type || null,
           rarity_description: conversationalGradingData.card_info.rarity_or_variant || null,
           autographed: conversationalGradingData.card_info.autographed !== undefined ? conversationalGradingData.card_info.autographed : null,
