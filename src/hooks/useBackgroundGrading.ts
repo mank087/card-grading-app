@@ -201,6 +201,9 @@ export function useBackgroundGrading() {
       .join(',')
   }, [queue])
 
+  // Track the previous key to detect when it actually changes
+  const previousKeyRef = useRef<string>('')
+
   // Separate effect for polling - only triggers when processing cards list changes
   // This prevents the infinite loop caused by updateCardStatus triggering re-renders
   useEffect(() => {
@@ -212,12 +215,27 @@ export function useBackgroundGrading() {
       }
       isPollingRef.current = false
       hasStartedPollingRef.current = false
+      previousKeyRef.current = ''
       return
     }
 
-    // If already polling for these cards, don't restart
-    if (hasStartedPollingRef.current && pollingTimeoutRef.current) {
+    // Check if the key actually changed (new card added or removed)
+    const keyChanged = processingCardIdsKey !== previousKeyRef.current
+
+    // If already polling for the EXACT SAME cards, don't restart
+    // But if key changed (new card added), we need to restart polling
+    if (hasStartedPollingRef.current && pollingTimeoutRef.current && !keyChanged) {
       return
+    }
+
+    // Key changed - reset polling state and restart
+    if (keyChanged) {
+      console.log(`[BackgroundGrading] Processing cards changed: "${previousKeyRef.current}" -> "${processingCardIdsKey}"`)
+      if (pollingTimeoutRef.current) {
+        clearTimeout(pollingTimeoutRef.current)
+        pollingTimeoutRef.current = null
+      }
+      previousKeyRef.current = processingCardIdsKey
     }
 
     hasStartedPollingRef.current = true
