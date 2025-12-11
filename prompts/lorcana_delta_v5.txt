@@ -83,8 +83,15 @@ REQUIRED FIELDS (All Lorcana Cards)
 • Example: "The First Chapter", "Rise of the Floodborn", "Into the Inklands"
 
 **card_number**: Collector number
-• Format: "X/Y" (e.g., "045/204")
-• Bottom of card
+🚨 **CRITICAL - EXACT OCR REQUIRED**:
+• READ THE ACTUAL PRINTED NUMBER ON THE CARD - DO NOT INFER OR CORRECT
+• Transcribe EXACTLY what is printed, character-by-character
+• Location: Bottom of card
+• Format: "X/Y" (e.g., "045/204", "214/204" for Enchanted variants)
+• DO NOT "fix" numbers based on your knowledge of set sizes
+• DO NOT substitute what you think the number "should be"
+• Enchanted cards have numbers ABOVE set size (e.g., 205/204) - this is correct
+• If partially obscured, report what IS visible with uncertainty note
 
 **year**: Release year
 • 4-digit year (e.g., "2023", "2024")
