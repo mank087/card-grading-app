@@ -176,6 +176,48 @@ function isValidSerialNumber(serial: string | null | undefined): boolean {
 }
 
 /**
+ * Clean a value by removing parenthetical explanations and truncating
+ * E.g., "XY – Flashfire (assumed from card number...)" → "XY – Flashfire"
+ */
+function cleanValue(value: string | null | undefined): string | null {
+  if (!value) return null;
+
+  let cleaned = value.trim();
+
+  // Remove parenthetical explanations (but keep short ones like "(2014)" or "(Holo)")
+  // Match opening paren followed by lowercase word (indicates explanation)
+  cleaned = cleaned.replace(/\s*\([a-z].*$/i, '').trim();
+
+  // Also remove if parenthetical is very long (more than 30 chars)
+  const parenMatch = cleaned.match(/^(.*?)\s*\((.{30,})\)(.*)$/);
+  if (parenMatch) {
+    cleaned = (parenMatch[1] + parenMatch[3]).trim();
+  }
+
+  // Remove trailing " - " or " – " if the explanation was at the end
+  cleaned = cleaned.replace(/\s*[-–]\s*$/, '').trim();
+
+  // If still too long (over 60 chars), truncate at a reasonable break point
+  if (cleaned.length > 60) {
+    // Try to break at a delimiter
+    const breakPoints = [' - ', ' – ', ' • ', ', '];
+    for (const bp of breakPoints) {
+      const idx = cleaned.indexOf(bp);
+      if (idx > 10 && idx < 50) {
+        cleaned = cleaned.substring(0, idx).trim();
+        break;
+      }
+    }
+    // If still too long, hard truncate
+    if (cleaned.length > 60) {
+      cleaned = cleaned.substring(0, 57) + '...';
+    }
+  }
+
+  return cleaned || null;
+}
+
+/**
  * Check if a string value is valid (not empty or placeholder)
  * Filters out: null, undefined, "unknown", "n/a", "??", values starting with "Unknown", etc.
  */
@@ -204,13 +246,28 @@ function isValidValue(value: string | null | undefined): boolean {
   // Reject values that START with "Unknown" (e.g., "Unknown Lorcana Set (card number...)")
   if (lower.startsWith('unknown')) return false;
 
+  // Reject values that START with "Assumed" or contain "(assumed"
+  if (lower.startsWith('assumed') || lower.includes('(assumed')) return false;
+
   // Reject values that contain question marks (e.g., "Set Name??")
   if (trimmed.includes('??')) return false;
 
   // Reject values that are just placeholders in parentheses
   if (lower.startsWith('(') && lower.endsWith(')')) return false;
 
+  // Reject overly long values (likely explanations, not actual data)
+  if (trimmed.length > 100) return false;
+
   return true;
+}
+
+/**
+ * Clean and validate a value for label display
+ * Returns cleaned value if valid, null otherwise
+ */
+function getCleanValue(value: string | null | undefined): string | null {
+  if (!isValidValue(value)) return null;
+  return cleanValue(value);
 }
 
 /**
@@ -584,67 +641,76 @@ export function generateLabelData(card: CardForLabel): LabelData {
   // ========================================
   // LINE 1: Primary Name
   // ========================================
-  let primaryName: string;
+  let rawPrimaryName: string;
 
   switch (category) {
     case 'Sports':
-      primaryName = getSportsName(cardInfo, card);
+      rawPrimaryName = getSportsName(cardInfo, card);
       break;
     case 'Pokemon':
-      primaryName = getPokemonName(cardInfo, card);
+      rawPrimaryName = getPokemonName(cardInfo, card);
       break;
     case 'MTG':
-      primaryName = getMTGName(cardInfo, card);
+      rawPrimaryName = getMTGName(cardInfo, card);
       break;
     case 'Lorcana':
-      primaryName = getLorcanaName(cardInfo, card);
+      rawPrimaryName = getLorcanaName(cardInfo, card);
       break;
     default:
-      primaryName = getOtherName(cardInfo, card);
+      rawPrimaryName = getOtherName(cardInfo, card);
   }
+
+  // Clean the primary name to remove any explanatory text
+  const primaryName = cleanValue(rawPrimaryName) || 'Card';
 
   // ========================================
   // LINE 2: Context (Set • Subset • #Number • Year)
   // ========================================
-  const setName = stripMarkdown(cardInfo.set_name) ||
-                  stripMarkdown(cardInfo.set_era) ||
-                  card.card_set ||
-                  null;
+  // Use getCleanValue to strip explanatory text and validate
+  const rawSetName = stripMarkdown(cardInfo.set_name) ||
+                     stripMarkdown(cardInfo.set_era) ||
+                     card.card_set ||
+                     null;
+  const setName = getCleanValue(rawSetName);
 
-  let subset: string | null;
+  let rawSubset: string | null;
   switch (category) {
     case 'Sports':
-      subset = getSportsSubset(cardInfo, card);
+      rawSubset = getSportsSubset(cardInfo, card);
       break;
     case 'Pokemon':
-      subset = getPokemonSubset(cardInfo, card);
+      rawSubset = getPokemonSubset(cardInfo, card);
       break;
     case 'MTG':
-      subset = getMTGSubset(cardInfo, card);
+      rawSubset = getMTGSubset(cardInfo, card);
       break;
     case 'Lorcana':
-      subset = getLorcanaSubset(cardInfo, card);
+      rawSubset = getLorcanaSubset(cardInfo, card);
       break;
     default:
-      subset = stripMarkdown(cardInfo.subset);
+      rawSubset = stripMarkdown(cardInfo.subset);
   }
+  const subset = getCleanValue(rawSubset);
 
-  const cardNumber = stripMarkdown(cardInfo.card_number) ||
-                     stripMarkdown(cardInfo.collector_number) ||
-                     card.card_number ||
-                     null;
+  const rawCardNumber = stripMarkdown(cardInfo.card_number) ||
+                        stripMarkdown(cardInfo.collector_number) ||
+                        card.card_number ||
+                        null;
+  // Clean card number - remove explanatory text like "(printed as 125/094★...)"
+  const cardNumber = getCleanValue(rawCardNumber);
 
-  const year = stripMarkdown(cardInfo.year) ||
-               stripMarkdown(cardInfo.set_year) ||
-               card.release_date ||
-               null;
+  const rawYear = stripMarkdown(cardInfo.year) ||
+                  stripMarkdown(cardInfo.set_year) ||
+                  card.release_date ||
+                  null;
+  const year = getCleanValue(rawYear);
 
   // Build context line: Set • Subset • #Number • Year
   const contextParts: string[] = [];
-  if (isValidValue(setName)) contextParts.push(setName!);
-  if (isValidValue(subset)) contextParts.push(subset!);
-  if (isValidValue(cardNumber)) contextParts.push(`#${cardNumber}`);
-  if (isValidValue(year)) contextParts.push(year!);
+  if (setName) contextParts.push(setName);
+  if (subset) contextParts.push(subset);
+  if (cardNumber) contextParts.push(`#${cardNumber}`);
+  if (year) contextParts.push(year);
 
   const contextLine = contextParts.join(' • ');
 
