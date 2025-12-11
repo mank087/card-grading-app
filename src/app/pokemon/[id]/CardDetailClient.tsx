@@ -28,6 +28,7 @@ import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
 import { useCredits } from '@/contexts/CreditsContext';
+import { getCardLabelData } from '@/lib/useLabelData';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -2480,65 +2481,58 @@ export function PokemonCardDetails() {
                     />
                   </div>
 
-                  {/* Center: Card Information - New 4-Line Structure */}
-                  <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
-                    {/* Line 1: Pokemon Name */}
-                    <div
-                      className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(cardInfo.card_name || cardInfo.player_or_character || card.card_name || "") ? 'font-noto-sans-jp' : ''}`}
-                      style={{
-                        fontSize: (() => {
-                          const name = cardInfo.card_name || cardInfo.player_or_character || card.card_name || "Unknown Card";
-                          if (name.length > 35) return '11px';
-                          if (name.length > 25) return '12px';
-                          return '14px';
-                        })()
-                      }}
-                      title={cardInfo.card_name || cardInfo.player_or_character || card.card_name || "Unknown Card"}
-                    >
-                      {cardInfo.card_name || cardInfo.player_or_character || card.card_name || "Unknown Card"}
-                    </div>
-
-                    {/* Line 2: Set Name • Card # • Year */}
-                    <div
-                      className="text-gray-700 leading-tight"
-                      style={{
-                        fontSize: (cardInfo.set_name || cardInfo.set_era || "Unknown Set").length > 30 ? '10px' : '11px',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
-                      }}
-                      title={`${cardInfo.set_name || cardInfo.set_era || "Unknown Set"} • ${cardInfo.card_number || ''} • ${cardInfo.year || 'N/A'}`}
-                    >
-                      {[
-                        cardInfo.set_name || cardInfo.set_era || "Unknown Set",
-                        cardInfo.card_number,
-                        cardInfo.year
-                      ].filter(p => p).join(' • ')}
-                    </div>
-
-                    {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
-                    {(() => {
-                      const features: string[] = [];
-                      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
-                      if (cardInfo.autographed) features.push('Auto');
-                      const serialNum = cardInfo.serial_number;
-                      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-                        features.push(serialNum);
-                      }
-                      if (features.length === 0) return null;
-                      return (
-                        <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                          {features.join(' • ')}
+                  {/* Center: Card Information - Using unified label data */}
+                  {(() => {
+                    const labelData = getCardLabelData(card);
+                    return (
+                      <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
+                        {/* Line 1: Pokemon Name */}
+                        <div
+                          className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(labelData.primaryName) ? 'font-noto-sans-jp' : ''}`}
+                          style={{
+                            fontSize: (() => {
+                              const name = labelData.primaryName;
+                              if (name.length > 35) return '11px';
+                              if (name.length > 25) return '12px';
+                              return '14px';
+                            })()
+                          }}
+                          title={labelData.primaryName}
+                        >
+                          {labelData.primaryName}
                         </div>
-                      );
-                    })()}
 
-                    {/* Line 4: DCM Serial Number */}
-                    <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
-                      {card.serial || `DCM-${card.id?.slice(0, 8)}`}
-                    </div>
-                  </div>
+                        {/* Line 2: Set Name • Card # • Year */}
+                        {labelData.contextLine && (
+                          <div
+                            className="text-gray-700 leading-tight"
+                            style={{
+                              fontSize: labelData.contextLine.length > 30 ? '10px' : '11px',
+                              display: '-webkit-box',
+                              WebkitLineClamp: 2,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden'
+                            }}
+                            title={labelData.contextLine}
+                          >
+                            {labelData.contextLine}
+                          </div>
+                        )}
+
+                        {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
+                        {labelData.featuresLine && (
+                          <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                            {labelData.featuresLine}
+                          </div>
+                        )}
+
+                        {/* Line 4: DCM Serial Number */}
+                        <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
+                          {labelData.serial}
+                        </div>
+                      </div>
+                    );
+                  })()}
 
                   {/* Right: Grade Display */}
                   <div className="text-center flex-shrink-0">
