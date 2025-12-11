@@ -72,9 +72,17 @@ REQUIRED FIELDS (All Pokemon Cards)
 • null if not visible or not present (older cards pre-2020)
 
 **card_number**: Card number within set
-• Full number as printed (e.g., "25/102", "251/264", "GG70/GG70")
-• Includes numerator/denominator format
-• May include special prefixes (GG, TG, SV)
+🚨 **CRITICAL - EXACT OCR REQUIRED**:
+• READ THE ACTUAL PRINTED NUMBER ON THE CARD - DO NOT INFER OR CORRECT
+• Transcribe EXACTLY what is printed, character-by-character
+• Location: Usually bottom-left or bottom-right of card front
+• Format: "X/Y" where X = card number, Y = set total (e.g., "125/094", "25/102")
+• May include special prefixes (GG, TG, SV) - transcribe exactly as shown
+• DO NOT "fix" numbers based on your knowledge of set sizes
+• DO NOT substitute what you think the number "should be"
+• If the card shows "125/094", report "125/094" - NOT "125/106"
+• Foreign language cards may have different denominators - report as printed
+• If partially obscured, report what IS visible with uncertainty note
 
 **year**: Year from copyright or release date
 • 4-digit year format
@@ -317,11 +325,16 @@ C. POKEMON SET IDENTIFICATION MODULE
 
 🚨 **DETECTION PRIORITY** (Execute in order, stop when confident match found):
 
+⚠️ **IMPORTANT**: The card_number field must contain the EXACT printed number from the card.
+   The lookup table below is ONLY for set name identification - NOT for "correcting" the card number.
+   If the card shows "125/094", report card_number as "125/094" even if the lookup table shows
+   a different denominator for that set. Foreign/regional prints often have different numbering.
+
 1. **Card Number Fraction Pattern** (PRIMARY METHOD)
    - Locate "X/Y" near lower front edge (e.g., "251/264")
-   - Extract denominator "Y" (total set size)
-   - Match against lookup table below
-   - If found → Use that set name
+   - READ AND RECORD THE EXACT PRINTED NUMBER for card_number field
+   - Use denominator "Y" to help identify the set name (but keep original number)
+   - Match against lookup table below for SET IDENTIFICATION ONLY
 
 2. **Set Symbol Recognition** (STRONGEST CONFIDENCE)
    - Detect small expansion icon on card front (usually bottom right)

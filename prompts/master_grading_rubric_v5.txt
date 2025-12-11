@@ -927,6 +927,15 @@ Actual field extraction rules are defined in the card-type delta files.
   • Lorcana: ink_color, character_version, inkwell, strength, willpower, lore_value
   • Other: generic fields (card_name, set_name, manufacturer, year)
 
+**CRITICAL - EXACT TEXT TRANSCRIPTION:**
+For ALL text-based fields (card_number, card_name, set_name, year, serial_number):
+• READ and TRANSCRIBE exactly what is PRINTED on the card
+• DO NOT infer, correct, or substitute based on your knowledge
+• DO NOT "fix" numbers that seem wrong - report what you SEE
+• If card shows "125/094", report "125/094" - NOT what you think it should be
+• Foreign/regional prints often have different numbering than English versions
+• If text is partially obscured, report visible portion with note
+
 **OUTPUT:**
 {
   "card_info": {
@@ -935,7 +944,7 @@ Actual field extraction rules are defined in the card-type delta files.
     "set_name": "string",
     "year": "string",
     "manufacturer": "string",
-    "card_number": "string",
+    "card_number": "string",  // EXACT as printed - do not modify
     "authentic": true|false,
 
     // Card-type-specific fields (see delta files)
