@@ -49,6 +49,22 @@ export function containsCJK(text: string): boolean {
  * @param englishFallback - Optional English name to use for CJK-only text
  * @returns ASCII-safe string
  */
+/**
+ * Check if a value should be filtered (unknown, n/a, etc.)
+ */
+function shouldFilterValue(text: string): boolean {
+  if (!text) return true;
+  const lower = text.toLowerCase().trim();
+  return (
+    lower === 'unknown' ||
+    lower === 'n/a' ||
+    lower === 'na' ||
+    lower === '??' ||
+    lower === '?' ||
+    lower.startsWith('unknown ')  // "Unknown Set", "Unknown Year", etc.
+  );
+}
+
 export function extractAsciiSafe(
   text: string,
   fallback: string = 'Card',
@@ -56,9 +72,18 @@ export function extractAsciiSafe(
 ): string {
   if (!text) return englishFallback || fallback;
 
+  // Filter out "Unknown...", "N/A", etc. values
+  if (shouldFilterValue(text)) {
+    return englishFallback || fallback;
+  }
+
   // If no CJK characters, return the text as-is (just clean it)
   if (!containsCJK(text)) {
     const cleaned = text.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
+    // Check if cleaned result should be filtered
+    if (shouldFilterValue(cleaned)) {
+      return fallback;
+    }
     // Fix any existing double variant suffixes (e.g., "Mega Gengar EX EX" → "Mega Gengar EX")
     const fixedDoubles = cleaned.replace(/\b(VMAX|VSTAR|V|GX|EX|Prime)\s+\1\b/gi, '$1');
     return fixedDoubles || fallback;
