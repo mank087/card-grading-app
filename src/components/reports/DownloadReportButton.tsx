@@ -18,6 +18,7 @@ import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGene
 import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 import { getCardLabelData } from '../../lib/useLabelData';
+import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 
 /**
  * Download Report Button Component
@@ -327,20 +328,32 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // Extract card info for additional fields not in labelData
       const cardInfo = card.conversational_card_info || {};
 
-      // Transform card data for report - using unified label data
+      // Get English fallback name for CJK cards (same as other handlers)
+      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
+
+      // Apply CJK-safe extraction for PDF (react-pdf doesn't support CJK fonts)
+      const safePrimaryName = extractAsciiSafe(cleanLabelData.primaryName, 'Card', englishName);
+      const safeContextLine = cleanLabelData.contextLine
+        ? extractAsciiSafe(cleanLabelData.contextLine, '')
+        : '';
+      const safeFeaturesLine = cleanLabelData.featuresLine
+        ? extractAsciiSafe(cleanLabelData.featuresLine, '')
+        : null;
+
+      // Transform card data for report - using unified label data with CJK-safe values
       const reportData: ReportCardData = {
-        // Label fields - use unified cleanLabelData for consistency with card detail page
-        primaryName: cleanLabelData.primaryName,
-        contextLine: cleanLabelData.contextLine,
-        featuresLine: cleanLabelData.featuresLine,
+        // Label fields - use CJK-safe values for PDF rendering
+        primaryName: safePrimaryName,
+        contextLine: safeContextLine,
+        featuresLine: safeFeaturesLine,
         serial: cleanLabelData.serial,
         grade: cleanLabelData.grade ?? 0,
         gradeFormatted: cleanLabelData.gradeFormatted,
         condition: cleanLabelData.condition,
         // Legacy fields for backward compatibility with other report sections
-        cardName: cleanLabelData.primaryName,
-        playerName: cleanLabelData.primaryName,
-        setName: cleanLabelData.setName || '',
+        cardName: safePrimaryName,
+        playerName: safePrimaryName,
+        setName: cleanLabelData.setName ? extractAsciiSafe(cleanLabelData.setName, '') : '',
         year: cleanLabelData.year || '',
         cardNumber: cleanLabelData.cardNumber || '',
         manufacturer: cardInfo.manufacturer || card.manufacturer_name || '',
@@ -358,9 +371,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           const uncertaintyValue = match ? match[1] : '0.25';
           return `${cleanLabelData.grade ?? 0} ± ${uncertaintyValue}`;
         })(),
-        // Deprecated - kept for backward compatibility
-        cardDetails: cleanLabelData.contextLine || '',
-        specialFeaturesString: cleanLabelData.featuresLine || '',
+        // Deprecated - kept for backward compatibility (using safe values)
+        cardDetails: safeContextLine,
+        specialFeaturesString: safeFeaturesLine || '',
         cardUrl: cardUrl,
         qrCodeDataUrl: qrCodeDataUrl,
         professionalGrades: {

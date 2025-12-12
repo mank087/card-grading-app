@@ -90,9 +90,9 @@ export function extractAsciiSafe(
       const englishFromFallback = fallbackParenMatch[1].replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
       if (englishFromFallback && /[a-zA-Z]/.test(englishFromFallback)) {
         // Append any ASCII suffix from the original text (like "EX", "VMAX")
-        // Pattern: uppercase variant suffixes at end of text
+        // But ONLY if the fallback doesn't already contain it
         const variantMatch = asciiOnly.match(/\b(VMAX|VSTAR|V|GX|EX|Prime)\b/i);
-        if (variantMatch) {
+        if (variantMatch && !englishFromFallback.toUpperCase().includes(variantMatch[1].toUpperCase())) {
           return `${englishFromFallback} ${variantMatch[1]} - Japanese`;
         }
         return `${englishFromFallback} - Japanese`;
@@ -103,8 +103,9 @@ export function extractAsciiSafe(
     const cleanFallback = englishFallback.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
     if (cleanFallback && cleanFallback.length > 2 && /[a-zA-Z]/.test(cleanFallback)) {
       // Append any ASCII variant suffix from original text
+      // But ONLY if the fallback doesn't already contain it
       const variantMatch = asciiOnly.match(/\b(VMAX|VSTAR|V|GX|EX|Prime)\b/i);
-      if (variantMatch && !cleanFallback.includes(variantMatch[1])) {
+      if (variantMatch && !cleanFallback.toUpperCase().includes(variantMatch[1].toUpperCase())) {
         return `${cleanFallback} ${variantMatch[1]} - Japanese`;
       }
       return `${cleanFallback} - Japanese`;
