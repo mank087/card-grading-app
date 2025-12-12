@@ -58,7 +58,10 @@ export function extractAsciiSafe(
 
   // If no CJK characters, return the text as-is (just clean it)
   if (!containsCJK(text)) {
-    return text.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim() || fallback;
+    const cleaned = text.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
+    // Fix any existing double variant suffixes (e.g., "Mega Gengar EX EX" → "Mega Gengar EX")
+    const fixedDoubles = cleaned.replace(/\b(VMAX|VSTAR|V|GX|EX|Prime)\s+\1\b/gi, '$1');
+    return fixedDoubles || fallback;
   }
 
   // Check for "Japanese (English)" format - extract English from parentheses
@@ -82,6 +85,11 @@ export function extractAsciiSafe(
     .replace(/\s+/g, ' ')         // Normalize whitespace
     .trim();
 
+  // Helper to fix double variants and build result
+  const fixDoubleVariants = (str: string): string => {
+    return str.replace(/\b(VMAX|VSTAR|V|GX|EX|Prime)\s+\1\b/gi, '$1');
+  };
+
   // Check englishFallback first - it might have better translation
   if (englishFallback && englishFallback.trim()) {
     // Check if englishFallback has "Japanese (English)" format
@@ -93,9 +101,9 @@ export function extractAsciiSafe(
         // But ONLY if the fallback doesn't already contain it
         const variantMatch = asciiOnly.match(/\b(VMAX|VSTAR|V|GX|EX|Prime)\b/i);
         if (variantMatch && !englishFromFallback.toUpperCase().includes(variantMatch[1].toUpperCase())) {
-          return `${englishFromFallback} ${variantMatch[1]} - Japanese`;
+          return fixDoubleVariants(`${englishFromFallback} ${variantMatch[1]} - Japanese`);
         }
-        return `${englishFromFallback} - Japanese`;
+        return fixDoubleVariants(`${englishFromFallback} - Japanese`);
       }
     }
 
@@ -106,9 +114,9 @@ export function extractAsciiSafe(
       // But ONLY if the fallback doesn't already contain it
       const variantMatch = asciiOnly.match(/\b(VMAX|VSTAR|V|GX|EX|Prime)\b/i);
       if (variantMatch && !cleanFallback.toUpperCase().includes(variantMatch[1].toUpperCase())) {
-        return `${cleanFallback} ${variantMatch[1]} - Japanese`;
+        return fixDoubleVariants(`${cleanFallback} ${variantMatch[1]} - Japanese`);
       }
-      return `${cleanFallback} - Japanese`;
+      return fixDoubleVariants(`${cleanFallback} - Japanese`);
     }
   }
 
