@@ -55,15 +55,32 @@ export const reportStyles = StyleSheet.create({
     color: '#2d3748',
   },
 
+  // Slab outer container - simulates metallic purple gradient border
+  slabOuterContainer: {
+    backgroundColor: '#7c3aed', // Purple-600 base (simulates metallic gradient)
+    borderRadius: 6,
+    padding: 3, // This creates the "border" effect
+    marginBottom: 4,
+  },
+
+  // Slab inner container - white background for content
+  slabInnerContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+
   // Professional label (PSA-style) above card images
   cardLabelContainer: {
-    marginBottom: 4,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#7c3aed',
-    borderStyle: 'solid',
+    backgroundColor: '#f9fafb', // Gray-50 (same as web)
     padding: 4,
     height: 45, // Fixed height for consistency
+  },
+
+  // Purple separator between label and card image
+  slabSeparator: {
+    height: 3,
+    backgroundColor: '#9333ea', // Purple-600 (matches web separator)
   },
 
   cardLabelRow: {

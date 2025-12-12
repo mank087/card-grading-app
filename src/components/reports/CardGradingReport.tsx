@@ -150,48 +150,56 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
         <View style={reportStyles.columnHalf}>
           <Text style={reportStyles.columnHeader}>FRONT</Text>
 
-          {/* Front Label - Unified 4-Line Structure (matches card detail page) */}
-          <View style={reportStyles.cardLabelContainer}>
-            <View style={reportStyles.cardLabelRow}>
-              <View style={reportStyles.cardLabelLeft}>
-                <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
+          {/* Slab Container - Purple border wrapping label + separator + card image */}
+          <View style={reportStyles.slabOuterContainer}>
+            <View style={reportStyles.slabInnerContainer}>
+              {/* Front Label - Unified 4-Line Structure (matches card detail page) */}
+              <View style={reportStyles.cardLabelContainer}>
+                <View style={reportStyles.cardLabelRow}>
+                  <View style={reportStyles.cardLabelLeft}>
+                    <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
+                  </View>
+                  <View style={reportStyles.cardLabelCenter}>
+                    {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
+                    <Text style={reportStyles.cardLabelPlayerName}>
+                      {truncateText(cardData.primaryName, PDF_LIMITS.PLAYER_NAME)}
+                    </Text>
+                    {/* Line 2: Context Line (Set • #Number • Year - pre-filtered) */}
+                    {cardData.contextLine && (
+                      <Text style={reportStyles.cardLabelDetails}>
+                        {truncateText(cardData.contextLine, PDF_LIMITS.CARD_DETAILS)}
+                      </Text>
+                    )}
+                    {/* Line 3: Features Line (RC • Auto • /99) - Only if present */}
+                    {cardData.featuresLine && (
+                      <Text style={reportStyles.cardLabelFeatures}>
+                        {truncateText(cardData.featuresLine, PDF_LIMITS.SPECIAL_FEATURES)}
+                      </Text>
+                    )}
+                    {/* Line 4: DCM Serial Number */}
+                    <Text style={reportStyles.cardLabelSerial}>
+                      {cardData.serial}
+                    </Text>
+                  </View>
+                  <View style={reportStyles.cardLabelRight}>
+                    <Text style={reportStyles.cardLabelGrade}>
+                      {cardData.gradeFormatted}
+                    </Text>
+                    <View style={reportStyles.cardLabelDivider} />
+                    <Text style={reportStyles.cardLabelConfidence}>
+                      {cardData.condition}
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={reportStyles.cardLabelCenter}>
-                {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
-                <Text style={reportStyles.cardLabelPlayerName}>
-                  {truncateText(cardData.primaryName, PDF_LIMITS.PLAYER_NAME)}
-                </Text>
-                {/* Line 2: Context Line (Set • #Number • Year - pre-filtered) */}
-                {cardData.contextLine && (
-                  <Text style={reportStyles.cardLabelDetails}>
-                    {truncateText(cardData.contextLine, PDF_LIMITS.CARD_DETAILS)}
-                  </Text>
-                )}
-                {/* Line 3: Features Line (RC • Auto • /99) - Only if present */}
-                {cardData.featuresLine && (
-                  <Text style={reportStyles.cardLabelFeatures}>
-                    {truncateText(cardData.featuresLine, PDF_LIMITS.SPECIAL_FEATURES)}
-                  </Text>
-                )}
-                {/* Line 4: DCM Serial Number */}
-                <Text style={reportStyles.cardLabelSerial}>
-                  {cardData.serial}
-                </Text>
-              </View>
-              <View style={reportStyles.cardLabelRight}>
-                <Text style={reportStyles.cardLabelGrade}>
-                  {cardData.gradeFormatted}
-                </Text>
-                <View style={reportStyles.cardLabelDivider} />
-                <Text style={reportStyles.cardLabelConfidence}>
-                  {cardData.condition}
-                </Text>
-              </View>
+
+              {/* Purple Separator - matches slab divider on web */}
+              <View style={reportStyles.slabSeparator} />
+
+              {/* Front Image */}
+              <Image src={cardData.frontImageUrl} style={reportStyles.cardImage} />
             </View>
           </View>
-
-          {/* Front Image */}
-          <Image src={cardData.frontImageUrl} style={reportStyles.cardImage} />
 
           {/* Front Subgrades */}
           <View style={reportStyles.subgradesSection}>
@@ -255,54 +263,62 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
         <View style={reportStyles.columnHalf}>
           <Text style={reportStyles.columnHeader}>BACK</Text>
 
-          {/* Back Label - QR Code Centered OR Unified Label */}
-          <View style={reportStyles.cardLabelContainer}>
-            {cardData.qrCodeDataUrl ? (
-              <View style={reportStyles.qrCodeContainer}>
-                <Image src={cardData.qrCodeDataUrl} style={reportStyles.qrCodeImage} />
+          {/* Slab Container - Purple border wrapping label + separator + card image */}
+          <View style={reportStyles.slabOuterContainer}>
+            <View style={reportStyles.slabInnerContainer}>
+              {/* Back Label - QR Code Centered OR Unified Label */}
+              <View style={reportStyles.cardLabelContainer}>
+                {cardData.qrCodeDataUrl ? (
+                  <View style={reportStyles.qrCodeContainer}>
+                    <Image src={cardData.qrCodeDataUrl} style={reportStyles.qrCodeImage} />
+                  </View>
+                ) : (
+                  <View style={reportStyles.cardLabelRow}>
+                    <View style={reportStyles.cardLabelLeft}>
+                      <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
+                    </View>
+                    <View style={reportStyles.cardLabelCenter}>
+                      {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
+                      <Text style={reportStyles.cardLabelPlayerName}>
+                        {truncateText(cardData.primaryName, PDF_LIMITS.PLAYER_NAME)}
+                      </Text>
+                      {/* Line 2: Context Line (Set • #Number • Year - pre-filtered) */}
+                      {cardData.contextLine && (
+                        <Text style={reportStyles.cardLabelDetails}>
+                          {truncateText(cardData.contextLine, PDF_LIMITS.CARD_DETAILS)}
+                        </Text>
+                      )}
+                      {/* Line 3: Features Line (RC • Auto • /99) - Only if present */}
+                      {cardData.featuresLine && (
+                        <Text style={reportStyles.cardLabelFeatures}>
+                          {truncateText(cardData.featuresLine, PDF_LIMITS.SPECIAL_FEATURES)}
+                        </Text>
+                      )}
+                      {/* Line 4: DCM Serial Number */}
+                      <Text style={reportStyles.cardLabelSerial}>
+                        {cardData.serial}
+                      </Text>
+                    </View>
+                    <View style={reportStyles.cardLabelRight}>
+                      <Text style={reportStyles.cardLabelGrade}>
+                        {cardData.gradeFormatted}
+                      </Text>
+                      <View style={reportStyles.cardLabelDivider} />
+                      <Text style={reportStyles.cardLabelConfidence}>
+                        {cardData.condition}
+                      </Text>
+                    </View>
+                  </View>
+                )}
               </View>
-            ) : (
-              <View style={reportStyles.cardLabelRow}>
-                <View style={reportStyles.cardLabelLeft}>
-                  <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
-                </View>
-                <View style={reportStyles.cardLabelCenter}>
-                  {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
-                  <Text style={reportStyles.cardLabelPlayerName}>
-                    {truncateText(cardData.primaryName, PDF_LIMITS.PLAYER_NAME)}
-                  </Text>
-                  {/* Line 2: Context Line (Set • #Number • Year - pre-filtered) */}
-                  {cardData.contextLine && (
-                    <Text style={reportStyles.cardLabelDetails}>
-                      {truncateText(cardData.contextLine, PDF_LIMITS.CARD_DETAILS)}
-                    </Text>
-                  )}
-                  {/* Line 3: Features Line (RC • Auto • /99) - Only if present */}
-                  {cardData.featuresLine && (
-                    <Text style={reportStyles.cardLabelFeatures}>
-                      {truncateText(cardData.featuresLine, PDF_LIMITS.SPECIAL_FEATURES)}
-                    </Text>
-                  )}
-                  {/* Line 4: DCM Serial Number */}
-                  <Text style={reportStyles.cardLabelSerial}>
-                    {cardData.serial}
-                  </Text>
-                </View>
-                <View style={reportStyles.cardLabelRight}>
-                  <Text style={reportStyles.cardLabelGrade}>
-                    {cardData.gradeFormatted}
-                  </Text>
-                  <View style={reportStyles.cardLabelDivider} />
-                  <Text style={reportStyles.cardLabelConfidence}>
-                    {cardData.condition}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
 
-          {/* Back Image */}
-          <Image src={cardData.backImageUrl} style={reportStyles.cardImage} />
+              {/* Purple Separator - matches slab divider on web */}
+              <View style={reportStyles.slabSeparator} />
+
+              {/* Back Image */}
+              <Image src={cardData.backImageUrl} style={reportStyles.cardImage} />
+            </View>
+          </View>
 
           {/* Back Subgrades */}
           <View style={reportStyles.subgradesSection}>
