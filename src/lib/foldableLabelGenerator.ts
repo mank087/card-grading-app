@@ -17,6 +17,7 @@
  */
 
 import { jsPDF } from 'jspdf';
+import { extractAsciiSafe } from './labelDataGenerator';
 
 // Page dimensions (in inches, converted to points: 1 inch = 72 points)
 const INCH = 72;
@@ -451,6 +452,13 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
   const infoX = LABEL_X + 48;
   const infoMaxWidth = LABEL_WIDTH - 100;
 
+  // Use ASCII-safe text for jsPDF (CJK fonts not supported by default)
+  const safeCardName = extractAsciiSafe(data.cardName, 'Card');
+  const safeSetName = data.setName ? extractAsciiSafe(data.setName, '') : '';
+  const safeCardNumber = data.cardNumber ? extractAsciiSafe(data.cardNumber, '') : '';
+  const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';
+  const safeFeatures = data.specialFeatures ? extractAsciiSafe(data.specialFeatures, '') : '';
+
   // Line 1: Player/Character Name (dark text, bold, dynamic font size)
   doc.setTextColor(COLORS.textDark);
   doc.setFont('helvetica', 'bold');
@@ -458,16 +466,16 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
   // Dynamic font size for player name to fit without truncation
   let playerFontSize = 9;
   doc.setFontSize(playerFontSize);
-  while (doc.getTextWidth(data.cardName) > infoMaxWidth && playerFontSize > 5) {
+  while (doc.getTextWidth(safeCardName) > infoMaxWidth && playerFontSize > 5) {
     playerFontSize -= 0.5;
     doc.setFontSize(playerFontSize);
   }
-  doc.text(data.cardName, infoX, headerY + 13);
+  doc.text(safeCardName, infoX, headerY + 13);
 
   // Line 2: Set Name • Card Number • Year (gray text, with wrapping if needed)
   doc.setTextColor(COLORS.textMedium);
   doc.setFont('helvetica', 'normal');
-  const setInfo = [data.setName, data.cardNumber, data.year].filter(Boolean).join(' • ');
+  const setInfo = [safeSetName, safeCardNumber, safeYear].filter(Boolean).join(' • ');
 
   // Start with font size 6, shrink if needed, then wrap if still too long
   let setFontSize = 6;
@@ -493,11 +501,11 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
 
   // Line 3: Special features (if any) - blue text
   let line3Y = currentY + 10;
-  if (data.specialFeatures) {
+  if (safeFeatures) {
     doc.setTextColor('#2563eb'); // Blue-600
     doc.setFontSize(5.5);
     doc.setFont('helvetica', 'bold');
-    doc.text(data.specialFeatures, infoX, line3Y);
+    doc.text(safeFeatures, infoX, line3Y);
     line3Y += 9;
   }
 

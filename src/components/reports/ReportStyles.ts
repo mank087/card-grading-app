@@ -56,11 +56,14 @@ export const reportStyles = StyleSheet.create({
   },
 
   // Slab outer container - simulates metallic purple gradient border
+  // Centered with max width to maintain card-like proportions
   slabOuterContainer: {
     backgroundColor: '#7c3aed', // Purple-600 base (simulates metallic gradient)
     borderRadius: 6,
-    padding: 3, // This creates the "border" effect
+    padding: 2, // This creates the "border" effect
     marginBottom: 4,
+    alignSelf: 'center',
+    width: '95%', // Slightly narrower than full column
   },
 
   // Slab inner container - white background for content
@@ -186,8 +189,9 @@ export const reportStyles = StyleSheet.create({
 
   cardImage: {
     width: '100%',
-    height: 190,  // Reduced from 200 to compensate for larger fonts
+    height: 180,  // Slightly reduced for better proportions
     objectFit: 'contain',
+    objectPosition: 'center',
   },
 
   // Grade box (purple gradient box matching detail page) - Reduced height for single page fit

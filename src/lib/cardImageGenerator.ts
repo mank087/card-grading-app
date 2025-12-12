@@ -11,6 +11,7 @@
  */
 
 import { generateQRCodeWithLogo, loadLogoAsBase64 } from './foldableLabelGenerator';
+import { extractAsciiSafe } from './labelDataGenerator';
 
 // Canvas dimensions - card ratio 2.5" x 3.5" (standard trading card)
 // Label adds ~110px height at 400px width scale
@@ -251,22 +252,28 @@ async function drawFrontLabel(
   };
 
   // Line 1: Card Name (bold, larger) - increased from 28 to 32
+  // Use ASCII-safe text for Canvas rendering (CJK characters not supported)
+  const safeCardName = extractAsciiSafe(data.cardName, 'Card');
   ctx.fillStyle = COLORS.textDark;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
   let nameFontSize = 32;
   ctx.font = `bold ${nameFontSize}px 'Helvetica Neue', Arial, sans-serif`;
-  while (ctx.measureText(data.cardName).width > infoMaxWidth && nameFontSize > 18) {
+  while (ctx.measureText(safeCardName).width > infoMaxWidth && nameFontSize > 18) {
     nameFontSize -= 2;
     ctx.font = `bold ${nameFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   }
-  ctx.fillText(data.cardName, infoX, currentY);
+  ctx.fillText(safeCardName, infoX, currentY);
   currentY += nameFontSize + 6;
 
   // Line 2: Set Name - Card # - Year (with wrapping) - increased from 20 to 24
+  // Use ASCII-safe versions for all text
   ctx.fillStyle = COLORS.textMedium;
-  const setInfo = [data.setName, data.cardNumber, data.year].filter(Boolean).join(' \u2022 ');
+  const safeSetName = data.setName ? extractAsciiSafe(data.setName, '') : '';
+  const safeCardNumber = data.cardNumber ? extractAsciiSafe(data.cardNumber, '') : '';
+  const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';
+  const setInfo = [safeSetName, safeCardNumber, safeYear].filter(Boolean).join(' \u2022 ');
 
   const setFontSize = 24;
   const setLines = wrapText(setInfo, infoMaxWidth, setFontSize);
@@ -279,10 +286,13 @@ async function drawFrontLabel(
 
   // Line 3: Special Features (if present) - increased from 18 to 20
   if (data.specialFeatures) {
-    ctx.fillStyle = COLORS.featureBlue;
-    ctx.font = 'bold 20px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(data.specialFeatures, infoX, currentY);
-    currentY += 26;
+    const safeFeatures = extractAsciiSafe(data.specialFeatures, '');
+    if (safeFeatures) {
+      ctx.fillStyle = COLORS.featureBlue;
+      ctx.font = 'bold 20px "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText(safeFeatures, infoX, currentY);
+      currentY += 26;
+    }
   }
 
   // Line 4: Serial Number - increased from 16 to 18

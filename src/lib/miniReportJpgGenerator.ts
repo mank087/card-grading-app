@@ -5,9 +5,13 @@
  * suitable for eBay listings, auction photos, and social media.
  *
  * Output: 750 x 1050 pixels (300 DPI equivalent for 2.5" x 3.5")
+ *
+ * NOTE: Canvas API does not support CJK fonts by default.
+ * Japanese/Chinese/Korean characters are converted to ASCII-safe equivalents.
  */
 
 import { FoldableLabelData } from './foldableLabelGenerator';
+import { extractAsciiSafe } from './labelDataGenerator';
 
 // Canvas dimensions (300 DPI equivalent)
 const CANVAS_WIDTH = 750;   // 2.5" at 300 DPI
@@ -312,21 +316,27 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   const infoMaxWidth = gradeAreaStart - infoX - 20; // Leave 20px padding before grade
 
   // Line 1: Card Name (dark, bold, dynamic font size)
+  // Use ASCII-safe text for Canvas rendering (CJK characters not supported)
+  const safeCardName = extractAsciiSafe(data.cardName, 'Pokemon Card');
   ctx.fillStyle = COLORS.textDark;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
 
   let playerFontSize = 32;
   ctx.font = `bold ${playerFontSize}px 'Helvetica Neue', Arial, sans-serif`;
-  while (ctx.measureText(data.cardName).width > infoMaxWidth && playerFontSize > 18) {
+  while (ctx.measureText(safeCardName).width > infoMaxWidth && playerFontSize > 18) {
     playerFontSize -= 2;
     ctx.font = `bold ${playerFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   }
-  ctx.fillText(data.cardName, infoX, innerHeaderY + 18);
+  ctx.fillText(safeCardName, infoX, innerHeaderY + 18);
 
   // Line 2: Set Name • Card Number • Year
+  // Use ASCII-safe versions for all text
   ctx.fillStyle = COLORS.textMedium;
-  const setInfo = [data.setName, data.cardNumber, data.year].filter(Boolean).join(' • ');
+  const safeSetName = data.setName ? extractAsciiSafe(data.setName, '') : '';
+  const safeCardNumber = data.cardNumber ? extractAsciiSafe(data.cardNumber, '') : '';
+  const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';
+  const setInfo = [safeSetName, safeCardNumber, safeYear].filter(Boolean).join(' • ');
 
   let setFontSize = 20;
   ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
@@ -347,10 +357,13 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
 
   // Line 3: Special features (if any) - blue text
   if (data.specialFeatures) {
-    ctx.fillStyle = COLORS.featureBlue;
-    ctx.font = 'bold 18px "Helvetica Neue", Arial, sans-serif';
-    ctx.fillText(data.specialFeatures, infoX, currentY);
-    currentY += 24;
+    const safeFeatures = extractAsciiSafe(data.specialFeatures, '');
+    if (safeFeatures) {
+      ctx.fillStyle = COLORS.featureBlue;
+      ctx.font = 'bold 18px "Helvetica Neue", Arial, sans-serif';
+      ctx.fillText(safeFeatures, infoX, currentY);
+      currentY += 24;
+    }
   }
 
   // Line 4: Serial number (gray, monospace style)
@@ -448,11 +461,13 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   ctx.fillText('OVERALL CARD CONDITION SUMMARY', 16 + summaryPadding, summaryY + 16);
 
   // Summary text (wrapped)
+  // Use ASCII-safe text for Canvas rendering
+  const safeSummary = extractAsciiSafe(data.overallSummary, 'Card condition analysis not available.');
   ctx.fillStyle = COLORS.textDark;
   ctx.font = `${20}px 'Helvetica Neue', Arial, sans-serif`;
 
   const summaryMaxWidth = CANVAS_WIDTH - 80;
-  const summaryLines = wrapText(ctx, data.overallSummary, summaryMaxWidth);
+  const summaryLines = wrapText(ctx, safeSummary, summaryMaxWidth);
   const maxLines = 8;
   const displayLines = summaryLines.slice(0, maxLines);
 

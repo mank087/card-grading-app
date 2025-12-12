@@ -22,6 +22,45 @@
 import { getConditionFromGrade } from './conditionAssessment';
 
 // ============================================================================
+// CJK/UNICODE HANDLING FOR PDF/CANVAS
+// ============================================================================
+
+/**
+ * Extract ASCII-safe text for PDF/Canvas generators that don't support CJK fonts.
+ * Keeps alphanumeric, common punctuation, and spaces.
+ * Removes Japanese/Chinese/Korean characters and other Unicode.
+ *
+ * For cards with Japanese names like "メガゲンガーEX", this extracts "EX".
+ * For "Mega Gengar EX", it keeps the full name.
+ *
+ * @param text - Input text that may contain CJK characters
+ * @param fallback - Fallback text if result is empty (default: "Card")
+ * @returns ASCII-safe string
+ */
+export function extractAsciiSafe(text: string, fallback: string = 'Card'): string {
+  if (!text) return fallback;
+
+  // Keep ASCII letters, numbers, common punctuation, and spaces
+  // This regex removes CJK characters (Japanese hiragana, katakana, kanji, etc.)
+  const asciiOnly = text
+    .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
+    .replace(/\s+/g, ' ')         // Normalize whitespace
+    .trim();
+
+  // If nothing left, return fallback
+  return asciiOnly || fallback;
+}
+
+/**
+ * Check if text contains CJK (Chinese/Japanese/Korean) characters
+ */
+export function containsCJK(text: string): boolean {
+  if (!text) return false;
+  // Japanese Hiragana, Katakana, CJK Unified Ideographs, Hangul
+  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uAC00-\uD7AF]/.test(text);
+}
+
+// ============================================================================
 // TYPES
 // ============================================================================
 

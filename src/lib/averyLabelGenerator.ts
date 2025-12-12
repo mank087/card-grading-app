@@ -15,6 +15,7 @@
 
 import { jsPDF } from 'jspdf';
 import { FoldableLabelData } from './foldableLabelGenerator';
+import { extractAsciiSafe } from './labelDataGenerator';
 
 // Page dimensions (in points: 1 inch = 72 points)
 const INCH = 72;
@@ -260,25 +261,32 @@ function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition,
   const line2Y = line3Y - lineHeight;              // Set info
   const line1Y = line2Y - lineHeight;              // Card name
 
+  // Use ASCII-safe text for jsPDF (CJK fonts not supported by default)
+  const safeCardName = extractAsciiSafe(data.cardName, 'Card');
+  const safeSetName = data.setName ? extractAsciiSafe(data.setName, '') : '';
+  const safeCardNumber = data.cardNumber ? extractAsciiSafe(data.cardNumber, '') : '';
+  const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';
+  const safeFeatures = data.specialFeatures ? extractAsciiSafe(data.specialFeatures, '') : '';
+
   // Line 1: Player/Card Name (bold) - dynamic font size, starts larger
   doc.setTextColor(COLORS.textDark);
   doc.setFont('helvetica', 'bold');
-  fitTextToWidth(doc, data.cardName, cardInfoWidth, 7, 4);  // Start at 7pt, min 4pt
-  doc.text(data.cardName, cardInfoX, line1Y);
+  fitTextToWidth(doc, safeCardName, cardInfoWidth, 7, 4);  // Start at 7pt, min 4pt
+  doc.text(safeCardName, cardInfoX, line1Y);
 
   // Line 2: Set Name • Card Number • Year - dynamic font size
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(COLORS.textMedium);
-  const setInfo = [data.setName, data.cardNumber, data.year].filter(Boolean).join(' • ');
+  const setInfo = [safeSetName, safeCardNumber, safeYear].filter(Boolean).join(' • ');
   fitTextToWidth(doc, setInfo, cardInfoWidth, 6, 3.5);  // Start at 6pt, min 3.5pt
   doc.text(setInfo, cardInfoX, line2Y);
 
   // Line 3: Special features (if any) - blue text, dynamic font size
-  if (data.specialFeatures) {
+  if (safeFeatures) {
     doc.setTextColor(COLORS.blue);
     doc.setFont('helvetica', 'bold');
-    fitTextToWidth(doc, data.specialFeatures, cardInfoWidth, 6, 3.5);  // Start at 6pt, min 3.5pt
-    doc.text(data.specialFeatures, cardInfoX, line3Y);
+    fitTextToWidth(doc, safeFeatures, cardInfoWidth, 6, 3.5);  // Start at 6pt, min 3.5pt
+    doc.text(safeFeatures, cardInfoX, line3Y);
   }
 
   // Line 4: Serial number - bold for visibility
