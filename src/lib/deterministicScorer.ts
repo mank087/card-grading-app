@@ -328,6 +328,16 @@ function calculateCenteringDeductions(centering: any): { deductions: number; det
 }
 
 /**
+ * Severe damage detection result
+ */
+interface SevereDamageResult {
+  hasDamage: boolean;
+  damageType: string;
+  tier: number;  // 1=structural (4.0), 2=severe surface (5.0), 3=severe edge/corner (5.5), 4=cumulative heavy (6.0)
+  gradeCap: number;
+}
+
+/**
  * Check for structural damage (creases, bent corners)
  * Returns true if structural damage found (auto-cap at 4.0)
  */
@@ -375,38 +385,216 @@ function checkStructuralDamage(defects: any): { hasDamage: boolean; damageType: 
 }
 
 /**
+ * Check for severe damage across all tiers (v5.14)
+ * Tier 1: Structural (4.0) - creases, tears, warping
+ * Tier 2: Severe Surface (5.0) - cardstock exposure, deep scratches, ink loss
+ * Tier 3: Severe Edge/Corner (5.5) - continuous chipping >25%, heavy rounding 3+ corners
+ * Tier 4: Cumulative Heavy (6.0) - multiple heavy defects
+ */
+function checkSevereDamage(defects: any): SevereDamageResult {
+  if (!defects) {
+    return { hasDamage: false, damageType: '', tier: 0, gradeCap: 10.0 };
+  }
+
+  const damages: SevereDamageResult[] = [];
+
+  // Helper to check text for keywords
+  const containsKeywords = (text: string | undefined, keywords: string[]): boolean => {
+    if (!text) return false;
+    const lower = text.toLowerCase();
+    return keywords.some(kw => lower.includes(kw));
+  };
+
+  // Collect all descriptions for analysis
+  const allDescriptions: string[] = [];
+
+  // Gather corner descriptions
+  const cornerLocations = ['top_left', 'top_right', 'bottom_left', 'bottom_right'];
+  for (const side of ['front', 'back']) {
+    for (const loc of cornerLocations) {
+      const corner = defects[side]?.corners?.[loc];
+      if (corner?.description) allDescriptions.push(corner.description);
+    }
+  }
+
+  // Gather edge descriptions
+  const edgeLocations = ['top', 'bottom', 'left', 'right'];
+  for (const side of ['front', 'back']) {
+    for (const loc of edgeLocations) {
+      const edge = defects[side]?.edges?.[loc];
+      if (edge?.description) allDescriptions.push(edge.description);
+    }
+  }
+
+  // Gather surface descriptions
+  for (const side of ['front', 'back']) {
+    const surface = defects[side]?.surface;
+    if (surface?.scratches?.description) allDescriptions.push(surface.scratches.description);
+    if (surface?.print_defects?.description) allDescriptions.push(surface.print_defects.description);
+    if (surface?.stains?.description) allDescriptions.push(surface.stains.description);
+    if (surface?.other?.description) allDescriptions.push(surface.other.description);
+  }
+
+  const fullText = allDescriptions.join(' ').toLowerCase();
+
+  // TIER 1: Structural Damage (Cap at 4.0)
+  // Check for creases
+  if (defects.front?.surface?.creases?.severity && defects.front.surface.creases.severity !== 'none') {
+    damages.push({ hasDamage: true, damageType: 'Crease detected (front)', tier: 1, gradeCap: 4.0 });
+  }
+  if (defects.back?.surface?.creases?.severity && defects.back.surface.creases.severity !== 'none') {
+    damages.push({ hasDamage: true, damageType: 'Crease detected (back)', tier: 1, gradeCap: 4.0 });
+  }
+
+  // Check for tears/rips (Cap at 3.0)
+  if (containsKeywords(fullText, ['tear', 'rip', 'torn', 'missing piece', 'paper loss', 'chunk missing'])) {
+    damages.push({ hasDamage: true, damageType: 'Tear/paper loss detected', tier: 1, gradeCap: 3.0 });
+  }
+
+  // Check for bent/warped
+  if (containsKeywords(fullText, ['bent', 'folded', 'warped', 'curved', 'bowed', 'does not lie flat'])) {
+    damages.push({ hasDamage: true, damageType: 'Bent/warped card detected', tier: 1, gradeCap: 4.0 });
+  }
+
+  // TIER 2: Severe Surface Damage (Cap at 5.0)
+  if (containsKeywords(fullText, ['cardstock exposed', 'cardstock visible', 'white core', 'paper layer visible', 'core visible'])) {
+    damages.push({ hasDamage: true, damageType: 'Cardstock/core exposure detected', tier: 2, gradeCap: 5.0 });
+  }
+  if (containsKeywords(fullText, ['deep scratch', 'through coating', 'into cardstock', 'gouged'])) {
+    damages.push({ hasDamage: true, damageType: 'Deep scratch through coating', tier: 2, gradeCap: 5.0 });
+  }
+  if (containsKeywords(fullText, ['ink loss', 'coating loss', 'color missing', 'delamination', 'peeling', 'layers separating'])) {
+    damages.push({ hasDamage: true, damageType: 'Ink/coating loss or delamination', tier: 2, gradeCap: 5.0 });
+  }
+
+  // TIER 3: Severe Edge/Corner Damage (Cap at 5.5)
+  // Check for continuous/extensive chipping
+  if (containsKeywords(fullText, ['continuous chipping', 'nearly continuous', 'extensive chipping'])) {
+    damages.push({ hasDamage: true, damageType: 'Continuous/extensive chipping detected', tier: 3, gradeCap: 5.5 });
+  }
+  // Check for percentage-based chipping
+  const chippingMatch = fullText.match(/(\d{2,3})%.*chipping|chipping.*(\d{2,3})%/);
+  if (chippingMatch) {
+    const percentage = parseInt(chippingMatch[1] || chippingMatch[2]);
+    if (percentage >= 25) {
+      damages.push({ hasDamage: true, damageType: `${percentage}% edge chipping detected`, tier: 3, gradeCap: 5.5 });
+    }
+  }
+
+  // Check for large fiber exposure (>0.5mm)
+  const fiberMatch = fullText.match(/(\d+\.?\d*)\s*mm.*(?:fiber|white|exposure|cardstock)|(?:fiber|white|exposure|cardstock).*(\d+\.?\d*)\s*mm/);
+  if (fiberMatch) {
+    const size = parseFloat(fiberMatch[1] || fiberMatch[2]);
+    if (size >= 0.5) {
+      damages.push({ hasDamage: true, damageType: `Large fiber exposure (${size}mm) detected`, tier: 3, gradeCap: 5.5 });
+    }
+  }
+
+  // Count heavy corners
+  let heavyCornerCount = 0;
+  for (const side of ['front', 'back']) {
+    for (const loc of cornerLocations) {
+      const corner = defects[side]?.corners?.[loc];
+      if (corner?.severity?.toLowerCase() === 'heavy') {
+        heavyCornerCount++;
+      }
+      // Also check description for heavy indicators
+      if (corner?.description && containsKeywords(corner.description, ['heavy rounding', 'heavy whitening', 'blunted', 'significant rounding'])) {
+        heavyCornerCount++;
+      }
+    }
+  }
+  if (heavyCornerCount >= 3) {
+    damages.push({ hasDamage: true, damageType: `Heavy damage on ${heavyCornerCount} corners`, tier: 3, gradeCap: 5.5 });
+  }
+
+  // TIER 4: Cumulative Heavy Damage (Cap at 6.0)
+  let heavyDefectCount = 0;
+  let categoriesWithHeavy = new Set<string>();
+  let sidesWithHeavy = new Set<string>();
+
+  for (const side of ['front', 'back']) {
+    // Check corners
+    for (const loc of cornerLocations) {
+      const corner = defects[side]?.corners?.[loc];
+      if (corner?.severity?.toLowerCase() === 'heavy') {
+        heavyDefectCount++;
+        categoriesWithHeavy.add('corners');
+        sidesWithHeavy.add(side);
+      }
+    }
+    // Check edges
+    for (const loc of edgeLocations) {
+      const edge = defects[side]?.edges?.[loc];
+      if (edge?.severity?.toLowerCase() === 'heavy') {
+        heavyDefectCount++;
+        categoriesWithHeavy.add('edges');
+        sidesWithHeavy.add(side);
+      }
+    }
+    // Check surface
+    const surface = defects[side]?.surface;
+    if (surface?.scratches?.severity?.toLowerCase() === 'heavy') {
+      heavyDefectCount++;
+      categoriesWithHeavy.add('surface');
+      sidesWithHeavy.add(side);
+    }
+    if (surface?.print_defects?.severity?.toLowerCase() === 'heavy') {
+      heavyDefectCount++;
+      categoriesWithHeavy.add('surface');
+      sidesWithHeavy.add(side);
+    }
+    if (surface?.stains?.severity?.toLowerCase() === 'heavy') {
+      heavyDefectCount++;
+      categoriesWithHeavy.add('surface');
+      sidesWithHeavy.add(side);
+    }
+  }
+
+  if (categoriesWithHeavy.size >= 3) {
+    damages.push({ hasDamage: true, damageType: `Heavy defects in ${categoriesWithHeavy.size} categories`, tier: 4, gradeCap: 6.0 });
+  }
+  if (heavyDefectCount >= 4) {
+    damages.push({ hasDamage: true, damageType: `${heavyDefectCount} individual heavy defects`, tier: 4, gradeCap: 6.0 });
+  }
+  if (sidesWithHeavy.size >= 2) {
+    damages.push({ hasDamage: true, damageType: 'Heavy defects on both front AND back', tier: 4, gradeCap: 6.0 });
+  }
+
+  // Return the most severe damage (lowest grade cap)
+  if (damages.length === 0) {
+    return { hasDamage: false, damageType: '', tier: 0, gradeCap: 10.0 };
+  }
+
+  // Sort by grade cap (ascending) to get the most severe
+  damages.sort((a, b) => a.gradeCap - b.gradeCap);
+
+  // Combine damage descriptions for the same tier
+  const lowestCap = damages[0].gradeCap;
+  const relevantDamages = damages.filter(d => d.gradeCap === lowestCap);
+  const combinedType = relevantDamages.map(d => d.damageType).join('; ');
+
+  return {
+    hasDamage: true,
+    damageType: combinedType,
+    tier: damages[0].tier,
+    gradeCap: lowestCap
+  };
+}
+
+/**
  * Main scoring function
  * Calculates deterministic grade from defect data
+ *
+ * v5.14: Added comprehensive severe damage detection with tiered grade caps
  */
 export function calculateDeterministicGrade(result: any): ScoringBreakdown {
   const BASE_SCORE = 10.0;
 
-  // Check for structural damage first
-  const structuralCheck = checkStructuralDamage(result.defects);
+  // v5.14: Check for ALL severe damage tiers (not just structural)
+  const severeDamageCheck = checkSevereDamage(result.defects);
 
-  if (structuralCheck.hasDamage) {
-    // Structural damage - auto-cap at 4.0
-    return {
-      base_score: BASE_SCORE,
-      corner_deductions: 0,
-      corner_details: [],
-      edge_deductions: 0,
-      edge_details: [],
-      surface_deductions: 0,
-      surface_details: [],
-      centering_deductions: 0,
-      centering_details: [],
-      structural_damage: true,
-      structural_damage_type: structuralCheck.damageType,
-      total_deductions: 6.0, // Conceptually, structural damage is a massive deduction
-      calculated_grade: 4.0,
-      final_grade: 4.0,
-      grade_explanation: `STRUCTURAL DAMAGE: ${structuralCheck.damageType}. Automatic grade cap at 4.0. ` +
-                         `Cards with creases or bent corners cannot receive grades above 4.0 per industry standards.`
-    };
-  }
-
-  // Calculate deductions for each category
+  // Calculate deductions for each category (we need these even with damage caps)
   const corners = calculateCornerDeductions(result.defects);
   const edges = calculateEdgeDeductions(result.defects);
   const surface = calculateSurfaceDeductions(result.defects);
@@ -431,16 +619,33 @@ export function calculateDeterministicGrade(result: any): ScoringBreakdown {
   }
 
   const totalDeductions = corners.deductions + edges.deductions + surface.deductions + centering.deductions + cumulativePenalty;
-  const calculatedGrade = Math.max(1.0, BASE_SCORE - totalDeductions); // Never below 1.0
+  let calculatedGrade = Math.max(1.0, BASE_SCORE - totalDeductions); // Never below 1.0
 
   // Round to nearest 0.5
-  const finalGrade = Math.round(calculatedGrade * 2) / 2;
+  let finalGrade = Math.round(calculatedGrade * 2) / 2;
+
+  // v5.14: Apply severe damage cap if detected
+  let severeDamageNote = '';
+  if (severeDamageCheck.hasDamage) {
+    const tierNames = ['', 'Structural', 'Severe Surface', 'Severe Edge/Corner', 'Cumulative Heavy'];
+    const tierName = tierNames[severeDamageCheck.tier] || 'Unknown';
+
+    if (finalGrade > severeDamageCheck.gradeCap) {
+      console.log(`[Deterministic Scorer] SEVERE DAMAGE CAP APPLIED: Tier ${severeDamageCheck.tier} (${tierName}) - ${severeDamageCheck.damageType}. Capping grade from ${finalGrade} to ${severeDamageCheck.gradeCap}`);
+      finalGrade = severeDamageCheck.gradeCap;
+      calculatedGrade = Math.min(calculatedGrade, severeDamageCheck.gradeCap);
+      severeDamageNote = ` SEVERE DAMAGE CAP APPLIED (Tier ${severeDamageCheck.tier} - ${tierName}): ${severeDamageCheck.damageType}. Maximum grade: ${severeDamageCheck.gradeCap}.`;
+    } else {
+      // Grade already below cap, just note the damage
+      severeDamageNote = ` Severe damage detected (Tier ${severeDamageCheck.tier} - ${tierName}): ${severeDamageCheck.damageType}. Grade cap: ${severeDamageCheck.gradeCap} (not applied, grade already lower).`;
+    }
+  }
 
   // Build explanation
   const gradeExplanation = `Grade calculated from base 10.0 with ${totalDeductions.toFixed(2)} points in deductions: ` +
     `Corners (-${corners.deductions.toFixed(2)}), Edges (-${edges.deductions.toFixed(2)}), ` +
     `Surface (-${surface.deductions.toFixed(2)}), Centering (-${centering.deductions.toFixed(2)}).` +
-    `${cumulativePenaltyNote} ` +
+    `${cumulativePenaltyNote}${severeDamageNote} ` +
     `Calculated: ${calculatedGrade.toFixed(2)}, Final: ${finalGrade} (rounded to nearest 0.5).`;
 
   return {
@@ -453,7 +658,8 @@ export function calculateDeterministicGrade(result: any): ScoringBreakdown {
     surface_details: surface.details,
     centering_deductions: centering.deductions,
     centering_details: centering.details,
-    structural_damage: false,
+    structural_damage: severeDamageCheck.hasDamage && severeDamageCheck.tier <= 2, // Tier 1-2 are "structural" level
+    structural_damage_type: severeDamageCheck.hasDamage ? severeDamageCheck.damageType : undefined,
     total_deductions: totalDeductions,
     calculated_grade: calculatedGrade,
     final_grade: finalGrade,
