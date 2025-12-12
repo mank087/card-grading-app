@@ -262,7 +262,8 @@ function drawLabel(doc: jsPDF, data: FoldableLabelData, position: LabelPosition,
   const line1Y = line2Y - lineHeight;              // Card name
 
   // Use ASCII-safe text for jsPDF (CJK fonts not supported by default)
-  const safeCardName = extractAsciiSafe(data.cardName, 'Card');
+  // Pass englishName as fallback for Japanese/Chinese/Korean cards
+  const safeCardName = extractAsciiSafe(data.cardName, 'Card', data.englishName);
   const safeSetName = data.setName ? extractAsciiSafe(data.setName, '') : '';
   const safeCardNumber = data.cardNumber ? extractAsciiSafe(data.cardNumber, '') : '';
   const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';

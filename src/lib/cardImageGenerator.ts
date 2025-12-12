@@ -58,6 +58,8 @@ export interface CardImageData {
   cardUrl: string;
   frontImageUrl: string;
   backImageUrl: string;
+  // English fallback for CJK card names (e.g., "Mega Gengar EX" for Japanese cards)
+  englishName?: string;
 }
 
 /**
@@ -253,7 +255,8 @@ async function drawFrontLabel(
 
   // Line 1: Card Name (bold, larger) - increased from 28 to 32
   // Use ASCII-safe text for Canvas rendering (CJK characters not supported)
-  const safeCardName = extractAsciiSafe(data.cardName, 'Card');
+  // Pass englishName as fallback for Japanese/Chinese/Korean cards
+  const safeCardName = extractAsciiSafe(data.cardName, 'Card', data.englishName);
   ctx.fillStyle = COLORS.textDark;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';

@@ -505,6 +505,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Build label data using cleaned values from labelDataGenerator
       // Pass individual fields, not contextLine (generators join internally)
+      // Get English fallback name for CJK cards from featured/pokemon_featured
+      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
+
       const labelData: FoldableLabelData = {
         cardName: cleanLabelData.primaryName,
         setName: cleanLabelData.setName || '', // Individual set name, not contextLine
@@ -512,6 +515,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
+        englishName, // Fallback for Japanese/Chinese/Korean card names
         grade: cleanLabelData.grade ?? 0,
         conditionLabel: cleanLabelData.condition,
         subgrades: {
@@ -611,6 +615,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Build label data using cleaned values from labelDataGenerator
       // Pass individual fields, not contextLine (generators join internally)
+      // Get English fallback name for CJK cards from featured/pokemon_featured
+      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
+
       const labelData: FoldableLabelData = {
         cardName: cleanLabelData.primaryName,
         setName: cleanLabelData.setName || '', // Individual set name, not contextLine
@@ -618,6 +625,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
+        englishName, // Fallback for Japanese/Chinese/Korean card names
         grade: cleanLabelData.grade ?? 0,
         conditionLabel: cleanLabelData.condition,
         subgrades: {
@@ -721,6 +729,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Build card image data using cleaned values from labelDataGenerator
       // Pass individual fields, not contextLine (cardImageGenerator joins internally)
+      // Get English fallback name for CJK cards from featured/pokemon_featured
+      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
+
       const cardImageData: CardImageData = {
         cardName: cleanLabelData.primaryName,
         setName: cleanLabelData.setName || '', // Individual set name, not contextLine
@@ -728,6 +739,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
+        englishName, // Fallback for Japanese/Chinese/Korean card names
         grade: cleanLabelData.grade ?? 0,
         conditionLabel: cleanLabelData.condition,
         cardUrl: `${window.location.origin}/${cardType}/${card.id}`,
@@ -837,6 +849,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // Pass individual fields, not contextLine (generators join internally)
       // Use the rotated QR code for Avery labels (appears upside down when printed,
       // right-side up when label is folded over the back of a one-touch slab)
+      // Get English fallback name for CJK cards from featured/pokemon_featured
+      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
+
       const labelData: FoldableLabelData = {
         cardName: cleanLabelData.primaryName,
         setName: cleanLabelData.setName || '', // Individual set name, not contextLine
@@ -844,6 +859,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
+        englishName, // Fallback for Japanese/Chinese/Korean card names
         grade: cleanLabelData.grade ?? 0,
         conditionLabel: cleanLabelData.condition,
         subgrades: {

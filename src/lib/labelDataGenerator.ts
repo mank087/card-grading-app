@@ -26,38 +26,61 @@ import { getConditionFromGrade } from './conditionAssessment';
 // ============================================================================
 
 /**
- * Extract ASCII-safe text for PDF/Canvas generators that don't support CJK fonts.
- * Keeps alphanumeric, common punctuation, and spaces.
- * Removes Japanese/Chinese/Korean characters and other Unicode.
- *
- * For cards with Japanese names like "メガゲンガーEX", this extracts "EX".
- * For "Mega Gengar EX", it keeps the full name.
- *
- * @param text - Input text that may contain CJK characters
- * @param fallback - Fallback text if result is empty (default: "Card")
- * @returns ASCII-safe string
- */
-export function extractAsciiSafe(text: string, fallback: string = 'Card'): string {
-  if (!text) return fallback;
-
-  // Keep ASCII letters, numbers, common punctuation, and spaces
-  // This regex removes CJK characters (Japanese hiragana, katakana, kanji, etc.)
-  const asciiOnly = text
-    .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII
-    .replace(/\s+/g, ' ')         // Normalize whitespace
-    .trim();
-
-  // If nothing left, return fallback
-  return asciiOnly || fallback;
-}
-
-/**
  * Check if text contains CJK (Chinese/Japanese/Korean) characters
  */
 export function containsCJK(text: string): boolean {
   if (!text) return false;
   // Japanese Hiragana, Katakana, CJK Unified Ideographs, Hangul
   return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uAC00-\uD7AF]/.test(text);
+}
+
+/**
+ * Extract ASCII-safe text for PDF/Canvas generators that don't support CJK fonts.
+ *
+ * Strategy:
+ * 1. If text has no CJK, return as-is
+ * 2. If text has CJK mixed with ASCII (like "メガゲンガーEX"), extract ASCII portion
+ * 3. If only CJK and englishFallback provided, use that with " - Japanese" suffix
+ * 4. Otherwise use generic fallback
+ *
+ * @param text - Input text that may contain CJK characters
+ * @param fallback - Fallback text if result is empty (default: "Card")
+ * @param englishFallback - Optional English name to use for CJK-only text
+ * @returns ASCII-safe string
+ */
+export function extractAsciiSafe(
+  text: string,
+  fallback: string = 'Card',
+  englishFallback?: string
+): string {
+  if (!text) return englishFallback || fallback;
+
+  // If no CJK characters, return the text as-is (just clean it)
+  if (!containsCJK(text)) {
+    return text.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim() || fallback;
+  }
+
+  // Text contains CJK - try to extract ASCII portion
+  const asciiOnly = text
+    .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII (including CJK)
+    .replace(/\s+/g, ' ')         // Normalize whitespace
+    .trim();
+
+  // If we got something meaningful (more than just punctuation), use it
+  if (asciiOnly && asciiOnly.length > 1 && /[a-zA-Z0-9]/.test(asciiOnly)) {
+    return asciiOnly;
+  }
+
+  // No ASCII portion - use English fallback if provided
+  if (englishFallback && englishFallback.trim()) {
+    const cleanFallback = englishFallback.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
+    if (cleanFallback) {
+      return `${cleanFallback} - Japanese`;
+    }
+  }
+
+  // Last resort - use generic fallback
+  return fallback;
 }
 
 // ============================================================================

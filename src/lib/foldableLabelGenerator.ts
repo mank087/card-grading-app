@@ -72,6 +72,10 @@ export interface FoldableLabelData {
   specialFeatures?: string;  // "RC • Auto • /99"
   serial: string;            // DCM-XXXXXXXX
 
+  // English fallback for CJK card names (e.g., "Mega Gengar EX" for Japanese cards)
+  // Used when cardName contains Japanese/Chinese/Korean characters
+  englishName?: string;
+
   // Grade information
   grade: number | string;
   conditionLabel: string;    // "Gem Mint", "Mint", etc.
@@ -453,7 +457,8 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
   const infoMaxWidth = LABEL_WIDTH - 100;
 
   // Use ASCII-safe text for jsPDF (CJK fonts not supported by default)
-  const safeCardName = extractAsciiSafe(data.cardName, 'Card');
+  // Pass englishName as fallback for Japanese/Chinese/Korean cards
+  const safeCardName = extractAsciiSafe(data.cardName, 'Card', data.englishName);
   const safeSetName = data.setName ? extractAsciiSafe(data.setName, '') : '';
   const safeCardNumber = data.cardNumber ? extractAsciiSafe(data.cardNumber, '') : '';
   const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';

@@ -317,7 +317,8 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
 
   // Line 1: Card Name (dark, bold, dynamic font size)
   // Use ASCII-safe text for Canvas rendering (CJK characters not supported)
-  const safeCardName = extractAsciiSafe(data.cardName, 'Pokemon Card');
+  // Pass englishName as fallback for Japanese/Chinese/Korean cards
+  const safeCardName = extractAsciiSafe(data.cardName, 'Card', data.englishName);
   ctx.fillStyle = COLORS.textDark;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
