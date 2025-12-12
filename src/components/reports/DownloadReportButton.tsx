@@ -17,6 +17,7 @@ import { generateMiniReportJpg } from '../../lib/miniReportJpgGenerator';
 import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
 import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
+import { getCardLabelData } from '../../lib/useLabelData';
 
 /**
  * Download Report Button Component
@@ -540,44 +541,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       console.log('[FOLDABLE LABEL] Starting generation...');
 
-      // Extract card info
-      const cardInfo = card.conversational_card_info || {};
-
-      // Helper: Extract English name from bilingual format
-      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
-        if (!text) return null;
-        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
-        if (!hasJapanese) return text;
-        const parts = text.split(/[/()（）]/);
-        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
-        return englishPart ? englishPart.trim() : text;
-      };
-
-      // Build player/character name
-      // For sports and other cards: prioritize player_or_character (primary subject)
-      // For TCG cards (pokemon, mtg, lorcana): prioritize card_name
-      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
-      const cardName = shouldPrioritizePlayer
-        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
-        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
-
-      // Build set name (include subset if available)
-      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
-                         (card.card_set && card.card_set !== 'null') ? card.card_set :
-                         cardInfo.set_era || 'Unknown Set';
-      const subset = cardInfo.subset || card.subset;
-      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
-      const setName = setNameWithSubset || 'Unknown Set';
-
-      // Build special features
-      const features: string[] = [];
-      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
-      if (cardInfo.autographed) features.push('Auto');
-      const serialNum = cardInfo.serial_number;
-      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-        features.push(serialNum);
-      }
-      const specialFeatures = features.length > 0 ? features.join(' • ') : undefined;
+      // Use unified label data generator (filters out "Unknown...", cleans values)
+      const cleanLabelData = getCardLabelData(card);
 
       // Get subgrades
       const weightedScores = card.conversational_weighted_sub_scores || {};
@@ -594,22 +559,16 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       console.log('[FOLDABLE LABEL] QR code and logo loaded');
 
-      // Get grade and condition
-      const grade = card.conversational_decimal_grade ?? 0;
-      const conditionLabel = card.conversational_condition_label
-        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-        : (getConditionFromGrade(grade) || 'N/A');
-
-      // Build label data
+      // Build label data using cleaned values from labelDataGenerator
       const labelData: FoldableLabelData = {
-        cardName,
-        setName,
-        cardNumber: cardInfo.card_number || card.card_number,
-        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
-        specialFeatures,
-        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
-        grade,
-        conditionLabel,
+        cardName: cleanLabelData.primaryName,
+        setName: cleanLabelData.contextLine || 'Card', // contextLine already filters unknowns
+        cardNumber: cleanLabelData.cardNumber,
+        year: cleanLabelData.year,
+        specialFeatures: cleanLabelData.featuresLine || undefined,
+        serial: cleanLabelData.serial,
+        grade: cleanLabelData.grade ?? 0,
+        conditionLabel: cleanLabelData.condition,
         subgrades: {
           centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
           corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
@@ -687,42 +646,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       console.log('[MINI-REPORT JPG] Starting generation...');
 
-      // Extract card info
-      const cardInfo = card.conversational_card_info || {};
-
-      // Helper: Extract English name from bilingual format
-      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
-        if (!text) return null;
-        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
-        if (!hasJapanese) return text;
-        const parts = text.split(/[/()（）]/);
-        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
-        return englishPart ? englishPart.trim() : text;
-      };
-
-      // Build player/character name
-      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
-      const cardName = shouldPrioritizePlayer
-        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
-        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
-
-      // Build set name (include subset if available)
-      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
-                         (card.card_set && card.card_set !== 'null') ? card.card_set :
-                         cardInfo.set_era || 'Unknown Set';
-      const subset = cardInfo.subset || card.subset;
-      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
-      const setName = setNameWithSubset || 'Unknown Set';
-
-      // Build special features
-      const features: string[] = [];
-      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
-      if (cardInfo.autographed) features.push('Auto');
-      const serialNum = cardInfo.serial_number;
-      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-        features.push(serialNum);
-      }
-      const specialFeatures = features.length > 0 ? features.join(' • ') : undefined;
+      // Use unified label data generator (filters out "Unknown...", cleans values)
+      const cleanLabelData = getCardLabelData(card);
 
       // Get subgrades
       const weightedScores = card.conversational_weighted_sub_scores || {};
@@ -739,22 +664,16 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       console.log('[MINI-REPORT JPG] QR code and logo loaded');
 
-      // Get grade and condition
-      const grade = card.conversational_decimal_grade ?? 0;
-      const conditionLabel = card.conversational_condition_label
-        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-        : (getConditionFromGrade(grade) || 'N/A');
-
-      // Build label data
+      // Build label data using cleaned values from labelDataGenerator
       const labelData: FoldableLabelData = {
-        cardName,
-        setName,
-        cardNumber: cardInfo.card_number || card.card_number,
-        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
-        specialFeatures,
-        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
-        grade,
-        conditionLabel,
+        cardName: cleanLabelData.primaryName,
+        setName: cleanLabelData.contextLine || 'Card',
+        cardNumber: cleanLabelData.cardNumber,
+        year: cleanLabelData.year,
+        specialFeatures: cleanLabelData.featuresLine || undefined,
+        serial: cleanLabelData.serial,
+        grade: cleanLabelData.grade ?? 0,
+        conditionLabel: cleanLabelData.condition,
         subgrades: {
           centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
           corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
@@ -820,48 +739,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       console.log('[CARD IMAGES] Starting generation...');
 
-      // Extract card info
-      const cardInfo = card.conversational_card_info || {};
-
-      // Helper: Extract English name from bilingual format
-      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
-        if (!text) return null;
-        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
-        if (!hasJapanese) return text;
-        const parts = text.split(/[/()（）]/);
-        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
-        return englishPart ? englishPart.trim() : text;
-      };
-
-      // Build player/character name
-      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
-      const cardName = shouldPrioritizePlayer
-        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
-        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
-
-      // Build set name (include subset if available)
-      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
-                         (card.card_set && card.card_set !== 'null') ? card.card_set :
-                         cardInfo.set_era || 'Unknown Set';
-      const subset = cardInfo.subset || card.subset;
-      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
-      const setName = setNameWithSubset || 'Unknown Set';
-
-      // Build special features
-      const features: string[] = [];
-      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
-      if (cardInfo.autographed) features.push('Auto');
-      const serialNum = cardInfo.serial_number;
-      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-        features.push(serialNum);
-      }
-      const specialFeatures = features.length > 0 ? features.join(' \u2022 ') : undefined;
-
-      // Get grade and condition
-      const grade = card.conversational_decimal_grade ?? 0;
-      const conditionLabel = card.conversational_condition_label
-        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-        : (getConditionFromGrade(grade) || 'N/A');
+      // Use unified label data generator (filters out "Unknown...", cleans values)
+      const cleanLabelData = getCardLabelData(card);
 
       // Get image URLs - use existing signed URLs or generate new ones
       let frontImageUrl = card.front_url;
@@ -894,16 +773,16 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         backImageUrl = backUrlData.signedUrl;
       }
 
-      // Build card image data
+      // Build card image data using cleaned values from labelDataGenerator
       const cardImageData: CardImageData = {
-        cardName,
-        setName,
-        cardNumber: cardInfo.card_number || card.card_number,
-        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
-        specialFeatures,
-        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
-        grade,
-        conditionLabel,
+        cardName: cleanLabelData.primaryName,
+        setName: cleanLabelData.contextLine || 'Card',
+        cardNumber: cleanLabelData.cardNumber || undefined,
+        year: cleanLabelData.year || undefined,
+        specialFeatures: cleanLabelData.featuresLine || undefined,
+        serial: cleanLabelData.serial,
+        grade: cleanLabelData.grade ?? 0,
+        conditionLabel: cleanLabelData.condition,
         cardUrl: `${window.location.origin}/${cardType}/${card.id}`,
         frontImageUrl,
         backImageUrl,
@@ -917,7 +796,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Generate filename base
       const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
-      const cardNameClean = sanitize(cardName);
+      const cardNameClean = sanitize(cleanLabelData.primaryName);
       const serialClean = sanitize(cardImageData.serial);
       const filenameBase = `DCM-Card-${cardNameClean}-${serialClean}`;
 
@@ -945,44 +824,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       console.log('[AVERY LABEL] Starting generation at position:', positionIndex);
 
-      // Extract card info (same logic as foldable label)
-      const cardInfo = card.conversational_card_info || {};
-
-      // Helper: Extract English name from bilingual format
-      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
-        if (!text) return null;
-        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
-        if (!hasJapanese) return text;
-        const parts = text.split(/[/()（）]/);
-        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
-        return englishPart ? englishPart.trim() : text;
-      };
-
-      // Build player/character name
-      // For sports and other cards: prioritize player_or_character (primary subject)
-      // For TCG cards (pokemon, mtg, lorcana): prioritize card_name
-      const shouldPrioritizePlayerAvery = cardType === 'sports' || cardType === 'other';
-      const cardName = shouldPrioritizePlayerAvery
-        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name) || 'Unknown'
-        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name) || 'Unknown Card';
-
-      // Build set name
-      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
-                         (card.card_set && card.card_set !== 'null') ? card.card_set :
-                         cardInfo.set_era || 'Unknown Set';
-      const subset = cardInfo.subset || card.subset;
-      const setNameWithSubset = subset ? `${extractEnglishForPDF(setNameRaw)} - ${subset}` : extractEnglishForPDF(setNameRaw);
-      const setName = setNameWithSubset || 'Unknown Set';
-
-      // Build special features
-      const features: string[] = [];
-      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
-      if (cardInfo.autographed) features.push('Auto');
-      const serialNum = cardInfo.serial_number;
-      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-        features.push(serialNum);
-      }
-      const specialFeatures = features.length > 0 ? features.join(' • ') : undefined;
+      // Use unified label data generator (filters out "Unknown...", cleans values)
+      const cleanLabelData = getCardLabelData(card);
 
       // Get subgrades
       const weightedScores = card.conversational_weighted_sub_scores || {};
@@ -1043,24 +886,18 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         }
       }
 
-      // Get grade and condition
-      const grade = card.conversational_decimal_grade ?? 0;
-      const conditionLabel = card.conversational_condition_label
-        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-        : (getConditionFromGrade(grade) || 'N/A');
-
-      // Build label data (same interface as foldable label)
+      // Build label data using cleaned values from labelDataGenerator
       // Use the rotated QR code for Avery labels (appears upside down when printed,
       // right-side up when label is folded over the back of a one-touch slab)
       const labelData: FoldableLabelData = {
-        cardName,
-        setName,
-        cardNumber: cardInfo.card_number || card.card_number,
-        year: cardInfo.year || card.release_date?.match(/\d{4}/)?.[0],
-        specialFeatures,
-        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
-        grade,
-        conditionLabel,
+        cardName: cleanLabelData.primaryName,
+        setName: cleanLabelData.contextLine || 'Card',
+        cardNumber: cleanLabelData.cardNumber,
+        year: cleanLabelData.year,
+        specialFeatures: cleanLabelData.featuresLine || undefined,
+        serial: cleanLabelData.serial,
+        grade: cleanLabelData.grade ?? 0,
+        conditionLabel: cleanLabelData.condition,
         subgrades: {
           centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
           corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
@@ -1086,7 +923,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Generate filename
       const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
-      const cardNameClean = sanitize(cardName);
+      const cardNameClean = sanitize(cleanLabelData.primaryName);
       const serialClean = sanitize(labelData.serial);
       const filename = `DCM-AveryLabel-${cardNameClean}-${serialClean}.pdf`;
 
