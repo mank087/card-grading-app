@@ -504,11 +504,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       console.log('[FOLDABLE LABEL] QR code and logo loaded');
 
       // Build label data using cleaned values from labelDataGenerator
+      // Pass individual fields, not contextLine (generators join internally)
       const labelData: FoldableLabelData = {
         cardName: cleanLabelData.primaryName,
-        setName: cleanLabelData.contextLine || 'Card', // contextLine already filters unknowns
-        cardNumber: cleanLabelData.cardNumber,
-        year: cleanLabelData.year,
+        setName: cleanLabelData.setName || '', // Individual set name, not contextLine
+        cardNumber: cleanLabelData.cardNumber || undefined,
+        year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
         grade: cleanLabelData.grade ?? 0,
@@ -609,11 +610,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       console.log('[MINI-REPORT JPG] QR code and logo loaded');
 
       // Build label data using cleaned values from labelDataGenerator
+      // Pass individual fields, not contextLine (generators join internally)
       const labelData: FoldableLabelData = {
         cardName: cleanLabelData.primaryName,
-        setName: cleanLabelData.contextLine || 'Card',
-        cardNumber: cleanLabelData.cardNumber,
-        year: cleanLabelData.year,
+        setName: cleanLabelData.setName || '', // Individual set name, not contextLine
+        cardNumber: cleanLabelData.cardNumber || undefined,
+        year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
         grade: cleanLabelData.grade ?? 0,
@@ -718,9 +720,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       }
 
       // Build card image data using cleaned values from labelDataGenerator
+      // Pass individual fields, not contextLine (cardImageGenerator joins internally)
       const cardImageData: CardImageData = {
         cardName: cleanLabelData.primaryName,
-        setName: cleanLabelData.contextLine || 'Card',
+        setName: cleanLabelData.setName || '', // Individual set name, not contextLine
         cardNumber: cleanLabelData.cardNumber || undefined,
         year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
@@ -831,13 +834,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       }
 
       // Build label data using cleaned values from labelDataGenerator
+      // Pass individual fields, not contextLine (generators join internally)
       // Use the rotated QR code for Avery labels (appears upside down when printed,
       // right-side up when label is folded over the back of a one-touch slab)
       const labelData: FoldableLabelData = {
         cardName: cleanLabelData.primaryName,
-        setName: cleanLabelData.contextLine || 'Card',
-        cardNumber: cleanLabelData.cardNumber,
-        year: cleanLabelData.year,
+        setName: cleanLabelData.setName || '', // Individual set name, not contextLine
+        cardNumber: cleanLabelData.cardNumber || undefined,
+        year: cleanLabelData.year || undefined,
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
         grade: cleanLabelData.grade ?? 0,
