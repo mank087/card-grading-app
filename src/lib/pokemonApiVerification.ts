@@ -225,7 +225,7 @@ async function queryBySetIdAndNumber(setId: string, cardNumber: string): Promise
     console.log(`[Pokemon API Verification] Query: ${query}`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
 
     const response = await fetch(url, {
       headers: { 'X-Api-Key': POKEMON_API_KEY },
@@ -235,7 +235,11 @@ async function queryBySetIdAndNumber(setId: string, cardNumber: string): Promise
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error(`[Pokemon API Verification] API error: ${response.status}`);
+      console.error(`[Pokemon API Verification] API error: ${response.status} for query: ${query}`);
+      try {
+        const errorBody = await response.text();
+        console.error(`[Pokemon API Verification] Error body: ${errorBody.substring(0, 200)}`);
+      } catch {}
       return null;
     }
 
@@ -249,10 +253,11 @@ async function queryBySetIdAndNumber(setId: string, cardNumber: string): Promise
       return data.data[0];
     }
 
+    console.log(`[Pokemon API Verification] No matches for query: ${query}`);
     return null;
   } catch (error: any) {
     if (error.name === 'AbortError') {
-      console.warn('[Pokemon API Verification] Request timeout');
+      console.warn('[Pokemon API Verification] Request timeout (15s)');
     } else {
       console.error('[Pokemon API Verification] Query error:', error.message);
     }
@@ -266,7 +271,14 @@ async function queryBySetIdAndNumber(setId: string, cardNumber: string): Promise
  */
 async function queryByNameAndSet(name: string, setName: string, cardNumber?: string): Promise<PokemonCard | null> {
   try {
-    let query = `name:"${name}" set.name:"${setName}"`;
+    // Sanitize the name for API query
+    const sanitizedName = sanitizePokemonName(name);
+    if (!sanitizedName) {
+      console.log('[Pokemon API Verification] No valid name for queryByNameAndSet');
+      return null;
+    }
+
+    let query = `name:"${sanitizedName}" set.name:"${setName}"`;
     if (cardNumber) {
       const normalizedNumber = normalizeCardNumber(cardNumber);
       query += ` number:${normalizedNumber}`;
@@ -277,7 +289,7 @@ async function queryByNameAndSet(name: string, setName: string, cardNumber?: str
     console.log(`[Pokemon API Verification] Fuzzy query: ${query}`);
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
 
     const response = await fetch(url, {
       headers: { 'X-Api-Key': POKEMON_API_KEY },
@@ -287,6 +299,7 @@ async function queryByNameAndSet(name: string, setName: string, cardNumber?: str
     clearTimeout(timeoutId);
 
     if (!response.ok) {
+      console.error(`[Pokemon API Verification] Fuzzy query returned ${response.status}`);
       return null;
     }
 
@@ -297,11 +310,48 @@ async function queryByNameAndSet(name: string, setName: string, cardNumber?: str
       return data.data[0];
     }
 
+    console.log(`[Pokemon API Verification] No matches for fuzzy query: ${query}`);
     return null;
   } catch (error: any) {
-    console.error('[Pokemon API Verification] Query error:', error.message);
+    if (error.name === 'AbortError') {
+      console.warn('[Pokemon API Verification] Fuzzy query timeout (15s)');
+    } else {
+      console.error('[Pokemon API Verification] Query error:', error.message);
+    }
     return null;
   }
+}
+
+/**
+ * Sanitize Pokemon name for API query
+ * - Removes Japanese/CJK characters
+ * - Extracts English name from parentheses format "Japanese (English)"
+ * - Escapes special Lucene query characters
+ */
+function sanitizePokemonName(name: string): string {
+  if (!name) return '';
+
+  // If name contains parentheses with English inside, extract it
+  // Format: "ガマゲロゲ (Seismitoad)" -> "Seismitoad"
+  const parenMatch = name.match(/\(([A-Za-z][A-Za-z0-9\s\-\'\.]+)\)/);
+  if (parenMatch) {
+    return parenMatch[1].trim();
+  }
+
+  // Remove CJK characters (Japanese, Chinese, Korean)
+  const asciiOnly = name.replace(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uAC00-\uD7AF]/g, '').trim();
+
+  // If we stripped everything, return original (will likely fail but logged)
+  if (!asciiOnly) {
+    console.warn(`[Pokemon API Verification] Name "${name}" is fully CJK, cannot query API`);
+    return name;
+  }
+
+  // Escape Lucene special characters: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
+  // But keep spaces and basic punctuation for Pokemon names
+  const escaped = asciiOnly.replace(/([+\-&|!(){}[\]^~*?:\\\/])/g, '\\$1');
+
+  return escaped;
 }
 
 /**
@@ -315,6 +365,13 @@ async function queryByFormatAwareNumber(
   setTotal?: string
 ): Promise<PokemonCard | null> {
   try {
+    // Sanitize name for API query
+    const sanitizedName = sanitizePokemonName(name);
+    if (!sanitizedName) {
+      console.log('[Pokemon API Verification] No valid name after sanitization');
+      return null;
+    }
+
     // Get format-specific number variations
     const numberVariations = normalizeCardNumberFromApi(cardNumberRaw, format);
     if (numberVariations.length === 0) {
@@ -330,27 +387,28 @@ async function queryByFormatAwareNumber(
 
       if (promoSetId) {
         // Promo cards: use set.id constraint
-        query = `name:"${name}" number:"${numberVariation}" set.id:${promoSetId}`;
+        query = `name:"${sanitizedName}" number:"${numberVariation}" set.id:${promoSetId}`;
         console.log(`[Pokemon API Verification] Format-aware promo query: ${query}`);
       } else if (setTotal && format === 'fraction') {
         // Standard cards with denominator: use printedTotal filter
         const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
         if (/^\d+$/.test(printedTotal)) {
-          query = `name:"${name}" number:"${numberVariation}" set.printedTotal:${printedTotal}`;
+          query = `name:"${sanitizedName}" number:"${numberVariation}" set.printedTotal:${printedTotal}`;
           console.log(`[Pokemon API Verification] Format-aware printedTotal query: ${query}`);
         } else {
-          query = `name:"${name}" number:"${numberVariation}"`;
+          query = `name:"${sanitizedName}" number:"${numberVariation}"`;
         }
       } else {
         // Other formats: standard query
-        query = `name:"${name}" number:"${numberVariation}"`;
+        query = `name:"${sanitizedName}" number:"${numberVariation}"`;
         console.log(`[Pokemon API Verification] Format-aware standard query: ${query}`);
       }
 
       const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
+      console.log(`[Pokemon API Verification] Full URL: ${url}`);
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
 
       const response = await fetch(url, {
         headers: { 'X-Api-Key': POKEMON_API_KEY },
@@ -364,14 +422,23 @@ async function queryByFormatAwareNumber(
         if (data.data && data.data.length > 0) {
           console.log(`[Pokemon API Verification] Format-aware search found ${data.data.length} match(es) for number: ${numberVariation}`);
           return data.data[0];
+        } else {
+          console.log(`[Pokemon API Verification] No matches for number: ${numberVariation}`);
         }
+      } else {
+        console.error(`[Pokemon API Verification] API returned ${response.status} for query: ${query}`);
+        // Try to get error details
+        try {
+          const errorBody = await response.text();
+          console.error(`[Pokemon API Verification] Error body: ${errorBody.substring(0, 200)}`);
+        } catch {}
       }
     }
 
     return null;
   } catch (error: any) {
     if (error.name === 'AbortError') {
-      console.warn('[Pokemon API Verification] Format-aware request timeout');
+      console.warn('[Pokemon API Verification] Format-aware request timeout (15s)');
     } else {
       console.error('[Pokemon API Verification] Format-aware query error:', error.message);
     }
