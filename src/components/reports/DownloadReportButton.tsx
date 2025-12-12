@@ -315,107 +315,52 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       console.log('[DOWNLOAD REPORT] All images converted successfully');
 
       // Generate QR code for the card URL
-      const cardUrl = `${window.location.origin}/sports/${card.id}`;
+      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
       console.log('[DOWNLOAD REPORT] Generating QR code for URL:', cardUrl);
       const qrCodeDataUrl = await generateQRCode(cardUrl);
       console.log('[DOWNLOAD REPORT] QR code generated');
 
-      // Extract card info
+      // Use unified label data generator (filters out "Unknown...", cleans values)
+      // This ensures PDF labels match card detail page labels exactly
+      const cleanLabelData = getCardLabelData(card);
+
+      // Extract card info for additional fields not in labelData
       const cardInfo = card.conversational_card_info || {};
 
-      // Helper: Extract English name from bilingual format for PDF (react-pdf doesn't support Japanese fonts)
-      const extractEnglishForPDF = (text: string | null | undefined): string | null => {
-        if (!text) return null;
-
-        // Check if text contains Japanese characters and bilingual format
-        const hasJapanese = /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(text);
-        if (!hasJapanese) return text; // Already English-only
-
-        // Extract English from "Japanese (English)" format
-        const parts = text.split(/[/()（）]/);
-        const englishPart = parts.find((p: string) => p.trim() && !/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(p));
-
-        return englishPart ? englishPart.trim() : text;
-      };
-
-      // Build card details string (matches detail page format)
-      // Extract English-only names for PDF compatibility
-      // For sports and other cards: prioritize player_or_character (primary subject)
-      // For TCG cards (pokemon, mtg, lorcana): prioritize card_name
-      const shouldPrioritizePlayer = cardType === 'sports' || cardType === 'other';
-      const playerOrCharacter = shouldPrioritizePlayer
-        ? extractEnglishForPDF(cardInfo.player_or_character || card.featured || cardInfo.card_name || card.card_name)
-        : extractEnglishForPDF(cardInfo.card_name || cardInfo.player_or_character || card.featured || card.card_name);
-      // Handle "null" string and actual null values, then fall back to set_era
-      const setNameRaw = (cardInfo.set_name && cardInfo.set_name !== 'null') ? cardInfo.set_name :
-                      (card.card_set && card.card_set !== 'null') ? card.card_set :
-                      cardInfo.set_era || 'Unknown Set';
-      const setNameBase = extractEnglishForPDF(setNameRaw);
-      const year = cardInfo.year || card.release_date?.match(/\d{4}/)?.[0] || 'N/A';
-      const cardNumber = cardInfo.card_number || card.card_number;
-      const subsetRaw = cardInfo.subset || card.subset;
-      // Filter out frame treatments (Showcase, Borderless, etc. are NOT subsets)
-      const frameTreatments = ['showcase', 'borderless', 'extended art', 'full art', 'etched', 'retro', 'anime'];
-      const isFrameTreatment = subsetRaw && frameTreatments.some(t => subsetRaw.toLowerCase().includes(t));
-      const subset = isFrameTreatment ? null : subsetRaw;
-      // Combine set name with subset if available (matching foldable label format)
-      const setName = subset ? `${setNameBase} - ${subset}` : setNameBase;
-
-      // Build special features (MTG features first, then standard)
-      const features: string[] = [];
-      // MTG-specific features (no emojis)
-      if (card.is_foil) features.push(card.foil_type || 'Foil');
-      if (card.mtg_rarity) {
-        const rarity = card.mtg_rarity === 'mythic' ? 'Mythic' :
-                      card.mtg_rarity.charAt(0).toUpperCase() + card.mtg_rarity.slice(1);
-        features.push(rarity);
-      }
-      if (card.is_double_faced) features.push('Double-Faced');
-      // Standard features
-      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true' || cardInfo.rookie_or_first === 'Yes') features.push('RC');
-      if (cardInfo.autographed) features.push('Auto');
-      const serialNum = cardInfo.serial_number;
-      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-        features.push(serialNum);
-      }
-      const specialFeatures = features.length > 0 ? features.join(' ') : '';
-      const specialFeaturesString = features.length > 0 ? features.join(' • ') : ''; // New format with bullets
-
-      // Build full card details: set - features - number - year (no duplicate card name/subset)
-      const parts = [
-        setName,
-        specialFeatures,
-        cardNumber,
-        year
-      ].filter(p => p && p.trim() !== '' && p !== 'N/A');
-      const cardDetails = parts.join(' - ');
-
-      // Transform card data for report
+      // Transform card data for report - using unified label data
       const reportData: ReportCardData = {
-        cardName: extractEnglishForPDF(cardInfo.card_name || card.card_name) || 'Unknown Card',
-        playerName: playerOrCharacter || 'Unknown Player',
-        setName: setName || 'Unknown Set',
-        year: year,
-        manufacturer: cardInfo.manufacturer || card.manufacturer_name || 'N/A',
-        cardNumber: cardNumber || 'N/A',
-        sport: cardInfo.sport_or_category || card.sport || 'N/A',
+        // Label fields - use unified cleanLabelData for consistency with card detail page
+        primaryName: cleanLabelData.primaryName,
+        contextLine: cleanLabelData.contextLine,
+        featuresLine: cleanLabelData.featuresLine,
+        serial: cleanLabelData.serial,
+        grade: cleanLabelData.grade ?? 0,
+        gradeFormatted: cleanLabelData.gradeFormatted,
+        condition: cleanLabelData.condition,
+        // Legacy fields for backward compatibility with other report sections
+        cardName: cleanLabelData.primaryName,
+        playerName: cleanLabelData.primaryName,
+        setName: cleanLabelData.setName || '',
+        year: cleanLabelData.year || '',
+        cardNumber: cleanLabelData.cardNumber || '',
+        manufacturer: cardInfo.manufacturer || card.manufacturer_name || '',
+        sport: cardInfo.sport_or_category || card.sport || '',
+        // Image URLs
         frontImageUrl: frontImageBase64,
         backImageUrl: backImageBase64,
-        grade: card.conversational_decimal_grade || 0,
-        conditionLabel: card.conversational_condition_label || 'N/A',
-        labelCondition: card.conversational_condition_label
-          ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-          : (getConditionFromGrade(card.conversational_decimal_grade) || 'N/A'),
+        // Grade details
+        conditionLabel: card.conversational_condition_label || cleanLabelData.condition,
+        labelCondition: cleanLabelData.condition,
         gradeRange: (() => {
           // Extract just the uncertainty value (e.g., "10.0 ± 0.25" → "0.25")
           const uncertaintyStr = card.conversational_grade_uncertainty || '±0.25';
           const match = uncertaintyStr.match(/±\s*([\d.]+)/);
           const uncertaintyValue = match ? match[1] : '0.25';
-          return `${card.conversational_decimal_grade || 0} ± ${uncertaintyValue}`;
+          return `${cleanLabelData.grade ?? 0} ± ${uncertaintyValue}`;
         })(),
-        serial: card.serial || `DCM-${card.id?.slice(0, 8)}`,
-        cardDetails: cardDetails,
-        specialFeaturesString: specialFeaturesString,
+        // Deprecated - kept for backward compatibility
+        cardDetails: cleanLabelData.contextLine || '',
+        specialFeaturesString: cleanLabelData.featuresLine || '',
         cardUrl: cardUrl,
         qrCodeDataUrl: qrCodeDataUrl,
         professionalGrades: {
@@ -500,13 +445,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Generate filename using label details, serial, and report ID
       const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
-      const playerNameClean = sanitize(reportData.playerName);
-      const cardDetailsClean = sanitize(reportData.cardDetails);
-      const serialClean = sanitize(reportData.serial);
+      const primaryNameClean = sanitize(cleanLabelData.primaryName);
+      const serialClean = sanitize(cleanLabelData.serial);
       const reportIdClean = reportData.reportId;
 
-      // Combine: DCM Report - PlayerName - CardDetails - Serial - ReportID
-      const filenameParts = [playerNameClean, cardDetailsClean, serialClean, reportIdClean].filter(p => p);
+      // Combine: DCM Report - PrimaryName - Serial - ReportID
+      const filenameParts = [primaryNameClean, serialClean, reportIdClean].filter(p => p);
       const filename = `DCM-Report-${filenameParts.join('-')}.pdf`;
 
       link.download = filename;

@@ -8,6 +8,16 @@ import { reportStyles } from './ReportStyles';
  */
 
 export interface ReportCardData {
+  // Unified Label Data (matches card detail page exactly)
+  primaryName: string;        // Line 1: Card/Player name (cleaned, no "Unknown...")
+  contextLine: string;        // Line 2: Set • #Number • Year (pre-formatted, unknowns filtered)
+  featuresLine: string | null; // Line 3: RC • Auto • /99 (null if none)
+  serial: string;             // Line 4: DCM serial number
+  grade: number;              // Numeric grade
+  gradeFormatted: string;     // Display format (7 or 7.5)
+  condition: string;          // Condition label (Near Mint, Excellent, etc.)
+
+  // Legacy fields (kept for backward compatibility with other report sections)
   cardName: string;
   playerName: string;
   setName: string;
@@ -17,9 +27,8 @@ export interface ReportCardData {
   sport: string;
   frontImageUrl: string;
   backImageUrl: string;
-  grade: number;
   conditionLabel: string;
-  labelCondition: string; // Condition category for card labels (e.g., "Mint", "Near Mint")
+  labelCondition: string;
   gradeRange: string;
   professionalGrades: {
     psa: string | number;
@@ -66,7 +75,6 @@ export interface ReportCardData {
     autographed?: boolean;
     serialNumbered?: string;
     subset?: string;
-    // MTG-specific
     isFoil?: boolean;
     foilType?: string;
     isDoubleFaced?: boolean;
@@ -76,12 +84,11 @@ export interface ReportCardData {
   imageQuality: string;
   generatedDate: string;
   reportId: string;
-  serial: string;
-  cardDetails: string; // Full card details string (subset - set - features - number - year) - DEPRECATED, use separate fields
-  specialFeaturesString: string; // Special features (RC • Auto • Serial #)
-  cardUrl: string; // URL to the graded card page
-  qrCodeDataUrl?: string; // Base64 QR code image for back label
-  overallSummary?: string; // 3-4 sentence overall card condition summary
+  cardDetails: string;          // DEPRECATED - use contextLine
+  specialFeaturesString: string; // DEPRECATED - use featuresLine
+  cardUrl: string;
+  qrCodeDataUrl?: string;
+  overallSummary?: string;
 }
 
 interface CardGradingReportProps {
@@ -143,25 +150,27 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
         <View style={reportStyles.columnHalf}>
           <Text style={reportStyles.columnHeader}>FRONT</Text>
 
-          {/* Front Label - New 4-Line Structure */}
+          {/* Front Label - Unified 4-Line Structure (matches card detail page) */}
           <View style={reportStyles.cardLabelContainer}>
             <View style={reportStyles.cardLabelRow}>
               <View style={reportStyles.cardLabelLeft}>
                 <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
               </View>
               <View style={reportStyles.cardLabelCenter}>
-                {/* Line 1: Player/Card Name */}
+                {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
                 <Text style={reportStyles.cardLabelPlayerName}>
-                  {truncateText(cardData.playerName || cardData.cardName, PDF_LIMITS.PLAYER_NAME)}
+                  {truncateText(cardData.primaryName, PDF_LIMITS.PLAYER_NAME)}
                 </Text>
-                {/* Line 2: Set Name • Card # • Year */}
-                <Text style={reportStyles.cardLabelDetails}>
-                  {truncateText([cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • '), PDF_LIMITS.CARD_DETAILS)}
-                </Text>
-                {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
-                {cardData.specialFeaturesString && (
+                {/* Line 2: Context Line (Set • #Number • Year - pre-filtered) */}
+                {cardData.contextLine && (
+                  <Text style={reportStyles.cardLabelDetails}>
+                    {truncateText(cardData.contextLine, PDF_LIMITS.CARD_DETAILS)}
+                  </Text>
+                )}
+                {/* Line 3: Features Line (RC • Auto • /99) - Only if present */}
+                {cardData.featuresLine && (
                   <Text style={reportStyles.cardLabelFeatures}>
-                    {truncateText(cardData.specialFeaturesString, PDF_LIMITS.SPECIAL_FEATURES)}
+                    {truncateText(cardData.featuresLine, PDF_LIMITS.SPECIAL_FEATURES)}
                   </Text>
                 )}
                 {/* Line 4: DCM Serial Number */}
@@ -171,11 +180,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               </View>
               <View style={reportStyles.cardLabelRight}>
                 <Text style={reportStyles.cardLabelGrade}>
-                  {cardData.grade}
+                  {cardData.gradeFormatted}
                 </Text>
                 <View style={reportStyles.cardLabelDivider} />
                 <Text style={reportStyles.cardLabelConfidence}>
-                  {cardData.labelCondition}
+                  {cardData.condition}
                 </Text>
               </View>
             </View>
@@ -246,7 +255,7 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
         <View style={reportStyles.columnHalf}>
           <Text style={reportStyles.columnHeader}>BACK</Text>
 
-          {/* Back Label - QR Code Centered */}
+          {/* Back Label - QR Code Centered OR Unified Label */}
           <View style={reportStyles.cardLabelContainer}>
             {cardData.qrCodeDataUrl ? (
               <View style={reportStyles.qrCodeContainer}>
@@ -258,18 +267,20 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                   <Image src="/DCM-logo.png" style={reportStyles.cardLabelLogo} />
                 </View>
                 <View style={reportStyles.cardLabelCenter}>
-                  {/* Line 1: Player/Card Name */}
+                  {/* Line 1: Primary Name (cleaned, no "Unknown...") */}
                   <Text style={reportStyles.cardLabelPlayerName}>
-                    {truncateText(cardData.playerName || cardData.cardName, PDF_LIMITS.PLAYER_NAME)}
+                    {truncateText(cardData.primaryName, PDF_LIMITS.PLAYER_NAME)}
                   </Text>
-                  {/* Line 2: Set Name • Card # • Year */}
-                  <Text style={reportStyles.cardLabelDetails}>
-                    {truncateText([cardData.setName, cardData.cardNumber, cardData.year].filter(p => p && p !== 'N/A').join(' • '), PDF_LIMITS.CARD_DETAILS)}
-                  </Text>
-                  {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
-                  {cardData.specialFeaturesString && (
+                  {/* Line 2: Context Line (Set • #Number • Year - pre-filtered) */}
+                  {cardData.contextLine && (
+                    <Text style={reportStyles.cardLabelDetails}>
+                      {truncateText(cardData.contextLine, PDF_LIMITS.CARD_DETAILS)}
+                    </Text>
+                  )}
+                  {/* Line 3: Features Line (RC • Auto • /99) - Only if present */}
+                  {cardData.featuresLine && (
                     <Text style={reportStyles.cardLabelFeatures}>
-                      {truncateText(cardData.specialFeaturesString, PDF_LIMITS.SPECIAL_FEATURES)}
+                      {truncateText(cardData.featuresLine, PDF_LIMITS.SPECIAL_FEATURES)}
                     </Text>
                   )}
                   {/* Line 4: DCM Serial Number */}
@@ -279,11 +290,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
                 </View>
                 <View style={reportStyles.cardLabelRight}>
                   <Text style={reportStyles.cardLabelGrade}>
-                    {cardData.grade}
+                    {cardData.gradeFormatted}
                   </Text>
                   <View style={reportStyles.cardLabelDivider} />
                   <Text style={reportStyles.cardLabelConfidence}>
-                    {cardData.labelCondition}
+                    {cardData.condition}
                   </Text>
                 </View>
               </View>
@@ -366,12 +377,12 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
       <View style={reportStyles.gradeBox}>
         {/* Large Grade Number */}
         <Text style={reportStyles.gradeNumber}>
-          {cardData.grade}
+          {cardData.gradeFormatted}
         </Text>
 
         {/* Condition Label */}
         <Text style={reportStyles.conditionLabel}>
-          {cardData.conditionLabel}
+          {cardData.condition}
         </Text>
 
         {/* Badges Row (Uncertainty & Image Quality) */}
