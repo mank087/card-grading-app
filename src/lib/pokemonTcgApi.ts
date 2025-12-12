@@ -151,9 +151,175 @@ export async function searchPokemonCards(
 }
 
 /**
+ * Card number format types for format-aware API queries
+ */
+export type CardNumberFormat =
+  | 'fraction'          // Standard X/Y format (240/193)
+  | 'swsh_promo'        // SWSH prefix (SWSH039)
+  | 'sv_promo'          // Scarlet & Violet promo (SVP EN 085, or just digits)
+  | 'trainer_gallery'   // TG prefix (TG10/TG30)
+  | 'galarian_gallery'  // GG prefix (GG33/GG70)
+  | 'single'            // Just a number (25)
+  | 'none';             // No visible number
+
+/**
+ * Normalize card number to API-compatible format based on detected format type
+ * Returns array of variations to try (most likely first)
+ *
+ * API NUMBER FORMATS (confirmed via research):
+ * - SVP promos: Store ONLY digits ("85" not "SVP EN 085")
+ * - SWSH promos: Store full prefix+number ("SWSH039")
+ * - Gallery cards: Store prefix+number ("TG10", "GG33")
+ * - Standard cards: Store just numerator ("240")
+ */
+export function normalizeCardNumber(cardNumber: string, format: CardNumberFormat): string[] {
+  if (!cardNumber) return [];
+
+  const variations: string[] = [];
+
+  switch (format) {
+    case 'fraction':
+      // "240/193" → ["240"]
+      // "025/102" → ["25", "025"]
+      const numerator = cardNumber.split('/')[0]?.trim() || cardNumber;
+      const withoutLeading = numerator.replace(/^0+/, '');
+      if (withoutLeading && withoutLeading !== numerator) {
+        variations.push(withoutLeading); // Try without leading zeros first
+        variations.push(numerator);
+      } else {
+        variations.push(numerator);
+      }
+      break;
+
+    case 'swsh_promo':
+      // "SWSH039" → ["SWSH039", "SWSH39"] - API stores with prefix
+      const swshMatch = cardNumber.match(/SWSH(\d+)/i);
+      if (swshMatch) {
+        const num = swshMatch[1];
+        const withoutLeadingZeros = num.replace(/^0+/, '') || num;
+        variations.push(`SWSH${num}`); // Original format first
+        if (withoutLeadingZeros !== num) {
+          variations.push(`SWSH${withoutLeadingZeros}`);
+        }
+      } else {
+        variations.push(cardNumber);
+      }
+      break;
+
+    case 'sv_promo':
+      // "SVP EN 085" → ["85", "085"] - API stores ONLY digits
+      // "085" → ["85", "085"]
+      const svDigits = cardNumber.match(/\d+/)?.[0] || '';
+      if (svDigits) {
+        const noLeading = svDigits.replace(/^0+/, '') || svDigits;
+        variations.push(noLeading); // Try without leading zeros first (API preference)
+        if (noLeading !== svDigits) {
+          variations.push(svDigits);
+        }
+      }
+      break;
+
+    case 'trainer_gallery':
+      // "TG10/TG30" or "TG10" → ["TG10"]
+      const tgNumber = cardNumber.split('/')[0]?.trim() || cardNumber;
+      variations.push(tgNumber);
+      break;
+
+    case 'galarian_gallery':
+      // "GG33/GG70" or "GG33" → ["GG33"]
+      const ggNumber = cardNumber.split('/')[0]?.trim() || cardNumber;
+      variations.push(ggNumber);
+      break;
+
+    case 'single':
+      // "25" → ["25"]
+      // "025" → ["25", "025"]
+      const singleNum = cardNumber.trim();
+      const singleNoLeading = singleNum.replace(/^0+/, '') || singleNum;
+      if (singleNoLeading !== singleNum) {
+        variations.push(singleNoLeading);
+        variations.push(singleNum);
+      } else {
+        variations.push(singleNum);
+      }
+      break;
+
+    case 'none':
+    default:
+      // No card number to normalize
+      break;
+  }
+
+  // Remove duplicates while preserving order
+  return [...new Set(variations)];
+}
+
+/**
+ * Detect card number format from the raw printed number
+ */
+export function detectCardNumberFormat(cardNumberRaw: string): CardNumberFormat {
+  if (!cardNumberRaw) return 'none';
+
+  const raw = cardNumberRaw.trim().toUpperCase();
+
+  // Check for SWSH promo format: SWSH###
+  if (/^SWSH\d+$/i.test(raw)) {
+    return 'swsh_promo';
+  }
+
+  // Check for SV promo format: SVP EN ###, SVP ###, or just digits with known context
+  if (/SVP/i.test(raw) || /^SVP?\s*(EN\s*)?\d+$/i.test(raw)) {
+    return 'sv_promo';
+  }
+
+  // Check for Trainer Gallery: TG##/TG## or TG##
+  if (/^TG\d+/i.test(raw)) {
+    return 'trainer_gallery';
+  }
+
+  // Check for Galarian Gallery: GG##/GG## or GG##
+  if (/^GG\d+/i.test(raw)) {
+    return 'galarian_gallery';
+  }
+
+  // Check for standard fraction format: X/Y
+  if (/^\d+\s*\/\s*\d+$/.test(raw)) {
+    return 'fraction';
+  }
+
+  // Check for single number (digits only, possibly with leading zeros)
+  if (/^\d+$/.test(raw)) {
+    return 'single';
+  }
+
+  // Default: try to extract something useful
+  if (/\d/.test(raw)) {
+    return 'single'; // Has digits, treat as single
+  }
+
+  return 'none';
+}
+
+/**
+ * Get the appropriate set.id constraint for promo formats
+ */
+export function getPromoSetId(format: CardNumberFormat): string | null {
+  switch (format) {
+    case 'swsh_promo':
+      return 'swshp';
+    case 'sv_promo':
+      return 'svp';
+    case 'galarian_gallery':
+      return 'swsh12pt5gg'; // Crown Zenith Galarian Gallery
+    default:
+      return null;
+  }
+}
+
+/**
  * Smart search with multi-tier fallback strategy
  * Tries multiple search strategies to find the best matches
- * Enhanced with flexible card number matching
+ * Enhanced with format-aware card number handling
  */
 export async function smartSearchPokemonCards(
   name: string,
@@ -236,6 +402,162 @@ export async function smartSearchPokemonCards(
   // No results found
   console.log('[Pokemon Smart Search] ❌ No cards found with any strategy');
   return { results, strategy: 'none' };
+}
+
+/**
+ * Enhanced format-aware smart search
+ * Uses detected card number format to optimize API queries
+ *
+ * @param name - Pokemon name
+ * @param cardNumber - Extracted card number (numerator only for API)
+ * @param cardNumberRaw - Full printed card number as shown on card
+ * @param cardNumberFormat - Detected format type (or will be auto-detected from raw)
+ * @param setName - Set name (optional)
+ * @param setTotal - Denominator from card number (for set identification)
+ */
+export async function formatAwareSearch(
+  name: string,
+  cardNumber?: string,
+  cardNumberRaw?: string,
+  cardNumberFormat?: CardNumberFormat,
+  setName?: string,
+  setTotal?: string
+): Promise<{ results: PokemonCard[], strategy: string }> {
+  console.log('[Format-Aware Search] Starting with:', {
+    name, cardNumber, cardNumberRaw, cardNumberFormat, setName, setTotal
+  });
+
+  // Clean up inputs
+  const cleanSetName = setName && !setName.toLowerCase().includes('not visible') &&
+                       !setName.toLowerCase().includes('unknown') ? setName : undefined;
+
+  // Auto-detect format if not provided
+  const format: CardNumberFormat = cardNumberFormat ||
+    (cardNumberRaw ? detectCardNumberFormat(cardNumberRaw) : 'none');
+
+  console.log('[Format-Aware Search] Detected format:', format);
+
+  // Get format-specific API variations
+  const numberVariations = normalizeCardNumber(cardNumber || cardNumberRaw || '', format);
+  console.log('[Format-Aware Search] Number variations:', numberVariations);
+
+  // Get promo set ID if applicable
+  const promoSetId = getPromoSetId(format);
+
+  // Strategy 0 (NEW): For promos, search with set.id constraint first
+  if (promoSetId && numberVariations.length > 0) {
+    console.log(`[Format-Aware Search] Strategy 0: Promo search with set.id:${promoSetId}`);
+    for (const numVariation of numberVariations) {
+      // Build query with set.id constraint
+      const query = `name:"${name}" number:"${numVariation}" set.id:${promoSetId}`;
+      const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
+
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        const response = await fetch(url, {
+          headers: { 'X-Api-Key': POKEMON_API_KEY },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          const json = await response.json();
+          if (json.data?.length > 0) {
+            console.log(`[Format-Aware Search] ✅ Found ${json.data.length} card(s) with promo strategy`);
+            return { results: json.data, strategy: `promo (name + number[${numVariation}] + set.id:${promoSetId})` };
+          }
+        }
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          console.warn('[Format-Aware Search] Promo search timeout');
+        }
+      }
+    }
+  }
+
+  // Strategy 1: Use setTotal (denominator) to filter by printedTotal
+  if (setTotal && numberVariations.length > 0 && format === 'fraction') {
+    // Clean the setTotal (remove TG/GG prefixes if present, extract number)
+    const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
+    if (printedTotal && /^\d+$/.test(printedTotal)) {
+      console.log(`[Format-Aware Search] Strategy 1: name + number + set.printedTotal:${printedTotal}`);
+
+      for (const numVariation of numberVariations) {
+        const query = `name:"${name}" number:"${numVariation}" set.printedTotal:${printedTotal}`;
+        const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
+
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+          const response = await fetch(url, {
+            headers: { 'X-Api-Key': POKEMON_API_KEY },
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const json = await response.json();
+            if (json.data?.length > 0) {
+              console.log(`[Format-Aware Search] ✅ Found ${json.data.length} card(s) with printedTotal strategy`);
+              return { results: json.data, strategy: `precise (name + number[${numVariation}] + printedTotal:${printedTotal})` };
+            }
+          }
+        } catch (error: any) {
+          if (error.name === 'AbortError') {
+            console.warn('[Format-Aware Search] PrintedTotal search timeout');
+          }
+        }
+      }
+    }
+  }
+
+  // Strategy 2: Name + number + set name (existing approach)
+  if (numberVariations.length > 0 && cleanSetName) {
+    console.log('[Format-Aware Search] Strategy 2: name + number + set name');
+    for (const numVariation of numberVariations) {
+      const results = await searchPokemonCards(name, cleanSetName, numVariation);
+      if (results.length > 0) {
+        console.log(`[Format-Aware Search] ✅ Found ${results.length} card(s) with Strategy 2`);
+        return { results, strategy: `good (name + number[${numVariation}] + set)` };
+      }
+    }
+  }
+
+  // Strategy 3: Name + number only
+  if (numberVariations.length > 0) {
+    console.log('[Format-Aware Search] Strategy 3: name + number');
+    for (const numVariation of numberVariations) {
+      const results = await searchPokemonCards(name, undefined, numVariation);
+      if (results.length > 0) {
+        console.log(`[Format-Aware Search] ✅ Found ${results.length} card(s) with Strategy 3`);
+        return { results, strategy: `moderate (name + number[${numVariation}])` };
+      }
+    }
+  }
+
+  // Strategy 4: Name + set name
+  if (cleanSetName) {
+    console.log('[Format-Aware Search] Strategy 4: name + set');
+    const results = await searchPokemonCards(name, cleanSetName);
+    if (results.length > 0) {
+      console.log(`[Format-Aware Search] ✅ Found ${results.length} card(s) with Strategy 4`);
+      return { results, strategy: 'broad (name + set)' };
+    }
+  }
+
+  // Strategy 5: Name only (fallback)
+  console.log('[Format-Aware Search] Strategy 5: name only');
+  const results = await searchPokemonCards(name);
+  if (results.length > 0) {
+    console.log(`[Format-Aware Search] ✅ Found ${results.length} card(s) with Strategy 5`);
+    return { results, strategy: 'fallback (name only)' };
+  }
+
+  console.log('[Format-Aware Search] ❌ No cards found');
+  return { results: [], strategy: 'none' };
 }
 
 /**

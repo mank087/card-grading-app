@@ -104,7 +104,11 @@ export async function POST(request: NextRequest) {
       set_name: overrideCardInfo?.set_name || convInfo.set_name || card.card_set,
       card_number: overrideCardInfo?.card_number || convInfo.card_number || card.card_number,
       year: overrideCardInfo?.year || convInfo.year || card.release_date,
-      set_code: overrideCardInfo?.set_code || convInfo.set_code || null
+      set_code: overrideCardInfo?.set_code || convInfo.set_code || null,
+      // New format-aware fields for improved API lookup
+      card_number_raw: overrideCardInfo?.card_number_raw || convInfo.card_number_raw || null,
+      card_number_format: overrideCardInfo?.card_number_format || convInfo.card_number_format || null,
+      set_total: overrideCardInfo?.set_total || convInfo.set_total || null
     };
 
     console.log(`[Pokemon Verify API] Card info for verification:`, cardInfoForVerification);

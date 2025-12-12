@@ -2,7 +2,14 @@
 // Pokemon TCG API Verification Service
 // Post-grading verification to ensure 100% accurate card identification
 
-import { PokemonCard, getPokemonCardById } from './pokemonTcgApi';
+import {
+  PokemonCard,
+  getPokemonCardById,
+  CardNumberFormat,
+  normalizeCardNumber as normalizeCardNumberFromApi,
+  detectCardNumberFormat,
+  getPromoSetId
+} from './pokemonTcgApi';
 
 const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
 // Get API key from environment variable - NO HARDCODED FALLBACKS
@@ -30,6 +37,10 @@ export interface CardInfoForVerification {
   card_number?: string;
   year?: string;
   set_code?: string; // 3-letter set code from card (e.g., "SVI", "PAF")
+  // New format-aware fields
+  card_number_raw?: string; // Full printed number exactly as shown (e.g., "240/193", "SWSH039")
+  card_number_format?: string; // Detected format type
+  set_total?: string; // Denominator from card number (e.g., "193" from "240/193")
 }
 
 /**
@@ -294,6 +305,81 @@ async function queryByNameAndSet(name: string, setName: string, cardNumber?: str
 }
 
 /**
+ * Query Pokemon TCG API using format-aware number normalization
+ * Uses detected format type to construct optimal API query
+ */
+async function queryByFormatAwareNumber(
+  name: string,
+  cardNumberRaw: string,
+  format: CardNumberFormat,
+  setTotal?: string
+): Promise<PokemonCard | null> {
+  try {
+    // Get format-specific number variations
+    const numberVariations = normalizeCardNumberFromApi(cardNumberRaw, format);
+    if (numberVariations.length === 0) {
+      console.log('[Pokemon API Verification] No number variations generated');
+      return null;
+    }
+
+    // Check if this is a promo format - use set.id constraint
+    const promoSetId = getPromoSetId(format);
+
+    for (const numberVariation of numberVariations) {
+      let query: string;
+
+      if (promoSetId) {
+        // Promo cards: use set.id constraint
+        query = `name:"${name}" number:"${numberVariation}" set.id:${promoSetId}`;
+        console.log(`[Pokemon API Verification] Format-aware promo query: ${query}`);
+      } else if (setTotal && format === 'fraction') {
+        // Standard cards with denominator: use printedTotal filter
+        const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
+        if (/^\d+$/.test(printedTotal)) {
+          query = `name:"${name}" number:"${numberVariation}" set.printedTotal:${printedTotal}`;
+          console.log(`[Pokemon API Verification] Format-aware printedTotal query: ${query}`);
+        } else {
+          query = `name:"${name}" number:"${numberVariation}"`;
+        }
+      } else {
+        // Other formats: standard query
+        query = `name:"${name}" number:"${numberVariation}"`;
+        console.log(`[Pokemon API Verification] Format-aware standard query: ${query}`);
+      }
+
+      const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await fetch(url, {
+        headers: { 'X-Api-Key': POKEMON_API_KEY },
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.data && data.data.length > 0) {
+          console.log(`[Pokemon API Verification] Format-aware search found ${data.data.length} match(es) for number: ${numberVariation}`);
+          return data.data[0];
+        }
+      }
+    }
+
+    return null;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.warn('[Pokemon API Verification] Format-aware request timeout');
+    } else {
+      console.error('[Pokemon API Verification] Format-aware query error:', error.message);
+    }
+    return null;
+  }
+}
+
+/**
  * Verify a Pokemon card using the Pokemon TCG API
  * Attempts multiple lookup strategies to find the exact card
  *
@@ -318,20 +404,49 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   const setName = cardInfo.set_name || '';
   const cardNumber = cardInfo.card_number || '';
   const setCode = cardInfo.set_code || '';
+  // New format-aware fields
+  const cardNumberRaw = cardInfo.card_number_raw || cardNumber;
+  const cardNumberFormat = cardInfo.card_number_format as CardNumberFormat || detectCardNumberFormat(cardNumberRaw);
+  const setTotal = cardInfo.set_total || '';
 
   if (!cardName && !cardNumber) {
     result.error = 'Insufficient card information for verification';
     return result;
   }
 
+  console.log(`[Pokemon API Verification] Detected format: ${cardNumberFormat}, setTotal: ${setTotal}`);
+
   let apiCard: PokemonCard | null = null;
 
+  // Strategy 0 (NEW): Format-aware search for promos and special formats
+  if (!apiCard && cardName && cardNumberRaw && (cardNumberFormat === 'swsh_promo' || cardNumberFormat === 'sv_promo' || cardNumberFormat === 'galarian_gallery' || cardNumberFormat === 'trainer_gallery')) {
+    console.log(`[Pokemon API Verification] Strategy 0: Format-aware search for ${cardNumberFormat}`);
+    apiCard = await queryByFormatAwareNumber(cardName, cardNumberRaw, cardNumberFormat, setTotal);
+    if (apiCard) {
+      result.verification_method = 'set_id_number';
+      result.confidence = 'high';
+    }
+  }
+
   // Strategy 1: Use set code (most reliable for modern cards)
-  if (setCode && cardNumber) {
+  if (!apiCard && setCode && cardNumber) {
     const setId = SET_CODE_TO_ID[setCode.toUpperCase()];
     if (setId) {
       console.log(`[Pokemon API Verification] Strategy 1: Set code ${setCode} -> ${setId}`);
       apiCard = await queryBySetIdAndNumber(setId, cardNumber);
+      if (apiCard) {
+        result.verification_method = 'set_id_number';
+        result.confidence = 'high';
+      }
+    }
+  }
+
+  // Strategy 1.5 (NEW): Use printedTotal from setTotal for fraction format
+  if (!apiCard && cardName && cardNumber && setTotal && cardNumberFormat === 'fraction') {
+    const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
+    if (/^\d+$/.test(printedTotal)) {
+      console.log(`[Pokemon API Verification] Strategy 1.5: Name + Number + printedTotal:${printedTotal}`);
+      apiCard = await queryByFormatAwareNumber(cardName, cardNumberRaw, cardNumberFormat, setTotal);
       if (apiCard) {
         result.verification_method = 'set_id_number';
         result.confidence = 'high';

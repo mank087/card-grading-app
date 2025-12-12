@@ -71,18 +71,45 @@ REQUIRED FIELDS (All Pokemon Cards)
 • Extract exactly as printed (e.g., "SVI", "PAF", "SVP")
 • null if not visible or not present (older cards pre-2020)
 
-**card_number**: Card number within set
+**card_number**: Card number within set (NUMERATOR ONLY for API lookup)
 🚨 **CRITICAL - EXACT OCR REQUIRED**:
 • READ THE ACTUAL PRINTED NUMBER ON THE CARD - DO NOT INFER OR CORRECT
-• Transcribe EXACTLY what is printed, character-by-character
 • Location: Usually bottom-left or bottom-right of card front
-• Format: "X/Y" where X = card number, Y = set total (e.g., "125/094", "25/102")
-• May include special prefixes (GG, TG, SV) - transcribe exactly as shown
-• DO NOT "fix" numbers based on your knowledge of set sizes
-• DO NOT substitute what you think the number "should be"
-• If the card shows "125/094", report "125/094" - NOT "125/106"
-• Foreign language cards may have different denominators - report as printed
+• **EXTRACT ONLY THE NUMERATOR** (the first number before any slash):
+  - "240/193" → card_number: "240"
+  - "25/102" → card_number: "25"
+  - "TG10/TG30" → card_number: "TG10"
+  - "GG33/GG70" → card_number: "GG33"
+  - "SWSH039" → card_number: "SWSH039" (no slash, use full value)
+  - "085" or "25" → card_number: "085" or "25" (single number, use as-is)
+• Keep leading zeros if present (e.g., "085" not "85")
+• Include prefixes (TG, GG, SWSH, SV) when part of the number
 • If partially obscured, report what IS visible with uncertainty note
+
+**card_number_raw**: Full printed card number EXACTLY as shown
+• Transcribe the COMPLETE number text, character-by-character
+• Examples: "240/193", "TG10/TG30", "GG33/GG70", "SWSH039", "SVP EN 085", "25"
+• Include ALL text - prefixes, slashes, spaces, everything printed
+• DO NOT modify or "correct" - if it shows "125/094", report "125/094"
+
+**card_number_format**: Classification of the card number format
+• Analyze the card_number_raw and classify into ONE of these formats:
+  - "fraction" = Standard X/Y format (e.g., "240/193", "25/102", "4/102")
+  - "swsh_promo" = SWSH prefix promo (e.g., "SWSH039", "SWSH254")
+  - "sv_promo" = Scarlet & Violet promo (e.g., "SVP EN 085", "085", or just digits with SVP set symbol)
+  - "trainer_gallery" = TG prefix (e.g., "TG10/TG30", "TG01/TG30")
+  - "galarian_gallery" = GG prefix (e.g., "GG33/GG70", "GG01/GG70")
+  - "single" = Just a number with no slash/denominator (e.g., "25" on older cards)
+  - "none" = No visible number (energy cards, some very old cards)
+• Use set symbol and era clues to help classify (e.g., SVP set symbol → sv_promo)
+
+**set_total**: The denominator/total from the card number (if present)
+• Extract the second number after the slash in fraction formats:
+  - "240/193" → set_total: "193"
+  - "TG10/TG30" → set_total: "TG30"
+  - "GG33/GG70" → set_total: "GG70"
+• For non-fraction formats (promo, single), set to null
+• Used for set identification - helps narrow down which set the card belongs to
 
 **year**: Year from copyright or release date
 • 4-digit year format
@@ -325,16 +352,20 @@ C. POKEMON SET IDENTIFICATION MODULE
 
 🚨 **DETECTION PRIORITY** (Execute in order, stop when confident match found):
 
-⚠️ **IMPORTANT**: The card_number field must contain the EXACT printed number from the card.
-   The lookup table below is ONLY for set name identification - NOT for "correcting" the card number.
-   If the card shows "125/094", report card_number as "125/094" even if the lookup table shows
-   a different denominator for that set. Foreign/regional prints often have different numbering.
+⚠️ **IMPORTANT**: The card_number field should contain ONLY the numerator (for API lookup).
+   The card_number_raw field preserves the EXACT printed number from the card.
+   The set_total field extracts the denominator for set identification.
+
+   Example: Card shows "125/094"
+   → card_number: "125" (numerator for API)
+   → card_number_raw: "125/094" (exact as printed)
+   → set_total: "094" (denominator for set lookup)
+   → card_number_format: "fraction"
 
 1. **Card Number Fraction Pattern** (PRIMARY METHOD)
    - Locate "X/Y" near lower front edge (e.g., "251/264")
-   - READ AND RECORD THE EXACT PRINTED NUMBER for card_number field
-   - Use denominator "Y" to help identify the set name (but keep original number)
-   - Match against lookup table below for SET IDENTIFICATION ONLY
+   - Extract numerator into card_number, full text into card_number_raw, denominator into set_total
+   - Use set_total to match against lookup table below for SET IDENTIFICATION
 
 2. **Set Symbol Recognition** (STRONGEST CONFIDENCE)
    - Detect small expansion icon on card front (usually bottom right)
