@@ -39,9 +39,10 @@ export function containsCJK(text: string): boolean {
  *
  * Strategy:
  * 1. If text has no CJK, return as-is
- * 2. If text has CJK mixed with ASCII (like "メガゲンガーEX"), extract ASCII portion
- * 3. If only CJK and englishFallback provided, use that with " - Japanese" suffix
- * 4. Otherwise use generic fallback
+ * 2. If text has format "Japanese (English)", extract the English portion
+ * 3. If text has CJK mixed with ASCII (like "メガゲンガーEX"), extract ASCII portion
+ * 4. If only CJK and englishFallback provided, use that with " - Japanese" suffix
+ * 5. Otherwise use generic fallback
  *
  * @param text - Input text that may contain CJK characters
  * @param fallback - Fallback text if result is empty (default: "Card")
@@ -58,6 +59,21 @@ export function extractAsciiSafe(
   // If no CJK characters, return the text as-is (just clean it)
   if (!containsCJK(text)) {
     return text.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim() || fallback;
+  }
+
+  // Check for "Japanese (English)" format - extract English from parentheses
+  // This handles AI output like "メガゲンガー (Mega Gengar)" or "ピカチュウ (Pikachu)"
+  const parenMatch = text.match(/\(([^)]+)\)/);
+  if (parenMatch && parenMatch[1]) {
+    const englishFromParens = parenMatch[1].replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
+    if (englishFromParens && /[a-zA-Z]/.test(englishFromParens)) {
+      // Add " - Japanese" suffix if the original had CJK outside parentheses
+      const outsideParens = text.replace(/\([^)]+\)/, '').trim();
+      if (containsCJK(outsideParens)) {
+        return `${englishFromParens} - Japanese`;
+      }
+      return englishFromParens;
+    }
   }
 
   // Text contains CJK - try to extract ASCII portion
