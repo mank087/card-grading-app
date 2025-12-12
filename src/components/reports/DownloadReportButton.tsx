@@ -546,7 +546,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Generate filename
       const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
-      const cardNameClean = sanitize(cardName);
+      const cardNameClean = sanitize(cleanLabelData.primaryName);
       const serialClean = sanitize(labelData.serial);
       const filename = `DCM-Label-${cardNameClean}-${serialClean}.pdf`;
 
@@ -656,7 +656,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
       // Generate filename
       const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
-      const cardNameClean = sanitize(cardName);
+      const cardNameClean = sanitize(cleanLabelData.primaryName);
       const serialClean = sanitize(labelData.serial);
       const filename = `DCM-MiniReport-${cardNameClean}-${serialClean}.jpg`;
 
