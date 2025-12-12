@@ -40,8 +40,8 @@ export function containsCJK(text: string): boolean {
  * Strategy:
  * 1. If text has no CJK, return as-is
  * 2. If text has format "Japanese (English)", extract the English portion
- * 3. If text has CJK mixed with ASCII (like "メガゲンガーEX"), extract ASCII portion
- * 4. If only CJK and englishFallback provided, use that with " - Japanese" suffix
+ * 3. If englishFallback provided, use it (possibly with ASCII suffix from text)
+ * 4. If text has significant ASCII portion (multiple words or meaningful content), use it
  * 5. Otherwise use generic fallback
  *
  * @param text - Input text that may contain CJK characters
@@ -76,23 +76,45 @@ export function extractAsciiSafe(
     }
   }
 
-  // Text contains CJK - try to extract ASCII portion
+  // Extract ASCII portion from the text
   const asciiOnly = text
     .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII (including CJK)
     .replace(/\s+/g, ' ')         // Normalize whitespace
     .trim();
 
-  // If we got something meaningful (more than just punctuation), use it
-  if (asciiOnly && asciiOnly.length > 1 && /[a-zA-Z0-9]/.test(asciiOnly)) {
-    return asciiOnly;
-  }
-
-  // No ASCII portion - use English fallback if provided
+  // Check englishFallback first - it might have better translation
   if (englishFallback && englishFallback.trim()) {
+    // Check if englishFallback has "Japanese (English)" format
+    const fallbackParenMatch = englishFallback.match(/\(([^)]+)\)/);
+    if (fallbackParenMatch && fallbackParenMatch[1]) {
+      const englishFromFallback = fallbackParenMatch[1].replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
+      if (englishFromFallback && /[a-zA-Z]/.test(englishFromFallback)) {
+        // Append any ASCII suffix from the original text (like "EX", "VMAX")
+        // Pattern: uppercase variant suffixes at end of text
+        const variantMatch = asciiOnly.match(/\b(VMAX|VSTAR|V|GX|EX|Prime)\b/i);
+        if (variantMatch) {
+          return `${englishFromFallback} ${variantMatch[1]} - Japanese`;
+        }
+        return `${englishFromFallback} - Japanese`;
+      }
+    }
+
+    // Clean englishFallback directly
     const cleanFallback = englishFallback.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
-    if (cleanFallback) {
+    if (cleanFallback && cleanFallback.length > 2 && /[a-zA-Z]/.test(cleanFallback)) {
+      // Append any ASCII variant suffix from original text
+      const variantMatch = asciiOnly.match(/\b(VMAX|VSTAR|V|GX|EX|Prime)\b/i);
+      if (variantMatch && !cleanFallback.includes(variantMatch[1])) {
+        return `${cleanFallback} ${variantMatch[1]} - Japanese`;
+      }
       return `${cleanFallback} - Japanese`;
     }
+  }
+
+  // If we got something meaningful from original text (not just short suffix), use it
+  // Consider it meaningful if it's multiple words or long enough to be a name
+  if (asciiOnly && asciiOnly.length > 3 && (asciiOnly.includes(' ') || /[a-zA-Z]{3,}/.test(asciiOnly))) {
+    return asciiOnly;
   }
 
   // Last resort - use generic fallback

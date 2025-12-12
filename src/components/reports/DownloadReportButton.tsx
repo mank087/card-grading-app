@@ -674,6 +674,11 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 
     } catch (error) {
       console.error('[MINI-REPORT JPG] ❌ Error generating JPG:', error);
+      // Log more details for debugging
+      if (error instanceof Error) {
+        console.error('[MINI-REPORT JPG] Error message:', error.message);
+        console.error('[MINI-REPORT JPG] Error stack:', error.stack);
+      }
       alert('Failed to generate mini-report image. Please try again or contact support if the issue persists.');
     } finally {
       setIsGenerating(false);
