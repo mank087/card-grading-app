@@ -3,7 +3,6 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 
 function UnsubscribeContent() {
   const searchParams = useSearchParams();
@@ -60,19 +59,6 @@ function UnsubscribeContent() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
       <div className="max-w-md w-full">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <Link href="/">
-            <Image
-              src="/DCM Logo.png"
-              alt="DCM Grading"
-              width={150}
-              height={50}
-              className="mx-auto"
-            />
-          </Link>
-        </div>
-
         {/* Card */}
         <div className="bg-white rounded-xl shadow-lg p-8">
           {/* Loading State */}
@@ -93,7 +79,7 @@ function UnsubscribeContent() {
               </div>
               <h1 className="text-2xl font-bold text-gray-900 mb-2">Unsubscribe</h1>
               <p className="text-gray-600 mb-6">
-                Are you sure you want to unsubscribe from DCM Grading marketing emails?
+                Are you sure you want to unsubscribe from DCM marketing emails?
               </p>
               <p className="text-sm text-gray-500 mb-6">
                 You will still receive important account-related emails (password resets, purchase confirmations, etc.)
