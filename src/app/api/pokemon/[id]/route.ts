@@ -776,12 +776,46 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
           console.log(`[GET /api/pokemon/${cardId}] 🔍 Calling Pokemon TCG API for set lookup...`);
 
           try {
-            const cardNumber = cardInfo.card_number;
+            // 🆕 ENHANCED: Use all available card number data for better API lookup
+            // Priority: card_number_raw (full printed) > constructed from parts > card_number alone
+            const cardNumberRaw = cardInfo.card_number_raw;  // Full printed: "251/264", "SWSH039", "SVP EN 085"
+            const cardNumberNumerator = cardInfo.card_number;  // Numerator only: "251", "SWSH039", "085"
+            const setTotal = cardInfo.set_total;  // Denominator: "264", "TG30", etc.
+            const cardFormat = cardInfo.card_number_format;  // "fraction", "swsh_promo", "sv_promo", etc.
+            const setCode = cardInfo.set_code;  // 3-letter code: "SVI", "PAL", "FST"
+
+            // Construct the best card number string for lookup:
+            // 1. Use card_number_raw if available (contains full printed number)
+            // 2. Otherwise construct from numerator + set_total for fractions
+            // 3. Fall back to just the numerator
+            let cardNumber: string;
+            if (cardNumberRaw) {
+              cardNumber = cardNumberRaw;
+            } else if (cardNumberNumerator && setTotal && cardFormat === 'fraction') {
+              cardNumber = `${cardNumberNumerator}/${setTotal}`;
+            } else {
+              cardNumber = cardNumberNumerator;
+            }
+
             const pokemonName = cardInfo.player_or_character;
             const year = cardInfo.year;
 
+            console.log(`[GET /api/pokemon/${cardId}] 📊 Card number data:`, {
+              card_number_raw: cardNumberRaw || 'null',
+              card_number: cardNumberNumerator || 'null',
+              set_total: setTotal || 'null',
+              card_number_format: cardFormat || 'null',
+              set_code: setCode || 'null',
+              constructed_lookup: cardNumber || 'null'
+            });
+
             if (cardNumber) {
-              const apiResult = await lookupSetByCardNumber(cardNumber, pokemonName, year);
+              const apiResult = await lookupSetByCardNumber(
+                cardNumber,
+                pokemonName,
+                year,
+                { setCode, cardFormat }  // 🆕 Pass additional context for smarter lookups
+              );
 
               if (apiResult.success) {
                 console.log(`[GET /api/pokemon/${cardId}] ✅ API lookup successful:`, apiResult.set_name);

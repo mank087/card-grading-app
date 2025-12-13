@@ -705,6 +705,66 @@ function extractYearFromDate(releaseDate: string): number | null {
 }
 
 /**
+ * 3-letter set code to Pokemon TCG API set.id mapping
+ * These are the official set abbreviations printed on modern cards
+ */
+const SET_CODE_TO_ID: Record<string, string> = {
+  // Scarlet & Violet Era (2023+)
+  'SVI': 'sv1',      // Scarlet & Violet Base
+  'PAL': 'sv2',      // Paldea Evolved
+  'OBF': 'sv3',      // Obsidian Flames
+  'MEW': 'sv3pt5',   // Pokemon 151
+  'PAR': 'sv4',      // Paradox Rift
+  'PAF': 'sv4pt5',   // Paldean Fates
+  'TEF': 'sv5',      // Temporal Forces
+  'TWM': 'sv6',      // Twilight Masquerade
+  'SFA': 'sv6pt5',   // Shrouded Fable
+  'SCR': 'sv7',      // Stellar Crown
+  'SSP': 'sv8',      // Surging Sparks
+  'SVP': 'svp',      // SV Promos
+  'SVE': 'sve',      // SV Energies
+  // Sword & Shield Era (2020-2023)
+  'SSH': 'swsh1',    // Sword & Shield Base
+  'RCL': 'swsh2',    // Rebel Clash
+  'DAA': 'swsh3',    // Darkness Ablaze
+  'VIV': 'swsh4',    // Vivid Voltage
+  'BST': 'swsh5',    // Battle Styles
+  'CRE': 'swsh6',    // Chilling Reign
+  'EVS': 'swsh7',    // Evolving Skies
+  'FST': 'swsh8',    // Fusion Strike
+  'BRS': 'swsh9',    // Brilliant Stars
+  'ASR': 'swsh10',   // Astral Radiance
+  'LOR': 'swsh11',   // Lost Origin
+  'SIT': 'swsh12',   // Silver Tempest
+  'CRZ': 'swsh12pt5', // Crown Zenith
+  'SHF': 'swsh45',   // Shining Fates
+  'CEL': 'cel25',    // Celebrations
+  'SWSHP': 'swshp',  // SWSH Promos
+  // Sun & Moon Era (2017-2020)
+  'SUM': 'sm1',      // Sun & Moon Base
+  'GRI': 'sm2',      // Guardians Rising
+  'BUS': 'sm3',      // Burning Shadows
+  'SLG': 'sm35',     // Shining Legends
+  'CIN': 'sm4',      // Crimson Invasion
+  'UPR': 'sm5',      // Ultra Prism
+  'FLI': 'sm6',      // Forbidden Light
+  'CES': 'sm7',      // Celestial Storm
+  'LOT': 'sm8',      // Lost Thunder
+  'TEU': 'sm9',      // Team Up
+  'UNB': 'sm10',     // Unbroken Bonds
+  'UNM': 'sm11',     // Unified Minds
+  'CEC': 'sm12',     // Cosmic Eclipse
+};
+
+/**
+ * Additional lookup options for smarter API queries
+ */
+export interface SetLookupOptions {
+  setCode?: string;           // 3-letter set code (e.g., "SVI", "FST")
+  cardFormat?: string;        // Card number format (e.g., "fraction", "sv_promo")
+}
+
+/**
  * Lookup Pokemon set by card number (for hybrid set identification system)
  *
  * This function is called when the AI's mini lookup table doesn't contain the set.
@@ -713,16 +773,18 @@ function extractYearFromDate(releaseDate: string): number | null {
  * @param cardNumber - Card number string (e.g., "251/264", "GG70/GG70")
  * @param pokemonName - Pokemon name for additional context (optional)
  * @param year - Copyright year from card (optional, helps disambiguation)
+ * @param options - Additional lookup options (setCode, cardFormat)
  * @returns SetLookupResult with set information
  */
 export async function lookupSetByCardNumber(
   cardNumber: string,
   pokemonName?: string,
-  year?: string
+  year?: string,
+  options?: SetLookupOptions
 ): Promise<SetLookupResult> {
 
-  // Generate cache key
-  const cacheKey = `${cardNumber}|${pokemonName || ''}|${year || ''}`;
+  // Generate cache key (include options for better cache hit rate)
+  const cacheKey = `${cardNumber}|${pokemonName || ''}|${year || ''}|${options?.setCode || ''}|${options?.cardFormat || ''}`;
 
   // Check cache first
   const cachedResult = setLookupCache.get(cacheKey);
@@ -732,7 +794,130 @@ export async function lookupSetByCardNumber(
   }
 
   try {
-    // Parse card number - supports multiple formats:
+    // 🆕 FAST PATH: If we have a set_code, use it directly (fastest lookup)
+    if (options?.setCode) {
+      const setId = SET_CODE_TO_ID[options.setCode.toUpperCase()];
+      if (setId) {
+        console.log(`[PokemonTCG API] 🚀 Fast path: Using set_code ${options.setCode} → set.id:${setId}`);
+
+        // Extract just the card number for query
+        let cardNum = cardNumber;
+        const fractionMatch = cardNumber.match(/^([A-Z0-9]+)\/[A-Z0-9]+$/i);
+        if (fractionMatch) {
+          cardNum = fractionMatch[1];
+        } else {
+          // Extract digits for promo-style numbers
+          const digitMatch = cardNumber.match(/\b(\d+)\b/);
+          if (digitMatch) {
+            cardNum = digitMatch[1];
+          }
+        }
+
+        // Query by set.id + number (very specific, fast)
+        const fastQuery = `set.id:${setId} number:${cardNum}`;
+        const fastUrl = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(fastQuery)}`;
+        console.log('[PokemonTCG API] Fast query URL:', fastUrl);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+          const response = await fetch(fastUrl, {
+            headers: { 'X-Api-Key': POKEMON_API_KEY },
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.data && data.data.length > 0) {
+              const card = data.data[0];
+              const result: SetLookupResult = {
+                success: true,
+                set_name: card.set.name,
+                set_id: card.set.id,
+                set_year: extractYearFromReleaseDate(card.set.releaseDate),
+                set_era: card.set.series,
+                set_confidence: 'high',
+                set_identifier_source: ['set_code', 'api_lookup'],
+                set_identifier_reason: `Matched via set_code ${options.setCode} → ${card.set.name}`,
+                cache_hit: false
+              };
+              setLookupCache.set(cacheKey, result);
+              console.log(`[PokemonTCG API] ✅ Fast path success: ${card.set.name}`);
+              return result;
+            }
+          }
+        } catch (e: any) {
+          clearTimeout(timeoutId);
+          console.warn(`[PokemonTCG API] Fast path failed, falling back:`, e.message);
+        }
+      }
+    }
+
+    // 🆕 PROMO PATH: If card_format indicates a promo, use promo set ID
+    if (options?.cardFormat === 'sv_promo' || options?.cardFormat === 'swsh_promo') {
+      const promoSetId = options.cardFormat === 'sv_promo' ? 'svp' : 'swshp';
+      console.log(`[PokemonTCG API] 🎁 Promo path: Using format ${options.cardFormat} → set.id:${promoSetId}`);
+
+      // Extract just the number
+      let cardNum = cardNumber.match(/\b(\d+)\b/)?.[1] || cardNumber;
+      // Try with and without leading zeros
+      const cardNumNoZeros = cardNum.replace(/^0+/, '') || cardNum;
+
+      for (const numVariation of [cardNumNoZeros, cardNum]) {
+        const promoQuery = `set.id:${promoSetId} number:${numVariation}`;
+        const promoUrl = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(promoQuery)}`;
+        console.log('[PokemonTCG API] Promo query URL:', promoUrl);
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        try {
+          const response = await fetch(promoUrl, {
+            headers: { 'X-Api-Key': POKEMON_API_KEY },
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data = await response.json();
+            if (data.data && data.data.length > 0) {
+              // If multiple results and we have Pokemon name, filter by it
+              let cards = data.data;
+              if (pokemonName && cards.length > 1) {
+                const nameMatch = cards.find((c: any) =>
+                  c.name.toLowerCase().includes(pokemonName.toLowerCase()) ||
+                  pokemonName.toLowerCase().includes(c.name.toLowerCase())
+                );
+                if (nameMatch) cards = [nameMatch];
+              }
+
+              const card = cards[0];
+              const result: SetLookupResult = {
+                success: true,
+                set_name: card.set.name,
+                set_id: card.set.id,
+                set_year: extractYearFromReleaseDate(card.set.releaseDate),
+                set_era: card.set.series,
+                set_confidence: 'high',
+                set_identifier_source: ['card_format', 'promo_lookup'],
+                set_identifier_reason: `Matched via ${options.cardFormat} format → ${card.set.name}`,
+                cache_hit: false
+              };
+              setLookupCache.set(cacheKey, result);
+              console.log(`[PokemonTCG API] ✅ Promo path success: ${card.set.name}`);
+              return result;
+            }
+          }
+        } catch (e: any) {
+          clearTimeout(timeoutId);
+          console.warn(`[PokemonTCG API] Promo path variation ${numVariation} failed:`, e.message);
+        }
+      }
+    }
+
+    // STANDARD PATH: Parse card number - supports multiple formats:
     // 1. Standard: "251/264" → cardNum=251, totalCards=264
     // 2. Promo: "SVP EN 085" → cardNum=085, totalCards=null
     // 3. Gallery: "GG70/GG70" → cardNum=GG70, totalCards=GG70
