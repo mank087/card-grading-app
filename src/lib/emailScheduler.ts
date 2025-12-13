@@ -89,6 +89,7 @@ export async function getPendingEmails(limit: number = 50): Promise<ScheduledEma
 
 /**
  * Check if user is still subscribed to marketing emails
+ * Returns true if marketing_emails_enabled is true OR null (default = opted in)
  */
 export async function isUserSubscribed(userId: string): Promise<boolean> {
   try {
@@ -99,10 +100,12 @@ export async function isUserSubscribed(userId: string): Promise<boolean> {
       .single();
 
     if (error || !data) {
-      return false;
+      // If no profile found, default to subscribed (will create profile on first email)
+      return true;
     }
 
-    return data.marketing_emails_enabled === true;
+    // null or true = subscribed, only false = unsubscribed
+    return data.marketing_emails_enabled !== false;
   } catch (error) {
     console.error('[EmailScheduler] Error checking subscription:', error);
     return false;
