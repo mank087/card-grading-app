@@ -1747,8 +1747,17 @@ export function MTGCardDetails() {
 
       setIsDeleting(true);
 
-      const response = await fetch(`/api/sports/${card.id}`, {
+      // Get user session for authentication
+      const session = getStoredSession();
+      if (!session || !session.user || !session.access_token) {
+        throw new Error('You must be logged in to delete cards');
+      }
+
+      const response = await fetch(`/api/cards/${card.id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
       });
 
       if (!response.ok) {
