@@ -513,7 +513,16 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     if (frontUrl && backUrl) {
       try {
         console.log(`[MTG CONVERSATIONAL AI v4.2] 🎯 Starting PRIMARY grading with MTG-specific prompt...`);
-        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'mtg');
+
+        // Check if user provided condition report hints
+        const userConditionReport = card.user_condition_processed || null;
+        if (userConditionReport) {
+          console.log(`[GET /api/mtg/${cardId}] 📋 User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
+        }
+
+        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'mtg', {
+          userConditionReport: userConditionReport
+        });
         conversationalGradingResult = conversationalResult.markdown_report;
 
         // Store full result for enhanced data extraction

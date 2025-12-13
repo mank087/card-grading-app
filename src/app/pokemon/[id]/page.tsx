@@ -23,7 +23,7 @@ function generateMetaKeywords(card: any): string {
   const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || '';
   const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || 'The Pokemon Company';
   const rarity = stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || '';
-  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
+  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
   const pokemonType = card.conversational_card_info?.pokemon_type || card.pokemon_type || '';
   const hp = card.conversational_card_info?.hp || card.hp || '';
   const grade = card.conversational_decimal_grade;
@@ -103,7 +103,7 @@ function buildTitle(card: any): string {
   const pokemonName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || card.pokemon_featured || '';
   const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || '';
   const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
-  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
+  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
   const rarity = stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || '';
   const grade = card.conversational_decimal_grade;
 
@@ -174,7 +174,7 @@ function buildDescription(card: any): string {
   const pokemonName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || card.pokemon_featured || '';
   const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
   const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || '';
-  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
+  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
   const rarity = stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || '';
   const pokemonType = card.conversational_card_info?.pokemon_type || card.pokemon_type || '';
   const hp = card.conversational_card_info?.hp || card.hp || '';

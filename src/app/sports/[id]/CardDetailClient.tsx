@@ -27,6 +27,8 @@ import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
 import { useCredits } from '@/contexts/CreditsContext';
+import { ConditionReportDisplay } from '@/components/UserConditionReport';
+import { UserConditionReportInput } from '@/types/conditionReport';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -2225,7 +2227,7 @@ export function SportsCardDetails() {
     set_name: setNameWithSubset,
     year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
-    card_number: stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
+    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
     sport_or_category: stripMarkdown(card.conversational_card_info?.sport_or_category) || card.sport || dvgGrading.card_info?.sport_or_category,
     serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
     rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
@@ -2873,6 +2875,20 @@ export function SportsCardDetails() {
                   </div>
                 );
               })()}
+
+              {/* User-Reported Condition - Show below AI summary */}
+              {card.has_user_condition_report && card.user_condition_report && (
+                <div className="mt-6">
+                  <ConditionReportDisplay
+                    report={card.user_condition_report as UserConditionReportInput}
+                    aiResponse={card.user_condition_ai_response ? {
+                      hints_confirmed: card.user_condition_ai_response.hints_confirmed || [],
+                      hints_not_visible: card.user_condition_ai_response.hints_not_visible || [],
+                      influenced_grade: card.user_report_influenced_grade || false
+                    } : undefined}
+                  />
+                </div>
+              )}
 
               {/* 📄 Download Report Button & Social Sharing */}
               {(() => {

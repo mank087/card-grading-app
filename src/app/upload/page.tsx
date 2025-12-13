@@ -14,6 +14,9 @@ import { useCredits } from '@/contexts/CreditsContext'
 import PhotoTipsPopup, { useShouldShowPhotoTips } from '@/components/PhotoTipsPopup'
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
+import UserConditionReport from '@/components/UserConditionReport'
+import { UserConditionReportInput, EMPTY_CONDITION_REPORT, hasAnyConditionData } from '@/types/conditionReport'
+import { processConditionReport } from '@/lib/conditionReportProcessor'
 
 interface CompressionInfo {
   originalSize: number;
@@ -168,6 +171,9 @@ function UniversalUploadPageContent() {
 
   // Track the navigation timestamp to detect when user clicks nav to grade another card
   const [lastNavTimestamp, setLastNavTimestamp] = useState<string | null>(null);
+
+  // User condition report state (optional defect hints)
+  const [conditionReport, setConditionReport] = useState<UserConditionReportInput>(EMPTY_CONDITION_REPORT);
 
   // Update selected type when URL param changes AND reset upload state if navigating to grade a new card
   useEffect(() => {
@@ -405,6 +411,15 @@ function UniversalUploadPageContent() {
       }
 
       console.log('[Upload] Saving to database...')
+
+      // Process condition report if user provided any data
+      const hasConditionData = hasAnyConditionData(conditionReport)
+      const processedConditionReport = hasConditionData ? processConditionReport(conditionReport) : null
+
+      if (hasConditionData) {
+        console.log('[Upload] User condition report provided:', processedConditionReport?.total_defects_reported, 'defects reported')
+      }
+
       // Save record in DB with selected category (use authenticated client)
       const { error: dbError } = await authClient.from('cards').insert({
         id: cardId,
@@ -414,6 +429,10 @@ function UniversalUploadPageContent() {
         back_path: backPath,
         category: config.category,
         is_public: true,
+        // User condition report fields
+        user_condition_report: hasConditionData ? conditionReport : null,
+        user_condition_processed: processedConditionReport,
+        has_user_condition_report: hasConditionData,
       })
 
       if (dbError) {
@@ -609,6 +628,7 @@ function UniversalUploadPageContent() {
     setUploadedCardId(null)
     setUploadedCardCategory(null)
     setUploadMode('select')
+    setConditionReport(EMPTY_CONDITION_REPORT)
     console.log('[Upload] Reset upload state - ready for new card')
   }
 
@@ -895,6 +915,16 @@ function UniversalUploadPageContent() {
               <p className="text-xs text-blue-800 font-semibold mb-1">💡 Tips:</p>
               <p className="text-xs text-blue-700">Good lighting, all corners visible, plain background</p>
             </div>
+
+            {/* User Condition Report - Optional defect hints (Gallery Mode) */}
+            {frontFile && backFile && (
+              <div className="mt-4 max-w-lg mx-auto">
+                <UserConditionReport
+                  value={conditionReport}
+                  onChange={setConditionReport}
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -996,6 +1026,14 @@ function UniversalUploadPageContent() {
                   </button>
                 </div>
               </div>
+            </div>
+
+            {/* User Condition Report - Optional defect hints */}
+            <div className="mt-4 max-w-lg mx-auto">
+              <UserConditionReport
+                value={conditionReport}
+                onChange={setConditionReport}
+              />
             </div>
           </div>
         </div>
@@ -1313,6 +1351,14 @@ function UniversalUploadPageContent() {
               )}
             </div>
           </div>
+        )}
+
+        {/* User Condition Report - Optional defect hints (Desktop Mode) */}
+        {frontFile && backFile && (
+          <UserConditionReport
+            value={conditionReport}
+            onChange={setConditionReport}
+          />
         )}
 
         {/* Upload Button */}

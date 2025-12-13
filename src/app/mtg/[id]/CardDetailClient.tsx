@@ -29,6 +29,8 @@ import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
 import { useCredits } from '@/contexts/CreditsContext';
+import { ConditionReportDisplay } from '@/components/UserConditionReport';
+import { UserConditionReportInput } from '@/types/conditionReport';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -2938,6 +2940,20 @@ export function MTGCardDetails() {
                   <p className="text-gray-700 leading-relaxed">
                     {card.conversational_final_grade_summary}
                   </p>
+                </div>
+              )}
+
+              {/* User-Reported Condition - Show below AI summary */}
+              {card.has_user_condition_report && card.user_condition_report && (
+                <div className="mt-6">
+                  <ConditionReportDisplay
+                    report={card.user_condition_report as UserConditionReportInput}
+                    aiResponse={card.user_condition_ai_response ? {
+                      hints_confirmed: card.user_condition_ai_response.hints_confirmed || [],
+                      hints_not_visible: card.user_condition_ai_response.hints_not_visible || [],
+                      influenced_grade: card.user_report_influenced_grade || false
+                    } : undefined}
+                  />
                 </div>
               )}
 

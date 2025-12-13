@@ -23,6 +23,8 @@ import {
   type DefectCoordinate,
   type GradingMetadataV3_3
 } from './conversationalGradingV3_3';
+import { ProcessedConditionReport } from '@/types/conditionReport';
+import { formatConditionReportForPrompt } from './conditionReportProcessor';
 
 // Re-export for use in routes
 export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
@@ -1452,6 +1454,7 @@ export async function gradeCardConversational(
     max_tokens?: number;
     seed?: number;
     top_p?: number;
+    userConditionReport?: ProcessedConditionReport; // Optional user-reported condition hints
   }
 ): Promise<ConversationalGradeResultV3_3> {
   const {
@@ -1459,8 +1462,18 @@ export async function gradeCardConversational(
     temperature = 0.2,  // 🔑 Low temperature for strict instruction adherence (v3.5 PATCHED v3)
     max_tokens = 16000, // 🔧 Increased to 16K - v5.11 rubric requires extensive JSON output
     seed = 42,          // Fixed seed for reproducibility
-    top_p = 1.0         // 🔑 Full probability space - allows nuanced descriptions while temp maintains consistency
+    top_p = 1.0,        // 🔑 Full probability space - allows nuanced descriptions while temp maintains consistency
+    userConditionReport = undefined // Optional user-reported condition hints
   } = options || {};
+
+  // Format user condition report for prompt injection (if provided)
+  const conditionReportSection = userConditionReport
+    ? formatConditionReportForPrompt(userConditionReport)
+    : null;
+
+  if (conditionReportSection?.has_user_hints) {
+    console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] User condition report provided - ${userConditionReport?.total_defects_reported || 0} defects reported`);
+  }
 
   console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Starting conversational grading...`);
   console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Parameters: Model=${model}, Temp=${temperature}, TopP=${top_p}, MaxTokens=${max_tokens}, Seed=${seed}`);
@@ -1522,7 +1535,8 @@ export async function gradeCardConversational(
 - Remember: ANY crease or bent corner = AUTOMATIC 4.0 grade cap
 - Don't overlook subtle defects - be thorough and critical
 - Each card is unique - base observations on THESE specific images
-
+${conditionReportSection?.has_user_hints ? `
+${conditionReportSection.full_prompt_text}` : ''}
 Return ONLY the JSON object with all required fields filled.`
                 : `Grade these card images following the structured report format.
 
@@ -1532,7 +1546,8 @@ Return ONLY the JSON object with all required fields filled.`
 - Remember: ANY crease or bent corner = AUTOMATIC 4.0 grade cap
 - Don't overlook subtle defects - be thorough and critical
 - Each card is unique - base observations on THESE specific images
-
+${conditionReportSection?.has_user_hints ? `
+${conditionReportSection.full_prompt_text}` : ''}
 Provide detailed analysis as markdown with all required sections.`
             }
           ]

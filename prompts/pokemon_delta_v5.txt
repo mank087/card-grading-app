@@ -72,11 +72,37 @@ REQUIRED FIELDS (All Pokemon Cards)
 • null if not visible or not present (older cards pre-2020)
 
 **card_number**: Card number within set (NUMERATOR ONLY for API lookup)
-🚨 **CRITICAL - EXACT OCR REQUIRED**:
-• READ THE ACTUAL PRINTED NUMBER ON THE CARD - DO NOT INFER OR CORRECT
+🚨 **CRITICAL - EXACT OCR REQUIRED WITH DIGIT-BY-DIGIT VERIFICATION**:
+
+**STEP 1: LOCATE THE NUMBER**
 • Location: Usually bottom-left or bottom-right of card front
-• **EXTRACT ONLY THE NUMERATOR** (the first number before any slash):
+• Look for format like "XXX/YYY" (e.g., "185/159")
+• Zoom in mentally on this area before reading
+
+**STEP 2: READ DIGIT-BY-DIGIT (Left to Right)**
+• Read each digit individually and verify its shape:
+  - 0: Oval/round shape with hole in middle
+  - 1: Single vertical line, may have serifs
+  - 2: Curved top, horizontal bottom stroke
+  - 3: Two curved bumps on right side (like sideways 'W')
+  - 4: Angular, vertical line with horizontal cross
+  - 5: Flat top, curved bottom (like backwards '2' rotated)
+  - 6: Round bottom with curved top stroke
+  - 7: Horizontal top, diagonal stroke down
+  - 8: Two stacked circles (figure-8)
+  - 9: Round top with curved bottom stroke (upside-down 6)
+
+**STEP 3: VERIFY COMMONLY CONFUSED DIGITS**
+🔍 These pairs are frequently misread - DOUBLE-CHECK:
+  - 3 vs 5 vs 8 (curved shapes - look at bump direction)
+  - 1 vs 7 (presence of horizontal top stroke)
+  - 6 vs 8 vs 9 (number of loops)
+  - 0 vs O vs 8 (hole count)
+
+**STEP 4: EXTRACT THE NUMERATOR**
+• **EXTRACT ONLY THE NUMBER BEFORE THE SLASH**:
   - "240/193" → card_number: "240"
+  - "185/159" → card_number: "185"
   - "25/102" → card_number: "25"
   - "TG10/TG30" → card_number: "TG10"
   - "GG33/GG70" → card_number: "GG33"
@@ -87,10 +113,18 @@ REQUIRED FIELDS (All Pokemon Cards)
 • If partially obscured, report what IS visible with uncertainty note
 
 **card_number_raw**: Full printed card number EXACTLY as shown
-• Transcribe the COMPLETE number text, character-by-character
-• Examples: "240/193", "TG10/TG30", "GG33/GG70", "SWSH039", "SVP EN 085", "25"
+🚨 **TRANSCRIBE CHARACTER-BY-CHARACTER - NO CORRECTIONS**:
+• Read each character from the image, left to right
+• Examples: "240/193", "185/159", "TG10/TG30", "GG33/GG70", "SWSH039", "SVP EN 085", "25"
 • Include ALL text - prefixes, slashes, spaces, everything printed
-• DO NOT modify or "correct" - if it shows "125/094", report "125/094"
+• DO NOT modify, guess, or "correct" - if it shows "125/094", report "125/094"
+• If you read "183/159" but are uncertain, note the uncertainty - DO NOT auto-correct to "185"
+
+**card_number_confidence**: Confidence in the card number OCR reading
+• "high" = Number is clearly visible, no ambiguity in any digit
+• "medium" = Number is readable but some digits are small/partially obscured
+• "low" = Number is difficult to read, one or more digits uncertain
+• Include notes on which specific digits were uncertain (e.g., "third digit could be 3 or 5")
 
 **card_number_format**: Classification of the card number format
 • Analyze the card_number_raw and classify into ONE of these formats:

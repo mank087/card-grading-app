@@ -496,6 +496,70 @@ The existing "when in doubt, deduct" rule applies ONLY to AMBIGUOUS VISIBLE feat
 • Ambiguous VISIBLE feature = Something you SEE but aren't certain what it is → Treat as defect
 • INVISIBLE/hidden area = Something you CANNOT see at all → DO NOT deduct, increase uncertainty instead
 ---
+SECTION 1.8: USER-REPORTED CONDITION HINTS (v5.15 NEW)
+---
+🆕 **SUPPLEMENTAL USER INPUT PROTOCOL**
+
+PURPOSE: Users may optionally report defects they noticed during physical inspection that photos might not capture clearly. These hints guide your inspection but do NOT override visual evidence.
+
+**CRITICAL PRINCIPLES:**
+
+1. **HINTS, NOT FACTS:**
+   User reports are suggestions to investigate more carefully, NOT confirmed defects.
+   Treat them as "areas to examine closely" rather than guaranteed issues.
+
+2. **VISUAL EVIDENCE ALWAYS WINS:**
+   | User Reports | You See | Action |
+   |--------------|---------|--------|
+   | "scratch on front" | Scratch visible | Confirm and include in analysis |
+   | "scratch on front" | No scratch visible | Note: "User reported scratch; not visible in submitted photos" |
+   | "card is perfect" | Defects visible | IGNORE user claim, grade what you see |
+   | "no defects" | Defects visible | IGNORE user claim, grade what you see |
+
+3. **ONE-DIRECTIONAL INFLUENCE:**
+   • User hints can ONLY add potential defects to investigate
+   • User hints can NEVER remove defects you observe
+   • User hints can NEVER raise scores above visual evidence
+   • User claims of "mint", "perfect", "no defects" are IGNORED completely
+
+4. **INCREASED SCRUTINY FOR REPORTED AREAS:**
+   When a user reports a specific defect (e.g., "light scratch on back surface"):
+   • Examine that specific area MORE carefully
+   • If area is ambiguous AND user reported issue → apply "when in doubt, deduct" rule
+   • If area clearly shows no defect → note user report was not confirmed
+
+5. **STRUCTURAL DAMAGE REPORTS:**
+   User-reported creases, bends, or warping require CAREFUL verification:
+   • If confirmed → Apply automatic grade caps (crease = 4.0 cap, etc.)
+   • If not visible → Note "User reported crease; not visible in photos. Confidence reduced."
+
+**OUTPUT REQUIREMENTS:**
+
+When user hints are provided, include in your response:
+
+```json
+"user_condition_integration": {
+  "user_hints_provided": true,
+  "reported_defects": ["list of what user reported"],
+  "hints_confirmed": ["defects you confirmed visually"],
+  "hints_not_visible": ["reported defects not seen in photos"],
+  "hints_influenced_grade": true/false,
+  "integration_notes": "Brief summary of how hints affected analysis"
+}
+```
+
+**EXAMPLE ANALYSIS WITH USER HINTS:**
+
+"User reported light scratch on back surface near bottom edge. Upon examination of the back surface, I can confirm a faint horizontal mark approximately 2cm from the bottom edge, measuring roughly 8mm in length. This mark is subtle in the photos but visible upon close inspection. User hint confirmed - this defect contributes to back surface score of 9.0."
+
+"User reported corner wear on front top-left corner. Examining this corner at maximum zoom, I observe a sharp corner point with no visible whitening or fiber exposure. User-reported corner wear NOT confirmed in submitted photos."
+
+**IMPORTANT:**
+• User hints help catch defects photos might miss
+• They NEVER override what you can clearly see
+• They NEVER allow grade inflation
+• Transparency about what was confirmed vs. not visible builds user trust
+---
 SECTION 1.9: MANDATORY SEVERITY CLASSIFICATION (v5.13)
 ---
 🚨 **VISIBLE DEFECTS = MODERATE OR HIGHER**

@@ -386,7 +386,16 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       try {
         const versionLabel = process.env.USE_V5_ARCHITECTURE === 'true' ? 'v5.0' : 'v4.2';
         console.log(`[OTHER CONVERSATIONAL AI ${versionLabel}] 🎯 Starting grading with Other-specific prompt...`);
-        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'other');
+
+        // Check if user provided condition report hints
+        const userConditionReport = card.user_condition_processed || null;
+        if (userConditionReport) {
+          console.log(`[GET /api/other/${cardId}] 📋 User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
+        }
+
+        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'other', {
+          userConditionReport: userConditionReport
+        });
         conversationalGradingResult = conversationalResult.markdown_report;
 
         console.log(`[GET /api/other/${cardId}] ✅ Conversational grading completed`);

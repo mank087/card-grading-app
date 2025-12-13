@@ -452,7 +452,16 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       try {
         const versionLabel = process.env.USE_V5_ARCHITECTURE === 'true' ? 'v5.0' : 'v4.2';
         console.log(`[SPORTS CONVERSATIONAL AI ${versionLabel}] 🎯 Starting PRIMARY grading with Sports-specific prompt...`);
-        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'sports');
+
+        // Check if user provided condition report hints
+        const userConditionReport = card.user_condition_processed || null;
+        if (userConditionReport) {
+          console.log(`[GET /api/sports/${cardId}] 📋 User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
+        }
+
+        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, 'sports', {
+          userConditionReport: userConditionReport
+        });
         conversationalGradingResult = conversationalResult.markdown_report;
         conversationalResultV3_3 = conversationalResult; // Store full result
 
