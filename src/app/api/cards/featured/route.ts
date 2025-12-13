@@ -55,7 +55,7 @@ export async function GET() {
       .eq('is_featured', true)
       .not('conversational_decimal_grade', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(8)
+      .limit(15)
 
     if (error) {
       console.error('Error fetching featured cards:', error)
