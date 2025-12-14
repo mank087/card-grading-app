@@ -58,8 +58,9 @@ export async function GET(request: NextRequest) {
     let skipped = 0;
     let failed = 0;
 
-    // Process each pending email
-    for (const email of pendingEmails) {
+    // Process each pending email with rate limiting (Resend allows 2 req/sec)
+    for (let i = 0; i < pendingEmails.length; i++) {
+      const email = pendingEmails[i];
       try {
         const result = await processScheduledEmail(email);
         if (result === 'sent') sent++;
@@ -69,6 +70,11 @@ export async function GET(request: NextRequest) {
         console.error(`[Cron] Error processing email ${email.id}:`, error);
         await markEmailFailed(email.id, error.message);
         failed++;
+      }
+
+      // Rate limit: wait 600ms between sends to stay under 2 req/sec
+      if (i < pendingEmails.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 600));
       }
     }
 
