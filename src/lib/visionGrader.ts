@@ -1746,16 +1746,19 @@ Provide detailed analysis as markdown with all required sections.`
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[CONVERSATIONAL] Attempt ${attempt}/${MAX_RETRIES} failed:`, errorMessage);
 
-      // Check if this is a retryable error
+      // Check if this is a retryable error (case-insensitive for timeout)
+      const errorLower = errorMessage.toLowerCase();
       const isRetryable =
         errorMessage.includes('No response content from API') ||
         errorMessage.includes('finish_reason: unknown') ||
         errorMessage.includes('ECONNRESET') ||
-        errorMessage.includes('timeout') ||
-        errorMessage.includes('rate limit') ||
+        errorLower.includes('timeout') ||
+        errorLower.includes('rate limit') ||
+        errorMessage.includes('Timeout while downloading') ||
         errorMessage.includes('503') ||
         errorMessage.includes('502') ||
-        errorMessage.includes('500');
+        errorMessage.includes('500') ||
+        errorMessage.includes('400');
 
       if (isRetryable && attempt < MAX_RETRIES) {
         const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
