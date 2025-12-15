@@ -254,7 +254,7 @@ interface Defect {
 interface GradeCardOptions {
   frontImageUrl: string;
   backImageUrl: string;
-  model?: 'gpt-4o' | 'gpt-4o-mini';
+  model?: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-5.1';
   temperature?: number;
   top_p?: number;              // Nucleus sampling parameter for deterministic grading
   max_tokens?: number;         // Response length limit - lower forces concise output
@@ -476,7 +476,7 @@ export async function gradeCardWithVision(
   const {
     frontImageUrl,
     backImageUrl,
-    model = 'gpt-4o',
+    model = 'gpt-5.1',      // 🆕 GPT-5.1 - Latest model (November 2025)
     temperature = 1.0,      // TESTING: Increased to 1.0 (ChatGPT default) to test if higher creativity improves defect detection consistency
     top_p = 0.1,            // TIGHT sampling - ChatGPT recommendation: 0.1-0.2 prevents optimistic language
     max_tokens = 4000,      // BALANCED - High enough to complete JSON, low enough to prevent verbose prose
@@ -721,12 +721,12 @@ export function extractGradeMetrics(result: VisionGradeResult) {
 export async function estimateProfessionalGrades(
   dcmResult: VisionGradeResult,
   options?: {
-    model?: 'gpt-4o' | 'gpt-4o-mini';
+    model?: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-5.1';
     temperature?: number;
   }
 ): Promise<VisionGradeResult['estimated_professional_grades']> {
   const {
-    model = 'gpt-4o',
+    model = 'gpt-5.1',      // 🆕 GPT-5.1 - Latest model (November 2025)
     temperature = 0.3
   } = options || {};
 
@@ -964,12 +964,12 @@ export async function performDetailedInspection(
   frontImageUrl: string,
   backImageUrl: string,
   options?: {
-    model?: 'gpt-4o' | 'gpt-4o-mini';
+    model?: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-5.1';
     temperature?: number;
   }
 ): Promise<DetailedInspectionResult> {
   const {
-    model = 'gpt-4o',
+    model = 'gpt-5.1',      // 🆕 GPT-5.1 - Latest model (November 2025)
     temperature = 0.3  // Use same temperature as Stage 1 for consistency
   } = options || {};
 
@@ -1245,77 +1245,24 @@ let conversationalPromptJSON: string | null = null;
 
 function loadConversationalPrompt(cardType: 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other' = 'sports'): { text: string; format: 'markdown' | 'json' } {
   const isDevelopment = process.env.NODE_ENV === 'development';
-  const outputFormat = (process.env.GRADING_OUTPUT_FORMAT || 'markdown').toLowerCase();
-  const useV5 = process.env.USE_V5_ARCHITECTURE === 'true';
 
-  // Determine which format to use
-  const useJSON = outputFormat === 'json';
-
-  // 🆕 V5.0 ARCHITECTURE: Master Rubric + Delta
-  if (useV5 && useJSON) {
-    try {
-      // Import promptLoader_v5 dynamically
-      const { loadGradingPrompt } = require('./promptLoader_v5');
-      const result = loadGradingPrompt(cardType);
-
-      if (result.success && result.prompt) {
-        console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] ✅ Loaded v5.0 architecture (${result.metadata.estimated_tokens} tokens)`);
-        return { text: result.prompt, format: 'json' };
-      } else {
-        console.error(`[CONVERSATIONAL ${cardType.toUpperCase()}] ❌ v5.0 load failed: ${result.error || 'No prompt returned'}`);
-        console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] 🔄 Falling back to v4.2...`);
-        // Fall through to v4.2 loading
-      }
-    } catch (error) {
-      console.error(`[CONVERSATIONAL ${cardType.toUpperCase()}] ❌ v5.0 error:`, error);
-      console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] 🔄 Falling back to v4.2...`);
-      // Fall through to v4.2 loading
-    }
-  }
-
-  // Use cached prompt in production (reload in development for testing)
-  if (!isDevelopment) {
-    if (useJSON && conversationalPromptJSON) {
-      return { text: conversationalPromptJSON, format: 'json' };
-    }
-    if (!useJSON && conversationalPrompt) {
-      return { text: conversationalPrompt, format: 'markdown' };
-    }
-  }
-
+  // 🆕 v6.0: ALWAYS use master rubric + delta architecture (three-pass grading)
+  // The v4.2 prompts have been sunset - all card types now use the master grading rubric
   try {
-    if (useJSON) {
-      // 🎯 v4.2 ENHANCED STRICTNESS with improved defect detection accuracy (2025-11-04)
-      // Stricter grading criteria prevents false 10.0 scores for cards with visible defects
-      // Enhanced protocols for corner/edge/surface inspection, realistic grade distribution
-      // 100% backward compatible JSON output - drop-in replacement for v4.1
+    // Import promptLoader_v5 dynamically
+    const { loadGradingPrompt } = require('./promptLoader_v5');
+    const result = loadGradingPrompt(cardType);
 
-      // Select appropriate prompt based on card type
-      const promptFileName = cardType === 'pokemon'
-        ? 'pokemon_conversational_grading_v4_2.txt'
-        : cardType === 'mtg'
-        ? 'mtg_conversational_grading_v4_2.txt'
-        : cardType === 'lorcana'
-        ? 'lorcana_conversational_grading_v4_2.txt'
-        : cardType === 'other'
-        ? 'other_conversational_grading_v4_2.txt'
-        : 'conversational_grading_v4_2_ENHANCED_STRICTNESS.txt';
-
-      const promptPath = path.join(process.cwd(), 'prompts', promptFileName);
-      conversationalPromptJSON = fs.readFileSync(promptPath, 'utf-8');
-      console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] 🎯 Loaded v4.2 ENHANCED STRICTNESS prompt (${conversationalPromptJSON.length} characters)${isDevelopment ? ' [DEV MODE]' : ''}`);
-      return { text: conversationalPromptJSON, format: 'json' };
+    if (result.success && result.prompt) {
+      console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] ✅ Loaded v6.0 master rubric + delta (${result.metadata.estimated_tokens} tokens)`);
+      return { text: result.prompt, format: 'json' };
     } else {
-      // 🎯 v3.5 PATCHED v2 with 10 critical fixes (2025-10-24)
-      // Parser updated to handle both v3.3 and v3.5 formats for backward compatibility
-      const promptPath = path.join(process.cwd(), 'prompts', 'conversational_grading_v3_5_PATCHED.txt');
-      conversationalPrompt = fs.readFileSync(promptPath, 'utf-8');
-      console.log(`[CONVERSATIONAL] Loaded v3.5 PATCHED v2 markdown prompt (${conversationalPrompt.length} characters)${isDevelopment ? ' [DEV MODE]' : ''}`);
-      return { text: conversationalPrompt, format: 'markdown' };
+      console.error(`[CONVERSATIONAL ${cardType.toUpperCase()}] ❌ v6.0 load failed: ${result.error || 'No prompt returned'}`);
+      throw new Error(`Failed to load v6.0 grading prompt: ${result.error}`);
     }
   } catch (error) {
-    console.error('[CONVERSATIONAL] Failed to load conversational prompt:', error);
-    throw new Error('Failed to load conversational grading prompt file');
+    console.error(`[CONVERSATIONAL ${cardType.toUpperCase()}] ❌ v6.0 error:`, error);
+    throw new Error(`Failed to load grading prompt for ${cardType}: ${error}`);
   }
 }
 
@@ -1616,14 +1563,34 @@ Provide detailed analysis as markdown with all required sections.`
         throw new Error('Failed to parse JSON response from AI');
       }
 
-      // Extract grade data from JSON (handle both v4.2 and v5.0 formats)
-      const extractedGrade = {
-        // v5.0: jsonData.scoring.final_grade (simple number)
-        // v4.2: jsonData.final_grade.decimal_grade (nested object)
-        decimal_grade: jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null,
-        whole_grade: jsonData.final_grade?.whole_grade ?? (jsonData.scoring?.final_grade ? Math.round(jsonData.scoring.final_grade) : null),
-        uncertainty: jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±0.5'
-      };
+      // 🆕 v6.0 THREE-PASS GRADING: Extract grades from grading_passes.averaged_rounded
+      // Priority: grading_passes.averaged_rounded > final_grade > scoring (for backward compatibility)
+      const threePassData = jsonData.grading_passes;
+      const hasThreePass = threePassData?.averaged_rounded?.final !== undefined;
+
+      let extractedGrade: { decimal_grade: number | null; whole_grade: number | null; uncertainty: string };
+
+      if (hasThreePass) {
+        // 🎯 THREE-PASS GRADING: Use averaged_rounded values
+        const avgRounded = threePassData.averaged_rounded;
+        extractedGrade = {
+          decimal_grade: avgRounded.final,
+          whole_grade: Math.floor(avgRounded.final), // v6.0: Floor rounding for whole grade
+          uncertainty: jsonData.image_quality?.grade_uncertainty || jsonData.final_grade?.grade_range || '±0.5'
+        };
+        console.log(`[CONVERSATIONAL JSON] ✅ THREE-PASS GRADING detected`);
+        console.log(`[CONVERSATIONAL JSON] Pass 1: ${threePassData.pass_1?.final}, Pass 2: ${threePassData.pass_2?.final}, Pass 3: ${threePassData.pass_3?.final}`);
+        console.log(`[CONVERSATIONAL JSON] Averaged: ${threePassData.averaged?.final?.toFixed(2)}, Rounded: ${avgRounded.final}`);
+        console.log(`[CONVERSATIONAL JSON] Variance: ${threePassData.variance}, Consistency: ${threePassData.consistency}`);
+      } else {
+        // Fallback: Use direct final_grade (for backward compatibility)
+        extractedGrade = {
+          decimal_grade: jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null,
+          whole_grade: jsonData.final_grade?.whole_grade ?? (jsonData.scoring?.final_grade ? Math.round(jsonData.scoring.final_grade) : null),
+          uncertainty: jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±0.5'
+        };
+        console.log(`[CONVERSATIONAL JSON] ⚠️ No three-pass data found, using direct final_grade`);
+      }
 
       console.log(`[CONVERSATIONAL JSON] Extracted grade: ${extractedGrade.decimal_grade} (${extractedGrade.uncertainty})`);
 

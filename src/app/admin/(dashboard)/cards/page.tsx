@@ -73,9 +73,7 @@ const getYear = (card: any) => {
 }
 
 const formatGrade = (grade: number): string => {
-  if (grade % 1 === 0.5) {
-    return grade.toFixed(1)
-  }
+  // v6.0: Always return whole number (no .5 grades)
   return Math.round(grade).toString()
 }
 

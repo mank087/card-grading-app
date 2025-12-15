@@ -554,9 +554,8 @@ const formatGrade = (grade: number | null) => {
   if (grade === null || grade === undefined || grade === 0) {
     return "N/A";
   }
-  // If the grade is a whole number (e.g., 10.0, 9.0), display without decimal
-  // Otherwise keep the decimal (e.g., 9.5, 8.5)
-  return grade % 1 === 0 ? Math.floor(grade).toString() : grade.toString();
+  // v6.0: Always return whole number (no decimals)
+  return Math.round(grade).toString();
 };
 
 // Helper: Map confidence score to uncertainty value
@@ -2214,9 +2213,13 @@ export function PokemonCardDetails() {
   };
 
   // Helper function to safely convert and format numeric values
+  // v6.0: Rounds to nearest 0.5 increment for sub-grades (like BGS style)
   const safeToFixed = (value: any, decimals: number = 1): string => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    return (typeof num === 'number' && !isNaN(num)) ? num.toFixed(decimals) : '0.0';
+    if (typeof num !== 'number' || isNaN(num)) return '0.0';
+    // Round to nearest 0.5 for cleaner display
+    const rounded = Math.round(num * 2) / 2;
+    return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
   };
 
   // Professional grades are stored as a separate column (two-stage system)

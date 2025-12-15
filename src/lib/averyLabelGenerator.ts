@@ -87,15 +87,15 @@ function getLabelPosition(position: LabelPosition, offsets?: CalibrationOffsets)
 }
 
 /**
- * Format grade - show whole number unless it has a meaningful decimal
+ * Format grade - v6.0: Always show whole number (no decimals)
  */
 function formatGradeDisplay(grade: string | number): string {
   if (typeof grade === 'string') {
     const num = parseFloat(grade);
     if (isNaN(num)) return grade;
-    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(1);
+    return Math.round(num).toString();
   }
-  return grade % 1 === 0 ? grade.toFixed(0) : grade.toFixed(1);
+  return Math.round(grade).toString();
 }
 
 /**

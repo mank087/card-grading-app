@@ -8,7 +8,8 @@ import {
   CardNumberFormat,
   normalizeCardNumber as normalizeCardNumberFromApi,
   detectCardNumberFormat,
-  getPromoSetId
+  getPromoSetId,
+  searchLocalFuzzyNumber
 } from './pokemonTcgApi';
 
 const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
@@ -637,19 +638,87 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     }
   }
 
+  // Strategy 5 (NEW): Fuzzy number matching - try nearby numbers when exact fails
+  // This helps when OCR misreads numbers (e.g., SM226 vs SM228)
+  if (!apiCard && cardName && cardNumber) {
+    const normalizedNumber = normalizeCardNumber(cardNumber);
+    console.log(`[Pokemon API Verification] Strategy 5: Fuzzy number matching (±3 range)`);
+
+    // Detect if this is a promo card
+    const promoSetId = getPromoSetId(cardNumberFormat);
+
+    const fuzzyResult = await searchLocalFuzzyNumber(cardName, normalizedNumber, promoSetId || undefined);
+    if (fuzzyResult.card) {
+      apiCard = fuzzyResult.card;
+      result.verification_method = 'fuzzy_match';
+      result.confidence = 'medium'; // Medium because name matched but number was corrected
+
+      // Add correction for the number
+      if (fuzzyResult.matchedNumber && fuzzyResult.matchedNumber !== normalizedNumber) {
+        result.corrections.push({
+          field: 'card_number',
+          original: cardNumber,
+          corrected: `${fuzzyResult.matchedNumber}/${apiCard.set.printedTotal}`
+        });
+        console.log(`[Pokemon API Verification] Fuzzy match corrected number: ${normalizedNumber} → ${fuzzyResult.matchedNumber}`);
+      }
+    }
+  }
+
   // Process results
   if (apiCard) {
-    result.success = true;
-    result.verified = true;
-    result.pokemon_api_id = apiCard.id;
-    result.pokemon_api_data = apiCard;
-
     // Check for corrections
     const apiSetName = apiCard.set.name;
     const apiCardName = apiCard.name;
     const apiCardNumber = `${apiCard.number}/${apiCard.set.printedTotal}`;
     const apiYear = apiCard.set.releaseDate?.split('/')[0] || '';
     const apiRarity = apiCard.rarity || '';
+
+    // VALIDATION: Reject matches where year is way off (more than 3 years different)
+    // This prevents matching 2014 cards to 2025 versions
+    if (cardInfo.year && apiYear) {
+      const originalYear = parseInt(cardInfo.year);
+      const matchedYear = parseInt(apiYear);
+      if (!isNaN(originalYear) && !isNaN(matchedYear)) {
+        const yearDiff = Math.abs(originalYear - matchedYear);
+        if (yearDiff > 3) {
+          console.log(`[Pokemon API Verification] REJECTED: Year mismatch too large (${cardInfo.year} vs ${apiYear}, diff=${yearDiff})`);
+          console.log(`[Pokemon API Verification] Original card info will be preserved`);
+          // Don't use this match - the year is too different
+          result.success = false;
+          result.verified = false;
+          result.pokemon_api_id = null;
+          result.pokemon_api_data = null;
+          result.verification_method = 'none';
+          result.confidence = 'low';
+          result.error = `Year mismatch: expected ~${cardInfo.year}, found ${apiYear}`;
+          return result;
+        }
+      }
+    }
+
+    // VALIDATION: Reject if card name doesn't match at all
+    // (fuzzy searches might return completely wrong cards)
+    const normalizedOriginal = cardName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedMatched = apiCardName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (normalizedOriginal && normalizedMatched &&
+        !normalizedMatched.includes(normalizedOriginal.substring(0, 5)) &&
+        !normalizedOriginal.includes(normalizedMatched.substring(0, 5))) {
+      console.log(`[Pokemon API Verification] REJECTED: Name mismatch (${cardName} vs ${apiCardName})`);
+      result.success = false;
+      result.verified = false;
+      result.pokemon_api_id = null;
+      result.pokemon_api_data = null;
+      result.verification_method = 'none';
+      result.confidence = 'low';
+      result.error = `Name mismatch: expected ${cardName}, found ${apiCardName}`;
+      return result;
+    }
+
+    result.success = true;
+    result.verified = true;
+    result.pokemon_api_id = apiCard.id;
+    result.pokemon_api_data = apiCard;
 
     // Record corrections if AI got something wrong
     if (setName && setName !== apiSetName && setName.toLowerCase() !== apiSetName.toLowerCase()) {
@@ -699,6 +768,19 @@ export function getPokemonApiUpdateFields(verificationResult: PokemonApiVerifica
 
   const apiCard = verificationResult.pokemon_api_data;
 
+  // Only apply corrections for high/medium confidence matches
+  // Low confidence matches should NOT override original card info
+  const shouldApplyCorrections = verificationResult.corrections.length > 0 &&
+    (verificationResult.confidence === 'high' || verificationResult.confidence === 'medium');
+
+  // For card_number specifically, only correct if the match is high confidence
+  // AND the card number was actually wrong (not just a formatting difference)
+  const shouldCorrectCardNumber = verificationResult.confidence === 'high';
+
+  console.log(`[Pokemon API Update] Confidence: ${verificationResult.confidence}, ` +
+              `Applying corrections: ${shouldApplyCorrections}, ` +
+              `Correcting card_number: ${shouldCorrectCardNumber}`);
+
   return {
     // API verification fields
     pokemon_api_id: verificationResult.pokemon_api_id,
@@ -711,13 +793,16 @@ export function getPokemonApiUpdateFields(verificationResult: PokemonApiVerifica
     // TCGPlayer direct product URL from Pokemon TCG API
     tcgplayer_url: apiCard.tcgplayer?.url || null,
 
-    // Override card info with verified data (only if corrections needed)
-    ...(verificationResult.corrections.length > 0 && {
+    // Override card info with verified data (only for high/medium confidence matches)
+    ...(shouldApplyCorrections && {
       // Update card info with verified values
       card_name: apiCard.name,
       card_set: apiCard.set.name,
       release_date: apiCard.set.releaseDate?.split('/')[0] || null,
-      card_number: `${apiCard.number}/${apiCard.set.printedTotal}`,
+      // Only correct card_number for high confidence matches
+      ...(shouldCorrectCardNumber && {
+        card_number: `${apiCard.number}/${apiCard.set.printedTotal}`,
+      })
     })
   };
 }

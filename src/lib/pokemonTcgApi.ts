@@ -1,9 +1,26 @@
 // src/lib/pokemonTcgApi.ts
 // Pokemon TCG API client for fetching card data
+// Now uses local Supabase database first, with API fallback for new releases
+
+import { createClient } from '@supabase/supabase-js';
 
 const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
 // Get API key from environment variable - NO HARDCODED FALLBACKS
 const POKEMON_API_KEY = process.env.POKEMON_TCG_API_KEY || '';
+
+// DISABLE EXTERNAL API - Use local database only
+// Set to true to disable all external Pokemon TCG API calls
+// The local database should have all cards from the import
+const DISABLE_EXTERNAL_API = true;
+
+// Initialize Supabase client for local database queries
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+// Create Supabase client only if we have the required env vars
+const supabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey)
+  : null;
 
 export interface PokemonCard {
   id: string;                    // "base1-4"
@@ -91,14 +108,360 @@ export interface PokemonSet {
   };
 }
 
+// Local database result type
+interface LocalCardResult {
+  id: string;
+  name: string;
+  number: string;
+  set_id: string | null;
+  supertype: string | null;
+  subtypes: string[] | null;
+  types: string[] | null;
+  hp: string | null;
+  evolves_from: string | null;
+  evolves_to: string[] | null;
+  rarity: string | null;
+  artist: string | null;
+  flavor_text: string | null;
+  image_small: string | null;
+  image_large: string | null;
+  tcgplayer_url: string | null;
+  cardmarket_url: string | null;
+  set_name: string | null;
+  set_series: string | null;
+  set_printed_total: number | null;
+  set_release_date: string | null;
+}
+
+/**
+ * Convert local database result to PokemonCard interface
+ */
+function convertLocalCardToApiFormat(card: LocalCardResult): PokemonCard {
+  return {
+    id: card.id,
+    name: card.name,
+    supertype: card.supertype || 'Pokémon',
+    subtypes: card.subtypes || [],
+    hp: card.hp || undefined,
+    types: card.types || undefined,
+    evolvesFrom: card.evolves_from || undefined,
+    set: {
+      id: card.set_id || '',
+      name: card.set_name || '',
+      series: card.set_series || '',
+      printedTotal: card.set_printed_total || 0,
+      total: card.set_printed_total || 0, // Use printedTotal as total
+      releaseDate: card.set_release_date || '',
+      images: {
+        symbol: '',
+        logo: ''
+      }
+    },
+    number: card.number,
+    rarity: card.rarity || '',
+    artist: card.artist || undefined,
+    images: {
+      small: card.image_small || '',
+      large: card.image_large || ''
+    },
+    tcgplayer: card.tcgplayer_url ? {
+      url: card.tcgplayer_url,
+      updatedAt: ''
+    } : undefined,
+    cardmarket: card.cardmarket_url ? {
+      url: card.cardmarket_url,
+      updatedAt: ''
+    } : undefined
+  };
+}
+
+/**
+ * Search local Supabase database for Pokemon cards
+ * Returns cards matching name, optionally filtered by set name and card number
+ */
+async function searchLocalDatabase(
+  name: string,
+  setName?: string,
+  cardNumber?: string
+): Promise<PokemonCard[]> {
+  if (!supabase) {
+    console.log('[Pokemon Local DB] Supabase not configured, skipping local search');
+    return [];
+  }
+
+  try {
+    console.log('[Pokemon Local DB] Searching:', { name, setName, cardNumber });
+
+    let query = supabase
+      .from('pokemon_cards')
+      .select('*')
+      .ilike('name', `%${name}%`);
+
+    // Add set name filter if provided
+    if (setName) {
+      query = query.ilike('set_name', `%${setName}%`);
+    }
+
+    // Add card number filter if provided
+    if (cardNumber) {
+      // Try exact match first, then partial
+      query = query.eq('number', cardNumber);
+    }
+
+    // Limit results and order by relevance (newer sets first)
+    query = query.order('set_release_date', { ascending: false }).limit(20);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[Pokemon Local DB] Search error:', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      console.log('[Pokemon Local DB] No results found');
+      return [];
+    }
+
+    console.log(`[Pokemon Local DB] Found ${data.length} card(s)`);
+    return data.map(convertLocalCardToApiFormat);
+  } catch (error) {
+    console.error('[Pokemon Local DB] Exception during search:', error);
+    return [];
+  }
+}
+
+/**
+ * Generate nearby number variations for fuzzy matching
+ * For SM226, generates: SM224, SM225, SM226, SM227, SM228 (±2 range)
+ * For standard numbers like "4", generates: 2, 3, 4, 5, 6
+ */
+function generateNearbyNumbers(cardNumber: string, range: number = 3): string[] {
+  const variations: string[] = [];
+
+  // Check for prefix format like SM226, SWSH039, TG10
+  const prefixMatch = cardNumber.match(/^([A-Za-z]+)(\d+)$/);
+  if (prefixMatch) {
+    const prefix = prefixMatch[1];
+    const num = parseInt(prefixMatch[2], 10);
+    const padLength = prefixMatch[2].length; // Preserve leading zeros
+
+    for (let i = -range; i <= range; i++) {
+      const newNum = num + i;
+      if (newNum > 0) {
+        variations.push(prefix + String(newNum).padStart(padLength, '0'));
+      }
+    }
+    return variations;
+  }
+
+  // Standard numeric format
+  const numMatch = cardNumber.match(/^(\d+)$/);
+  if (numMatch) {
+    const num = parseInt(numMatch[1], 10);
+    for (let i = -range; i <= range; i++) {
+      const newNum = num + i;
+      if (newNum > 0) {
+        variations.push(String(newNum));
+      }
+    }
+    return variations;
+  }
+
+  // If we can't parse it, just return the original
+  return [cardNumber];
+}
+
+/**
+ * Fuzzy number search - tries nearby numbers when exact match fails
+ * Cross-references with card name to find the correct card
+ * Exported for use in verification code
+ */
+export async function searchLocalFuzzyNumber(
+  name: string,
+  cardNumber: string,
+  setId?: string
+): Promise<{ card: PokemonCard | null, matchedNumber: string | null }> {
+  if (!supabase) {
+    return { card: null, matchedNumber: null };
+  }
+
+  try {
+    // Generate nearby number variations
+    const numberVariations = generateNearbyNumbers(cardNumber, 3);
+    console.log(`[Pokemon Local DB] Fuzzy search: name="${name}", trying numbers:`, numberVariations);
+
+    // Build query for all number variations at once
+    let query = supabase
+      .from('pokemon_cards')
+      .select('*')
+      .ilike('name', `%${name}%`)
+      .in('number', numberVariations);
+
+    // Add set filter if provided
+    if (setId) {
+      query = query.eq('set_id', setId);
+    }
+
+    query = query.order('set_release_date', { ascending: false }).limit(20);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[Pokemon Local DB] Fuzzy search error:', error);
+      return { card: null, matchedNumber: null };
+    }
+
+    if (!data || data.length === 0) {
+      console.log('[Pokemon Local DB] No fuzzy matches found');
+      return { card: null, matchedNumber: null };
+    }
+
+    // Score and rank matches
+    // Prefer: exact name match > partial name match
+    // Then: closest number to original
+    const originalNum = parseInt(cardNumber.replace(/^[A-Za-z]+/, ''), 10);
+
+    const scored = data.map(card => {
+      const cardNum = parseInt(card.number.replace(/^[A-Za-z]+/, ''), 10);
+      const numberDistance = Math.abs(cardNum - originalNum);
+      const exactNameMatch = card.name.toLowerCase() === name.toLowerCase();
+
+      return {
+        card,
+        score: (exactNameMatch ? 100 : 0) - numberDistance,
+        numberDistance
+      };
+    });
+
+    // Sort by score (higher = better)
+    scored.sort((a, b) => b.score - a.score);
+
+    const bestMatch = scored[0];
+    console.log(`[Pokemon Local DB] Fuzzy match found: ${bestMatch.card.name} #${bestMatch.card.number} (distance: ${bestMatch.numberDistance})`);
+
+    return {
+      card: convertLocalCardToApiFormat(bestMatch.card),
+      matchedNumber: bestMatch.card.number
+    };
+  } catch (error) {
+    console.error('[Pokemon Local DB] Fuzzy search exception:', error);
+    return { card: null, matchedNumber: null };
+  }
+}
+
+/**
+ * Search local database by name, number, and set ID (for promo cards)
+ */
+async function searchLocalByNameNumberSetId(
+  name: string,
+  cardNumber: string,
+  setId: string
+): Promise<PokemonCard[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    console.log('[Pokemon Local DB] Searching promo by name+number+setId:', { name, cardNumber, setId });
+
+    const { data, error } = await supabase
+      .from('pokemon_cards')
+      .select('*')
+      .ilike('name', `%${name}%`)
+      .eq('number', cardNumber)
+      .eq('set_id', setId)
+      .limit(10);
+
+    if (error) {
+      console.error('[Pokemon Local DB] Promo search error:', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    console.log(`[Pokemon Local DB] Found ${data.length} promo card(s)`);
+    return data.map(convertLocalCardToApiFormat);
+  } catch (error) {
+    console.error('[Pokemon Local DB] Promo search exception:', error);
+    return [];
+  }
+}
+
+/**
+ * Search local database by name, number, and set printed total
+ * This is the primary lookup for grading (uses the denormalized set_printed_total)
+ */
+async function searchLocalByNameNumberTotal(
+  name: string,
+  cardNumber: string,
+  printedTotal?: number
+): Promise<PokemonCard[]> {
+  if (!supabase) {
+    return [];
+  }
+
+  try {
+    console.log('[Pokemon Local DB] Searching by name+number+total:', { name, cardNumber, printedTotal });
+
+    let query = supabase
+      .from('pokemon_cards')
+      .select('*')
+      .ilike('name', `%${name}%`)
+      .eq('number', cardNumber);
+
+    if (printedTotal) {
+      query = query.eq('set_printed_total', printedTotal);
+    }
+
+    query = query.order('set_release_date', { ascending: false }).limit(10);
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('[Pokemon Local DB] Search error:', error);
+      return [];
+    }
+
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    console.log(`[Pokemon Local DB] Found ${data.length} card(s) by name+number+total`);
+    return data.map(convertLocalCardToApiFormat);
+  } catch (error) {
+    console.error('[Pokemon Local DB] Exception:', error);
+    return [];
+  }
+}
+
 /**
  * Search for Pokemon cards by name and optional set
+ * Now searches local database first, with API fallback (if enabled)
  */
 export async function searchPokemonCards(
   name: string,
   setName?: string,
   cardNumber?: string
 ): Promise<PokemonCard[]> {
+  // 1. Try local database first (fast, no API calls)
+  const localResults = await searchLocalDatabase(name, setName, cardNumber);
+  if (localResults.length > 0) {
+    console.log(`[Pokemon Search] ✅ Found ${localResults.length} card(s) in local database`);
+    return localResults;
+  }
+
+  // If external API is disabled, return empty (local-only mode)
+  if (DISABLE_EXTERNAL_API) {
+    console.log('[Pokemon Search] Local database miss, external API disabled - returning empty');
+    return [];
+  }
+
+  console.log('[Pokemon Search] Local database miss, falling back to API...');
+
+  // 2. Fall back to external API
   try {
     // Build query
     let query = `name:"${name}"`;
@@ -445,47 +808,25 @@ export async function formatAwareSearch(
   const promoSetId = getPromoSetId(format);
 
   // Strategy 0 (NEW): For promos, search with set.id constraint first
+  // Try local database first, then API fallback
   if (promoSetId && numberVariations.length > 0) {
     console.log(`[Format-Aware Search] Strategy 0: Promo search with set.id:${promoSetId}`);
+
+    // Try local database first
     for (const numVariation of numberVariations) {
-      // Build query with set.id constraint
-      const query = `name:"${name}" number:"${numVariation}" set.id:${promoSetId}`;
-      const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
-
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-
-        const response = await fetch(url, {
-          headers: { 'X-Api-Key': POKEMON_API_KEY },
-          signal: controller.signal
-        });
-        clearTimeout(timeoutId);
-
-        if (response.ok) {
-          const json = await response.json();
-          if (json.data?.length > 0) {
-            console.log(`[Format-Aware Search] ✅ Found ${json.data.length} card(s) with promo strategy`);
-            return { results: json.data, strategy: `promo (name + number[${numVariation}] + set.id:${promoSetId})` };
-          }
-        }
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.warn('[Format-Aware Search] Promo search timeout');
-        }
+      const localResults = await searchLocalByNameNumberSetId(name, numVariation, promoSetId);
+      if (localResults.length > 0) {
+        console.log(`[Format-Aware Search] ✅ Found ${localResults.length} promo card(s) in LOCAL DB`);
+        return { results: localResults, strategy: `promo-local (name + number[${numVariation}] + set.id:${promoSetId})` };
       }
     }
-  }
 
-  // Strategy 1: Use setTotal (denominator) to filter by printedTotal
-  if (setTotal && numberVariations.length > 0 && format === 'fraction') {
-    // Clean the setTotal (remove TG/GG prefixes if present, extract number)
-    const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
-    if (printedTotal && /^\d+$/.test(printedTotal)) {
-      console.log(`[Format-Aware Search] Strategy 1: name + number + set.printedTotal:${printedTotal}`);
-
+    // Fall back to API (if enabled)
+    if (!DISABLE_EXTERNAL_API) {
+      console.log('[Format-Aware Search] Local DB miss for promo, falling back to API');
       for (const numVariation of numberVariations) {
-        const query = `name:"${name}" number:"${numVariation}" set.printedTotal:${printedTotal}`;
+        // Build query with set.id constraint
+        const query = `name:"${name}" number:"${numVariation}" set.id:${promoSetId}`;
         const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
 
         try {
@@ -501,13 +842,64 @@ export async function formatAwareSearch(
           if (response.ok) {
             const json = await response.json();
             if (json.data?.length > 0) {
-              console.log(`[Format-Aware Search] ✅ Found ${json.data.length} card(s) with printedTotal strategy`);
-              return { results: json.data, strategy: `precise (name + number[${numVariation}] + printedTotal:${printedTotal})` };
+              console.log(`[Format-Aware Search] ✅ Found ${json.data.length} card(s) with promo strategy (API)`);
+              return { results: json.data, strategy: `promo (name + number[${numVariation}] + set.id:${promoSetId})` };
             }
           }
         } catch (error: any) {
           if (error.name === 'AbortError') {
-            console.warn('[Format-Aware Search] PrintedTotal search timeout');
+            console.warn('[Format-Aware Search] Promo search timeout');
+          }
+        }
+      }
+    }
+  }
+
+  // Strategy 1: Use setTotal (denominator) to filter by printedTotal
+  // Try local database first, then API fallback
+  if (setTotal && numberVariations.length > 0 && format === 'fraction') {
+    // Clean the setTotal (remove TG/GG prefixes if present, extract number)
+    const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
+    if (printedTotal && /^\d+$/.test(printedTotal)) {
+      console.log(`[Format-Aware Search] Strategy 1: name + number + set.printedTotal:${printedTotal}`);
+
+      // Try local database first (fast!)
+      for (const numVariation of numberVariations) {
+        const localResults = await searchLocalByNameNumberTotal(name, numVariation, parseInt(printedTotal));
+        if (localResults.length > 0) {
+          console.log(`[Format-Aware Search] ✅ Found ${localResults.length} card(s) in LOCAL DB with printedTotal strategy`);
+          return { results: localResults, strategy: `precise-local (name + number[${numVariation}] + printedTotal:${printedTotal})` };
+        }
+      }
+
+      // Fall back to API if not in local database (if enabled)
+      if (!DISABLE_EXTERNAL_API) {
+        console.log('[Format-Aware Search] Local DB miss, falling back to API for printedTotal search');
+        for (const numVariation of numberVariations) {
+          const query = `name:"${name}" number:"${numVariation}" set.printedTotal:${printedTotal}`;
+          const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
+
+          try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+            const response = await fetch(url, {
+              headers: { 'X-Api-Key': POKEMON_API_KEY },
+              signal: controller.signal
+            });
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+              const json = await response.json();
+              if (json.data?.length > 0) {
+                console.log(`[Format-Aware Search] ✅ Found ${json.data.length} card(s) with printedTotal strategy (API)`);
+                return { results: json.data, strategy: `precise (name + number[${numVariation}] + printedTotal:${printedTotal})` };
+              }
+            }
+          } catch (error: any) {
+            if (error.name === 'AbortError') {
+              console.warn('[Format-Aware Search] PrintedTotal search timeout');
+            }
           }
         }
       }
@@ -538,6 +930,26 @@ export async function formatAwareSearch(
     }
   }
 
+  // Strategy 3.5 (NEW): Fuzzy number matching - try nearby numbers with same name
+  // This helps when OCR misreads the number (e.g., SM226 vs SM228)
+  if (numberVariations.length > 0) {
+    console.log('[Format-Aware Search] Strategy 3.5: Fuzzy number matching (±3 range)');
+    const primaryNumber = numberVariations[0];
+
+    // Detect if this is a promo card to narrow search
+    const promoSetId = getPromoSetId(format);
+
+    const fuzzyResult = await searchLocalFuzzyNumber(name, primaryNumber, promoSetId || undefined);
+    if (fuzzyResult.card) {
+      const correctedNumber = fuzzyResult.matchedNumber;
+      console.log(`[Format-Aware Search] ✅ Fuzzy match found! AI read "${primaryNumber}", corrected to "${correctedNumber}"`);
+      return {
+        results: [fuzzyResult.card],
+        strategy: `fuzzy-number (name + nearby numbers, corrected ${primaryNumber} → ${correctedNumber})`
+      };
+    }
+  }
+
   // Strategy 4: Name + set name
   if (cleanSetName) {
     console.log('[Format-Aware Search] Strategy 4: name + set');
@@ -564,6 +976,12 @@ export async function formatAwareSearch(
  * Get a specific card by ID
  */
 export async function getPokemonCardById(cardId: string): Promise<PokemonCard | null> {
+  // If external API is disabled, we can't fetch by ID (would need local DB lookup)
+  if (DISABLE_EXTERNAL_API) {
+    console.log('[Pokemon API] getPokemonCardById disabled - external API is off');
+    return null;
+  }
+
   try {
     const url = `${POKEMON_API_BASE}/cards/${cardId}`;
 
@@ -589,6 +1007,12 @@ export async function getPokemonCardById(cardId: string): Promise<PokemonCard | 
  * Search for Pokemon sets
  */
 export async function searchPokemonSets(name: string): Promise<PokemonSet[]> {
+  // If external API is disabled, return empty (would need local DB lookup)
+  if (DISABLE_EXTERNAL_API) {
+    console.log('[Pokemon API] searchPokemonSets disabled - external API is off');
+    return [];
+  }
+
   try {
     const query = `name:"${name}"`;
     const url = `${POKEMON_API_BASE}/sets?q=${encodeURIComponent(query)}`;
@@ -615,6 +1039,12 @@ export async function searchPokemonSets(name: string): Promise<PokemonSet[]> {
  * Get all available rarities
  */
 export async function getPokemonRarities(): Promise<string[]> {
+  // If external API is disabled, return empty
+  if (DISABLE_EXTERNAL_API) {
+    console.log('[Pokemon API] getPokemonRarities disabled - external API is off');
+    return [];
+  }
+
   try {
     const url = `${POKEMON_API_BASE}/rarities`;
 
@@ -783,6 +1213,23 @@ export async function lookupSetByCardNumber(
   options?: SetLookupOptions
 ): Promise<SetLookupResult> {
 
+  // If external API is disabled, return a failure result
+  if (DISABLE_EXTERNAL_API) {
+    console.log('[Pokemon API] lookupSetByCardNumber disabled - external API is off');
+    return {
+      success: false,
+      set_name: null,
+      set_id: null,
+      set_year: null,
+      set_era: null,
+      set_confidence: 'low',
+      set_identifier_source: ['local_only'],
+      set_identifier_reason: 'External API disabled - using local database only',
+      cache_hit: false,
+      error: 'External API disabled'
+    };
+  }
+
   // Generate cache key (include options for better cache hit rate)
   const cacheKey = `${cardNumber}|${pokemonName || ''}|${year || ''}|${options?.setCode || ''}|${options?.cardFormat || ''}`;
 
@@ -836,7 +1283,7 @@ export async function lookupSetByCardNumber(
                 success: true,
                 set_name: card.set.name,
                 set_id: card.set.id,
-                set_year: extractYearFromReleaseDate(card.set.releaseDate),
+                set_year: extractYearFromDate(card.set.releaseDate),
                 set_era: card.set.series,
                 set_confidence: 'high',
                 set_identifier_source: ['set_code', 'api_lookup'],
@@ -898,7 +1345,7 @@ export async function lookupSetByCardNumber(
                 success: true,
                 set_name: card.set.name,
                 set_id: card.set.id,
-                set_year: extractYearFromReleaseDate(card.set.releaseDate),
+                set_year: extractYearFromDate(card.set.releaseDate),
                 set_era: card.set.series,
                 set_confidence: 'high',
                 set_identifier_source: ['card_format', 'promo_lookup'],

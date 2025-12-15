@@ -24,7 +24,7 @@ import { z } from 'zod';
  * Meta information about the grading analysis
  */
 const MetaSchema = z.object({
-  model_name: z.string().describe('AI model used for grading (e.g., "gpt-4o")'),
+  model_name: z.string().describe('AI model used for grading (e.g., "gpt-5.1")'),
   provider: z.string().describe('AI provider (e.g., "openai")'),
   version: z.string().describe('Schema version (e.g., "v5.0")'),
   prompt_version: z.string().describe('Grading prompt version (e.g., "Conversational_Grading_v5.5_THREE_PASS")'),
@@ -289,27 +289,32 @@ const GradingPassesSchema = z.object({
 }).describe('Three-pass consensus grading results (v5.5)');
 
 /**
- * Final grade with validation
+ * Final grade with validation (v6.0 - WHOLE NUMBERS ONLY)
  *
  * CRITICAL VALIDATION FROM EVIDENCE-BASED PROTOCOL:
- * - If decimal_grade = 10.0, ALL defects arrays across entire response must be empty
- * - If decimal_grade < 10.0, at least one defects array must have entries
- * - Summary must explain what caused point deductions if grade < 10.0
+ * - v6.0: decimal_grade and whole_grade MUST be whole integers (no 8.5, 9.5, etc.)
+ * - If decimal_grade = 10, ALL defects arrays across entire response must be empty
+ * - If decimal_grade < 10, at least one defects array must have entries
+ * - Summary must explain condition tier and dominant defect
  */
 const FinalGradeSchema = z.object({
-  decimal_grade: z.number().min(0).max(10).nullable().describe('Final decimal grade (0.0 to 10.0) or null if not gradeable'),
-  whole_grade: z.number().int().min(0).max(10).nullable().describe('Final whole number grade (0 to 10) or null if not gradeable'),
+  decimal_grade: z.number().int().min(0).max(10).nullable().describe('v6.0: Final grade as whole integer (1-10) or null if not gradeable. NO half-points.'),
+  whole_grade: z.number().int().min(0).max(10).nullable().describe('Final whole number grade (must match decimal_grade)'),
   grade_range: z.enum(['±0.0', '±0.25', '±0.5', '±1.0']).describe('Uncertainty range based on image quality'),
   condition_label: z.string().optional().describe('Condition label (e.g., "Gem Mint", "Near Mint", "Excellent")'),
+  condition_tier: z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G']).optional().describe('v6.0: Condition tier (A=N/A, B=1-4, C=5-6, D=7, E=8, F=9, G=10)'),
+  dominant_defect: z.string().optional().describe('v6.0: Category with lowest score that controlled the grade'),
   summary: z.string().min(100).describe(
-    'REQUIRED: Overall card condition summary. ' +
-    'MUST explain what caused grade. ' +
-    'IF GRADE = 10.0: Must state "zero defects detected" and summarize inspection performed. ' +
-    'IF GRADE < 10.0: Must summarize key defects that caused point deductions. ' +
+    'REQUIRED: Natural language summary of card condition. ' +
+    'Do NOT mention condition tiers or internal scoring mechanics. ' +
+    'CRITICAL: When mentioning the grade, you MUST use the EXACT value from decimal_grade field above. ' +
+    'Do NOT write the summary until after calculating the final decimal_grade. ' +
+    'Describe: 1) Overall condition in plain language, 2) Key defects affecting grade, ' +
+    '3) Final grade with brief justification (MUST match decimal_grade exactly). ' +
     'Minimum 100 characters.'
   ),
   grading_status: z.enum(['gradeable', 'not_gradeable_altered', 'not_gradeable_damaged', 'not_gradeable_slabbed']).optional().describe('Grading eligibility status')
-}).describe('Final grade with evidence-based justification');
+}).describe('Final grade with evidence-based justification (v6.0: whole numbers only)');
 
 // ═══════════════════════════════════════════════════════════════════════
 // PART 2: CARD-TYPE-SPECIFIC SCHEMAS
@@ -325,7 +330,11 @@ const SportsCardInfoSchema = z.object({
   set_name: z.string().nullable().describe('Set/product name'),
   year: z.string().nullable().describe('Release year (4 digits)'),
   manufacturer: z.string().nullable().describe('Card manufacturer/publisher'),
-  card_number: z.string().nullable().describe('Card number'),
+  card_number: z.string().nullable().describe(
+    'CRITICAL: Read the EXACT card number as printed on the card. ' +
+    'DO NOT GUESS - read the actual digits. Include any prefixes or suffixes.'
+  ),
+  card_number_raw: z.string().nullable().optional().describe('The EXACT card number as printed verbatim'),
   authentic: z.boolean().describe('Is card authentic (true) or proxy/counterfeit (false)?'),
 
   // Sports-specific required fields
@@ -352,7 +361,24 @@ const PokemonCardInfoSchema = z.object({
   set_name: z.string().nullable().describe('Set name'),
   year: z.string().nullable().describe('Release year (4 digits)'),
   manufacturer: z.string().nullable().describe('Always "The Pokemon Company" or "Nintendo"'),
-  card_number: z.string().nullable().describe('Card number (format: "XXX/YYY")'),
+  card_number_ocr_breakdown: z.string().nullable().optional().describe(
+    'MANDATORY: Character-by-character breakdown of card number. ' +
+    'Format: "Position 1: [char], Position 2: [char], ..." ' +
+    'Example for 179/132: "Position 1: 1, Position 2: 7, Position 3: 9, Position 4: /, Position 5: 1, Position 6: 3, Position 7: 2" ' +
+    'You MUST fill this BEFORE card_number. Forces actual OCR instead of guessing.'
+  ),
+  card_number: z.string().nullable().describe(
+    'CRITICAL: Read the EXACT card number as printed on the card. ' +
+    'Location: Usually bottom-left or bottom-right corner of the card front. ' +
+    'Format: "XXX/YYY" where XXX is the card number and YYY is the set total (e.g., "125/094", "179/132"). ' +
+    'For promos: Use prefix format (e.g., "SM228", "SWSH039", "SVP085"). ' +
+    'DO NOT GUESS OR INFER - read the actual digits printed on the card. ' +
+    'Must match the digits from card_number_ocr_breakdown above.'
+  ),
+  card_number_raw: z.string().nullable().optional().describe(
+    'The EXACT card number as printed, including any special characters or formatting. ' +
+    'Copy verbatim from the card - do not normalize or clean up. Must match card_number_ocr_breakdown.'
+  ),
   authentic: z.boolean().describe('Is card authentic?'),
 
   // Pokemon-specific required fields
@@ -388,7 +414,12 @@ const MtgCardInfoSchema = z.object({
   set_name: z.string().nullable().describe('Set/expansion name'),
   year: z.string().nullable().describe('Release year (4 digits)'),
   manufacturer: z.string().nullable().describe('Always "Wizards of the Coast"'),
-  card_number: z.string().nullable().describe('Collector number (format: "XXX/YYY")'),
+  card_number: z.string().nullable().describe(
+    'CRITICAL: Read the EXACT collector number as printed on the card. ' +
+    'Location: Usually bottom-left corner. Format: "XXX/YYY" (e.g., "234/287"). ' +
+    'DO NOT GUESS - read the actual digits printed on the card.'
+  ),
+  card_number_raw: z.string().nullable().optional().describe('The EXACT card number as printed verbatim'),
   authentic: z.boolean().describe('Is card authentic?'),
 
   // MTG-specific required fields
@@ -416,7 +447,11 @@ const LorcanaCardInfoSchema = z.object({
   set_name: z.string().nullable().describe('Set name'),
   year: z.string().nullable().describe('Release year (4 digits)'),
   manufacturer: z.string().nullable().describe('Always "Ravensburger"'),
-  card_number: z.string().nullable().describe('Collector number (format: "XXX/YYY")'),
+  card_number: z.string().nullable().describe(
+    'CRITICAL: Read the EXACT collector number as printed on the card. ' +
+    'Format: "XXX/YYY" (e.g., "156/204"). DO NOT GUESS - read the actual digits.'
+  ),
+  card_number_raw: z.string().nullable().optional().describe('The EXACT card number as printed verbatim'),
   authentic: z.boolean().describe('Is card authentic?'),
 
   // Lorcana-specific required fields
@@ -446,7 +481,11 @@ const OtherCardInfoSchema = z.object({
   set_name: z.string().nullable().describe('Set/expansion/product line name (e.g., "Pop Century", "Legend of Blue Eyes")'),
   year: z.string().nullable().describe('Release year (4 digits)'),
   manufacturer: z.string().nullable().describe('Card publisher (Panini, Upper Deck, Topps, Konami, Bushiroad, etc.)'),
-  card_number: z.string().nullable().describe('Card number as shown'),
+  card_number: z.string().nullable().describe(
+    'CRITICAL: Read the EXACT card number as printed on the card. ' +
+    'DO NOT GUESS - read the actual digits. Include any prefixes or suffixes.'
+  ),
+  card_number_raw: z.string().nullable().optional().describe('The EXACT card number as printed verbatim'),
   authentic: z.boolean().describe('Is card authentic licensed product?'),
   autographed: z.boolean().describe('Does card contain an autograph/signature?'),
   memorabilia: z.boolean().describe('Does card contain memorabilia/relic material?'),
@@ -618,7 +657,7 @@ export type GradingPasses = z.infer<typeof GradingPassesSchema>;
  * Usage:
  * ```typescript
  * const response = await openai.chat.completions.create({
- *   model: 'gpt-4o',
+ *   model: 'gpt-5.1',
  *   messages: [...],
  *   response_format: getCardGradingResponseFormat()
  * });
@@ -651,7 +690,7 @@ export function validateGradingResponse(response: unknown): {
 }
 
 /**
- * Additional runtime validation for evidence-based protocol rules
+ * Additional runtime validation for evidence-based protocol rules (v6.0 updated)
  * These rules are harder to enforce at the schema level but critical for quality
  *
  * @param response - Validated response object
@@ -660,32 +699,79 @@ export function validateGradingResponse(response: unknown): {
 export function validateEvidenceBasedRules(response: CardGradingResponseV5): string[] {
   const warnings: string[] = [];
 
-  // Rule 1: If final_grade.decimal_grade = 10.0, ALL defects arrays must be empty
-  if (response.final_grade.decimal_grade === 10.0) {
+  // v6.0 Rule 0: Final grade must be a whole integer
+  if (response.final_grade.decimal_grade !== null) {
+    if (!Number.isInteger(response.final_grade.decimal_grade)) {
+      warnings.push(
+        `CRITICAL v6.0: Grade is ${response.final_grade.decimal_grade} but must be whole integer. ` +
+        `NO half-point grades allowed (no 8.5, 9.5, etc.). Round DOWN to nearest integer.`
+      );
+    }
+    // Check that decimal_grade and whole_grade match
+    if (response.final_grade.decimal_grade !== response.final_grade.whole_grade) {
+      warnings.push(
+        `CRITICAL v6.0: decimal_grade (${response.final_grade.decimal_grade}) must equal whole_grade (${response.final_grade.whole_grade}).`
+      );
+    }
+  }
+
+  // Rule 1: If final_grade.decimal_grade = 10, ALL defects arrays must be empty
+  if (response.final_grade.decimal_grade === 10) {
     const frontDefectCount = countDefects(response.defects.front);
     const backDefectCount = countDefects(response.defects.back);
 
     if (frontDefectCount > 0 || backDefectCount > 0) {
       warnings.push(
-        `CRITICAL: Grade is 10.0 but ${frontDefectCount + backDefectCount} defects found. ` +
-        `If grade = 10.0, ALL defects arrays must be empty. ` +
+        `CRITICAL: Grade is 10 but ${frontDefectCount + backDefectCount} defects found. ` +
+        `If grade = 10, ALL defects arrays must be empty. ` +
         `Either lower the grade or remove defects from descriptions.`
       );
     }
   }
 
-  // Rule 2: If final_grade.decimal_grade < 10.0, at least one defect must exist
+  // Rule 2: If final_grade.decimal_grade < 10, at least one defect must exist
   if (response.final_grade.decimal_grade !== null &&
-      response.final_grade.decimal_grade < 10.0) {
+      response.final_grade.decimal_grade < 10) {
     const frontDefectCount = countDefects(response.defects.front);
     const backDefectCount = countDefects(response.defects.back);
 
     if (frontDefectCount === 0 && backDefectCount === 0) {
       warnings.push(
         `CRITICAL: Grade is ${response.final_grade.decimal_grade} but zero defects found. ` +
-        `If grade < 10.0, must describe defects that caused point deduction. ` +
-        `Either raise the grade to 10.0 or add defects to justify the deduction.`
+        `If grade < 10, must describe defects that caused point deduction. ` +
+        `Either raise the grade to 10 or add defects to justify the deduction.`
       );
+    }
+  }
+
+  // Rule 2.5: Check if summary mentions a different grade than decimal_grade
+  if (response.final_grade.decimal_grade !== null && response.final_grade.summary) {
+    const actualGrade = response.final_grade.decimal_grade;
+    const summary = response.final_grade.summary;
+
+    // Look for grade mentions in summary like "grade of 4", "a 4", "grade: 4", etc.
+    // Match patterns: "grade of X", "grade X", "X/10", "a X", etc.
+    const gradePatterns = [
+      /\bgrade\s+(?:of\s+)?(\d+(?:\.\d+)?)\b/gi,
+      /\ba\s+(\d+(?:\.\d+)?)\s+(?:overall|grade|out\s+of)/gi,
+      /\b(\d+(?:\.\d+)?)\s*\/\s*10\b/gi,
+      /\bfinal\s+(?:grade\s+)?(?:of\s+)?(\d+(?:\.\d+)?)\b/gi,
+      /\breceives?\s+(?:a\s+)?(\d+(?:\.\d+)?)\b/gi,
+      /\bearns?\s+(?:a\s+)?(\d+(?:\.\d+)?)\b/gi
+    ];
+
+    for (const pattern of gradePatterns) {
+      let match;
+      while ((match = pattern.exec(summary)) !== null) {
+        const mentionedGrade = parseFloat(match[1]);
+        if (!isNaN(mentionedGrade) && mentionedGrade !== actualGrade) {
+          warnings.push(
+            `CRITICAL: Summary mentions grade "${match[1]}" but decimal_grade is ${actualGrade}. ` +
+            `Summary text must match the actual calculated grade. ` +
+            `Context: "...${summary.substring(Math.max(0, match.index - 20), match.index + match[0].length + 20)}..."`
+          );
+        }
+      }
     }
   }
 

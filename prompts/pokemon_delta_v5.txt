@@ -72,12 +72,19 @@ REQUIRED FIELDS (All Pokemon Cards)
 • null if not visible or not present (older cards pre-2020)
 
 **card_number**: Card number within set (NUMERATOR ONLY for API lookup)
-🚨 **CRITICAL - EXACT OCR REQUIRED WITH DIGIT-BY-DIGIT VERIFICATION**:
+🚨🚨🚨 **CRITICAL - EXACT OCR REQUIRED - DO NOT INFER OR GUESS** 🚨🚨🚨
 
-**STEP 1: LOCATE THE NUMBER**
+⛔ **FORBIDDEN BEHAVIOR:**
+• DO NOT use your knowledge of Pokemon sets to "correct" numbers
+• DO NOT guess what the number "should be" based on set information
+• DO NOT assume a number based on how many cards are in a set
+• If you read "125/094" on the card, report "125/094" - even if you "know" that set has more than 94 cards
+• ONLY report what you can physically see in the image
+
+🔍 **STEP 1: LOCATE THE NUMBER**
 • Location: Usually bottom-left or bottom-right of card front
-• Look for format like "XXX/YYY" (e.g., "185/159")
-• Zoom in mentally on this area before reading
+• Look for format like "XXX/YYY" (e.g., "185/159", "125/094")
+• ZOOM IN on this area - do not guess from memory
 
 **STEP 2: READ DIGIT-BY-DIGIT (Left to Right)**
 • Read each digit individually and verify its shape:
@@ -113,12 +120,30 @@ REQUIRED FIELDS (All Pokemon Cards)
 • If partially obscured, report what IS visible with uncertainty note
 
 **card_number_raw**: Full printed card number EXACTLY as shown
-🚨 **TRANSCRIBE CHARACTER-BY-CHARACTER - NO CORRECTIONS**:
+🚨🚨🚨 **TRANSCRIBE CHARACTER-BY-CHARACTER - ABSOLUTELY NO CORRECTIONS** 🚨🚨🚨
 • Read each character from the image, left to right
 • Examples: "240/193", "185/159", "TG10/TG30", "GG33/GG70", "SWSH039", "SVP EN 085", "25"
 • Include ALL text - prefixes, slashes, spaces, everything printed
-• DO NOT modify, guess, or "correct" - if it shows "125/094", report "125/094"
-• If you read "183/159" but are uncertain, note the uncertainty - DO NOT auto-correct to "185"
+
+⛔ **YOU MUST NOT:**
+• DO NOT modify based on your knowledge of Pokemon sets
+• DO NOT "correct" numbers that seem wrong
+• DO NOT assume the denominator should be different
+• If the card shows "125/094", you MUST report "125/094" (not "125/106" or "125/109")
+• If the card shows "179/132", you MUST report "179/132" (not any other number)
+
+✅ **YOU MUST:**
+• Report EXACTLY what is printed on the card
+• If uncertain about a digit, note the uncertainty but report what you see
+• Trust what is printed, not what you think should be there
+
+**card_number_ocr_breakdown**: Character-by-character breakdown of what you see
+🚨 **MANDATORY - You MUST fill this out BEFORE setting card_number or card_number_raw**
+• List each character you see in the card number area, one by one
+• Format: "Position 1: [digit], Position 2: [digit], ..."
+• Example for "179/132": "Position 1: 1, Position 2: 7, Position 3: 9, Position 4: /, Position 5: 1, Position 6: 3, Position 7: 2"
+• This forces you to actually READ the image instead of guessing from card knowledge
+• If you skip this field or fill it incorrectly, the grading will be rejected
 
 **card_number_confidence**: Confidence in the card number OCR reading
 • "high" = Number is clearly visible, no ambiguity in any digit

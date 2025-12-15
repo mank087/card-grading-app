@@ -194,6 +194,7 @@ export interface ConversationalCardInfo {
   set_era?: string | null;
   subset?: string | null;
   card_number?: string | null;
+  card_number_raw?: string | null;  // Full card number as printed (e.g., "94/102", "SM226")
   collector_number?: string | null;
   year?: string | null;
   set_year?: string | null;
@@ -270,6 +271,15 @@ export interface CardForLabel {
   is_double_faced?: boolean | null;
   mtg_rarity?: string | null;
 
+  // Pokemon API data (for verified cards)
+  pokemon_api_data?: {
+    set?: {
+      printedTotal?: number;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  } | null;
+
   // Conversational data
   conversational_card_info?: ConversationalCardInfo | null;
 }
@@ -288,11 +298,13 @@ function stripMarkdown(text: string | null | undefined): string | null {
 }
 
 /**
- * Format grade for display - show decimal only if meaningful (.5)
+ * Format grade for display
+ * v6.0: Grades are whole integers (1-10), no half-points
  */
 function formatGrade(grade: number | null | undefined): string {
   if (grade === null || grade === undefined || isNaN(grade)) return 'N/A';
-  return grade % 1 === 0.5 ? grade.toFixed(1) : Math.round(grade).toString();
+  // v6.0: Always return whole number (no decimals)
+  return Math.round(grade).toString();
 }
 
 /**
@@ -422,14 +434,14 @@ function getGrade(card: CardForLabel): number | null {
 
 /**
  * Get condition label from card
+ * v6.1: Always use deterministic grade-to-condition mapping for uniformity
+ * This ensures cards with the same grade always get the same condition label
  */
 function getCondition(card: CardForLabel, grade: number | null): string {
-  if (card.conversational_condition_label) {
-    // Strip abbreviation like (GM), (M), (NM) from end
-    return card.conversational_condition_label.replace(/\s*\([A-Z]+\)\s*$/, '').trim();
-  }
+  // Always use the deterministic mapping based on whole number grade
+  // This ensures uniform labeling (e.g., all 10s = "Gem Mint", all 9s = "Mint")
   if (grade !== null) {
-    return getConditionFromGrade(grade);
+    return getConditionFromGrade(Math.round(grade));
   }
   return '';
 }
@@ -826,12 +838,59 @@ export function generateLabelData(card: CardForLabel): LabelData {
   }
   const subset = getCleanValue(rawSubset);
 
-  const rawCardNumber = stripMarkdown(cardInfo.card_number) ||
+  // Prefer card_number_raw for full format (e.g., "94/102", "SM226")
+  // This matches the logic in CardDetailClient.tsx for the Card Information section
+  const rawCardNumber = stripMarkdown(cardInfo.card_number_raw) ||
+                        stripMarkdown(cardInfo.card_number) ||
                         stripMarkdown(cardInfo.collector_number) ||
                         card.card_number ||
                         null;
   // Clean card number - remove explanatory text like "(printed as 125/094★...)"
-  const cardNumber = getCleanValue(rawCardNumber);
+  let cardNumber = getCleanValue(rawCardNumber);
+
+  // For Pokemon cards, format the card number properly
+  // - Promo formats (SM226, SWSH039, SVP085) - show as-is, no "#" prefix
+  // - Standard fractions (232/182) - show as-is with "#" prefix
+  // - Just numerator (232) - try to add set total if we have it
+  let formattedCardNumber: string | null = null;
+  if (cardNumber && category === 'Pokemon') {
+    // Check if it's already in fraction format (X/Y)
+    if (/^\d+\/\d+$/.test(cardNumber)) {
+      // Already has fraction format - use as-is with "#" prefix
+      formattedCardNumber = `#${cardNumber}`;
+    }
+    // Check for promo-style formats (SM###, SWSH###, SVP###, TG##, GG##)
+    else if (/^(SM|SWSH|SVP|TG|GG|XY|BW)\d+$/i.test(cardNumber)) {
+      // Promo format - show as-is without "#" prefix
+      formattedCardNumber = cardNumber.toUpperCase();
+    }
+    // Check if it's a pure number that needs the set total
+    else if (/^\d+$/.test(cardNumber)) {
+      // Try to get set total from various sources
+      // 1. From card's pokemon_api_data (if verified)
+      const setPrintedTotal = card.pokemon_api_data?.set?.printedTotal;
+
+      if (setPrintedTotal) {
+        formattedCardNumber = `#${cardNumber}/${setPrintedTotal}`;
+      } else {
+        // Just use the number with "#" prefix
+        formattedCardNumber = `#${cardNumber}`;
+      }
+    }
+    // Gallery formats like TG10/TG30 or GG33/GG70
+    else if (/^(TG|GG)\d+\/(TG|GG)\d+$/i.test(cardNumber)) {
+      // Show first part only with no prefix (TG10)
+      const firstPart = cardNumber.split('/')[0];
+      formattedCardNumber = firstPart.toUpperCase();
+    }
+    else {
+      // Unknown format - show with "#" prefix
+      formattedCardNumber = `#${cardNumber}`;
+    }
+  } else if (cardNumber) {
+    // Non-Pokemon cards - standard "#" prefix
+    formattedCardNumber = `#${cardNumber}`;
+  }
 
   const rawYear = stripMarkdown(cardInfo.year) ||
                   stripMarkdown(cardInfo.set_year) ||
@@ -843,7 +902,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
   const contextParts: string[] = [];
   if (setName) contextParts.push(setName);
   if (subset) contextParts.push(subset);
-  if (cardNumber) contextParts.push(`#${cardNumber}`);
+  if (formattedCardNumber) contextParts.push(formattedCardNumber);
   if (year) contextParts.push(year);
 
   const contextLine = contextParts.join(' • ');

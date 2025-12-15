@@ -305,33 +305,39 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           console.log('[MTG CACHE] Parsing cached conversational_grading JSON...');
           const jsonData = JSON.parse(card.conversational_grading);
 
+          // 🆕 v6.0 THREE-PASS: Check for grading_passes.averaged_rounded in cached data
+          const threePassData = jsonData.grading_passes;
+          const avgRounded = threePassData?.averaged_rounded;
+
           parsedConversationalData = {
-            decimal_grade: jsonData.final_grade?.decimal_grade ?? null,
-            whole_grade: jsonData.final_grade?.whole_grade ?? null,
+            // 🎯 THREE-PASS: Use averaged_rounded when available
+            decimal_grade: avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null,
+            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
             condition_label: jsonData.final_grade?.condition_label || null,
-            final_grade_summary: jsonData.final_grade?.summary || null,  // 🆕 Overall card condition summary
+            final_grade_summary: jsonData.final_grade?.summary || null,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
+            // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
             sub_scores: {
               centering: {
                 front: jsonData.raw_sub_scores?.centering_front || 0,
                 back: jsonData.raw_sub_scores?.centering_back || 0,
-                weighted: jsonData.weighted_scores?.centering_weighted || 0
+                weighted: avgRounded?.centering ?? jsonData.weighted_scores?.centering_weighted ?? 0
               },
               corners: {
                 front: jsonData.raw_sub_scores?.corners_front || 0,
                 back: jsonData.raw_sub_scores?.corners_back || 0,
-                weighted: jsonData.weighted_scores?.corners_weighted || 0
+                weighted: avgRounded?.corners ?? jsonData.weighted_scores?.corners_weighted ?? 0
               },
               edges: {
                 front: jsonData.raw_sub_scores?.edges_front || 0,
                 back: jsonData.raw_sub_scores?.edges_back || 0,
-                weighted: jsonData.weighted_scores?.edges_weighted || 0
+                weighted: avgRounded?.edges ?? jsonData.weighted_scores?.edges_weighted ?? 0
               },
               surface: {
                 front: jsonData.raw_sub_scores?.surface_front || 0,
                 back: jsonData.raw_sub_scores?.surface_back || 0,
-                weighted: jsonData.weighted_scores?.surface_weighted || 0
+                weighted: avgRounded?.surface ?? jsonData.weighted_scores?.surface_weighted ?? 0
               }
             },
             centering_ratios: {

@@ -63,10 +63,10 @@ export interface CardImageData {
 }
 
 /**
- * Format grade - show whole number unless it has a meaningful decimal
+ * Format grade - v6.0: Always show whole number (no decimals)
  */
 function formatGradeDisplay(grade: number): string {
-  return grade % 1 === 0 ? grade.toFixed(0) : grade.toFixed(1);
+  return Math.round(grade).toString();
 }
 
 /**

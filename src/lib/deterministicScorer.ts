@@ -22,7 +22,7 @@ export interface ScoringBreakdown {
   structural_damage_type?: string;
   total_deductions: number;
   calculated_grade: number;
-  final_grade: number; // After rounding to 0.5 increments
+  final_grade: number; // v6.0: Whole integer grade (1-10)
   grade_explanation: string;
 }
 
@@ -621,8 +621,8 @@ export function calculateDeterministicGrade(result: any): ScoringBreakdown {
   const totalDeductions = corners.deductions + edges.deductions + surface.deductions + centering.deductions + cumulativePenalty;
   let calculatedGrade = Math.max(1.0, BASE_SCORE - totalDeductions); // Never below 1.0
 
-  // Round to nearest 0.5
-  let finalGrade = Math.round(calculatedGrade * 2) / 2;
+  // v6.0: Round DOWN to whole number (no decimals)
+  let finalGrade = Math.floor(calculatedGrade);
 
   // v5.14: Apply severe damage cap if detected
   let severeDamageNote = '';
@@ -646,7 +646,7 @@ export function calculateDeterministicGrade(result: any): ScoringBreakdown {
     `Corners (-${corners.deductions.toFixed(2)}), Edges (-${edges.deductions.toFixed(2)}), ` +
     `Surface (-${surface.deductions.toFixed(2)}), Centering (-${centering.deductions.toFixed(2)}).` +
     `${cumulativePenaltyNote}${severeDamageNote} ` +
-    `Calculated: ${calculatedGrade.toFixed(2)}, Final: ${finalGrade} (rounded to nearest 0.5).`;
+    `Calculated: ${calculatedGrade.toFixed(2)}, Final: ${finalGrade} (v6.0: rounded down to whole number).`;
 
   return {
     base_score: BASE_SCORE,

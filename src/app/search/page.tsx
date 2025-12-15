@@ -37,11 +37,10 @@ interface CardResult {
   mtg_rarity?: string;
 }
 
-// Helper: Format grade for display
+// Helper: Format grade for display - v6.0: Always whole numbers
 const formatGrade = (grade: number | null | undefined): string => {
   if (grade === null || grade === undefined || grade === 0) return 'N/A';
-  // Show .5 scores with decimal, whole numbers without
-  if (grade % 1 === 0.5) return grade.toFixed(1);
+  // v6.0: Always return whole number (no .5 grades)
   return Math.round(grade).toString();
 };
 

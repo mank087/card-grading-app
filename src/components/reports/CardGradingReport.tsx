@@ -96,13 +96,11 @@ interface CardGradingReportProps {
 }
 
 /**
- * Format grade score - only show decimal if it's .5
+ * Format grade score - v6.0: Always whole numbers, no decimals
  */
 const formatScore = (score: number): string => {
-  if (score % 1 === 0.5) {
-    return score.toFixed(1); // Show .5 scores
-  }
-  return Math.round(score).toString(); // Show whole numbers
+  // v6.0: Always return whole number (no .5 scores)
+  return Math.round(score).toString();
 };
 
 /**

@@ -98,10 +98,12 @@ function getContextFontSize(line: string, config: typeof sizeConfig.md): string 
 
 /**
  * Format grade for display
+ * v6.0: Grades are whole integers (1-10), no half-points
  */
 function formatGradeDisplay(grade: number | null, isAlteredAuthentic: boolean): string {
   if (grade === null) return isAlteredAuthentic ? 'A' : 'N/A'
-  return grade % 1 === 0.5 ? grade.toFixed(1) : Math.round(grade).toString()
+  // v6.0: Always return whole number (no decimals)
+  return Math.round(grade).toString()
 }
 
 export function CardLabel({

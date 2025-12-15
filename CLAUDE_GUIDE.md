@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 15, 2025
+> Last Updated: December 15, 2025 (v6.1 - Pokemon Local Database)
 
 ---
 
@@ -31,7 +31,9 @@
 **DCM Grading** is a full-stack card grading platform that uses AI (GPT-4o vision) to grade trading cards (Pokemon, MTG, Sports, Lorcana, Other). Users upload card images, receive AI-powered condition grades, and can download professional labels/reports.
 
 **Core Features:**
-- AI-powered card grading with three-pass consensus system
+- AI-powered card grading with three-pass consensus system (v6.0)
+- **v6.0: Whole number grades only (1-10, no half-points)**
+- **v6.0: Tier-first grading with dominant defect control**
 - Support for multiple card types (Pokemon, MTG, Sports, Lorcana, Other)
 - Credit-based payment system via Stripe
 - User collection management
@@ -53,7 +55,7 @@
 | Database | Supabase (PostgreSQL) |
 | Storage | Supabase Storage |
 | Auth | Supabase Auth (email/password + Google/Facebook OAuth) |
-| AI | OpenAI GPT-4o (vision) |
+| AI | OpenAI GPT-5.1 (vision) |
 | Payments | Stripe Checkout |
 | Email | Resend |
 | Hosting | Vercel |
@@ -89,8 +91,9 @@ src/
 │   ├── supabaseClient.ts         # Client Supabase instance
 │   ├── supabaseServer.ts         # Server Supabase instance
 │   ├── supabaseAdmin.ts          # Admin Supabase instance
-│   ├── visionGrader_v5.ts        # PRIMARY: AI grading system
-│   ├── visionGrader.ts           # Legacy v4.2 grading (fallback)
+│   ├── visionGrader.ts           # PRIMARY: AI grading with master rubric + deltas (v6.0)
+│   ├── visionGrader_v5.ts        # Alternate three-pass implementation
+│   ├── promptLoader_v5.ts        # Loads master rubric + card-type deltas
 │   ├── professionalGradeMapper.ts # Map to PSA/BGS/SGC/CGC grades
 │   ├── labelDataGenerator.ts     # Generate label data
 │   ├── emailScheduler.ts         # Email scheduling
@@ -259,22 +262,52 @@ src/
 
 | File | Purpose |
 |------|---------|
-| `lib/visionGrader_v5.ts` | **PRIMARY**: Three-pass consensus grading |
-| `lib/visionGrader.ts` | Legacy v4.2 grading (fallback) |
+| `lib/visionGrader.ts` | **PRIMARY**: Master rubric + delta grading (v6.0 three-pass) |
+| `lib/promptLoader_v5.ts` | Loads master_grading_rubric_v5.txt + card-type deltas |
 | `lib/conversationalParserV3_5.ts` | Parse grading markdown reports |
 | `lib/professionalGradeMapper.ts` | Map to PSA/BGS/SGC/CGC grades |
 | `lib/conditionAssessment.ts` | Numeric grade to condition label |
 | `lib/promptLoader_v5.ts` | Load card-type specific prompts |
 | `lib/cardGradingSchema_v5.ts` | Zod validation for grading responses |
 
+### v6.0 Grading System Updates (December 2025)
+
+**Key Changes:**
+1. **Whole Number Grades Only**: Final grades are integers 1-10 (no 8.5, 9.5, etc.)
+2. **Tier-First Grading**: Identify condition tier BEFORE calculating numeric scores
+3. **Dominant Defect Control**: Worst category controls grade, not average
+4. **Stricter Scratch Penalties**: Visible scratch = max grade 8; deep scratch = max 6
+5. **Mandatory Low Grade Triggers**: Creases = max 4, tears = max 3
+
+**Condition Tiers:**
+| Tier | Grade Range | Examples |
+|------|-------------|----------|
+| A | N/A | Altered, markings, trimmed |
+| B | 1-4 | Creases, tears, structural damage |
+| C | 5-6 | Deep scratches, heavy damage |
+| D | 7 | Visible scratches, fuzzy corners |
+| E | 8 | Light scratches, moderate wear |
+| F | 9 | Minor defects only |
+| G | 10 | Zero defects (very rare) |
+
+**Rubric File:** `prompts/master_grading_rubric_v5.txt` (updated to v6.0)
+
 ### External APIs
 
 | File | Purpose |
 |------|---------|
-| `lib/pokemonApiVerification.ts` | Pokemon TCG API integration |
-| `lib/pokemonTcgApi.ts` | Pokemon TCG API client |
+| `lib/pokemonTcgApi.ts` | **Pokemon TCG API client (v6.1: local DB first, API fallback)** |
+| `lib/pokemonApiVerification.ts` | Pokemon TCG API verification |
 | `lib/mtgApiVerification.ts` | MTG Scryfall integration |
 | `lib/scryfallApi.ts` | Scryfall API client |
+
+#### Pokemon Local Database (v6.1)
+
+The `pokemonTcgApi.ts` file now searches the local Supabase database first:
+- `searchLocalDatabase()` - General name/set/number search
+- `searchLocalByNameNumberTotal()` - Optimized for printedTotal matching
+- `searchLocalByNameNumberSetId()` - For promo cards by set ID
+- Falls back to external Pokemon TCG API if not found locally
 
 ### Payments
 
@@ -476,6 +509,60 @@ admin_sessions (
   token VARCHAR,
   expires_at TIMESTAMP
 )
+
+-- Pokemon Local Database (v6.1)
+pokemon_sets (
+  id TEXT PRIMARY KEY,                    -- API set ID: "base1", "sv1"
+  name TEXT NOT NULL,                     -- "Base", "Scarlet & Violet"
+  series TEXT,                            -- "Base", "Scarlet & Violet"
+  printed_total INTEGER,                  -- Number on cards (e.g., 102)
+  total INTEGER,                          -- Actual total including secrets
+  release_date DATE,                      -- Set release date
+  symbol_url TEXT,                        -- Set symbol image URL
+  logo_url TEXT,                          -- Set logo image URL
+  ptcgo_code TEXT,                        -- Pokemon TCG Online code
+  updated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ
+)
+
+pokemon_cards (
+  id TEXT PRIMARY KEY,                    -- API card ID: "base1-4", "sv1-185"
+  name TEXT NOT NULL,                     -- "Charizard", "Professor's Research"
+  number TEXT NOT NULL,                   -- "4", "185", "TG10"
+  set_id TEXT REFERENCES pokemon_sets(id),
+  supertype TEXT,                         -- "Pokémon", "Trainer", "Energy"
+  subtypes TEXT[],                        -- ["Stage 2"], ["Supporter"]
+  types TEXT[],                           -- ["Fire"], ["Water", "Psychic"]
+  hp TEXT,                                -- "120", "340"
+  evolves_from TEXT,                      -- "Charmeleon"
+  evolves_to TEXT[],
+  rarity TEXT,                            -- "Rare Holo", "Illustration Rare"
+  artist TEXT,
+  flavor_text TEXT,
+  image_small TEXT,                       -- Low-res image URL
+  image_large TEXT,                       -- High-res image URL
+  tcgplayer_url TEXT,
+  cardmarket_url TEXT,
+  -- Denormalized set data for fast queries
+  set_name TEXT,
+  set_series TEXT,
+  set_printed_total INTEGER,
+  set_release_date DATE,
+  updated_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ
+)
+
+pokemon_import_log (
+  id SERIAL PRIMARY KEY,
+  import_type TEXT NOT NULL,              -- "full", "incremental"
+  sets_imported INTEGER DEFAULT 0,
+  cards_imported INTEGER DEFAULT 0,
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ,
+  status TEXT DEFAULT 'running',          -- "running", "completed", "failed"
+  error_message TEXT,
+  created_at TIMESTAMPTZ
+)
 ```
 
 ### Storage Buckets
@@ -554,15 +641,27 @@ Email/Password users: email_confirmed_at within 60 seconds
 ```
 1. GET card paths from database
 2. Create signed URLs for images (1 hour expiry)
-3. THREE-PASS CONSENSUS GRADING (visionGrader_v5.ts):
-   ├── Pass 1 → GPT-4o with master rubric
-   ├── Pass 2 → GPT-4o (same prompt, deterministic)
-   └── Pass 3 → GPT-4o
-   └── Average scores, consensus defects
-4. Parse response with conversationalParserV3_5.ts
-5. Generate label_data
-6. Update card record with grades
+3. LOAD PROMPT (promptLoader_v5.ts):
+   ├── master_grading_rubric_v5.txt (universal rules, ~50k tokens)
+   └── {card_type}_delta_v5.txt (card-specific rules)
+4. THREE-PASS CONSENSUS GRADING (visionGrader.ts):
+   ├── Pass 1 → GPT-4o evaluates independently
+   ├── Pass 2 → GPT-4o (fresh evaluation, same prompt)
+   └── Pass 3 → GPT-4o (fresh evaluation)
+   └── Average scores, apply dominant defect control
+   └── Final grade = whole number (v6.0: floor rounding)
+5. Parse response, extract grading_passes
+6. Generate label_data
+7. Update card record with grades
 ```
+
+### v6.0 Grading Rules
+
+- **Whole numbers only**: Final grades are 1-10 integers (no 8.5, 9.5)
+- **Tier-first**: Identify condition tier before calculating scores
+- **Dominant defect control**: Worst category caps the grade
+- **Three-pass consensus**: 2+/3 passes must agree on defects
+- **Floor rounding**: Always round down (8.7 → 8)
 
 ### Post-Grading Verification
 
@@ -653,21 +752,39 @@ vercel.json              - Cron configuration
 
 ## 13. External API Integrations
 
-### OpenAI (GPT-4o)
+### OpenAI (GPT-5.1)
 
 ```
 Purpose: AI card grading with vision
-Model: gpt-4o
-Usage: Three-pass consensus grading
-File: lib/visionGrader_v5.ts
+Model: gpt-5.1 (released November 2025)
+Usage: Three-pass consensus grading with master rubric + deltas
+File: lib/visionGrader.ts → promptLoader_v5.ts
 ```
 
-### Pokemon TCG API
+### Pokemon TCG API (with Local Database)
 
 ```
 Base URL: https://api.pokemontcg.io/v2
 Purpose: Verify Pokemon card info
-File: lib/pokemonApiVerification.ts
+Files:
+  - lib/pokemonTcgApi.ts        # Main API client (local DB first, API fallback)
+  - lib/pokemonApiVerification.ts
+
+LOCAL DATABASE (v6.1):
+  The system now queries a local Supabase database first, eliminating
+  API timeouts and rate limits. Falls back to external API for new releases.
+
+  Tables:
+  - pokemon_sets (170 sets)
+  - pokemon_cards (~17,500+ cards)
+  - pokemon_import_log (import tracking)
+
+  Import Script: scripts/import-pokemon-database.js
+  Migration: migrations/add_pokemon_cards_database.sql
+
+  Usage:
+    node scripts/import-pokemon-database.js --full        # Full import
+    node scripts/import-pokemon-database.js --incremental # Last 90 days only
 ```
 
 ### Scryfall API
@@ -837,6 +954,19 @@ node scripts/send-test-email.js admin@dcmgrading.com
 node scripts/backfill-followup-emails.js
 ```
 
+### Pokemon Database Maintenance
+
+```bash
+# Full import of all Pokemon cards (~20k cards, takes ~60-90 min)
+node scripts/import-pokemon-database.js --full
+
+# Incremental import (cards from last 90 days only)
+node scripts/import-pokemon-database.js --incremental
+
+# Re-run import to fill gaps (uses upsert, safe to re-run)
+node scripts/import-pokemon-database.js --full
+```
+
 ---
 
 ## Common Issues & Solutions
@@ -870,6 +1000,12 @@ node scripts/backfill-followup-emails.js
 - Database trigger is failing - check handle_new_user() function
 - Ensure all tables exist: users, profiles, email_schedule
 - Triggers should use exception handlers to fail gracefully
+
+### Pokemon Card Lookup Fails
+- Check if card exists in local database: `SELECT * FROM pokemon_cards WHERE name ILIKE '%Charizard%' LIMIT 5`
+- Re-run import if cards missing: `node scripts/import-pokemon-database.js --full`
+- Check import logs: `SELECT * FROM pokemon_import_log ORDER BY created_at DESC LIMIT 5`
+- Verify Supabase env vars are set for server-side code
 
 ---
 

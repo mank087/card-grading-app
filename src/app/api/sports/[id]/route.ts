@@ -222,33 +222,39 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
           console.log('[SPORTS CACHE] Parsing cached conversational_grading JSON...');
           const jsonData = JSON.parse(card.conversational_grading);
 
+          // 🆕 v6.0 THREE-PASS: Check for grading_passes.averaged_rounded in cached data
+          const threePassData = jsonData.grading_passes;
+          const avgRounded = threePassData?.averaged_rounded;
+
           parsedConversationalData = {
-            decimal_grade: jsonData.final_grade?.decimal_grade ?? null,
-            whole_grade: jsonData.final_grade?.whole_grade ?? null,
+            // 🎯 THREE-PASS: Use averaged_rounded when available
+            decimal_grade: avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null,
+            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
             condition_label: jsonData.final_grade?.condition_label || null,
             final_grade_summary: jsonData.final_grade?.summary || null,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
+            // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
             sub_scores: {
               centering: {
                 front: jsonData.raw_sub_scores?.centering_front || 0,
                 back: jsonData.raw_sub_scores?.centering_back || 0,
-                weighted: jsonData.weighted_scores?.centering_weighted || 0
+                weighted: avgRounded?.centering ?? jsonData.weighted_scores?.centering_weighted ?? 0
               },
               corners: {
                 front: jsonData.raw_sub_scores?.corners_front || 0,
                 back: jsonData.raw_sub_scores?.corners_back || 0,
-                weighted: jsonData.weighted_scores?.corners_weighted || 0
+                weighted: avgRounded?.corners ?? jsonData.weighted_scores?.corners_weighted ?? 0
               },
               edges: {
                 front: jsonData.raw_sub_scores?.edges_front || 0,
                 back: jsonData.raw_sub_scores?.edges_back || 0,
-                weighted: jsonData.weighted_scores?.edges_weighted || 0
+                weighted: avgRounded?.edges ?? jsonData.weighted_scores?.edges_weighted ?? 0
               },
               surface: {
                 front: jsonData.raw_sub_scores?.surface_front || 0,
                 back: jsonData.raw_sub_scores?.surface_back || 0,
-                weighted: jsonData.weighted_scores?.surface_weighted || 0
+                weighted: avgRounded?.surface ?? jsonData.weighted_scores?.surface_weighted ?? 0
               }
             },
             centering_ratios: {
@@ -497,35 +503,50 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
             const parsedJSONData = JSON.parse(conversationalGradingResult);
             console.log(`[GET /api/sports/${cardId}] ✅ Successfully parsed JSON response`);
 
+            // 🆕 v6.0 THREE-PASS GRADING: Check for grading_passes.averaged_rounded
+            const threePassData = parsedJSONData.grading_passes;
+            const hasThreePass = threePassData?.averaged_rounded?.final !== undefined;
+            const avgRounded = threePassData?.averaged_rounded;
+
+            if (hasThreePass) {
+              console.log(`[GET /api/sports/${cardId}] ✅ THREE-PASS GRADING detected`);
+              console.log(`[GET /api/sports/${cardId}] Pass 1: ${threePassData.pass_1?.final}, Pass 2: ${threePassData.pass_2?.final}, Pass 3: ${threePassData.pass_3?.final}`);
+              console.log(`[GET /api/sports/${cardId}] Averaged: ${threePassData.averaged?.final?.toFixed(2)}, Variance: ${threePassData.variance}, Consistency: ${threePassData.consistency}`);
+            } else {
+              console.log(`[GET /api/sports/${cardId}] ⚠️ No three-pass data found, using direct scores`);
+            }
+
             // Build conversationalGradingData from JSON
+            // 🎯 THREE-PASS: Use averaged_rounded when available, fallback to direct values
             conversationalGradingData = {
-              // Handle both v5.0 (scoring.final_grade) and v4.2 (final_grade.decimal_grade) formats
-              decimal_grade: parsedJSONData.scoring?.final_grade ?? parsedJSONData.final_grade?.decimal_grade ?? null,
-              whole_grade: parsedJSONData.scoring?.rounded_grade ?? parsedJSONData.final_grade?.whole_grade ?? null,
-              grade_uncertainty: parsedJSONData.image_quality?.grade_uncertainty || parsedJSONData.scoring?.grade_range || parsedJSONData.final_grade?.grade_range || '±0.5',  // 🔧 FIX: Prioritize ± format over range
+              // Handle three-pass, v5.0, and v4.2 formats (priority order)
+              decimal_grade: avgRounded?.final ?? parsedJSONData.scoring?.final_grade ?? parsedJSONData.final_grade?.decimal_grade ?? null,
+              whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (parsedJSONData.scoring?.rounded_grade ?? parsedJSONData.final_grade?.whole_grade ?? null),
+              grade_uncertainty: parsedJSONData.image_quality?.grade_uncertainty || parsedJSONData.scoring?.grade_range || parsedJSONData.final_grade?.grade_range || '±0.5',
               condition_label: parsedJSONData.final_grade?.condition_label || null,
               final_grade_summary: parsedJSONData.final_grade?.summary || null,
               image_confidence: parsedJSONData.image_quality?.confidence_letter || null,
+              // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
               sub_scores: {
                 centering: {
                   front: parsedJSONData.raw_sub_scores?.centering_front || 0,
                   back: parsedJSONData.raw_sub_scores?.centering_back || 0,
-                  weighted: parsedJSONData.weighted_scores?.centering_weighted || 0
+                  weighted: avgRounded?.centering ?? parsedJSONData.weighted_scores?.centering_weighted ?? 0
                 },
                 corners: {
                   front: parsedJSONData.raw_sub_scores?.corners_front || 0,
                   back: parsedJSONData.raw_sub_scores?.corners_back || 0,
-                  weighted: parsedJSONData.weighted_scores?.corners_weighted || 0
+                  weighted: avgRounded?.corners ?? parsedJSONData.weighted_scores?.corners_weighted ?? 0
                 },
                 edges: {
                   front: parsedJSONData.raw_sub_scores?.edges_front || 0,
                   back: parsedJSONData.raw_sub_scores?.edges_back || 0,
-                  weighted: parsedJSONData.weighted_scores?.edges_weighted || 0
+                  weighted: avgRounded?.edges ?? parsedJSONData.weighted_scores?.edges_weighted ?? 0
                 },
                 surface: {
                   front: parsedJSONData.raw_sub_scores?.surface_front || 0,
                   back: parsedJSONData.raw_sub_scores?.surface_back || 0,
-                  weighted: parsedJSONData.weighted_scores?.surface_weighted || 0
+                  weighted: avgRounded?.surface ?? parsedJSONData.weighted_scores?.surface_weighted ?? 0
                 }
               },
               centering_ratios: {

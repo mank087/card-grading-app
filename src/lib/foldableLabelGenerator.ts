@@ -222,17 +222,15 @@ function drawRoundedRect(
 }
 
 /**
- * Format grade - show whole number unless it has a meaningful decimal (like 9.5)
+ * Format grade - v6.0: Always show whole number (no decimals)
  */
 function formatGradeDisplay(grade: string | number): string {
   if (typeof grade === 'string') {
     const num = parseFloat(grade);
     if (isNaN(num)) return grade;
-    // Check if has meaningful decimal (not .0)
-    return num % 1 === 0 ? num.toFixed(0) : num.toFixed(1);
+    return Math.round(num).toString();
   }
-  // Check if has meaningful decimal (not .0)
-  return grade % 1 === 0 ? grade.toFixed(0) : grade.toFixed(1);
+  return Math.round(grade).toString();
 }
 
 /**

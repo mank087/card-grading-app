@@ -406,17 +406,17 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
 
     console.log(`[CONVERSATIONAL AI] Stub visionResult created, skipping DVG v2 grading`);
 
-    // SAFETY NET: Enforce half-point increment scale (0.5 steps only)
-    // Round any non-conforming grades to nearest 0.5 increment
+    // SAFETY NET v6.0: Enforce whole number grades (no decimals)
+    // Round any non-integer grades DOWN to whole number
     if (visionResult.recommended_grade.recommended_decimal_grade !== null) {
       const rawGrade = visionResult.recommended_grade.recommended_decimal_grade;
-      const roundedGrade = Math.round(rawGrade * 2) / 2;
+      const roundedGrade = Math.floor(rawGrade); // v6.0: Always round DOWN
 
       if (rawGrade !== roundedGrade) {
-        console.log(`[GRADE ENFORCEMENT] AI returned invalid grade ${rawGrade}, rounding to ${roundedGrade}`);
+        console.log(`[GRADE ENFORCEMENT v6.0] AI returned non-integer grade ${rawGrade}, rounding down to ${roundedGrade}`);
         visionResult.recommended_grade.recommended_decimal_grade = roundedGrade;
         // Also update whole grade to match
-        visionResult.recommended_grade.recommended_whole_grade = Math.round(roundedGrade);
+        visionResult.recommended_grade.recommended_whole_grade = roundedGrade;
       }
     }
 

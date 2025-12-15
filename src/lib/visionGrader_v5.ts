@@ -39,7 +39,7 @@ export interface GradeCardOptionsV5 {
   cardType: CardType;
 
   // API parameters
-  model?: 'gpt-4o' | 'gpt-4o-mini';
+  model?: 'gpt-4o' | 'gpt-4o-mini' | 'gpt-5.1';
   temperature?: number;
   max_tokens?: number;
   seed?: number;
@@ -85,14 +85,14 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
     frontImageUrl,
     backImageUrl,
     cardType,
-    model = 'gpt-4o',
+    model = 'gpt-5.1',      // 🆕 GPT-5.1 - Latest model (November 2025)
     temperature = 0.2,
     max_tokens = 10000,  // Increased for three-pass consensus grading (v5.5)
     seed = 42,
     top_p = 1.0,
-    useV5Architecture = process.env.USE_V5_ARCHITECTURE === 'true',
+    useV5Architecture = true,  // 🆕 v6.0: Always use v5 architecture (master rubric + delta)
     strictValidation = true,
-    fallbackToV4 = true
+    fallbackToV4 = false       // 🆕 v6.0: Don't fall back to v4.2 - it's sunset
   } = options;
 
   console.log(`[Vision Grader v5.0] Starting grading for ${cardType} card`);
@@ -244,7 +244,8 @@ For EACH pass:
 
 After all three passes:
 - Calculate averaged scores (arithmetic mean)
-- Round averages to nearest 0.5 increment
+- Round sub-grade averages to nearest 0.5 increment (centering, corners, edges, surface)
+- Round FINAL grade DOWN to whole number (v6.0: no 8.5, 9.5, etc.)
 - Apply defect consensus (include defects from 2+ passes)
 - Note defects from only 1 pass in consensus_notes
 

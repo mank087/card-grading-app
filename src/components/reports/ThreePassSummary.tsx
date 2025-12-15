@@ -15,9 +15,9 @@ interface ThreePassSummaryProps {
 export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
   const { pass_1, pass_2, pass_3, averaged_rounded, variance, consistency, consensus_notes } = gradingPasses;
 
-  // Helper to format score display
+  // Helper to format score display - v6.0: Always whole numbers
   const formatScore = (score: number): string => {
-    return score % 1 === 0 ? score.toString() : score.toFixed(1);
+    return Math.round(score).toString();
   };
 
   // Helper to get consistency color

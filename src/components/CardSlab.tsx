@@ -40,9 +40,9 @@ export interface CardSlabProps {
   isAlteredAuthentic?: boolean
 }
 
-// Helper: Format grade for display
+// Helper: Format grade for display - v6.0: Always whole numbers
 const formatGrade = (grade: number): string => {
-  if (grade % 1 === 0.5) return grade.toFixed(1)
+  // v6.0: Always return whole number (no .5 grades)
   return Math.round(grade).toString()
 }
 
@@ -450,7 +450,7 @@ export function CardSlabGrid({
             {/* Right: Grade Display */}
             <div className="text-center flex-shrink-0">
               <div className="font-bold text-purple-700 text-3xl leading-none">
-                {grade !== null ? (grade % 1 === 0.5 ? grade.toFixed(1) : Math.round(grade).toString()) : (isAlteredAuthentic ? 'A' : 'N/A')}
+                {grade !== null ? Math.round(grade).toString() : (isAlteredAuthentic ? 'A' : 'N/A')}
               </div>
               {(condition || isAlteredAuthentic) && (
                 <>

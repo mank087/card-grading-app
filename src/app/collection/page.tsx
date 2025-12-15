@@ -126,12 +126,9 @@ const getCardGrade = (card: Card) => {
   return null;
 };
 
-// Format grade for display (matches detail page formatting)
+// Format grade for display - v6.0: Always whole numbers
 const formatGrade = (grade: number): string => {
-  // Show .5 grades, otherwise show whole numbers
-  if (grade % 1 === 0.5) {
-    return grade.toFixed(1);
-  }
+  // v6.0: Always return whole number (no .5 grades)
   return Math.round(grade).toString();
 };
 

@@ -440,16 +440,33 @@ export function getConditionDescription(condition: ConditionLevel): string {
 }
 
 // Helper function to map numeric grade to condition category
+// v6.0 Updated: Supports whole number grades (1-10)
 export function getConditionFromGrade(grade: number | null | undefined): string {
   if (grade === null || grade === undefined) return '';
 
-  if (grade >= 10) return 'Gem Mint';
-  if (grade >= 9.5) return 'Mint';
-  if (grade >= 9.0) return 'Mint';
-  if (grade >= 8.0) return 'Near Mint';
-  if (grade >= 7.0) return 'Excellent';
-  if (grade >= 6.0) return 'Very Good';
-  if (grade >= 5.0) return 'Good';
-  if (grade >= 4.0) return 'Fair';
-  return 'Poor';
+  // v6.0: Whole number grades only (1-10)
+  if (grade >= 10) return 'Gem Mint';      // Grade 10 = Gem Mint (Tier G)
+  if (grade >= 9) return 'Mint';           // Grade 9 = Mint (Tier F)
+  if (grade >= 8) return 'Near Mint-Mint'; // Grade 8 = NM-MT (Tier E)
+  if (grade >= 7) return 'Near Mint';      // Grade 7 = NM (Tier D)
+  if (grade >= 6) return 'Excellent-Mint'; // Grade 6 = EX-MT (Tier C)
+  if (grade >= 5) return 'Excellent';      // Grade 5 = EX (Tier C)
+  if (grade >= 4) return 'Very Good-Excellent'; // Grade 4 = VG-EX (Tier B)
+  if (grade >= 3) return 'Very Good';      // Grade 3 = VG (Tier B)
+  if (grade >= 2) return 'Good';           // Grade 2 = Good (Tier B)
+  return 'Poor';                           // Grade 1 = Poor (Tier B)
+}
+
+// v6.0: Map condition tier to label
+export function getConditionFromTier(tier: string): string {
+  switch (tier) {
+    case 'G': return 'Gem Mint';
+    case 'F': return 'Mint';
+    case 'E': return 'Near Mint-Mint';
+    case 'D': return 'Near Mint';
+    case 'C': return 'Excellent';
+    case 'B': return 'Good/Fair';
+    case 'A': return 'Not Gradeable';
+    default: return '';
+  }
 }
