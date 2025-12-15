@@ -83,18 +83,32 @@ export default function AuthCallbackPage() {
           const storedSession = getStoredSession()
 
           if (storedSession && storedSession.user) {
-            console.log('[OAuth Callback] Session verified in localStorage, user:', storedSession.user.email)
+            console.log('[Auth Callback] Session verified in localStorage, user:', storedSession.user.email)
             setStatus('Success! Redirecting...')
 
-            // Check if this is a new user (created within last 60 seconds)
-            const createdAt = new Date(storedSession.user.created_at || 0).getTime()
+            // Check if this is a new user:
+            // - OAuth: created_at within last 60 seconds
+            // - Email/password: email_confirmed_at within last 60 seconds (just confirmed)
             const now = Date.now()
-            const isNewUser = (now - createdAt) < 60000 // Created within last 60 seconds
+            const createdAt = new Date(storedSession.user.created_at || 0).getTime()
+            const emailConfirmedAt = new Date(storedSession.user.email_confirmed_at || 0).getTime()
+
+            const isNewOAuthUser = (now - createdAt) < 60000
+            const justConfirmedEmail = (now - emailConfirmedAt) < 60000
+            const isNewUser = isNewOAuthUser || justConfirmedEmail
+
+            console.log('[Auth Callback] New user check:', {
+              isNewOAuthUser,
+              justConfirmedEmail,
+              isNewUser,
+              createdAt: storedSession.user.created_at,
+              emailConfirmedAt: storedSession.user.email_confirmed_at
+            })
 
             // Use replace to prevent back-button issues
             // New users go to credits page for onboarding, existing users go to collection
             if (isNewUser) {
-              console.log('[OAuth Callback] New user detected, redirecting to credits page')
+              console.log('[Auth Callback] New user detected, redirecting to credits page')
 
               // Send welcome email (fire-and-forget, don't block redirect)
               fetch('/api/email/welcome', {
@@ -104,7 +118,7 @@ export default function AuthCallbackPage() {
                   email: storedSession.user.email,
                   name: storedSession.user.user_metadata?.full_name || storedSession.user.user_metadata?.name
                 })
-              }).catch(err => console.error('[OAuth Callback] Failed to send welcome email:', err))
+              }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
 
               router.replace('/credits?welcome=true')
             } else {
@@ -117,11 +131,12 @@ export default function AuthCallbackPage() {
 
             const retrySession = getStoredSession()
             if (retrySession && retrySession.user) {
-              console.log('[OAuth Callback] Session found on retry, redirecting...')
-              // Check if this is a new user
-              const createdAt = new Date(retrySession.user.created_at || 0).getTime()
+              console.log('[Auth Callback] Session found on retry, redirecting...')
+              // Check if this is a new user (same logic as above)
               const now = Date.now()
-              const isNewUser = (now - createdAt) < 60000
+              const createdAt = new Date(retrySession.user.created_at || 0).getTime()
+              const emailConfirmedAt = new Date(retrySession.user.email_confirmed_at || 0).getTime()
+              const isNewUser = (now - createdAt) < 60000 || (now - emailConfirmedAt) < 60000
 
               if (isNewUser) {
                 // Send welcome email (fire-and-forget, don't block redirect)
@@ -132,7 +147,7 @@ export default function AuthCallbackPage() {
                     email: retrySession.user.email,
                     name: retrySession.user.user_metadata?.full_name || retrySession.user.user_metadata?.name
                   })
-                }).catch(err => console.error('[OAuth Callback] Failed to send welcome email:', err))
+                }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
 
                 router.replace('/credits?welcome=true')
               } else {
