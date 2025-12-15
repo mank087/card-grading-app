@@ -82,32 +82,32 @@ export async function signInWithPassword(email: string, password: string): Promi
 
 export async function signUp(email: string, password: string): Promise<AuthResponse> {
   try {
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': SUPABASE_ANON_KEY,
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({ email, password })
+    // Use Supabase client for signup to properly handle emailRedirectTo
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}/auth/callback`
+      : 'https://www.dcmgrading.com/auth/callback'
+
+    const { data, error } = await supabaseClient.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: redirectTo
+      }
     })
 
-    const data = await response.json()
-
-    if (!response.ok) {
-      return { error: data.error_description || data.msg || 'Sign up failed' }
+    if (error) {
+      return { error: error.message || 'Sign up failed' }
     }
 
-    // Supabase returns 200 OK even when user already exists (to prevent email enumeration)
+    // Supabase returns success even when user already exists (to prevent email enumeration)
     // But when user exists, the identities array is empty
-    // Check for this case and return a user-friendly error
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
       return { error: 'User already registered' }
     }
 
     return {
-      access_token: data.access_token,
-      refresh_token: data.refresh_token,
+      access_token: data.session?.access_token,
+      refresh_token: data.session?.refresh_token,
       user: data.user
     }
   } catch (err: any) {
