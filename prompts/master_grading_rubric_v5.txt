@@ -4292,13 +4292,13 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
   },
   "metadata": {
     "timestamp": "2025-01-15T14:32:00Z",
-    "prompt_version": "Conversational_Grading_v5.5_THREE_PASS"
+    "prompt_version": "Conversational_Grading_v6.2_THREE_PASS"
   }
 }
 
 **CRITICAL:** Always include the metadata object with:
 - timestamp: Current date/time in ISO 8601 format
-- prompt_version: "Conversational_Grading_v5.5_THREE_PASS"
+- prompt_version: "Conversational_Grading_v6.2_THREE_PASS"
 ---
 SECTION 12: OUTPUT REQUIREMENTS & VALIDATION
 ---
@@ -4364,8 +4364,8 @@ METADATA REQUIREMENTS
 ---
 Include in metadata object:
 • timestamp: ISO 8601 format
-• model_version: "DCM_OPTIC_v5.11"
-• rubric_version: "master_v5.11"
+• model_version: "DCM_OPTIC_v6.2"
+• rubric_version: "master_v6.2"
 • delta_applied: "sports_v5" | "pokemon_v5" | "mtg_v5" | "lorcana_v5" | "other_v5"
 • processing_notes: Any special conditions or issues encountered
 ---

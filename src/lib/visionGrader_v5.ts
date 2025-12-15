@@ -1,15 +1,16 @@
 /**
- * Vision Grader v5.5
+ * Vision Grader v6.2
  * Supports master rubric + delta architecture with Three-Pass Consensus Grading
  *
  * Features:
  * - Master rubric + card-type delta loading
- * - THREE-PASS CONSENSUS GRADING (v5.5): Three independent evaluations averaged for final grade
+ * - THREE-PASS CONSENSUS GRADING: Three independent evaluations averaged for final grade
  * - OpenAI json_schema response format with Zod validation
  * - Evidence-based protocol enforcement
  * - Defect consensus: Only include defects detected in 2+ passes
  * - Variance/consistency metrics for confidence indication
- * - Backward compatibility with v4.2
+ * - Grade/summary mismatch detection and auto-fix (v6.2)
+ * - Card number OCR enforcement (v6.2)
  * - A/B testing support
  */
 
@@ -56,7 +57,7 @@ export interface GradeCardOptionsV5 {
  */
 export interface GradeResultV5 {
   success: boolean;
-  version: 'v5.5' | 'v5.0' | 'v4.2';
+  version: 'v6.2' | 'v5.5' | 'v5.0' | 'v4.2';
   data?: CardGradingResponseV5;
   legacyData?: ConversationalGradeResultV3_3;  // If fallback to v4.2
   validation?: {
@@ -177,7 +178,7 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
 
     return {
       success: false,
-      version: 'v5.5',
+      version: 'v6.2',
       error: promptResult.error || 'Failed to load v5.0 prompts',
       metadata: {
         card_type: cardType,
@@ -325,7 +326,7 @@ Return complete JSON response following the v5.5 schema with three-pass consensu
 
     return {
       success: true,
-      version: 'v5.5',
+      version: 'v6.2',
       data: validationResult.data,
       validation: {
         schema_valid: validationResult.success,
@@ -379,7 +380,7 @@ Return complete JSON response following the v5.5 schema with three-pass consensu
 
     return {
       success: false,
-      version: 'v5.5',
+      version: 'v6.2',
       error: `v5.0 grading failed: ${error}`,
       metadata: {
         card_type: cardType,

@@ -26,8 +26,8 @@ import { z } from 'zod';
 const MetaSchema = z.object({
   model_name: z.string().describe('AI model used for grading (e.g., "gpt-5.1")'),
   provider: z.string().describe('AI provider (e.g., "openai")'),
-  version: z.string().describe('Schema version (e.g., "v5.0")'),
-  prompt_version: z.string().describe('Grading prompt version (e.g., "Conversational_Grading_v5.5_THREE_PASS")'),
+  version: z.string().describe('Schema version (e.g., "v6.2")'),
+  prompt_version: z.string().describe('Grading prompt version (e.g., "Conversational_Grading_v6.2_THREE_PASS")'),
   card_type: z.enum(['sports', 'pokemon', 'mtg', 'lorcana', 'other']).describe('Card type determines which delta rules were applied')
 });
 
