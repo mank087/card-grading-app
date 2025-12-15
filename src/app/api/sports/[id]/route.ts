@@ -7,6 +7,8 @@ import { gradeCardConversational } from "@/lib/visionGrader";
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
+// Grade/summary mismatch fixer (v6.2)
+import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -226,13 +228,20 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
           const threePassData = jsonData.grading_passes;
           const avgRounded = threePassData?.averaged_rounded;
 
+          // 🔧 v6.2: Fix any grade mismatches in cached summary text
+          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedRawSummary = jsonData.final_grade?.summary || null;
+          const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
+            ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
+            : cachedRawSummary;
+
           parsedConversationalData = {
             // 🎯 THREE-PASS: Use averaged_rounded when available
-            decimal_grade: avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null,
+            decimal_grade: cachedDecimalGrade,
             whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
             condition_label: jsonData.final_grade?.condition_label || null,
-            final_grade_summary: jsonData.final_grade?.summary || null,
+            final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
             sub_scores: {
@@ -518,13 +527,20 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
             // Build conversationalGradingData from JSON
             // 🎯 THREE-PASS: Use averaged_rounded when available, fallback to direct values
+            const actualDecimalGrade = avgRounded?.final ?? parsedJSONData.scoring?.final_grade ?? parsedJSONData.final_grade?.decimal_grade ?? null;
+            const rawSummary = parsedJSONData.final_grade?.summary || null;
+            // 🔧 v6.2: Fix any grade mismatches in the summary text
+            const correctedSummary = rawSummary && actualDecimalGrade !== null
+              ? fixSummaryGradeMismatch(rawSummary, actualDecimalGrade)
+              : rawSummary;
+
             conversationalGradingData = {
               // Handle three-pass, v5.0, and v4.2 formats (priority order)
-              decimal_grade: avgRounded?.final ?? parsedJSONData.scoring?.final_grade ?? parsedJSONData.final_grade?.decimal_grade ?? null,
+              decimal_grade: actualDecimalGrade,
               whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (parsedJSONData.scoring?.rounded_grade ?? parsedJSONData.final_grade?.whole_grade ?? null),
               grade_uncertainty: parsedJSONData.image_quality?.grade_uncertainty || parsedJSONData.scoring?.grade_range || parsedJSONData.final_grade?.grade_range || '±0.5',
               condition_label: parsedJSONData.final_grade?.condition_label || null,
-              final_grade_summary: parsedJSONData.final_grade?.summary || null,
+              final_grade_summary: correctedSummary,
               image_confidence: parsedJSONData.image_quality?.confidence_letter || null,
               // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
               sub_scores: {

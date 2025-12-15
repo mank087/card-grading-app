@@ -4211,13 +4211,32 @@ STEP 14: FINAL GRADE DETERMINATION (v6.0 UPDATED)
 
 If alteration detected → Final Grade = N/A
 
-**REQUIRED SUMMARY COMPONENTS:**
+**⚠️ CRITICAL: SUMMARY GENERATION ORDER (v6.2)**
+The final_grade.summary field MUST be the LAST thing you generate. Follow this exact order:
+
+**STEP 1 - COMPLETE ALL GRADING FIRST:**
+✓ Complete all three grading passes (pass_1, pass_2, pass_3)
+✓ Calculate averaged scores across passes
+✓ Round to averaged_rounded values
+✓ Determine the final decimal_grade (whole integer 1-10)
+
+**STEP 2 - ONLY THEN WRITE THE SUMMARY:**
+✓ Review the calculated decimal_grade value
+✓ Write summary that references THAT EXACT grade number
+✓ If decimal_grade = 9, summary must say "grade of 9" or "9/10" - NEVER 8 or 10
+
+**REQUIRED SUMMARY CONTENT:**
 Write a natural, user-friendly summary that explains the grade. Do NOT mention condition tiers or internal scoring mechanics. Focus on:
 1. The card's overall condition in plain language
 2. Key defects that affected the grade (if any)
-3. The final grade with brief justification
+3. The final grade with brief justification - MUST MATCH decimal_grade exactly
+
+**🚨 GRADE MISMATCH = CRITICAL ERROR 🚨**
+If your summary mentions "grade of 8" but decimal_grade is 9, this is a CRITICAL ERROR.
+ALWAYS double-check that any grade mentioned in summary matches decimal_grade.
 
 Example: "This card shows light corner wear and minor surface scratches consistent with play. The centering is slightly off-center. Final grade: 7."
+(This example is valid ONLY if decimal_grade = 7)
 ---
 OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
 ---

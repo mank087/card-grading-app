@@ -6,6 +6,8 @@ import { gradeCardConversational } from "@/lib/visionGrader";
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
+// Grade/summary mismatch fixer (v6.2)
+import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -206,13 +208,20 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           const threePassData = jsonData.grading_passes;
           const avgRounded = threePassData?.averaged_rounded;
 
+          // 🔧 v6.2: Fix any grade mismatches in cached summary text
+          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedRawSummary = jsonData.final_grade?.summary || null;
+          const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
+            ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
+            : cachedRawSummary;
+
           parsedConversationalData = {
             // 🎯 THREE-PASS: Use averaged_rounded when available
-            decimal_grade: avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null,
+            decimal_grade: cachedDecimalGrade,
             whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
             condition_label: jsonData.final_grade?.condition_label || null,
-            final_grade_summary: jsonData.final_grade?.summary || null,
+            final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
             sub_scores: {
@@ -430,6 +439,13 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         const decimalGrade = jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null;
         const wholeGrade = jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null;
         const finalGrade = jsonData.final_grade || {};
+
+        // 🔧 v6.2: Fix any grade mismatches in the summary text
+        const rawSummary = finalGrade.summary ?? null;
+        const correctedSummary = rawSummary && decimalGrade !== null
+          ? fixSummaryGradeMismatch(rawSummary, decimalGrade)
+          : rawSummary;
+
         gradingData = {
           // Legacy columns (for backwards compatibility)
           raw_decimal_grade: decimalGrade,
@@ -439,7 +455,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           conversational_decimal_grade: decimalGrade,
           conversational_whole_grade: wholeGrade,
           conversational_grade_uncertainty: jsonData.image_quality?.grade_uncertainty || finalGrade.grade_range || '±0.5',  // 🔧 FIX: Prioritize ± format over range
-          conversational_final_grade_summary: finalGrade.summary ?? null,
+          conversational_final_grade_summary: correctedSummary,  // 🆕 v6.2: Fixed summary with correct grade
           conversational_condition_label: finalGrade.condition_label || null,
 
           // Sub-scores for colored circles display

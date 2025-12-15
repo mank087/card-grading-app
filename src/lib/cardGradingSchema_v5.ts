@@ -305,12 +305,16 @@ const FinalGradeSchema = z.object({
   condition_tier: z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G']).optional().describe('v6.0: Condition tier (A=N/A, B=1-4, C=5-6, D=7, E=8, F=9, G=10)'),
   dominant_defect: z.string().optional().describe('v6.0: Category with lowest score that controlled the grade'),
   summary: z.string().min(100).describe(
-    'REQUIRED: Natural language summary of card condition. ' +
+    '⚠️ PROCESS ORDER - THIS FIELD MUST BE GENERATED LAST: ' +
+    'Before writing this summary, you MUST have already: ' +
+    '(1) Completed all three grading passes, ' +
+    '(2) Calculated averaged_rounded scores, ' +
+    '(3) Determined the final decimal_grade value. ' +
+    'ONLY THEN write this summary. ' +
+    'CRITICAL: Any grade mentioned in this summary MUST exactly match the decimal_grade field value. ' +
+    'If decimal_grade is 9, you must write "grade of 9" or "9/10" - NEVER a different number. ' +
+    'Content: Describe overall condition, key defects affecting grade, and final grade with justification. ' +
     'Do NOT mention condition tiers or internal scoring mechanics. ' +
-    'CRITICAL: When mentioning the grade, you MUST use the EXACT value from decimal_grade field above. ' +
-    'Do NOT write the summary until after calculating the final decimal_grade. ' +
-    'Describe: 1) Overall condition in plain language, 2) Key defects affecting grade, ' +
-    '3) Final grade with brief justification (MUST match decimal_grade exactly). ' +
     'Minimum 100 characters.'
   ),
   grading_status: z.enum(['gradeable', 'not_gradeable_altered', 'not_gradeable_damaged', 'not_gradeable_slabbed']).optional().describe('Grading eligibility status')
@@ -807,6 +811,57 @@ export function validateEvidenceBasedRules(response: CardGradingResponseV5): str
   checkCornerConsistency(response.defects.back.corners.bottom_right, 'Back Bottom-Right', warnings);
 
   return warnings;
+}
+
+/**
+ * Fix grade mismatches in the summary text (v6.2)
+ *
+ * The AI sometimes generates summaries that mention a different grade than the actual calculated grade.
+ * This function finds and replaces incorrect grade mentions with the actual grade.
+ *
+ * @param summary - The original summary text
+ * @param actualGrade - The actual calculated grade
+ * @returns Corrected summary text
+ */
+export function fixSummaryGradeMismatch(summary: string, actualGrade: number): string {
+  if (!summary || actualGrade === null || actualGrade === undefined) {
+    return summary;
+  }
+
+  let correctedSummary = summary;
+
+  // Patterns that capture grade mentions with surrounding context for replacement
+  // Each pattern captures: (prefix)(grade)(suffix)
+  const replacementPatterns = [
+    // "grade of 8" -> "grade of 9"
+    { pattern: /(\bgrade\s+of\s+)(\d+(?:\.\d+)?)(\b)/gi, prefix: 1, grade: 2, suffix: 3 },
+    // "grade is 8" -> "grade is 9"
+    { pattern: /(\bgrade\s+is\s+)(\d+(?:\.\d+)?)(\b)/gi, prefix: 1, grade: 2, suffix: 3 },
+    // "final grade 8" or "final grade of 8"
+    { pattern: /(\bfinal\s+(?:grade\s+)?(?:of\s+)?)(\d+(?:\.\d+)?)(\b)/gi, prefix: 1, grade: 2, suffix: 3 },
+    // "assigned grade is 8"
+    { pattern: /(\bassigned\s+grade\s+is\s+)(\d+(?:\.\d+)?)(\b)/gi, prefix: 1, grade: 2, suffix: 3 },
+    // "receives a 8" or "receives 8"
+    { pattern: /(\breceives?\s+(?:a\s+)?)(\d+(?:\.\d+)?)(\s+(?:overall|grade|out\s+of)|\b)/gi, prefix: 1, grade: 2, suffix: 3 },
+    // "earns a 8" or "earns 8"
+    { pattern: /(\bearns?\s+(?:a\s+)?)(\d+(?:\.\d+)?)(\s+(?:overall|grade|out\s+of)|\b)/gi, prefix: 1, grade: 2, suffix: 3 },
+    // "8/10" -> "9/10"
+    { pattern: /(\b)(\d+(?:\.\d+)?)(\s*\/\s*10\b)/gi, prefix: 1, grade: 2, suffix: 3 },
+  ];
+
+  for (const { pattern, prefix, grade, suffix } of replacementPatterns) {
+    correctedSummary = correctedSummary.replace(pattern, (match, p1, p2, p3) => {
+      const mentionedGrade = parseFloat(p2);
+      // Only replace if the grade is different and is a valid grade (1-10)
+      if (!isNaN(mentionedGrade) && mentionedGrade !== actualGrade && mentionedGrade >= 1 && mentionedGrade <= 10) {
+        console.log(`[fixSummaryGradeMismatch] Replacing grade "${p2}" with "${actualGrade}" in: "${match}"`);
+        return `${p1}${actualGrade}${p3}`;
+      }
+      return match;
+    });
+  }
+
+  return correctedSummary;
 }
 
 /**
