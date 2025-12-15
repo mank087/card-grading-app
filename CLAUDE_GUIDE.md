@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 15, 2025 (v6.1 - Pokemon Local Database)
+> Last Updated: December 15, 2025 (v6.2 - Card Number OCR & Verification Fixes)
 
 ---
 
@@ -291,6 +291,42 @@ src/
 | G | 10 | Zero defects (very rare) |
 
 **Rubric File:** `prompts/master_grading_rubric_v5.txt` (updated to v6.0)
+
+### v6.2 Card Number OCR & Verification Fixes (December 2025)
+
+**Problem Solved:** AI was using Pokemon set knowledge to "correct" card numbers instead of reading them from the image (e.g., card shows 179/132 but AI outputs 113/111).
+
+**Changes:**
+
+1. **Card Number OCR Breakdown Field** (`card_number_ocr_breakdown`)
+   - Forces AI to spell out each digit position-by-position
+   - Must be filled BEFORE setting `card_number` or `card_number_raw`
+   - Example: `"Position 1: 1, Position 2: 7, Position 3: 9, Position 4: /, Position 5: 1, Position 6: 3, Position 7: 2"`
+
+2. **Strengthened Prompts** (`prompts/pokemon_delta_v5.txt`)
+   - Added **FORBIDDEN BEHAVIOR** section
+   - Explicit: "DO NOT use knowledge of Pokemon sets to correct numbers"
+   - Explicit: "If card shows 125/094, report 125/094 even if you know the set has more cards"
+
+3. **Verification Validation** (`lib/pokemonApiVerification.ts`)
+   - **Year validation**: Rejects matches >3 years different (prevents 2014 card matching to 2025)
+   - **Name validation**: Rejects completely mismatched card names
+   - **Confidence-based corrections**: Only high/medium confidence matches can override card info
+   - **Card number protection**: Only HIGH confidence matches can change `card_number`
+
+4. **Force Regrade Improvements** (`api/pokemon/[id]/route.ts`)
+   - Now clears ALL cached `pokemon_api_*` fields
+   - Clears `card_number`, `card_set`, `release_date`, `label_data`
+   - Ensures completely fresh grading without cached verification data
+
+5. **Condition Label Uniformity** (`lib/labelDataGenerator.ts`)
+   - Always uses deterministic `getConditionFromGrade()` mapping
+   - Same grade always produces same condition label (no AI variation)
+
+6. **Label Display Fixes** (`lib/labelDataGenerator.ts`)
+   - Pokemon cards show full card number (232/182 not just 232)
+   - Promo formats (SM226, SWSH039) display without "#" prefix
+   - Uses `card_number_raw` for accurate display
 
 ### External APIs
 
@@ -1006,6 +1042,26 @@ node scripts/import-pokemon-database.js --full
 - Re-run import if cards missing: `node scripts/import-pokemon-database.js --full`
 - Check import logs: `SELECT * FROM pokemon_import_log ORDER BY created_at DESC LIMIT 5`
 - Verify Supabase env vars are set for server-side code
+
+### Pokemon Card Number Wrong After Grading
+- AI may be using set knowledge instead of reading the image
+- Check `card_number_ocr_breakdown` field in grading response
+- Force regrade clears all cached verification data
+- If verification matched wrong card, check year validation in logs:
+  - `[Pokemon API Verification] REJECTED: Year mismatch too large (2014 vs 2025)`
+- Check name validation:
+  - `[Pokemon API Verification] REJECTED: Name mismatch (CardA vs CardB)`
+
+### Force Regrade Not Working
+- Verify the force_regrade=true parameter is being passed
+- Check logs for: `🧹 Clearing cached pokemon_api_* fields for fresh re-grade`
+- If still showing old data, check if browser is caching the response
+- Database should show nulled fields: `pokemon_api_id`, `pokemon_api_data`, `card_number`
+
+### Condition Labels Inconsistent
+- v6.2 fix: Labels now always use deterministic `getConditionFromGrade()` mapping
+- Same numeric grade = same condition label (no AI variation)
+- Run `/api/admin/backfill-labels` to regenerate all existing card labels
 
 ---
 
