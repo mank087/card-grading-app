@@ -2850,48 +2850,48 @@ export function MTGCardDetails() {
                     {/* Centering */}
                     <div className="text-center">
                       <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-xl font-bold text-white bg-gradient-to-br from-blue-500 to-blue-600 shadow-lg mb-2">
-                        {safeToFixed(weightedScores?.centering ?? subScores.centering.weighted ?? subScores.centering.weighted_score ?? 0)}
+                        {safeToFixed(weightedScores?.centering ?? subScores?.centering?.weighted ?? subScores?.centering?.weighted_score ?? 0)}
                       </div>
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">🎯 Centering</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
-                        <p>F: <span className="font-semibold text-blue-700">{safeToFixed(subScores.centering.front_score ?? subScores.centering.front)}</span> | B: <span className="font-semibold text-blue-700">{safeToFixed(subScores.centering.back_score ?? subScores.centering.back)}</span></p>
-                        <p className="font-semibold text-blue-800 mt-1">Weighted: {safeToFixed(weightedScores?.centering ?? subScores.centering.weighted ?? subScores.centering.weighted_score ?? 0)}</p>
+                        <p>F: <span className="font-semibold text-blue-700">{safeToFixed(subScores?.centering?.front_score ?? subScores?.centering?.front)}</span> | B: <span className="font-semibold text-blue-700">{safeToFixed(subScores?.centering?.back_score ?? subScores?.centering?.back)}</span></p>
+                        <p className="font-semibold text-blue-800 mt-1">Weighted: {safeToFixed(weightedScores?.centering ?? subScores?.centering?.weighted ?? subScores?.centering?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
 
                     {/* Corners */}
                     <div className="text-center">
                       <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-xl font-bold text-white bg-gradient-to-br from-green-500 to-green-600 shadow-lg mb-2">
-                        {safeToFixed(weightedScores?.corners ?? subScores.corners.weighted ?? subScores.corners.weighted_score ?? 0)}
+                        {safeToFixed(weightedScores?.corners ?? subScores?.corners?.weighted ?? subScores?.corners?.weighted_score ?? 0)}
                       </div>
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">📐 Corners</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
-                        <p>F: <span className="font-semibold text-green-700">{safeToFixed(subScores.corners.front_score ?? subScores.corners.front)}</span> | B: <span className="font-semibold text-green-700">{safeToFixed(subScores.corners.back_score ?? subScores.corners.back)}</span></p>
-                        <p className="font-semibold text-green-800 mt-1">Weighted: {safeToFixed(weightedScores?.corners ?? subScores.corners.weighted ?? subScores.corners.weighted_score ?? 0)}</p>
+                        <p>F: <span className="font-semibold text-green-700">{safeToFixed(subScores?.corners?.front_score ?? subScores?.corners?.front)}</span> | B: <span className="font-semibold text-green-700">{safeToFixed(subScores?.corners?.back_score ?? subScores?.corners?.back)}</span></p>
+                        <p className="font-semibold text-green-800 mt-1">Weighted: {safeToFixed(weightedScores?.corners ?? subScores?.corners?.weighted ?? subScores?.corners?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
 
                     {/* Edges */}
                     <div className="text-center">
                       <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-xl font-bold text-white bg-gradient-to-br from-purple-500 to-purple-600 shadow-lg mb-2">
-                        {safeToFixed(weightedScores?.edges ?? subScores.edges.weighted ?? subScores.edges.weighted_score ?? 0)}
+                        {safeToFixed(weightedScores?.edges ?? subScores?.edges?.weighted ?? subScores?.edges?.weighted_score ?? 0)}
                       </div>
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">📏 Edges</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
-                        <p>F: <span className="font-semibold text-purple-700">{safeToFixed(subScores.edges.front_score ?? subScores.edges.front)}</span> | B: <span className="font-semibold text-purple-700">{safeToFixed(subScores.edges.back_score ?? subScores.edges.back)}</span></p>
-                        <p className="font-semibold text-purple-800 mt-1">Weighted: {safeToFixed(weightedScores?.edges ?? subScores.edges.weighted ?? subScores.edges.weighted_score ?? 0)}</p>
+                        <p>F: <span className="font-semibold text-purple-700">{safeToFixed(subScores?.edges?.front_score ?? subScores?.edges?.front)}</span> | B: <span className="font-semibold text-purple-700">{safeToFixed(subScores?.edges?.back_score ?? subScores?.edges?.back)}</span></p>
+                        <p className="font-semibold text-purple-800 mt-1">Weighted: {safeToFixed(weightedScores?.edges ?? subScores?.edges?.weighted ?? subScores?.edges?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
 
                     {/* Surface */}
                     <div className="text-center">
                       <div className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-xl font-bold text-white bg-gradient-to-br from-amber-500 to-amber-600 shadow-lg mb-2">
-                        {safeToFixed(weightedScores?.surface ?? subScores.surface.weighted ?? subScores.surface.weighted_score ?? 0)}
+                        {safeToFixed(weightedScores?.surface ?? subScores?.surface?.weighted ?? subScores?.surface?.weighted_score ?? 0)}
                       </div>
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">✨ Surface</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
-                        <p>F: <span className="font-semibold text-amber-700">{safeToFixed(subScores.surface.front_score ?? subScores.surface.front)}</span> | B: <span className="font-semibold text-amber-700">{safeToFixed(subScores.surface.back_score ?? subScores.surface.back)}</span></p>
-                        <p className="font-semibold text-amber-800 mt-1">Weighted: {safeToFixed(weightedScores?.surface ?? subScores.surface.weighted ?? subScores.surface.weighted_score ?? 0)}</p>
+                        <p>F: <span className="font-semibold text-amber-700">{safeToFixed(subScores?.surface?.front_score ?? subScores?.surface?.front)}</span> | B: <span className="font-semibold text-amber-700">{safeToFixed(subScores?.surface?.back_score ?? subScores?.surface?.back)}</span></p>
+                        <p className="font-semibold text-amber-800 mt-1">Weighted: {safeToFixed(weightedScores?.surface ?? subScores?.surface?.weighted ?? subScores?.surface?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
                   </div>
