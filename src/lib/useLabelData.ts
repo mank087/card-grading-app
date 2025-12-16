@@ -9,39 +9,12 @@ import { generateLabelData, type LabelData, type CardForLabel } from './labelDat
 
 /**
  * Extract label data from a card object
- * Uses stored label_data if available and complete, otherwise generates on the fly
+ * 🔧 v7.2: Always generates fresh label data to ensure accuracy
+ * This fixes issues where stored label_data was incomplete
  */
 export function getCardLabelData(card: any): LabelData {
-  // If card has pre-generated label_data, check if it's complete
-  if (card.label_data && typeof card.label_data === 'object') {
-    const stored = card.label_data as LabelData;
-
-    // 🔧 v7.2: Regenerate if stored label_data has obvious placeholder values
-    // This handles cases where label_data was saved before card_info was available
-    const hasValidGrade = stored.grade !== null && stored.grade !== undefined;
-    const hasValidName = stored.primaryName && stored.primaryName !== 'Card';
-
-    // If we have a grade in the card but not in label_data, regenerate
-    const cardHasGrade = card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined;
-
-    if (hasValidGrade && hasValidName) {
-      return stored;
-    }
-
-    // If stored data is incomplete but card has more data, regenerate
-    if (!hasValidGrade && cardHasGrade) {
-      console.log('[getCardLabelData] Regenerating label_data - stored has no grade but card does');
-      // Fall through to regenerate
-    } else if (!hasValidName && (card.featured || card.card_name || card.conversational_card_info?.player_or_character)) {
-      console.log('[getCardLabelData] Regenerating label_data - stored has placeholder name but card has data');
-      // Fall through to regenerate
-    } else {
-      // Use stored data even if incomplete - it's the best we have
-      return stored;
-    }
-  }
-
-  // Otherwise, generate it on the fly for backward compatibility
+  // Always generate fresh label data from card fields
+  // This ensures we use the latest data regardless of what's stored in label_data
   const cardForLabel: CardForLabel = {
     id: card.id,
     category: card.category,
