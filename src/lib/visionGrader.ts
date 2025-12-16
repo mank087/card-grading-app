@@ -1648,8 +1648,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v7.1-json',
-          prompt_version: 'Conversational_Grading_v7.1_THREE_PASS'
+          version: 'conversational-v7.2-json',
+          prompt_version: 'Conversational_Grading_v7.2_MIN_SCORING'
         }
       };
 
@@ -1700,12 +1700,12 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v7.1-markdown',
-          prompt_version: 'Conversational_Grading_v7.1_THREE_PASS'
+          version: 'conversational-v7.2-markdown',
+          prompt_version: 'Conversational_Grading_v7.2_MIN_SCORING'
         }
       };
 
-      console.log('[CONVERSATIONAL v7.1] Conversational grading completed successfully');
+      console.log('[CONVERSATIONAL v7.2] Conversational grading completed successfully');
       return result;
     }
 

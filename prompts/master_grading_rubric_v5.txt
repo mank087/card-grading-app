@@ -167,12 +167,12 @@ THREE-PASS EXECUTION PROTOCOL
 **CRITICAL: You MUST perform THREE complete, independent evaluations.**
 
 For EACH pass, you will:
-1. Evaluate centering (front and back)
-2. Evaluate all 8 corners (4 front, 4 back)
-3. Evaluate all 8 edges (4 front, 4 back)
-4. Evaluate both surfaces (front and back)
-5. Calculate weighted sub-scores
-6. Determine pass final grade
+1. Evaluate centering (front and back) → assign front_centering_score and back_centering_score
+2. Evaluate all 8 corners (4 front, 4 back) → assign front_corners_score and back_corners_score
+3. Evaluate all 8 edges (4 front, 4 back) → assign front_edges_score and back_edges_score
+4. Evaluate both surfaces (front and back) → assign front_surface_score and back_surface_score
+5. Calculate pass sub-scores using MIN: centering = MIN(front, back), corners = MIN(front, back), etc.
+6. Determine pass final grade = MIN(centering, corners, edges, surface) for that pass
 
 **PASS INDEPENDENCE REQUIREMENT:**
 • Each pass must be a FRESH evaluation
@@ -224,23 +224,26 @@ Identical word-for-word defects_noted arrays across ALL three passes ARE suspici
 A pristine card graded 10/10/10/10 with empty defects arrays is perfectly valid.
 A damaged card with the exact same 5-sentence defect description copied three times is not.
 ---
-PASS OUTPUT STRUCTURE (v7.0 - WHOLE NUMBERS ONLY)
+PASS OUTPUT STRUCTURE (v7.2 - MIN SCORING, WHOLE NUMBERS ONLY)
 ---
 For EACH of the three passes, record:
 
 {
   "pass_N": {
-    "centering": X,        // Centering score (1-10, whole numbers only)
-    "corners": X,          // Corners score (1-10, whole numbers only)
-    "edges": X,            // Edges score (1-10, whole numbers only)
-    "surface": X,          // Surface score (1-10, whole numbers only)
-    "final": X,            // Pass final grade (1-10, whole numbers only)
+    "centering": X,        // MIN(front_centering, back_centering) - whole integer 1-10
+    "corners": X,          // MIN(front_corners, back_corners) - whole integer 1-10
+    "edges": X,            // MIN(front_edges, back_edges) - whole integer 1-10
+    "surface": X,          // MIN(front_surface, back_surface) - whole integer 1-10
+    "final": X,            // MIN(centering, corners, edges, surface) - whole integer 1-10
     "defects_noted": [     // Key defects observed in this pass
       "description of defect 1",
       "description of defect 2"
     ]
   }
 }
+
+**v7.2 IMPORTANT:** Each subgrade score is the MINIMUM of front and back for that category.
+This ensures the weakest side determines the subgrade, not a weighted average.
 ---
 AVERAGING AND FINAL GRADE CALCULATION (v6.0 UPDATED - WHOLE NUMBERS ONLY)
 ---
@@ -4242,27 +4245,33 @@ All raw_sub_scores values MUST be whole integers 1-10:
 7. back_edges_score (whole integer 1-10)
 8. back_surface_score (whole integer 1-10)
 ---
-STEP 8: WEIGHTED SCORING (55% Front, 45% Back)
+STEP 8: SUBGRADE SCORING (v7.2 - MINIMUM OF FRONT/BACK)
 ---
-Calculate weighted component scores:
+🚨 **v7.2 CRITICAL CHANGE: Use MINIMUM score, not weighted average**
 
-**Front Weight: 55%**
-• front_centering_weighted = front_centering_score × 0.55
-• front_corners_weighted = front_corners_score × 0.55
-• front_edges_weighted = front_edges_score × 0.55
-• front_surface_weighted = front_surface_score × 0.55
+For each subgrade category, the score is the MINIMUM of front and back:
 
-**Back Weight: 45%**
-• back_centering_weighted = back_centering_score × 0.45
-• back_corners_weighted = back_corners_score × 0.45
-• back_edges_weighted = back_edges_score × 0.45
-• back_surface_weighted = back_surface_score × 0.45
+**SUBGRADE CALCULATION (Weakest Link per Category):**
+• centering_score = MIN(front_centering_score, back_centering_score)
+• corners_score = MIN(front_corners_score, back_corners_score)
+• edges_score = MIN(front_edges_score, back_edges_score)
+• surface_score = MIN(front_surface_score, back_surface_score)
 
-**Combined Scores:**
-• total_centering = front_centering_weighted + back_centering_weighted
-• total_corners = front_corners_weighted + back_corners_weighted
-• total_edges = front_edges_weighted + back_edges_weighted
-• total_surface = front_surface_weighted + back_surface_weighted
+**WHY MINIMUM INSTEAD OF WEIGHTED AVERAGE:**
+• Aligns with professional grading standards (PSA, BGS, SGC, CGC)
+• Prevents a weak front score from being masked by a strong back score
+• Example: Front surface 8, Back surface 9 → Surface score = 8 (not 8.45 rounded to 9)
+• Makes subgrade scores directly meaningful to users
+• Ensures the final grade reflects actual card condition
+
+**IMPORTANT:** The front and back scores are STILL recorded individually in raw_sub_scores
+for transparency. The MIN is used for the displayed subgrade and for final grade calculation.
+
+**Combined Scores (for final grade calculation):**
+• total_centering = MIN(front_centering_score, back_centering_score)
+• total_corners = MIN(front_corners_score, back_corners_score)
+• total_edges = MIN(front_edges_score, back_edges_score)
+• total_surface = MIN(front_surface_score, back_surface_score)
 ---
 STEP 9: GRADE CAPS APPLICATION
 ---
@@ -4496,24 +4505,24 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
     // ❌ NEVER use decimals: 8.5, 9.25, 7.8, 9.3, etc.
   },
   "weighted_scores": {
-    "centering_weighted": 8.55,   // (9×0.55) + (8×0.45)
-    "corners_weighted": 9.0,      // (9×0.55) + (9×0.45)
-    "edges_weighted": 9.55,       // (10×0.55) + (9×0.45)
-    "surface_weighted": 9.0,      // (9×0.55) + (9×0.45)
+    "centering_weighted": 8,      // v7.2: MIN(front=9, back=8) = 8
+    "corners_weighted": 9,        // v7.2: MIN(front=9, back=9) = 9
+    "edges_weighted": 9,          // v7.2: MIN(front=10, back=9) = 9
+    "surface_weighted": 9,        // v7.2: MIN(front=9, back=9) = 9
     "limiting_factor": "centering",
-    "preliminary_grade": 8.55,
+    "preliminary_grade": 8,       // v7.2: MIN of all subgrades = 8
     "condition_tier": "E",        // v6.0: Tier from Section 1.13
     "tier_cap": 8                 // v6.0: Maximum grade from tier
   },
   "grading_passes": {             // 🚨 MANDATORY - Three-Pass Consensus Data
-    "pass_1": { "centering": 9, "corners": 9, "edges": 10, "surface": 9, "final": 8, "defects_noted": [] },
-    "pass_2": { "centering": 9, "corners": 8, "edges": 9, "surface": 9, "final": 8, "defects_noted": [] },
-    "pass_3": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": [] },
-    "averaged": { "centering": 8.67, "corners": 8.67, "edges": 9.33, "surface": 9.0, "final": 8.0 },
-    "averaged_rounded": { "centering": 9, "corners": 9, "edges": 9, "surface": 9, "final": 8 },
-    "variance": 0.33,
+    "pass_1": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Left-right centering 58/42"] },
+    "pass_2": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Left-right centering shift noted"] },
+    "pass_3": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Centering off-center to left"] },
+    "averaged": { "centering": 8.0, "corners": 9.0, "edges": 9.0, "surface": 9.0, "final": 8.0 },
+    "averaged_rounded": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8 },
+    "variance": 0,
     "consistency": "high",
-    "consensus_notes": []
+    "consensus_notes": ["Centering shift confirmed in 3/3 passes"]
   },
   "final_grade": {
     "decimal_grade": 8,           // 🚨 v6.0: MUST be whole integer (was 8.0)
@@ -4547,7 +4556,7 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
 
 **CRITICAL:** Always include the metadata object with:
 - timestamp: Current date/time in ISO 8601 format
-- prompt_version: "DCM_Grading_v7.1_THREE_PASS"
+- prompt_version: "DCM_Grading_v7.2_MIN_SCORING"
 ---
 SECTION 12: OUTPUT REQUIREMENTS & VALIDATION
 ---

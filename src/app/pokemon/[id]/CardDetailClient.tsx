@@ -2791,7 +2791,7 @@ export function PokemonCardDetails() {
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">🎯 Centering</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
                         <p>F: <span className="font-semibold text-blue-700">{safeToFixed(subScores?.centering?.front_score ?? subScores?.centering?.front ?? 0)}</span> | B: <span className="font-semibold text-blue-700">{safeToFixed(subScores?.centering?.back_score ?? subScores?.centering?.back ?? 0)}</span></p>
-                        <p className="font-semibold text-blue-800 mt-1">Weighted: {safeToFixed(weightedScores?.centering ?? subScores?.centering?.weighted ?? subScores?.centering?.weighted_score ?? 0)}</p>
+                        <p className="font-semibold text-blue-800 mt-1">Score: {safeToFixed(weightedScores?.centering ?? subScores?.centering?.weighted ?? subScores?.centering?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
 
@@ -2803,7 +2803,7 @@ export function PokemonCardDetails() {
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">📐 Corners</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
                         <p>F: <span className="font-semibold text-green-700">{safeToFixed(subScores?.corners?.front_score ?? subScores?.corners?.front ?? 0)}</span> | B: <span className="font-semibold text-green-700">{safeToFixed(subScores?.corners?.back_score ?? subScores?.corners?.back ?? 0)}</span></p>
-                        <p className="font-semibold text-green-800 mt-1">Weighted: {safeToFixed(weightedScores?.corners ?? subScores?.corners?.weighted ?? subScores?.corners?.weighted_score ?? 0)}</p>
+                        <p className="font-semibold text-green-800 mt-1">Score: {safeToFixed(weightedScores?.corners ?? subScores?.corners?.weighted ?? subScores?.corners?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
 
@@ -2815,7 +2815,7 @@ export function PokemonCardDetails() {
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">📏 Edges</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
                         <p>F: <span className="font-semibold text-purple-700">{safeToFixed(subScores?.edges?.front_score ?? subScores?.edges?.front ?? 0)}</span> | B: <span className="font-semibold text-purple-700">{safeToFixed(subScores?.edges?.back_score ?? subScores?.edges?.back ?? 0)}</span></p>
-                        <p className="font-semibold text-purple-800 mt-1">Weighted: {safeToFixed(weightedScores?.edges ?? subScores?.edges?.weighted ?? subScores?.edges?.weighted_score ?? 0)}</p>
+                        <p className="font-semibold text-purple-800 mt-1">Score: {safeToFixed(weightedScores?.edges ?? subScores?.edges?.weighted ?? subScores?.edges?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
 
@@ -2827,7 +2827,7 @@ export function PokemonCardDetails() {
                       <h3 className="font-semibold text-sm text-gray-800 mb-1">✨ Surface</h3>
                       <div className="text-xs text-gray-600 space-y-0.5">
                         <p>F: <span className="font-semibold text-amber-700">{safeToFixed(subScores?.surface?.front_score ?? subScores?.surface?.front ?? 0)}</span> | B: <span className="font-semibold text-amber-700">{safeToFixed(subScores?.surface?.back_score ?? subScores?.surface?.back ?? 0)}</span></p>
-                        <p className="font-semibold text-amber-800 mt-1">Weighted: {safeToFixed(weightedScores?.surface ?? subScores?.surface?.weighted ?? subScores?.surface?.weighted_score ?? 0)}</p>
+                        <p className="font-semibold text-amber-800 mt-1">Score: {safeToFixed(weightedScores?.surface ?? subScores?.surface?.weighted ?? subScores?.surface?.weighted_score ?? 0)}</p>
                       </div>
                     </div>
                   </div>

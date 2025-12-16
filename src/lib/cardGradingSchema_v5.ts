@@ -607,13 +607,13 @@ export const CardGradingResponseSchemaV5 = z.object({
     surface_back: z.number().min(0).max(10)
   }).describe('Raw sub-scores before front/back weighting'),
 
-  // Weighted sub-scores (front 60% + back 40%)
+  // Subgrade scores (v7.2: MIN of front and back for each category)
   weighted_scores: z.object({
     centering_weighted: z.number().min(0).max(10),
     corners_weighted: z.number().min(0).max(10),
     edges_weighted: z.number().min(0).max(10),
     surface_weighted: z.number().min(0).max(10)
-  }).describe('Weighted sub-scores (front 60% + back 40%)'),
+  }).describe('Subgrade scores - v7.2: MIN(front, back) for each category'),
 
   // Final grade (MUST follow validation rules)
   final_grade: FinalGradeSchema,
