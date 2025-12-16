@@ -40,10 +40,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
 
-    // Query cards for this user - OPTIMIZED: removed unused ai_grading field to reduce egress
+    // Query cards for this user - includes all fields needed for label generation
     let query = supabase
       .from('cards')
-      .select('id, serial, front_path, back_path, card_name, featured, category, card_set, manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score, dcm_grade_whole, dvg_image_quality, created_at, visibility, conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence, conversational_card_info, conversational_condition_label, dvg_decimal_grade, is_foil, foil_type, is_double_faced, mtg_api_verified, mtg_rarity, mtg_set_code, card_language, scryfall_price_usd, scryfall_price_usd_foil, label_data')
+      .select(`
+        id, serial, front_path, back_path, card_name, featured, pokemon_featured, category, card_set,
+        manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score,
+        dcm_grade_whole, dcm_grade_decimal, dvg_image_quality, created_at, visibility,
+        conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence,
+        conversational_card_info, conversational_condition_label, dvg_decimal_grade,
+        is_foil, foil_type, is_double_faced, mtg_api_verified, mtg_rarity, mtg_set_code,
+        card_language, scryfall_price_usd, scryfall_price_usd_foil,
+        serial_numbering, rarity_tier, rarity_description, autographed, autograph_type,
+        memorabilia_type, rookie_card, first_print_rookie, holofoil
+      `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
 

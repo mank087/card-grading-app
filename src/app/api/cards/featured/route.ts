@@ -22,34 +22,19 @@ function addTransformToUrl(signedUrl: string): string {
 export async function GET() {
   try {
     // Fetch featured cards (public, graded, and marked as featured)
-    // OPTIMIZED: removed unused ai_grading field to reduce egress
+    // Includes all fields needed for label generation
     const { data: cards, error } = await supabaseAdmin
       .from('cards')
       .select(`
-        id,
-        serial,
-        card_name,
-        category,
-        conversational_decimal_grade,
-        conversational_condition_label,
-        conversational_card_info,
-        label_data,
-        featured,
-        card_set,
-        release_date,
-        manufacturer_name,
-        card_number,
-        front_path,
-        back_path,
-        created_at,
-        is_foil,
-        foil_type,
-        mtg_api_verified,
-        mtg_rarity,
-        mtg_set_code,
-        card_language,
-        scryfall_price_usd,
-        scryfall_price_usd_foil
+        id, serial, card_name, category, front_path, back_path, created_at,
+        featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number,
+        conversational_decimal_grade, conversational_whole_grade,
+        conversational_condition_label, conversational_card_info,
+        dvg_decimal_grade, dcm_grade_decimal,
+        is_foil, foil_type, is_double_faced, mtg_rarity, holofoil,
+        serial_numbering, rarity_tier, rarity_description,
+        autographed, autograph_type, memorabilia_type,
+        rookie_card, first_print_rookie
       `)
       .eq('visibility', 'public')
       .eq('is_featured', true)
