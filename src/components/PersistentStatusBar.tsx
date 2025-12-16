@@ -34,7 +34,7 @@ function getStageMessage(stage: GradingStage, cardName?: string): string {
     case 'completed':
       return 'Grading complete!'
     case 'error':
-      return 'Failed to process'
+      return 'Card may need extra time. Check My Collection or contact admin@dcmgrading.com'
     default:
       return STAGE_CONFIG[stage]?.label || 'Processing...'
   }
@@ -208,7 +208,7 @@ export default function PersistentStatusBar() {
 
                   <p className="text-xs text-white/70">
                     {card.status === 'error'
-                      ? (card.errorMessage || 'Failed to process')
+                      ? (card.errorMessage || 'Card may need extra time. Check My Collection or contact admin@dcmgrading.com')
                       : getStageMessage(card.stage || 'uploading', card.cardName)}
                     {card.estimatedTimeRemaining && card.status !== 'completed' && card.status !== 'error' && (
                       <span className="ml-2 text-white/50">~{card.estimatedTimeRemaining}s remaining</span>

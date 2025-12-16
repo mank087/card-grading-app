@@ -64,7 +64,7 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
             return {
               ...card,
               status: 'error' as const,
-              errorMessage: 'Session expired. Please re-upload this card to grade it.'
+              errorMessage: 'Card may need extra time. Wait 2 minutes and check My Collection. Contact admin@dcmgrading.com if issue persists.'
             }
           }
           return card
