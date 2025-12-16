@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         id, serial, category, visibility, front_path, featured, pokemon_featured,
         card_name, release_date, manufacturer_name, card_set, card_number,
         dvg_decimal_grade, conversational_decimal_grade,
-        conversational_whole_grade, conversational_card_info, conversational_condition_label,
+        conversational_whole_grade, conversational_card_info, conversational_condition_label, conversational_grading,
         user_id, created_at,
         is_foil, foil_type, is_double_faced, mtg_rarity, holofoil,
         serial_numbering, rarity_tier, rarity_description,
@@ -117,52 +117,92 @@ export async function GET(request: NextRequest) {
 
     // Map database fields to frontend - include all raw fields for label generation
     const sanitizedCards = cards?.map(card => {
-      // Extract player name from conversational_card_info if available
-      const convInfo = card.conversational_card_info as any;
-      const playerOrCharacter = convInfo?.player_or_character || card.featured || card.card_name || 'Unknown';
+      // Parse conversational_grading JSON if conversational_card_info is missing
+      let enrichedCard = { ...card };
+      if (!card.conversational_card_info && card.conversational_grading) {
+        try {
+          const parsed = typeof card.conversational_grading === 'string'
+            ? JSON.parse(card.conversational_grading)
+            : card.conversational_grading;
+
+          if (parsed.card_info) {
+            enrichedCard.conversational_card_info = parsed.card_info;
+            if (!card.featured && parsed.card_info.player_or_character) {
+              enrichedCard.featured = parsed.card_info.player_or_character;
+            }
+            if (!card.card_name && parsed.card_info.card_name) {
+              enrichedCard.card_name = parsed.card_info.card_name;
+            }
+            if (!card.card_set && parsed.card_info.set_name) {
+              enrichedCard.card_set = parsed.card_info.set_name;
+            }
+            if (!card.card_number && parsed.card_info.card_number) {
+              enrichedCard.card_number = parsed.card_info.card_number;
+            }
+            if (!card.release_date && parsed.card_info.year) {
+              enrichedCard.release_date = parsed.card_info.year;
+            }
+          }
+          if (!card.conversational_decimal_grade) {
+            const grade = parsed.grading_passes?.averaged_rounded?.final ?? parsed.final_grade?.decimal_grade;
+            if (grade !== undefined && grade !== null) {
+              enrichedCard.conversational_decimal_grade = grade;
+              enrichedCard.conversational_whole_grade = Math.floor(grade);
+            }
+          }
+          if (!card.conversational_condition_label && parsed.final_grade?.condition_label) {
+            enrichedCard.conversational_condition_label = parsed.final_grade.condition_label;
+          }
+        } catch (e) {
+          // Parsing failed, continue with original data
+        }
+      }
+
+      const convInfo = enrichedCard.conversational_card_info as any;
+      const playerOrCharacter = convInfo?.player_or_character || enrichedCard.featured || enrichedCard.card_name || 'Unknown';
 
       return {
         // Core identifiers
-        id: card.id,
-        serial: card.serial,
-        sport_type: card.category,
-        category: card.category,
-        visibility: card.visibility,
-        front_url: card.front_path ? urlMap.get(card.front_path) || null : null,
-        created_at: card.created_at,
+        id: enrichedCard.id,
+        serial: enrichedCard.serial,
+        sport_type: enrichedCard.category,
+        category: enrichedCard.category,
+        visibility: enrichedCard.visibility,
+        front_url: enrichedCard.front_path ? urlMap.get(enrichedCard.front_path) || null : null,
+        created_at: enrichedCard.created_at,
         // Friendly mapped names for backward compatibility
         player_name: playerOrCharacter,
-        year: convInfo?.year || card.release_date || '',
-        manufacturer: convInfo?.manufacturer || card.manufacturer_name || '',
-        set_name: convInfo?.set_name || card.card_set || '',
+        year: convInfo?.year || enrichedCard.release_date || '',
+        manufacturer: convInfo?.manufacturer || enrichedCard.manufacturer_name || '',
+        set_name: convInfo?.set_name || enrichedCard.card_set || '',
         subset: convInfo?.subset || '',
         // Raw fields needed for getCardLabelData()
-        featured: card.featured,
-        pokemon_featured: card.pokemon_featured,
-        card_name: card.card_name,
-        card_set: card.card_set,
-        card_number: card.card_number,
-        release_date: card.release_date,
-        conversational_decimal_grade: card.conversational_decimal_grade,
-        conversational_whole_grade: card.conversational_whole_grade,
-        conversational_condition_label: card.conversational_condition_label,
-        conversational_card_info: card.conversational_card_info,
-        dvg_decimal_grade: card.dvg_decimal_grade,
+        featured: enrichedCard.featured,
+        pokemon_featured: enrichedCard.pokemon_featured,
+        card_name: enrichedCard.card_name,
+        card_set: enrichedCard.card_set,
+        card_number: enrichedCard.card_number,
+        release_date: enrichedCard.release_date,
+        conversational_decimal_grade: enrichedCard.conversational_decimal_grade,
+        conversational_whole_grade: enrichedCard.conversational_whole_grade,
+        conversational_condition_label: enrichedCard.conversational_condition_label,
+        conversational_card_info: enrichedCard.conversational_card_info,
+        dvg_decimal_grade: enrichedCard.dvg_decimal_grade,
         // Features for label
-        serial_numbering: card.serial_numbering,
-        rarity_tier: card.rarity_tier,
-        rarity_description: card.rarity_description,
-        autographed: card.autographed,
-        autograph_type: card.autograph_type,
-        memorabilia_type: card.memorabilia_type,
-        rookie_card: card.rookie_card,
-        first_print_rookie: card.first_print_rookie,
-        holofoil: card.holofoil,
+        serial_numbering: enrichedCard.serial_numbering,
+        rarity_tier: enrichedCard.rarity_tier,
+        rarity_description: enrichedCard.rarity_description,
+        autographed: enrichedCard.autographed,
+        autograph_type: enrichedCard.autograph_type,
+        memorabilia_type: enrichedCard.memorabilia_type,
+        rookie_card: enrichedCard.rookie_card,
+        first_print_rookie: enrichedCard.first_print_rookie,
+        holofoil: enrichedCard.holofoil,
         // MTG-specific
-        is_foil: card.is_foil || false,
-        foil_type: card.foil_type || null,
-        is_double_faced: card.is_double_faced || false,
-        mtg_rarity: card.mtg_rarity || null,
+        is_foil: enrichedCard.is_foil || false,
+        foil_type: enrichedCard.foil_type || null,
+        is_double_faced: enrichedCard.is_double_faced || false,
+        mtg_rarity: enrichedCard.mtg_rarity || null,
       };
     }) || [];
 
