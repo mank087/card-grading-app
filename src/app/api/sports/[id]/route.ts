@@ -850,6 +850,22 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     };
 
     // Generate standardized label data for consistent display across all contexts
+    // 🔧 v7.2: Enhanced fallbacks - extract card info from final_grade summary if card_info is missing
+    const cardInfoFromAI = conversationalGradingData?.card_info;
+
+    // Try to extract player name from summary text if card_info is missing
+    // Summary often contains: "This [year] [set] [player name] card..."
+    let extractedPlayerName: string | null = null;
+    if (!cardInfoFromAI?.player_or_character && conversationalGradingData?.final_grade_summary) {
+      const summary = conversationalGradingData.final_grade_summary;
+      // Match patterns like "2021 Panini Impeccable Matthew Stafford" or just player names
+      const playerMatch = summary.match(/(?:This\s+)?(?:\d{4}\s+)?(?:[\w\s]+\s+)?((?:[A-Z][a-z]+\s+)+[A-Z][a-z]+)(?:\s+(?:card|silver|gold|base|rookie|auto))/i);
+      if (playerMatch && playerMatch[1]) {
+        extractedPlayerName = playerMatch[1].trim();
+        console.log(`[GET /api/sports/${cardId}] Extracted player name from summary: "${extractedPlayerName}"`);
+      }
+    }
+
     const cardForLabel: CardForLabel = {
       id: cardId,
       category: card.category || 'Sports',
@@ -857,15 +873,16 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       conversational_decimal_grade: conversationalGradingData?.decimal_grade || null,
       conversational_whole_grade: conversationalGradingData?.whole_grade || null,
       conversational_condition_label: conversationalGradingData?.condition_label || null,
-      conversational_card_info: conversationalGradingData?.card_info || null,
-      card_name: conversationalGradingData?.card_info?.card_name || card.card_name,
-      card_set: conversationalGradingData?.card_info?.set_name || card.card_set,
-      card_number: conversationalGradingData?.card_info?.card_number || card.card_number,
-      featured: conversationalGradingData?.card_info?.player_or_character || card.featured,
-      release_date: conversationalGradingData?.card_info?.year || card.release_date,
-      serial_numbering: conversationalGradingData?.card_info?.serial_number || card.serial_numbering,
-      autographed: conversationalGradingData?.card_info?.autographed || card.autographed,
-      rookie_card: conversationalGradingData?.card_info?.rookie_or_first === true || card.rookie_card,
+      conversational_card_info: cardInfoFromAI || null,
+      card_name: cardInfoFromAI?.card_name || card.card_name,
+      card_set: cardInfoFromAI?.set_name || card.card_set,
+      card_number: cardInfoFromAI?.card_number || card.card_number,
+      // 🔧 v7.2: Enhanced fallback chain for player name
+      featured: cardInfoFromAI?.player_or_character || extractedPlayerName || card.featured,
+      release_date: cardInfoFromAI?.year || card.release_date,
+      serial_numbering: cardInfoFromAI?.serial_number || card.serial_numbering,
+      autographed: cardInfoFromAI?.autographed || card.autographed,
+      rookie_card: cardInfoFromAI?.rookie_or_first === true || card.rookie_card,
     };
     const labelData = generateLabelData(cardForLabel);
     (updateData as any).label_data = labelData;
