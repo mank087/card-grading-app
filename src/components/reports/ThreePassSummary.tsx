@@ -13,10 +13,20 @@ interface ThreePassSummaryProps {
  * averaged results, and consistency metrics.
  */
 export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
+  // Guard against missing data
+  if (!gradingPasses) return null;
+
   const { pass_1, pass_2, pass_3, averaged_rounded, variance, consistency, consensus_notes } = gradingPasses;
 
+  // Guard against missing pass data
+  if (!pass_1 || !pass_2 || !pass_3 || !averaged_rounded) {
+    console.warn('[ThreePassSummary] Missing pass data:', { pass_1: !!pass_1, pass_2: !!pass_2, pass_3: !!pass_3, averaged_rounded: !!averaged_rounded });
+    return null;
+  }
+
   // Helper to format score display - v6.0: Always whole numbers
-  const formatScore = (score: number): string => {
+  const formatScore = (score: number | undefined): string => {
+    if (score === undefined || score === null) return 'N/A';
     return Math.round(score).toString();
   };
 
