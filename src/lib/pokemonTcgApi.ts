@@ -179,7 +179,7 @@ function convertLocalCardToApiFormat(card: LocalCardResult): PokemonCard {
  * Search local Supabase database for Pokemon cards
  * Returns cards matching name, optionally filtered by set name and card number
  */
-async function searchLocalDatabase(
+export async function searchLocalDatabase(
   name: string,
   setName?: string,
   cardNumber?: string
@@ -353,7 +353,7 @@ export async function searchLocalFuzzyNumber(
 /**
  * Search local database by name, number, and set ID (for promo cards)
  */
-async function searchLocalByNameNumberSetId(
+export async function searchLocalByNameNumberSetId(
   name: string,
   cardNumber: string,
   setId: string
@@ -394,7 +394,7 @@ async function searchLocalByNameNumberSetId(
  * Search local database by name, number, and set printed total
  * This is the primary lookup for grading (uses the denormalized set_printed_total)
  */
-async function searchLocalByNameNumberTotal(
+export async function searchLocalByNameNumberTotal(
   name: string,
   cardNumber: string,
   printedTotal?: number

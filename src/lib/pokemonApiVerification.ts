@@ -1,27 +1,26 @@
 // src/lib/pokemonApiVerification.ts
-// Pokemon TCG API Verification Service
-// Post-grading verification to ensure 100% accurate card identification
+// Pokemon Card Verification Service
+// Uses LOCAL Supabase database for card lookup - NO external API calls
+// v2.0 - Switched from external Pokemon TCG API to local database
 
 import {
   PokemonCard,
-  getPokemonCardById,
   CardNumberFormat,
   normalizeCardNumber as normalizeCardNumberFromApi,
   detectCardNumberFormat,
   getPromoSetId,
-  searchLocalFuzzyNumber
+  searchLocalFuzzyNumber,
+  searchLocalDatabase,
+  searchLocalByNameNumberSetId,
+  searchLocalByNameNumberTotal
 } from './pokemonTcgApi';
-
-const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
-// Get API key from environment variable - NO HARDCODED FALLBACKS
-const POKEMON_API_KEY = process.env.POKEMON_TCG_API_KEY || '';
 
 export interface PokemonApiVerificationResult {
   success: boolean;
   verified: boolean;
   pokemon_api_id: string | null;
   pokemon_api_data: PokemonCard | null;
-  verification_method: 'set_id_number' | 'name_number_set' | 'fuzzy_match' | 'none';
+  verification_method: 'set_id_number' | 'name_number_set' | 'fuzzy_match' | 'local_db' | 'none';
   confidence: 'high' | 'medium' | 'low';
   corrections: {
     field: string;
@@ -45,7 +44,7 @@ export interface CardInfoForVerification {
 }
 
 /**
- * Normalize card number for API lookup
+ * Normalize card number for database lookup
  * Handles various formats: "085/198", "85/198", "GG70/GG70", "SVP EN 085"
  */
 function normalizeCardNumber(cardNumber: string): string {
@@ -54,7 +53,7 @@ function normalizeCardNumber(cardNumber: string): string {
   // If it's a fraction format, extract just the numerator
   const fractionMatch = cardNumber.match(/^(\d+)\/\d+$/);
   if (fractionMatch) {
-    // Remove leading zeros for API compatibility
+    // Remove leading zeros for consistency
     return fractionMatch[1].replace(/^0+/, '') || '0';
   }
 
@@ -75,7 +74,7 @@ function normalizeCardNumber(cardNumber: string): string {
 
 /**
  * Map common set names to Pokemon TCG API set IDs
- * This covers modern sets (2020+) which are most commonly graded
+ * Used for local database queries
  */
 const SET_NAME_TO_ID: Record<string, string> = {
   // Scarlet & Violet Era (2023-2025)
@@ -274,120 +273,9 @@ const SET_CODE_TO_ID: Record<string, string> = {
 };
 
 /**
- * Query Pokemon TCG API by set ID and card number
- * This is the most reliable method for card identification
- */
-async function queryBySetIdAndNumber(setId: string, cardNumber: string): Promise<PokemonCard | null> {
-  try {
-    const normalizedNumber = normalizeCardNumber(cardNumber);
-    const query = `set.id:${setId} number:${normalizedNumber}`;
-    const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
-
-    console.log(`[Pokemon API Verification] Query: ${query}`);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
-
-    const response = await fetch(url, {
-      headers: { 'X-Api-Key': POKEMON_API_KEY },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.error(`[Pokemon API Verification] API error: ${response.status} for query: ${query}`);
-      try {
-        const errorBody = await response.text();
-        console.error(`[Pokemon API Verification] Error body: ${errorBody.substring(0, 200)}`);
-      } catch {}
-      return null;
-    }
-
-    const data = await response.json();
-
-    if (data.data && data.data.length === 1) {
-      console.log(`[Pokemon API Verification] Found unique match: ${data.data[0].name} (${data.data[0].id})`);
-      return data.data[0];
-    } else if (data.data && data.data.length > 1) {
-      console.log(`[Pokemon API Verification] Found ${data.data.length} matches, returning first`);
-      return data.data[0];
-    }
-
-    console.log(`[Pokemon API Verification] No matches for query: ${query}`);
-    return null;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.warn('[Pokemon API Verification] Request timeout (15s)');
-    } else {
-      console.error('[Pokemon API Verification] Query error:', error.message);
-    }
-    return null;
-  }
-}
-
-/**
- * Query Pokemon TCG API by name and set name
- * Fallback method when set ID is not available
- */
-async function queryByNameAndSet(name: string, setName: string, cardNumber?: string): Promise<PokemonCard | null> {
-  try {
-    // Sanitize the name for API query
-    const sanitizedName = sanitizePokemonName(name);
-    if (!sanitizedName) {
-      console.log('[Pokemon API Verification] No valid name for queryByNameAndSet');
-      return null;
-    }
-
-    let query = `name:"${sanitizedName}" set.name:"${setName}"`;
-    if (cardNumber) {
-      const normalizedNumber = normalizeCardNumber(cardNumber);
-      query += ` number:${normalizedNumber}`;
-    }
-
-    const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
-
-    console.log(`[Pokemon API Verification] Fuzzy query: ${query}`);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
-
-    const response = await fetch(url, {
-      headers: { 'X-Api-Key': POKEMON_API_KEY },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.error(`[Pokemon API Verification] Fuzzy query returned ${response.status}`);
-      return null;
-    }
-
-    const data = await response.json();
-
-    if (data.data && data.data.length > 0) {
-      console.log(`[Pokemon API Verification] Found ${data.data.length} match(es) by name/set`);
-      return data.data[0];
-    }
-
-    console.log(`[Pokemon API Verification] No matches for fuzzy query: ${query}`);
-    return null;
-  } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.warn('[Pokemon API Verification] Fuzzy query timeout (15s)');
-    } else {
-      console.error('[Pokemon API Verification] Query error:', error.message);
-    }
-    return null;
-  }
-}
-
-/**
- * Sanitize Pokemon name for API query
+ * Sanitize Pokemon name for database query
  * - Removes Japanese/CJK characters
  * - Extracts English name from parentheses format "Japanese (English)"
- * - Escapes special Lucene query characters
  */
 function sanitizePokemonName(name: string): string {
   if (!name) return '';
@@ -402,22 +290,71 @@ function sanitizePokemonName(name: string): string {
   // Remove CJK characters (Japanese, Chinese, Korean)
   const asciiOnly = name.replace(/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF\uAC00-\uD7AF]/g, '').trim();
 
-  // If we stripped everything, return original (will likely fail but logged)
+  // If we stripped everything, return original
   if (!asciiOnly) {
-    console.warn(`[Pokemon API Verification] Name "${name}" is fully CJK, cannot query API`);
+    console.warn(`[Pokemon Local Verification] Name "${name}" is fully CJK`);
     return name;
   }
 
-  // Escape Lucene special characters: + - && || ! ( ) { } [ ] ^ " ~ * ? : \ /
-  // But keep spaces and basic punctuation for Pokemon names
-  const escaped = asciiOnly.replace(/([+\-&|!(){}[\]^~*?:\\\/])/g, '\\$1');
-
-  return escaped;
+  return asciiOnly;
 }
 
 /**
- * Query Pokemon TCG API using format-aware number normalization
- * Uses detected format type to construct optimal API query
+ * Query local database by set ID and card number
+ * This is the most reliable method for card identification
+ */
+async function queryBySetIdAndNumber(setId: string, cardNumber: string): Promise<PokemonCard | null> {
+  try {
+    const normalizedNumber = normalizeCardNumber(cardNumber);
+    console.log(`[Pokemon Local Verification] Query by set+number: setId=${setId}, number=${normalizedNumber}`);
+
+    const results = await searchLocalByNameNumberSetId('', normalizedNumber, setId);
+
+    if (results.length > 0) {
+      console.log(`[Pokemon Local Verification] Found ${results.length} match(es) by set+number`);
+      return results[0];
+    }
+
+    console.log(`[Pokemon Local Verification] No matches for set ${setId} number ${normalizedNumber}`);
+    return null;
+  } catch (error: any) {
+    console.error('[Pokemon Local Verification] Query error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Query local database by name and set name
+ * Fallback method when set ID is not available
+ */
+async function queryByNameAndSet(name: string, setName: string, cardNumber?: string): Promise<PokemonCard | null> {
+  try {
+    const sanitizedName = sanitizePokemonName(name);
+    if (!sanitizedName) {
+      console.log('[Pokemon Local Verification] No valid name for queryByNameAndSet');
+      return null;
+    }
+
+    console.log(`[Pokemon Local Verification] Query by name+set: name=${sanitizedName}, set=${setName}, number=${cardNumber}`);
+
+    const results = await searchLocalDatabase(sanitizedName, setName, cardNumber ? normalizeCardNumber(cardNumber) : undefined);
+
+    if (results.length > 0) {
+      console.log(`[Pokemon Local Verification] Found ${results.length} match(es) by name/set`);
+      return results[0];
+    }
+
+    console.log(`[Pokemon Local Verification] No matches for name+set query`);
+    return null;
+  } catch (error: any) {
+    console.error('[Pokemon Local Verification] Query error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Query local database using format-aware number normalization
+ * Uses detected format type to construct optimal query
  */
 async function queryByFormatAwareNumber(
   name: string,
@@ -426,17 +363,16 @@ async function queryByFormatAwareNumber(
   setTotal?: string
 ): Promise<PokemonCard | null> {
   try {
-    // Sanitize name for API query
     const sanitizedName = sanitizePokemonName(name);
     if (!sanitizedName) {
-      console.log('[Pokemon API Verification] No valid name after sanitization');
+      console.log('[Pokemon Local Verification] No valid name after sanitization');
       return null;
     }
 
     // Get format-specific number variations
     const numberVariations = normalizeCardNumberFromApi(cardNumberRaw, format);
     if (numberVariations.length === 0) {
-      console.log('[Pokemon API Verification] No number variations generated');
+      console.log('[Pokemon Local Verification] No number variations generated');
       return null;
     }
 
@@ -444,78 +380,50 @@ async function queryByFormatAwareNumber(
     const promoSetId = getPromoSetId(format);
 
     for (const numberVariation of numberVariations) {
-      let query: string;
+      let results: PokemonCard[] = [];
 
       if (promoSetId) {
         // Promo cards: use set.id constraint
-        query = `name:"${sanitizedName}" number:"${numberVariation}" set.id:${promoSetId}`;
-        console.log(`[Pokemon API Verification] Format-aware promo query: ${query}`);
+        console.log(`[Pokemon Local Verification] Format-aware promo search: name=${sanitizedName}, number=${numberVariation}, setId=${promoSetId}`);
+        results = await searchLocalByNameNumberSetId(sanitizedName, numberVariation, promoSetId);
       } else if (setTotal && format === 'fraction') {
         // Standard cards with denominator: use printedTotal filter
         const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
         if (/^\d+$/.test(printedTotal)) {
-          query = `name:"${sanitizedName}" number:"${numberVariation}" set.printedTotal:${printedTotal}`;
-          console.log(`[Pokemon API Verification] Format-aware printedTotal query: ${query}`);
-        } else {
-          query = `name:"${sanitizedName}" number:"${numberVariation}"`;
+          console.log(`[Pokemon Local Verification] Format-aware printedTotal search: name=${sanitizedName}, number=${numberVariation}, total=${printedTotal}`);
+          results = await searchLocalByNameNumberTotal(sanitizedName, numberVariation, parseInt(printedTotal));
         }
-      } else {
-        // Other formats: standard query
-        query = `name:"${sanitizedName}" number:"${numberVariation}"`;
-        console.log(`[Pokemon API Verification] Format-aware standard query: ${query}`);
       }
 
-      const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
-      console.log(`[Pokemon API Verification] Full URL: ${url}`);
+      if (results.length === 0) {
+        // Fallback: standard name+number search
+        console.log(`[Pokemon Local Verification] Format-aware standard search: name=${sanitizedName}, number=${numberVariation}`);
+        results = await searchLocalByNameNumberTotal(sanitizedName, numberVariation);
+      }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // Increased to 15s
-
-      const response = await fetch(url, {
-        headers: { 'X-Api-Key': POKEMON_API_KEY },
-        signal: controller.signal
-      });
-
-      clearTimeout(timeoutId);
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data && data.data.length > 0) {
-          console.log(`[Pokemon API Verification] Format-aware search found ${data.data.length} match(es) for number: ${numberVariation}`);
-          return data.data[0];
-        } else {
-          console.log(`[Pokemon API Verification] No matches for number: ${numberVariation}`);
-        }
-      } else {
-        console.error(`[Pokemon API Verification] API returned ${response.status} for query: ${query}`);
-        // Try to get error details
-        try {
-          const errorBody = await response.text();
-          console.error(`[Pokemon API Verification] Error body: ${errorBody.substring(0, 200)}`);
-        } catch {}
+      if (results.length > 0) {
+        console.log(`[Pokemon Local Verification] Format-aware search found ${results.length} match(es)`);
+        return results[0];
       }
     }
 
     return null;
   } catch (error: any) {
-    if (error.name === 'AbortError') {
-      console.warn('[Pokemon API Verification] Format-aware request timeout (15s)');
-    } else {
-      console.error('[Pokemon API Verification] Format-aware query error:', error.message);
-    }
+    console.error('[Pokemon Local Verification] Format-aware query error:', error.message);
     return null;
   }
 }
 
 /**
- * Verify a Pokemon card using the Pokemon TCG API
+ * Verify a Pokemon card using the LOCAL Supabase database
  * Attempts multiple lookup strategies to find the exact card
+ * NO external API calls - uses local database only
  *
  * @param cardInfo - Card information from grading (conversational_card_info)
- * @returns Verification result with API data and corrections
+ * @returns Verification result with local database data and corrections
  */
 export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Promise<PokemonApiVerificationResult> {
-  console.log('[Pokemon API Verification] Starting verification for:', cardInfo);
+  console.log('[Pokemon Local Verification] Starting verification for:', cardInfo);
 
   const result: PokemonApiVerificationResult = {
     success: false,
@@ -542,27 +450,27 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     return result;
   }
 
-  console.log(`[Pokemon API Verification] Detected format: ${cardNumberFormat}, setTotal: ${setTotal}`);
+  console.log(`[Pokemon Local Verification] Detected format: ${cardNumberFormat}, setTotal: ${setTotal}`);
 
-  let apiCard: PokemonCard | null = null;
+  let dbCard: PokemonCard | null = null;
 
   // Strategy 0 (NEW): Format-aware search for promos and special formats
-  if (!apiCard && cardName && cardNumberRaw && (cardNumberFormat === 'swsh_promo' || cardNumberFormat === 'sv_promo' || cardNumberFormat === 'galarian_gallery' || cardNumberFormat === 'trainer_gallery')) {
-    console.log(`[Pokemon API Verification] Strategy 0: Format-aware search for ${cardNumberFormat}`);
-    apiCard = await queryByFormatAwareNumber(cardName, cardNumberRaw, cardNumberFormat, setTotal);
-    if (apiCard) {
+  if (!dbCard && cardName && cardNumberRaw && (cardNumberFormat === 'swsh_promo' || cardNumberFormat === 'sv_promo' || cardNumberFormat === 'galarian_gallery' || cardNumberFormat === 'trainer_gallery')) {
+    console.log(`[Pokemon Local Verification] Strategy 0: Format-aware search for ${cardNumberFormat}`);
+    dbCard = await queryByFormatAwareNumber(cardName, cardNumberRaw, cardNumberFormat, setTotal);
+    if (dbCard) {
       result.verification_method = 'set_id_number';
       result.confidence = 'high';
     }
   }
 
   // Strategy 1: Use set code (most reliable for modern cards)
-  if (!apiCard && setCode && cardNumber) {
+  if (!dbCard && setCode && cardNumber) {
     const setId = SET_CODE_TO_ID[setCode.toUpperCase()];
     if (setId) {
-      console.log(`[Pokemon API Verification] Strategy 1: Set code ${setCode} -> ${setId}`);
-      apiCard = await queryBySetIdAndNumber(setId, cardNumber);
-      if (apiCard) {
+      console.log(`[Pokemon Local Verification] Strategy 1: Set code ${setCode} -> ${setId}`);
+      dbCard = await queryBySetIdAndNumber(setId, cardNumber);
+      if (dbCard) {
         result.verification_method = 'set_id_number';
         result.confidence = 'high';
       }
@@ -570,12 +478,12 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   }
 
   // Strategy 1.5 (NEW): Use printedTotal from setTotal for fraction format
-  if (!apiCard && cardName && cardNumber && setTotal && cardNumberFormat === 'fraction') {
+  if (!dbCard && cardName && cardNumber && setTotal && cardNumberFormat === 'fraction') {
     const printedTotal = setTotal.replace(/^[A-Za-z]+/, '').trim();
     if (/^\d+$/.test(printedTotal)) {
-      console.log(`[Pokemon API Verification] Strategy 1.5: Name + Number + printedTotal:${printedTotal}`);
-      apiCard = await queryByFormatAwareNumber(cardName, cardNumberRaw, cardNumberFormat, setTotal);
-      if (apiCard) {
+      console.log(`[Pokemon Local Verification] Strategy 1.5: Name + Number + printedTotal:${printedTotal}`);
+      dbCard = await queryByFormatAwareNumber(cardName, cardNumberRaw, cardNumberFormat, setTotal);
+      if (dbCard) {
         result.verification_method = 'set_id_number';
         result.confidence = 'high';
       }
@@ -583,12 +491,12 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   }
 
   // Strategy 2: Use set name mapping
-  if (!apiCard && setName && cardNumber) {
+  if (!dbCard && setName && cardNumber) {
     const setId = SET_NAME_TO_ID[setName];
     if (setId) {
-      console.log(`[Pokemon API Verification] Strategy 2: Set name "${setName}" -> ${setId}`);
-      apiCard = await queryBySetIdAndNumber(setId, cardNumber);
-      if (apiCard) {
+      console.log(`[Pokemon Local Verification] Strategy 2: Set name "${setName}" -> ${setId}`);
+      dbCard = await queryBySetIdAndNumber(setId, cardNumber);
+      if (dbCard) {
         result.verification_method = 'set_id_number';
         result.confidence = 'high';
       }
@@ -596,60 +504,51 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   }
 
   // Strategy 3: Fuzzy lookup by name + set name + number
-  if (!apiCard && cardName && setName) {
-    console.log(`[Pokemon API Verification] Strategy 3: Name + Set fuzzy search`);
-    apiCard = await queryByNameAndSet(cardName, setName, cardNumber);
-    if (apiCard) {
+  if (!dbCard && cardName && setName) {
+    console.log(`[Pokemon Local Verification] Strategy 3: Name + Set fuzzy search`);
+    dbCard = await queryByNameAndSet(cardName, setName, cardNumber);
+    if (dbCard) {
       result.verification_method = 'name_number_set';
       result.confidence = cardNumber ? 'medium' : 'low';
     }
   }
 
   // Strategy 4: Just name + number (broader search)
-  if (!apiCard && cardName && cardNumber) {
+  if (!dbCard && cardName && cardNumber) {
     const normalizedNumber = normalizeCardNumber(cardNumber);
-    const query = `name:"${cardName}" number:${normalizedNumber}`;
-    console.log(`[Pokemon API Verification] Strategy 4: Name + Number only`);
+    console.log(`[Pokemon Local Verification] Strategy 4: Name + Number only`);
 
     try {
-      const url = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(query)}`;
-      const response = await fetch(url, {
-        headers: { 'X-Api-Key': POKEMON_API_KEY }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.data && data.data.length > 0) {
-          // If we have year, filter by it
-          if (cardInfo.year) {
-            const yearMatch = data.data.find((c: PokemonCard) =>
-              c.set.releaseDate?.startsWith(cardInfo.year!)
-            );
-            apiCard = yearMatch || data.data[0];
-          } else {
-            apiCard = data.data[0];
-          }
-          result.verification_method = 'fuzzy_match';
-          result.confidence = 'low';
+      const results = await searchLocalByNameNumberTotal(cardName, normalizedNumber);
+      if (results.length > 0) {
+        // If we have year, filter by it
+        if (cardInfo.year) {
+          const yearMatch = results.find((c: PokemonCard) =>
+            c.set.releaseDate?.startsWith(cardInfo.year!)
+          );
+          dbCard = yearMatch || results[0];
+        } else {
+          dbCard = results[0];
         }
+        result.verification_method = 'local_db';
+        result.confidence = 'low';
       }
     } catch (error) {
-      console.error('[Pokemon API Verification] Strategy 4 failed:', error);
+      console.error('[Pokemon Local Verification] Strategy 4 failed:', error);
     }
   }
 
-  // Strategy 5 (NEW): Fuzzy number matching - try nearby numbers when exact fails
-  // This helps when OCR misreads numbers (e.g., SM226 vs SM228)
-  if (!apiCard && cardName && cardNumber) {
+  // Strategy 5: Fuzzy number matching - try nearby numbers when exact fails
+  if (!dbCard && cardName && cardNumber) {
     const normalizedNumber = normalizeCardNumber(cardNumber);
-    console.log(`[Pokemon API Verification] Strategy 5: Fuzzy number matching (±3 range)`);
+    console.log(`[Pokemon Local Verification] Strategy 5: Fuzzy number matching (±3 range)`);
 
     // Detect if this is a promo card
     const promoSetId = getPromoSetId(cardNumberFormat);
 
     const fuzzyResult = await searchLocalFuzzyNumber(cardName, normalizedNumber, promoSetId || undefined);
     if (fuzzyResult.card) {
-      apiCard = fuzzyResult.card;
+      dbCard = fuzzyResult.card;
       result.verification_method = 'fuzzy_match';
       result.confidence = 'medium'; // Medium because name matched but number was corrected
 
@@ -658,191 +557,182 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
         result.corrections.push({
           field: 'card_number',
           original: cardNumber,
-          corrected: `${fuzzyResult.matchedNumber}/${apiCard.set.printedTotal}`
+          corrected: `${fuzzyResult.matchedNumber}/${dbCard.set.printedTotal}`
         });
-        console.log(`[Pokemon API Verification] Fuzzy match corrected number: ${normalizedNumber} → ${fuzzyResult.matchedNumber}`);
+        console.log(`[Pokemon Local Verification] Fuzzy match corrected number: ${normalizedNumber} → ${fuzzyResult.matchedNumber}`);
       }
     }
   }
 
   // Process results
-  if (apiCard) {
+  if (dbCard) {
     // Check for corrections
-    const apiSetName = apiCard.set.name;
-    const apiCardName = apiCard.name;
-    const apiCardNumber = `${apiCard.number}/${apiCard.set.printedTotal}`;
-    const apiYear = apiCard.set.releaseDate?.split('/')[0] || '';
-    const apiRarity = apiCard.rarity || '';
+    const dbSetName = dbCard.set.name;
+    const dbCardName = dbCard.name;
+    const dbCardNumber = `${dbCard.number}/${dbCard.set.printedTotal}`;
+    const dbYear = dbCard.set.releaseDate?.split('/')[0] || '';
 
     // VALIDATION: Reject matches where year is way off (more than 3 years different)
-    // This prevents matching 2014 cards to 2025 versions
-    if (cardInfo.year && apiYear) {
+    if (cardInfo.year && dbYear) {
       const originalYear = parseInt(cardInfo.year);
-      const matchedYear = parseInt(apiYear);
+      const matchedYear = parseInt(dbYear);
       if (!isNaN(originalYear) && !isNaN(matchedYear)) {
         const yearDiff = Math.abs(originalYear - matchedYear);
         if (yearDiff > 3) {
-          console.log(`[Pokemon API Verification] REJECTED: Year mismatch too large (${cardInfo.year} vs ${apiYear}, diff=${yearDiff})`);
-          console.log(`[Pokemon API Verification] Original card info will be preserved`);
-          // Don't use this match - the year is too different
+          console.log(`[Pokemon Local Verification] REJECTED: Year mismatch too large (${cardInfo.year} vs ${dbYear}, diff=${yearDiff})`);
           result.success = false;
           result.verified = false;
           result.pokemon_api_id = null;
           result.pokemon_api_data = null;
           result.verification_method = 'none';
           result.confidence = 'low';
-          result.error = `Year mismatch: expected ~${cardInfo.year}, found ${apiYear}`;
+          result.error = `Year mismatch: expected ~${cardInfo.year}, found ${dbYear}`;
           return result;
         }
       }
     }
 
     // VALIDATION: Reject if card name doesn't match at all
-    // (fuzzy searches might return completely wrong cards)
     const normalizedOriginal = cardName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const normalizedMatched = apiCardName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedMatched = dbCardName.toLowerCase().replace(/[^a-z0-9]/g, '');
     if (normalizedOriginal && normalizedMatched &&
         !normalizedMatched.includes(normalizedOriginal.substring(0, 5)) &&
         !normalizedOriginal.includes(normalizedMatched.substring(0, 5))) {
-      console.log(`[Pokemon API Verification] REJECTED: Name mismatch (${cardName} vs ${apiCardName})`);
+      console.log(`[Pokemon Local Verification] REJECTED: Name mismatch (${cardName} vs ${dbCardName})`);
       result.success = false;
       result.verified = false;
       result.pokemon_api_id = null;
       result.pokemon_api_data = null;
       result.verification_method = 'none';
       result.confidence = 'low';
-      result.error = `Name mismatch: expected ${cardName}, found ${apiCardName}`;
+      result.error = `Name mismatch: expected ${cardName}, found ${dbCardName}`;
       return result;
     }
 
     result.success = true;
     result.verified = true;
-    result.pokemon_api_id = apiCard.id;
-    result.pokemon_api_data = apiCard;
+    result.pokemon_api_id = dbCard.id;
+    result.pokemon_api_data = dbCard;
 
     // Record corrections if AI got something wrong
-    if (setName && setName !== apiSetName && setName.toLowerCase() !== apiSetName.toLowerCase()) {
+    if (setName && setName !== dbSetName && setName.toLowerCase() !== dbSetName.toLowerCase()) {
       result.corrections.push({
         field: 'set_name',
         original: setName,
-        corrected: apiSetName
+        corrected: dbSetName
       });
     }
 
-    if (cardName && cardName !== apiCardName && cardName.toLowerCase() !== apiCardName.toLowerCase()) {
+    if (cardName && cardName !== dbCardName && cardName.toLowerCase() !== dbCardName.toLowerCase()) {
       result.corrections.push({
         field: 'card_name',
         original: cardName,
-        corrected: apiCardName
+        corrected: dbCardName
       });
     }
 
-    if (cardInfo.year && cardInfo.year !== apiYear) {
+    if (cardInfo.year && cardInfo.year !== dbYear) {
       result.corrections.push({
         field: 'year',
         original: cardInfo.year,
-        corrected: apiYear
+        corrected: dbYear
       });
     }
 
-    console.log(`[Pokemon API Verification] SUCCESS: ${apiCard.name} (${apiCard.id}) from ${apiCard.set.name}`);
+    console.log(`[Pokemon Local Verification] SUCCESS: ${dbCard.name} (${dbCard.id}) from ${dbCard.set.name}`);
     if (result.corrections.length > 0) {
-      console.log(`[Pokemon API Verification] Corrections needed:`, result.corrections);
+      console.log(`[Pokemon Local Verification] Corrections needed:`, result.corrections);
     }
   } else {
-    result.error = 'No matching card found in Pokemon TCG API';
-    console.log(`[Pokemon API Verification] FAILED: No match found for ${cardName} #${cardNumber}`);
+    result.error = 'No matching card found in local database';
+    console.log(`[Pokemon Local Verification] FAILED: No match found for ${cardName} #${cardNumber}`);
   }
 
   return result;
 }
 
 /**
- * Save Pokemon API verification results to database
- * Updates the card with verified API data
+ * Save Pokemon verification results to database
+ * Updates the card with verified data from local lookup
  */
 export function getPokemonApiUpdateFields(verificationResult: PokemonApiVerificationResult) {
   if (!verificationResult.success || !verificationResult.pokemon_api_data) {
     return null;
   }
 
-  const apiCard = verificationResult.pokemon_api_data;
+  const dbCard = verificationResult.pokemon_api_data;
 
   // Only apply corrections for high/medium confidence matches
-  // Low confidence matches should NOT override original card info
   const shouldApplyCorrections = verificationResult.corrections.length > 0 &&
     (verificationResult.confidence === 'high' || verificationResult.confidence === 'medium');
 
   // For card_number specifically, only correct if the match is high confidence
-  // AND the card number was actually wrong (not just a formatting difference)
   const shouldCorrectCardNumber = verificationResult.confidence === 'high';
 
-  console.log(`[Pokemon API Update] Confidence: ${verificationResult.confidence}, ` +
+  console.log(`[Pokemon Local Update] Confidence: ${verificationResult.confidence}, ` +
               `Applying corrections: ${shouldApplyCorrections}, ` +
               `Correcting card_number: ${shouldCorrectCardNumber}`);
 
   return {
-    // API verification fields
+    // Verification fields
     pokemon_api_id: verificationResult.pokemon_api_id,
-    pokemon_api_data: apiCard, // Full API response as JSONB
+    pokemon_api_data: dbCard, // Full card data as JSONB
     pokemon_api_verified: true,
     pokemon_api_verified_at: new Date().toISOString(),
     pokemon_api_confidence: verificationResult.confidence,
     pokemon_api_method: verificationResult.verification_method,
 
-    // TCGPlayer direct product URL from Pokemon TCG API
-    tcgplayer_url: apiCard.tcgplayer?.url || null,
+    // TCGPlayer direct product URL if available
+    tcgplayer_url: dbCard.tcgplayer?.url || null,
 
     // Override card info with verified data (only for high/medium confidence matches)
     ...(shouldApplyCorrections && {
-      // Update card info with verified values
-      card_name: apiCard.name,
-      card_set: apiCard.set.name,
-      release_date: apiCard.set.releaseDate?.split('/')[0] || null,
-      // Only correct card_number for high confidence matches
+      card_name: dbCard.name,
+      card_set: dbCard.set.name,
+      release_date: dbCard.set.releaseDate?.split('/')[0] || null,
       ...(shouldCorrectCardNumber && {
-        card_number: `${apiCard.number}/${apiCard.set.printedTotal}`,
+        card_number: `${dbCard.number}/${dbCard.set.printedTotal}`,
       })
     })
   };
 }
 
 /**
- * Extract additional metadata from verified API card
+ * Extract additional metadata from verified card
  * For display purposes
  */
-export function extractPokemonMetadata(apiCard: PokemonCard) {
+export function extractPokemonMetadata(dbCard: PokemonCard) {
   return {
     // Card details
-    pokemon_name: apiCard.name,
-    pokemon_type: apiCard.types?.[0] || null,
-    hp: apiCard.hp ? parseInt(apiCard.hp) : null,
-    card_type: apiCard.supertype, // Pokemon, Trainer, Energy
-    subtypes: apiCard.subtypes || [],
-    evolves_from: apiCard.evolvesFrom || null,
-    rarity: apiCard.rarity || null,
-    artist: apiCard.artist || null,
+    pokemon_name: dbCard.name,
+    pokemon_type: dbCard.types?.[0] || null,
+    hp: dbCard.hp ? parseInt(dbCard.hp) : null,
+    card_type: dbCard.supertype, // Pokemon, Trainer, Energy
+    subtypes: dbCard.subtypes || [],
+    evolves_from: dbCard.evolvesFrom || null,
+    rarity: dbCard.rarity || null,
+    artist: dbCard.artist || null,
 
     // Set details
-    set_id: apiCard.set.id,
-    set_name: apiCard.set.name,
-    set_series: apiCard.set.series,
-    set_printed_total: apiCard.set.printedTotal,
-    set_total: apiCard.set.total,
-    set_release_date: apiCard.set.releaseDate,
-    set_symbol_url: apiCard.set.images?.symbol || null,
-    set_logo_url: apiCard.set.images?.logo || null,
+    set_id: dbCard.set.id,
+    set_name: dbCard.set.name,
+    set_series: dbCard.set.series,
+    set_printed_total: dbCard.set.printedTotal,
+    set_total: dbCard.set.total,
+    set_release_date: dbCard.set.releaseDate,
+    set_symbol_url: dbCard.set.images?.symbol || null,
+    set_logo_url: dbCard.set.images?.logo || null,
 
     // Images
-    api_image_small: apiCard.images?.small || null,
-    api_image_large: apiCard.images?.large || null,
+    api_image_small: dbCard.images?.small || null,
+    api_image_large: dbCard.images?.large || null,
 
     // Market data
-    tcgplayer_url: apiCard.tcgplayer?.url || null,
-    market_price: apiCard.tcgplayer?.prices?.holofoil?.market ||
-                  apiCard.tcgplayer?.prices?.normal?.market ||
-                  apiCard.tcgplayer?.prices?.reverseHolofoil?.market ||
-                  apiCard.cardmarket?.prices?.averageSellPrice ||
+    tcgplayer_url: dbCard.tcgplayer?.url || null,
+    market_price: dbCard.tcgplayer?.prices?.holofoil?.market ||
+                  dbCard.tcgplayer?.prices?.normal?.market ||
+                  dbCard.tcgplayer?.prices?.reverseHolofoil?.market ||
+                  dbCard.cardmarket?.prices?.averageSellPrice ||
                   null
   };
 }
