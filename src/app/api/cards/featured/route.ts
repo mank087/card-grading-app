@@ -30,7 +30,7 @@ export async function GET() {
         featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number,
         conversational_decimal_grade, conversational_whole_grade,
         conversational_condition_label, conversational_card_info,
-        dvg_decimal_grade, dcm_grade_decimal,
+        dvg_decimal_grade,
         is_foil, foil_type, is_double_faced, mtg_rarity, holofoil,
         serial_numbering, rarity_tier, rarity_description,
         autographed, autograph_type, memorabilia_type,

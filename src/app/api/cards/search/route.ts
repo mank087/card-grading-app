@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
       .select(`
         id, serial, category, visibility, front_path, featured, pokemon_featured,
         card_name, release_date, manufacturer_name, card_set, card_number,
-        dvg_decimal_grade, dcm_grade_decimal, conversational_decimal_grade,
+        dvg_decimal_grade, conversational_decimal_grade,
         conversational_whole_grade, conversational_card_info, conversational_condition_label,
         user_id, created_at,
         is_foil, foil_type, is_double_faced, mtg_rarity, holofoil,
@@ -148,7 +148,6 @@ export async function GET(request: NextRequest) {
         conversational_condition_label: card.conversational_condition_label,
         conversational_card_info: card.conversational_card_info,
         dvg_decimal_grade: card.dvg_decimal_grade,
-        dcm_grade_decimal: card.dcm_grade_decimal,
         // Features for label
         serial_numbering: card.serial_numbering,
         rarity_tier: card.rarity_tier,
