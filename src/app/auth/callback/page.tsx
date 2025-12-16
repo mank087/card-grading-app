@@ -110,12 +110,13 @@ export default function AuthCallbackPage() {
             if (isNewUser) {
               console.log('[Auth Callback] New user detected, redirecting to credits page')
 
-              // Send welcome email (fire-and-forget, don't block redirect)
+              // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
               fetch('/api/email/welcome', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   email: storedSession.user.email,
+                  userId: storedSession.user.id,
                   name: storedSession.user.user_metadata?.full_name || storedSession.user.user_metadata?.name
                 })
               }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
@@ -139,12 +140,13 @@ export default function AuthCallbackPage() {
               const isNewUser = (now - createdAt) < 60000 || (now - emailConfirmedAt) < 60000
 
               if (isNewUser) {
-                // Send welcome email (fire-and-forget, don't block redirect)
+                // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
                 fetch('/api/email/welcome', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
                   body: JSON.stringify({
                     email: retrySession.user.email,
+                    userId: retrySession.user.id,
                     name: retrySession.user.user_metadata?.full_name || retrySession.user.user_metadata?.name
                   })
                 }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))

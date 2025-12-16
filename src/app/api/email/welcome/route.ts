@@ -1,6 +1,7 @@
 /**
  * Welcome Email API
  * Sends welcome email to new users after successful signup/email confirmation
+ * Also schedules 24-hour follow-up email
  *
  * NOTE: Email HTML must use basic styling for Outlook/Gmail compatibility:
  * - No CSS gradients (use solid bgcolor)
@@ -12,13 +13,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { scheduleFollowUpEmail } from '@/lib/emailScheduler';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = body;
+    const { email, userId } = body;
 
     // Validate required fields
     if (!email) {
@@ -333,9 +335,22 @@ export async function POST(request: NextRequest) {
 
     console.log('[Welcome Email] Sent successfully to:', email, 'ID:', data?.id);
 
+    // Schedule 24-hour follow-up email if userId is provided
+    if (userId) {
+      const scheduleResult = await scheduleFollowUpEmail(userId, email, 24);
+      if (scheduleResult.success) {
+        console.log('[Welcome Email] Follow-up email scheduled for:', email);
+      } else {
+        console.warn('[Welcome Email] Failed to schedule follow-up:', scheduleResult.error);
+      }
+    } else {
+      console.warn('[Welcome Email] No userId provided, skipping follow-up scheduling');
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Welcome email sent',
+      followUpScheduled: !!userId,
     });
   } catch (error: any) {
     console.error('[Welcome Email] Error:', error);
