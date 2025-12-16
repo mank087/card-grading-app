@@ -780,20 +780,6 @@ export function generateLabelData(card: CardForLabel): LabelData {
   const category = card.category || 'Other';
   const cardInfo = card.conversational_card_info || {};
 
-  // Debug logging for sports cards
-  const isSportsCategory = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(category);
-  if (isSportsCategory) {
-    console.log(`[LabelGen] Sports card debug:`, {
-      category,
-      serial: card.serial,
-      featured: card.featured,
-      card_name: card.card_name,
-      hasCardInfo: !!card.conversational_card_info,
-      cardInfoPlayerOrCharacter: cardInfo.player_or_character,
-      grade: card.conversational_decimal_grade
-    });
-  }
-
   // ========================================
   // LINE 1: Primary Name
   // ========================================

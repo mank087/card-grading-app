@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
         manufacturer_name, release_date, card_number, grade_numeric, ai_confidence_score,
         dcm_grade_whole, dvg_image_quality, created_at, visibility,
         conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence,
-        conversational_card_info, conversational_condition_label, dvg_decimal_grade,
+        conversational_card_info, conversational_condition_label, conversational_grading, dvg_decimal_grade,
         is_foil, foil_type, is_double_faced, mtg_api_verified, mtg_rarity, mtg_set_code,
         card_language, scryfall_price_usd, scryfall_price_usd_foil,
         serial_numbering, rarity_tier, rarity_description, autographed, autograph_type,
@@ -68,18 +68,6 @@ export async function GET(request: NextRequest) {
       console.error('[Collection API] Error fetching cards:', error);
       return NextResponse.json({ error: "Failed to fetch cards" }, { status: 500 });
     }
-
-    // Debug: Log sports cards data
-    const sportCategories = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
-    cards?.filter(c => sportCategories.includes(c.category || '')).slice(0, 3).forEach(card => {
-      console.log(`[Collection API] Sports card ${card.serial}:`, {
-        category: card.category,
-        featured: card.featured,
-        card_name: card.card_name,
-        hasCardInfo: !!card.conversational_card_info,
-        grade: card.conversational_decimal_grade
-      });
-    });
 
     if (!cards || cards.length === 0) {
       return NextResponse.json({ cards: [] });
@@ -110,12 +98,65 @@ export async function GET(request: NextRequest) {
       }
     });
 
-    // Map URLs back to cards
-    const cardsWithUrls = cards.map(card => ({
-      ...card,
-      front_url: urlMap.get(card.front_path) || null,
-      back_url: urlMap.get(card.back_path) || null
-    }));
+    // Map URLs back to cards + parse conversational_grading for missing fields
+    const cardsWithUrls = cards.map(card => {
+      let enrichedCard = {
+        ...card,
+        front_url: urlMap.get(card.front_path) || null,
+        back_url: urlMap.get(card.back_path) || null
+      };
+
+      // If conversational_card_info is missing but conversational_grading exists, parse it
+      // This handles sports cards that have the JSON but not the extracted fields
+      if (!card.conversational_card_info && card.conversational_grading) {
+        try {
+          const parsed = typeof card.conversational_grading === 'string'
+            ? JSON.parse(card.conversational_grading)
+            : card.conversational_grading;
+
+          if (parsed.card_info) {
+            enrichedCard.conversational_card_info = parsed.card_info;
+            // Also populate direct fields if they're missing
+            if (!card.featured && parsed.card_info.player_or_character) {
+              enrichedCard.featured = parsed.card_info.player_or_character;
+            }
+            if (!card.card_name && parsed.card_info.card_name) {
+              enrichedCard.card_name = parsed.card_info.card_name;
+            }
+            if (!card.card_set && parsed.card_info.set_name) {
+              enrichedCard.card_set = parsed.card_info.set_name;
+            }
+            if (!card.card_number && parsed.card_info.card_number) {
+              enrichedCard.card_number = parsed.card_info.card_number;
+            }
+            if (!card.release_date && parsed.card_info.year) {
+              enrichedCard.release_date = parsed.card_info.year;
+            }
+          }
+
+          // Extract grade if missing
+          if (!card.conversational_decimal_grade) {
+            const grade = parsed.grading_passes?.averaged_rounded?.final ?? parsed.final_grade?.decimal_grade;
+            if (grade !== undefined && grade !== null) {
+              enrichedCard.conversational_decimal_grade = grade;
+              enrichedCard.conversational_whole_grade = Math.floor(grade);
+            }
+          }
+
+          // Extract condition label if missing
+          if (!card.conversational_condition_label && parsed.final_grade?.condition_label) {
+            enrichedCard.conversational_condition_label = parsed.final_grade.condition_label;
+          }
+        } catch (e) {
+          // Parsing failed, continue with original data
+        }
+      }
+
+      // Remove the large conversational_grading field from response to reduce payload
+      delete enrichedCard.conversational_grading;
+
+      return enrichedCard;
+    });
 
     return NextResponse.json({ cards: cardsWithUrls });
   } catch (error: any) {
