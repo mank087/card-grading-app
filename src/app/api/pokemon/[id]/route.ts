@@ -39,20 +39,26 @@ type PokemonCardGradingRequest = {
 };
 
 // Signed URL generation
-async function createSignedUrl(supabase: any, bucket: string, path: string): Promise<string | null> {
+async function createSignedUrl(supabase: any, bucket: string, path: string | null | undefined): Promise<string | null> {
+  // Guard against null/undefined paths
+  if (!path) {
+    console.error(`[createSignedUrl] Cannot create signed URL: path is ${path}`);
+    return null;
+  }
+
   try {
     const { data, error } = await supabase.storage
       .from(bucket)
       .createSignedUrl(path, 60 * 60); // 1 hour expiry
 
     if (error) {
-      console.error(`Failed to create signed URL for ${path}:`, error);
+      console.error(`[createSignedUrl] Failed for ${path}:`, error.message || error);
       return null;
     }
 
     return data.signedUrl;
   } catch (error) {
-    console.error(`Error creating signed URL for ${path}:`, error);
+    console.error(`[createSignedUrl] Error for ${path}:`, error);
     return null;
   }
 }

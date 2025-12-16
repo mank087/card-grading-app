@@ -128,7 +128,45 @@ const PDF_LIMITS = {
   SPECIAL_FEATURES: 30,       // Max chars for special features line
 };
 
-export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }) => (
+/**
+ * Default subgrade structure to prevent null access errors
+ */
+const defaultSubgrade = {
+  score: 0,
+  summary: 'No data available',
+  frontScore: 0,
+  backScore: 0,
+  frontSummary: 'No data available',
+  backSummary: 'No data available',
+};
+
+const defaultSubgrades = {
+  centering: defaultSubgrade,
+  corners: defaultSubgrade,
+  edges: defaultSubgrade,
+  surface: defaultSubgrade,
+};
+
+/**
+ * Safely get subgrades with defaults to prevent null access errors
+ */
+const getSafeSubgrades = (cardData: ReportCardData) => {
+  if (!cardData.subgrades) {
+    return defaultSubgrades;
+  }
+  return {
+    centering: { ...defaultSubgrade, ...subgrades.centering },
+    corners: { ...defaultSubgrade, ...subgrades.corners },
+    edges: { ...defaultSubgrade, ...subgrades.edges },
+    surface: { ...defaultSubgrade, ...subgrades.surface },
+  };
+};
+
+export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }) => {
+  // Get safe subgrades with defaults
+  const subgrades = getSafeSubgrades(cardData);
+
+  return (
   <Document>
     <Page size="A4" style={reportStyles.page}>
       {/* Header with Logo on Right */}
@@ -208,11 +246,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Centering</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.centering.frontScore || cardData.subgrades.centering.score)}/10
+                  {formatScore(subgrades.centering.frontScore || subgrades.centering.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.centering.frontSummary || cardData.subgrades.centering.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.centering.frontSummary || subgrades.centering.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -221,11 +259,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Corners</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.corners.frontScore || cardData.subgrades.corners.score)}/10
+                  {formatScore(subgrades.corners.frontScore || subgrades.corners.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.corners.frontSummary || cardData.subgrades.corners.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.corners.frontSummary || subgrades.corners.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -234,11 +272,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Edges</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.edges.frontScore || cardData.subgrades.edges.score)}/10
+                  {formatScore(subgrades.edges.frontScore || subgrades.edges.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.edges.frontSummary || cardData.subgrades.edges.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.edges.frontSummary || subgrades.edges.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -247,11 +285,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Surface</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.surface.frontScore || cardData.subgrades.surface.score)}/10
+                  {formatScore(subgrades.surface.frontScore || subgrades.surface.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.surface.frontSummary || cardData.subgrades.surface.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.surface.frontSummary || subgrades.surface.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
           </View>
@@ -327,11 +365,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Centering</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.centering.backScore || cardData.subgrades.centering.score)}/10
+                  {formatScore(subgrades.centering.backScore || subgrades.centering.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.centering.backSummary || cardData.subgrades.centering.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.centering.backSummary || subgrades.centering.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -340,11 +378,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Corners</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.corners.backScore || cardData.subgrades.corners.score)}/10
+                  {formatScore(subgrades.corners.backScore || subgrades.corners.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.corners.backSummary || cardData.subgrades.corners.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.corners.backSummary || subgrades.corners.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -353,11 +391,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Edges</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.edges.backScore || cardData.subgrades.edges.score)}/10
+                  {formatScore(subgrades.edges.backScore || subgrades.edges.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.edges.backSummary || cardData.subgrades.edges.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.edges.backSummary || subgrades.edges.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
 
@@ -366,11 +404,11 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
               <View style={reportStyles.subgradeHeader}>
                 <Text style={reportStyles.subgradeTitle}>Surface</Text>
                 <Text style={reportStyles.subgradeScore}>
-                  {formatScore(cardData.subgrades.surface.backScore || cardData.subgrades.surface.score)}/10
+                  {formatScore(subgrades.surface.backScore || subgrades.surface.score)}/10
                 </Text>
               </View>
               <Text style={reportStyles.subgradeSummary}>
-                {truncateText(cardData.subgrades.surface.backSummary || cardData.subgrades.surface.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
+                {truncateText(subgrades.surface.backSummary || subgrades.surface.summary, PDF_LIMITS.SUBGRADE_SUMMARY)}
               </Text>
             </View>
           </View>
@@ -462,4 +500,5 @@ export const CardGradingReport: React.FC<CardGradingReportProps> = ({ cardData }
       </View>
     </Page>
   </Document>
-);
+  );
+};
