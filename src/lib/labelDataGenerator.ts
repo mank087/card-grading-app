@@ -246,7 +246,6 @@ export interface CardForLabel {
   conversational_whole_grade?: number | null;
   conversational_condition_label?: string | null;
   dvg_decimal_grade?: number | null;
-  dcm_grade_decimal?: number | null;
 
   // Legacy fields (fallbacks)
   card_name?: string | null;
@@ -425,9 +424,6 @@ function getGrade(card: CardForLabel): number | null {
   }
   if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
     return card.dvg_decimal_grade;
-  }
-  if (card.dcm_grade_decimal !== null && card.dcm_grade_decimal !== undefined) {
-    return card.dcm_grade_decimal;
   }
   return null;
 }

@@ -24,7 +24,6 @@ export function getCardLabelData(card: any): LabelData {
     conversational_condition_label: card.conversational_condition_label,
     conversational_card_info: card.conversational_card_info,
     dvg_decimal_grade: card.dvg_decimal_grade,
-    dcm_grade_decimal: card.dcm_grade_decimal,
     card_name: card.card_name,
     card_set: card.card_set,
     card_number: card.card_number,
