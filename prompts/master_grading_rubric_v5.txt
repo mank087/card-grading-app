@@ -2732,14 +2732,21 @@ Calculate the ratio between your measured borders:
 | 2.0x | 67/33 | One border DOUBLE |
 | 2.5x or more | 71/29 or worse | Severely off-center |
 
-**VERIFICATION CHECK 4: Cross-Reference Front and Back**
-If BOTH front and back show similar off-centering direction:
-• This is expected (cut shifted during production)
-• Ratios should be similar (within 5 percentage points)
+**VERIFICATION CHECK 4: Cross-Reference Front and Back (v7.2 Physics-Based)**
+Remember: When card is flipped horizontally to view back, LEFT↔RIGHT are MIRRORED.
 
-If front and back show OPPOSITE off-centering:
-• This is unusual - verify measurements carefully
-• May indicate measurement error
+**For LEFT-RIGHT centering:**
+• If front has thick LEFT border, back SHOULD have thick RIGHT border (mirrored)
+• If front and back BOTH show thick LEFT → Something is wrong, re-verify
+
+**For TOP-BOTTOM centering:**
+• Top/bottom relationship SHOULD be the same on both sides (not mirrored)
+• If front has thick TOP, back should also have thick TOP
+
+**If measurements seem physics-inconsistent:**
+• Re-examine both images carefully
+• May indicate camera distortion or measurement error
+• See [STEP C3] for detailed physics explanation
 
 **MANDATORY BEFORE FINALIZING:**
 □ Check 1: Math adds up correctly
@@ -3120,24 +3127,56 @@ than 66/34 on that axis.
 ❌ Description: "Dominant right border" + Ratio: "55/45" → INVALID
 ❌ Description: "Severely shifted" + Ratio: "58/42" → INVALID
 ---
-[STEP C3] FRONT-BACK CONSISTENCY & OPPOSITE-SHIFT RULE
+[STEP C3] FRONT-BACK CENTERING RELATIONSHIP (v7.2 PHYSICS-BASED)
 ---
-You MUST evaluate front and back centering independently, then COMPARE:
+🚨 **CRITICAL: UNDERSTAND HOW CARD FLIP AFFECTS CENTERING PERCEPTION**
 
-**SCENARIO A: Same-Direction Shift (Expected)**
-If the front is left-heavy AND the back is also left-heavy:
-• This is CONSISTENT sheet shift during production
-• Ratios should be in the same direction and similar magnitude (within 5 points)
-• This is normal and expected
+When you flip a card horizontally (like turning a book page) to view the back:
+• **LEFT on front → RIGHT on back** (horizontal axis is MIRRORED)
+• **RIGHT on front → LEFT on back**
+• **TOP stays TOP, BOTTOM stays BOTTOM** (vertical axis unchanged)
 
-**SCENARIO B: Opposite-Direction Shift (Confirms Real Off-Centering)**
-If the front is left-heavy BUT the back is right-heavy (or vice versa):
-• This is STRONG EVIDENCE of real cutting variance, NOT camera distortion
-• Camera distortion would affect both sides the same way
-• You MUST explicitly state:
-  "Front image is shifted toward [side A], back image is shifted toward [side B],
-   which confirms a real off-center cut rather than camera angle."
-• You are PROHIBITED from using any ratio tighter than 60/40 on the more extreme axis
+**PHYSICAL REALITY OF OFF-CENTER CUTS:**
+If a card was cut with the design shifted LEFT (thick left border, thin right border):
+• **FRONT shows:** Thick LEFT border, thin RIGHT border (shifted toward right)
+• **BACK shows:** Thick RIGHT border, thin LEFT border (shifted toward left)
+• This is because the SAME physical cut affects both sides, but the back is FLIPPED
+
+**EXPECTED CENTERING RELATIONSHIPS:**
+
+| Axis | Front Observation | Expected Back Observation | Reason |
+|------|-------------------|---------------------------|--------|
+| Left-Right | Thick LEFT border | Thick RIGHT border | Horizontal flip mirrors L/R |
+| Left-Right | Thick RIGHT border | Thick LEFT border | Horizontal flip mirrors L/R |
+| Top-Bottom | Thick TOP border | Thick TOP border | Vertical axis unchanged |
+| Top-Bottom | Thick BOTTOM border | Thick BOTTOM border | Vertical axis unchanged |
+
+**HOW TO ANALYZE BACK CENTERING CORRECTLY:**
+
+1. **Observe the back image AS PRESENTED** (do not mentally flip it)
+2. **Report what you SEE** - if back shows thick LEFT border, say "thick LEFT border"
+3. **VERIFY the relationship** - if front had thick LEFT, back SHOULD have thick RIGHT
+4. **If they MATCH (both thick LEFT)** - this is UNUSUAL and may indicate:
+   - Measurement error on one side
+   - The card was photographed with non-standard flip (top-to-bottom instead of left-to-right)
+   - Camera distortion affecting perception
+
+**EXAMPLE - CORRECT ANALYSIS:**
+• Front: 41/59 L/R (thick left, shifted right), 42/58 T/B (thick top, shifted down)
+• Back SHOULD be: ~59/41 L/R (thick RIGHT now), ~42/58 T/B (same as front)
+• If back shows 43/57 L/R (thick left) - this is INCONSISTENT with physics
+• Either re-examine measurements or note the discrepancy
+
+**SCENARIO A: Physics-Consistent (Expected)**
+Front L/R thick LEFT + Back L/R thick RIGHT = Correct mirror relationship
+→ Confirms real off-center cut
+→ Both measurements are likely accurate
+
+**SCENARIO B: Physics-Inconsistent (Unusual)**
+Front L/R thick LEFT + Back L/R thick LEFT = Same direction on mirrored axis
+→ Something is wrong - re-examine both images
+→ May be camera distortion, measurement error, or unusual photo orientation
+→ Flag in notes if persists after re-examination
 
 **CRITICAL:** You are NOT allowed to "average away" front/back differences.
 The centering score MUST respect the WORST axis across both sides.
