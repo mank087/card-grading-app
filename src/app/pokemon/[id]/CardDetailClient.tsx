@@ -2279,6 +2279,9 @@ export function PokemonCardDetails() {
     card_type: stripMarkdown(card.conversational_card_info?.card_type) || card.card_type || null
   };
 
+  // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images
+  const labelData = getCardLabelData(card);
+
   // 🎯 Pokemon cards use conversational grading as PRIMARY source
   const recommendedGrade = card.conversational_decimal_grade ? {
     recommended_decimal_grade: card.conversational_decimal_grade,
@@ -2495,96 +2498,65 @@ export function PokemonCardDetails() {
                     />
                   </div>
 
-                  {/* Center: Card Information - Using unified label data */}
-                  {(() => {
-                    const labelData = getCardLabelData(card);
-                    return (
-                      <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
-                        {/* Line 1: Pokemon Name */}
-                        <div
-                          className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(labelData.primaryName) ? 'font-noto-sans-jp' : ''}`}
-                          style={{
-                            fontSize: (() => {
-                              const name = labelData.primaryName;
-                              if (name.length > 35) return '11px';
-                              if (name.length > 25) return '12px';
-                              return '14px';
-                            })()
-                          }}
-                          title={labelData.primaryName}
-                        >
-                          {labelData.primaryName}
-                        </div>
+                  {/* Center: Card Information - Unified 4-Line Structure (matches downloadable labels) */}
+                  <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
+                    {/* Line 1: Primary Name (from unified labelData) */}
+                    <div
+                      className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(labelData.primaryName) ? 'font-noto-sans-jp' : ''}`}
+                      style={{
+                        fontSize: (() => {
+                          const name = labelData.primaryName;
+                          if (name.length > 35) return '11px';
+                          if (name.length > 25) return '12px';
+                          return '14px';
+                        })()
+                      }}
+                      title={labelData.primaryName}
+                    >
+                      {labelData.primaryName}
+                    </div>
 
-                        {/* Line 2: Set Name • Card # • Year */}
-                        {labelData.contextLine && (
-                          <div
-                            className="text-gray-700 leading-tight"
-                            style={{
-                              fontSize: labelData.contextLine.length > 30 ? '10px' : '11px',
-                              display: '-webkit-box',
-                              WebkitLineClamp: 2,
-                              WebkitBoxOrient: 'vertical',
-                              overflow: 'hidden'
-                            }}
-                            title={labelData.contextLine}
-                          >
-                            {labelData.contextLine}
-                          </div>
-                        )}
+                    {/* Line 2: Context Line (Set • Subset • #Number • Year) */}
+                    <div
+                      className="text-gray-700 leading-tight"
+                      style={{
+                        fontSize: labelData.contextLine.length > 30 ? '10px' : '11px',
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden'
+                      }}
+                      title={labelData.contextLine}
+                    >
+                      {labelData.contextLine || 'Card Details'}
+                    </div>
 
-                        {/* Line 3: Special Features (RC, Auto, Serial #) - Only if present */}
-                        {labelData.featuresLine && (
-                          <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                            {labelData.featuresLine}
-                          </div>
-                        )}
-
-                        {/* Line 4: DCM Serial Number */}
-                        <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
-                          {labelData.serial}
-                        </div>
+                    {/* Line 3: Special Features (from unified labelData) - Only if present */}
+                    {labelData.featuresLine && (
+                      <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                        {labelData.featuresLine}
                       </div>
-                    );
-                  })()}
+                    )}
 
-                  {/* Right: Grade Display */}
+                    {/* Line 4: DCM Serial Number */}
+                    <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
+                      {labelData.serial}
+                    </div>
+                  </div>
+
+                  {/* Right: Grade Display (from unified labelData) */}
                   <div className="text-center flex-shrink-0">
-                    {(() => {
-                      // Get the numeric grade
-                      let grade: number | null = null;
-                      if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
-                        grade = card.conversational_decimal_grade;
-                      } else if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
-                        grade = card.dvg_decimal_grade;
-                      } else if (recommendedGrade.recommended_decimal_grade !== null && recommendedGrade.recommended_decimal_grade !== undefined) {
-                        grade = recommendedGrade.recommended_decimal_grade;
-                      } else if (card.dcm_grade_decimal !== null && card.dcm_grade_decimal !== undefined) {
-                        grade = card.dcm_grade_decimal;
-                      }
-
-                      // Use actual AI-generated condition label, stripping abbreviation like (GM), (M), etc
-                      const condition = card.conversational_condition_label
-                        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-                        : (grade !== null ? getConditionFromGrade(grade) : '');
-                      const displayGrade = grade !== null ? formatGrade(grade) : 'N/A';
-
-                      return (
-                        <>
-                          <div className="font-bold text-purple-700 text-3xl leading-none">
-                            {displayGrade}
-                          </div>
-                          {condition && (
-                            <>
-                              <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                              <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                                {condition}
-                              </div>
-                            </>
-                          )}
-                        </>
-                      );
-                    })()}
+                    <div className="font-bold text-purple-700 text-3xl leading-none">
+                      {labelData.gradeFormatted || 'N/A'}
+                    </div>
+                    {labelData.condition && (
+                      <>
+                        <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+                        <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
+                          {labelData.condition}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

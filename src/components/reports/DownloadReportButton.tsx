@@ -746,15 +746,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       }
 
       // Build card image data using cleaned values from labelDataGenerator
-      // Pass individual fields, not contextLine (cardImageGenerator joins internally)
+      // Use contextLine directly to ensure consistency with card detail page labels
       // Get English fallback name for CJK cards from featured/pokemon_featured
       const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
 
       const cardImageData: CardImageData = {
         cardName: cleanLabelData.primaryName,
-        setName: cleanLabelData.setName || '', // Individual set name, not contextLine
-        cardNumber: cleanLabelData.cardNumber || undefined,
-        year: cleanLabelData.year || undefined,
+        contextLine: cleanLabelData.contextLine, // Pre-formatted: "Set • Subset • #123 • 2023"
         specialFeatures: cleanLabelData.featuresLine || undefined,
         serial: cleanLabelData.serial,
         englishName, // Fallback for Japanese/Chinese/Korean card names

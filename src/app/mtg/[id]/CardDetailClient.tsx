@@ -31,6 +31,7 @@ import { useGradingQueue } from '@/contexts/GradingQueueContext';
 import { useCredits } from '@/contexts/CreditsContext';
 import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { UserConditionReportInput } from '@/types/conditionReport';
+import { getCardLabelData } from '@/lib/useLabelData';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -2342,6 +2343,9 @@ export function MTGCardDetails() {
     scryfall_price_usd_foil: convInfo.scryfall_price_usd_foil || card.scryfall_price_usd_foil || null
   };
 
+  // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images
+  const labelData = getCardLabelData(card);
+
   // 🎯 MTG cards use conversational grading as PRIMARY source
   const recommendedGrade = card.conversational_decimal_grade ? {
     recommended_decimal_grade: card.conversational_decimal_grade,
@@ -2558,112 +2562,65 @@ export function MTGCardDetails() {
                     />
                   </div>
 
-                  {/* Center: Card Information - New 4-Line Structure */}
+                  {/* Center: Card Information - Unified 4-Line Structure (matches downloadable labels) */}
                   <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
-                    {/* Line 1: Card Name - Dynamic Font Sizing */}
+                    {/* Line 1: Primary Name (from unified labelData) */}
                     <div
-                      className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(cardInfo.card_name || cardInfo.player_or_character || card.card_name || "") ? 'font-noto-sans-jp' : ''}`}
+                      className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(labelData.primaryName) ? 'font-noto-sans-jp' : ''}`}
                       style={{
                         fontSize: (() => {
-                          const name = cardInfo.card_name || cardInfo.player_or_character || card.card_name || "Unknown Card";
+                          const name = labelData.primaryName;
                           if (name.length > 35) return '11px';
                           if (name.length > 25) return '12px';
                           return '14px';
                         })()
                       }}
-                      title={cardInfo.card_name || cardInfo.player_or_character || card.card_name || "Unknown Card"}
+                      title={labelData.primaryName}
                     >
-                      {cardInfo.card_name || cardInfo.player_or_character || card.card_name || "Unknown Card"}
+                      {labelData.primaryName}
                     </div>
 
-                    {/* Line 2: Set Name • Card # • Year */}
+                    {/* Line 2: Context Line (Set • Subset • #Number • Year) */}
                     <div
                       className="text-gray-700 leading-tight"
                       style={{
-                        fontSize: (cardInfo.set_name || cardInfo.set_era || "Unknown Set").length > 30 ? '10px' : '11px',
+                        fontSize: labelData.contextLine.length > 30 ? '10px' : '11px',
                         display: '-webkit-box',
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: 'vertical',
                         overflow: 'hidden'
                       }}
-                      title={`${cardInfo.set_name || cardInfo.set_era || "Unknown Set"} • ${cardInfo.card_number || ''} • ${cardInfo.year || 'N/A'}`}
+                      title={labelData.contextLine}
                     >
-                      {[
-                        cardInfo.set_name || cardInfo.set_era || "Unknown Set",
-                        cardInfo.card_number,
-                        cardInfo.year
-                      ].filter(p => p).join(' • ')}
+                      {labelData.contextLine || 'Card Details'}
                     </div>
 
-                    {/* Line 3: Special Features (Foil, Rarity, Double-Faced, RC, Auto, Serial #) - Only if present */}
-                    {(() => {
-                      const features: string[] = [];
-                      // MTG-specific features from Scryfall API
-                      if (card.is_foil) features.push(card.foil_type || 'Foil');
-                      if (card.mtg_rarity) {
-                        const rarity = card.mtg_rarity === 'mythic' ? 'Mythic' :
-                                      card.mtg_rarity.charAt(0).toUpperCase() + card.mtg_rarity.slice(1);
-                        features.push(rarity);
-                      }
-                      if (card.is_double_faced) features.push('Double-Faced');
-                      // Standard features
-                      if (cardInfo.rookie_or_first === true || cardInfo.rookie_or_first === 'true') features.push('RC');
-                      if (cardInfo.autographed) features.push('Auto');
-                      const serialNum = cardInfo.serial_number;
-                      if (serialNum && serialNum !== 'N/A' && !serialNum.toLowerCase().includes('not present') && !serialNum.toLowerCase().includes('none')) {
-                        features.push(serialNum);
-                      }
-                      if (features.length === 0) return null;
-                      return (
-                        <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                          {features.join(' • ')}
-                        </div>
-                      );
-                    })()}
+                    {/* Line 3: Special Features (from unified labelData) - Only if present */}
+                    {labelData.featuresLine && (
+                      <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                        {labelData.featuresLine}
+                      </div>
+                    )}
 
                     {/* Line 4: DCM Serial Number */}
                     <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
-                      {card.serial || `DCM-${card.id?.slice(0, 8)}`}
+                      {labelData.serial}
                     </div>
                   </div>
 
-                  {/* Right: Grade Display */}
+                  {/* Right: Grade Display (from unified labelData) */}
                   <div className="text-center flex-shrink-0">
-                    {(() => {
-                      // Get the numeric grade
-                      let grade: number | null = null;
-                      if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
-                        grade = card.conversational_decimal_grade;
-                      } else if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
-                        grade = card.dvg_decimal_grade;
-                      } else if (recommendedGrade.recommended_decimal_grade !== null && recommendedGrade.recommended_decimal_grade !== undefined) {
-                        grade = recommendedGrade.recommended_decimal_grade;
-                      } else if (card.dcm_grade_decimal !== null && card.dcm_grade_decimal !== undefined) {
-                        grade = card.dcm_grade_decimal;
-                      }
-
-                      // Use actual AI-generated condition label, stripping abbreviation like (GM), (M), etc
-                      const condition = card.conversational_condition_label
-                        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-                        : (grade !== null ? getConditionFromGrade(grade) : '');
-                      const displayGrade = grade !== null ? formatGrade(grade) : 'N/A';
-
-                      return (
-                        <>
-                          <div className="font-bold text-purple-700 text-3xl leading-none">
-                            {displayGrade}
-                          </div>
-                          {condition && (
-                            <>
-                              <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                              <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                                {condition}
-                              </div>
-                            </>
-                          )}
-                        </>
-                      );
-                    })()}
+                    <div className="font-bold text-purple-700 text-3xl leading-none">
+                      {labelData.gradeFormatted || 'N/A'}
+                    </div>
+                    {labelData.condition && (
+                      <>
+                        <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+                        <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
+                          {labelData.condition}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>

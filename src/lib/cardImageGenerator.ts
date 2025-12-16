@@ -48,9 +48,7 @@ const COLORS = {
 
 export interface CardImageData {
   cardName: string;
-  setName: string;
-  cardNumber?: string;
-  year?: string;
+  contextLine: string;  // Pre-formatted: "Set • Subset • #123 • 2023" - matches labelDataGenerator
   specialFeatures?: string;
   serial: string;
   grade: number;
@@ -270,13 +268,10 @@ async function drawFrontLabel(
   ctx.fillText(safeCardName, infoX, currentY);
   currentY += nameFontSize + 6;
 
-  // Line 2: Set Name - Card # - Year (with wrapping) - increased from 20 to 24
-  // Use ASCII-safe versions for all text
+  // Line 2: Context line (Set • Subset • #Number • Year) - use pre-formatted contextLine
+  // This matches labelDataGenerator for consistency across all label displays
   ctx.fillStyle = COLORS.textMedium;
-  const safeSetName = data.setName ? extractAsciiSafe(data.setName, '') : '';
-  const safeCardNumber = data.cardNumber ? extractAsciiSafe(data.cardNumber, '') : '';
-  const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';
-  const setInfo = [safeSetName, safeCardNumber, safeYear].filter(Boolean).join(' \u2022 ');
+  const setInfo = data.contextLine ? extractAsciiSafe(data.contextLine, '') : '';
 
   const setFontSize = 24;
   const setLines = wrapText(setInfo, infoMaxWidth, setFontSize);
