@@ -1,21 +1,65 @@
 -- Fix RLS performance warnings
 -- 1. Wrap auth.uid() in (select auth.uid()) to prevent per-row re-evaluation
 -- 2. Consolidate multiple permissive SELECT policies into single policies
+-- Updated: December 16, 2025 - Added email_log fix and additional profile policies
 
 -- ============================================
--- PROFILES TABLE
+-- PROFILES TABLE - Consolidate duplicate policies
 -- ============================================
 
--- Drop existing policies
+-- Drop ALL existing policies (including duplicates)
 DROP POLICY IF EXISTS "Read own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Update own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
+DROP POLICY IF EXISTS "Users can update own marketing prefs" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_select_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_update_own" ON public.profiles;
+DROP POLICY IF EXISTS "profiles_insert_own" ON public.profiles;
 
--- Recreate with optimized auth.uid() calls
-CREATE POLICY "Read own profile" ON public.profiles
-  FOR SELECT USING ((select auth.uid()) = id);
+-- Create single consolidated SELECT policy with optimized auth call
+CREATE POLICY "profiles_select_own" ON public.profiles
+  FOR SELECT
+  TO authenticated
+  USING (id = (select auth.uid()));
 
-CREATE POLICY "Update own profile" ON public.profiles
-  FOR UPDATE USING ((select auth.uid()) = id);
+-- Create single consolidated UPDATE policy with optimized auth call
+CREATE POLICY "profiles_update_own" ON public.profiles
+  FOR UPDATE
+  TO authenticated
+  USING (id = (select auth.uid()))
+  WITH CHECK (id = (select auth.uid()));
+
+-- Create INSERT policy for profile creation
+CREATE POLICY "profiles_insert_own" ON public.profiles
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (id = (select auth.uid()));
+
+-- ============================================
+-- EMAIL_LOG TABLE - Fix auth function re-evaluation
+-- ============================================
+
+-- Drop existing policy
+DROP POLICY IF EXISTS "Service role only" ON public.email_log;
+DROP POLICY IF EXISTS "email_log_service_role_only" ON public.email_log;
+DROP POLICY IF EXISTS "email_log_select_own" ON public.email_log;
+
+-- email_log should only be accessible by service role (for admin/cron operations)
+-- No policy needed for authenticated users - they can't access this table
+-- Service role bypasses RLS anyway, so we just need to block regular users
+
+-- Option 1: Block all authenticated access (service role still works)
+CREATE POLICY "email_log_deny_all" ON public.email_log
+  FOR ALL
+  TO authenticated
+  USING (false);
+
+-- Option 2 (alternative): Allow users to see their own email logs
+-- Uncomment if you want users to see their email history:
+-- CREATE POLICY "email_log_select_own" ON public.email_log
+--   FOR SELECT
+--   TO authenticated
+--   USING (user_id = (select auth.uid()));
 
 -- ============================================
 -- CARDS TABLE

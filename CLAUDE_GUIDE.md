@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 15, 2025 (v6.2 - Card Number OCR & Verification Fixes)
+> Last Updated: December 16, 2025 (v7.1 - Database Validation & Version Tracking)
 
 ---
 
@@ -23,6 +23,7 @@
 14. [Admin Dashboard](#14-admin-dashboard)
 15. [Environment Variables](#15-environment-variables)
 16. [Key Data Flows](#16-key-data-flows)
+17. [Version History](#version-history)
 
 ---
 
@@ -31,8 +32,9 @@
 **DCM Grading** is a full-stack card grading platform that uses AI (GPT-4o vision) to grade trading cards (Pokemon, MTG, Sports, Lorcana, Other). Users upload card images, receive AI-powered condition grades, and can download professional labels/reports.
 
 **Core Features:**
-- AI-powered card grading with three-pass consensus system (v6.0)
-- **v6.0: Whole number grades only (1-10, no half-points)**
+- AI-powered card grading with three-pass consensus system (v7.1)
+- **v7.1: Transparent subgrade-to-overall caps with 1:1 mapping**
+- **v7.0: Whole number grades only (1-10, no half-points)**
 - **v6.0: Tier-first grading with dominant defect control**
 - Support for multiple card types (Pokemon, MTG, Sports, Lorcana, Other)
 - Credit-based payment system via Stripe
@@ -41,6 +43,7 @@
 - Professional label and report generation
 - Admin dashboard with analytics
 - Email marketing with 24-hour follow-up
+- **v7.1: DCM Optic™ version tracking per card**
 
 **Live URL:** https://www.dcmgrading.com
 
@@ -262,12 +265,11 @@ src/
 
 | File | Purpose |
 |------|---------|
-| `lib/visionGrader.ts` | **PRIMARY**: Master rubric + delta grading (v6.0 three-pass) |
+| `lib/visionGrader.ts` | **PRIMARY**: Master rubric + delta grading (v7.1 three-pass) |
 | `lib/promptLoader_v5.ts` | Loads master_grading_rubric_v5.txt + card-type deltas |
 | `lib/conversationalParserV3_5.ts` | Parse grading markdown reports |
 | `lib/professionalGradeMapper.ts` | Map to PSA/BGS/SGC/CGC grades |
 | `lib/conditionAssessment.ts` | Numeric grade to condition label |
-| `lib/promptLoader_v5.ts` | Load card-type specific prompts |
 | `lib/cardGradingSchema_v5.ts` | Zod validation for grading responses |
 
 ### v6.0 Grading System Updates (December 2025)
@@ -290,7 +292,56 @@ src/
 | F | 9 | Minor defects only |
 | G | 10 | Zero defects (very rare) |
 
-**Rubric File:** `prompts/master_grading_rubric_v5.txt` (updated to v6.0)
+**Rubric File:** `prompts/master_grading_rubric_v5.txt` (currently v7.1)
+
+### v7.1 Database Validation & Version Tracking (December 2025)
+
+**Key Updates:**
+
+1. **DCM Optic™ Version Tracking**
+   - Each graded card stores the prompt version used at grading time
+   - Displayed at bottom of card detail page: "DCM Optic™ Version: V7.1"
+   - Version is static per card - won't change when prompt updates
+   - Legacy cards show their original version or "Legacy" if none stored
+   - **Files changed:** `lib/visionGrader.ts` (lines 1651-1652, 1703-1704)
+   - **Frontend helpers:** `extractDCMOpticVersion()`, `getDCMOpticVersion()` in all CardDetailClient.tsx files
+
+2. **Pokemon Card Database Validation** (`api/pokemon/[id]/route.ts`)
+   - After AI grading, validates card info against local `pokemon_cards` database
+   - Database is source of truth for: `set_name`, `set_total`, `card_number_raw`, `year`
+   - Fixes AI "corrections" that change card numbers based on set knowledge
+   - Query: `pokemon_cards WHERE name ILIKE '%{name}%' AND number = '{card_number}'`
+   - Orders by `set_release_date DESC` (newest sets first)
+   - Extracts year from `set_release_date` column
+   - **Updates both:** `conversationalGradingData.card_info` AND raw `conversationalGradingResult` JSON
+
+3. **Transparent Subgrade Caps** (Master Rubric v7.1)
+   - Direct 1:1 cap mapping from subgrades to overall grade
+   - No hidden surface caps - all penalties visible in subgrade scores
+   - Subgrade ≤4 caps overall at 4, ≤5 caps at 5, etc.
+
+4. **Version String Updates** (`lib/visionGrader.ts`)
+   ```
+   meta.version: 'conversational-v7.1-json' or 'conversational-v7.1-markdown'
+   meta.prompt_version: 'Conversational_Grading_v7.1_THREE_PASS'
+   ```
+
+**How Version Tracking Works:**
+```
+1. At Grading Time:
+   - visionGrader.ts sets prompt_version in meta object
+   - Stored in conversational_grading JSON column
+
+2. At Display Time:
+   - Frontend reads conversational_grading JSON
+   - extractDCMOpticVersion() parses "v7.1" from prompt_version string
+   - Displays as "V7.1" in UI
+
+3. For Future Updates:
+   - Change prompt_version in visionGrader.ts when rubric updates
+   - Old cards keep their original version
+   - New cards get new version
+```
 
 ### v6.2 Card Number OCR & Verification Fixes (December 2025)
 
@@ -307,23 +358,29 @@ src/
    - Added **FORBIDDEN BEHAVIOR** section
    - Explicit: "DO NOT use knowledge of Pokemon sets to correct numbers"
    - Explicit: "If card shows 125/094, report 125/094 even if you know the set has more cards"
+   - **Mega Evolution X/Y handling**: Explicit instructions to include X or Y designation
 
-3. **Verification Validation** (`lib/pokemonApiVerification.ts`)
+3. **Pokemon Identify Endpoint** (`api/pokemon/identify/route.ts`)
+   - Lightweight AI call for card name + number identification
+   - Strict OCR instructions: "Read EXACTLY as printed"
+   - Critical warnings against "correcting" card numbers
+
+4. **Verification Validation** (`lib/pokemonApiVerification.ts`)
    - **Year validation**: Rejects matches >3 years different (prevents 2014 card matching to 2025)
    - **Name validation**: Rejects completely mismatched card names
    - **Confidence-based corrections**: Only high/medium confidence matches can override card info
    - **Card number protection**: Only HIGH confidence matches can change `card_number`
 
-4. **Force Regrade Improvements** (`api/pokemon/[id]/route.ts`)
+5. **Force Regrade Improvements** (`api/pokemon/[id]/route.ts`)
    - Now clears ALL cached `pokemon_api_*` fields
    - Clears `card_number`, `card_set`, `release_date`, `label_data`
    - Ensures completely fresh grading without cached verification data
 
-5. **Condition Label Uniformity** (`lib/labelDataGenerator.ts`)
+6. **Condition Label Uniformity** (`lib/labelDataGenerator.ts`)
    - Always uses deterministic `getConditionFromGrade()` mapping
    - Same grade always produces same condition label (no AI variation)
 
-6. **Label Display Fixes** (`lib/labelDataGenerator.ts`)
+7. **Label Display Fixes** (`lib/labelDataGenerator.ts`)
    - Pokemon cards show full card number (232/182 not just 232)
    - Promo formats (SM226, SWSH039) display without "#" prefix
    - Uses `card_number_raw` for accurate display
@@ -678,26 +735,33 @@ Email/Password users: email_confirmed_at within 60 seconds
 1. GET card paths from database
 2. Create signed URLs for images (1 hour expiry)
 3. LOAD PROMPT (promptLoader_v5.ts):
-   ├── master_grading_rubric_v5.txt (universal rules, ~50k tokens)
+   ├── master_grading_rubric_v5.txt (universal rules, v7.1, ~50k tokens)
    └── {card_type}_delta_v5.txt (card-specific rules)
 4. THREE-PASS CONSENSUS GRADING (visionGrader.ts):
-   ├── Pass 1 → GPT-4o evaluates independently
-   ├── Pass 2 → GPT-4o (fresh evaluation, same prompt)
-   └── Pass 3 → GPT-4o (fresh evaluation)
+   ├── Pass 1 → GPT-5.1 evaluates independently
+   ├── Pass 2 → GPT-5.1 (fresh evaluation, same prompt)
+   └── Pass 3 → GPT-5.1 (fresh evaluation)
    └── Average scores, apply dominant defect control
-   └── Final grade = whole number (v6.0: floor rounding)
+   └── Final grade = whole number (v7.0: floor rounding)
+   └── Version stored: "Conversational_Grading_v7.1_THREE_PASS"
 5. Parse response, extract grading_passes
-6. Generate label_data
-7. Update card record with grades
+6. DATABASE VALIDATION (v7.1 - Pokemon only):
+   └── Query local pokemon_cards by name + number
+   └── Override AI's set_name, set_total, year with DB values
+   └── Update both card_info object AND raw JSON string
+7. Generate label_data
+8. Update card record with grades
 ```
 
-### v6.0 Grading Rules
+### Grading Rules (v7.1)
 
-- **Whole numbers only**: Final grades are 1-10 integers (no 8.5, 9.5)
-- **Tier-first**: Identify condition tier before calculating scores
+- **Whole numbers only** (v7.0): Final grades are 1-10 integers (no 8.5, 9.5)
+- **Transparent subgrade caps** (v7.1): Direct 1:1 cap mapping, no hidden penalties
+- **Tier-first** (v6.0): Identify condition tier before calculating scores
 - **Dominant defect control**: Worst category caps the grade
 - **Three-pass consensus**: 2+/3 passes must agree on defects
 - **Floor rounding**: Always round down (8.7 → 8)
+- **Version tracking** (v7.1): Each card stores prompt version used at grading time
 
 ### Post-Grading Verification
 
@@ -1063,6 +1127,29 @@ node scripts/import-pokemon-database.js --full
 - Same numeric grade = same condition label (no AI variation)
 - Run `/api/admin/backfill-labels` to regenerate all existing card labels
 
+### DCM Optic Version Not Showing
+- Version is stored in `conversational_grading` JSON under `meta.prompt_version`
+- Frontend helper `getDCMOpticVersion()` parses this from the stored JSON
+- If version is null/missing, card was graded before version tracking was implemented
+- **To update version string:** Edit `lib/visionGrader.ts` lines 1651-1652 and 1703-1704
+- Legacy cards won't show version - must force regrade to get version stored
+
+### Pokemon Card Info Shows Wrong Set/Year
+- v7.1 fix: Database validation now overrides AI-identified set info
+- Local `pokemon_cards` database is source of truth
+- Query uses `name ILIKE '%{name}%' AND number = '{card_number}'`
+- Orders by `set_release_date DESC` (newest sets first)
+- Extracts year from `set_release_date` column
+- Both Card Information panel AND label should show same correct data
+- If still wrong: check if card exists in local database with correct set info
+
+### Card Information Panel vs Label Show Different Data
+- v7.1 fix: Both now use same corrected data from database validation
+- Database validation updates BOTH:
+  - `conversationalGradingData.card_info` (object)
+  - `conversationalGradingResult` (raw JSON string)
+- If mismatch persists: force regrade with `?force_regrade=true`
+
 ---
 
 ## File Naming Conventions
@@ -1076,4 +1163,17 @@ node scripts/import-pokemon-database.js --full
 
 ---
 
-*This guide covers active, working code as of December 2025. Deprecated files are not included.*
+*This guide covers active, working code as of December 2025 (v7.1). Deprecated files are not included.*
+
+---
+
+## Version History
+
+| Version | Date | Key Changes |
+|---------|------|-------------|
+| v7.1 | Dec 16, 2025 | Database validation, DCM Optic version tracking, transparent subgrade caps |
+| v7.0 | Dec 2025 | Whole number grades only, removed half-points |
+| v6.2 | Dec 15, 2025 | Card number OCR fixes, verification validation, Mega Evolution X/Y |
+| v6.1 | Dec 2025 | Local Pokemon database, API fallback |
+| v6.0 | Dec 2025 | Tier-first grading, dominant defect control |
+| v5.5 | Nov 2025 | Three-pass consensus grading |

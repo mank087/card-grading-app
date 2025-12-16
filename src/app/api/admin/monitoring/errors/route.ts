@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     // Previously used SELECT * which fetched all columns including large stack traces
     let query = supabaseAdmin
       .from('error_log')
-      .select('id, error_type, error_message, severity, user_id, card_id, created_at', { count: 'exact' })
+      .select('id, error_type, error_message, severity, user_id, route, created_at', { count: 'exact' })
 
     // Apply severity filter
     if (severity !== 'all') {

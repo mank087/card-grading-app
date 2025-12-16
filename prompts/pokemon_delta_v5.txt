@@ -28,7 +28,11 @@ REQUIRED FIELDS (All Pokemon Cards)
 **player_or_character**: Pokemon name
 • Extract exact Pokemon name as printed on card
 • Include form variations (e.g., "Giratina Origin Forme", "Pikachu VMAX")
-• Examples: "Charizard", "Pikachu", "Mewtwo", "Rayquaza VMAX"
+• ⚠️ MEGA EVOLUTIONS: Include X or Y designation - these are DIFFERENT Pokemon:
+  - "Mega Charizard X" and "Mega Charizard Y" are separate cards
+  - "Mega Mewtwo X" and "Mega Mewtwo Y" are separate cards
+  - The X/Y comes BEFORE EX suffix: "Mega Charizard X EX" (not "Mega Charizard EX")
+• Examples: "Charizard", "Pikachu", "Mewtwo", "Rayquaza VMAX", "Mega Charizard X"
 • 🇯🇵 For Japanese cards: "日本語名 (English Name)" (e.g., "ガマゲロゲ (Seismitoad)")
 
 **card_name**: Card title/name

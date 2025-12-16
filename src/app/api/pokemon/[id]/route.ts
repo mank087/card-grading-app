@@ -826,6 +826,94 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
 
         // 🆕 HYBRID SET IDENTIFICATION: Check if we need API lookup
         const cardInfo = conversationalGradingData.card_info;
+
+        // 🔧 DATABASE VALIDATION: Query local pokemon_cards by name + number to validate/correct AI's values
+        // This fixes issues where AI changes "125/094" to "125/109" or uses wrong set/year based on its knowledge
+        let dbValidationApplied = false;
+        if (cardInfo?.player_or_character && cardInfo?.card_number) {
+          try {
+            const pokemonName = cardInfo.player_or_character;
+            const cardNumber = cardInfo.card_number; // Numerator only, e.g., "125"
+
+            console.log(`[GET /api/pokemon/${cardId}] 🔍 Validating card number against local DB: name="${pokemonName}", number="${cardNumber}"`);
+
+            const { data: dbMatches, error: dbError } = await supabase
+              .from('pokemon_cards')
+              .select('name, number, set_printed_total, set_name, set_id, set_release_date')
+              .ilike('name', `%${pokemonName}%`)
+              .eq('number', cardNumber)
+              .order('set_release_date', { ascending: false })
+              .limit(5);
+
+            if (!dbError && dbMatches && dbMatches.length > 0) {
+              // Found match(es) - use database values as source of truth
+              const bestMatch = dbMatches.find(m => m.name.toLowerCase().includes(pokemonName.toLowerCase())) || dbMatches[0];
+              const dbSetTotal = bestMatch.set_printed_total?.toString();
+              const aiSetTotal = cardInfo.set_total;
+              const aiSetName = cardInfo.set_name;
+
+              // Extract year from set_release_date (format: "2025-01-15" or similar)
+              let dbYear: string | null = null;
+              if (bestMatch.set_release_date) {
+                const yearMatch = bestMatch.set_release_date.toString().match(/^(\d{4})/);
+                if (yearMatch) {
+                  dbYear = yearMatch[1];
+                }
+              }
+
+              // Always update from DB when we have a match - DB is source of truth
+              const needsCorrection = (dbSetTotal && dbSetTotal !== aiSetTotal) ||
+                                       (bestMatch.set_name && bestMatch.set_name !== aiSetName) ||
+                                       (dbYear && dbYear !== cardInfo.year);
+
+              if (needsCorrection) {
+                console.log(`[GET /api/pokemon/${cardId}] ✅ DB CORRECTION APPLIED:`);
+                console.log(`  - Card number: AI="${cardNumber}/${aiSetTotal}" → DB="${cardNumber}/${dbSetTotal}"`);
+                console.log(`  - Set name: AI="${aiSetName}" → DB="${bestMatch.set_name}"`);
+                console.log(`  - Year: AI="${cardInfo.year}" → DB="${dbYear}"`);
+
+                // Correct ALL card_info values with database values
+                if (dbSetTotal) {
+                  cardInfo.set_total = dbSetTotal;
+                  cardInfo.card_number_raw = `${cardNumber}/${dbSetTotal}`;
+                }
+                cardInfo.set_name = bestMatch.set_name;
+                if (dbYear) {
+                  cardInfo.year = dbYear;
+                }
+                cardInfo.needs_api_lookup = false; // Already resolved from local DB
+                dbValidationApplied = true;
+              } else {
+                console.log(`[GET /api/pokemon/${cardId}] ✅ DB VALIDATED: All values match database`);
+              }
+            } else {
+              console.log(`[GET /api/pokemon/${cardId}] ⚠️ No DB match for "${pokemonName}" #${cardNumber}, using AI values`);
+            }
+          } catch (dbValidationError) {
+            console.error(`[GET /api/pokemon/${cardId}] ⚠️ DB validation error:`, dbValidationError);
+            // Continue with AI values if DB lookup fails
+          }
+        }
+
+        // 🔧 If DB validation applied corrections, update the raw JSON string too
+        // This ensures conversational_grading column has correct values for frontend parsing
+        if (dbValidationApplied && conversationalGradingResult) {
+          try {
+            const updatedJson = JSON.parse(conversationalGradingResult);
+            if (updatedJson.card_info) {
+              updatedJson.card_info.set_name = cardInfo.set_name;
+              updatedJson.card_info.set_total = cardInfo.set_total;
+              updatedJson.card_info.card_number_raw = cardInfo.card_number_raw;
+              updatedJson.card_info.year = cardInfo.year;
+              updatedJson.card_info.needs_api_lookup = false;
+            }
+            conversationalGradingResult = JSON.stringify(updatedJson);
+            console.log(`[GET /api/pokemon/${cardId}] ✅ Updated raw JSON with DB-corrected values`);
+          } catch (jsonUpdateError) {
+            console.error(`[GET /api/pokemon/${cardId}] ⚠️ Failed to update raw JSON:`, jsonUpdateError);
+          }
+        }
+
         const needsApiLookup = cardInfo?.needs_api_lookup === true ||
                                ((!cardInfo?.set_name || cardInfo?.set_name === null) && !!cardInfo?.card_number);
 
