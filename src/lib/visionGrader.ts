@@ -1649,7 +1649,7 @@ Provide detailed analysis as markdown with all required sections.`
           model: model,
           timestamp: new Date().toISOString(),
           version: 'conversational-v7.2-json',
-          prompt_version: 'Conversational_Grading_v7.2_MIN_SCORING'
+          prompt_version: 'DCM_Grading_v7.2'
         }
       };
 
@@ -1701,7 +1701,7 @@ Provide detailed analysis as markdown with all required sections.`
           model: model,
           timestamp: new Date().toISOString(),
           version: 'conversational-v7.2-markdown',
-          prompt_version: 'Conversational_Grading_v7.2_MIN_SCORING'
+          prompt_version: 'DCM_Grading_v7.2'
         }
       };
 

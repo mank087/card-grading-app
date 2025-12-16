@@ -4589,13 +4589,13 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
   },
   "metadata": {
     "timestamp": "2025-01-15T14:32:00Z",
-    "prompt_version": "DCM_Grading_v7.1_THREE_PASS"
+    "prompt_version": "DCM_Grading_v7.2"
   }
 }
 
 **CRITICAL:** Always include the metadata object with:
 - timestamp: Current date/time in ISO 8601 format
-- prompt_version: "DCM_Grading_v7.2_MIN_SCORING"
+- prompt_version: "DCM_Grading_v7.2"
 ---
 SECTION 12: OUTPUT REQUIREMENTS & VALIDATION
 ---
