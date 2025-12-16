@@ -785,21 +785,25 @@ export function generateLabelData(card: CardForLabel): LabelData {
   // ========================================
   let rawPrimaryName: string;
 
-  switch (category) {
-    case 'Sports':
-      rawPrimaryName = getSportsName(cardInfo, card);
-      break;
-    case 'Pokemon':
-      rawPrimaryName = getPokemonName(cardInfo, card);
-      break;
-    case 'MTG':
-      rawPrimaryName = getMTGName(cardInfo, card);
-      break;
-    case 'Lorcana':
-      rawPrimaryName = getLorcanaName(cardInfo, card);
-      break;
-    default:
-      rawPrimaryName = getOtherName(cardInfo, card);
+  // Sports cards can have specific sport categories
+  const isSportsCard = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(category);
+
+  if (isSportsCard) {
+    rawPrimaryName = getSportsName(cardInfo, card);
+  } else {
+    switch (category) {
+      case 'Pokemon':
+        rawPrimaryName = getPokemonName(cardInfo, card);
+        break;
+      case 'MTG':
+        rawPrimaryName = getMTGName(cardInfo, card);
+        break;
+      case 'Lorcana':
+        rawPrimaryName = getLorcanaName(cardInfo, card);
+        break;
+      default:
+        rawPrimaryName = getOtherName(cardInfo, card);
+    }
   }
 
   // Clean the primary name to remove any explanatory text
@@ -816,21 +820,22 @@ export function generateLabelData(card: CardForLabel): LabelData {
   const setName = getCleanValue(rawSetName);
 
   let rawSubset: string | null;
-  switch (category) {
-    case 'Sports':
-      rawSubset = getSportsSubset(cardInfo, card);
-      break;
-    case 'Pokemon':
-      rawSubset = getPokemonSubset(cardInfo, card);
-      break;
-    case 'MTG':
-      rawSubset = getMTGSubset(cardInfo, card);
-      break;
-    case 'Lorcana':
-      rawSubset = getLorcanaSubset(cardInfo, card);
-      break;
-    default:
-      rawSubset = stripMarkdown(cardInfo.subset);
+  if (isSportsCard) {
+    rawSubset = getSportsSubset(cardInfo, card);
+  } else {
+    switch (category) {
+      case 'Pokemon':
+        rawSubset = getPokemonSubset(cardInfo, card);
+        break;
+      case 'MTG':
+        rawSubset = getMTGSubset(cardInfo, card);
+        break;
+      case 'Lorcana':
+        rawSubset = getLorcanaSubset(cardInfo, card);
+        break;
+      default:
+        rawSubset = stripMarkdown(cardInfo.subset);
+    }
   }
   const subset = getCleanValue(rawSubset);
 
@@ -908,21 +913,22 @@ export function generateLabelData(card: CardForLabel): LabelData {
   // ========================================
   let features: string[];
 
-  switch (category) {
-    case 'Sports':
-      features = getSportsFeatures(cardInfo, card);
-      break;
-    case 'Pokemon':
-      features = getPokemonFeatures(cardInfo, card);
-      break;
-    case 'MTG':
-      features = getMTGFeatures(cardInfo, card);
-      break;
-    case 'Lorcana':
-      features = getLorcanaFeatures(cardInfo, card);
-      break;
-    default:
-      features = getOtherFeatures(cardInfo, card);
+  if (isSportsCard) {
+    features = getSportsFeatures(cardInfo, card);
+  } else {
+    switch (category) {
+      case 'Pokemon':
+        features = getPokemonFeatures(cardInfo, card);
+        break;
+      case 'MTG':
+        features = getMTGFeatures(cardInfo, card);
+        break;
+      case 'Lorcana':
+        features = getLorcanaFeatures(cardInfo, card);
+        break;
+      default:
+        features = getOtherFeatures(cardInfo, card);
+    }
   }
 
   const featuresLine = features.length > 0 ? features.join(' • ') : null;
