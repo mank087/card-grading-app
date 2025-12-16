@@ -69,6 +69,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Failed to fetch cards" }, { status: 500 });
     }
 
+    // Debug: Log sports cards data
+    const sportCategories = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
+    cards?.filter(c => sportCategories.includes(c.category || '')).slice(0, 3).forEach(card => {
+      console.log(`[Collection API] Sports card ${card.serial}:`, {
+        category: card.category,
+        featured: card.featured,
+        card_name: card.card_name,
+        hasCardInfo: !!card.conversational_card_info,
+        grade: card.conversational_decimal_grade
+      });
+    });
+
     if (!cards || cards.length === 0) {
       return NextResponse.json({ cards: [] });
     }
