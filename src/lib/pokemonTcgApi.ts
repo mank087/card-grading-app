@@ -520,6 +520,8 @@ export type CardNumberFormat =
   | 'fraction'          // Standard X/Y format (240/193)
   | 'swsh_promo'        // SWSH prefix (SWSH039)
   | 'sv_promo'          // Scarlet & Violet promo (SVP EN 085, or just digits)
+  | 'sm_promo'          // Sun & Moon promo (SM228)
+  | 'xy_promo'          // XY promo (XY01)
   | 'trainer_gallery'   // TG prefix (TG10/TG30)
   | 'galarian_gallery'  // GG prefix (GG33/GG70)
   | 'single'            // Just a number (25)
@@ -563,6 +565,36 @@ export function normalizeCardNumber(cardNumber: string, format: CardNumberFormat
         variations.push(`SWSH${num}`); // Original format first
         if (withoutLeadingZeros !== num) {
           variations.push(`SWSH${withoutLeadingZeros}`);
+        }
+      } else {
+        variations.push(cardNumber);
+      }
+      break;
+
+    case 'sm_promo':
+      // "SM228" → ["SM228"] - API stores with SM prefix
+      const smMatch = cardNumber.match(/SM(\d+)/i);
+      if (smMatch) {
+        const num = smMatch[1];
+        const withoutLeadingZeros = num.replace(/^0+/, '') || num;
+        variations.push(`SM${num}`); // Original format first
+        if (withoutLeadingZeros !== num) {
+          variations.push(`SM${withoutLeadingZeros}`);
+        }
+      } else {
+        variations.push(cardNumber);
+      }
+      break;
+
+    case 'xy_promo':
+      // "XY01" → ["XY01", "XY1"] - API stores with XY prefix
+      const xyMatch = cardNumber.match(/XY(\d+)/i);
+      if (xyMatch) {
+        const num = xyMatch[1];
+        const withoutLeadingZeros = num.replace(/^0+/, '') || num;
+        variations.push(`XY${num}`);
+        if (withoutLeadingZeros !== num) {
+          variations.push(`XY${withoutLeadingZeros}`);
         }
       } else {
         variations.push(cardNumber);
@@ -630,6 +662,16 @@ export function detectCardNumberFormat(cardNumberRaw: string): CardNumberFormat 
     return 'swsh_promo';
   }
 
+  // Check for SM promo format: SM### (Sun & Moon promos)
+  if (/^SM\d+$/i.test(raw)) {
+    return 'sm_promo';
+  }
+
+  // Check for XY promo format: XY## (XY promos)
+  if (/^XY\d+$/i.test(raw)) {
+    return 'xy_promo';
+  }
+
   // Check for SV promo format: SVP EN ###, SVP ###, or just digits with known context
   if (/SVP/i.test(raw) || /^SVP?\s*(EN\s*)?\d+$/i.test(raw)) {
     return 'sv_promo';
@@ -672,6 +714,10 @@ export function getPromoSetId(format: CardNumberFormat): string | null {
       return 'swshp';
     case 'sv_promo':
       return 'svp';
+    case 'sm_promo':
+      return 'smp';  // Sun & Moon Promos
+    case 'xy_promo':
+      return 'xyp';  // XY Promos
     case 'galarian_gallery':
       return 'swsh12pt5gg'; // Crown Zenith Galarian Gallery
     default:
@@ -1303,16 +1349,25 @@ export async function lookupSetByCardNumber(
     }
 
     // 🆕 PROMO PATH: If card_format indicates a promo, use promo set ID
-    if (options?.cardFormat === 'sv_promo' || options?.cardFormat === 'swsh_promo') {
-      const promoSetId = options.cardFormat === 'sv_promo' ? 'svp' : 'swshp';
+    const promoFormats = ['sv_promo', 'swsh_promo', 'sm_promo', 'xy_promo'];
+    if (options?.cardFormat && promoFormats.includes(options.cardFormat)) {
+      const promoSetId = getPromoSetId(options.cardFormat as CardNumberFormat);
       console.log(`[PokemonTCG API] 🎁 Promo path: Using format ${options.cardFormat} → set.id:${promoSetId}`);
 
-      // Extract just the number
-      let cardNum = cardNumber.match(/\b(\d+)\b/)?.[1] || cardNumber;
+      // Extract card number - SM/XY promos keep prefix, SV/SWSH promos use digits only
+      let cardNum: string;
+      if (options.cardFormat === 'sm_promo' || options.cardFormat === 'xy_promo') {
+        // SM228 → SM228 (keep prefix)
+        cardNum = cardNumber.toUpperCase();
+      } else {
+        // SVP EN 085 → 85 (extract digits)
+        cardNum = cardNumber.match(/\b(\d+)\b/)?.[1] || cardNumber;
+      }
       // Try with and without leading zeros
       const cardNumNoZeros = cardNum.replace(/^0+/, '') || cardNum;
+      const variations = cardNum === cardNumNoZeros ? [cardNum] : [cardNumNoZeros, cardNum];
 
-      for (const numVariation of [cardNumNoZeros, cardNum]) {
+      for (const numVariation of variations) {
         const promoQuery = `set.id:${promoSetId} number:${numVariation}`;
         const promoUrl = `${POKEMON_API_BASE}/cards?q=${encodeURIComponent(promoQuery)}`;
         console.log('[PokemonTCG API] Promo query URL:', promoUrl);
