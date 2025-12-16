@@ -155,10 +155,10 @@ const getSafeSubgrades = (cardData: ReportCardData) => {
     return defaultSubgrades;
   }
   return {
-    centering: { ...defaultSubgrade, ...subgrades.centering },
-    corners: { ...defaultSubgrade, ...subgrades.corners },
-    edges: { ...defaultSubgrade, ...subgrades.edges },
-    surface: { ...defaultSubgrade, ...subgrades.surface },
+    centering: { ...defaultSubgrade, ...cardData.subgrades.centering },
+    corners: { ...defaultSubgrade, ...cardData.subgrades.corners },
+    edges: { ...defaultSubgrade, ...cardData.subgrades.edges },
+    surface: { ...defaultSubgrade, ...cardData.subgrades.surface },
   };
 };
 
