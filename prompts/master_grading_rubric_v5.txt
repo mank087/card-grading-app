@@ -4662,8 +4662,8 @@ METADATA REQUIREMENTS
 ---
 Include in metadata object:
 • timestamp: ISO 8601 format
-• model_version: "DCM_OPTIC_v6.2"
-• rubric_version: "master_v6.2"
+• model_version: "DCM_OPTIC_v7.2"
+• rubric_version: "master_v7.2"
 • delta_applied: "sports_v5" | "pokemon_v5" | "mtg_v5" | "lorcana_v5" | "other_v5"
 • processing_notes: Any special conditions or issues encountered
 ---
