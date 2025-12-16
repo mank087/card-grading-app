@@ -2213,13 +2213,12 @@ export function PokemonCardDetails() {
   };
 
   // Helper function to safely convert and format numeric values
-  // v6.0: Rounds to nearest 0.5 increment for sub-grades (like BGS style)
-  const safeToFixed = (value: any, decimals: number = 1): string => {
+  // v6.2: Rounds to whole numbers to match printed labels/reports
+  const safeToFixed = (value: any, decimals: number = 0): string => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
-    if (typeof num !== 'number' || isNaN(num)) return '0.0';
-    // Round to nearest 0.5 for cleaner display
-    const rounded = Math.round(num * 2) / 2;
-    return rounded % 1 === 0 ? rounded.toString() : rounded.toFixed(1);
+    if (typeof num !== 'number' || isNaN(num)) return '0';
+    // Round to whole number to match PDF labels
+    return Math.round(num).toString();
   };
 
   // Professional grades are stored as a separate column (two-stage system)
