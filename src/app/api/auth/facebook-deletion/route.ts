@@ -7,10 +7,9 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-
-    // Facebook sends a signed_request parameter
-    const signedRequest = body.signed_request
+    // Facebook sends data as form-urlencoded, not JSON
+    const formData = await request.formData()
+    const signedRequest = formData.get('signed_request') as string
 
     if (!signedRequest) {
       return NextResponse.json(
@@ -100,7 +99,7 @@ export async function POST(request: NextRequest) {
     const confirmationCode = `${facebookUserId}_${Date.now()}`
 
     return NextResponse.json({
-      url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/data-deletion-status?code=${confirmationCode}`,
+      url: `${process.env.NEXT_PUBLIC_BASE_URL || 'https://www.dcmgrading.com'}/data-deletion-status?code=${confirmationCode}`,
       confirmation_code: confirmationCode
     }, { status: 200 })
 
