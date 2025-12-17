@@ -4798,8 +4798,13 @@ export function PokemonCardDetails() {
                       subset: cardInfo.rarity_tier || cardInfo.subset || card.subset
                     } as CardData;
 
-                    // Use database URL if available, otherwise generate search URL
-                    const tcgplayerUrl = card.tcgplayer_url || generateTCGPlayerSetSearchUrl(cardData) || generateTCGPlayerSearchUrl(cardData);
+                    // Use database URL if available (check all possible sources from verification)
+                    // Priority: direct column > conversational_card_info > pokemon_api_data > generated search URL
+                    const tcgplayerUrl = card.tcgplayer_url ||
+                                        card.conversational_card_info?.tcgplayer_url ||
+                                        card.pokemon_api_data?.tcgplayer?.url ||
+                                        generateTCGPlayerSetSearchUrl(cardData) ||
+                                        generateTCGPlayerSearchUrl(cardData);
                     const displaySetName = cardInfo.set_name || cardInfo.set_era || card.card_set;
 
                     return (
