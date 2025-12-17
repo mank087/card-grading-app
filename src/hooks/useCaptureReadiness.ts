@@ -8,9 +8,9 @@ import {
 } from '@/types/camera';
 
 // How many consecutive ready frames before starting countdown
-const READY_FRAMES_REQUIRED = 10;
+const READY_FRAMES_REQUIRED = 5; // Reduced for faster response
 // Countdown duration in seconds
-const COUNTDOWN_SECONDS = 3;
+const COUNTDOWN_SECONDS = 2; // Faster countdown
 // How often to check readiness (ms)
 const CHECK_INTERVAL = 100;
 
@@ -109,27 +109,23 @@ export function useCaptureReadiness({
       return;
     }
 
-    // Evaluate individual conditions
-    const isCardDetected = detection.detected && detection.confidence > 50;
+    // Evaluate individual conditions - simplified and lenient
+    const isCardDetected = detection.detected;
     const isStable = stabilization.isStable;
-    const isAligned = detection.alignment.isCentered &&
-                      detection.alignment.isParallel &&
-                      detection.alignment.fillPercent >= 60 &&
-                      detection.alignment.fillPercent <= 95;
+    const isAligned = true; // Trust user to align - simplified version
     const isQualityGood = detection.lighting.level === 'good' ||
-                          detection.lighting.level === 'bright';
+                          detection.lighting.level === 'bright' ||
+                          detection.lighting.level === 'dim';
 
-    // Check for critical warnings
+    // Check for critical warnings - only glare is critical
     const hasCriticalWarnings = detection.warnings.some(w =>
-      w === 'corners_cut_off' ||
-      w === 'blur_detected' ||
       w === 'glare_detected'
     );
 
-    // Overall readiness
+    // Overall readiness - much more lenient
+    // Just need: detected + stable + no glare
     const readyForCapture = isCardDetected &&
                             isStable &&
-                            isAligned &&
                             !hasCriticalWarnings;
 
     // Track consecutive ready frames

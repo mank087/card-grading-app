@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 16, 2025 (v7.1 - Database Validation & Version Tracking)
+> Last Updated: December 17, 2025 (v7.3 - Prompt Consistency & Unified Cap System)
 
 ---
 
@@ -32,10 +32,11 @@
 **DCM Grading** is a full-stack card grading platform that uses AI (GPT-4o vision) to grade trading cards (Pokemon, MTG, Sports, Lorcana, Other). Users upload card images, receive AI-powered condition grades, and can download professional labels/reports.
 
 **Core Features:**
-- AI-powered card grading with three-pass consensus system (v7.1)
+- AI-powered card grading with three-pass consensus system
+- **v7.3: Unified cap system, execution flowchart, prompt consistency**
+- **v7.2: Visual Defect Identification Guide with defect hunting protocol**
 - **v7.1: Transparent subgrade-to-overall caps with 1:1 mapping**
 - **v7.0: Whole number grades only (1-10, no half-points)**
-- **v6.0: Tier-first grading with dominant defect control**
 - Support for multiple card types (Pokemon, MTG, Sports, Lorcana, Other)
 - Credit-based payment system via Stripe
 - User collection management
@@ -343,6 +344,88 @@ src/
    - New cards get new version
 ```
 
+### v7.2 Unified Label System & Promo Support (December 2025)
+
+**Key Updates:**
+
+1. **Unified Card Label System**
+   - Labels now show consistent data across all pages (collection, search, detail, homepage)
+   - `lib/useLabelData.ts` - Always generates fresh label data via `getCardLabelData()`
+   - `lib/labelDataGenerator.ts` - Central label data generation with card-type-specific handling
+   - `components/CardLabel.tsx` - Unified label display component
+
+2. **Sports Card Category Fix** (`lib/labelDataGenerator.ts`)
+   - Sports cards have specific categories: 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'
+   - Fixed switch statements that only checked `case 'Sports':`
+   - Added `isSportsCard` check to handle all sport category types:
+   ```typescript
+   const isSportsCard = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(category);
+   if (isSportsCard) {
+     rawPrimaryName = getSportsName(cardInfo, card);
+   }
+   ```
+
+3. **API JSON Parsing for Labels**
+   - Collection, search, and featured APIs now parse `conversational_grading` JSON when direct columns are NULL
+   - Extracts: `card_info`, `decimal_grade`, `condition_label` from nested JSON
+   - Files modified:
+     - `src/app/api/cards/my-collection/route.ts` - Added JSON parsing for label data
+     - `src/app/api/cards/search/route.ts` - Added JSON parsing for label data
+     - `src/app/api/cards/featured/route.ts` - Added JSON parsing for label data
+   - Pattern used in all APIs:
+   ```typescript
+   if (!card.conversational_card_info && card.conversational_grading) {
+     try {
+       const parsed = typeof card.conversational_grading === 'string'
+         ? JSON.parse(card.conversational_grading) : card.conversational_grading;
+       if (parsed.card_info) {
+         enrichedCard.conversational_card_info = parsed.card_info;
+         // Extract featured, card_name, card_set, card_number, release_date
+       }
+       // Extract grade from grading_passes or final_grade
+       // Remove large JSON from response after parsing
+     } catch (e) { /* continue with original */ }
+   }
+   ```
+
+4. **SM/XY Promo Card Support** (`lib/pokemonTcgApi.ts`)
+   - Added Sun & Moon promo format: `sm_promo` (e.g., SM228, SM226)
+   - Added XY promo format: `xy_promo` (e.g., XY01, XY124)
+   - Detection in `detectCardNumberFormat()`:
+   ```typescript
+   if (/^SM\d+$/i.test(raw)) return 'sm_promo';
+   if (/^XY\d+$/i.test(raw)) return 'xy_promo';
+   ```
+   - Set IDs in `getPromoSetId()`:
+   ```typescript
+   case 'sm_promo': return 'smp';  // Sun & Moon Promos
+   case 'xy_promo': return 'xyp';  // XY Promos
+   ```
+   - Promo cards correctly route to promo set lookup instead of standard sets
+
+5. **TCGPlayer URL from Database** (`src/app/pokemon/[id]/CardDetailClient.tsx`)
+   - Pokemon card detail page now uses `tcgplayer_url` from database when available
+   - Falls back to generated search URL if not in database
+   ```typescript
+   const tcgplayerUrl = card.tcgplayer_url || generateTCGPlayerSetSearchUrl(cardData) || generateTCGPlayerSearchUrl(cardData);
+   ```
+
+**Files Changed:**
+| File | Changes |
+|------|---------|
+| `lib/useLabelData.ts` | Always generates fresh label data from card fields |
+| `lib/labelDataGenerator.ts` | Fixed sports card category handling in switch statements |
+| `lib/pokemonTcgApi.ts` | Added SM/XY promo format detection and set IDs |
+| `api/cards/my-collection/route.ts` | Added conversational_grading JSON parsing |
+| `api/cards/search/route.ts` | Added conversational_grading JSON parsing |
+| `api/cards/featured/route.ts` | Added conversational_grading JSON parsing |
+| `pokemon/[id]/CardDetailClient.tsx` | Use tcgplayer_url from database |
+
+**Troubleshooting Labels:**
+- If sports cards show "N/A" labels: Check that API is returning `conversational_grading` and parsing it
+- If Pokemon promos fail lookup: Check card number format matches expected promo pattern
+- If TCGPlayer link wrong: Verify `tcgplayer_url` column populated for card in database
+
 ### v6.2 Card Number OCR & Verification Fixes (December 2025)
 
 **Problem Solved:** AI was using Pokemon set knowledge to "correct" card numbers instead of reading them from the image (e.g., card shows 179/132 but AI outputs 113/111).
@@ -420,11 +503,41 @@ The `pokemonTcgApi.ts` file now searches the local Supabase database first:
 
 | File | Purpose |
 |------|---------|
-| `lib/labelDataGenerator.ts` | Generate standardized label data |
-| `lib/useLabelData.ts` | Retrieve/format label data |
+| `lib/labelDataGenerator.ts` | **Core**: Generate standardized label data for all card types |
+| `lib/useLabelData.ts` | **Helper**: Always generates fresh label data via `getCardLabelData()` |
+| `components/CardLabel.tsx` | Unified label display component |
 | `lib/averyLabelGenerator.ts` | Generate Avery label PDFs |
 | `lib/foldableLabelGenerator.ts` | Generate foldable labels |
 | `lib/miniReportJpgGenerator.ts` | Generate mini report images |
+
+#### Label Data Flow (v7.2)
+
+```
+1. API fetches card from database
+2. If conversational_card_info is NULL, parse conversational_grading JSON
+3. Return enriched card data with extracted fields
+4. Frontend calls getCardLabelData(card) from useLabelData.ts
+5. generateLabelData() routes to category-specific handler:
+   - Pokemon: getPokemonName(), getPokemonSetInfo(), getPokemonFeatures()
+   - Sports: getSportsName(), getSportsSetInfo(), getSportsFeatures()
+   - MTG: getMTGName(), getMTGSetInfo(), getMTGFeatures()
+   - etc.
+6. Returns LabelData: { primaryName, setInfo, cardNumber, grade, condition, features }
+7. CardLabel.tsx renders the label
+```
+
+**Label Data Structure:**
+```typescript
+interface LabelData {
+  primaryName: string;      // Card name or player name
+  setInfo: string;          // Set name and year
+  cardNumber: string;       // Card number with proper formatting
+  grade: number;            // Decimal grade (e.g., 9.2)
+  wholeGrade: number;       // Integer grade (e.g., 9)
+  condition: string;        // Condition label (e.g., "Mint")
+  features: string[];       // Special features (RC, Auto, etc.)
+}
+```
 
 ### Utilities
 
@@ -885,6 +998,18 @@ LOCAL DATABASE (v6.1):
   Usage:
     node scripts/import-pokemon-database.js --full        # Full import
     node scripts/import-pokemon-database.js --incremental # Last 90 days only
+
+PROMO CARD SUPPORT (v7.2):
+  Supported promo formats and their set IDs:
+  - SWSH promos: SWSH039, SWSH123 → set ID: swshp
+  - SV promos: SVP EN 085, SVP 021 → set ID: svp
+  - SM promos: SM228, SM001 → set ID: smp
+  - XY promos: XY124, XY01 → set ID: xyp
+
+  Detection flow (pokemonTcgApi.ts):
+  1. detectCardNumberFormat() identifies promo format
+  2. getPromoSetId() returns correct set ID
+  3. lookupSetByCardNumber() queries with set constraint
 ```
 
 ### Scryfall API
@@ -1127,6 +1252,21 @@ node scripts/import-pokemon-database.js --full
 - Same numeric grade = same condition label (no AI variation)
 - Run `/api/admin/backfill-labels` to regenerate all existing card labels
 
+### Sports Cards Show "N/A" Labels on Collection/Search
+- v7.2 fix: APIs now parse `conversational_grading` JSON when direct columns are NULL
+- Sports cards have specific categories: 'Football', 'Baseball', 'Basketball', etc.
+- Check `labelDataGenerator.ts` handles the specific sport category
+- Verify API is selecting `conversational_grading` column
+- Check API response includes enriched `conversational_card_info` field
+- Debug: Add `console.log` in `getSportsName()` to verify card info is passed
+
+### Pokemon Promo Card Lookup Fails
+- v7.2 fix: Added SM promo (SM228) and XY promo (XY124) format support
+- Check card number format is detected correctly in `detectCardNumberFormat()`
+- Verify promo set ID returned by `getPromoSetId()` (smp, xyp, swshp, svp)
+- Check promo set exists in local database: `SELECT * FROM pokemon_sets WHERE id IN ('smp', 'xyp')`
+- Fallback: External API lookup if not in local database
+
 ### DCM Optic Version Not Showing
 - Version is stored in `conversational_grading` JSON under `meta.prompt_version`
 - Frontend helper `getDCMOpticVersion()` parses this from the stored JSON
@@ -1163,7 +1303,7 @@ node scripts/import-pokemon-database.js --full
 
 ---
 
-*This guide covers active, working code as of December 2025 (v7.1). Deprecated files are not included.*
+*This guide covers active, working code as of December 2025 (v7.2). Deprecated files are not included.*
 
 ---
 
@@ -1171,6 +1311,9 @@ node scripts/import-pokemon-database.js --full
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v7.3 | Dec 17, 2025 | Prompt consistency overhaul: unified cap system, execution flowchart, whole numbers only, fixed contradictions |
+| v7.2 | Dec 17, 2025 | Visual Defect Identification Guide, Defect Hunting Protocol, Facebook OAuth |
+| v7.1.1 | Dec 16, 2025 | Unified label system, sports card category fix, SM/XY promo support |
 | v7.1 | Dec 16, 2025 | Database validation, DCM Optic version tracking, transparent subgrade caps |
 | v7.0 | Dec 2025 | Whole number grades only, removed half-points |
 | v6.2 | Dec 15, 2025 | Card number OCR fixes, verification validation, Mega Evolution X/Y |

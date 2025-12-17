@@ -88,58 +88,45 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   // Motion/stabilization detection
   const stabilization = useStabilization(videoRef, !!stream);
 
-  // Capture handler - extracted for auto-capture
+  // Capture handler - fast and simple
   const handleCapture = useCallback(async () => {
     if (isProcessing) return;
 
     setIsProcessing(true);
+
+    // Capture immediately
+    const captured = await captureImage();
+    if (!captured) {
+      toast.error('Failed to capture image. Please try again.');
+      setIsProcessing(false);
+      return;
+    }
+
+    // Show preview immediately with original image
+    setCapturedImageUrl(captured.dataUrl);
+    setCapturedFile(captured.file);
+    setIsProcessing(false);
+
+    // Process crop and quality validation in background (non-blocking)
     try {
-      const captured = await captureImage();
-      if (!captured) {
-        toast.error('Failed to capture image. Please try again.');
-        setIsProcessing(false);
-        return;
-      }
+      const cropResult = await cropToGuideFrame(captured.file, {
+        paddingPercent: 0.08,
+        maintainAspectRatio: true,
+        orientation: guideOrientation,
+      });
+      // Update with cropped version
+      setCapturedImageUrl(cropResult.croppedDataUrl);
+      setCapturedFile(cropResult.croppedFile);
 
-      console.log('[MobileCamera] Image captured, applying auto-crop...');
-
-      // Auto-crop to guide frame boundaries
-      let finalFile = captured.file;
-      let finalDataUrl = captured.dataUrl;
-
-      try {
-        const cropResult = await cropToGuideFrame(captured.file, {
-          paddingPercent: 0.08, // 8% padding for positioning tolerance
-          maintainAspectRatio: true,
-          orientation: guideOrientation, // Pass current orientation
-        });
-
-        finalFile = cropResult.croppedFile;
-        finalDataUrl = cropResult.croppedDataUrl;
-
-        console.log('[MobileCamera] Auto-crop applied:', {
-          original: cropResult.originalSize,
-          cropped: cropResult.croppedSize,
-          removed: `${Math.round((1 - (cropResult.croppedSize.width * cropResult.croppedSize.height) / (cropResult.originalSize.width * cropResult.originalSize.height)) * 100)}%`
-        });
-      } catch (cropErr) {
-        console.warn('[MobileCamera] Auto-crop failed, using original image:', cropErr);
-      }
-
-      setCapturedImageUrl(finalDataUrl);
-      setCapturedFile(finalFile);
-
-      // Validate image quality
-      const imageData = await getImageDataFromFile(finalFile);
+      // Validate quality
+      const imageData = await getImageDataFromFile(cropResult.croppedFile);
       if (imageData) {
         const validation = validateImageQuality(imageData);
         setQualityValidation(validation);
       }
     } catch (err) {
-      console.error('Capture error:', err);
-      toast.error('Failed to capture image. Please try again.');
-    } finally {
-      setIsProcessing(false);
+      // If crop fails, keep original - already showing preview
+      console.warn('[MobileCamera] Post-processing failed:', err);
     }
   }, [captureImage, guideOrientation, isProcessing, toast]);
 

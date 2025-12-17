@@ -4,9 +4,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { StabilizationState } from '@/types/camera';
 
 // Motion threshold - lower value = more sensitive
-const MOTION_THRESHOLD = 8;
+const MOTION_THRESHOLD = 12; // Increased for more tolerance
 // How many stable frames before considered "stable"
-const STABLE_FRAMES_REQUIRED = 5;
+const STABLE_FRAMES_REQUIRED = 3; // Reduced for faster response
 // Analysis frequency (ms) - ~20fps
 const ANALYSIS_INTERVAL = 50;
 // Low resolution for performance

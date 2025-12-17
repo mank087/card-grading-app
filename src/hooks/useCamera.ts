@@ -326,16 +326,14 @@ export const useCamera = () => {
    * Capture image with optional settings lock
    * Lock ensures focus/exposure don't shift during capture
    */
-  const captureImage = useCallback(async (lockSettings: boolean = true): Promise<CapturedImage | null> => {
+  const captureImage = useCallback(async (lockSettings: boolean = false): Promise<CapturedImage | null> => {
     if (!videoRef.current) {
       return null;
     }
 
-    // Lock settings for consistent capture
+    // Lock settings for consistent capture (disabled by default for speed)
     if (lockSettings) {
       await lockSettingsForCapture();
-      // Small delay to let settings stabilize
-      await new Promise(resolve => setTimeout(resolve, 50));
     }
 
     return new Promise((resolve) => {
