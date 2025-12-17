@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useCamera } from '@/hooks/useCamera';
-import { useCardDetection, LightingInfo } from '@/hooks/useCardDetection';
+import { useCardDetection } from '@/hooks/useCardDetection';
+import { useStabilization } from '@/hooks/useStabilization';
+import { useGuideOrientation } from '@/hooks/useGuideOrientation';
+import { useCaptureReadiness } from '@/hooks/useCaptureReadiness';
 import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
 import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality';
 import { cropToGuideFrame } from '@/utils/guideCrop';
-import { ImageQualityValidation } from '@/types/camera';
+import { ImageQualityValidation, LightingInfo } from '@/types/camera';
 import Image from 'next/image';
 import { useToast } from '@/hooks/useToast';
 
@@ -41,7 +44,7 @@ function LightingIndicator({ lighting }: { lighting: LightingInfo }) {
   }
 
   return (
-    <div className={`absolute top-4 right-4 px-3 py-2 rounded-lg flex items-center gap-2 ${getColor()} backdrop-blur-sm shadow-lg`}>
+    <div className={`absolute top-16 right-4 px-3 py-2 rounded-lg flex items-center gap-2 ${getColor()} backdrop-blur-sm shadow-lg`}>
       <span className="text-lg">{getIcon()}</span>
       <span className="text-xs font-medium">{lighting.message}</span>
     </div>
@@ -55,47 +58,40 @@ interface MobileCameraProps {
 }
 
 export default function MobileCamera({ side, onCapture, onCancel }: MobileCameraProps) {
-  const { videoRef, stream, error, hasPermission, startCamera, stopCamera, captureImage } = useCamera();
+  const {
+    videoRef,
+    stream,
+    error,
+    hasPermission,
+    startCamera,
+    stopCamera,
+    captureImage,
+  } = useCamera();
+
   const [capturedImageUrl, setCapturedImageUrl] = useState<string | null>(null);
   const [capturedFile, setCapturedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(true);
   const toast = useToast();
 
-  // Auto card detection - pass side to adjust detection for card backs
-  const detection = useCardDetection(videoRef, !!stream, side);
+  // Guide orientation (portrait/landscape toggle)
+  const {
+    orientation: guideOrientation,
+    toggleOrientation,
+  } = useGuideOrientation();
 
-  // Start camera on mount and when facingMode changes
-  useEffect(() => {
-    startCamera(facingMode);
+  // Card detection with edge detection
+  const detection = useCardDetection(videoRef, !!stream, guideOrientation);
 
-    // Cleanup function - inline to avoid stale closures
-    return () => {
-      console.log('[MobileCamera] Cleaning up camera on unmount or facingMode change');
-      stopCamera();
-    };
-  }, [facingMode]); // Only depend on facingMode, not the functions
+  // Motion/stabilization detection
+  const stabilization = useStabilization(videoRef, !!stream);
 
-  // Ensure video element has the stream when stream changes
-  useEffect(() => {
-    if (stream && videoRef.current) {
-      console.log('[MobileCamera] Syncing stream to video element');
-      console.log('[MobileCamera] Stream active:', stream.active);
-      console.log('[MobileCamera] Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.label}, enabled: ${t.enabled}`));
+  // Capture handler - extracted for auto-capture
+  const handleCapture = useCallback(async () => {
+    if (isProcessing) return;
 
-      videoRef.current.srcObject = stream;
-
-      // Force play
-      videoRef.current.play().then(() => {
-        console.log('[MobileCamera] Video playing');
-      }).catch(err => {
-        console.error('[MobileCamera] Video play error:', err);
-      });
-    }
-  }, [stream]); // Run when stream changes
-
-  const handleCapture = async () => {
     setIsProcessing(true);
     try {
       const captured = await captureImage();
@@ -113,8 +109,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
       try {
         const cropResult = await cropToGuideFrame(captured.file, {
-          paddingPercent: 0.08, // 8% padding (~1 inch buffer) for positioning tolerance
-          maintainAspectRatio: true
+          paddingPercent: 0.08, // 8% padding for positioning tolerance
+          maintainAspectRatio: true,
+          orientation: guideOrientation, // Pass current orientation
         });
 
         finalFile = cropResult.croppedFile;
@@ -127,7 +124,6 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         });
       } catch (cropErr) {
         console.warn('[MobileCamera] Auto-crop failed, using original image:', cropErr);
-        // Continue with original image if crop fails
       }
 
       setCapturedImageUrl(finalDataUrl);
@@ -145,13 +141,44 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     } finally {
       setIsProcessing(false);
     }
-  };
+  }, [captureImage, guideOrientation, isProcessing, toast]);
+
+  // Auto-capture readiness
+  const readiness = useCaptureReadiness({
+    detection,
+    stabilization,
+    autoCaptureEnabled,
+    onAutoCapture: handleCapture,
+    enabled: !!stream && !capturedImageUrl,
+  });
+
+  // Start camera on mount and when facingMode changes
+  useEffect(() => {
+    startCamera(facingMode);
+
+    return () => {
+      console.log('[MobileCamera] Cleaning up camera on unmount or facingMode change');
+      stopCamera();
+    };
+  }, [facingMode]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Ensure video element has the stream when stream changes
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      console.log('[MobileCamera] Syncing stream to video element');
+      videoRef.current.srcObject = stream;
+
+      videoRef.current.play().then(() => {
+        console.log('[MobileCamera] Video playing');
+      }).catch(err => {
+        console.error('[MobileCamera] Video play error:', err);
+      });
+    }
+  }, [stream, videoRef]);
 
   const handleConfirm = () => {
     if (capturedFile) {
       onCapture(capturedFile);
-      // Don't stop camera here - let parent component control it
-      // Camera will be stopped by cleanup when component unmounts
     }
   };
 
@@ -159,7 +186,6 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     setCapturedImageUrl(null);
     setCapturedFile(null);
     setQualityValidation(null);
-    // Restart camera to ensure fresh stream
     console.log('[MobileCamera] Restarting camera after retake');
     stopCamera();
     setTimeout(() => {
@@ -169,6 +195,10 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
 
   const handleSwitchCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
+  };
+
+  const toggleAutoCapture = () => {
+    setAutoCaptureEnabled(prev => !prev);
   };
 
   // Show preview if image captured
@@ -227,7 +257,6 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             <div className="space-y-3">
               <button
                 onClick={async () => {
-                  // Ensure clean state before retry
                   stopCamera();
                   await new Promise(resolve => setTimeout(resolve, 200));
                   startCamera(facingMode);
@@ -314,36 +343,47 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
           className="absolute inset-0 w-full h-full object-cover"
         />
 
-        {/* Guide Overlay */}
-        <CameraGuideOverlay side={side} cardDetected={detection.isCardDetected} />
+        {/* Guide Overlay with all detection info */}
+        <CameraGuideOverlay
+          side={side}
+          orientation={guideOrientation}
+          detection={detection}
+          readiness={readiness}
+          onToggleOrientation={toggleOrientation}
+        />
 
         {/* Lighting Indicator */}
         <LightingIndicator lighting={detection.lighting} />
       </div>
 
-      {/* Controls - Fixed height to prevent layout jumping */}
+      {/* Controls */}
       <div className="bg-gray-900 border-t border-gray-700 px-4 py-4 relative z-10">
-        {/* Instruction text - Fixed height container */}
-        <div className="h-12 flex items-center justify-center mb-3">
-          <div className="text-center">
-            <p className="text-sm font-medium text-gray-300">
-              {side === 'front' ? 'Capture Front of Card' : 'Capture Back of Card'}
-            </p>
-            <p className="text-xs text-gray-500 mt-1">
-              Position card within the frame
-            </p>
-          </div>
+        {/* Auto-capture toggle */}
+        <div className="flex items-center justify-center mb-3">
+          <button
+            onClick={toggleAutoCapture}
+            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              autoCaptureEnabled
+                ? 'bg-green-600 text-white'
+                : 'bg-gray-700 text-gray-300'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${autoCaptureEnabled ? 'bg-white' : 'bg-gray-500'}`} />
+            Auto-capture {autoCaptureEnabled ? 'ON' : 'OFF'}
+          </button>
         </div>
 
-        {/* Capture Button - Always enabled */}
+        {/* Capture Button */}
         <div className="flex items-center justify-center">
           <button
             onClick={handleCapture}
             disabled={isProcessing}
             className={`w-20 h-20 rounded-full border-4 transition-all shadow-lg ${
-              detection.isCardDetected
+              readiness.readyForCapture
                 ? 'border-green-400 bg-green-400/20 hover:bg-green-400/30'
-                : 'border-white bg-white/20 hover:bg-white/30'
+                : detection.detected
+                  ? 'border-yellow-400 bg-yellow-400/20 hover:bg-yellow-400/30'
+                  : 'border-white bg-white/20 hover:bg-white/30'
             } ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
             aria-label="Capture photo"
           >
@@ -351,15 +391,22 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
               <div className="w-full h-full rounded-full bg-gray-400 animate-pulse"></div>
             ) : (
               <div className={`w-full h-full rounded-full ${
-                detection.isCardDetected ? 'bg-green-400' : 'bg-white'
+                readiness.readyForCapture
+                  ? 'bg-green-400'
+                  : detection.detected
+                    ? 'bg-yellow-400'
+                    : 'bg-white'
               }`}></div>
             )}
           </button>
         </div>
 
-        {/* Tip text - Fixed position */}
+        {/* Tip text */}
         <p className="text-center text-xs text-gray-500 mt-3">
-          Tap to capture • You can always retake
+          {autoCaptureEnabled
+            ? 'Hold steady - auto-captures when ready'
+            : 'Tap to capture • You can always retake'
+          }
         </p>
       </div>
     </div>

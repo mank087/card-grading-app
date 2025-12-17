@@ -3,13 +3,143 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { CapturedImage } from '@/types/camera';
 
+// Detect iOS for constraint compatibility
+const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+/**
+ * Get optimal camera constraints for card photography
+ * - 4:3 aspect ratio (closer to card ratio than 16:9)
+ * - High resolution for detail capture
+ * - Continuous focus/exposure for live preview
+ */
+const getOptimalConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints => {
+  // Base constraints that work across devices
+  const baseConstraints: MediaTrackConstraints = {
+    // iOS doesn't support 'exact' well, use ideal instead
+    facingMode: isIOS ? facingMode : { ideal: facingMode },
+    // Request 4:3 aspect ratio - better for card photography than 16:9
+    width: { ideal: 2160, min: 1080 },
+    height: { ideal: 2880, min: 1440 },
+    frameRate: { ideal: 30, max: 30 },
+  };
+
+  // Advanced constraints for Android/desktop (iOS ignores these)
+  if (!isIOS) {
+    Object.assign(baseConstraints, {
+      // @ts-ignore - These are valid constraints but not in TS types
+      focusMode: { ideal: 'continuous' },
+      // @ts-ignore
+      exposureMode: { ideal: 'continuous' },
+      // @ts-ignore
+      whiteBalanceMode: { ideal: 'continuous' },
+    });
+  }
+
+  return { video: baseConstraints };
+};
+
+/**
+ * Fallback constraints for older/limited devices
+ */
+const getFallbackConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints[] => [
+  // Try 1: Just facingMode with 1080p
+  {
+    video: {
+      facingMode: facingMode,
+      width: { ideal: 1920 },
+      height: { ideal: 1080 },
+    }
+  },
+  // Try 2: Just facingMode
+  {
+    video: {
+      facingMode: facingMode,
+    }
+  },
+  // Try 3: Any camera
+  {
+    video: true
+  }
+];
+
 export const useCamera = () => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [isStarting, setIsStarting] = useState(false);
+  const [isSettingsLocked, setIsSettingsLocked] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null); // Track current stream with ref
+  const streamRef = useRef<MediaStream | null>(null);
+
+  /**
+   * Lock focus and exposure settings before capture
+   * Ensures consistent, sharp images
+   */
+  const lockSettingsForCapture = useCallback(async (): Promise<void> => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      // @ts-ignore - getCapabilities may not be in TS types
+      const capabilities = track.getCapabilities?.();
+      // @ts-ignore
+      const settings = track.getSettings?.();
+
+      if (!capabilities || !settings) return;
+
+      const advancedConstraints: MediaTrackConstraintSet[] = [];
+
+      // Lock focus at current distance if supported
+      if (capabilities.focusMode?.includes('manual') && settings.focusDistance !== undefined) {
+        advancedConstraints.push({
+          // @ts-ignore
+          focusMode: 'manual',
+          // @ts-ignore
+          focusDistance: settings.focusDistance,
+        });
+      }
+
+      // Lock exposure if supported
+      if (capabilities.exposureMode?.includes('manual')) {
+        advancedConstraints.push({
+          // @ts-ignore
+          exposureMode: 'manual',
+        });
+      }
+
+      if (advancedConstraints.length > 0) {
+        await track.applyConstraints({ advanced: advancedConstraints });
+        setIsSettingsLocked(true);
+        console.log('[Camera] Settings locked for capture');
+      }
+    } catch (err) {
+      console.warn('[Camera] Could not lock settings:', err);
+      // Continue without locking - capture will still work
+    }
+  }, []);
+
+  /**
+   * Unlock settings to return to continuous mode
+   */
+  const unlockSettings = useCallback(async (): Promise<void> => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track || !isSettingsLocked) return;
+
+    try {
+      await track.applyConstraints({
+        advanced: [{
+          // @ts-ignore
+          focusMode: 'continuous',
+          // @ts-ignore
+          exposureMode: 'continuous',
+        }]
+      });
+      setIsSettingsLocked(false);
+      console.log('[Camera] Settings unlocked');
+    } catch (err) {
+      console.warn('[Camera] Could not unlock settings:', err);
+    }
+  }, [isSettingsLocked]);
 
   const startCamera = async (facingMode: 'user' | 'environment' = 'environment') => {
     // Prevent multiple simultaneous start attempts
@@ -49,35 +179,29 @@ export const useCamera = () => {
 
       let mediaStream: MediaStream | null = null;
 
-      // Try with preferred constraints first
+      // Try optimal constraints first
       try {
-        console.log('[Camera] Attempting with ideal constraints');
-        mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: { ideal: facingMode },
-            width: { ideal: 1920 },
-            height: { ideal: 1080 }
-          }
-        });
-      } catch (firstErr) {
-        console.warn('[Camera] First attempt failed, trying with simpler constraints:', firstErr);
+        console.log('[Camera] Attempting with optimal constraints (4:3, high res)');
+        const constraints = getOptimalConstraints(facingMode);
+        mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
+        console.log('[Camera] Optimal constraints succeeded');
+      } catch (optimalErr) {
+        console.warn('[Camera] Optimal constraints failed, trying fallbacks:', optimalErr);
 
-        // Fallback: Try with just facingMode
-        try {
-          console.log('[Camera] Attempting with facingMode only');
-          mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              facingMode: facingMode
+        // Try fallback constraints in order
+        const fallbacks = getFallbackConstraints(facingMode);
+        for (let i = 0; i < fallbacks.length; i++) {
+          try {
+            console.log(`[Camera] Trying fallback ${i + 1}/${fallbacks.length}`);
+            mediaStream = await navigator.mediaDevices.getUserMedia(fallbacks[i]);
+            console.log(`[Camera] Fallback ${i + 1} succeeded`);
+            break;
+          } catch (fallbackErr) {
+            console.warn(`[Camera] Fallback ${i + 1} failed:`, fallbackErr);
+            if (i === fallbacks.length - 1) {
+              throw fallbackErr; // All fallbacks failed
             }
-          });
-        } catch (secondErr) {
-          console.warn('[Camera] Second attempt failed, trying with any camera:', secondErr);
-
-          // Last resort: Try with just video: true
-          console.log('[Camera] Attempting with video: true');
-          mediaStream = await navigator.mediaDevices.getUserMedia({
-            video: true
-          });
+          }
         }
       }
 
@@ -85,11 +209,18 @@ export const useCamera = () => {
         throw new Error('Failed to get media stream');
       }
 
-      console.log('[Camera] Media stream acquired successfully');
-      console.log('[Camera] Stream tracks:', mediaStream.getTracks().map(t => `${t.kind}: ${t.label}`));
+      // Log actual stream settings
+      const videoTrack = mediaStream.getVideoTracks()[0];
+      const settings = videoTrack.getSettings();
+      console.log('[Camera] Stream acquired:', {
+        width: settings.width,
+        height: settings.height,
+        frameRate: settings.frameRate,
+        facingMode: settings.facingMode,
+      });
 
-      streamRef.current = mediaStream; // Update ref
-      setStream(mediaStream); // Update state
+      streamRef.current = mediaStream;
+      setStream(mediaStream);
       setHasPermission(true);
       setError(null);
 
@@ -182,15 +313,31 @@ export const useCamera = () => {
     if (videoRef.current) {
       console.log('[Camera] Clearing video element');
       videoRef.current.srcObject = null;
-      videoRef.current.load(); // Reset video element to initial state
+      videoRef.current.load();
     }
 
     // Reset states
     setError(null);
     setIsStarting(false);
-  }, []); // No dependencies needed since we use ref
+    setIsSettingsLocked(false);
+  }, []);
 
-  const captureImage = (): Promise<CapturedImage | null> => {
+  /**
+   * Capture image with optional settings lock
+   * Lock ensures focus/exposure don't shift during capture
+   */
+  const captureImage = useCallback(async (lockSettings: boolean = true): Promise<CapturedImage | null> => {
+    if (!videoRef.current) {
+      return null;
+    }
+
+    // Lock settings for consistent capture
+    if (lockSettings) {
+      await lockSettingsForCapture();
+      // Small delay to let settings stabilize
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+
     return new Promise((resolve) => {
       if (!videoRef.current) {
         resolve(null);
@@ -209,6 +356,7 @@ export const useCamera = () => {
 
       ctx.drawImage(videoRef.current, 0, 0);
 
+      // Use high quality JPEG
       canvas.toBlob((blob) => {
         if (!blob) {
           resolve(null);
@@ -218,6 +366,11 @@ export const useCamera = () => {
         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
         const file = new File([blob], `card-${Date.now()}.jpg`, { type: 'image/jpeg' });
 
+        // Unlock settings after capture
+        if (lockSettings) {
+          unlockSettings();
+        }
+
         resolve({
           dataUrl,
           blob,
@@ -226,13 +379,12 @@ export const useCamera = () => {
         });
       }, 'image/jpeg', 0.95);
     });
-  };
+  }, [lockSettingsForCapture, unlockSettings]);
 
   // Cleanup on unmount only
   useEffect(() => {
     return () => {
       console.log('[Camera Hook] Component unmounting, cleaning up camera');
-      // Use ref to access current stream (avoids stale closure)
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => {
           track.stop();
@@ -244,15 +396,19 @@ export const useCamera = () => {
         videoRef.current.srcObject = null;
       }
     };
-  }, []); // Empty array - only run on unmount
+  }, []);
 
   return {
     videoRef,
     stream,
     error,
     hasPermission,
+    isStarting,
+    isSettingsLocked,
     startCamera,
     stopCamera,
-    captureImage
+    captureImage,
+    lockSettingsForCapture,
+    unlockSettings,
   };
 };

@@ -1,287 +1,575 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import {
+  CardDetectionResult,
+  CardBounds,
+  CardOrientation,
+  CardAlignment,
+  CardWarning,
+  LightingInfo,
+  GuideOrientation,
+  Point,
+  CARD_ASPECT_RATIOS,
+} from '@/types/camera';
 
-export interface LightingInfo {
-  level: 'too_dark' | 'dim' | 'good' | 'bright' | 'too_bright';
-  brightness: number; // 0-255
-  message: string;
-}
+// Detection settings
+const ANALYSIS_INTERVAL = 50; // ~20fps
+const DETECTION_WIDTH = 320; // Analysis resolution
+const DETECTION_HEIGHT = 240;
 
-interface DetectionResult {
-  isCardDetected: boolean;
-  confidence: number; // 0-100
-  message: string;
-  hints?: string[]; // Specific feedback about what's wrong
-  lighting: LightingInfo;
+// Thresholds
+const EDGE_THRESHOLD = 50; // Sobel edge strength threshold
+const CORNER_THRESHOLD = 0.01; // Harris corner response threshold
+const CONFIDENCE_THRESHOLD_DETECTED = 40; // Min confidence to be "detected"
+const CONFIDENCE_THRESHOLD_READY = 60; // Min confidence to be "ready"
+
+// Guide frame settings (matches CameraGuideOverlay)
+const GUIDE_WIDTH_PERCENT = 0.75; // Guide frame width as % of viewport
+const GUIDE_MAX_WIDTH = 320; // Max guide width in pixels
+
+/**
+ * Apply Sobel edge detection
+ */
+function detectEdges(imageData: ImageData): Float32Array {
+  const { data, width, height } = imageData;
+  const edges = new Float32Array(width * height);
+
+  // Sobel kernels
+  const sobelX = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+  const sobelY = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+
+  // Convert to grayscale first
+  const gray = new Float32Array(width * height);
+  for (let i = 0; i < data.length; i += 4) {
+    const idx = i / 4;
+    gray[idx] = (data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114);
+  }
+
+  // Apply Sobel operator
+  for (let y = 1; y < height - 1; y++) {
+    for (let x = 1; x < width - 1; x++) {
+      let gx = 0, gy = 0;
+
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const idx = (y + ky) * width + (x + kx);
+          const ki = (ky + 1) * 3 + (kx + 1);
+          gx += gray[idx] * sobelX[ki];
+          gy += gray[idx] * sobelY[ki];
+        }
+      }
+
+      edges[y * width + x] = Math.sqrt(gx * gx + gy * gy);
+    }
+  }
+
+  return edges;
 }
 
 /**
- * Enhanced card detection hook
- * Multi-criteria analysis for robust card detection
+ * Find strong horizontal and vertical lines in edge map
+ * Returns line segments that could be card edges
  */
-export const useCardDetection = (
+function findCardEdges(
+  edges: Float32Array,
+  width: number,
+  height: number
+): { horizontal: number[]; vertical: number[] } {
+  const horizontalStrength: number[] = new Array(height).fill(0);
+  const verticalStrength: number[] = new Array(width).fill(0);
+
+  // Sum edge strength along rows (horizontal lines)
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const edge = edges[y * width + x];
+      if (edge > EDGE_THRESHOLD) {
+        horizontalStrength[y] += edge;
+      }
+    }
+  }
+
+  // Sum edge strength along columns (vertical lines)
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      const edge = edges[y * width + x];
+      if (edge > EDGE_THRESHOLD) {
+        verticalStrength[x] += edge;
+      }
+    }
+  }
+
+  // Find peaks (strong lines)
+  const findPeaks = (arr: number[], minDistance: number = 20): number[] => {
+    const peaks: number[] = [];
+    const threshold = Math.max(...arr) * 0.3;
+
+    for (let i = minDistance; i < arr.length - minDistance; i++) {
+      if (arr[i] > threshold &&
+          arr[i] >= arr[i - 1] && arr[i] >= arr[i + 1]) {
+        // Check if it's a local maximum
+        let isPeak = true;
+        for (let j = 1; j <= minDistance; j++) {
+          if (arr[i - j] > arr[i] || arr[i + j] > arr[i]) {
+            isPeak = false;
+            break;
+          }
+        }
+        if (isPeak) {
+          peaks.push(i);
+        }
+      }
+    }
+
+    return peaks;
+  };
+
+  return {
+    horizontal: findPeaks(horizontalStrength, Math.floor(height * 0.1)),
+    vertical: findPeaks(verticalStrength, Math.floor(width * 0.1)),
+  };
+}
+
+/**
+ * Estimate card bounds from detected edges
+ */
+function estimateCardBounds(
+  horizontalLines: number[],
+  verticalLines: number[],
+  width: number,
+  height: number,
+  guideOrientation: GuideOrientation
+): CardBounds | null {
+  // Need at least 2 horizontal and 2 vertical lines
+  if (horizontalLines.length < 2 || verticalLines.length < 2) {
+    return null;
+  }
+
+  // Sort lines
+  horizontalLines.sort((a, b) => a - b);
+  verticalLines.sort((a, b) => a - b);
+
+  // Get outermost lines as card edges
+  const top = horizontalLines[0];
+  const bottom = horizontalLines[horizontalLines.length - 1];
+  const left = verticalLines[0];
+  const right = verticalLines[verticalLines.length - 1];
+
+  // Validate aspect ratio
+  const cardWidth = right - left;
+  const cardHeight = bottom - top;
+  const aspectRatio = cardWidth / cardHeight;
+
+  const expectedRatio = CARD_ASPECT_RATIOS[guideOrientation];
+  const tolerance = 0.3; // Allow 30% deviation
+
+  if (aspectRatio < expectedRatio * (1 - tolerance) ||
+      aspectRatio > expectedRatio * (1 + tolerance)) {
+    return null;
+  }
+
+  // Calculate confidence based on how well the aspect ratio matches
+  const ratioError = Math.abs(aspectRatio - expectedRatio) / expectedRatio;
+  const confidence = Math.max(0, 100 - ratioError * 200);
+
+  return {
+    topLeft: { x: left, y: top },
+    topRight: { x: right, y: top },
+    bottomRight: { x: right, y: bottom },
+    bottomLeft: { x: left, y: bottom },
+    confidence,
+  };
+}
+
+/**
+ * Calculate alignment quality of detected card
+ */
+function calculateAlignment(
+  bounds: CardBounds | null,
+  frameWidth: number,
+  frameHeight: number,
+  guideOrientation: GuideOrientation
+): CardAlignment {
+  const defaultAlignment: CardAlignment = {
+    isCentered: false,
+    isParallel: true, // Assume parallel since we detect axis-aligned edges
+    rotationAngle: 0,
+    fillPercent: 0,
+    isWithinGuide: false,
+  };
+
+  if (!bounds) {
+    return defaultAlignment;
+  }
+
+  // Calculate card dimensions and center
+  const cardWidth = bounds.topRight.x - bounds.topLeft.x;
+  const cardHeight = bounds.bottomLeft.y - bounds.topLeft.y;
+  const cardCenterX = bounds.topLeft.x + cardWidth / 2;
+  const cardCenterY = bounds.topLeft.y + cardHeight / 2;
+
+  // Frame center
+  const frameCenterX = frameWidth / 2;
+  const frameCenterY = frameHeight / 2;
+
+  // Check centering (within 10% of frame)
+  const centerThreshold = Math.min(frameWidth, frameHeight) * 0.1;
+  const xOffset = Math.abs(cardCenterX - frameCenterX);
+  const yOffset = Math.abs(cardCenterY - frameCenterY);
+  const isCentered = xOffset < centerThreshold && yOffset < centerThreshold;
+
+  // Calculate guide frame dimensions
+  const guideAspectRatio = guideOrientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5;
+  const guideWidth = Math.min(frameWidth * GUIDE_WIDTH_PERCENT, GUIDE_MAX_WIDTH);
+  const guideHeight = guideWidth / guideAspectRatio;
+  const guideArea = guideWidth * guideHeight;
+
+  // Calculate fill percent
+  const cardArea = cardWidth * cardHeight;
+  const fillPercent = Math.min(100, (cardArea / guideArea) * 100);
+
+  // Check if within guide bounds
+  const guideLeft = (frameWidth - guideWidth) / 2;
+  const guideRight = guideLeft + guideWidth;
+  const guideTop = (frameHeight - guideHeight) / 2;
+  const guideBottom = guideTop + guideHeight;
+
+  const isWithinGuide =
+    bounds.topLeft.x >= guideLeft - 10 &&
+    bounds.topRight.x <= guideRight + 10 &&
+    bounds.topLeft.y >= guideTop - 10 &&
+    bounds.bottomLeft.y <= guideBottom + 10;
+
+  // Calculate rotation (simplified - check if edges are parallel)
+  const topEdgeAngle = Math.atan2(
+    bounds.topRight.y - bounds.topLeft.y,
+    bounds.topRight.x - bounds.topLeft.x
+  ) * (180 / Math.PI);
+
+  return {
+    isCentered,
+    isParallel: Math.abs(topEdgeAngle) < 5,
+    rotationAngle: topEdgeAngle,
+    fillPercent,
+    isWithinGuide,
+  };
+}
+
+/**
+ * Analyze lighting conditions
+ */
+function analyzeLighting(imageData: ImageData, bounds: CardBounds | null): LightingInfo {
+  const { data, width, height } = imageData;
+
+  // Sample pixels (within bounds if available, otherwise whole image)
+  let totalBrightness = 0;
+  let sampleCount = 0;
+  let maxBrightness = 0;
+  let minBrightness = 255;
+  let highBrightnessCount = 0;
+  let lowBrightnessCount = 0;
+
+  const startX = bounds ? Math.max(0, Math.floor(bounds.topLeft.x)) : 0;
+  const endX = bounds ? Math.min(width, Math.ceil(bounds.topRight.x)) : width;
+  const startY = bounds ? Math.max(0, Math.floor(bounds.topLeft.y)) : 0;
+  const endY = bounds ? Math.min(height, Math.ceil(bounds.bottomLeft.y)) : height;
+
+  for (let y = startY; y < endY; y += 4) {
+    for (let x = startX; x < endX; x += 4) {
+      const idx = (y * width + x) * 4;
+      const brightness = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+
+      totalBrightness += brightness;
+      sampleCount++;
+      maxBrightness = Math.max(maxBrightness, brightness);
+      minBrightness = Math.min(minBrightness, brightness);
+
+      if (brightness > 240) highBrightnessCount++;
+      if (brightness < 30) lowBrightnessCount++;
+    }
+  }
+
+  const avgBrightness = sampleCount > 0 ? totalBrightness / sampleCount : 128;
+  const hasGlare = highBrightnessCount > sampleCount * 0.02; // >2% overexposed
+  const hasShadow = lowBrightnessCount > sampleCount * 0.15; // >15% very dark
+
+  let level: LightingInfo['level'];
+  let message: string;
+
+  if (avgBrightness < 30) {
+    level = 'too_dark';
+    message = 'Too dark - add more light';
+  } else if (avgBrightness < 60) {
+    level = 'dim';
+    message = 'Dim - more light recommended';
+  } else if (avgBrightness < 200) {
+    level = 'good';
+    message = 'Good lighting';
+  } else if (avgBrightness < 230) {
+    level = 'bright';
+    message = 'Bright - watch for glare';
+  } else {
+    level = 'too_bright';
+    message = 'Too bright - reduce glare';
+  }
+
+  return {
+    level,
+    brightness: avgBrightness,
+    message,
+    hasGlare,
+    hasShadow,
+  };
+}
+
+/**
+ * Generate warnings based on detection results
+ */
+function generateWarnings(
+  bounds: CardBounds | null,
+  alignment: CardAlignment,
+  lighting: LightingInfo,
+  frameWidth: number,
+  frameHeight: number
+): CardWarning[] {
+  const warnings: CardWarning[] = [];
+
+  if (!bounds) {
+    warnings.push('corners_cut_off');
+    return warnings;
+  }
+
+  // Size warnings
+  if (alignment.fillPercent < 50) {
+    warnings.push('card_too_small');
+  } else if (alignment.fillPercent > 95) {
+    warnings.push('card_too_large');
+  }
+
+  // Position warnings
+  if (!alignment.isCentered) {
+    warnings.push('card_off_center');
+  }
+
+  // Rotation warning
+  if (!alignment.isParallel) {
+    warnings.push('card_rotated');
+  }
+
+  // Lighting warnings
+  if (lighting.hasGlare) {
+    warnings.push('glare_detected');
+  }
+  if (lighting.hasShadow) {
+    warnings.push('shadow_detected');
+  }
+
+  return warnings;
+}
+
+/**
+ * Determine card orientation from aspect ratio
+ */
+function detectOrientation(bounds: CardBounds | null): CardOrientation {
+  if (!bounds) return 'unknown';
+
+  const width = bounds.topRight.x - bounds.topLeft.x;
+  const height = bounds.bottomLeft.y - bounds.topLeft.y;
+  const aspectRatio = width / height;
+
+  if (aspectRatio > 1.1) return 'landscape';
+  if (aspectRatio < 0.9) return 'portrait';
+  return 'unknown';
+}
+
+/**
+ * Enhanced card detection hook with edge detection
+ */
+export function useCardDetection(
   videoRef: React.RefObject<HTMLVideoElement>,
   enabled: boolean = true,
-  side: 'front' | 'back' = 'front' // Add side parameter to adjust detection
-) => {
-  const [detection, setDetection] = useState<DetectionResult>({
-    isCardDetected: false,
+  guideOrientation: GuideOrientation = 'portrait'
+): CardDetectionResult {
+  const [detection, setDetection] = useState<CardDetectionResult>({
+    detected: false,
     confidence: 0,
-    message: 'Position card in frame',
-    hints: [],
-    lighting: { level: 'good', brightness: 128, message: 'Checking lighting...' }
+    bounds: null,
+    orientation: 'unknown',
+    alignment: {
+      isCentered: false,
+      isParallel: true,
+      rotationAngle: 0,
+      fillPercent: 0,
+      isWithinGuide: false,
+    },
+    lighting: {
+      level: 'good',
+      brightness: 128,
+      message: 'Checking...',
+      hasGlare: false,
+      hasShadow: false,
+    },
+    warnings: [],
+    readyForCapture: false,
   });
-  const animationFrameRef = useRef<number>();
-  const canvasRef = useRef<HTMLCanvasElement>();
-  const stableFramesRef = useRef<number>(0);
-  const lastConfidenceRef = useRef<number>(0);
-  const frameCountRef = useRef<number>(0);
-  const lastDetectedStateRef = useRef<boolean>(false); // Track last detected state for hysteresis
 
-  useEffect(() => {
-    if (!enabled || !videoRef.current) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const animationIdRef = useRef<number | null>(null);
+  const timeoutIdRef = useRef<NodeJS.Timeout | null>(null);
+  const frameCountRef = useRef(0);
+  const lastConfidenceRef = useRef(0);
+
+  const analyze = useCallback(() => {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = ctxRef.current;
+
+    if (!video || !canvas || !ctx || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      timeoutIdRef.current = setTimeout(() => {
+        animationIdRef.current = requestAnimationFrame(analyze);
+      }, ANALYSIS_INTERVAL);
       return;
     }
 
-    // Create reusable canvas for detection
+    frameCountRef.current++;
+
+    // Draw scaled frame
+    ctx.drawImage(video, 0, 0, DETECTION_WIDTH, DETECTION_HEIGHT);
+    const imageData = ctx.getImageData(0, 0, DETECTION_WIDTH, DETECTION_HEIGHT);
+
+    // Detect edges
+    const edges = detectEdges(imageData);
+
+    // Find card edges (lines)
+    const lines = findCardEdges(edges, DETECTION_WIDTH, DETECTION_HEIGHT);
+
+    // Estimate card bounds
+    const bounds = estimateCardBounds(
+      lines.horizontal,
+      lines.vertical,
+      DETECTION_WIDTH,
+      DETECTION_HEIGHT,
+      guideOrientation
+    );
+
+    // Calculate alignment
+    const alignment = calculateAlignment(
+      bounds,
+      DETECTION_WIDTH,
+      DETECTION_HEIGHT,
+      guideOrientation
+    );
+
+    // Analyze lighting
+    const lighting = analyzeLighting(imageData, bounds);
+
+    // Generate warnings
+    const warnings = generateWarnings(
+      bounds,
+      alignment,
+      lighting,
+      DETECTION_WIDTH,
+      DETECTION_HEIGHT
+    );
+
+    // Calculate overall confidence
+    let confidence = 0;
+    if (bounds) {
+      confidence = bounds.confidence;
+      // Boost confidence for good alignment
+      if (alignment.isCentered) confidence += 10;
+      if (alignment.isParallel) confidence += 10;
+      if (alignment.fillPercent > 60 && alignment.fillPercent < 90) confidence += 10;
+      if (lighting.level === 'good') confidence += 10;
+      // Reduce for warnings
+      confidence -= warnings.length * 5;
+      confidence = Math.max(0, Math.min(100, confidence));
+    }
+
+    // Smooth confidence for stability
+    const smoothedConfidence = lastConfidenceRef.current * 0.4 + confidence * 0.6;
+    lastConfidenceRef.current = smoothedConfidence;
+
+    // Determine detection state
+    const detected = smoothedConfidence >= CONFIDENCE_THRESHOLD_DETECTED;
+    const readyForCapture = detected &&
+      smoothedConfidence >= CONFIDENCE_THRESHOLD_READY &&
+      warnings.length === 0 &&
+      alignment.isWithinGuide;
+
+    // Detect orientation
+    const orientation = detectOrientation(bounds);
+
+    // Log diagnostics periodically
+    if (frameCountRef.current % 60 === 0) {
+      console.log('[CardDetection] Confidence:', Math.round(smoothedConfidence),
+        '| Lines H:', lines.horizontal.length, 'V:', lines.vertical.length,
+        '| Fill:', Math.round(alignment.fillPercent) + '%',
+        '| Warnings:', warnings.length);
+    }
+
+    setDetection({
+      detected,
+      confidence: Math.round(smoothedConfidence),
+      bounds,
+      orientation,
+      alignment,
+      lighting,
+      warnings,
+      readyForCapture,
+    });
+
+    // Schedule next analysis
+    timeoutIdRef.current = setTimeout(() => {
+      animationIdRef.current = requestAnimationFrame(analyze);
+    }, ANALYSIS_INTERVAL);
+  }, [videoRef, guideOrientation]);
+
+  useEffect(() => {
+    if (!enabled) {
+      setDetection(prev => ({
+        ...prev,
+        detected: false,
+        confidence: 0,
+        readyForCapture: false,
+      }));
+      return;
+    }
+
+    // Initialize canvas
     if (!canvasRef.current) {
       canvasRef.current = document.createElement('canvas');
+      canvasRef.current.width = DETECTION_WIDTH;
+      canvasRef.current.height = DETECTION_HEIGHT;
     }
 
-    const detectCard = () => {
-      const video = videoRef.current;
-      if (!video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        animationFrameRef.current = requestAnimationFrame(detectCard);
-        return;
-      }
+    if (!ctxRef.current) {
+      ctxRef.current = canvasRef.current.getContext('2d', { willReadFrequently: true });
+    }
 
-      const canvas = canvasRef.current!;
-      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctxRef.current) {
+      console.error('[CardDetection] Failed to get canvas context');
+      return;
+    }
 
-      if (!ctx) {
-        animationFrameRef.current = requestAnimationFrame(detectCard);
-        return;
-      }
-
-      // Set canvas to video dimensions
-      if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
-        console.log('[CardDetection] Canvas initialized:', canvas.width, 'x', canvas.height);
-      }
-
-      // Debug: Check if video dimensions are valid
-      if (video.videoWidth === 0 || video.videoHeight === 0) {
-        console.warn('[CardDetection] Video dimensions are 0, skipping detection');
-        animationFrameRef.current = requestAnimationFrame(detectCard);
-        return;
-      }
-
-      // Draw current frame
-      ctx.drawImage(video, 0, 0);
-
-      // Define guide frame area (centered, 82% width, card aspect ratio 2.5:3.5)
-      // Matches CameraGuideOverlay.tsx dimensions
-      const frameWidth = Math.floor(canvas.width * 0.82);
-      const frameHeight = Math.floor(frameWidth * (3.5 / 2.5)); // Card aspect ratio
-      const frameX = Math.floor((canvas.width - frameWidth) / 2);
-      const frameY = Math.floor((canvas.height - frameHeight) / 2);
-
-      // Sample pixels within guide frame
-      const imageData = ctx.getImageData(frameX, frameY, frameWidth, frameHeight);
-
-      // Detect card presence using enhanced multi-criteria analysis
-      const result = analyzeFrameForCard(imageData, frameCountRef.current, side);
-      frameCountRef.current++;
-
-      // Faster smoothing for quicker response
-      const smoothedConfidence = smoothConfidence(result.confidence, lastConfidenceRef.current, 0.6);
-      lastConfidenceRef.current = smoothedConfidence;
-
-      // Use hysteresis to prevent flickering (different thresholds for entering vs exiting detected state)
-      const ENTER_THRESHOLD = 35; // Threshold to become "detected" (lowered from 50)
-      const EXIT_THRESHOLD = 25;  // Threshold to lose "detected" status (lowered from 35)
-
-      let isCardDetected: boolean;
-      if (lastDetectedStateRef.current) {
-        // Currently detected - need to drop below exit threshold to lose detection
-        isCardDetected = smoothedConfidence > EXIT_THRESHOLD;
-      } else {
-        // Currently not detected - need to exceed enter threshold to gain detection
-        isCardDetected = smoothedConfidence > ENTER_THRESHOLD;
-      }
-      lastDetectedStateRef.current = isCardDetected;
-
-      // Track stable frames
-      if (isCardDetected) {
-        stableFramesRef.current++;
-      } else {
-        stableFramesRef.current = 0;
-      }
-
-      setDetection({
-        isCardDetected,
-        confidence: smoothedConfidence,
-        message: getDetectionMessage(smoothedConfidence, stableFramesRef.current),
-        hints: result.hints,
-        lighting: result.lighting
-      });
-
-      // Continue detection loop (aim for ~20 FPS to save battery)
-      setTimeout(() => {
-        animationFrameRef.current = requestAnimationFrame(detectCard);
-      }, 50);
-    };
-
-    detectCard();
+    // Start analysis
+    animationIdRef.current = requestAnimationFrame(analyze);
 
     return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
+      if (animationIdRef.current) {
+        cancelAnimationFrame(animationIdRef.current);
+      }
+      if (timeoutIdRef.current) {
+        clearTimeout(timeoutIdRef.current);
       }
     };
-  }, [enabled, videoRef]);
+  }, [enabled, analyze]);
 
-  return {
-    ...detection,
-    stableFrames: stableFramesRef.current,
-    isStable: stableFramesRef.current >= 3 // Very fast response - 3 frames (~150ms)
-  };
-};
-
-/**
- * Simplified card detection
- * Uses relaxed thresholds for better user experience
- * Detection is informational only - users can always capture
- */
-function analyzeFrameForCard(imageData: ImageData, frameCount: number, side: 'front' | 'back' = 'front'): DetectionResult {
-  const { data, width, height } = imageData;
-  const hints: string[] = [];
-
-  // Define center region (where card should be)
-  const centerWidth = Math.floor(width * 0.7);
-  const centerHeight = Math.floor(height * 0.7);
-  const centerX = Math.floor((width - centerWidth) / 2);
-  const centerY = Math.floor((height - centerHeight) / 2);
-
-  // Sample pixels (optimized sampling)
-  const edgePixels: number[] = [];
-  const centerPixels: number[] = [];
-  const allPixels: number[] = [];
-
-  for (let y = 0; y < height; y += 8) {
-    for (let x = 0; x < width; x += 8) {
-      const idx = (y * width + x) * 4;
-      const gray = (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
-      allPixels.push(gray);
-
-      if (x < centerX || x >= centerX + centerWidth || y < centerY || y >= centerY + centerHeight) {
-        edgePixels.push(gray);
-      } else {
-        centerPixels.push(gray);
-      }
-    }
-  }
-
-  // Basic lighting check
-  const overallMean = allPixels.reduce((a, b) => a + b, 0) / allPixels.length;
-  const centerMean = centerPixels.reduce((a, b) => a + b, 0) / centerPixels.length;
-  const edgeMean = edgePixels.reduce((a, b) => a + b, 0) / edgePixels.length;
-
-  // Determine lighting level
-  let lighting: LightingInfo;
-  if (overallMean < 30) {
-    lighting = { level: 'too_dark', brightness: overallMean, message: 'Too dark - add more light' };
-    hints.push('Try adding more light');
-  } else if (overallMean < 60) {
-    lighting = { level: 'dim', brightness: overallMean, message: 'Dim - more light recommended' };
-  } else if (overallMean < 200) {
-    lighting = { level: 'good', brightness: overallMean, message: 'Good lighting' };
-  } else if (overallMean < 230) {
-    lighting = { level: 'bright', brightness: overallMean, message: 'Bright - watch for glare' };
-  } else {
-    lighting = { level: 'too_bright', brightness: overallMean, message: 'Too bright - reduce glare' };
-    hints.push('Too bright - reduce glare');
-  }
-
-  // Simple texture detection (variance in center)
-  const centerVariance = centerPixels.reduce((sum, val) => sum + Math.pow(val - centerMean, 2), 0) / centerPixels.length;
-  const centerStdDev = Math.sqrt(centerVariance);
-
-  // Simple contrast detection
-  const colorDifference = Math.abs(centerMean - edgeMean);
-
-  // Log diagnostics every 60 frames (~3 seconds)
-  if (frameCount % 60 === 0) {
-    console.log('[CardDetection] Brightness:', overallMean.toFixed(1),
-                '| Detail:', centerStdDev.toFixed(1),
-                '| Contrast:', colorDifference.toFixed(1));
-  }
-
-  // RELAXED SCORING - More forgiving detection
-  let score = 0;
-
-  // Detail/texture score - RELAXED threshold
-  const detailThreshold = 8;
-  if (centerStdDev > detailThreshold) {
-    score += Math.min(40, (centerStdDev - detailThreshold) * 2);
-  }
-
-  // Contrast score - RELAXED threshold
-  const contrastThreshold = 5;
-  if (colorDifference > contrastThreshold) {
-    score += Math.min(40, (colorDifference - contrastThreshold) * 3);
-  }
-
-  // Brightness bonus - good lighting helps
-  if (overallMean >= 50 && overallMean <= 200) {
-    score += 20;
-  }
-
-  // NO PENALTIES - just additive scoring
-
-  const confidence = Math.min(100, Math.max(0, Math.round(score)));
-
-  // Lower threshold for detection (was 50, now 35)
-  const isDetected = confidence > 35;
-
-  // Simple hint if not detected and no lighting issue
-  if (!isDetected && hints.length === 0) {
-    hints.push('Center the card in the frame');
-  }
-
-  return {
-    isCardDetected: isDetected,
-    confidence,
-    message: '',
-    hints: hints.length > 0 ? hints : undefined,
-    lighting
-  };
+  return detection;
 }
 
+export default useCardDetection;
 
-/**
- * Smooth confidence changes with configurable responsiveness
- */
-function smoothConfidence(newConfidence: number, oldConfidence: number, alpha: number = 0.5): number {
-  // Use exponential moving average with higher alpha for faster response
-  return Math.round(alpha * newConfidence + (1 - alpha) * oldConfidence);
-}
-
-/**
- * Generate user-friendly detection message with better feedback
- */
-function getDetectionMessage(confidence: number, stableFrames: number): string {
-  if (confidence < 20) {
-    return 'Position card in frame';
-  } else if (confidence < 40) {
-    return 'Getting closer...';
-  } else if (confidence < 50) {
-    return 'Almost there...';
-  } else if (stableFrames < 10) { // Reduced from 15 for faster feedback
-    return 'Hold steady...';
-  } else {
-    return '✓ Ready to capture!';
-  }
-}
+// Re-export types for convenience
+export type { LightingInfo } from '@/types/camera';

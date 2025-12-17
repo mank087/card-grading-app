@@ -15,7 +15,8 @@ export interface CropResult {
 
 export interface CropOptions {
   paddingPercent?: number; // Padding around guide frame (default: 0.05 = 5%)
-  maintainAspectRatio?: boolean; // Force 2.5:3.5 card ratio (default: true)
+  maintainAspectRatio?: boolean; // Force card aspect ratio (default: true)
+  orientation?: 'portrait' | 'landscape'; // Card orientation (default: 'portrait')
 }
 
 /**
@@ -31,7 +32,8 @@ export async function cropToGuideFrame(
 ): Promise<CropResult> {
   const {
     paddingPercent = 0.08, // 8% padding by default (~1 inch buffer at card size)
-    maintainAspectRatio = true
+    maintainAspectRatio = true,
+    orientation = 'portrait'
   } = options;
 
   return new Promise((resolve, reject) => {
@@ -44,11 +46,15 @@ export async function cropToGuideFrame(
         const originalHeight = img.height;
 
         // Calculate guide frame dimensions (matches CameraGuideOverlay.tsx)
-        // Guide is 82% of width, centered, with 2.5:3.5 aspect ratio
-        const guideWidth = originalWidth * 0.82;
+        // Portrait: guide is 75% of width with 2.5:3.5 aspect ratio
+        // Landscape: guide is 90% of width with 3.5:2.5 aspect ratio
+        const guideWidthPercent = orientation === 'portrait' ? 0.75 : 0.90;
+        const aspectRatio = orientation === 'portrait' ? (3.5 / 2.5) : (2.5 / 3.5);
+
+        const guideWidth = originalWidth * guideWidthPercent;
         const guideHeight = maintainAspectRatio
-          ? guideWidth * (3.5 / 2.5) // Card aspect ratio
-          : originalHeight * 0.82;
+          ? guideWidth * aspectRatio
+          : originalHeight * guideWidthPercent;
 
         // Calculate guide position (centered)
         const guideX = (originalWidth - guideWidth) / 2;
