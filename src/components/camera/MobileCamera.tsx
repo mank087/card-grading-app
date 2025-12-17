@@ -2,54 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useCamera } from '@/hooks/useCamera';
-import { useCardDetection } from '@/hooks/useCardDetection';
-import { useStabilization } from '@/hooks/useStabilization';
-import { useGuideOrientation } from '@/hooks/useGuideOrientation';
-import { useCaptureReadiness } from '@/hooks/useCaptureReadiness';
 import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
 import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality';
 import { cropToGuideFrame } from '@/utils/guideCrop';
-import { ImageQualityValidation, LightingInfo } from '@/types/camera';
+import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
 import { useToast } from '@/hooks/useToast';
-
-// Lighting indicator component
-function LightingIndicator({ lighting }: { lighting: LightingInfo }) {
-  const getIcon = () => {
-    switch (lighting.level) {
-      case 'too_dark': return '🌑';
-      case 'dim': return '🌒';
-      case 'good': return '☀️';
-      case 'bright': return '🌤️';
-      case 'too_bright': return '⚡';
-      default: return '☀️';
-    }
-  };
-
-  const getColor = () => {
-    switch (lighting.level) {
-      case 'too_dark': return 'bg-red-500/80 text-white';
-      case 'dim': return 'bg-yellow-500/80 text-white';
-      case 'good': return 'bg-green-500/80 text-white';
-      case 'bright': return 'bg-yellow-400/80 text-gray-900';
-      case 'too_bright': return 'bg-red-500/80 text-white';
-      default: return 'bg-green-500/80 text-white';
-    }
-  };
-
-  // Only show indicator if lighting isn't good
-  if (lighting.level === 'good') {
-    return null;
-  }
-
-  return (
-    <div className={`absolute top-16 right-4 px-3 py-2 rounded-lg flex items-center gap-2 ${getColor()} backdrop-blur-sm shadow-lg`}>
-      <span className="text-lg">{getIcon()}</span>
-      <span className="text-xs font-medium">{lighting.message}</span>
-    </div>
-  );
-}
 
 interface MobileCameraProps {
   side: 'front' | 'back';
@@ -73,95 +32,68 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [isProcessing, setIsProcessing] = useState(false);
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
-  const [autoCaptureEnabled, setAutoCaptureEnabled] = useState(true);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const toast = useToast();
 
-  // Guide orientation (portrait/landscape toggle)
-  const {
-    orientation: guideOrientation,
-    toggleOrientation,
-  } = useGuideOrientation();
+  // Start camera on mount and when facingMode changes
+  useEffect(() => {
+    startCamera(facingMode);
+    return () => {
+      stopCamera();
+    };
+  }, [facingMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Card detection with edge detection
-  const detection = useCardDetection(videoRef, !!stream, guideOrientation);
+  // Sync stream to video element
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.play().catch(console.error);
+    }
+  }, [stream, videoRef]);
 
-  // Motion/stabilization detection
-  const stabilization = useStabilization(videoRef, !!stream);
-
-  // Capture handler - fast and simple
+  // Simple capture handler
   const handleCapture = useCallback(async () => {
     if (isProcessing) return;
 
     setIsProcessing(true);
 
-    // Capture immediately
-    const captured = await captureImage();
-    if (!captured) {
-      toast.error('Failed to capture image. Please try again.');
-      setIsProcessing(false);
-      return;
-    }
-
-    // Show preview immediately with original image
-    setCapturedImageUrl(captured.dataUrl);
-    setCapturedFile(captured.file);
-    setIsProcessing(false);
-
-    // Process crop and quality validation in background (non-blocking)
     try {
-      const cropResult = await cropToGuideFrame(captured.file, {
-        paddingPercent: 0.08,
-        maintainAspectRatio: true,
-        orientation: guideOrientation,
-      });
-      // Update with cropped version
-      setCapturedImageUrl(cropResult.croppedDataUrl);
-      setCapturedFile(cropResult.croppedFile);
+      const captured = await captureImage();
+      if (!captured) {
+        toast.error('Failed to capture image. Please try again.');
+        setIsProcessing(false);
+        return;
+      }
 
-      // Validate quality
-      const imageData = await getImageDataFromFile(cropResult.croppedFile);
-      if (imageData) {
-        const validation = validateImageQuality(imageData);
-        setQualityValidation(validation);
+      // Show preview immediately
+      setCapturedImageUrl(captured.dataUrl);
+      setCapturedFile(captured.file);
+      setIsProcessing(false);
+
+      // Process crop in background
+      try {
+        const cropResult = await cropToGuideFrame(captured.file, {
+          paddingPercent: 0.08,
+          maintainAspectRatio: true,
+          orientation: orientation,
+        });
+        setCapturedImageUrl(cropResult.croppedDataUrl);
+        setCapturedFile(cropResult.croppedFile);
+
+        // Validate quality
+        const imageData = await getImageDataFromFile(cropResult.croppedFile);
+        if (imageData) {
+          setQualityValidation(validateImageQuality(imageData));
+        }
+      } catch (err) {
+        console.warn('[MobileCamera] Crop failed, using original:', err);
       }
     } catch (err) {
-      // If crop fails, keep original - already showing preview
-      console.warn('[MobileCamera] Post-processing failed:', err);
+      console.error('Capture error:', err);
+      toast.error('Failed to capture image. Please try again.');
+      setIsProcessing(false);
     }
-  }, [captureImage, guideOrientation, isProcessing, toast]);
-
-  // Auto-capture readiness
-  const readiness = useCaptureReadiness({
-    detection,
-    stabilization,
-    autoCaptureEnabled,
-    onAutoCapture: handleCapture,
-    enabled: !!stream && !capturedImageUrl,
-  });
-
-  // Start camera on mount and when facingMode changes
-  useEffect(() => {
-    startCamera(facingMode);
-
-    return () => {
-      console.log('[MobileCamera] Cleaning up camera on unmount or facingMode change');
-      stopCamera();
-    };
-  }, [facingMode]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Ensure video element has the stream when stream changes
-  useEffect(() => {
-    if (stream && videoRef.current) {
-      console.log('[MobileCamera] Syncing stream to video element');
-      videoRef.current.srcObject = stream;
-
-      videoRef.current.play().then(() => {
-        console.log('[MobileCamera] Video playing');
-      }).catch(err => {
-        console.error('[MobileCamera] Video play error:', err);
-      });
-    }
-  }, [stream, videoRef]);
+  }, [captureImage, orientation, isProcessing, toast]);
 
   const handleConfirm = () => {
     if (capturedFile) {
@@ -173,19 +105,16 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     setCapturedImageUrl(null);
     setCapturedFile(null);
     setQualityValidation(null);
-    console.log('[MobileCamera] Restarting camera after retake');
     stopCamera();
-    setTimeout(() => {
-      startCamera(facingMode);
-    }, 200);
+    setTimeout(() => startCamera(facingMode), 100);
   };
 
   const handleSwitchCamera = () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
-  const toggleAutoCapture = () => {
-    setAutoCaptureEnabled(prev => !prev);
+  const toggleOrientation = () => {
+    setOrientation(prev => prev === 'portrait' ? 'landscape' : 'portrait');
   };
 
   // Show preview if image captured
@@ -201,75 +130,44 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     );
   }
 
-  // Show error state
+  // Error state
   if (hasPermission === false || error) {
     return (
       <div className="fixed inset-0 bg-gray-900 z-50 flex flex-col">
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={onCancel}
-            className="text-white hover:text-gray-200 transition-colors"
-          >
+          <button onClick={onCancel} className="text-white font-medium">
             ← Back
           </button>
           <h2 className="text-lg font-bold">Camera Access</h2>
-          <div className="w-16"></div>
+          <div className="w-16" />
         </div>
 
-        <div className="flex-1 flex items-center justify-center p-6 overflow-y-auto">
-          <div className="text-center space-y-4 max-w-md">
+        <div className="flex-1 flex items-center justify-center p-6">
+          <div className="text-center space-y-4 max-w-sm">
             <div className="text-6xl">📷</div>
             <h3 className="text-xl font-bold text-white">Camera Permission Needed</h3>
             <p className="text-gray-300">
-              To capture card images, we need access to your camera. Please allow camera access when prompted.
+              Please allow camera access to capture card images.
             </p>
             {error && (
-              <div className="bg-red-900/50 border border-red-500 rounded-lg p-4 text-left">
-                <p className="text-red-200 text-sm font-semibold mb-2">Error Details:</p>
-                <p className="text-red-200 text-sm">{error}</p>
-              </div>
+              <p className="text-red-400 text-sm bg-red-900/30 p-3 rounded-lg">{error}</p>
             )}
-
-            {/* Diagnostic Information */}
-            <div className="bg-gray-800 border border-gray-600 rounded-lg p-4 text-left">
-              <p className="text-gray-400 text-xs font-semibold mb-2">Diagnostic Info:</p>
-              <div className="text-gray-300 text-xs space-y-1">
-                <p>• Browser: {typeof navigator !== 'undefined' ? navigator.userAgent.split(' ').slice(-2).join(' ') : 'Unknown'}</p>
-                <p>• HTTPS: {typeof window !== 'undefined' ? (window.location.protocol === 'https:' ? '✓ Yes' : '✗ No (Required!)') : 'Unknown'}</p>
-                <p>• MediaDevices API: {typeof navigator !== 'undefined' && navigator.mediaDevices ? '✓ Available' : '✗ Not Available'}</p>
-                <p>• getUserMedia: {typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia ? '✓ Supported' : '✗ Not Supported'}</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
+            <div className="space-y-3 pt-4">
               <button
-                onClick={async () => {
+                onClick={() => {
                   stopCamera();
-                  await new Promise(resolve => setTimeout(resolve, 200));
-                  startCamera(facingMode);
+                  setTimeout(() => startCamera(facingMode), 200);
                 }}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold"
               >
                 Try Again
               </button>
               <button
                 onClick={onCancel}
-                className="w-full bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors"
+                className="w-full bg-gray-700 hover:bg-gray-600 text-white px-6 py-3 rounded-lg font-semibold"
               >
                 Use Gallery Instead
               </button>
-            </div>
-
-            {/* Help Text */}
-            <div className="bg-blue-900/30 border border-blue-500/50 rounded-lg p-3 text-left">
-              <p className="text-blue-200 text-xs font-semibold mb-2">Troubleshooting:</p>
-              <ul className="text-blue-300 text-xs space-y-1 list-disc list-inside">
-                <li>Make sure camera permission is allowed in browser settings</li>
-                <li>Close other apps that might be using the camera</li>
-                <li>Refresh the page and try again</li>
-                <li>Ensure you're using HTTPS (not HTTP)</li>
-                <li>Try using "Gallery" option as a workaround</li>
-              </ul>
             </div>
           </div>
         </div>
@@ -277,7 +175,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     );
   }
 
-  // Show loading state
+  // Loading state
   if (!stream || hasPermission === null) {
     return (
       <div className="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center">
@@ -289,16 +187,17 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     );
   }
 
-  // Show camera view
+  // Main camera view
   return (
     <div className="fixed inset-0 bg-black z-50 flex flex-col">
       {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-4 flex items-center justify-between relative z-10">
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between relative z-10">
         <button
           onClick={onCancel}
-          className="text-white hover:text-gray-200 transition-colors font-medium"
+          className="text-white font-medium flex items-center gap-1"
         >
-          ← Cancel
+          <span>←</span>
+          <span>Cancel</span>
         </button>
         <div className="flex items-center gap-2">
           <Image
@@ -308,92 +207,53 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             height={24}
             className="object-contain"
           />
-          <h2 className="text-lg font-bold">Capture Card</h2>
+          <span className="font-bold">Capture Card</span>
         </div>
         <button
           onClick={handleSwitchCamera}
-          className="text-white hover:text-gray-200 transition-colors text-sm"
+          className="text-white p-2 rounded-full hover:bg-white/20 transition-colors"
           title="Switch Camera"
         >
-          🔄
+          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
         </button>
       </div>
 
       {/* Camera View */}
-      <div className="flex-1 relative overflow-hidden">
+      <div className="flex-1 relative overflow-hidden bg-black">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          webkit-playsinline="true"
           className="absolute inset-0 w-full h-full object-cover"
         />
 
-        {/* Guide Overlay with all detection info */}
+        {/* Guide Overlay */}
         <CameraGuideOverlay
           side={side}
-          orientation={guideOrientation}
-          detection={detection}
-          readiness={readiness}
+          orientation={orientation}
           onToggleOrientation={toggleOrientation}
         />
-
-        {/* Lighting Indicator */}
-        <LightingIndicator lighting={detection.lighting} />
       </div>
 
-      {/* Controls */}
-      <div className="bg-gray-900 border-t border-gray-700 px-4 py-4 relative z-10">
-        {/* Auto-capture toggle */}
-        <div className="flex items-center justify-center mb-3">
-          <button
-            onClick={toggleAutoCapture}
-            className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
-              autoCaptureEnabled
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-700 text-gray-300'
-            }`}
-          >
-            <span className={`w-2 h-2 rounded-full ${autoCaptureEnabled ? 'bg-white' : 'bg-gray-500'}`} />
-            Auto-capture {autoCaptureEnabled ? 'ON' : 'OFF'}
-          </button>
-        </div>
-
-        {/* Capture Button */}
+      {/* Capture Controls */}
+      <div className="bg-gray-900 px-4 py-6 relative z-10">
         <div className="flex items-center justify-center">
           <button
             onClick={handleCapture}
             disabled={isProcessing}
-            className={`w-20 h-20 rounded-full border-4 transition-all shadow-lg ${
-              readiness.readyForCapture
-                ? 'border-green-400 bg-green-400/20 hover:bg-green-400/30'
-                : detection.detected
-                  ? 'border-yellow-400 bg-yellow-400/20 hover:bg-yellow-400/30'
-                  : 'border-white bg-white/20 hover:bg-white/30'
-            } ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'active:scale-95'}`}
+            className={`w-20 h-20 rounded-full border-4 border-white bg-white/20
+              hover:bg-white/30 active:scale-95 transition-all shadow-lg
+              ${isProcessing ? 'opacity-50' : ''}`}
             aria-label="Capture photo"
           >
-            {isProcessing ? (
-              <div className="w-full h-full rounded-full bg-gray-400 animate-pulse"></div>
-            ) : (
-              <div className={`w-full h-full rounded-full ${
-                readiness.readyForCapture
-                  ? 'bg-green-400'
-                  : detection.detected
-                    ? 'bg-yellow-400'
-                    : 'bg-white'
-              }`}></div>
-            )}
+            <div className="w-full h-full rounded-full bg-white" />
           </button>
         </div>
-
-        {/* Tip text */}
-        <p className="text-center text-xs text-gray-500 mt-3">
-          {autoCaptureEnabled
-            ? 'Hold steady - auto-captures when ready'
-            : 'Tap to capture • You can always retake'
-          }
+        <p className="text-center text-gray-400 text-sm mt-4">
+          Tap to capture
         </p>
       </div>
     </div>
