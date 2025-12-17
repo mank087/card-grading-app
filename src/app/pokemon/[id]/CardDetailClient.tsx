@@ -4798,13 +4798,15 @@ export function PokemonCardDetails() {
                       subset: cardInfo.rarity_tier || cardInfo.subset || card.subset
                     } as CardData;
 
-                    // Use database URL if available (check all possible sources from verification)
-                    // Priority: direct column > conversational_card_info > pokemon_api_data > generated search URL
-                    const tcgplayerUrl = card.tcgplayer_url ||
-                                        card.conversational_card_info?.tcgplayer_url ||
-                                        card.pokemon_api_data?.tcgplayer?.url ||
-                                        generateTCGPlayerSetSearchUrl(cardData) ||
-                                        generateTCGPlayerSearchUrl(cardData);
+                    // Use direct TCGPlayer URLs only - skip prices.pokemontcg.io redirect URLs (unreliable/timeout)
+                    // Only use stored URL if it's a direct tcgplayer.com link
+                    const storedUrl = card.tcgplayer_url ||
+                                     card.conversational_card_info?.tcgplayer_url ||
+                                     card.pokemon_api_data?.tcgplayer?.url;
+                    const isDirectTcgplayerUrl = storedUrl && storedUrl.includes('tcgplayer.com');
+                    const tcgplayerUrl = isDirectTcgplayerUrl
+                                        ? storedUrl
+                                        : (generateTCGPlayerSetSearchUrl(cardData) || generateTCGPlayerSearchUrl(cardData));
                     const displaySetName = cardInfo.set_name || cardInfo.set_era || card.card_set;
 
                     return (
