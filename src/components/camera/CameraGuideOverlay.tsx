@@ -77,23 +77,20 @@ export default function CameraGuideOverlay({
         </div>
       </div>
 
-      {/* Bottom tips - static message */}
-      <div className="absolute bottom-32 left-0 right-0 px-4">
-        <div className="bg-black/70 text-white rounded-xl p-4 mx-auto max-w-sm">
-          <p className="text-sm font-medium text-center mb-3">Tips for best results:</p>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-white/10 rounded-lg p-2">
-              <p className="text-lg mb-1">💡</p>
-              <p className="text-xs">Good lighting</p>
-            </div>
-            <div className="bg-white/10 rounded-lg p-2">
-              <p className="text-lg mb-1">🚫</p>
-              <p className="text-xs">No glare</p>
-            </div>
-            <div className="bg-white/10 rounded-lg p-2">
-              <p className="text-lg mb-1">📐</p>
-              <p className="text-xs">Fill frame</p>
-            </div>
+      {/* Bottom tips - small, below guide frame */}
+      <div className="absolute bottom-2 left-0 right-0 px-4">
+        <div className="flex justify-center gap-3">
+          <div className="bg-black/60 text-white/90 px-2 py-1 rounded-full flex items-center gap-1">
+            <span className="text-xs">💡</span>
+            <span className="text-[10px]">Good light</span>
+          </div>
+          <div className="bg-black/60 text-white/90 px-2 py-1 rounded-full flex items-center gap-1">
+            <span className="text-xs">🚫</span>
+            <span className="text-[10px]">No glare</span>
+          </div>
+          <div className="bg-black/60 text-white/90 px-2 py-1 rounded-full flex items-center gap-1">
+            <span className="text-xs">📐</span>
+            <span className="text-[10px]">Fill frame</span>
           </div>
         </div>
       </div>
