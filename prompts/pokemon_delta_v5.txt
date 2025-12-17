@@ -520,12 +520,13 @@ OUTPUT REQUIREMENTS
   "set_era": null,
   "set_confidence": "low",
   "set_identifier_source": [],
-  "set_identifier_reason": "Denominator 112 not found in common sets table. Requires API lookup.",
+  "set_identifier_reason": "Denominator 112 not found in common sets table. Will be looked up in local database.",
   "needs_api_lookup": true
 }
 
 🚨 **CRITICAL MANDATORY RULE:**
 **IF `set_name` is null, YOU MUST set `needs_api_lookup: true`**
+(Note: This flags the backend to check the local Supabase database - no external API calls are made)
 
 ═══════════════════════════════════════════════════════════════════════
 D. POKEMON CARD DEFECT PATTERNS

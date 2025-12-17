@@ -5,7 +5,7 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational } from "@/lib/visionGrader";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
-// HYBRID SET IDENTIFICATION: Pokemon TCG API for set lookup when AI doesn't have it in mini table
+// SET IDENTIFICATION: Local Supabase database lookup (external Pokemon TCG API is disabled)
 import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
@@ -466,7 +466,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
                 has_structural_damage: jsonData.structural_damage?.detected || false,
                 has_handwriting: jsonData.handwriting?.detected || false,
-                has_alterations: jsonData.alterations?.detected || false,
+                has_alterations: jsonData.alteration_detection?.altered || jsonData.alterations?.detected || false,
                 crease_detected: jsonData.structural_damage?.has_creases || false,
                 bent_corner_detected: jsonData.structural_damage?.has_bent_corners || false,
                 is_authenticated_autograph: isAuthenticatedAutograph
@@ -801,7 +801,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
               surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
               has_structural_damage: jsonData.structural_damage?.detected || false,
               has_handwriting: jsonData.handwriting?.detected || false,
-              has_alterations: jsonData.alterations?.detected || false,
+              has_alterations: jsonData.alteration_detection?.altered || jsonData.alterations?.detected || false,
               crease_detected: jsonData.structural_damage?.has_creases || false,
               bent_corner_detected: jsonData.structural_damage?.has_bent_corners || false,
               // If autograph is authenticated, don't treat as alteration

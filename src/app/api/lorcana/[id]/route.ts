@@ -457,7 +457,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
                 has_structural_damage: jsonData.structural_damage?.detected || false,
                 has_handwriting: jsonData.handwriting?.detected || false,
-                has_alterations: jsonData.alterations?.detected || false,
+                has_alterations: jsonData.alteration_detection?.altered || jsonData.alterations?.detected || false,
                 crease_detected: jsonData.structural_damage?.has_creases || false,
                 bent_corner_detected: jsonData.structural_damage?.has_bent_corners || false,
                 is_authenticated_autograph: isAuthenticatedAutograph
@@ -756,7 +756,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
               surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
               has_structural_damage: jsonData.structural_damage?.detected || false,
               has_handwriting: jsonData.handwriting?.detected || false,
-              has_alterations: jsonData.alterations?.detected || false,
+              has_alterations: jsonData.alteration_detection?.altered || jsonData.alterations?.detected || false,
               crease_detected: jsonData.structural_damage?.has_creases || false,
               bent_corner_detected: jsonData.structural_damage?.has_bent_corners || false,
               // If autograph is authenticated, don't treat as alteration

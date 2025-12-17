@@ -1,6 +1,7 @@
 // src/lib/pokemonTcgApi.ts
-// Pokemon TCG API client for fetching card data
-// Now uses local Supabase database first, with API fallback for new releases
+// Pokemon TCG card lookup service
+// CURRENT MODE: Local Supabase database ONLY (external API disabled)
+// The DISABLE_EXTERNAL_API flag controls whether external Pokemon TCG API calls are allowed
 
 import { createClient } from '@supabase/supabase-js';
 
@@ -8,9 +9,12 @@ const POKEMON_API_BASE = 'https://api.pokemontcg.io/v2';
 // Get API key from environment variable - NO HARDCODED FALLBACKS
 const POKEMON_API_KEY = process.env.POKEMON_TCG_API_KEY || '';
 
+// ============================================
 // DISABLE EXTERNAL API - Use local database only
-// Set to true to disable all external Pokemon TCG API calls
-// The local database should have all cards from the import
+// ============================================
+// When TRUE: All lookups use local Supabase pokemon_cards table (fast, no external calls)
+// When FALSE: Falls back to external api.pokemontcg.io when local DB misses (slower, can timeout)
+// IMPORTANT: Keep TRUE in production to avoid Pokemon TCG API timeout errors
 const DISABLE_EXTERNAL_API = true;
 
 // Initialize Supabase client for local database queries

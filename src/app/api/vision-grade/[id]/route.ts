@@ -498,15 +498,15 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
             // Extract quality tiers (v5.0+)
             centering_front_quality_tier: parsedJSONData.centering?.front?.quality_tier,
             centering_back_quality_tier: parsedJSONData.centering?.back?.quality_tier,
-            slab_detection: parsedJSONData.professional_slab?.detected ? {
+            slab_detection: parsedJSONData.slab_detection?.detected ? {
               detected: true,
-              company: parsedJSONData.professional_slab.company || null,
-              grade: parsedJSONData.professional_slab.grade || null,
-              grade_description: parsedJSONData.professional_slab.grade_description || null,
-              cert_number: parsedJSONData.professional_slab.cert_number || null,
+              company: parsedJSONData.slab_detection.company || null,
+              grade: parsedJSONData.slab_detection.grade || null,
+              grade_description: parsedJSONData.slab_detection.grade_description || null,
+              cert_number: parsedJSONData.slab_detection.cert_number || null,
               serial_number: null,
-              subgrades: parsedJSONData.professional_slab.sub_grades ? {
-                raw: parsedJSONData.professional_slab.sub_grades
+              subgrades: parsedJSONData.slab_detection.subgrades ? {
+                raw: parsedJSONData.slab_detection.subgrades
               } : null
             } : null,
             card_info: parsedJSONData.card_info || null,
