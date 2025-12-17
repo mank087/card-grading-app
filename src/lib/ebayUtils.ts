@@ -160,12 +160,12 @@ export function generateMTGEbaySoldListingsUrl(cardData: CardData): string {
 
 /**
  * Generate eBay search URL for a specific card (Sports cards - simplified search)
- * Order: Player Name + Card Number + Set Name + Special Features (auto, RC, /99, etc.)
+ * Simplified: Card Name + Card Number only for more accurate searches
  */
 export function generateEbaySearchUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // 1. Player/Character name (most important identifier)
+  // 1. Player/Character name (primary identifier)
   if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
@@ -173,42 +173,6 @@ export function generateEbaySearchUrl(cardData: CardData): string {
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
-  }
-
-  // 3. Set name
-  if (cardData.card_set) {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 4. Special features (only add if applicable)
-
-  // Autograph - add "auto" keyword
-  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
-    searchTerms.push("auto");
-  }
-
-  // Rookie card - add "RC" keyword
-  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
-    searchTerms.push("RC");
-  }
-
-  // Serial numbered - add the /XX format (e.g., "/99")
-  if (cardData.serial_numbering &&
-      cardData.serial_numbering !== "N/A" &&
-      !cardData.serial_numbering.toLowerCase().includes('not present') &&
-      !cardData.serial_numbering.toLowerCase().includes('none')) {
-    const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
-    if (numberMatch) {
-      searchTerms.push(`/${numberMatch[1]}`);
-    }
-  }
-
-  // 5. Subset/parallel (only if it adds useful info not in set name)
-  if (cardData.subset &&
-      cardData.subset !== cardData.card_name &&
-      cardData.subset !== cardData.card_set &&
-      !cardData.card_set?.toLowerCase().includes(cardData.subset.toLowerCase())) {
-    searchTerms.push(cardData.subset);
   }
 
   const searchQuery = searchTerms.join(" ");
@@ -227,12 +191,12 @@ export function generateEbaySearchUrl(cardData: CardData): string {
 
 /**
  * Generate eBay sold listings URL for pricing research (Sports cards - simplified)
- * Order: Player Name + Card Number + Set Name + Special Features (auto, RC, /99, etc.)
+ * Simplified: Card Name + Card Number only for more accurate searches
  */
 export function generateEbaySoldListingsUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // 1. Player/Character name (most important identifier)
+  // 1. Player/Character name (primary identifier)
   if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
@@ -240,42 +204,6 @@ export function generateEbaySoldListingsUrl(cardData: CardData): string {
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
-  }
-
-  // 3. Set name
-  if (cardData.card_set) {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 4. Special features (only add if applicable)
-
-  // Autograph - add "auto" keyword
-  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
-    searchTerms.push("auto");
-  }
-
-  // Rookie card - add "RC" keyword
-  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
-    searchTerms.push("RC");
-  }
-
-  // Serial numbered - add the /XX format (e.g., "/99")
-  if (cardData.serial_numbering &&
-      cardData.serial_numbering !== "N/A" &&
-      !cardData.serial_numbering.toLowerCase().includes('not present') &&
-      !cardData.serial_numbering.toLowerCase().includes('none')) {
-    const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
-    if (numberMatch) {
-      searchTerms.push(`/${numberMatch[1]}`);
-    }
-  }
-
-  // 5. Subset/parallel (only if it adds useful info not in set name)
-  if (cardData.subset &&
-      cardData.subset !== cardData.card_name &&
-      cardData.subset !== cardData.card_set &&
-      !cardData.card_set?.toLowerCase().includes(cardData.subset.toLowerCase())) {
-    searchTerms.push(cardData.subset);
   }
 
   const searchQuery = searchTerms.join(" ");
@@ -295,12 +223,12 @@ export function generateEbaySoldListingsUrl(cardData: CardData): string {
 
 /**
  * Generate eBay graded cards search URL (Sports cards - simplified)
- * Order: Player Name + Card Number + Set Name + Special Features + "graded"
+ * Simplified: Card Name + Card Number + "graded" for more accurate searches
  */
 export function generateEbayGradedSearchUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // 1. Player/Character name (most important identifier)
+  // 1. Player/Character name (primary identifier)
   if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
@@ -310,41 +238,8 @@ export function generateEbayGradedSearchUrl(cardData: CardData): string {
     searchTerms.push(cardData.card_number);
   }
 
-  // 3. Set name
-  if (cardData.card_set) {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 4. Special features (only add if applicable)
-
-  // Autograph - add "auto" keyword
-  if (cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) {
-    searchTerms.push("auto");
-  }
-
-  // Rookie card - add "RC" keyword
-  if (cardData.rookie_or_first_print === "Yes" || cardData.rookie_or_first_print === "true" || cardData.rookie_or_first_print === true) {
-    searchTerms.push("RC");
-  }
-
-  // Serial numbered - add the /XX format (e.g., "/99")
-  if (cardData.serial_numbering &&
-      cardData.serial_numbering !== "N/A" &&
-      !cardData.serial_numbering.toLowerCase().includes('not present') &&
-      !cardData.serial_numbering.toLowerCase().includes('none')) {
-    const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
-    if (numberMatch) {
-      searchTerms.push(`/${numberMatch[1]}`);
-    }
-  }
-
-  // 5. Add "graded" keyword for graded card search
+  // 3. Add "graded" keyword for graded card search
   searchTerms.push("graded");
-
-  // 6. Add specific grade if high grade (PSA 9, PSA 10, etc.)
-  if (cardData.dcm_grade_whole && cardData.dcm_grade_whole >= 9) {
-    searchTerms.push(`${cardData.dcm_grade_whole}`);
-  }
 
   const searchQuery = searchTerms.join(" ");
 
@@ -362,45 +257,21 @@ export function generateEbayGradedSearchUrl(cardData: CardData): string {
 
 /**
  * Generate eBay search URL for Lorcana cards
- * Priority: Character Name + Character Version > Set Name > Enchanted/Foil > Card Number
+ * Simplified: Card Name + Card Number only for more accurate searches
  */
 export function generateLorcanaEbaySearchUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // 1. Character name (REQUIRED - most important)
+  // 1. Character name (primary identifier)
   if (cardData.card_name) {
     searchTerms.push(cardData.card_name);
   } else if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Character version (CRITICAL - same character has many versions)
-  if (cardData.character_version) {
-    searchTerms.push(cardData.character_version);
-  }
-
-  // 3. Set name
-  if (cardData.card_set && cardData.card_set !== 'Unknown') {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 4. Card number (helps narrow results)
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
-  }
-
-  // 5. Variant indicator (IMPORTANT - huge price difference)
-  if (cardData.is_enchanted) {
-    searchTerms.push('Enchanted');
-  } else if (cardData.is_foil) {
-    searchTerms.push('Foil');
-  }
-
-  // 6. Add condition hint based on grade
-  if (cardData.dcm_grade_whole) {
-    if (cardData.dcm_grade_whole >= 9) {
-      searchTerms.push('NM'); // Near Mint
-    }
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -420,38 +291,21 @@ export function generateLorcanaEbaySearchUrl(cardData: CardData): string {
 
 /**
  * Generate eBay sold listings URL for Lorcana cards
- * Shows completed sales for pricing reference
+ * Simplified: Card Name + Card Number only for more accurate searches
  */
 export function generateLorcanaEbaySoldListingsUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
 
-  // 1. Character name
+  // 1. Character name (primary identifier)
   if (cardData.card_name) {
     searchTerms.push(cardData.card_name);
   } else if (cardData.featured) {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Character version
-  if (cardData.character_version) {
-    searchTerms.push(cardData.character_version);
-  }
-
-  // 3. Set name
-  if (cardData.card_set && cardData.card_set !== 'Unknown') {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 4. Card number
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
-  }
-
-  // 5. Variant indicator
-  if (cardData.is_enchanted) {
-    searchTerms.push('Enchanted');
-  } else if (cardData.is_foil) {
-    searchTerms.push('Foil');
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -474,6 +328,7 @@ export function generateLorcanaEbaySoldListingsUrl(cardData: CardData): string {
 
 /**
  * Generate eBay search URL for Other collectible cards (active listings)
+ * Simplified: Card Name + Card Number only for more accurate searches
  */
 export function generateOtherEbaySearchUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
@@ -483,56 +338,12 @@ export function generateOtherEbaySearchUrl(cardData: CardData): string {
     searchTerms.push(cardData.card_name);
   }
 
-  // 2. Manufacturer (important for Other cards)
-  if (cardData.manufacturer) {
-    searchTerms.push(cardData.manufacturer);
-  }
-
-  // 3. Set name (if applicable)
-  if (cardData.card_set && cardData.card_set !== 'Unknown') {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 4. Date (helps narrow results)
-  if (cardData.card_date) {
-    searchTerms.push(cardData.card_date);
-  }
-
-  // 5. Card number (if available)
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
   }
 
-  // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
-  const callouts: string[] = [];
-
-  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
-      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
-    callouts.push("auto");
-    callouts.push("autograph");
-  }
-
-  // Serial numbered callout (rarity indicator)
-  if (cardData.serial_numbering &&
-      cardData.serial_numbering !== "N/A" &&
-      !cardData.serial_numbering.toLowerCase().includes('not present') &&
-      !cardData.serial_numbering.toLowerCase().includes('none')) {
-    callouts.push("numbered");
-    const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
-    if (numberMatch) {
-      callouts.push(`/${numberMatch[1]}`);
-    }
-  }
-
-  // 6. Grade-based condition indicator
-  if (cardData.dcm_grade_whole && cardData.dcm_grade_whole >= 9) {
-    searchTerms.push('NM'); // Near Mint condition
-  }
-
-  // Combine all terms: callouts first for prominence, then card details
-  const allTerms = [...callouts, ...searchTerms];
-  const searchQuery = allTerms.join(' ');
+  const searchQuery = searchTerms.join(' ');
 
   const baseUrl = 'https://www.ebay.com/sch/i.html';
   const params = new URLSearchParams({
@@ -548,6 +359,7 @@ export function generateOtherEbaySearchUrl(cardData: CardData): string {
 
 /**
  * Generate eBay sold listings URL for Other collectible cards
+ * Simplified: Card Name + Card Number only for more accurate searches
  */
 export function generateOtherEbaySoldListingsUrl(cardData: CardData): string {
   const searchTerms: string[] = [];
@@ -557,51 +369,12 @@ export function generateOtherEbaySoldListingsUrl(cardData: CardData): string {
     searchTerms.push(cardData.card_name);
   }
 
-  // 2. Manufacturer (important for Other cards)
-  if (cardData.manufacturer) {
-    searchTerms.push(cardData.manufacturer);
-  }
-
-  // 3. Set name (if applicable)
-  if (cardData.card_set && cardData.card_set !== 'Unknown') {
-    searchTerms.push(cardData.card_set);
-  }
-
-  // 4. Date (helps narrow results)
-  if (cardData.card_date) {
-    searchTerms.push(cardData.card_date);
-  }
-
-  // 5. Card number (if available)
+  // 2. Card number (for precise identification)
   if (cardData.card_number) {
     searchTerms.push(cardData.card_number);
   }
 
-  // 🆕 PRIORITY CALLOUTS - Add special attributes prominently
-  const callouts: string[] = [];
-
-  // Autograph callout (high value indicator) - ONLY if explicitly Yes/true
-  if ((cardData.autographed === "Yes" || cardData.autographed === "true" || cardData.autographed === true) &&
-      cardData.autographed !== "No" && cardData.autographed !== false && cardData.autographed !== "false" && cardData.autographed !== "N/A") {
-    callouts.push("auto");
-    callouts.push("autograph");
-  }
-
-  // Serial numbered callout (rarity indicator)
-  if (cardData.serial_numbering &&
-      cardData.serial_numbering !== "N/A" &&
-      !cardData.serial_numbering.toLowerCase().includes('not present') &&
-      !cardData.serial_numbering.toLowerCase().includes('none')) {
-    callouts.push("numbered");
-    const numberMatch = cardData.serial_numbering.match(/\/(\d+)/);
-    if (numberMatch) {
-      callouts.push(`/${numberMatch[1]}`);
-    }
-  }
-
-  // Combine all terms: callouts first for prominence, then card details
-  const allTerms = [...callouts, ...searchTerms];
-  const searchQuery = allTerms.join(' ');
+  const searchQuery = searchTerms.join(' ');
 
   const baseUrl = 'https://www.ebay.com/sch/i.html';
   const params = new URLSearchParams({
