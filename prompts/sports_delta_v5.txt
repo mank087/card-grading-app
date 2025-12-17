@@ -157,19 +157,22 @@ ENHANCED FIELDS (Modern Sports Cards 2000+)
   - Incorrect fonts or logos
 
 **facsimile_autograph**: Does card have official facsimile autograph? (true|false)
-• true if card back explicitly states "Facsimile Autograph", "Facsimile Signature", or similar
+• 🚨 MANDATORY: Read ALL text on card back (including fine print, margins, footers) before determining
+• true if card back states "Facsimile Autograph", "Facsimile Signature", "reproduction", "reprint", or similar ANYWHERE
 • This is a PRINTED/REPRODUCED signature, NOT hand-signed
 • Common in vintage reprints and commemorative sets
 • Card is still authentic and official - grade normally
-• false if no facsimile autograph disclosure present
+• false ONLY if no facsimile/reproduction disclosure present after reading ENTIRE card back
 • IMPORTANT: facsimile_autograph = true means autographed = false (not hand-signed)
+• ⚠️ Do NOT trust "Certified Autograph Issue" on front alone - reprints copy this text. ALWAYS verify on back.
 
 **official_reprint**: Is card an official reprint? (true|false)
-• true if card back explicitly states reproduction/reprint disclosure
+• 🚨 MANDATORY: Read ALL text on card back (including fine print, margins, footers) before determining
+• true if card back states "reproduction", "reprint", "reproduced" ANYWHERE on back
 • Common text: "The front of this card is a reproduction...", "Reprint", "Official Reproduction"
 • Part of commemorative or archive series (e.g., Topps Archives, All-Time Greats)
 • Card is legitimate - grade normally with special feature notation
-• false if no reprint disclosure present
+• false ONLY if no reprint disclosure present after reading ENTIRE card back
 
 ────────────────────────────────────────────────────────────────────────
 OPTIONAL FIELDS (If Visible)

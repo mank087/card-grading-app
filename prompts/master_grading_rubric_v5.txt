@@ -1688,6 +1688,27 @@ PURPOSE: Identify official reprints and facsimile autograph cards that should be
 
 🚨 CRITICAL: Facsimile autographs and official reprints are NOT alterations. They are legitimate, manufacturer-produced cards that should receive numeric grades with special feature notation.
 
+🚨 MANDATORY CARD BACK TEXT EXTRACTION:
+Before evaluating facsimile/reprint status, you MUST:
+1. Read and transcribe ALL visible text on the card back - not just the main description paragraph
+2. Include fine print, legal text, footer text, and any text in margins, borders, or separate sections
+3. Look specifically for these keywords ANYWHERE on card back: "facsimile", "reproduction", "reprint", "printed signature", "not an original", "reproduced"
+4. If any such disclosure text exists ANYWHERE on card back, you MUST flag appropriately
+5. Do not skip or summarize - capture the full text to ensure no disclosure is missed
+
+⚠️ AUTOGRAPH VERIFICATION REQUIREMENT:
+When a card appears to have an autograph (signature visible on front):
+1. Do NOT assume authentic just because front says "Certified Autograph Issue" or similar certification text
+2. Reprint and reproduction cards often copy the ENTIRE original front design INCLUDING certification text and logos
+3. ALWAYS thoroughly check the card back for any disclosure language before confirming autograph is authentic
+4. If card back mentions "reproduction", "reprint", or "facsimile" ANYWHERE → the autograph is a facsimile, NOT hand-signed
+5. Only set autographed=true if: NO reproduction disclosure found on back AND signature appears genuinely hand-signed (ink variations, pen pressure differences)
+
+**DEFAULT ASSUMPTION FOR AUTOGRAPHED CARDS:**
+• If autograph visible + ANY reproduction/reprint/facsimile language found on back → facsimile_autograph: true, autographed: false
+• If autograph visible + NO reproduction language + signature shows hand-signed characteristics → autographed: true, facsimile_autograph: false
+• When in doubt about autograph authenticity, re-read ALL card back text before concluding
+
 **FACSIMILE AUTOGRAPH INDICATORS (Card IS Official):**
 ✅ Card back explicitly states "Facsimile Autograph" or "Facsimile Signature"
 ✅ Text indicates "Printed Autograph" or "Reproduced Signature"
