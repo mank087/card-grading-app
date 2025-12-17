@@ -2,6 +2,16 @@
  * Utility functions for eBay integration
  */
 
+/**
+ * Format card number for eBay search with # prefix
+ * Examples: "9/111" -> "#9/111", "23" -> "#23", "SWSH039" -> "#SWSH039"
+ */
+function formatCardNumber(cardNumber: string): string {
+  if (!cardNumber) return '';
+  // Add # prefix for better eBay search matching
+  return `#${cardNumber}`;
+}
+
 export interface CardData {
   card_name?: string;
   card_set?: string;
@@ -38,9 +48,9 @@ export function generatePokemonEbaySearchUrl(cardData: CardData): string {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Add card number (for precise identification)
+  // 2. Add card number with # prefix (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   // Join terms and encode for URL
@@ -70,9 +80,9 @@ export function generatePokemonEbaySoldListingsUrl(cardData: CardData): string {
     searchTerms.push(cardData.featured);
   }
 
-  // 2. Add card number
+  // 2. Add card number with # prefix
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(" ");
@@ -106,7 +116,7 @@ export function generateMTGEbaySearchUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -140,7 +150,7 @@ export function generateMTGEbaySoldListingsUrl(cardData: CardData): string {
 
   // 2. Card number
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -172,7 +182,7 @@ export function generateEbaySearchUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(" ");
@@ -203,7 +213,7 @@ export function generateEbaySoldListingsUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(" ");
@@ -235,7 +245,7 @@ export function generateEbayGradedSearchUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   // 3. Add "graded" keyword for graded card search
@@ -271,7 +281,7 @@ export function generateLorcanaEbaySearchUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -305,7 +315,7 @@ export function generateLorcanaEbaySoldListingsUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -340,7 +350,7 @@ export function generateOtherEbaySearchUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(' ');
@@ -371,7 +381,7 @@ export function generateOtherEbaySoldListingsUrl(cardData: CardData): string {
 
   // 2. Card number (for precise identification)
   if (cardData.card_number) {
-    searchTerms.push(cardData.card_number);
+    searchTerms.push(formatCardNumber(cardData.card_number));
   }
 
   const searchQuery = searchTerms.join(' ');
