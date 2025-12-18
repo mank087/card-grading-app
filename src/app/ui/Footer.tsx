@@ -72,6 +72,11 @@ export default function Footer() {
                   Buy Credits
                 </Link>
               </li>
+              <li>
+                <Link href="/collection" className="text-gray-400 hover:text-white transition-colors">
+                  My Collection
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -137,8 +142,8 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/collection" className="text-gray-400 hover:text-white transition-colors">
-                  My Collection
+                <Link href="/pokemon-database" className="text-gray-400 hover:text-white transition-colors">
+                  Pokémon Database
                 </Link>
               </li>
             </ul>

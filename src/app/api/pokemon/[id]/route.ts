@@ -833,10 +833,115 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         // 🆕 HYBRID SET IDENTIFICATION: Check if we need API lookup
         const cardInfo = conversationalGradingData.card_info;
 
-        // 🔧 DATABASE VALIDATION: Query local pokemon_cards by name + number to validate/correct AI's values
-        // This fixes issues where AI changes "125/094" to "125/109" or uses wrong set/year based on its knowledge
+        // 🇯🇵 JAPANESE CARD DETECTION: Check if card has Japanese text
+        // Detects hiragana (3040-309F), katakana (30A0-30FF), and kanji (4E00-9FFF)
+        const hasJapaneseText = (text: string | null | undefined): boolean => {
+          if (!text) return false;
+          return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+        };
+
+        const isJapaneseCard = hasJapaneseText(cardInfo?.card_name) ||
+                               hasJapaneseText(cardInfo?.player_or_character) ||
+                               hasJapaneseText(cardInfo?.set_name) ||
+                               cardInfo?.language === 'ja' ||
+                               cardInfo?.language === 'japanese';
+
+        // 🇯🇵 JAPANESE DATABASE VALIDATION: Query pokemon_cards_ja for Japanese cards
         let dbValidationApplied = false;
-        if (cardInfo?.player_or_character && cardInfo?.card_number) {
+        if (isJapaneseCard && cardInfo?.card_number) {
+          try {
+            const cardName = cardInfo.card_name || cardInfo.player_or_character;
+            const cardNumber = cardInfo.card_number;
+
+            console.log(`[GET /api/pokemon/${cardId}] 🇯🇵 Japanese card detected, validating against pokemon_cards_ja`);
+            console.log(`[GET /api/pokemon/${cardId}] 🔍 Searching: name="${cardName}", number="${cardNumber}"`);
+
+            // Try to find the Japanese card in our database
+            let jaQuery = supabase
+              .from('pokemon_cards_ja')
+              .select('id, name, name_english, local_id, set_id, set_name, set_printed_total, set_release_date, rarity, illustrator, image_url')
+              .eq('local_id', cardNumber)
+              .order('set_release_date', { ascending: false })
+              .limit(10);
+
+            // If we have a name, filter by it too
+            if (cardName) {
+              jaQuery = supabase
+                .from('pokemon_cards_ja')
+                .select('id, name, name_english, local_id, set_id, set_name, set_printed_total, set_release_date, rarity, illustrator, image_url')
+                .eq('local_id', cardNumber)
+                .or(`name.ilike.%${cardName}%,name_english.ilike.%${cardName}%`)
+                .order('set_release_date', { ascending: false })
+                .limit(10);
+            }
+
+            const { data: jaMatches, error: jaError } = await jaQuery;
+
+            if (!jaError && jaMatches && jaMatches.length > 0) {
+              // Found match(es) in Japanese database
+              // Try to find best match by name similarity
+              let bestMatch = jaMatches[0];
+              if (cardName && jaMatches.length > 1) {
+                const exactMatch = jaMatches.find(m =>
+                  m.name === cardName ||
+                  m.name_english?.toLowerCase() === cardName.toLowerCase()
+                );
+                if (exactMatch) bestMatch = exactMatch;
+              }
+
+              console.log(`[GET /api/pokemon/${cardId}] ✅ JAPANESE DB MATCH FOUND:`);
+              console.log(`  - Japanese name: ${bestMatch.name}`);
+              console.log(`  - English name: ${bestMatch.name_english || 'N/A'}`);
+              console.log(`  - Set: ${bestMatch.set_name} (${bestMatch.set_id})`);
+              console.log(`  - Number: ${bestMatch.local_id}/${bestMatch.set_printed_total}`);
+
+              // Fill in card_info with Japanese database values
+              cardInfo.set_name = bestMatch.set_name;
+              cardInfo.set_id = bestMatch.set_id;
+              cardInfo.set_total = bestMatch.set_printed_total?.toString();
+              cardInfo.card_number_raw = `${bestMatch.local_id}/${bestMatch.set_printed_total}`;
+              cardInfo.language = 'ja';
+              cardInfo.tcgdex_id = bestMatch.id;
+              cardInfo.tcgdex_image_url = bestMatch.image_url;
+
+              // Add English name if available
+              if (bestMatch.name_english) {
+                cardInfo.name_english = bestMatch.name_english;
+              }
+
+              // Extract year from set_release_date
+              if (bestMatch.set_release_date) {
+                const yearMatch = bestMatch.set_release_date.toString().match(/^(\d{4})/);
+                if (yearMatch) {
+                  cardInfo.year = yearMatch[1];
+                }
+              }
+
+              // Add rarity and illustrator if available
+              if (bestMatch.rarity) {
+                cardInfo.rarity_or_variant = bestMatch.rarity;
+              }
+              if (bestMatch.illustrator) {
+                cardInfo.illustrator = bestMatch.illustrator;
+              }
+
+              cardInfo.needs_api_lookup = false;
+              cardInfo.validated_source = 'pokemon_cards_ja';
+              dbValidationApplied = true;
+
+              console.log(`[GET /api/pokemon/${cardId}] ✅ Japanese card info enriched from TCGdex database`);
+            } else {
+              console.log(`[GET /api/pokemon/${cardId}] ⚠️ No Japanese DB match for "${cardName}" #${cardNumber}, using AI values`);
+            }
+          } catch (jaValidationError) {
+            console.error(`[GET /api/pokemon/${cardId}] ⚠️ Japanese DB validation error:`, jaValidationError);
+          }
+        }
+
+        // 🔧 ENGLISH DATABASE VALIDATION: Query local pokemon_cards by name + number to validate/correct AI's values
+        // This fixes issues where AI changes "125/094" to "125/109" or uses wrong set/year based on its knowledge
+        // Skip if already validated as Japanese card
+        if (!dbValidationApplied && !isJapaneseCard && cardInfo?.player_or_character && cardInfo?.card_number) {
           try {
             const pokemonName = cardInfo.player_or_character;
             const cardNumber = cardInfo.card_number; // Numerator only, e.g., "125"
@@ -912,16 +1017,30 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
               updatedJson.card_info.card_number_raw = cardInfo.card_number_raw;
               updatedJson.card_info.year = cardInfo.year;
               updatedJson.card_info.needs_api_lookup = false;
+
+              // 🇯🇵 Add Japanese-specific fields if this is a Japanese card
+              if (isJapaneseCard) {
+                updatedJson.card_info.language = 'ja';
+                updatedJson.card_info.validated_source = 'pokemon_cards_ja';
+                if (cardInfo.tcgdex_id) updatedJson.card_info.tcgdex_id = cardInfo.tcgdex_id;
+                if (cardInfo.tcgdex_image_url) updatedJson.card_info.tcgdex_image_url = cardInfo.tcgdex_image_url;
+                if (cardInfo.name_english) updatedJson.card_info.name_english = cardInfo.name_english;
+                if (cardInfo.set_id) updatedJson.card_info.set_id = cardInfo.set_id;
+                if (cardInfo.rarity_or_variant) updatedJson.card_info.rarity_or_variant = cardInfo.rarity_or_variant;
+                if (cardInfo.illustrator) updatedJson.card_info.illustrator = cardInfo.illustrator;
+              }
             }
             conversationalGradingResult = JSON.stringify(updatedJson);
-            console.log(`[GET /api/pokemon/${cardId}] ✅ Updated raw JSON with DB-corrected values`);
+            console.log(`[GET /api/pokemon/${cardId}] ✅ Updated raw JSON with DB-corrected values${isJapaneseCard ? ' (Japanese)' : ''}`);
           } catch (jsonUpdateError) {
             console.error(`[GET /api/pokemon/${cardId}] ⚠️ Failed to update raw JSON:`, jsonUpdateError);
           }
         }
 
-        const needsApiLookup = cardInfo?.needs_api_lookup === true ||
-                               ((!cardInfo?.set_name || cardInfo?.set_name === null) && !!cardInfo?.card_number);
+        // Skip API lookup for Japanese cards (they use TCGdex, not Pokemon TCG API)
+        const needsApiLookup = !isJapaneseCard && (
+                               cardInfo?.needs_api_lookup === true ||
+                               ((!cardInfo?.set_name || cardInfo?.set_name === null) && !!cardInfo?.card_number));
 
         console.log(`[GET /api/pokemon/${cardId}] 🔍 Set identification check:`, {
           set_name: cardInfo?.set_name || 'null',
