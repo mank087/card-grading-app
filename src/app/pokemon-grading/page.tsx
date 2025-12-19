@@ -473,18 +473,6 @@ export default function PokemonGradingLanding() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="py-8 bg-gray-900 border-t border-gray-800">
-        <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} DCM Grading. All rights reserved.</p>
-          <div className="flex justify-center gap-6 mt-4">
-            <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
-            <Link href="/about" className="hover:text-gray-300 transition-colors">About</Link>
-          </div>
-        </div>
-      </footer>
-
       {/* CSS for floating animation */}
       <style jsx>{`
         @keyframes float-slow {

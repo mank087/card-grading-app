@@ -140,7 +140,7 @@ export default function SportsGradingLanding() {
 
               <p className="text-xl text-gray-300 mb-8 max-w-xl">
                 AI-powered grading in <span className="text-white font-semibold">under 60 seconds</span>.
-                Get detailed centering, corners, edges & surface analysis — know if your rookie card is worth submitting.
+                Get detailed centering, corners, edges & surface analysis — know if your card is worth submitting.
               </p>
 
               {/* Trust badges */}
@@ -530,18 +530,6 @@ export default function SportsGradingLanding() {
           </Link>
         </div>
       </section>
-
-      {/* Footer */}
-      <footer className="py-8 bg-gray-900 border-t border-gray-800">
-        <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          <p>&copy; {new Date().getFullYear()} DCM Grading. All rights reserved.</p>
-          <div className="flex justify-center gap-6 mt-4">
-            <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms</Link>
-            <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
-            <Link href="/about" className="hover:text-gray-300 transition-colors">About</Link>
-          </div>
-        </div>
-      </footer>
 
       {/* CSS for floating animation */}
       <style jsx>{`
