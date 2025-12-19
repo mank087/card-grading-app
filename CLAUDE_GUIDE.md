@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 17, 2025 (v7.3 - Prompt Consistency & Unified Cap System)
+> Last Updated: December 18, 2025 (v7.4 - Japanese Pokemon Card Database)
 
 ---
 
@@ -139,6 +139,7 @@ src/
 | `/terms` | `app/terms/page.tsx` | Terms of service |
 | `/privacy` | `app/privacy/page.tsx` | Privacy policy |
 | `/unsubscribe` | `app/unsubscribe/page.tsx` | Email unsubscribe |
+| `/pokemon-database` | `app/pokemon-database/page.tsx` | Pokemon card database search (EN/JA) |
 
 ### Protected Pages (Require Login)
 
@@ -212,6 +213,13 @@ src/
 | `/api/sports/[id]` | GET/DELETE | Sports card operations |
 | `/api/lorcana/[id]` | GET/DELETE | Lorcana card operations |
 | `/api/other/[id]` | GET/DELETE | Other card operations |
+
+### Pokemon Database (v7.4)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/pokemon-database/search` | GET | Search Pokemon cards (EN/JA/All) |
+| `/api/pokemon-database/sets` | GET | Get sets list by language |
 
 ### Payments & Credits
 
@@ -769,6 +777,48 @@ pokemon_import_log (
   error_message TEXT,
   created_at TIMESTAMPTZ
 )
+
+-- Japanese Pokemon Database (v7.4 - TCGdex)
+pokemon_sets_ja (
+  id TEXT PRIMARY KEY,                    -- TCGdex set ID: "sv1", "base1"
+  name TEXT NOT NULL,                     -- Japanese set name
+  logo TEXT,                              -- Set logo URL
+  symbol TEXT,                            -- Set symbol URL
+  series_id TEXT,                         -- Series identifier
+  series_name TEXT,                       -- Series name in Japanese
+  tcg_online TEXT,                        -- PTCGO code
+  release_date DATE,
+  legal_standard BOOLEAN,
+  legal_expanded BOOLEAN,
+  card_count_total INTEGER,
+  card_count_official INTEGER,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+
+pokemon_cards_ja (
+  id TEXT PRIMARY KEY,                    -- TCGdex card ID: "sv1-1", "base1-4"
+  local_id TEXT,                          -- Card number within set
+  name TEXT NOT NULL,                     -- Japanese card name
+  image_url TEXT,                         -- High-res image URL from TCGdex
+  set_id TEXT REFERENCES pokemon_sets_ja(id),
+  set_name TEXT,                          -- Denormalized set name
+  category TEXT,                          -- "Pokemon", "Trainer", "Energy"
+  illustrator TEXT,
+  rarity TEXT,
+  hp INTEGER,
+  types TEXT[],                           -- ["Fire"], ["Water", "Psychic"]
+  evolve_from TEXT,                       -- Evolution source
+  description TEXT,                       -- Flavor text
+  stage TEXT,                             -- "Basic", "Stage 1", "Stage 2"
+  suffix TEXT,                            -- "EX", "V", "VMAX", etc.
+  regulation_mark TEXT,                   -- "G", "H", etc.
+  legal_standard BOOLEAN,
+  legal_expanded BOOLEAN,
+  release_date DATE,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
 ```
 
 ### Storage Buckets
@@ -882,6 +932,33 @@ Email/Password users: email_confirmed_at within 60 seconds
 Pokemon cards → pokemonApiVerification.ts → Pokemon TCG API
 MTG cards → mtgApiVerification.ts → Scryfall API
 ```
+
+### Japanese Card Detection (v7.4)
+
+The grading system now automatically detects Japanese cards and validates against the Japanese database:
+
+```typescript
+// Japanese text detection (api/pokemon/[id]/route.ts)
+const hasJapaneseText = (text: string | null | undefined): boolean => {
+  if (!text) return false;
+  return /[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(text);
+};
+
+// Detection checks multiple fields
+const isJapaneseCard = hasJapaneseText(cardInfo?.card_name) ||
+                       hasJapaneseText(cardInfo?.player_or_character) ||
+                       hasJapaneseText(cardInfo?.set_name) ||
+                       cardInfo?.language === 'ja' ||
+                       cardInfo?.language === 'japanese';
+```
+
+**Japanese Card Grading Flow:**
+1. AI grades card normally (all languages supported)
+2. After grading, system detects if card has Japanese text
+3. If Japanese, query `pokemon_cards_ja` by name and number
+4. Enrich card_info with: `set_name`, `set_id`, `set_total`, `year`, `language`, `tcgdex_id`, `tcgdex_image_url`, `name_english`, `rarity_or_variant`, `illustrator`
+5. Skip English Pokemon TCG API lookup for Japanese cards
+6. Update both `card_info` object and raw JSON in database
 
 ---
 
@@ -1018,6 +1095,35 @@ PROMO CARD SUPPORT (v7.2):
 Base URL: https://api.scryfall.com
 Purpose: Verify MTG card info
 File: lib/mtgApiVerification.ts
+```
+
+### TCGdex API (Japanese Cards - v7.4)
+
+```
+Base URL: https://api.tcgdex.net/v2/ja
+Purpose: Japanese Pokemon card data
+Files:
+  - scripts/import-pokemon-tcgdex.js    # Import script
+  - scripts/backfill-japanese-images.js # Image backfill
+
+JAPANESE DATABASE:
+  The system maintains a separate Japanese Pokemon database sourced from TCGdex.
+  Used for Japanese card detection and validation during grading.
+
+  Tables:
+  - pokemon_sets_ja (171 sets)
+  - pokemon_cards_ja (~5,500+ cards)
+
+  Import Script: scripts/import-pokemon-tcgdex.js
+  Migration: migrations/add_japanese_pokemon_tables.sql
+
+  Usage:
+    node scripts/import-pokemon-tcgdex.js  # Full import (~17 minutes)
+
+IMAGE NOTES:
+  - Modern sets (SV, S series) have images from TCGdex
+  - Old sets (1996-2000s) may have null images (no scans available)
+  - Images hosted at: https://assets.tcgdex.net/ja/{series}/{set}/{localId}/high.webp
 ```
 
 ### Stripe
@@ -1182,7 +1288,7 @@ node scripts/backfill-followup-emails.js
 ### Pokemon Database Maintenance
 
 ```bash
-# Full import of all Pokemon cards (~20k cards, takes ~60-90 min)
+# Full import of all English Pokemon cards (~20k cards, takes ~60-90 min)
 node scripts/import-pokemon-database.js --full
 
 # Incremental import (cards from last 90 days only)
@@ -1190,6 +1296,16 @@ node scripts/import-pokemon-database.js --incremental
 
 # Re-run import to fill gaps (uses upsert, safe to re-run)
 node scripts/import-pokemon-database.js --full
+```
+
+### Japanese Pokemon Database Maintenance (v7.4)
+
+```bash
+# Full import of Japanese cards from TCGdex (~171 sets, ~5,500 cards, ~17 min)
+node scripts/import-pokemon-tcgdex.js
+
+# Backfill missing image URLs for Japanese cards
+node scripts/backfill-japanese-images.js
 ```
 
 ---
@@ -1290,6 +1406,29 @@ node scripts/import-pokemon-database.js --full
   - `conversationalGradingResult` (raw JSON string)
 - If mismatch persists: force regrade with `?force_regrade=true`
 
+### Japanese Pokemon Cards Not Detected
+- v7.4 fix: System detects Japanese text using Unicode ranges (Hiragana, Katakana, Kanji)
+- Check if card_name, player_or_character, or set_name contains Japanese text
+- Also checks language field for 'ja' or 'japanese'
+- Debug: Log `isJapaneseCard` value in `api/pokemon/[id]/route.ts`
+
+### Japanese Card Not Enriched with Set Data
+- Verify card exists in `pokemon_cards_ja` table: `SELECT * FROM pokemon_cards_ja WHERE name ILIKE '%カード名%' LIMIT 5`
+- Re-run import if cards missing: `node scripts/import-pokemon-tcgdex.js`
+- Check that card number matches: query uses `local_id = '{card_number}'`
+
+### Japanese Card Images Not Displaying
+- v7.4: Added `assets.tcgdex.net` to Next.js image whitelist in `next.config.ts`
+- Old sets (1996-2000s) may have null images - this is a TCGdex data limitation
+- Modern sets (SV, S series) should have images
+- Check image_url column: `SELECT id, name, image_url FROM pokemon_cards_ja WHERE image_url IS NULL LIMIT 10`
+
+### Pokemon Database Page Search Issues
+- v7.4: Search API fixed - helper functions should NOT be async
+- If "query.order is not a function" error: check helper functions return Supabase query builder directly
+- Sets dropdown updates based on language selection
+- Clear selected set when language changes
+
 ---
 
 ## File Naming Conventions
@@ -1303,7 +1442,7 @@ node scripts/import-pokemon-database.js --full
 
 ---
 
-*This guide covers active, working code as of December 2025 (v7.2). Deprecated files are not included.*
+*This guide covers active, working code as of December 2025 (v7.4). Deprecated files are not included.*
 
 ---
 
@@ -1311,6 +1450,7 @@ node scripts/import-pokemon-database.js --full
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v7.4 | Dec 18, 2025 | Japanese Pokemon database (TCGdex), Pokemon Database page with language toggle, Japanese card grading detection |
 | v7.3 | Dec 17, 2025 | Prompt consistency overhaul: unified cap system, execution flowchart, whole numbers only, fixed contradictions |
 | v7.2 | Dec 17, 2025 | Visual Defect Identification Guide, Defect Hunting Protocol, Facebook OAuth |
 | v7.1.1 | Dec 16, 2025 | Unified label system, sports card category fix, SM/XY promo support |
