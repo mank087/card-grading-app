@@ -558,48 +558,55 @@ const formatGrade = (grade: number | null) => {
   return Math.round(grade).toString();
 };
 
-// Helper: Map confidence score to uncertainty value
+// Helper: Map confidence score to uncertainty value (v7.4: whole number system)
 const getUncertaintyFromConfidence = (confidence: string | null | undefined): string => {
-  if (!confidence) return '±0.5'; // Default to B confidence
+  if (!confidence) return '±1'; // Default to B confidence
 
   const conf = confidence.toUpperCase().trim();
   switch (conf) {
-    case 'A': return '±0.25';
-    case 'B': return '±0.5';
-    case 'C': return '±1.0';
-    case 'D': return '±1.5';
-    default: return '±0.5'; // Default to B confidence
+    case 'A': return '±0';
+    case 'B': return '±1';
+    case 'C': return '±2';
+    case 'D': return '±3';
+    default: return '±1'; // Default to B confidence
   }
 };
 
-// Helper: Convert range format (e.g., "9.75-10.25") to ± format (e.g., "±0.25")
+// Helper: Check if confidence grade recommends new photos
+const shouldRecommendNewPhotos = (confidence: string | null | undefined): boolean => {
+  if (!confidence) return false;
+  const conf = confidence.toUpperCase().trim();
+  return conf === 'C' || conf === 'D';
+};
+
+// Helper: Convert range format to ± format (v7.4: whole number system)
 const convertRangeToPlusMinus = (uncertainty: string | null | undefined): string => {
-  if (!uncertainty) return '±0.5';
+  if (!uncertainty) return '±1';
 
   const uncertaintyStr = uncertainty.toString().trim();
 
   // If already in ± format, return as-is
   if (uncertaintyStr.includes('±')) {
     const match = uncertaintyStr.match(/±\s*[\d.]+/);
-    return match ? match[0] : '±0.5';
+    return match ? match[0] : '±1';
   }
 
-  // If in range format (e.g., "9.75-10.25"), convert to ±
+  // If in range format (e.g., "9-10"), convert to ±
   const rangeMatch = uncertaintyStr.match(/([\d.]+)\s*-\s*([\d.]+)/);
   if (rangeMatch) {
     const lower = parseFloat(rangeMatch[1]);
     const upper = parseFloat(rangeMatch[2]);
-    const plusMinus = ((upper - lower) / 2).toFixed(2);
+    const plusMinus = Math.round((upper - lower) / 2);
     return `±${plusMinus}`;
   }
 
-  // If just a number (e.g., "0.5"), assume it's the ± value
+  // If just a number (e.g., "1"), assume it's the ± value
   if (/^[\d.]+$/.test(uncertaintyStr)) {
-    return `±${uncertaintyStr}`;
+    return `±${Math.round(parseFloat(uncertaintyStr))}`;
   }
 
   // Default fallback
-  return '±0.5';
+  return '±1';
 };
 
 const getGradeColor = (grade: string | number) => {
@@ -4373,46 +4380,48 @@ export function PokemonCardDetails() {
                   const imageGrade = card.conversational_image_confidence || card.dvg_image_quality || imageQuality?.grade || card.ai_confidence_score || 'B';
 
                   const getConfidenceLevel = (grade: string) => {
-                    // Check grade uncertainty first (if available and matches known values)
-                    // Maps to Image Confidence: A=±0.25, B=±0.5, C=±1.0, D=±1.5
-                    if (recommendedGrade.grade_uncertainty === '±0.0') return { level: 'Very High', width: '95%', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
-                    if (recommendedGrade.grade_uncertainty === '±0.25') return { level: 'High', width: '85%', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
-                    if (recommendedGrade.grade_uncertainty === '±0.5') return { level: 'Medium-High', width: '70%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
-                    if (recommendedGrade.grade_uncertainty === '±1.0') return { level: 'Medium', width: '55%', color: 'bg-yellow-400', textColor: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-300' };
-                    if (recommendedGrade.grade_uncertainty === '±1.5') return { level: 'Low', width: '40%', color: 'bg-red-400', textColor: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-300' };
+                    // v7.4: Maps to Image Confidence: A=±0, B=±1, C=±2, D=±3
+                    if (recommendedGrade.grade_uncertainty === '±0') return { level: 'Very High', width: '95%', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
+                    if (recommendedGrade.grade_uncertainty === '±1') return { level: 'High', width: '80%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
+                    if (recommendedGrade.grade_uncertainty === '±2') return { level: 'Moderate', width: '55%', color: 'bg-yellow-400', textColor: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-300' };
+                    if (recommendedGrade.grade_uncertainty === '±3') return { level: 'Low', width: '35%', color: 'bg-red-400', textColor: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-300' };
 
                     // Fallback: Use the actual image grade (from conversational AI or fallback)
-                    // Maps to prompt: A=±0.25, B=±0.5, C=±1.0, D=±1.5
-                    if (grade === 'A') return { level: 'High', width: '85%', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
-                    if (grade === 'B') return { level: 'Medium-High', width: '70%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
-                    if (grade === 'C') return { level: 'Medium', width: '55%', color: 'bg-yellow-400', textColor: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-300' };
-                    if (grade === 'D') return { level: 'Low', width: '40%', color: 'bg-red-400', textColor: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-300' };
+                    // v7.4 mapping: A=±0, B=±1, C=±2, D=±3
+                    if (grade === 'A') return { level: 'Very High', width: '95%', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
+                    if (grade === 'B') return { level: 'High', width: '80%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
+                    if (grade === 'C') return { level: 'Moderate', width: '55%', color: 'bg-yellow-400', textColor: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-300' };
+                    if (grade === 'D') return { level: 'Low', width: '35%', color: 'bg-red-400', textColor: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-300' };
 
-                    // Default to Medium-High for B grade
-                    return { level: 'Medium-High', width: '70%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
+                    // Default to High for B grade
+                    return { level: 'High', width: '80%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
                   };
 
                   const getImageQualityInfo = (grade: string) => {
                     const gradeDefinitions = {
                       'A': {
                         name: 'Grade A - Excellent',
-                        description: 'Clear, well-lit images with no obstructions. Optimal for accurate grading with minimal uncertainty.',
-                        icon: '✨'
+                        description: 'Clear, well-lit images with no obstructions. Optimal for accurate grading with no uncertainty.',
+                        icon: '✨',
+                        recommendNewPhotos: false
                       },
                       'B': {
                         name: 'Grade B - Good',
-                        description: 'Minor issues with lighting or focus. Reliable for grading with slight uncertainty in fine details.',
-                        icon: '👍'
+                        description: 'Minor issues with lighting or focus. Reliable grading with minimal uncertainty in fine details.',
+                        icon: '👍',
+                        recommendNewPhotos: false
                       },
                       'C': {
                         name: 'Grade C - Fair',
-                        description: 'Moderate issues with glare, blur, or lighting. May increase grading uncertainty for defect detection.',
-                        icon: '⚠️'
+                        description: 'Moderate issues with glare, blur, or lighting. Consider submitting new photos for improved accuracy.',
+                        icon: '⚠️',
+                        recommendNewPhotos: true
                       },
                       'D': {
                         name: 'Grade D - Poor',
-                        description: 'Significant image quality issues that limit assessment accuracy. Results should be verified with better images.',
-                        icon: '❌'
+                        description: 'Significant image quality issues limiting assessment accuracy. We recommend submitting new photos for accurate grading.',
+                        icon: '❌',
+                        recommendNewPhotos: true
                       }
                     };
                     return gradeDefinitions[grade as keyof typeof gradeDefinitions] || gradeDefinitions['D'];
@@ -4453,6 +4462,32 @@ export function PokemonCardDetails() {
                           </div>
                         </div>
                       </div>
+
+                      {/* v7.4: New Photos Recommendation for C/D grades */}
+                      {gradeInfo.recommendNewPhotos && (
+                        <div className="mt-4 bg-amber-50 border-2 border-amber-300 rounded-lg p-4 shadow-sm">
+                          <div className="flex items-start gap-3">
+                            <span className="text-2xl">📷</span>
+                            <div className="flex-1">
+                              <h3 className="text-lg font-bold text-amber-800 mb-2">
+                                New Photos Recommended
+                              </h3>
+                              <p className="text-sm text-gray-700 leading-relaxed mb-3">
+                                The image quality affects grading accuracy. For the most reliable results, consider uploading clearer photos with better lighting and no obstructions.
+                              </p>
+                              <a
+                                href="/upload/pokemon"
+                                className="inline-flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors"
+                              >
+                                <span>Upload New Photos</span>
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      )}
 
                       {/* Professional Slab Detection - JSON Mode v4.0 */}
                       {(() => {

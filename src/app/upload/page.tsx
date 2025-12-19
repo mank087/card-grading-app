@@ -15,7 +15,8 @@ import PhotoTipsPopup, { useShouldShowPhotoTips } from '@/components/PhotoTipsPo
 import Link from 'next/link'
 import { useToast } from '@/hooks/useToast'
 import UserConditionReport from '@/components/UserConditionReport'
-import { UserConditionReportInput, EMPTY_CONDITION_REPORT, hasAnyConditionData } from '@/types/conditionReport'
+import WizardProgressIndicator from '@/components/WizardProgressIndicator'
+import { UserConditionReportInput, EMPTY_CONDITION_REPORT, hasAnyConditionData, countDefects } from '@/types/conditionReport'
 import { processConditionReport } from '@/lib/conditionReportProcessor'
 
 interface CompressionInfo {
@@ -175,6 +176,12 @@ function UniversalUploadPageContent() {
   // User condition report state (optional defect hints)
   const [conditionReport, setConditionReport] = useState<UserConditionReportInput>(EMPTY_CONDITION_REPORT);
 
+  // Wizard step state for review flow (1 = Category, 2 = Photos, 3 = Condition)
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+
+  // "No defects" acknowledgment checkbox state
+  const [noDefectsConfirmed, setNoDefectsConfirmed] = useState(false);
+
   // Update selected type when URL param changes AND reset upload state if navigating to grade a new card
   useEffect(() => {
     const categoryParam = searchParams?.get('category');
@@ -200,18 +207,31 @@ function UniversalUploadPageContent() {
         setUploadedCardId(null);
         setUploadedCardCategory(null);
         setUploadMode('select');
+        setWizardStep(1);
+        setNoDefectsConfirmed(false);
+        setConditionReport(EMPTY_CONDITION_REPORT);
       }
       setLastNavTimestamp(navTimestamp || null);
       setSelectedType(categoryParam as CardType);
     }
   }, [searchParams, lastNavTimestamp, isUploading]);
 
-  // Scroll to top when returning to main upload screen
+  // Scroll to top when returning to main upload screen or changing wizard steps
   useEffect(() => {
     if (uploadMode === 'select') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Reset wizard when going back to select
+      setWizardStep(1);
+      setNoDefectsConfirmed(false);
     }
   }, [uploadMode]);
+
+  // Scroll to top when wizard step changes
+  useEffect(() => {
+    if (uploadMode === 'review') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [wizardStep, uploadMode]);
 
   const config = CARD_TYPES[selectedType];
 
@@ -589,21 +609,28 @@ function UniversalUploadPageContent() {
   }
 
   const handleRetakePhoto = (side: 'front' | 'back') => {
-    // Clear only the specific side being retaken
-    if (side === 'front') {
-      setFrontFile(null)
-      setFrontHash(null)
-      setFrontCompressed(null)
-      setFrontCompressionInfo(null)
+    // On desktop (no camera option), directly open file picker
+    // The new file will overwrite the old one when selected - no need to clear first
+    // On mobile/tablet, clear the file and return to the original upload method
+    if (!showCameraOption) {
+      // Desktop: directly trigger file input, keep current image until new one selected
+      document.getElementById(side === 'front' ? 'front-input' : 'back-input')?.click()
     } else {
-      setBackFile(null)
-      setBackHash(null)
-      setBackCompressed(null)
-      setBackCompressionInfo(null)
+      // Mobile: clear the image and return to original method
+      if (side === 'front') {
+        setFrontFile(null)
+        setFrontHash(null)
+        setFrontCompressed(null)
+        setFrontCompressionInfo(null)
+      } else {
+        setBackFile(null)
+        setBackHash(null)
+        setBackCompressed(null)
+        setBackCompressionInfo(null)
+      }
+      setCurrentSide(side)
+      setUploadMode(originalUploadMethod)
     }
-    // Return to the original upload method (camera or gallery)
-    setCurrentSide(side)
-    setUploadMode(originalUploadMethod)
   }
 
   const handleReviewImages = () => {
@@ -950,120 +977,407 @@ function UniversalUploadPageContent() {
     )
   }
 
-  // Show review screen after both photos captured
+  // Show review screen after both photos captured - 3-Step Wizard Flow
   if (uploadMode === 'review' && frontFile && backFile) {
+    const wizardSteps = [
+      { number: 1, label: 'Confirm Category', shortLabel: 'Category' },
+      { number: 2, label: 'Review Photos', shortLabel: 'Photos' },
+      { number: 3, label: 'Report Condition', shortLabel: 'Condition' },
+    ];
+
+    const defectCount = countDefects(conditionReport);
+    const hasConditionData = hasAnyConditionData(conditionReport);
+
+    // Get card type icon based on category
+    const getCategoryIcon = (type: CardType) => {
+      switch (type) {
+        case 'Pokemon': return '⚡';
+        case 'MTG': return '🔮';
+        case 'Sports': return '🏆';
+        case 'Lorcana': return '✨';
+        case 'Other': return '🎴';
+        default: return '🎴';
+      }
+    };
+
     return (
       <>
         {hiddenFileInputs}
-        <div className="fixed inset-0 bg-white z-50 flex flex-col">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3">
-          <h2 className="text-lg font-bold text-center">Review & Submit</h2>
-        </div>
-
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
-          {/* Category Selector - Compact at top */}
-          <div className="bg-gray-50 border-b border-gray-200 px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Card Type:</label>
-              <select
-                value={selectedType}
-                onChange={(e) => setSelectedType(e.target.value as CardType)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-              >
-                {Object.entries(CARD_TYPES).map(([key, value]) => (
-                  <option key={key} value={key}>
-                    {value.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="text-xs text-gray-500 mt-1.5 text-center">
-              Make sure this matches your card type for accurate grading
-            </p>
+        <div className="fixed inset-0 bg-gray-50 z-50 flex flex-col">
+          {/* Header */}
+          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3">
+            <h2 className="text-lg font-bold text-center">
+              {wizardStep === 1 && 'Confirm Card Type'}
+              {wizardStep === 2 && 'Review Your Photos'}
+              {wizardStep === 3 && 'Report Card Condition'}
+            </h2>
           </div>
 
-          {/* Images Preview - Side by side on larger screens */}
-          <div className="p-4">
-            <div className="grid grid-cols-2 gap-3 max-w-lg mx-auto">
-              {/* Front Image */}
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="bg-gray-100 px-3 py-1.5 border-b">
-                  <h3 className="font-semibold text-gray-900 text-sm text-center">Front</h3>
+          {/* Progress Indicator */}
+          <div className="bg-white border-b border-gray-200">
+            <WizardProgressIndicator
+              steps={wizardSteps}
+              currentStep={wizardStep}
+              onStepClick={(step) => setWizardStep(step as 1 | 2 | 3)}
+              allowNavigation={true}
+            />
+          </div>
+
+          {/* Scrollable Content */}
+          <div className="flex-1 overflow-y-auto">
+            {/* ════════════════════════════════════════════════════════════ */}
+            {/* STEP 1: CONFIRM CATEGORY */}
+            {/* ════════════════════════════════════════════════════════════ */}
+            {wizardStep === 1 && (
+              <div className="p-4 max-w-lg mx-auto">
+                <div className="text-center mb-6">
+                  <p className="text-gray-600 text-sm">
+                    Make sure you&apos;ve selected the correct card type for accurate grading results.
+                  </p>
                 </div>
-                <div className="p-2">
-                  <img
-                    src={URL.createObjectURL(frontFile)}
-                    alt="Front of card"
-                    className="w-full rounded-lg"
-                  />
-                  <button
-                    onClick={() => handleRetakePhoto('front')}
-                    className="w-full mt-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+
+                {/* Current Selection - Large Display */}
+                <div className="bg-white rounded-2xl border-2 border-indigo-200 shadow-lg p-6 mb-6">
+                  <div className="text-center">
+                    <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-4xl">{getCategoryIcon(selectedType)}</span>
+                    </div>
+                    <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                      {config.label}
+                    </h3>
+                    <div className="text-left mt-4 space-y-2">
+                      {config.description.items.map((item, index) => (
+                        <div key={index} className="flex items-start gap-2 text-sm text-gray-600">
+                          <span className="text-green-500 mt-0.5">✓</span>
+                          <span>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Warning Banner */}
+                <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">⚠️</span>
+                    <div>
+                      <h4 className="font-semibold text-amber-800 mb-1">Wrong card type?</h4>
+                      <p className="text-sm text-amber-700">
+                        Selecting the wrong category affects grading accuracy. Change it below before continuing.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Category Selector */}
+                <div className="bg-white rounded-xl border border-gray-200 p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Change Card Type:
+                  </label>
+                  <select
+                    value={selectedType}
+                    onChange={(e) => setSelectedType(e.target.value as CardType)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base font-medium text-gray-900 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
                   >
-                    🔄 Retake
-                  </button>
+                    {Object.entries(CARD_TYPES).map(([key, value]) => (
+                      <option key={key} value={key}>
+                        {value.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
+            )}
 
-              {/* Back Image */}
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="bg-gray-100 px-3 py-1.5 border-b">
-                  <h3 className="font-semibold text-gray-900 text-sm text-center">Back</h3>
+            {/* ════════════════════════════════════════════════════════════ */}
+            {/* STEP 2: REVIEW PHOTOS */}
+            {/* ════════════════════════════════════════════════════════════ */}
+            {wizardStep === 2 && (
+              <div className="p-4 max-w-lg mx-auto">
+                {/* Category Badge */}
+                <div className="flex items-center justify-center gap-2 mb-4 bg-white rounded-full py-2 px-4 shadow-sm border border-gray-200 w-fit mx-auto">
+                  <span className="text-lg">{getCategoryIcon(selectedType)}</span>
+                  <span className="font-medium text-gray-700">{config.label}</span>
                 </div>
-                <div className="p-2">
-                  <img
-                    src={URL.createObjectURL(backFile)}
-                    alt="Back of card"
-                    className="w-full rounded-lg"
-                  />
-                  <button
-                    onClick={() => handleRetakePhoto('back')}
-                    className="w-full mt-2 px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
-                  >
-                    🔄 Retake
-                  </button>
+
+                <div className="text-center mb-4">
+                  <p className="text-gray-600 text-sm">
+                    Review your photos before submitting. Better quality photos lead to more accurate grading.
+                  </p>
+                </div>
+
+                {/* Images Preview - Larger */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  {/* Front Image */}
+                  <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+                    <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-3 py-2">
+                      <h3 className="font-bold text-white text-sm text-center">FRONT</h3>
+                    </div>
+                    <div className="p-3">
+                      <img
+                        src={URL.createObjectURL(frontFile)}
+                        alt="Front of card"
+                        className="w-full rounded-lg shadow-sm"
+                      />
+                      <button
+                        onClick={() => handleRetakePhoto('front')}
+                        className="w-full mt-3 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span>🔄</span> Retake Front
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Back Image */}
+                  <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-3 py-2">
+                      <h3 className="font-bold text-white text-sm text-center">BACK</h3>
+                    </div>
+                    <div className="p-3">
+                      <img
+                        src={URL.createObjectURL(backFile)}
+                        alt="Back of card"
+                        className="w-full rounded-lg shadow-sm"
+                      />
+                      <button
+                        onClick={() => handleRetakePhoto('back')}
+                        className="w-full mt-3 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <span>🔄</span> Retake Back
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Photo Tips */}
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <h4 className="font-semibold text-blue-800 mb-2 flex items-center gap-2">
+                    <span>💡</span> Photo Tips
+                  </h4>
+                  <ul className="text-sm text-blue-700 space-y-1.5">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-400">•</span>
+                      Good lighting with no glare or reflections
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-400">•</span>
+                      Card fills most of the frame
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-400">•</span>
+                      Clear focus on all corners and edges
+                    </li>
+                  </ul>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* User Condition Report - Optional defect hints */}
-            <div className="mt-4 max-w-lg mx-auto">
-              <UserConditionReport
-                value={conditionReport}
-                onChange={setConditionReport}
-              />
-            </div>
+            {/* ════════════════════════════════════════════════════════════ */}
+            {/* STEP 3: REPORT CONDITION */}
+            {/* ════════════════════════════════════════════════════════════ */}
+            {wizardStep === 3 && (
+              <div className="p-4 max-w-2xl mx-auto">
+                {/* Category & Photos Summary Badge */}
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <div className="flex items-center gap-2 bg-white rounded-full py-2 px-4 shadow-sm border border-gray-200">
+                    <span className="text-lg">{getCategoryIcon(selectedType)}</span>
+                    <span className="font-medium text-gray-700 text-sm">{config.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1 bg-white rounded-full py-2 px-4 shadow-sm border border-gray-200">
+                    <span className="text-green-500">✓</span>
+                    <span className="font-medium text-gray-700 text-sm">2 Photos</span>
+                  </div>
+                </div>
+
+                {/* Educational Banner with Optional Highlight */}
+                <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-xl p-4 mb-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">📋</span>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h4 className="font-semibold text-indigo-800">Help Improve Grading Accuracy</h4>
+                        <span className="px-2 py-0.5 bg-indigo-200 text-indigo-700 text-xs font-semibold rounded-full uppercase">
+                          Optional
+                        </span>
+                      </div>
+                      <p className="text-sm text-indigo-700 leading-relaxed">
+                        Photos can miss subtle defects. If you notice any issues with your card, report them below to guide our AI inspection.
+                      </p>
+                      <p className="text-xs text-indigo-500 mt-2 italic">
+                        Your input helps guide inspection but cannot raise grades above what photos show.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* "No Defects" Acknowledgment - Moved up for visibility */}
+                <div className={`border-2 rounded-xl p-4 mb-4 transition-colors ${
+                  noDefectsConfirmed
+                    ? 'bg-green-50 border-green-300'
+                    : 'bg-white border-gray-200 hover:border-gray-300'
+                }`}>
+                  <label className="flex items-start gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={noDefectsConfirmed}
+                      onChange={(e) => {
+                        setNoDefectsConfirmed(e.target.checked)
+                        // Clear condition report when "no defects" is checked
+                        if (e.target.checked) {
+                          setConditionReport(EMPTY_CONDITION_REPORT)
+                        }
+                      }}
+                      className="w-5 h-5 mt-0.5 rounded border-gray-300 text-green-600 focus:ring-green-500 cursor-pointer"
+                    />
+                    <div>
+                      <span className={`font-semibold ${noDefectsConfirmed ? 'text-green-800' : 'text-gray-800'} group-hover:text-gray-900`}>
+                        No visible defects to report
+                      </span>
+                      <p className={`text-xs mt-1 ${noDefectsConfirmed ? 'text-green-600' : 'text-gray-500'}`}>
+                        Check this if you&apos;ve reviewed your card and don&apos;t see any defects worth mentioning.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Divider with OR */}
+                {!noDefectsConfirmed && (
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                    <span className="text-xs font-medium text-gray-400 uppercase">or report defects below</span>
+                    <div className="flex-1 h-px bg-gray-200"></div>
+                  </div>
+                )}
+
+                {/* Condition Report - Expanded by Default, hidden when no defects checked */}
+                {!noDefectsConfirmed && (
+                  <div className="mb-4">
+                    <UserConditionReport
+                      value={conditionReport}
+                      onChange={(newReport) => {
+                        setConditionReport(newReport)
+                        // Uncheck "no defects" if user starts reporting defects
+                        if (hasAnyConditionData(newReport)) {
+                          setNoDefectsConfirmed(false)
+                        }
+                      }}
+                      defaultExpanded={true}
+                    />
+                  </div>
+                )}
+
+                {/* Validation Message */}
+                {!noDefectsConfirmed && !hasConditionData && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-amber-500 text-lg">⚠️</span>
+                      <span className="text-sm font-medium text-amber-800">
+                        Please check &quot;No visible defects&quot; or report at least one defect to continue.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Summary - shown when complete */}
+                {(hasConditionData || noDefectsConfirmed) && (
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-500 text-lg">✓</span>
+                      <span className="font-medium text-green-800">
+                        {hasConditionData
+                          ? `${defectCount} defect${defectCount !== 1 ? 's' : ''} reported`
+                          : 'No defects reported - ready to submit'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons - Fixed at bottom */}
+          <div className="bg-white border-t border-gray-200 px-4 py-3 space-y-2">
+            {/* Processing indicator (only on step 3) */}
+            {wizardStep === 3 && isCompressing && (
+              <div className="flex items-center justify-center gap-2 text-indigo-600 py-1">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
+                <span className="text-sm font-medium">Processing images...</span>
+              </div>
+            )}
+
+            {/* Step-specific buttons */}
+            {wizardStep === 1 && (
+              <>
+                <button
+                  onClick={() => setWizardStep(2)}
+                  className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  <span>Continue to Photos</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setUploadMode('select')}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
+                >
+                  ← Cancel
+                </button>
+              </>
+            )}
+
+            {wizardStep === 2 && (
+              <>
+                <button
+                  onClick={() => setWizardStep(3)}
+                  className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  <span>Continue to Condition Report</span>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setWizardStep(1)}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
+                >
+                  ← Back to Category
+                </button>
+              </>
+            )}
+
+            {wizardStep === 3 && (
+              <>
+                <button
+                  onClick={handleUpload}
+                  disabled={!frontCompressed || !backCompressed || isCompressing || isUploading || (!noDefectsConfirmed && !hasConditionData)}
+                  className="w-full px-4 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg font-semibold text-lg hover:from-green-600 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg flex items-center justify-center gap-2"
+                >
+                  {isCompressing ? (
+                    'Processing Images...'
+                  ) : isUploading ? (
+                    'Uploading...'
+                  ) : !noDefectsConfirmed && !hasConditionData ? (
+                    'Complete Condition Report to Submit'
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span>Submit for Grading</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => setWizardStep(2)}
+                  className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
+                >
+                  ← Back to Photos
+                </button>
+              </>
+            )}
           </div>
         </div>
-
-        {/* Action Buttons - Fixed at bottom */}
-        <div className="bg-white border-t border-gray-200 px-4 py-3 space-y-2">
-          {/* Processing indicator */}
-          {isCompressing && (
-            <div className="flex items-center justify-center gap-2 text-indigo-600 py-1">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-              <span className="text-sm font-medium">Processing images...</span>
-            </div>
-          )}
-
-          <button
-            onClick={handleUpload}
-            disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
-            className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
-          >
-            {isCompressing ? 'Processing Images...' : isUploading ? 'Uploading...' : '✓ Submit for Grading'}
-          </button>
-
-          <button
-            onClick={() => setUploadMode('select')}
-            className="w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors text-sm"
-          >
-            ← Back
-          </button>
-        </div>
-      </div>
       </>
     )
   }
@@ -1353,22 +1667,35 @@ function UniversalUploadPageContent() {
           </div>
         )}
 
-        {/* User Condition Report - Optional defect hints (Desktop Mode) */}
-        {frontFile && backFile && (
-          <UserConditionReport
-            value={conditionReport}
-            onChange={setConditionReport}
-          />
+        {/* Review & Submit Button - Opens Wizard */}
+        {frontFile && backFile ? (
+          <button
+            onClick={() => setUploadMode('review')}
+            disabled={isCompressing}
+            className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-lg shadow-lg flex items-center justify-center gap-2"
+          >
+            {isCompressing ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                <span>Processing Images...</span>
+              </>
+            ) : (
+              <>
+                <span>Review & Submit</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </>
+            )}
+          </button>
+        ) : (
+          <button
+            disabled={true}
+            className="w-full px-4 py-4 bg-gray-300 text-gray-500 rounded-lg cursor-not-allowed font-semibold text-lg"
+          >
+            Select Both Images to Continue
+          </button>
         )}
-
-        {/* Upload Button */}
-        <button
-          onClick={handleUpload}
-          disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
-          className="w-full px-4 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium text-lg"
-        >
-          {isCompressing ? 'Processing...' : isUploading ? 'Grading Card...' : 'Upload & Grade Card'}
-        </button>
 
         {/* Footer */}
         <div className="text-center text-xs text-gray-500">

@@ -110,12 +110,12 @@ export function enforceGradeCaps(result: VisionGradeResult): VisionGradeResult {
   // ═════════════════════════════════════════════════════════════════════════
   // STATISTICAL HARD CAP (ChatGPT Recommendation)
   // ═════════════════════════════════════════════════════════════════════════
-  // Always block 10.0 to enforce <1% statistical rarity
+  // Always block 10 to enforce <1% statistical rarity
   // This is the "give up on AI detection, just cap programmatically" approach
-  if (ENABLE_STATISTICAL_HARD_CAP && originalGrade === 10.0) {
-    cappedGrade = 9.5;
-    cappedReasons.push("Statistical rarity enforcement - Grade 10.0 blocked (occurs in <1% of cards)");
-    console.log(`[GRADE VALIDATOR - HARD CAP] 10.0 blocked by statistical hard cap → 9.5`);
+  if (ENABLE_STATISTICAL_HARD_CAP && originalGrade === 10) {
+    cappedGrade = 9;
+    cappedReasons.push("Statistical rarity enforcement - Grade 10 blocked (occurs in <1% of cards)");
+    console.log(`[GRADE VALIDATOR - HARD CAP] 10 blocked by statistical hard cap → 9`);
   }
   // ═════════════════════════════════════════════════════════════════════════
 
@@ -124,27 +124,27 @@ export function enforceGradeCaps(result: VisionGradeResult): VisionGradeResult {
     const checks = (result as any).perfect_gate_checks;
 
     if (checks.corners8_pass === false) {
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push("8-corner audit incomplete or found defects (perfect_gate_checks.corners8_pass = false)");
     }
 
     if (checks.edges4_pass === false) {
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push("Edge audit incomplete or found defects (perfect_gate_checks.edges4_pass = false)");
     }
 
     if (checks.centering_two_axis_pass === false) {
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push("Centering outside 50/50-55/45 range (perfect_gate_checks.centering_two_axis_pass = false)");
     }
 
     if (checks.cross_side_pass === false) {
-      cappedGrade = Math.min(cappedGrade, 9.0);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push("Cross-side verification incomplete or failed (perfect_gate_checks.cross_side_pass = false)");
     }
 
     if (checks.image_quality_sufficient === false) {
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push("Image quality insufficient for micro-defect detection (perfect_gate_checks.image_quality_sufficient = false)");
     }
   }
@@ -155,24 +155,24 @@ export function enforceGradeCaps(result: VisionGradeResult): VisionGradeResult {
 
     if (findings.corner_whitening_mm_sum_front > 0 || findings.corner_whitening_mm_sum_back > 0) {
       const totalWhitening = (findings.corner_whitening_mm_sum_front || 0) + (findings.corner_whitening_mm_sum_back || 0);
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push(`Corner whitening detected (${totalWhitening.toFixed(2)}mm total)`);
     }
 
     if ((findings.edge_chips_total || 0) > 0 || (findings.edge_whitening_dots_total || 0) > 0) {
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push(`Edge defects detected (${findings.edge_chips_total || 0} chips, ${findings.edge_whitening_dots_total || 0} white dots)`);
     }
 
     if ((findings.hairline_count_front || 0) > 0 || (findings.hairline_count_back || 0) > 0) {
       const totalHairlines = (findings.hairline_count_front || 0) + (findings.hairline_count_back || 0);
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push(`Hairline scratches detected (${totalHairlines} total)`);
     }
 
     if ((findings.print_dots_count_front || 0) > 0 || (findings.print_dots_count_back || 0) > 0) {
       const totalPrintDots = (findings.print_dots_count_front || 0) + (findings.print_dots_count_back || 0);
-      cappedGrade = Math.min(cappedGrade, 9.5);
+      cappedGrade = Math.min(cappedGrade, 9);
       cappedReasons.push(`Print dots detected (${totalPrintDots} total)`);
     }
   }
@@ -226,16 +226,11 @@ export function enforceGradeCaps(result: VisionGradeResult): VisionGradeResult {
     }
   }
 
-  // CAP 4: High grade uncertainty - round down
-  if (result.recommended_grade.grade_uncertainty >= 0.3) {
-    const roundedDown = Math.floor(cappedGrade * 2) / 2; // Round down to nearest 0.5
-    if (roundedDown < cappedGrade) {
-      cappedGrade = roundedDown;
-      cappedReasons.push(`High uncertainty (${result.recommended_grade.grade_uncertainty}) - rounded down from ${cappedGrade} to ${roundedDown}`);
-    }
-  }
+  // CAP 4: REMOVED in v7.4 - grade_uncertainty is now a display-only reliability indicator
+  // The old logic compared a string (e.g., "±1") to a number (0.3) which never worked anyway
+  // Uncertainty is now shown to users as: A=±0, B=±1, C=±2, D=±3
 
-  // CAP 5: Statistical reality check - grade 10.0 should be extremely rare
+  // CAP 5: Statistical reality check - grade 10 should be extremely rare
   // FIXED: Only check for ACTUAL defects, not just !== 'none'
   if (originalGrade === 10.0 && cappedGrade === 10.0) {
     // Helper to check for actual defects (not 'none' or undefined)
@@ -255,9 +250,9 @@ export function enforceGradeCaps(result: VisionGradeResult): VisionGradeResult {
       hasActualDefect(result.defects?.back?.surface?.print_defects?.severity);
 
     if (hasAnyDefect) {
-      cappedGrade = 9.5;
-      cappedReasons.push("AI assigned 10.0 but defects were detected in legacy defect structure - safety cap applied");
-      console.log(`[GRADE VALIDATOR - 10.0 SAFETY CHECK] Defects found → Grade capped at 9.5`);
+      cappedGrade = 9;
+      cappedReasons.push("AI assigned 10 but defects were detected in legacy defect structure - safety cap applied");
+      console.log(`[GRADE VALIDATOR - 10 SAFETY CHECK] Defects found → Grade capped at 9`);
     }
   }
 
@@ -288,15 +283,15 @@ export function enforceGradeCaps(result: VisionGradeResult): VisionGradeResult {
 }
 
 /**
- * Validate that grade is on 0.5 increment scale
+ * Validate that grade is a whole number (v7.4: whole number grading system)
  */
-export function enforceHalfPointScale(grade: number | null): number | null {
+export function enforceWholeNumberScale(grade: number | null): number | null {
   if (grade === null) return null;
 
-  const rounded = Math.round(grade * 2) / 2;
+  const rounded = Math.floor(grade); // v7.4: Floor to whole number
 
   if (grade !== rounded) {
-    console.log(`[GRADE VALIDATOR] Enforcing half-point scale: ${grade} → ${rounded}`);
+    console.log(`[GRADE VALIDATOR] Enforcing whole number scale: ${grade} → ${rounded}`);
     return rounded;
   }
 
@@ -310,14 +305,12 @@ export function validateGrade(result: VisionGradeResult): VisionGradeResult {
   // Step 1: Enforce grade caps based on defects/checks
   let validated = enforceGradeCaps(result);
 
-  // Step 2: Enforce half-point scale
+  // Step 2: Enforce whole number scale (v7.4: no more half-points)
   if (validated.recommended_grade.recommended_decimal_grade !== null) {
-    validated.recommended_grade.recommended_decimal_grade = enforceHalfPointScale(
+    validated.recommended_grade.recommended_decimal_grade = enforceWholeNumberScale(
       validated.recommended_grade.recommended_decimal_grade
     );
-    validated.recommended_grade.recommended_whole_grade = Math.round(
-      validated.recommended_grade.recommended_decimal_grade
-    );
+    validated.recommended_grade.recommended_whole_grade = validated.recommended_grade.recommended_decimal_grade;
   }
 
   return validated;

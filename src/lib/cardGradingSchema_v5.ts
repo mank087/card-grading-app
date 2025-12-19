@@ -300,7 +300,7 @@ const GradingPassesSchema = z.object({
 const FinalGradeSchema = z.object({
   decimal_grade: z.number().int().min(0).max(10).nullable().describe('v6.0: Final grade as whole integer (1-10) or null if not gradeable. NO half-points.'),
   whole_grade: z.number().int().min(0).max(10).nullable().describe('Final whole number grade (must match decimal_grade)'),
-  grade_range: z.enum(['±0.0', '±0.25', '±0.5', '±1.0']).describe('Uncertainty range based on image quality'),
+  grade_range: z.enum(['±0', '±1', '±2', '±3']).describe('Uncertainty range based on image quality (v7.4: whole numbers)'),
   condition_label: z.string().optional().describe('Condition label (e.g., "Gem Mint", "Near Mint", "Excellent")'),
   condition_tier: z.enum(['A', 'B', 'C', 'D', 'E', 'F', 'G']).optional().describe('v6.0: Condition tier (A=N/A, B=1-4, C=5-6, D=7, E=8, F=9, G=10)'),
   dominant_defect: z.string().optional().describe('v6.0: Category with lowest score that controlled the grade'),
@@ -627,7 +627,7 @@ export const CardGradingResponseSchemaV5 = z.object({
     case_type: z.enum(['penny_sleeve', 'top_loader', 'semi_rigid', 'slab', 'none']).describe('Type of protective case/holder detected (or "none")'),
     case_visibility: z.enum(['full', 'partial', 'unknown']).describe('How well card is visible through case'),
     impact_level: z.enum(['none', 'minor', 'moderate', 'high']).describe('Impact of case on grading visibility'),
-    adjusted_uncertainty: z.enum(['±0.0', '±0.25', '±0.5', '±1.0']).describe('Grade uncertainty adjustment due to case'),
+    adjusted_uncertainty: z.enum(['±0', '±1', '±2', '±3']).describe('Grade uncertainty adjustment due to case (v7.4: whole numbers)'),
     notes: z.string().describe('Description of case observed and its impact on visibility. If none, state "No protective case observed."')
   }).describe('Protective case/holder detection - ALWAYS populate this field'),
 

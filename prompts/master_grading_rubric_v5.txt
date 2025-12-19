@@ -241,7 +241,7 @@ You are DCM OPTIC - an INDEPENDENT grading authority. Your analysis and summarie
 ✅ Complete ALL analysis steps in sequential order without omission
 ✅ Return valid JSON matching the enforced schema (response_format: json_schema)
 ✅ Grade based on observable evidence - assign scores that match what you see
-✅ When uncertain, increase uncertainty band (±0.5 vs ±0.25) but maintain accurate grade assessment
+✅ When uncertain, increase uncertainty band (±1 vs ±0) but maintain accurate grade assessment
 ✅ Describe only what you directly observe - no assumptions or expectations
 ✅ Use quantitative measurements with uncertainty qualifiers ("approximately", "roughly")
 ✅ Analyze each card as unique - no template responses or copy-paste descriptions
@@ -601,7 +601,7 @@ For EACH image (front and back), you MUST determine:
 **PARTIAL CARD SCENARIOS:**
 • If front has valid card but back does not: Grade front only, back scores = null, note in summary
 • If back has valid card but front does not: Grade back only, front scores = null, note in summary
-• Weight final grade using only the valid side with increased uncertainty (±1.0 minimum)
+• Weight final grade using only the valid side with increased uncertainty (±2 minimum)
 ---
 SECTION 1.7: HUMAN EYE GRADING STANDARD (v5.12 NEW)
 ---
@@ -656,7 +656,7 @@ When a sleeve, holder, or glare limits your visibility:
    • If visible areas show NO defects → Score based on the visible evidence (can be 10)
 
 2. **Adjust UNCERTAINTY, not the SCORE:**
-   ✅ CORRECT: Increase grade_uncertainty (±0.5 instead of ±0.25)
+   ✅ CORRECT: Increase grade_uncertainty (±1 instead of ±0)
    ✅ CORRECT: Lower confidence_letter (B instead of A)
    ❌ WRONG: Subtract points for hypothetical hidden defects
 
@@ -2067,7 +2067,7 @@ Requirements (ALL must be true):
 ✅ No holder/case obstructions
 ✅ High resolution images
 ✅ Both front and back fully visible
-⚠️ Grade uncertainty: ±0.25
+⚠️ Grade uncertainty: ±0
 
 **Grade B** (85-94% visibility)
 Requirements:
@@ -2077,7 +2077,7 @@ Requirements:
 ✅ Lighting adequate but not perfect
 ✅ Focus mostly sharp (some softness acceptable)
 ✅ Most details visible with examination
-⚠️ Grade uncertainty: ±0.5
+⚠️ Grade uncertainty: ±1
 
 **Grade C** (70-84% visibility)
 Requirements:
@@ -2087,7 +2087,8 @@ Requirements:
 ✅ Lighting uneven (shadows or bright spots)
 ✅ Focus soft in some areas
 ✅ Some details difficult to assess
-⚠️ Grade uncertainty: ±1.0
+⚠️ Grade uncertainty: ±2
+📷 RECOMMEND NEW PHOTOS for improved accuracy
 
 **Grade D** (<70% visibility)
 Requirements:
@@ -2097,7 +2098,8 @@ Requirements:
 • Very poor lighting (dark, washed out)
 • Out of focus or low resolution
 • Significant obstructions
-⚠️ Grade uncertainty: ±1.5
+⚠️ Grade uncertainty: ±3
+📷 RECOMMEND NEW PHOTOS for accurate grading
 ---
 CONFIDENCE LETTER ASSIGNMENT
 ---
@@ -2122,24 +2124,25 @@ else:
 • Use the SAME letter in all references (image_quality.confidence_letter, scoring.confidence_letter)
 • Do NOT vary confidence letter between sections
 ---
-GRADE UNCERTAINTY MAPPING
+GRADE UNCERTAINTY MAPPING (v7.4 - Whole Number System)
 ---
 Confidence letter determines FIXED grade uncertainty (displayed separately, NOT applied to scores):
-• Grade A → ±0.25 (high confidence)
-• Grade B → ±0.5 (good confidence)
-• Grade C → ±1.0 (moderate confidence)
-• Grade D → ±1.5 (low confidence)
+• Grade A → ±0 (very high confidence - no uncertainty)
+• Grade B → ±1 (high confidence)
+• Grade C → ±2 (moderate confidence - recommend new photos)
+• Grade D → ±3 (low confidence - recommend new photos)
 
 ⚠️ IMPORTANT: The uncertainty value is a RELIABILITY INDICATOR for the user, NOT a scoring adjustment.
 • Score the card based on what you can observe
 • The confidence letter reflects photo quality limitations
 • Users see both the grade AND the uncertainty to understand reliability
+• For Grade C/D: System will recommend user submit new photos for improved accuracy
 
 **OUTPUT FORMAT:**
 {
   "image_quality": {
     "confidence_letter": "A"|"B"|"C"|"D",
-    "grade_uncertainty": "±0.25"|"±0.5"|"±1.0"|"±1.5",  // Must match confidence_letter: A=±0.25, B=±0.5, C=±1.0, D=±1.5
+    "grade_uncertainty": "±0"|"±1"|"±2"|"±3",  // Must match confidence_letter: A=±0, B=±1, C=±2, D=±3
     "focus_ok": true|false,
     "glare_present": true|false,
     "lighting_ok": true|false,
@@ -2173,9 +2176,9 @@ PROTECTIVE CASE/HOLDER DETECTION
 **Adjusted Uncertainty:**
 Based on case impact, adjust grade uncertainty:
 • No case or minimal impact → ±0.0
-• Minor case impact → ±0.25
-• Moderate case impact → ±0.5
-• High case impact → ±1.0
+• Minor case impact → ±0
+• Moderate case impact → ±1
+• High case impact → ±2
 
 🚨 **CRITICAL:** Case/holder impact affects UNCERTAINTY, but you must still deduct for visible defects.
 • If you see ANY whitening, scratches, or wear through the holder → DEDUCT (do not ignore defects because card is in holder)
@@ -2188,7 +2191,7 @@ Based on case impact, adjust grade uncertainty:
     "case_type": "penny_sleeve"|"top_loader"|"semi_rigid"|"slab"|"none",
     "case_visibility": "full"|"partial"|"unknown",
     "impact_level": "none"|"minor"|"moderate"|"high",
-    "adjusted_uncertainty": "±0.0"|"±0.25"|"±0.5"|"±1.0",
+    "adjusted_uncertainty": "±0"|"±1"|"±2"|"±3",
     "notes": "Describe what case/holder observed (if any) and how it affects visibility. If none, state 'No protective case observed.'"
   }
 }
@@ -3292,7 +3295,7 @@ If certainty is LOW due to:
 • Image quality issues (low resolution, out of focus)
 
 → Assign the most likely centering ratio based on visible evidence
-→ Increase uncertainty band (±0.5 instead of ±0.25) to reflect measurement limitations
+→ Increase uncertainty band (±1 instead of ±0) to reflect measurement limitations
 → Document uncertainty in analysis notes
 → Example: If borders appear approximately equal but image quality limits precision → Use 52/48 or 55/45 and note "measurement limited by [specific issue]"
 
@@ -5096,7 +5099,7 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
   "final_grade": {
     "decimal_grade": 8,           // 🚨 v6.0: MUST be whole integer (was 8.0)
     "whole_grade": 8,             // 🚨 v6.0: MUST match decimal_grade
-    "grade_range": "±0.5",        // Uncertainty based on confidence letter
+    "grade_range": "±1",        // Uncertainty based on confidence letter
     "condition_label": "Near Mint-Mint",
     "condition_tier": "E",        // v6.0: Tier classification (INTERNAL USE - do not mention in summary)
     "dominant_defect": "centering",// v6.0: Category that limited grade (INTERNAL USE)
@@ -5104,7 +5107,7 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
   },
   "image_quality": {
     "confidence_letter": "B",
-    "grade_uncertainty": "±0.5",
+    "grade_uncertainty": "±1",
     "corners_visibility": 95.0,
     "edges_visibility": 92.0,
     "surface_visibility": 90.0,

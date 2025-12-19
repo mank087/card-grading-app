@@ -102,7 +102,7 @@ export interface VisionGradeResult {
     case_type: 'penny_sleeve' | 'top_loader' | 'semi_rigid' | 'slab' | 'none';
     case_visibility: 'full' | 'partial' | 'unknown';
     impact_level: 'none' | 'minor' | 'moderate' | 'high';
-    adjusted_uncertainty: '±0.0' | '±0.25' | '±0.5' | '±1.0';
+    adjusted_uncertainty: '±0' | '±1' | '±2' | '±3';
   };
   // Professional grading slab detection
   slab_detection?: {
@@ -215,7 +215,7 @@ export interface VisionGradeResult {
   recommended_grade: {
     recommended_decimal_grade: number | null;
     recommended_whole_grade: number | null;
-    grade_uncertainty: '±0.0' | '±0.25' | '±0.5' | '±1.0' | 'N/A';
+    grade_uncertainty: '±0' | '±1' | '±2' | '±3' | 'N/A';
     ai_suggested_grade?: number | null; // AI's original grade before deterministic scoring
     reasoning?: string; // AI's reasoning
   };
@@ -1363,7 +1363,7 @@ function extractGradeFromMarkdown(markdown: string): {
 
   const decimalGrade = decimalMatch ? parseFloat(decimalMatch[1]) : null;
   const wholeGrade = wholeMatch ? parseInt(wholeMatch[1]) : (decimalGrade ? Math.round(decimalGrade) : null);
-  const uncertainty = uncertaintyMatch ? uncertaintyMatch[1] : '±0.5';
+  const uncertainty = uncertaintyMatch ? uncertaintyMatch[1] : '±1';
 
   // Debug: Show what was matched
   console.log(`[extractGradeFromMarkdown] Decimal match:`, decimalMatch ? `"${decimalMatch[0]}" → ${decimalMatch[1]}` : 'NO MATCH');
@@ -1576,7 +1576,7 @@ Provide detailed analysis as markdown with all required sections.`
         extractedGrade = {
           decimal_grade: avgRounded.final,
           whole_grade: Math.floor(avgRounded.final), // v6.0: Floor rounding for whole grade
-          uncertainty: jsonData.image_quality?.grade_uncertainty || jsonData.final_grade?.grade_range || '±0.5'
+          uncertainty: jsonData.image_quality?.grade_uncertainty || jsonData.final_grade?.grade_range || '±1'
         };
         console.log(`[CONVERSATIONAL JSON] ✅ THREE-PASS GRADING detected`);
         console.log(`[CONVERSATIONAL JSON] Pass 1: ${threePassData.pass_1?.final}, Pass 2: ${threePassData.pass_2?.final}, Pass 3: ${threePassData.pass_3?.final}`);
@@ -1587,7 +1587,7 @@ Provide detailed analysis as markdown with all required sections.`
         extractedGrade = {
           decimal_grade: jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null,
           whole_grade: jsonData.final_grade?.whole_grade ?? (jsonData.scoring?.final_grade ? Math.round(jsonData.scoring.final_grade) : null),
-          uncertainty: jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±0.5'
+          uncertainty: jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±1'
         };
         console.log(`[CONVERSATIONAL JSON] ⚠️ No three-pass data found, using direct final_grade`);
       }
