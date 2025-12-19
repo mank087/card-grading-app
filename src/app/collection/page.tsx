@@ -217,10 +217,38 @@ function CollectionPageContent() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [displayLimit, setDisplayLimit] = useState(20) // Initial display limit
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
+  const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
+  const [isDeleting, setIsDeleting] = useState(false)
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
 
+  // Multi-select handlers
+  const toggleCardSelection = (cardId: string) => {
+    setSelectedCardIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(cardId)) {
+        newSet.delete(cardId)
+      } else {
+        newSet.add(cardId)
+      }
+      return newSet
+    })
+  }
+
+  const selectAllDisplayed = (cardsToSelect: Card[]) => {
+    const allIds = new Set(cardsToSelect.map(card => card.id))
+    setSelectedCardIds(allIds)
+  }
+
+  const deselectAll = () => {
+    setSelectedCardIds(new Set())
+  }
+
+  // Clear selection when category changes
+  useEffect(() => {
+    setSelectedCardIds(new Set())
+  }, [selectedCategory])
 
   useEffect(() => {
     const fetchCards = async () => {
@@ -336,9 +364,63 @@ function CollectionPageContent() {
   const displayedCards = filteredCards.slice(0, displayLimit)
   const hasMore = filteredCards.length > displayLimit
 
+  // Multi-select helper calculations (must be after displayedCards is defined)
+  const isAllSelected = displayedCards.length > 0 && displayedCards.every(card => selectedCardIds.has(card.id))
+  const isSomeSelected = selectedCardIds.size > 0
+
   // Load more handler
   const loadMore = () => {
     setDisplayLimit(prev => prev + 20)
+  }
+
+  // Bulk delete handler
+  const handleBulkDelete = async () => {
+    if (selectedCardIds.size === 0) return
+
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete ${selectedCardIds.size} card${selectedCardIds.size !== 1 ? 's' : ''}?\n\nThis action cannot be undone.`
+    )
+
+    if (!confirmDelete) return
+
+    setIsDeleting(true)
+
+    try {
+      const session = getStoredSession()
+      if (!session || !session.user || !session.access_token) {
+        throw new Error('You must be logged in to delete cards')
+      }
+
+      // Delete cards one by one
+      const deletePromises = Array.from(selectedCardIds).map(async (cardId) => {
+        const response = await fetch(`/api/cards/${cardId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || `Failed to delete card ${cardId}`)
+        }
+
+        return cardId
+      })
+
+      const deletedIds = await Promise.all(deletePromises)
+
+      // Remove deleted cards from local state
+      setCards(prevCards => prevCards.filter(card => !deletedIds.includes(card.id)))
+      setSelectedCardIds(new Set())
+
+      toast.success(`Successfully deleted ${deletedIds.length} card${deletedIds.length !== 1 ? 's' : ''}!`)
+    } catch (error: any) {
+      console.error('Bulk delete error:', error)
+      toast.error(`Failed to delete cards: ${error.message}`)
+    } finally {
+      setIsDeleting(false)
+    }
   }
 
   // Delete card handler
@@ -560,13 +642,64 @@ function CollectionPageContent() {
               </p>
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
+                {/* Bulk Action Bar */}
+                {isSomeSelected && viewMode === 'list' && (
+                  <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-indigo-700">
+                        {selectedCardIds.size} card{selectedCardIds.size !== 1 ? 's' : ''} selected
+                      </span>
+                      <button
+                        onClick={deselectAll}
+                        className="text-sm text-indigo-600 hover:text-indigo-800 underline"
+                      >
+                        Clear selection
+                      </button>
+                    </div>
+                    <button
+                      onClick={handleBulkDelete}
+                      disabled={isDeleting}
+                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          Deleting...
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete Selected
+                        </>
+                      )}
+                    </button>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full table-fixed">
                     <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    {/* Checkbox column */}
+                    <th className="w-[4%] px-2 py-3 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            selectAllDisplayed(displayedCards)
+                          } else {
+                            deselectAll()
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        title={isAllSelected ? 'Deselect all' : 'Select all'}
+                      />
+                    </th>
                     <th
                       onClick={() => handleSort('name')}
-                      className="w-[28%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      className="w-[26%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                     >
                       <div className="flex items-center gap-1">
                         Card Name
@@ -649,7 +782,19 @@ function CollectionPageContent() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {displayedCards.map((card) => (
-                    <tr key={card.id} className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      key={card.id}
+                      className={`hover:bg-gray-50 transition-colors ${selectedCardIds.has(card.id) ? 'bg-indigo-50' : ''}`}
+                    >
+                      {/* Checkbox cell */}
+                      <td className="px-2 py-3 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedCardIds.has(card.id)}
+                          onChange={() => toggleCardSelection(card.id)}
+                          className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                        />
+                      </td>
                       <td className="px-3 py-3">
                         <div className="text-sm font-medium text-gray-900 truncate" title={getPlayerName(card)}>
                           {getPlayerName(card)}
