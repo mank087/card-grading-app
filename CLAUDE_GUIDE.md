@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 18, 2025 (v7.4 - Japanese Pokemon Card Database)
+> Last Updated: December 19, 2025 (v7.5 - Upload Wizard, Reddit Pixel, Landing Pages)
 
 ---
 
@@ -140,6 +140,8 @@ src/
 | `/privacy` | `app/privacy/page.tsx` | Privacy policy |
 | `/unsubscribe` | `app/unsubscribe/page.tsx` | Email unsubscribe |
 | `/pokemon-database` | `app/pokemon-database/page.tsx` | Pokemon card database search (EN/JA) |
+| `/pokemon-grading` | `app/pokemon-grading/page.tsx` | Pokemon-focused landing page |
+| `/sports-grading` | `app/sports-grading/page.tsx` | Sports-focused landing page (v7.5) |
 
 ### Protected Pages (Require Login)
 
@@ -351,6 +353,81 @@ src/
    - Old cards keep their original version
    - New cards get new version
 ```
+
+### v7.5 Upload Wizard, Reddit Pixel, Landing Pages (December 19, 2025)
+
+**Key Updates:**
+
+1. **3-Step Upload Wizard Flow**
+   - All uploads now go through a confirmation wizard before submission
+   - **Step 1: Confirm Category** - Verify card type is correct
+   - **Step 2: Review Photos** - Preview front/back with retake option
+   - **Step 3: Condition Report** - Optional defect hints, must acknowledge "No defects" OR report defects
+   - Works for both camera and gallery modes on mobile
+   - Desktop also uses wizard via "Review & Submit" button
+   - Component: `components/WizardProgressIndicator.tsx`
+   - File changed: `app/upload/page.tsx`
+
+2. **Reddit Pixel Conversion Tracking**
+   - Pixel ID: `a2_i6zsi175k40r`
+   - Base pixel in `app/layout.tsx` tracks PageVisit on all pages
+   - Events tracked with unique conversion IDs for deduplication:
+     - **Lead**: Landing page CTA clicks (`lead_{page}_{timestamp}_{location}`)
+     - **SignUp**: Account creation (`signup_{timestamp}_{email_prefix}`)
+     - **Purchase**: Credit purchase (`{stripe_session_id}`)
+   - Files changed: `layout.tsx`, `login/page.tsx`, `credits/success/page.tsx`, `pokemon-grading/page.tsx`, `sports-grading/page.tsx`
+
+3. **Sports Card Landing Page** (`/sports-grading`)
+   - New landing page targeting sports card collectors
+   - Green/emerald color theme
+   - Floating card animations with real sports card images
+   - Supported leagues: NFL, NBA, MLB, NHL, UFC, WWE, Soccer
+   - Card brands: Panini, Topps, Upper Deck, Bowman, Donruss, Fleer
+   - 3-column layout: Card image (left), features (center), grading report (right)
+   - Eye-catching "Launch Special" banner with pulsing glow and sparkle animations
+
+4. **Pokemon Landing Page Updates** (`/pokemon-grading`)
+   - Updated to 3-column layout matching sports page
+   - Eye-catching "Launch Special" banner added
+   - Removed duplicate footer
+
+5. **Grading Rubric v7.4 Whole Number Scoring**
+   - Updated uncertainty ranges to whole numbers:
+     - A = ±0 (was ±0.25)
+     - B = ±1 (was ±0.5)
+     - C = ±2 (was ±1.0)
+     - D = ±3 (was ±1.5)
+   - Added "New Photos Recommended" badge for C and D grades
+   - Grade scale now shows whole numbers only (10, 9, 8, 7, 6, 5-1)
+   - File: `app/grading-rubric/page.tsx`
+
+6. **Multi-Select Bulk Delete on Collection Page**
+   - Checkbox column in list view for selecting multiple cards
+   - "Select All" / "Deselect All" functionality
+   - Bulk delete with confirmation dialog
+   - File: `app/collection/page.tsx`
+
+7. **Terms & Conditions Updates**
+   - Section 5.3: Third-Party Trademarks (expanded with manufacturer list)
+   - Section 5.4: DCM Grading Outputs and Ownership (grades, analyses, certificates)
+   - Section 5.5: Marketing and Promotional Materials (public cards may be used)
+   - File: `app/terms/page.tsx`
+
+**Files Changed:**
+| File | Changes |
+|------|---------|
+| `app/layout.tsx` | Reddit Pixel base code |
+| `app/upload/page.tsx` | 3-step wizard flow, gallery mode wizard fix |
+| `components/WizardProgressIndicator.tsx` | New wizard stepper component |
+| `app/login/page.tsx` | Reddit SignUp tracking |
+| `app/credits/success/page.tsx` | Reddit Purchase tracking |
+| `app/sports-grading/page.tsx` | New sports landing page |
+| `app/pokemon-grading/page.tsx` | 3-column layout, Launch Special, Lead tracking |
+| `app/grading-rubric/page.tsx` | Whole number scoring, updated uncertainty |
+| `app/collection/page.tsx` | Multi-select bulk delete |
+| `app/terms/page.tsx` | IP and ownership sections |
+| `public/Sports/` | Sports card images |
+| `public/Pokemon/` | Pokemon card images for landing page |
 
 ### v7.2 Unified Label System & Promo Support (December 2025)
 
@@ -1442,7 +1519,7 @@ node scripts/backfill-japanese-images.js
 
 ---
 
-*This guide covers active, working code as of December 2025 (v7.4). Deprecated files are not included.*
+*This guide covers active, working code as of December 2025 (v7.5). Deprecated files are not included.*
 
 ---
 
@@ -1450,6 +1527,7 @@ node scripts/backfill-japanese-images.js
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v7.5 | Dec 19, 2025 | 3-step upload wizard, Reddit Pixel tracking, sports landing page, multi-select bulk delete, terms updates |
 | v7.4 | Dec 18, 2025 | Japanese Pokemon database (TCGdex), Pokemon Database page with language toggle, Japanese card grading detection |
 | v7.3 | Dec 17, 2025 | Prompt consistency overhaul: unified cap system, execution flowchart, whole numbers only, fixed contradictions |
 | v7.2 | Dec 17, 2025 | Visual Defect Identification Guide, Defect Hunting Protocol, Facebook OAuth |
