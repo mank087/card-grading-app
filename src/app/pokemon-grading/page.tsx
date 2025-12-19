@@ -267,15 +267,23 @@ export default function PokemonGradingLanding() {
                   </div>
 
                   {/* Launch Special Banner */}
-                  <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 rounded-lg p-3 mb-4">
-                    <div className="flex items-center justify-center gap-2 text-green-400">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M5 2a2 2 0 00-2 2v14l3.5-2 3.5 2 3.5-2 3.5 2V4a2 2 0 00-2-2H5zm2.5 3a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm6.207.293a1 1 0 00-1.414 0l-6 6a1 1 0 101.414 1.414l6-6a1 1 0 000-1.414zM12.5 10a1.5 1.5 0 100 3 1.5 1.5 0 000-3z" clipRule="evenodd" />
+                  <div className="relative overflow-hidden bg-gradient-to-r from-yellow-500/20 via-purple-500/20 to-yellow-500/20 border-2 border-yellow-500/50 rounded-lg p-3 mb-4 animate-pulse-subtle">
+                    {/* Shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+
+                    <div className="relative flex items-center justify-center gap-2">
+                      {/* Sparkle icon left */}
+                      <svg className="w-5 h-5 text-yellow-400 animate-sparkle" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
                       </svg>
-                      <span className="font-bold text-sm">LAUNCH SPECIAL</span>
+                      <span className="font-bold text-sm text-yellow-300 tracking-wide">🎉 LAUNCH SPECIAL</span>
+                      {/* Sparkle icon right */}
+                      <svg className="w-5 h-5 text-yellow-400 animate-sparkle-delayed" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
+                      </svg>
                     </div>
-                    <p className="text-center text-green-300 text-sm mt-1">
-                      {selectedPkg.label} gets <span className="font-bold">+{selectedPkg.bonus} bonus credit{selectedPkg.bonus > 1 ? 's' : ''}</span> free!
+                    <p className="relative text-center text-purple-300 text-sm mt-1 font-medium">
+                      {selectedPkg.label} gets <span className="font-bold text-yellow-300">+{selectedPkg.bonus} bonus credit{selectedPkg.bonus > 1 ? 's' : ''}</span> free!
                     </p>
                   </div>
 
@@ -486,6 +494,30 @@ export default function PokemonGradingLanding() {
         @keyframes float-fast {
           0%, 100% { transform: translateY(0) rotate(5deg); }
           50% { transform: translateY(-10px) rotate(8deg); }
+        }
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+        @keyframes sparkle {
+          0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+          50% { transform: scale(1.2) rotate(15deg); opacity: 0.8; }
+        }
+        @keyframes pulse-subtle {
+          0%, 100% { box-shadow: 0 0 5px rgba(234, 179, 8, 0.3); }
+          50% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.5), 0 0 25px rgba(234, 179, 8, 0.3); }
+        }
+        .animate-shimmer {
+          animation: shimmer 2s infinite;
+        }
+        .animate-sparkle {
+          animation: sparkle 1.5s ease-in-out infinite;
+        }
+        .animate-sparkle-delayed {
+          animation: sparkle 1.5s ease-in-out infinite 0.75s;
+        }
+        .animate-pulse-subtle {
+          animation: pulse-subtle 2s ease-in-out infinite;
         }
         .animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
         .animate-float-medium { animation: float-medium 5s ease-in-out infinite; }
