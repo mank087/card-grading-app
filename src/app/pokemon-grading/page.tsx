@@ -383,24 +383,25 @@ export default function PokemonGradingLanding() {
       {/* Example Report Section */}
       <section className="py-16 bg-gradient-to-b from-gray-900 to-gray-800">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            {/* Report Image */}
-            <div className="flex-1 flex justify-center">
+          {/* Mobile: Stack vertically, Desktop: 3 columns */}
+          <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-6">
+            {/* Card Image - Left */}
+            <div className="flex-shrink-0 flex justify-center lg:flex-1">
               <div className="relative">
                 <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl blur-xl opacity-30" />
                 <Image
-                  src="/DCM-MiniReport-Umbreon-ex-309396.jpg"
-                  alt="Example DCM Grade Report"
-                  width={300}
-                  height={420}
+                  src="/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg"
+                  alt="Umbreon ex Pokemon Card"
+                  width={240}
+                  height={336}
                   className="relative rounded-xl shadow-2xl border border-gray-700"
                 />
               </div>
             </div>
 
-            {/* Description */}
-            <div className="flex-1">
-              <h2 className="text-3xl font-bold text-white mb-6">
+            {/* Description - Center */}
+            <div className="flex-1 lg:flex-[1.5]">
+              <h2 className="text-3xl font-bold text-white mb-6 text-center lg:text-left">
                 Detailed Analysis You Can Trust
               </h2>
               <div className="space-y-4">
@@ -440,6 +441,20 @@ export default function PokemonGradingLanding() {
                     <p className="text-gray-400 text-sm">See estimated PSA, BGS, CGC, and SGC grades before you submit</p>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Report Image - Right */}
+            <div className="flex-shrink-0 flex justify-center lg:flex-1">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-2xl blur-xl opacity-30" />
+                <Image
+                  src="/Pokemon/DCM-MiniReport-Umbreon-ex-887696.jpg"
+                  alt="DCM Grading Report Example"
+                  width={280}
+                  height={400}
+                  className="relative rounded-xl shadow-2xl border border-gray-700"
+                />
               </div>
             </div>
           </div>
