@@ -942,27 +942,17 @@ function UniversalUploadPageContent() {
               <p className="text-xs text-blue-800 font-semibold mb-1">💡 Tips:</p>
               <p className="text-xs text-blue-700">Good lighting, all corners visible, plain background</p>
             </div>
-
-            {/* User Condition Report - Optional defect hints (Gallery Mode) */}
-            {frontFile && backFile && (
-              <div className="mt-4 max-w-lg mx-auto">
-                <UserConditionReport
-                  value={conditionReport}
-                  onChange={setConditionReport}
-                />
-              </div>
-            )}
           </div>
         </div>
 
         {/* Action Buttons - Fixed at bottom */}
         <div className="bg-white border-t border-gray-200 px-4 py-3 space-y-2">
           <button
-            onClick={handleUpload}
-            disabled={!frontCompressed || !backCompressed || isCompressing || isUploading}
+            onClick={() => setUploadMode('review')}
+            disabled={!frontCompressed || !backCompressed || isCompressing}
             className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
           >
-            {isCompressing ? 'Processing Images...' : isUploading ? 'Uploading...' : !frontFile || !backFile ? 'Select Both Images' : '✓ Submit for Grading'}
+            {isCompressing ? 'Processing Images...' : !frontFile || !backFile ? 'Select Both Images' : 'Review & Submit →'}
           </button>
 
           <button
