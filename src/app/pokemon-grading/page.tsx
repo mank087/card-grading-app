@@ -9,26 +9,35 @@ import { getStoredSession } from '@/lib/directAuth'
 declare global {
   interface Window {
     gtag: (...args: any[]) => void
+    rdt: (...args: any[]) => void
   }
 }
 
 // Track conversion events
 const trackSignupClick = (location: string, packageType?: string) => {
-  if (typeof window !== 'undefined' && window.gtag) {
+  if (typeof window !== 'undefined') {
     // Send event to Google Analytics
-    window.gtag('event', 'signup_click', {
-      event_category: 'conversion',
-      event_label: location,
-      package_type: packageType || 'none',
-      page: 'pokemon-grading-landing'
-    })
+    if (window.gtag) {
+      window.gtag('event', 'signup_click', {
+        event_category: 'conversion',
+        event_label: location,
+        package_type: packageType || 'none',
+        page: 'pokemon-grading-landing'
+      })
 
-    // Also send as a conversion event (for Google Ads if connected)
-    window.gtag('event', 'conversion', {
-      send_to: 'G-YLC2FKKBGC',
-      event_category: 'signup',
-      event_label: `pokemon_landing_${location}`
-    })
+      // Also send as a conversion event (for Google Ads if connected)
+      window.gtag('event', 'conversion', {
+        send_to: 'G-YLC2FKKBGC',
+        event_category: 'signup',
+        event_label: `pokemon_landing_${location}`
+      })
+    }
+
+    // Track Reddit Lead conversion
+    if (window.rdt) {
+      window.rdt('track', 'Lead')
+      console.log('[Reddit Pixel] Lead event tracked')
+    }
 
     console.log(`[Analytics] Signup click tracked: ${location}, package: ${packageType}`)
   }

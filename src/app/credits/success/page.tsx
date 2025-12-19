@@ -1,18 +1,33 @@
 'use client'
 
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
+
+// Declare rdt for TypeScript
+declare global {
+  interface Window {
+    rdt: (...args: any[]) => void
+  }
+}
 
 function PurchaseSuccessContent() {
   const searchParams = useSearchParams()
   const { balance, refreshCredits } = useCredits()
   const [isLoading, setIsLoading] = useState(true)
+  const hasTrackedPurchase = useRef(false)
 
   const sessionId = searchParams.get('session_id')
 
   useEffect(() => {
+    // Track Reddit Purchase conversion (only once)
+    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && window.rdt) {
+      window.rdt('track', 'Purchase')
+      hasTrackedPurchase.current = true
+      console.log('[Reddit Pixel] Purchase event tracked')
+    }
+
     // Refresh credits after successful purchase
     const loadCredits = async () => {
       await refreshCredits()

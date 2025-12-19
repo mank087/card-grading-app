@@ -6,6 +6,13 @@ import Link from 'next/link'
 import { signInWithPassword, signUp, getStoredSession, signInWithOAuth } from '../../lib/directAuth'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
+// Declare rdt for TypeScript
+declare global {
+  interface Window {
+    rdt: (...args: any[]) => void
+  }
+}
+
 // Inner component that uses useSearchParams
 function LoginPageContent() {
   const router = useRouter()
@@ -71,6 +78,11 @@ function LoginPageContent() {
             setError(result.error)
           }
         } else {
+          // Track Reddit SignUp conversion
+          if (typeof window !== 'undefined' && window.rdt) {
+            window.rdt('track', 'SignUp')
+            console.log('[Reddit Pixel] SignUp event tracked')
+          }
           alert('Account created! Check your email for the confirmation link.')
         }
       } else {

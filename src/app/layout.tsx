@@ -54,6 +54,15 @@ export default function RootLayout({
             gtag('config', 'G-YLC2FKKBGC');
           `}
         </Script>
+
+        {/* Reddit Pixel */}
+        <Script id="reddit-pixel" strategy="afterInteractive">
+          {`
+            !function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);
+            rdt('init','a2_i6zsi175k40r');
+            rdt('track', 'PageVisit');
+          `}
+        </Script>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansJP.variable} antialiased bg-gray-50`}
