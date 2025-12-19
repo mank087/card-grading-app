@@ -322,6 +322,7 @@ export default function SportsGradingLanding() {
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">MLB</div>
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">NHL</div>
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">UFC</div>
+            <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">WWE</div>
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">Soccer</div>
           </div>
         </div>
