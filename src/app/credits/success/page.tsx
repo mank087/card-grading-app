@@ -22,10 +22,12 @@ function PurchaseSuccessContent() {
 
   useEffect(() => {
     // Track Reddit Purchase conversion (only once)
-    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && window.rdt) {
-      window.rdt('track', 'Purchase')
+    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && window.rdt && sessionId) {
+      window.rdt('track', 'Purchase', {
+        conversionId: sessionId // Stripe session ID for deduplication
+      })
       hasTrackedPurchase.current = true
-      console.log('[Reddit Pixel] Purchase event tracked')
+      console.log('[Reddit Pixel] Purchase event tracked with conversionId:', sessionId)
     }
 
     // Refresh credits after successful purchase

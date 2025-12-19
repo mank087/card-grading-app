@@ -80,8 +80,11 @@ function LoginPageContent() {
         } else {
           // Track Reddit SignUp conversion
           if (typeof window !== 'undefined' && window.rdt) {
-            window.rdt('track', 'SignUp')
-            console.log('[Reddit Pixel] SignUp event tracked')
+            const signupId = `signup_${Date.now()}_${email.split('@')[0]}`
+            window.rdt('track', 'SignUp', {
+              conversionId: signupId
+            })
+            console.log('[Reddit Pixel] SignUp event tracked with conversionId:', signupId)
           }
           alert('Account created! Check your email for the confirmation link.')
         }

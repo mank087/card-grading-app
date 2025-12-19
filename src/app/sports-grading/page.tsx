@@ -35,8 +35,11 @@ const trackSignupClick = (location: string, packageType?: string) => {
 
     // Track Reddit Lead conversion
     if (window.rdt) {
-      window.rdt('track', 'Lead')
-      console.log('[Reddit Pixel] Lead event tracked')
+      const leadId = `lead_sports_${Date.now()}_${location}`
+      window.rdt('track', 'Lead', {
+        conversionId: leadId
+      })
+      console.log('[Reddit Pixel] Lead event tracked with conversionId:', leadId)
     }
 
     console.log(`[Analytics] Signup click tracked: ${location}, package: ${packageType}`)
