@@ -322,7 +322,7 @@ export default function GradingRubricPage() {
 
           <div className="bg-white rounded-xl shadow-md p-8">
             <p className="text-gray-700 mb-6">
-              DCM uses a 10-point scale with 0.5 precision, aligned with industry-standard grading criteria from PSA, BGS, and CGC. Our evidence-based protocol ensures every deduction is documented and justified.
+              DCM uses a 10-point whole number scale, aligned with industry-standard grading criteria from PSA, BGS, and CGC. Our evidence-based protocol ensures every deduction is documented and justified.
             </p>
 
             <div className="space-y-3">
@@ -335,56 +335,47 @@ export default function GradingRubricPage() {
                 </div>
               </div>
 
-              {/* 9.5 - Silver Metallic */}
-              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #f3f4f6, #d1d5db)', borderLeftColor: '#6b7280' }}>
-                <div className="text-3xl font-bold w-16" style={{ color: '#374151', textShadow: '0 1px 2px rgba(156, 163, 175, 0.5)' }}>9.5</div>
-                <div>
-                  <p className="font-bold text-gray-900">Gem Mint</p>
-                  <p className="text-sm text-gray-600">Near-perfect with only microscopic imperfections visible at maximum zoom</p>
-                </div>
-              </div>
-
               {/* 9 - Silver Metallic */}
-              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #f9fafb, #e5e7eb)', borderLeftColor: '#9ca3af' }}>
-                <div className="text-3xl font-bold w-16" style={{ color: '#4b5563', textShadow: '0 1px 2px rgba(156, 163, 175, 0.5)' }}>9</div>
+              <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #f3f4f6, #d1d5db)', borderLeftColor: '#6b7280' }}>
+                <div className="text-3xl font-bold w-16" style={{ color: '#374151', textShadow: '0 1px 2px rgba(156, 163, 175, 0.5)' }}>9</div>
                 <div>
                   <p className="font-bold text-gray-900">Mint</p>
-                  <p className="text-sm text-gray-600">Minor imperfections under close inspection. Slight corner softening or minor edge whitening.</p>
+                  <p className="text-sm text-gray-600">Near-perfect with only microscopic imperfections. Minor corner softening or slight edge whitening allowed.</p>
                 </div>
               </div>
 
-              {/* 8.5-8 - Bronze Metallic */}
+              {/* 8 - Bronze Metallic */}
               <div className="flex items-center gap-4 p-4 rounded-lg border-l-4" style={{ background: 'linear-gradient(to right, #fef3e2, #f5d0a9)', borderLeftColor: '#b45309' }}>
-                <div className="text-2xl font-bold w-20" style={{ color: '#78350f', textShadow: '0 1px 2px rgba(180, 83, 9, 0.3)' }}>8.5-8</div>
+                <div className="text-3xl font-bold w-16" style={{ color: '#78350f', textShadow: '0 1px 2px rgba(180, 83, 9, 0.3)' }}>8</div>
                 <div>
                   <p className="font-bold text-gray-900">Near Mint-Mint</p>
                   <p className="text-sm text-gray-600">Slight wear visible upon close examination. Minor rounding, light whitening, or small surface imperfections.</p>
                 </div>
               </div>
 
-              {/* 7.5-7 - Blue */}
+              {/* 7 - Blue */}
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-blue-100 rounded-lg border-l-4 border-blue-500">
-                <div className="text-2xl font-bold text-blue-700 w-20">7.5-7</div>
+                <div className="text-3xl font-bold text-blue-700 w-16">7</div>
                 <div>
                   <p className="font-bold text-gray-900">Near Mint</p>
                   <p className="text-sm text-gray-600">Minor surface wear or slight corner/edge wear visible at normal viewing distance</p>
                 </div>
               </div>
 
-              {/* 6.5-6 - Purple (unchanged) */}
+              {/* 6 - Purple */}
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-purple-50 to-purple-100 rounded-lg border-l-4 border-purple-500">
-                <div className="text-2xl font-bold text-purple-800 w-20">6.5-6</div>
+                <div className="text-3xl font-bold text-purple-800 w-16">6</div>
                 <div>
                   <p className="font-bold text-gray-900">Excellent-Mint</p>
                   <p className="text-sm text-gray-600">Visible wear on corners or edges, moderate centering issues, but still displays well</p>
                 </div>
               </div>
 
-              {/* 5.5-1 - Gray (unchanged) */}
+              {/* 5-1 - Gray */}
               <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border-l-4 border-gray-500">
-                <div className="text-2xl font-bold text-gray-800 w-20">5.5-1</div>
+                <div className="text-2xl font-bold text-gray-800 w-16">5-1</div>
                 <div>
-                  <p className="font-bold text-gray-900">Excellent to Good</p>
+                  <p className="font-bold text-gray-900">Excellent to Poor</p>
                   <p className="text-sm text-gray-600">Significant wear, structural damage (creases, bends), or other issues affecting overall appearance</p>
                 </div>
               </div>
@@ -458,24 +449,30 @@ export default function GradingRubricPage() {
               <div>
                 <h3 className="text-xl font-bold text-gray-900 mb-4">Grade Uncertainty & Consistency</h3>
                 <p className="text-gray-700 mb-4">
-                  The uncertainty range indicates how much the actual grade might vary. The consistency score shows how well all three evaluation passes agreed.
+                  The uncertainty range indicates how much the actual grade might vary based on image quality. Higher confidence means a more precise grade.
                 </p>
 
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
-                    <span className="font-semibold text-gray-900">±0.25</span>
-                    <span className="text-sm text-green-700">Grade A — High Confidence</span>
+                    <span className="font-semibold text-gray-900">±0</span>
+                    <span className="text-sm text-green-700">Grade A — Highest Confidence</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <span className="font-semibold text-gray-900">±0.5</span>
-                    <span className="text-sm text-blue-700">Grade B — Good Confidence</span>
+                    <span className="font-semibold text-gray-900">±1</span>
+                    <span className="text-sm text-blue-700">Grade B — High Confidence</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-                    <span className="font-semibold text-gray-900">±1.0</span>
+                    <div>
+                      <span className="font-semibold text-gray-900">±2</span>
+                      <span className="ml-2 text-xs bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded">New Photos Recommended</span>
+                    </div>
                     <span className="text-sm text-yellow-700">Grade C — Moderate Confidence</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-200">
-                    <span className="font-semibold text-gray-900">±1.5</span>
+                    <div>
+                      <span className="font-semibold text-gray-900">±3</span>
+                      <span className="ml-2 text-xs bg-red-200 text-red-800 px-2 py-0.5 rounded">New Photos Recommended</span>
+                    </div>
                     <span className="text-sm text-red-700">Grade D — Low Confidence</span>
                   </div>
                 </div>
@@ -483,9 +480,9 @@ export default function GradingRubricPage() {
                 <div className="mt-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
                   <h4 className="font-bold text-indigo-900 mb-2">Three-Pass Consistency</h4>
                   <ul className="text-sm text-indigo-800 space-y-1">
-                    <li><strong>High:</strong> All 3 passes agree within ±0.5 points</li>
-                    <li><strong>Moderate:</strong> Passes vary by 0.5-1.0 points</li>
-                    <li><strong>Low:</strong> Passes vary by more than 1.0 point</li>
+                    <li><strong>High:</strong> All 3 passes agree within ±1 point</li>
+                    <li><strong>Moderate:</strong> Passes vary by 1-2 points</li>
+                    <li><strong>Low:</strong> Passes vary by more than 2 points</li>
                   </ul>
                 </div>
               </div>
