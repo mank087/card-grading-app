@@ -6,10 +6,11 @@ import Link from 'next/link'
 import { signInWithPassword, signUp, getStoredSession, signInWithOAuth } from '../../lib/directAuth'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
-// Declare rdt for TypeScript
+// Declare rdt and gtag for TypeScript
 declare global {
   interface Window {
     rdt: (...args: any[]) => void
+    gtag: (...args: any[]) => void
   }
 }
 
@@ -78,13 +79,25 @@ function LoginPageContent() {
             setError(result.error)
           }
         } else {
-          // Track Reddit SignUp conversion
-          if (typeof window !== 'undefined' && window.rdt) {
+          // Track SignUp conversions
+          if (typeof window !== 'undefined') {
             const signupId = `signup_${Date.now()}_${email.split('@')[0]}`
-            window.rdt('track', 'SignUp', {
-              conversionId: signupId
-            })
-            console.log('[Reddit Pixel] SignUp event tracked with conversionId:', signupId)
+
+            // Reddit SignUp conversion
+            if (window.rdt) {
+              window.rdt('track', 'SignUp', {
+                conversionId: signupId
+              })
+              console.log('[Reddit Pixel] SignUp event tracked with conversionId:', signupId)
+            }
+
+            // Google Analytics sign_up event
+            if (window.gtag) {
+              window.gtag('event', 'sign_up', {
+                method: 'email'
+              })
+              console.log('[GA4] sign_up event tracked')
+            }
           }
           alert('Account created! Check your email for the confirmation link.')
         }

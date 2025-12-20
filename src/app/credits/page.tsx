@@ -1,6 +1,13 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+
+// Declare gtag for TypeScript
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void
+  }
+}
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
@@ -116,6 +123,21 @@ function CreditsPageContent() {
 
     setError(null)
     setPurchaseLoading(tier.id)
+
+    // Track begin_checkout event
+    if (typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', 'begin_checkout', {
+        currency: 'USD',
+        value: tier.price,
+        items: [{
+          item_id: tier.id,
+          item_name: `${tier.credits} Credits`,
+          price: tier.price,
+          quantity: 1
+        }]
+      })
+      console.log('[GA4] begin_checkout event tracked:', tier.id, tier.price)
+    }
 
     try {
       const session = getStoredSession()

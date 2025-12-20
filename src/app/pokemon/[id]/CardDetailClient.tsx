@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+
+// Declare gtag for TypeScript
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void
+  }
+}
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -1406,6 +1413,8 @@ export function PokemonCardDetails() {
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
+  // 📊 Track grade_card_complete event (only once per card)
+  const hasTrackedGradeComplete = useRef(false);
 
   // Fetch Pokemon card details using Pokemon-specific API
   const fetchPokemonCardDetails = useCallback(async () => {
@@ -1530,6 +1539,18 @@ export function PokemonCardDetails() {
       setOrigin(window.location.origin);
     }
   }, []);
+
+  // 📊 Track grade_card_complete when a graded card is viewed
+  useEffect(() => {
+    if (card && card.grade && !hasTrackedGradeComplete.current && typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', 'grade_card_complete', {
+        card_category: card.category || 'Pokemon',
+        grade: card.grade
+      });
+      hasTrackedGradeComplete.current = true;
+      console.log('[GA4] grade_card_complete event tracked:', card.category, card.grade);
+    }
+  }, [card]);
 
   // 📦 Parse defects when card data changes
   useEffect(() => {

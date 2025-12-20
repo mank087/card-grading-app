@@ -1,6 +1,13 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
+
+// Declare gtag for TypeScript
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void
+  }
+}
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
@@ -358,6 +365,14 @@ function UniversalUploadPageContent() {
     try {
       setIsUploading(true)
       setStatus(`⏳ Uploading ${config.label}...`)
+
+      // Track grade_card_start event
+      if (typeof window !== 'undefined' && window.gtag) {
+        window.gtag('event', 'grade_card_start', {
+          card_category: config.category
+        })
+        console.log('[GA4] grade_card_start event tracked:', config.category)
+      }
 
       // Create unique ID for this card
       const cardId = crypto.randomUUID()

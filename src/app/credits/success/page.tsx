@@ -20,6 +20,9 @@ function PurchaseSuccessContent() {
   const hasTrackedPurchase = useRef(false)
 
   const sessionId = searchParams.get('session_id')
+  const tier = searchParams.get('tier')
+  const value = parseFloat(searchParams.get('value') || '0')
+  const credits = parseInt(searchParams.get('credits') || '0')
 
   useEffect(() => {
     // Track purchase conversions (only once)
@@ -38,6 +41,22 @@ function PurchaseSuccessContent() {
           transaction_id: sessionId // Stripe session ID for deduplication
         })
         console.log('[Google Ads] Purchase conversion tracked with transaction_id:', sessionId)
+      }
+
+      // Track GA4 purchase event with ecommerce data
+      if (window.gtag && value > 0) {
+        window.gtag('event', 'purchase', {
+          transaction_id: sessionId,
+          value: value,
+          currency: 'USD',
+          items: [{
+            item_id: tier || 'credits',
+            item_name: `${credits} Credits`,
+            price: value,
+            quantity: 1
+          }]
+        })
+        console.log('[GA4] purchase event tracked:', { tier, value, credits })
       }
 
       hasTrackedPurchase.current = true

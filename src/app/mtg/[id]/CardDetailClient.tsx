@@ -1,7 +1,14 @@
 "use client";
 
 // Force rebuild to pick up card text changes
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
+
+// Declare gtag for TypeScript
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void
+  }
+}
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -1436,6 +1443,8 @@ export function MTGCardDetails() {
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
   // 💰 Insufficient credits modal
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
+  // 📊 Track grade_card_complete event (only once per card)
+  const hasTrackedGradeComplete = useRef(false);
 
   // Fetch MTG Card Details using MTG-specific API
   const fetchMTGCardDetails = useCallback(async () => {
@@ -1560,6 +1569,18 @@ export function MTGCardDetails() {
       setOrigin(window.location.origin);
     }
   }, []);
+
+  // 📊 Track grade_card_complete when a graded card is viewed
+  useEffect(() => {
+    if (card && card.grade && !hasTrackedGradeComplete.current && typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', 'grade_card_complete', {
+        card_category: card.category || 'MTG',
+        grade: card.grade
+      });
+      hasTrackedGradeComplete.current = true;
+      console.log('[GA4] grade_card_complete event tracked:', card.category, card.grade);
+    }
+  }, [card]);
 
   // 📦 Parse defects when card data changes
   useEffect(() => {

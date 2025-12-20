@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       ? requestOrigin
       : 'https://www.dcmgrading.com';
 
-    const successUrl = `${origin}/credits/success?session_id={CHECKOUT_SESSION_ID}`;
+    const successUrl = `${origin}/credits/success?session_id={CHECKOUT_SESSION_ID}&tier=${tier}&value=${priceConfig.price}&credits=${priceConfig.credits}`;
     const cancelUrl = `${origin}/credits?canceled=true`;
 
     // Create Stripe checkout session
