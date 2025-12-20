@@ -5,10 +5,11 @@ import { useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
 
-// Declare rdt for TypeScript
+// Declare rdt and gtag for TypeScript
 declare global {
   interface Window {
     rdt: (...args: any[]) => void
+    gtag: (...args: any[]) => void
   }
 }
 
@@ -21,13 +22,25 @@ function PurchaseSuccessContent() {
   const sessionId = searchParams.get('session_id')
 
   useEffect(() => {
-    // Track Reddit Purchase conversion (only once)
-    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && window.rdt && sessionId) {
-      window.rdt('track', 'Purchase', {
-        conversionId: sessionId // Stripe session ID for deduplication
-      })
+    // Track purchase conversions (only once)
+    if (!hasTrackedPurchase.current && typeof window !== 'undefined' && sessionId) {
+      // Track Reddit Purchase conversion
+      if (window.rdt) {
+        window.rdt('track', 'Purchase', {
+          conversionId: sessionId // Stripe session ID for deduplication
+        })
+        console.log('[Reddit Pixel] Purchase event tracked with conversionId:', sessionId)
+      }
+
+      // Track Google Ads Purchase conversion
+      if (window.gtag) {
+        window.gtag('event', 'ads_conversion_PURCHASE_1', {
+          transaction_id: sessionId // Stripe session ID for deduplication
+        })
+        console.log('[Google Ads] Purchase conversion tracked with transaction_id:', sessionId)
+      }
+
       hasTrackedPurchase.current = true
-      console.log('[Reddit Pixel] Purchase event tracked with conversionId:', sessionId)
     }
 
     // Refresh credits after successful purchase
