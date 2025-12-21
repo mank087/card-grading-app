@@ -160,7 +160,7 @@ export default function PokemonGradingLanding() {
             <div className="flex justify-center mb-6">
               <div className="w-full max-w-[300px]">
                 <HeroGradingAnimation
-                  rawCardImage="/DCM-Card-Mega-Charizard-X-EX-899391-front.jpg"
+                  rawCardImage="/Pokemon/Mega-charizard-x-ex-dcm-10.png"
                   cardName="Mega Charizard X EX"
                   cardDetails="Phantasmal Flames • #125/94 • 2025"
                   cardNumber="899391"
@@ -186,7 +186,7 @@ export default function PokemonGradingLanding() {
             {/* Left: Grading Animation */}
             <div className="flex-shrink-0 w-[340px]">
               <HeroGradingAnimation
-                rawCardImage="/DCM-Card-Mega-Charizard-X-EX-899391-front.jpg"
+                rawCardImage="/Pokemon/Mega-charizard-x-ex-dcm-10.png"
                 cardName="Mega Charizard X EX"
                 cardDetails="Phantasmal Flames • #125/94 • 2025"
                 cardNumber="899391"
