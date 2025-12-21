@@ -194,8 +194,14 @@ export default function HeroGradingAnimation({
           <div className="relative bg-white rounded-t-xl p-3 shadow-lg border-2 border-emerald-500/50 border-b-0">
             <div className="flex items-start gap-3">
               {/* DCM Logo */}
-              <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xs">DCM</span>
+              <div className="flex-shrink-0 w-12 h-12">
+                <Image
+                  src="/DCM-logo.png"
+                  alt="DCM"
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-contain"
+                />
               </div>
 
               {/* Card Info */}
