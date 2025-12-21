@@ -54,7 +54,7 @@ const pricingTiers: PricingTier[] = [
     name: 'Pro',
     price: 9.99,
     credits: 5,
-    bonusCredits: 2,
+    bonusCredits: 3,
     description: 'Best value for casual collectors',
     popular: true,
     icon: '🚀',

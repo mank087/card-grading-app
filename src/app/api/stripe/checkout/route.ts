@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     // Tier-specific bonus credits for DCM Launch Special
     const bonusCreditsMap: Record<StripePriceTier, number> = {
       basic: 1,
-      pro: 2,
+      pro: 3,
       elite: 5,
     };
     const bonusCredits = bonusCreditsMap[tier];
