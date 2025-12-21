@@ -135,23 +135,65 @@ export default function SportsGradingLanding() {
           </div>
         </div>
 
-        <div className="relative z-10 container mx-auto px-4 py-16 md:py-24">
-          <div className="flex flex-col xl:flex-row items-center gap-8 xl:gap-6">
-            {/* Left: Grading Animation - Hidden on mobile, shown on xl */}
-            <div className="hidden xl:block flex-shrink-0 w-[340px]">
+        <div className="relative z-10 container mx-auto px-4 py-8 md:py-24">
+          {/* Mobile: Animation First */}
+          <div className="xl:hidden mb-8">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <Image src="/DCM Logo white.png" alt="DCM" width={40} height={40} />
+              <span className="text-white/80 text-xs font-medium tracking-wider uppercase">Sports Card Grading</span>
+            </div>
+
+            {/* Headline right below logo */}
+            <div className="text-center mb-6">
+              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 leading-tight">
+                Grade Your Sports Card
+                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
+                  Instantly
+                </span>
+              </h1>
+              <p className="text-base text-gray-300">
+                <span className="text-white font-semibold">No shipping. No waiting.</span> Results in 60 seconds.
+              </p>
+            </div>
+
+            {/* Animation centered on mobile */}
+            <div className="flex justify-center mb-6">
+              <div className="w-full max-w-[300px]">
+                <HeroGradingAnimation
+                  rawCardImage="/Sports/drake may - daniel- williams f.png"
+                />
+              </div>
+            </div>
+
+            {/* CTA for mobile */}
+            <div className="text-center">
+              <Link
+                href={user ? "/upload/sports" : "/login?mode=signup&redirect=/upload/sports"}
+                onClick={() => trackSignupClick('hero_mobile', selectedPkg.label)}
+                className="inline-block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
+              >
+                Grade Your Cards Now
+              </Link>
+            </div>
+          </div>
+
+          {/* Desktop: Original 3-column layout */}
+          <div className="hidden xl:flex flex-row items-center gap-6">
+            {/* Left: Grading Animation */}
+            <div className="flex-shrink-0 w-[340px]">
               <HeroGradingAnimation
                 rawCardImage="/Sports/drake may - daniel- williams f.png"
               />
             </div>
 
             {/* Center: Hero Content */}
-            <div className="flex-1 text-center lg:text-left">
-              <div className="flex items-center justify-center lg:justify-start gap-3 mb-6">
+            <div className="flex-1 text-left">
+              <div className="flex items-center gap-3 mb-6">
                 <Image src="/DCM Logo white.png" alt="DCM" width={50} height={50} />
                 <span className="text-white/80 text-sm font-medium tracking-wider uppercase">Sports Card Grading</span>
               </div>
 
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
+              <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
                 Grade Your Sports Card
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
                   Instantly
@@ -162,8 +204,8 @@ export default function SportsGradingLanding() {
                 <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in under 60 seconds.
               </p>
 
-              {/* Feature bullets */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-xl">
+              {/* Feature bullets - desktop only */}
+              <div className="grid grid-cols-2 gap-4 mb-8 max-w-xl">
                 <div className="bg-white/5 rounded-lg px-4 py-4">
                   <div className="flex items-center gap-3 mb-2">
                     <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
@@ -209,20 +251,9 @@ export default function SportsGradingLanding() {
                   <p className="text-gray-400 text-xs leading-relaxed pl-11">Downloadable graded card images, reports and labels</p>
                 </div>
               </div>
-
-              {/* CTA for mobile */}
-              <div className="lg:hidden">
-                <Link
-                  href={user ? "/upload/sports" : "/login?mode=signup&redirect=/upload/sports"}
-                  onClick={() => trackSignupClick('hero_mobile', selectedPkg.label)}
-                  className="inline-block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
-                >
-                  Grade Your Cards Now
-                </Link>
-              </div>
             </div>
 
-            {/* Right: Pricing Card */}
+            {/* Right: Pricing Card - Desktop */}
             <div className="w-full max-w-md">
               <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
                 {/* Header */}
@@ -321,7 +352,7 @@ export default function SportsGradingLanding() {
                       <svg className="w-5 h-5 text-yellow-400 animate-sparkle" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
                       </svg>
-                      <span className="font-bold text-sm text-yellow-300 tracking-wide">🎉 LAUNCH SPECIAL</span>
+                      <span className="font-bold text-sm text-yellow-300 tracking-wide">LAUNCH SPECIAL</span>
                       {/* Sparkle icon right */}
                       <svg className="w-5 h-5 text-yellow-400 animate-sparkle-delayed" fill="currentColor" viewBox="0 0 20 20">
                         <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
@@ -359,6 +390,158 @@ export default function SportsGradingLanding() {
                     No subscription required. Pay only for what you use
                   </p>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile: Pricing Card - shown below hero on mobile */}
+          <div className="xl:hidden mt-8">
+            <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl max-w-md mx-auto">
+              {/* Header */}
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+                <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
+                <p className="text-emerald-200 text-sm text-center">1 credit = 1 card graded</p>
+              </div>
+
+              {/* Package selector */}
+              <div className="p-6">
+                <div className="grid grid-cols-3 gap-2 mb-6">
+                  {(Object.keys(packages) as Array<keyof typeof packages>).map((pkg) => (
+                    <button
+                      key={pkg}
+                      onClick={() => {
+                        setSelectedPackage(pkg)
+                        trackPackageSelect(packages[pkg].label)
+                      }}
+                      className={`relative py-3 px-2 rounded-lg border-2 transition-all ${
+                        selectedPackage === pkg
+                          ? 'border-emerald-500 bg-emerald-500/20 text-white'
+                          : 'border-gray-600 bg-gray-700/50 text-gray-400 hover:border-gray-500'
+                      }`}
+                    >
+                      {packages[pkg].popular && (
+                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-green-500 to-emerald-500 text-[10px] font-bold text-gray-900 px-2 py-0.5 rounded-full">
+                          BEST VALUE
+                        </span>
+                      )}
+                      <div className="text-sm font-medium">{packages[pkg].label}</div>
+                      <div className="text-xs opacity-75">{packages[pkg].credits} credit{packages[pkg].credits > 1 ? 's' : ''}</div>
+                      <div className="text-xs opacity-75">${packages[pkg].price}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Selected package details */}
+                <div className="bg-gray-900/50 rounded-xl p-4 mb-6">
+                  <div className="flex items-baseline justify-center gap-1 mb-2">
+                    <span className="text-4xl font-bold text-white">${selectedPkg.price.toFixed(2)}</span>
+                  </div>
+                  <div className="text-center text-gray-400 text-sm">
+                    {selectedPkg.credits} + {selectedPkg.bonus} bonus = <span className="text-white font-semibold">{selectedPkg.credits + selectedPkg.bonus} credits</span>
+                  </div>
+                  <div className="text-center text-gray-500 text-xs mt-1">
+                    ${(selectedPkg.price / (selectedPkg.credits + selectedPkg.bonus)).toFixed(2)} per card with bonus
+                  </div>
+                  {selectedPackage !== 'single' && (
+                    <div className="text-center text-green-400 text-sm font-medium mt-1">
+                      Save {Math.round((1 - selectedPkg.perCard / 2.99) * 100)}% vs single cards
+                    </div>
+                  )}
+                </div>
+
+                {/* Launch Special Banner */}
+                <div className="relative overflow-hidden bg-gradient-to-r from-yellow-500/20 via-green-500/20 to-yellow-500/20 border-2 border-yellow-500/50 rounded-lg p-3 mb-4 animate-pulse-subtle">
+                  {/* Shimmer effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+
+                  <div className="relative flex items-center justify-center gap-2">
+                    <svg className="w-5 h-5 text-yellow-400 animate-sparkle" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
+                    </svg>
+                    <span className="font-bold text-sm text-yellow-300 tracking-wide">LAUNCH SPECIAL</span>
+                    <svg className="w-5 h-5 text-yellow-400 animate-sparkle-delayed" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
+                    </svg>
+                  </div>
+                  <p className="relative text-center text-green-300 text-sm mt-1 font-medium">
+                    {selectedPkg.label} gets <span className="font-bold text-yellow-300">+{selectedPkg.bonus} bonus credit{selectedPkg.bonus > 1 ? 's' : ''}</span> free!
+                  </p>
+                </div>
+
+                {/* CTA Button */}
+                {isLoading ? (
+                  <div className="w-full bg-gray-700 text-gray-400 font-bold text-lg px-6 py-4 rounded-xl text-center">
+                    Loading...
+                  </div>
+                ) : user ? (
+                  <Link
+                    href="/upload/sports"
+                    onClick={() => trackSignupClick('pricing_card_mobile', selectedPkg.label)}
+                    className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg shadow-emerald-500/30"
+                  >
+                    Grade Your Cards Now
+                  </Link>
+                ) : (
+                  <Link
+                    href="/login?mode=signup&redirect=/upload/sports"
+                    onClick={() => trackSignupClick('pricing_card_mobile_signup', selectedPkg.label)}
+                    className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg shadow-emerald-500/30"
+                  >
+                    Create Account
+                  </Link>
+                )}
+
+                <p className="text-center text-gray-500 text-xs mt-3">
+                  No subscription required. Pay only for what you use
+                </p>
+              </div>
+            </div>
+
+            {/* Feature boxes - mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 max-w-xl mx-auto">
+              <div className="bg-white/5 rounded-lg px-4 py-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-sm font-semibold">Identify Your Card</span>
+                </div>
+                <p className="text-gray-400 text-xs leading-relaxed pl-11">Player, set name, card number, manufacturer, and more</p>
+              </div>
+              <div className="bg-white/5 rounded-lg px-4 py-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-sm font-semibold">Evaluate Condition</span>
+                </div>
+                <p className="text-gray-400 text-xs leading-relaxed pl-11">Analysis of centering, corners, edges and surface for front and back of your card</p>
+              </div>
+              <div className="bg-white/5 rounded-lg px-4 py-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-sm font-semibold">Market Pricing & Grade Estimates</span>
+                </div>
+                <p className="text-gray-400 text-xs leading-relaxed pl-11">Estimates of PSA, BGS, SGC and CGC grade equivalents & links to marketplace listings for your card</p>
+              </div>
+              <div className="bg-white/5 rounded-lg px-4 py-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <span className="text-white text-sm font-semibold">Reports & Labels</span>
+                </div>
+                <p className="text-gray-400 text-xs leading-relaxed pl-11">Downloadable graded card images, reports and labels</p>
               </div>
             </div>
           </div>
