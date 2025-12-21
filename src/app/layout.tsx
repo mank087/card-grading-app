@@ -41,6 +41,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Facebook Domain Verification */}
+        <meta name="facebook-domain-verification" content="gqf9ydy92vx2nn9eq1bmw3yyf0wu8z" />
+
         {/* Google Analytics + Google Ads */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-YLC2FKKBGC"
