@@ -163,60 +163,50 @@ export default function SportsGradingLanding() {
               </p>
 
               {/* Feature bullets */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 max-w-xl">
-                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                    </svg>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 max-w-xl">
+                <div className="bg-white/5 rounded-lg px-4 py-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-sm font-semibold">Identify Your Card</span>
                   </div>
-                  <span className="text-gray-200 text-sm font-medium">Identify Your Card</span>
+                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Player, set name, card number, and more</p>
                 </div>
-                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+                <div className="bg-white/5 rounded-lg px-4 py-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-sm font-semibold">Evaluate Condition</span>
                   </div>
-                  <span className="text-gray-200 text-sm font-medium">Evaluate Condition</span>
+                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Analysis of centering, corners, edges and surface for front and back of your card</p>
                 </div>
-                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
+                <div className="bg-white/5 rounded-lg px-4 py-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-sm font-semibold">Grade Estimates</span>
                   </div>
-                  <span className="text-gray-200 text-sm font-medium">View Market Sales</span>
+                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Estimates of PSA, BGS, SGC and CGC grade equivalents</p>
                 </div>
-                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
+                <div className="bg-white/5 rounded-lg px-4 py-4">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
+                    <span className="text-white text-sm font-semibold">Reports & Labels</span>
                   </div>
-                  <span className="text-gray-200 text-sm font-medium">Reports & Labels</span>
-                </div>
-              </div>
-
-              {/* Trust badges */}
-              <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 mb-8">
-                <div className="flex items-center gap-2 text-gray-400">
-                  <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>50,000+ Cards Graded</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-400">
-                  <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>Instant Results</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-400">
-                  <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span>PSA/BGS Estimates</span>
+                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Downloadable graded card images, reports and labels</p>
                 </div>
               </div>
 
