@@ -192,53 +192,62 @@ export default function HeroGradingAnimation({
 
           {/* Purple metallic slab border */}
           <div
-            className="relative rounded-2xl p-[3px] shadow-xl"
+            className="relative rounded-xl p-1 shadow-xl overflow-hidden"
             style={{
               background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
               boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
             }}
           >
-          {/* DCM Label - Above card */}
-          <div className="bg-white rounded-t-xl p-3">
-            <div className="flex items-start gap-3">
-              {/* DCM Logo */}
-              <div className="flex-shrink-0 w-12 h-12">
+            {/* Inner white container */}
+            <div className="bg-white rounded-lg overflow-hidden">
+              {/* DCM Label - Above card */}
+              <div className="p-3">
+                <div className="flex items-start gap-3">
+                  {/* DCM Logo */}
+                  <div className="flex-shrink-0 w-12 h-12">
+                    <Image
+                      src="/DCM-logo.png"
+                      alt="DCM"
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+
+                  {/* Card Info */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-gray-900 font-bold text-[10px] leading-tight">{cardName}</h3>
+                    <p className="text-gray-600 text-[10px] leading-tight mt-0.5 line-clamp-2">{cardDetails}</p>
+                    <p className="text-emerald-600 text-[10px] font-semibold mt-0.5">RC Auto 07/10</p>
+                    <p className="text-gray-400 text-[9px]">{cardNumber}</p>
+                  </div>
+
+                  {/* Grade */}
+                  <div className="flex-shrink-0 text-center">
+                    <div className="text-3xl font-bold text-purple-600 leading-none">{grade}</div>
+                    <div className="text-[10px] font-semibold text-purple-600 uppercase">{getGradeLabel(grade)}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Purple Separator - mimics slab divider */}
+              <div
+                className="h-1"
+                style={{
+                  background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
+                }}
+              />
+
+              {/* Card Image */}
+              <div className="relative" style={{ aspectRatio: '2.5/3.5' }}>
                 <Image
-                  src="/DCM-logo.png"
-                  alt="DCM"
-                  width={48}
-                  height={48}
-                  className="w-full h-full object-contain"
+                  src={rawCardImage}
+                  alt="Graded card"
+                  fill
+                  className="object-cover"
                 />
               </div>
-
-              {/* Card Info */}
-              <div className="flex-1 min-w-0">
-                <h3 className="text-gray-900 font-bold text-[10px] leading-tight">{cardName}</h3>
-                <p className="text-gray-600 text-[10px] leading-tight mt-0.5 line-clamp-2">{cardDetails}</p>
-                <p className="text-emerald-600 text-[10px] font-semibold mt-0.5">RC Auto 07/10</p>
-                <p className="text-gray-400 text-[9px]">{cardNumber}</p>
-              </div>
-
-              {/* Grade */}
-              <div className="flex-shrink-0 text-center">
-                <div className="text-3xl font-bold text-purple-600 leading-none">{grade}</div>
-                <div className="text-[10px] font-semibold text-purple-600 uppercase">{getGradeLabel(grade)}</div>
-              </div>
             </div>
-          </div>
-
-          {/* Card Image */}
-          <div className="relative overflow-hidden rounded-b-xl">
-            <div className="relative w-full" style={{ aspectRatio: '2.5/3.5' }}>
-              <Image
-                src={rawCardImage}
-                alt="Graded card"
-                fill
-                className="object-cover"
-              />
-            </div>
-          </div>
           </div>
         </div>
 
