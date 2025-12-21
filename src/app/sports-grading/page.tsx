@@ -144,16 +144,51 @@ export default function SportsGradingLanding() {
               </div>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-                Know Your Card's Grade
+                Grade Your Sports Card
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-green-400 to-emerald-500">
-                  Before PSA Does
+                  Instantly
                 </span>
               </h1>
 
-              <p className="text-xl text-gray-300 mb-8 max-w-xl">
-                AI-powered grading in <span className="text-white font-semibold">under 60 seconds</span>.
-                Get detailed centering, corners, edges & surface analysis — know if your card is worth submitting.
+              <p className="text-xl text-gray-300 mb-6 max-w-xl">
+                <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in under 60 seconds.
               </p>
+
+              {/* Feature bullets */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8 max-w-xl">
+                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
+                    </svg>
+                  </div>
+                  <span className="text-gray-200 text-sm font-medium">Identify Your Card</span>
+                </div>
+                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <span className="text-gray-200 text-sm font-medium">Evaluate Condition</span>
+                </div>
+                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                  <span className="text-gray-200 text-sm font-medium">View Market Sales</span>
+                </div>
+                <div className="flex items-center gap-3 bg-white/5 rounded-lg px-4 py-3">
+                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <span className="text-gray-200 text-sm font-medium">Reports & Labels</span>
+                </div>
+              </div>
 
               {/* Trust badges */}
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 mb-8">
@@ -332,11 +367,12 @@ export default function SportsGradingLanding() {
         </div>
       </section>
 
-      {/* Sports Leagues Supported */}
-      <section className="py-12 bg-gray-900 border-b border-gray-800">
+      {/* Sports Leagues Supported + DCM Stats */}
+      <section className="py-16 bg-gray-900 border-b border-gray-800">
         <div className="container mx-auto px-4">
+          {/* Sports leagues */}
           <p className="text-center text-gray-500 text-sm mb-6 uppercase tracking-wider">Grade cards from all major sports</p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
+          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 mb-12">
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">NFL</div>
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">NBA</div>
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">MLB</div>
@@ -344,6 +380,42 @@ export default function SportsGradingLanding() {
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">UFC</div>
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">WWE</div>
             <div className="text-gray-400 text-lg font-bold opacity-60 hover:opacity-100 transition-opacity">Soccer</div>
+          </div>
+
+          {/* DCM Stats - 3 column grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <div className="bg-gradient-to-br from-emerald-900/50 to-teal-900/50 rounded-2xl p-6 border border-emerald-700/30 text-center">
+              <div className="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">50,000+</div>
+              <div className="text-emerald-400 font-semibold mb-2">Cards Graded</div>
+              <p className="text-gray-400 text-sm">Trusted by collectors worldwide for accurate, reliable grading</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-emerald-900/50 to-teal-900/50 rounded-2xl p-6 border border-emerald-700/30 text-center">
+              <div className="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">Instant</div>
+              <div className="text-emerald-400 font-semibold mb-2">Results</div>
+              <p className="text-gray-400 text-sm">Get your grade in under 60 seconds — no waiting weeks for a slab</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-emerald-900/50 to-teal-900/50 rounded-2xl p-6 border border-emerald-700/30 text-center">
+              <div className="w-14 h-14 bg-emerald-500/20 rounded-xl flex items-center justify-center mx-auto mb-4">
+                <svg className="w-7 h-7 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div className="text-3xl font-bold text-white mb-1">Detailed</div>
+              <div className="text-emerald-400 font-semibold mb-2">Downloadable Reports</div>
+              <p className="text-gray-400 text-sm">Professional PDF reports with grades, defect analysis, and printable labels</p>
+            </div>
           </div>
         </div>
       </section>
