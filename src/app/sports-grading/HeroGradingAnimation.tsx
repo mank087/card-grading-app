@@ -206,7 +206,7 @@ export default function HeroGradingAnimation({
 
               {/* Card Info */}
               <div className="flex-1 min-w-0">
-                <h3 className="text-gray-900 font-bold text-xs leading-tight truncate">{cardName}</h3>
+                <h3 className="text-gray-900 font-bold text-[10px] leading-tight">{cardName}</h3>
                 <p className="text-gray-600 text-[10px] leading-tight mt-0.5 line-clamp-2">{cardDetails}</p>
                 <p className="text-emerald-600 text-[10px] font-semibold mt-0.5">RC Auto 07/10</p>
                 <p className="text-gray-400 text-[9px]">{cardNumber}</p>
