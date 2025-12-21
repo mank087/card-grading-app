@@ -140,7 +140,7 @@ export default function SportsGradingLanding() {
             {/* Left: Grading Animation - Hidden on mobile, shown on xl */}
             <div className="hidden xl:block flex-shrink-0 w-[340px]">
               <HeroGradingAnimation
-                rawCardImage="/Sports/DCM-Card-Caleb-Williams-Jayden-Daniels-Drake-Maye-884215-front.jpg"
+                rawCardImage="/Sports/drake may - daniel- williams f.png"
               />
             </div>
 
