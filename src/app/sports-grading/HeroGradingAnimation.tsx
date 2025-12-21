@@ -188,10 +188,18 @@ export default function HeroGradingAnimation({
       >
         <div className="relative mx-auto" style={{ maxWidth: '280px' }}>
           {/* Celebration glow */}
-          <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 via-teal-500/20 to-emerald-500/20 rounded-3xl blur-xl animate-pulse" />
+          <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/30 via-indigo-500/30 to-purple-500/30 rounded-3xl blur-xl animate-pulse" />
 
+          {/* Purple metallic slab border */}
+          <div
+            className="relative rounded-2xl p-[3px] shadow-xl"
+            style={{
+              background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
+              boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
+            }}
+          >
           {/* DCM Label - Above card */}
-          <div className="relative bg-white rounded-t-xl p-3 shadow-lg border-2 border-emerald-500/50 border-b-0">
+          <div className="bg-white rounded-t-xl p-3">
             <div className="flex items-start gap-3">
               {/* DCM Logo */}
               <div className="flex-shrink-0 w-12 h-12">
@@ -221,7 +229,7 @@ export default function HeroGradingAnimation({
           </div>
 
           {/* Card Image */}
-          <div className="relative overflow-hidden rounded-b-xl shadow-2xl border-2 border-emerald-500/50 border-t-0">
+          <div className="relative overflow-hidden rounded-b-xl">
             <div className="relative w-full" style={{ aspectRatio: '2.5/3.5' }}>
               <Image
                 src={rawCardImage}
@@ -230,6 +238,7 @@ export default function HeroGradingAnimation({
                 className="object-cover"
               />
             </div>
+          </div>
           </div>
         </div>
 
