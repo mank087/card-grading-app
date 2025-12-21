@@ -6,11 +6,12 @@ import Link from 'next/link'
 import { signInWithPassword, signUp, getStoredSession, signInWithOAuth } from '../../lib/directAuth'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
-// Declare rdt and gtag for TypeScript
+// Declare rdt, gtag, and fbq for TypeScript
 declare global {
   interface Window {
     rdt: (...args: any[]) => void
     gtag: (...args: any[]) => void
+    fbq: (...args: any[]) => void
   }
 }
 
@@ -97,6 +98,15 @@ function LoginPageContent() {
                 method: 'email'
               })
               console.log('[GA4] sign_up event tracked')
+            }
+
+            // Meta/Facebook CompleteRegistration event
+            if (window.fbq) {
+              window.fbq('track', 'CompleteRegistration', {
+                content_name: 'Email Signup',
+                status: true
+              })
+              console.log('[Meta Pixel] CompleteRegistration event tracked')
             }
           }
           alert('Account created! Check your email for the confirmation link.')

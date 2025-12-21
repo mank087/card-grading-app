@@ -2,10 +2,11 @@
 
 import { useState, useEffect, Suspense } from 'react'
 
-// Declare gtag for TypeScript
+// Declare gtag and fbq for TypeScript
 declare global {
   interface Window {
     gtag: (...args: any[]) => void
+    fbq: (...args: any[]) => void
   }
 }
 import Link from 'next/link'
@@ -137,6 +138,18 @@ function CreditsPageContent() {
         }]
       })
       console.log('[GA4] begin_checkout event tracked:', tier.id, tier.price)
+    }
+
+    // Track Meta/Facebook InitiateCheckout event
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', 'InitiateCheckout', {
+        value: tier.price,
+        currency: 'USD',
+        content_type: 'product',
+        content_ids: [tier.id],
+        num_items: tier.credits
+      })
+      console.log('[Meta Pixel] InitiateCheckout event tracked:', tier.id, tier.price)
     }
 
     try {

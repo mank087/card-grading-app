@@ -5,11 +5,12 @@ import { useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
 
-// Declare rdt and gtag for TypeScript
+// Declare rdt, gtag, and fbq for TypeScript
 declare global {
   interface Window {
     rdt: (...args: any[]) => void
     gtag: (...args: any[]) => void
+    fbq: (...args: any[]) => void
   }
 }
 
@@ -57,6 +58,18 @@ function PurchaseSuccessContent() {
           }]
         })
         console.log('[GA4] purchase event tracked:', { tier, value, credits })
+      }
+
+      // Track Meta/Facebook Purchase conversion
+      if (window.fbq && value > 0) {
+        window.fbq('track', 'Purchase', {
+          value: value,
+          currency: 'USD',
+          content_type: 'product',
+          content_ids: [tier || 'credits'],
+          num_items: credits
+        })
+        console.log('[Meta Pixel] Purchase event tracked:', { tier, value, credits })
       }
 
       hasTrackedPurchase.current = true
