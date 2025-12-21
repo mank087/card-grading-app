@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession } from '@/lib/directAuth'
+import HeroGradingAnimation from './HeroGradingAnimation'
 
 // Declare gtag for TypeScript
 declare global {
@@ -135,8 +136,15 @@ export default function SportsGradingLanding() {
         </div>
 
         <div className="relative z-10 container mx-auto px-4 py-16 md:py-24">
-          <div className="flex flex-col lg:flex-row items-center gap-12">
-            {/* Left: Hero Content */}
+          <div className="flex flex-col xl:flex-row items-center gap-8 xl:gap-6">
+            {/* Left: Grading Animation - Hidden on mobile, shown on xl */}
+            <div className="hidden xl:block flex-shrink-0 w-[340px]">
+              <HeroGradingAnimation
+                rawCardImage="/Sports/DCM-Card-Caleb-Williams-Jayden-Daniels-Drake-Maye-884215-front.jpg"
+              />
+            </div>
+
+            {/* Center: Hero Content */}
             <div className="flex-1 text-center lg:text-left">
               <div className="flex items-center justify-center lg:justify-start gap-3 mb-6">
                 <Image src="/DCM Logo white.png" alt="DCM" width={50} height={50} />
