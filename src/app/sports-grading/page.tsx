@@ -173,7 +173,7 @@ export default function SportsGradingLanding() {
                     </div>
                     <span className="text-white text-sm font-semibold">Identify Your Card</span>
                   </div>
-                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Player, set name, card number, and more</p>
+                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Player, set name, card number, manufacturer, and more</p>
                 </div>
                 <div className="bg-white/5 rounded-lg px-4 py-4">
                   <div className="flex items-center gap-3 mb-2">
@@ -193,9 +193,9 @@ export default function SportsGradingLanding() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
                       </svg>
                     </div>
-                    <span className="text-white text-sm font-semibold">Grade Estimates</span>
+                    <span className="text-white text-sm font-semibold">Market Pricing & Grade Estimates</span>
                   </div>
-                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Estimates of PSA, BGS, SGC and CGC grade equivalents</p>
+                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Estimates of PSA, BGS, SGC and CGC grade equivalents & links to marketplace listings for your card</p>
                 </div>
                 <div className="bg-white/5 rounded-lg px-4 py-4">
                   <div className="flex items-center gap-3 mb-2">
