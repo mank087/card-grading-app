@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { addCredits, updateStripeCustomerId } from '@/lib/credits';
+import { addCredits, updateStripeCustomerId, setFounderStatus } from '@/lib/credits';
 import Stripe from 'stripe';
 
 // Disable body parsing - we need raw body for signature verification
@@ -84,12 +84,41 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const credits = parseInt(session.metadata?.credits || '0', 10);
   const bonusCredits = parseInt(session.metadata?.bonusCredits || '1', 10); // Default to 1 for backwards compatibility
   const isFirstPurchase = session.metadata?.isFirstPurchase === 'true';
+  const isFoundersPackage = session.metadata?.isFoundersPackage === 'true';
 
   if (!userId || !credits) {
     console.error('Missing required metadata:', { userId, credits });
     return;
   }
 
+  // Update Stripe customer ID if we have it
+  if (session.customer && typeof session.customer === 'string') {
+    await updateStripeCustomerId(userId, session.customer);
+  }
+
+  // Handle Founders Package separately
+  if (isFoundersPackage) {
+    console.log('Processing Founders Package purchase:', {
+      userId,
+      sessionId: session.id,
+    });
+
+    const founderResult = await setFounderStatus(userId, {
+      stripeSessionId: session.id,
+      stripePaymentIntentId: typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : undefined,
+    });
+
+    if (founderResult.success) {
+      console.log('Founder status set successfully:', { userId });
+    } else {
+      console.error('Failed to set founder status:', { userId, error: founderResult.error });
+    }
+    return;
+  }
+
+  // Regular credit purchase
   console.log('Adding credits:', {
     userId,
     tier,
@@ -100,11 +129,6 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     paymentIntentId: session.payment_intent,
   });
 
-  // Update Stripe customer ID if we have it
-  if (session.customer && typeof session.customer === 'string') {
-    await updateStripeCustomerId(userId, session.customer);
-  }
-
   // Add credits to user account
   const result = await addCredits(userId, credits, {
     stripeSessionId: session.id,
@@ -113,7 +137,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       : undefined,
     description: `Purchased ${tier} package (${credits} credits)`,
     isFirstPurchase,
-    bonusCredits, // Tier-specific bonus: Basic=1, Pro=2, Elite=5
+    bonusCredits, // Tier-specific bonus: Basic=1, Pro=3, Elite=5
   });
 
   if (result.success) {

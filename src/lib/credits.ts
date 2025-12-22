@@ -20,6 +20,9 @@ export interface UserCredits {
   total_used: number;
   first_purchase_bonus_claimed: boolean;
   stripe_customer_id: string | null;
+  is_founder: boolean;
+  founder_purchased_at: string | null;
+  show_founder_badge: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -67,6 +70,8 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
         total_purchased: 0,
         total_used: 0,
         first_purchase_bonus_claimed: false,
+        is_founder: false,
+        show_founder_badge: true,
       })
       .select()
       .single();
@@ -276,4 +281,99 @@ export async function updateStripeCustomerId(
 export async function isFirstPurchase(userId: string): Promise<boolean> {
   const credits = await getUserCredits(userId);
   return credits !== null && !credits.first_purchase_bonus_claimed;
+}
+
+/**
+ * Check if user is a founder
+ */
+export async function isFounder(userId: string): Promise<boolean> {
+  const credits = await getUserCredits(userId);
+  return credits !== null && credits.is_founder;
+}
+
+/**
+ * Set user as founder (called after Founders Package purchase)
+ */
+export async function setFounderStatus(
+  userId: string,
+  options: {
+    stripeSessionId?: string;
+    stripePaymentIntentId?: string;
+  } = {}
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  // Get current credits
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { success: false, error: 'User credits not found' };
+  }
+
+  // Check if already a founder
+  if (credits.is_founder) {
+    return { success: false, error: 'User is already a founder' };
+  }
+
+  const founderCredits = 150;
+  const newBalance = credits.balance + founderCredits;
+
+  // Update user as founder and add credits
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update({
+      is_founder: true,
+      founder_purchased_at: new Date().toISOString(),
+      show_founder_badge: true,
+      balance: newBalance,
+      total_purchased: credits.total_purchased + founderCredits,
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('Error setting founder status:', updateError);
+    return { success: false, error: 'Database error' };
+  }
+
+  // Record the transaction
+  await supabase.from('credit_transactions').insert({
+    user_id: userId,
+    type: 'purchase',
+    amount: founderCredits,
+    balance_after: newBalance,
+    description: 'Founders Package - 150 credits',
+    stripe_session_id: options.stripeSessionId,
+    stripe_payment_intent_id: options.stripePaymentIntentId,
+    metadata: { package: 'founders' },
+  });
+
+  return { success: true };
+}
+
+/**
+ * Toggle founder badge visibility on labels
+ */
+export async function toggleFounderBadge(
+  userId: string,
+  showBadge: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  const { error } = await supabase
+    .from('user_credits')
+    .update({ show_founder_badge: showBadge })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error toggling founder badge:', error);
+    return { success: false, error: 'Database error' };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Get founder discount multiplier (20% off = 0.8)
+ */
+export function getFounderDiscountMultiplier(): number {
+  return 0.8; // 20% off
 }

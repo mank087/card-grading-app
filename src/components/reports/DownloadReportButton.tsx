@@ -30,12 +30,14 @@ interface DownloadReportButtonProps {
   card: any; // Card data from database
   variant?: 'default' | 'compact';
   cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'other'; // For URL generation
+  showFounderEmblem?: boolean; // Show founder emblem on back label of card images
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   card,
   variant = 'default',
-  cardType = 'sports'
+  cardType = 'sports',
+  showFounderEmblem = false
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'mini-jpg' | 'card-images' | null>(null);
@@ -761,6 +763,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         cardUrl: `${window.location.origin}/${cardType}/${card.id}`,
         frontImageUrl,
         backImageUrl,
+        showFounderEmblem, // Show founder emblem on back label if user is founder with badge enabled
       };
 
       console.log('[CARD IMAGES] Generating images with data:', {

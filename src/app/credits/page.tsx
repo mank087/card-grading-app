@@ -16,6 +16,9 @@ import { getStoredSession } from '@/lib/directAuth'
 import { loadStripe } from '@stripe/stripe-js'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
+// Founder discount constant
+const FOUNDER_DISCOUNT = 0.2 // 20% off
+
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -79,6 +82,9 @@ const pricingTiers: PricingTier[] = [
   },
 ]
 
+// Countdown end date: January 1, 2026 at 12:00 AM EST (midnight)
+const COUNTDOWN_END = new Date('2026-01-01T00:00:00-05:00').getTime()
+
 function CreditsPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -87,6 +93,8 @@ function CreditsPageContent() {
   const [purchaseLoading, setPurchaseLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(false)
+  const [isFounder, setIsFounder] = useState(false)
+  const [countdown, setCountdown] = useState<{ days: number; hours: number; mins: number; secs: number } | null>(null)
 
   // Check for canceled payment and welcome parameter
   const canceled = searchParams.get('canceled')
@@ -96,6 +104,22 @@ function CreditsPageContent() {
     const session = getStoredSession()
     // Set authentication state but don't redirect - page works for everyone
     setIsAuthenticated(!!session?.access_token)
+
+    // Check founder status if authenticated
+    if (session?.access_token) {
+      fetch('/api/founders/status', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.isFounder) {
+            setIsFounder(true)
+          }
+        })
+        .catch(err => console.error('Error checking founder status:', err))
+    }
   }, [])
 
   useEffect(() => {
@@ -114,6 +138,34 @@ function CreditsPageContent() {
       router.replace('/credits')
     }
   }, [welcome, router])
+
+  // Countdown timer for Founders offer
+  useEffect(() => {
+    const calculateCountdown = () => {
+      const now = Date.now()
+      const difference = COUNTDOWN_END - now
+
+      if (difference <= 0) {
+        return { days: 0, hours: 0, mins: 0, secs: 0 }
+      }
+
+      return {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        mins: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+        secs: Math.floor((difference % (1000 * 60)) / 1000),
+      }
+    }
+
+    // Set initial value
+    setCountdown(calculateCountdown())
+
+    const timer = setInterval(() => {
+      setCountdown(calculateCountdown())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [])
 
   const handlePurchase = async (tier: PricingTier) => {
     // If not authenticated, redirect to signup
@@ -184,6 +236,78 @@ function CreditsPageContent() {
       }
     } catch (err) {
       console.error('Purchase error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to start checkout')
+      setPurchaseLoading(null)
+    }
+  }
+
+  const handleFoundersPurchase = async () => {
+    // If not authenticated, redirect to signup
+    if (!isAuthenticated) {
+      router.push('/login?mode=signup&redirect=/credits')
+      return
+    }
+
+    setError(null)
+    setPurchaseLoading('founders')
+
+    // Track begin_checkout event
+    if (typeof window !== 'undefined' && window.gtag) {
+      window.gtag('event', 'begin_checkout', {
+        currency: 'USD',
+        value: 99,
+        items: [{
+          item_id: 'founders',
+          item_name: 'Founders Package',
+          price: 99,
+          quantity: 1
+        }]
+      })
+    }
+
+    // Track Meta/Facebook InitiateCheckout event
+    if (typeof window !== 'undefined' && window.fbq) {
+      window.fbq('track', 'InitiateCheckout', {
+        value: 99,
+        currency: 'USD',
+        content_type: 'product',
+        content_ids: ['founders'],
+        num_items: 150
+      })
+    }
+
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        router.push('/login?redirect=/credits')
+        return
+      }
+
+      // Create checkout session
+      const response = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ tier: 'founders' }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to create checkout session')
+      }
+
+      const { url } = await response.json()
+
+      // Redirect to Stripe Checkout
+      if (url) {
+        window.location.href = url
+      } else {
+        throw new Error('No checkout URL returned')
+      }
+    } catch (err) {
+      console.error('Founders purchase error:', err)
       setError(err instanceof Error ? err.message : 'Failed to start checkout')
       setPurchaseLoading(null)
     }
@@ -322,8 +446,18 @@ function CreditsPageContent() {
               </div>
             )}
 
-            {/* First Purchase Bonus Banner - Only for logged-in first-time buyers */}
-            {isAuthenticated && isFirstPurchase && (
+            {/* Founder Discount Banner */}
+            {isAuthenticated && isFounder && (
+              <div className="mt-6 inline-flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 rounded-full px-6 py-2 shadow-lg">
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                </svg>
+                <span className="font-semibold">Founder Discount: 20% off all credit packages!</span>
+              </div>
+            )}
+
+            {/* First Purchase Bonus Banner - Only for logged-in first-time buyers (not founders) */}
+            {isAuthenticated && isFirstPurchase && !isFounder && (
               <div className="mt-6 inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full px-6 py-2 shadow-lg">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
@@ -341,102 +475,232 @@ function CreditsPageContent() {
         )}
 
         {/* Pricing Cards */}
-        <div className="grid md:grid-cols-3 gap-6 items-center">
+        <div className={`grid md:grid-cols-2 ${isFounder ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-6`}>
+          {/* Founders Package - Special Limited-Time Offer */}
+          {!isFounder && (
+            <div className="relative bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-yellow-400 flex flex-col">
+              {/* Colored Header Bar - Fixed Height */}
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 px-5 py-4 h-[88px] relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">⭐</span>
+                    <h3 className="text-xl font-bold text-gray-900">Founders</h3>
+                  </div>
+                  <div className="text-right">
+                    <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      LIMITED TIME
+                    </div>
+                    {countdown && (
+                      <div className="bg-gray-900/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded mt-1">
+                        {countdown.days}d {countdown.hours.toString().padStart(2, '0')}:{countdown.mins.toString().padStart(2, '0')}:{countdown.secs.toString().padStart(2, '0')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1.5 inline-block bg-white/30 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  🚀 BEST VALUE
+                </div>
+              </div>
+
+              {/* Card Body - Flex grow to fill space */}
+              <div className="p-5 flex flex-col flex-grow">
+                {/* Price Section - Fixed Height */}
+                <div className="text-center mb-3 h-[60px] flex flex-col justify-center">
+                  <div>
+                    <span className="text-3xl font-bold text-gray-900">$99</span>
+                    <span className="text-gray-500 text-sm ml-1">one-time</span>
+                  </div>
+                  <p className="text-gray-500 text-xs mt-1">Lifetime benefits for early supporters</p>
+                </div>
+
+                {/* Credits Display - Fixed Height */}
+                <div className="mb-3 p-3 bg-gray-50 rounded-xl text-center h-[52px] flex items-center justify-center">
+                  <span className="text-2xl font-bold text-yellow-600">150</span>
+                  <span className="text-gray-600 ml-2">credits</span>
+                </div>
+
+                {/* Per Grade Cost - Fixed Height */}
+                <div className="mb-3 p-2.5 rounded-lg bg-yellow-50 border border-yellow-300 h-[56px] flex flex-col justify-center">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 text-xs font-medium">Cost per grade:</span>
+                    <span className="text-lg font-bold text-yellow-600">$0.66</span>
+                  </div>
+                  <div className="text-yellow-700 text-[10px] font-semibold">Save 78% vs Basic!</div>
+                </div>
+
+                {/* Benefits Section - Flex grow to push button down */}
+                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl">
+                  <div className="text-yellow-800 font-bold text-xs mb-1.5">Lifetime Benefits:</div>
+                  <ul className="text-yellow-700 text-xs space-y-1">
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      20% off future purchases
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Exclusive Founder badge
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Founder emblem on labels
+                    </li>
+                  </ul>
+                </div>
+
+                {/* CTA Button - Always at bottom */}
+                {isAuthenticated ? (
+                  <button
+                    onClick={handleFoundersPurchase}
+                    disabled={purchaseLoading !== null}
+                    className="w-full py-3 px-4 rounded-xl font-bold text-base transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-gray-900 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {purchaseLoading === 'founders' ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Processing...
+                      </span>
+                    ) : (
+                      'Become a Founder'
+                    )}
+                  </button>
+                ) : (
+                  <Link
+                    href="/login?mode=signup&redirect=/credits"
+                    className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-gray-900 shadow-lg hover:shadow-xl"
+                  >
+                    Sign Up to Purchase
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
           {pricingTiers.map((tier) => (
             <div
               key={tier.id}
-              className={`relative bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-105 ${
+              className={`relative bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] flex flex-col ${
                 tier.popular
-                  ? 'ring-4 ring-purple-500 md:scale-110 md:hover:scale-115 z-10 shadow-2xl'
+                  ? 'ring-4 ring-purple-500 shadow-2xl'
                   : 'hover:shadow-2xl'
               }`}
             >
-              {/* Colored Header Bar */}
-              <div className={`bg-gradient-to-r ${tier.bgGradient} px-6 py-4`}>
+              {/* Colored Header Bar - Fixed Height */}
+              <div className={`bg-gradient-to-r ${tier.bgGradient} px-5 py-4 h-[88px]`}>
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{tier.icon}</span>
-                    <h3 className="text-2xl font-bold text-white">{tier.name}</h3>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{tier.icon}</span>
+                    <h3 className="text-xl font-bold text-white">{tier.name}</h3>
                   </div>
-                  {tier.savingsPercent && (
-                    <div className="bg-white/20 backdrop-blur-sm rounded-full px-3 py-1">
-                      <span className="text-white font-bold text-sm">Save {tier.savingsPercent}%</span>
+                  {tier.savingsPercent ? (
+                    <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
+                      <span className="text-white font-bold text-xs">Save {tier.savingsPercent}%</span>
                     </div>
-                  )}
+                  ) : <div className="w-16"></div>}
                 </div>
-                {/* Popular Badge */}
-                {tier.popular && (
-                  <div className="mt-2 inline-block bg-white text-purple-600 text-xs font-bold px-3 py-1 rounded-full">
+                {tier.popular ? (
+                  <div className="mt-1.5 inline-block bg-white text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
                     ⭐ MOST POPULAR
                   </div>
+                ) : (
+                  <div className="mt-1.5 h-[18px]"></div>
                 )}
               </div>
 
-              <div className="p-6">
-                {/* Description */}
-                <p className="text-gray-500 mb-4 text-sm">{tier.description}</p>
-
-                {/* Price */}
-                <div className="mb-4">
-                  <span className="text-4xl font-bold text-gray-900">${tier.price}</span>
+              {/* Card Body - Flex grow to fill space */}
+              <div className="p-5 flex flex-col flex-grow">
+                {/* Price Section - Fixed Height */}
+                <div className="text-center mb-3 h-[60px] flex flex-col justify-center">
+                  {isFounder ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-xl text-gray-400 line-through">${tier.price.toFixed(2)}</span>
+                      <span className="text-3xl font-bold text-gray-900">
+                        ${(tier.price * (1 - FOUNDER_DISCOUNT)).toFixed(2)}
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="text-3xl font-bold text-gray-900">${tier.price}</span>
+                  )}
+                  <p className="text-gray-500 text-xs mt-1">{tier.description}</p>
                 </div>
 
-                {/* Per Grade Cost - Prominent */}
-                <div className={`mb-4 p-3 rounded-lg ${
+                {/* Credits Display - Fixed Height */}
+                <div className="mb-3 p-3 bg-gray-50 rounded-xl text-center h-[52px] flex items-center justify-center">
+                  <span className={`text-2xl font-bold ${
+                    tier.color === 'blue' ? 'text-blue-600' :
+                    tier.color === 'purple' ? 'text-purple-600' :
+                    'text-amber-600'
+                  }`}>{tier.credits}</span>
+                  <span className="text-gray-600 ml-2">credit{tier.credits !== 1 ? 's' : ''}</span>
+                </div>
+
+                {/* Per Grade Cost - Fixed Height */}
+                <div className={`mb-3 p-2.5 rounded-lg h-[56px] flex flex-col justify-center ${
+                  isFounder ? 'bg-yellow-50 border border-yellow-300' :
                   tier.color === 'blue' ? 'bg-blue-50 border border-blue-200' :
                   tier.color === 'purple' ? 'bg-purple-50 border border-purple-200' :
                   'bg-amber-50 border border-amber-200'
                 }`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-sm font-medium">Cost per grade:</span>
-                    <span className={`text-xl font-bold ${
+                    <span className="text-gray-600 text-xs font-medium">Cost per grade:</span>
+                    <span className={`text-lg font-bold ${
+                      isFounder ? 'text-yellow-600' :
                       tier.color === 'blue' ? 'text-blue-600' :
                       tier.color === 'purple' ? 'text-purple-600' :
                       'text-amber-600'
                     }`}>
-                      ${tier.perGradeCost.toFixed(2)}
+                      ${isFounder
+                        ? (tier.perGradeCost * (1 - FOUNDER_DISCOUNT)).toFixed(2)
+                        : tier.perGradeCost.toFixed(2)}
                     </span>
                   </div>
-                  {tier.savingsPercent && (
-                    <div className="text-green-600 text-xs font-semibold mt-1">
-                      You save ${((BASE_PRICE_PER_CREDIT - tier.perGradeCost) * tier.credits).toFixed(2)} vs Basic
+                  {isFounder ? (
+                    <div className="text-yellow-700 text-[10px] font-semibold flex items-center gap-1">
+                      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                      </svg>
+                      Founder discount applied!
+                    </div>
+                  ) : tier.savingsPercent ? (
+                    <div className="text-green-600 text-[10px] font-semibold">
+                      Save ${((BASE_PRICE_PER_CREDIT - tier.perGradeCost) * tier.credits).toFixed(2)} vs Basic
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 text-[10px]">Standard rate</div>
+                  )}
+                </div>
+
+                {/* Bonus/Features Section - Flex grow to push button down */}
+                <div className="flex-grow mb-3">
+                  {(isAuthenticated ? isFirstPurchase : true) && (
+                    <div className="p-2.5 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl h-full flex items-center justify-center">
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-500 text-lg">🎁</span>
+                        <div className="text-center">
+                          <div className="text-green-700 font-bold text-xs">First Purchase Bonus!</div>
+                          <div className="text-green-600 text-sm font-bold">
+                            +{tier.bonusCredits} FREE = {tier.credits + tier.bonusCredits} total
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* Credits */}
-                <div className="mb-4 p-4 bg-gray-50 rounded-xl text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <span className={`text-3xl font-bold ${
-                      tier.color === 'blue' ? 'text-blue-600' :
-                      tier.color === 'purple' ? 'text-purple-600' :
-                      'text-amber-600'
-                    }`}>{tier.credits}</span>
-                    <span className="text-gray-600">credit{tier.credits !== 1 ? 's' : ''}</span>
-                  </div>
-                </div>
-
-                {/* First Purchase Bonus - Enhanced visibility */}
-                {(isAuthenticated ? isFirstPurchase : true) && (
-                  <div className="mb-4 p-3 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl">
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-green-500 text-xl">🎁</span>
-                      <div className="text-center">
-                        <div className="text-green-700 font-bold text-sm">First Purchase Bonus!</div>
-                        <div className="text-green-600 text-lg font-bold">
-                          +{tier.bonusCredits} FREE = {tier.credits + tier.bonusCredits} total
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Purchase Button */}
+                {/* Purchase Button - Always at bottom */}
                 {isAuthenticated ? (
                   <button
                     onClick={() => handlePurchase(tier)}
                     disabled={purchaseLoading !== null}
-                    className={`w-full py-4 px-6 rounded-xl font-bold text-lg transition-all duration-200 bg-gradient-to-r ${tier.bgGradient} hover:opacity-90 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed`}
+                    className={`w-full py-3 px-4 rounded-xl font-bold text-base transition-all duration-200 bg-gradient-to-r ${tier.bgGradient} hover:opacity-90 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {purchaseLoading === tier.id ? (
                       <span className="flex items-center justify-center gap-2">
@@ -453,7 +717,7 @@ function CreditsPageContent() {
                 ) : (
                   <Link
                     href="/login?mode=signup&redirect=/credits"
-                    className={`block w-full py-4 px-6 rounded-xl font-bold text-lg text-center transition-all duration-200 bg-gradient-to-r ${tier.bgGradient} hover:opacity-90 text-white shadow-lg hover:shadow-xl`}
+                    className={`block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r ${tier.bgGradient} hover:opacity-90 text-white shadow-lg hover:shadow-xl`}
                   >
                     Sign Up to Purchase
                   </Link>

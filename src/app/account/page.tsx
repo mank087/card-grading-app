@@ -44,6 +44,11 @@ export default function AccountPage() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
+  // Founder state
+  const [isFounder, setIsFounder] = useState(false)
+  const [showFounderBadge, setShowFounderBadge] = useState(true)
+  const [isTogglingBadge, setIsTogglingBadge] = useState(false)
+
   useEffect(() => {
     const fetchAccountData = async () => {
       try {
@@ -172,6 +177,22 @@ export default function AccountPage() {
           recentUploads
         })
 
+        // Fetch founder status
+        try {
+          const founderRes = await fetch('/api/founders/status', {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
+          if (founderRes.ok) {
+            const founderData = await founderRes.json()
+            setIsFounder(founderData.isFounder)
+            setShowFounderBadge(founderData.showFounderBadge)
+          }
+        } catch (err) {
+          console.error('Error fetching founder status:', err)
+        }
+
         setLoading(false)
       } catch (err) {
         console.error('Error fetching account data:', err)
@@ -268,6 +289,34 @@ export default function AccountPage() {
       setPasswordError(err.message || 'Failed to change password')
     } finally {
       setIsChangingPassword(false)
+    }
+  }
+
+  // Handle founder badge toggle
+  const handleFounderBadgeToggle = async () => {
+    setIsTogglingBadge(true)
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        return
+      }
+
+      const response = await fetch('/api/founders/toggle-badge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ showBadge: !showFounderBadge }),
+      })
+
+      if (response.ok) {
+        setShowFounderBadge(!showFounderBadge)
+      }
+    } catch (err) {
+      console.error('Error toggling founder badge:', err)
+    } finally {
+      setIsTogglingBadge(false)
     }
   }
 
@@ -559,6 +608,49 @@ export default function AccountPage() {
             </div>
           </div>
         </div>
+
+        {/* Founder Settings - Only show for founders */}
+        {isFounder && (
+          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg shadow-md p-6 border border-yellow-200">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+              <svg className="w-6 h-6 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              Founder Settings
+            </h2>
+
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium text-gray-900">Show Founder Badge on Labels</h3>
+                <p className="text-sm text-gray-600">
+                  Display the founder emblem on your graded card labels
+                </p>
+              </div>
+              <button
+                onClick={handleFounderBadgeToggle}
+                disabled={isTogglingBadge}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 ${
+                  showFounderBadge ? 'bg-yellow-500' : 'bg-gray-300'
+                } ${isTogglingBadge ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    showFounderBadge ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="mt-4 p-3 bg-white rounded-lg border border-yellow-100">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+                <span>20% discount on all credit purchases (applied automatically)</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Account Actions */}
         <div className="bg-white rounded-lg shadow-md p-6">

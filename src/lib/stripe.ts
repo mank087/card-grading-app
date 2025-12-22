@@ -31,6 +31,13 @@ export const STRIPE_PRICES = {
     name: 'Elite',
     description: '20 Card Grades',
   },
+  founders: {
+    priceId: process.env.STRIPE_PRICE_FOUNDERS!,
+    credits: 150,
+    price: 99,
+    name: 'Founders Package',
+    description: '150 Card Grades + Lifetime Benefits',
+  },
 } as const;
 
 export type StripePriceTier = keyof typeof STRIPE_PRICES;

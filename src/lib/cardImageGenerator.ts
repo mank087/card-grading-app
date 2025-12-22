@@ -58,6 +58,8 @@ export interface CardImageData {
   backImageUrl: string;
   // English fallback for CJK card names (e.g., "Mega Gengar EX" for Japanese cards)
   englishName?: string;
+  // Founder emblem - shown on back label when user is a founder with badge enabled
+  showFounderEmblem?: boolean;
 }
 
 /**
@@ -300,7 +302,7 @@ async function drawFrontLabel(
 }
 
 /**
- * Draw the back label with QR code
+ * Draw the back label with QR code and optional founder emblem
  */
 async function drawBackLabel(
   ctx: CanvasRenderingContext2D,
@@ -308,7 +310,8 @@ async function drawBackLabel(
   logoDataUrl: string | undefined,
   startY: number,
   contentWidth: number,
-  borderWidth: number
+  borderWidth: number,
+  showFounderEmblem: boolean = false
 ) {
   const labelX = borderWidth;
   const labelY = startY;
@@ -322,9 +325,16 @@ async function drawBackLabel(
   ctx.fillStyle = bgGradient;
   ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
 
-  // QR Code centered
+  // QR Code - adjust position if founder emblem is shown
   const qrSize = 140;
-  const qrX = labelX + (labelWidth - qrSize) / 2;
+  const founderEmblemSize = 80;
+  const gap = 24;
+
+  // If founder emblem shown, offset QR code to the left
+  const totalWidth = showFounderEmblem ? qrSize + gap + founderEmblemSize : qrSize;
+  const startX = labelX + (labelWidth - totalWidth) / 2;
+
+  const qrX = startX;
   const qrY = labelY + (labelHeight - qrSize) / 2;
 
   // White background for QR
@@ -344,6 +354,66 @@ async function drawBackLabel(
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText('QR Code', qrX + qrSize / 2, qrY + qrSize / 2);
+  }
+
+  // Draw founder emblem if enabled
+  if (showFounderEmblem) {
+    const emblemX = qrX + qrSize + gap;
+    const emblemY = labelY + (labelHeight - founderEmblemSize - 24) / 2; // 24px for "FOUNDER" text
+    const emblemRadius = founderEmblemSize / 2;
+    const emblemCenterX = emblemX + emblemRadius;
+    const emblemCenterY = emblemY + emblemRadius;
+
+    // Draw gradient circle background (yellow to orange)
+    const emblemGradient = ctx.createLinearGradient(
+      emblemX, emblemY, emblemX + founderEmblemSize, emblemY + founderEmblemSize
+    );
+    emblemGradient.addColorStop(0, '#facc15'); // yellow-400
+    emblemGradient.addColorStop(1, '#f97316'); // orange-400
+
+    ctx.beginPath();
+    ctx.arc(emblemCenterX, emblemCenterY, emblemRadius, 0, Math.PI * 2);
+    ctx.fillStyle = emblemGradient;
+    ctx.fill();
+
+    // Add shadow effect
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
+    ctx.shadowBlur = 8;
+    ctx.shadowOffsetX = 2;
+    ctx.shadowOffsetY = 2;
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Draw star icon (simplified 5-point star)
+    const starSize = founderEmblemSize * 0.5;
+    ctx.fillStyle = COLORS.white;
+    ctx.beginPath();
+    const spikes = 5;
+    const outerRadius = starSize / 2;
+    const innerRadius = outerRadius * 0.4;
+    for (let i = 0; i < spikes * 2; i++) {
+      const radius = i % 2 === 0 ? outerRadius : innerRadius;
+      const angle = (Math.PI / 2) + (Math.PI * i / spikes);
+      const x = emblemCenterX + Math.cos(angle) * radius;
+      const y = emblemCenterY - Math.sin(angle) * radius;
+      if (i === 0) {
+        ctx.moveTo(x, y);
+      } else {
+        ctx.lineTo(x, y);
+      }
+    }
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw "FOUNDER" text below emblem
+    ctx.fillStyle = '#ca8a04'; // yellow-600
+    ctx.font = 'bold 18px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('FOUNDER', emblemCenterX, emblemY + founderEmblemSize + 4);
   }
 }
 
@@ -386,7 +456,7 @@ async function generateCardImage(
   if (side === 'front') {
     await drawFrontLabel(ctx, data, logoDataUrl, borderWidth, contentWidth, borderWidth);
   } else {
-    await drawBackLabel(ctx, qrCodeDataUrl, logoDataUrl, borderWidth, contentWidth, borderWidth);
+    await drawBackLabel(ctx, qrCodeDataUrl, logoDataUrl, borderWidth, contentWidth, borderWidth, data.showFounderEmblem);
   }
 
   // Draw separator
