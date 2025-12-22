@@ -211,7 +211,7 @@ export default function FoundersPage() {
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Join our exclusive group of early supporters and unlock lifetime benefits as DCM launches.
+              Join our exclusive group of early supporters and unlock lifetime benefits to celebrate the launch of DCM and begin your Card Grading Journey with Us!
             </p>
 
             {/* Countdown Timer */}
