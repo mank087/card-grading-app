@@ -627,7 +627,7 @@ export default function GetStartedPage() {
               href="/upload"
               className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg"
             >
-              Grade Your First Card Free
+              Grade Your First Card
             </Link>
             <Link
               href="/login?mode=signup"
