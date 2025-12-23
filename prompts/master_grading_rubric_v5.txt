@@ -1759,13 +1759,18 @@ When both = true: special_features includes "Facsimile Autograph, Official Repri
 ---
 PURPOSE: Detect post-production alterations that disqualify card from numeric grading.
 
+🚨 **CRITICAL: MANUFACTURER ARTWORK IS NOT AN ALTERATION**
+Many trading cards feature printed artwork, illustrations, or stylized designs that may APPEAR hand-drawn but are legitimate manufacturer design elements. You MUST distinguish between:
+- **Manufacturer artwork** (printed as part of card production) → Grade normally
+- **Post-production alterations** (added after card was manufactured) → N/A grade
+
 **MANDATORY INSPECTION AREAS:**
 • Front surface (full area scan)
 • Back surface (full area scan)
 • Edges (all four sides)
 • Corners (all four corners)
 
-**MARKING TYPES TO DETECT:**
+**MARKING TYPES TO DETECT (Actual Alterations Only):**
 1. Handwritten text (names, dates, numbers, notes in pen/pencil/marker)
 2. Non-manufacturer stamps or ink stamps (date stamps, library stamps, price stickers residue)
 3. Adhesive residue from removed stickers (price tags, name labels)
@@ -1773,29 +1778,91 @@ PURPOSE: Detect post-production alterations that disqualify card from numeric gr
 5. Colored markings (highlighter, marker, crayon)
 6. Tape residue or tape damage
 
-**VISUAL CHARACTERISTICS:**
-• Ink color differs from card's printed colors
-• Handwriting or stamp shows above card surface (not part of original print layer)
-• Irregular placement (wouldn't make sense as manufacturer feature)
-• Appears added after card production (sits on top of gloss layer)
+═══════════════════════════════════════════════════════════════════════
+🚨 CRITICAL: MANUFACTURER ARTWORK vs. ACTUAL ALTERATIONS
+═══════════════════════════════════════════════════════════════════════
+
+**How to Identify MANUFACTURER ARTWORK (NOT alterations - Grade Normally):**
+
+| Characteristic | Manufacturer Artwork | Actual Alteration |
+|---------------|---------------------|-------------------|
+| Print Layer | UNDER gloss layer (same layer as card) | ON TOP of gloss layer |
+| Print Quality | Professional halftone dots, consistent | Irregular ink, fuzzy edges |
+| Color Registration | Precise, aligned with design | Bleeds, smears, misaligned |
+| Edge Quality | Clean, precise boundaries | Fuzzy, variable line weight |
+| Integration | Part of overall card design layout | Random placement, doesn't fit |
+| Consistency | Appears on other cards in same set | Unique to this card only |
+| Ink Texture | Flat, printed appearance | Raised, pen/marker texture |
+
+**COMMON MANUFACTURER ARTWORK (NOT Alterations):**
+✅ Printed illustrations or artwork (even if hand-drawn style)
+✅ Facsimile signatures that are PRINTED (part of card design)
+✅ Artistic borders, decorative embellishments, ornate frames
+✅ Team logos, mascots, cartoon characters, caricatures
+✅ Player illustrations, portraits, or artistic renderings
+✅ Commemorative artwork, tributes, or themed graphics
+✅ Stylized text that appears handwritten but is printed
+✅ Vintage-style artwork (especially on retro or throwback sets)
+✅ Insert set themed artwork and graphics
+✅ Background patterns, textures, or artistic elements
+
+**ACTUAL ALTERATIONS (Flag as N/A):**
+❌ Pen/pencil/marker writing added ON TOP of card surface
+❌ Personal signatures not authenticated by manufacturer
+❌ Price tags, date stamps, or library markings
+❌ Names written in ballpoint pen (owner identification)
+❌ Sticker residue or tape damage
+❌ Punch holes, staple holes, or physical damage from attachment
+❌ Crayon, highlighter, or colored marker additions
+
+**KEY DISTINCTION TEST:**
+Ask yourself: "Is this artwork PRINTED as part of the card design, or was it ADDED by hand after production?"
+
+Signs it's PRINTED (manufacturer artwork):
+• Same print quality/dot pattern as rest of card
+• Artwork is beneath the gloss/coating layer
+• Colors match the card's overall color palette
+• Design is integrated with card layout (not random placement)
+• Professional execution with clean, precise lines
+• Similar artwork appears on other cards in the set
+
+Signs it's ADDED (alteration):
+• Ink sits ON TOP of the gloss layer
+• Different texture than printed areas (raised, glossy pen ink)
+• Irregular, amateur execution
+• Random placement that doesn't fit card design
+• Unique to this specific card (no similar cards have it)
+• Bleeds, smears, or inconsistent ink coverage
+
+═══════════════════════════════════════════════════════════════════════
 
 **DETECTION PROTOCOL:**
-1. Scan entire front surface for any non-manufacturer markings
+1. Scan entire front surface for any suspicious markings
 2. Scan entire back surface (common location for names/prices)
 3. Check edges for pricing stickers or label residue
 4. Look for physical alterations (holes, tape marks)
-5. Distinguish from manufacturer printing (intentional design elements)
+5. **CRITICAL:** For any artwork or illustrations found, apply the distinction test above
+6. **CRITICAL:** Only flag as alteration if HIGH CONFIDENCE it was added post-production
+7. When uncertain, DEFAULT TO GRADING NORMALLY (assume manufacturer artwork)
+
+**CONFIDENCE REQUIREMENT:**
+• Only flag marking_detected = true when you have HIGH CONFIDENCE the marking was added post-production
+• Printed artwork, illustrations, or stylized designs should NOT trigger marking detection
+• If uncertain whether something is manufacturer artwork vs. alteration → Do NOT flag it
 
 **GRADING IMPACT:**
-• Any handwritten marking detected → N/A grade (card altered)
-• Any non-manufacturer stamp/sticker → N/A grade
-• Any physical alteration (punch hole, etc.) → N/A grade
+• Handwritten marking detected (HIGH CONFIDENCE post-production) → N/A grade
+• Non-manufacturer stamp/sticker (HIGH CONFIDENCE) → N/A grade
+• Physical alteration (punch hole, etc.) → N/A grade
+• Manufacturer artwork or printed illustrations → Grade normally (NOT an alteration)
+• When uncertain → Grade normally, do NOT apply N/A
 
 **OUTPUT:**
 • marking_detected: true|false
 • marking_type: "handwritten_text" | "stamp" | "adhesive_residue" | "physical_alteration" | "none"
 • marking_location: "front" | "back" | "edge" | "corner" | null
 • marking_description: Brief description of what was detected
+• marking_confidence: "high" | "medium" | "low" (only apply N/A when "high")
 ---
 [STEP 0C] CARD TRIMMING DETECTION PROTOCOL
 ---

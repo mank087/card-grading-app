@@ -332,6 +332,58 @@ C. SPORTS CARD DEFECT PATTERNS
 • Often includes season stats table
 • May have manufacturer info, copyright, legal text
 • Centering often measured using text blocks as anchors (not always bordered)
+• **IMPORTANT:** Many sports cards have ARTWORK on the back - this is NOT an alteration
+
+═══════════════════════════════════════════════════════════════════════
+🚨 SPORTS CARD BACK ARTWORK - NOT ALTERATIONS
+═══════════════════════════════════════════════════════════════════════
+
+Many sports cards feature legitimate manufacturer artwork on card backs that may appear hand-drawn or illustrated. This is PRINTED artwork, NOT post-production alterations.
+
+**Common Sports Card Back Artwork (Grade Normally - NOT Alterations):**
+• Player caricatures or cartoon illustrations
+• Team mascots and artistic logo renderings
+• Decorative borders with hand-drawn style elements
+• Commemorative tributes with artistic flourishes
+• Facsimile signatures as part of printed design
+• Vintage-style artwork (especially retro/throwback sets)
+• Insert set themed graphics and illustrations
+• Background artwork, patterns, or artistic textures
+• Player portraits in illustrated/painted style
+• Action scene illustrations or comic-style artwork
+
+**Sports Card Sets Known for Artistic Backs:**
+• Topps Gallery (painted player portraits)
+• Donruss Diamond Kings (illustrated player art)
+• Topps Gypsy Queen (vintage-style artwork)
+• Topps Allen & Ginter (illustrated mini cards)
+• Upper Deck Masterpieces (museum-style art)
+• Panini Court Kings (basketball artistic series)
+• 1980s-1990s Topps/Donruss/Fleer (cartoon mascots, player illustrations)
+• Topps Heritage (retro designs with period-appropriate artwork)
+• Panini Prizm/Select inserts (themed artistic graphics)
+
+**How to Verify It's Manufacturer Artwork:**
+1. Print quality matches rest of card (same halftone dot pattern)
+2. Artwork is UNDER the gloss layer, not sitting on top
+3. Colors use same palette as overall card design
+4. Design appears on other cards in the same set/series
+5. Professional execution with clean, precise lines
+6. Integrated into card layout (not randomly placed)
+
+**Key Question:** "Is this artwork PRINTED as part of the card, or ADDED by hand after production?"
+→ If PRINTED (same print layer, professional quality) = Grade normally
+→ If ADDED (on top of gloss, irregular execution) = Flag as alteration
+
+**DO NOT flag as alterations:**
+❌ Illustrated player portraits on card backs
+❌ Cartoon mascots or team characters
+❌ Decorative artistic borders or frames
+❌ Facsimile signatures that are clearly printed
+❌ Commemorative artwork or tributes
+❌ Any artwork that appears on other cards in the set
+
+═══════════════════════════════════════════════════════════════════════
 
 **Centering Assessment:**
 • Front: Usually has borders or photo framing for measurement
@@ -517,13 +569,13 @@ The presence of the memorabilia window does not negatively impact the grade; it 
 END OF SPORTS DELTA v5.0
 ═══════════════════════════════════════════════════════════════════════
 
-**TOTAL LINES:** ~550
-**ESTIMATED TOKENS:** ~4,000-4,500
+**TOTAL LINES:** ~620
+**ESTIMATED TOKENS:** ~4,500-5,000
 
 **COMBINED PROMPT SIZE (Master + Sports Delta):**
-• Master Rubric: ~18,000-20,000 tokens
-• Sports Delta: ~4,000-4,500 tokens
-• **TOTAL: ~22,000-24,500 tokens** ✓ Within target range
+• Master Rubric: ~20,000-22,000 tokens
+• Sports Delta: ~4,500-5,000 tokens
+• **TOTAL: ~24,500-27,000 tokens** ✓ Within target range
 
 When grading sports cards, use:
 1. Master Grading Rubric v5.0 (universal grading rules)
