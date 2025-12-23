@@ -14,6 +14,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession } from '@/lib/directAuth'
 import { loadStripe } from '@stripe/stripe-js'
+import Image from 'next/image'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
 // Founder discount constant
@@ -741,6 +742,38 @@ function CreditsPageContent() {
                 <div className="text-4xl mb-3">{feature.icon}</div>
                 <h3 className="font-bold text-gray-900">{feature.title}</h3>
                 <p className="text-gray-500 text-sm">{feature.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Graded Cards Showcase */}
+        <div className="mt-16">
+          <h2 className="text-2xl font-bold text-gray-900 mb-3 text-center">Recently Graded Cards</h2>
+          <p className="text-gray-600 text-center mb-8 max-w-2xl mx-auto">
+            See examples of cards graded by our DCM Optic™ system. Every card receives detailed analysis of centering, corners, edges, and surface quality.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+            {[
+              { src: '/DCM-Card-Shohei-Ohtani-496896-front.jpg', name: 'Shohei Ohtani', type: 'Sports' },
+              { src: '/Pokemon/DCM-Card-Umbreon-ex-887696-front.jpg', name: 'Umbreon ex', type: 'Pokémon' },
+              { src: '/Sports/DCM-Card-LeBron-James-547249-front.jpg', name: 'LeBron James', type: 'Sports' },
+              { src: '/DCM-Card-Lugia-217275-front.jpg', name: 'Lugia', type: 'Pokémon' },
+            ].map((card, i) => (
+              <div key={i} className="group">
+                <div className="relative aspect-[2.5/3.5] rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02]">
+                  <Image
+                    src={card.src}
+                    alt={`${card.name} graded card`}
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <div className="absolute bottom-0 left-0 right-0 p-3 text-white transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
+                    <p className="font-bold text-sm">{card.name}</p>
+                    <p className="text-xs text-white/80">{card.type}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
