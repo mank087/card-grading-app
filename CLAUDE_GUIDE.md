@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 19, 2025 (v7.5 - Upload Wizard, Reddit Pixel, Landing Pages)
+> Last Updated: December 22, 2025 (v7.6 - Founders Package)
 
 ---
 
@@ -33,6 +33,7 @@
 
 **Core Features:**
 - AI-powered card grading with three-pass consensus system
+- **v7.6: Founders Package with lifetime benefits (150 credits, 20% discount, founder emblem)**
 - **v7.3: Unified cap system, execution flowchart, prompt consistency**
 - **v7.2: Visual Defect Identification Guide with defect hunting protocol**
 - **v7.1: Transparent subgrade-to-overall caps with 1:1 mapping**
@@ -142,6 +143,8 @@ src/
 | `/pokemon-database` | `app/pokemon-database/page.tsx` | Pokemon card database search (EN/JA) |
 | `/pokemon-grading` | `app/pokemon-grading/page.tsx` | Pokemon-focused landing page |
 | `/sports-grading` | `app/sports-grading/page.tsx` | Sports-focused landing page (v7.5) |
+| `/founders` | `app/founders/page.tsx` | Founders Package landing page (v7.6) |
+| `/founders/success` | `app/founders/success/page.tsx` | Founders purchase success page |
 
 ### Protected Pages (Require Login)
 
@@ -227,10 +230,17 @@ src/
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/stripe/checkout` | POST | Create Stripe checkout session |
-| `/api/stripe/webhook` | POST | Stripe webhook handler |
+| `/api/stripe/checkout` | POST | Create Stripe checkout session (includes founders tier) |
+| `/api/stripe/webhook` | POST | Stripe webhook handler (handles founder status) |
 | `/api/stripe/credits` | GET | Get user credit balance |
 | `/api/stripe/deduct` | POST | Deduct credit for grading |
+
+### Founders Program (v7.6)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/founders/status` | GET | Check if user is a founder, get badge preference |
+| `/api/founders/toggle-badge` | POST | Toggle founder emblem display on card labels |
 
 ### Email System
 
@@ -352,6 +362,72 @@ src/
    - Change prompt_version in visionGrader.ts when rubric updates
    - Old cards keep their original version
    - New cards get new version
+```
+
+### v7.6 Founders Package (December 22, 2025)
+
+**Key Features:**
+
+1. **Founders Package** ($99 one-time)
+   - 150 grading credits
+   - 20% lifetime discount on future purchases
+   - Founder badge on collection page
+   - Founder emblem on card labels (toggleable)
+   - Available until January 1, 2026
+
+2. **Founders Landing Page** (`/founders`)
+   - Countdown timer to offer expiration
+   - Package details and value comparison table
+   - FAQ section
+   - Direct Stripe checkout integration
+
+3. **Founder Status APIs**
+   - `GET /api/founders/status` - Check founder status and badge preference
+   - `POST /api/founders/toggle-badge` - Toggle emblem display on labels
+
+4. **Founder Emblem on Card Labels**
+   - Gold star emblem appears on back labels (near QR code)
+   - Toggleable via Account Settings page
+   - Works on card detail pages and downloadable images
+   - `lib/cardImageGenerator.ts` - Draws emblem on generated images
+
+5. **Navigation Updates**
+   - Shimmering gold "✨ Founders" link added to desktop and mobile nav
+   - CSS shimmer animation in `globals.css`
+
+6. **Credits Page Updates**
+   - Fourth pricing card for Founders Package
+   - Direct Stripe checkout (not linking to /founders page)
+   - Card only shows if user is not already a founder
+   - Grid adjusts from 4 to 3 columns for founders
+
+**Files Changed:**
+| File | Changes |
+|------|---------|
+| `app/founders/page.tsx` | New founders landing page with countdown |
+| `app/founders/success/page.tsx` | Founders purchase success page |
+| `app/api/founders/status/route.ts` | Founder status API |
+| `app/api/founders/toggle-badge/route.ts` | Toggle badge API |
+| `app/api/stripe/checkout/route.ts` | Added founders tier, founder discount |
+| `app/api/stripe/webhook/route.ts` | Handle founder status on purchase |
+| `app/credits/page.tsx` | Founders card, direct checkout |
+| `app/collection/page.tsx` | Founder badge display |
+| `app/account/page.tsx` | Founder emblem toggle setting |
+| `app/ui/Navigation.tsx` | Shimmering Founders link |
+| `app/globals.css` | Shimmer animation keyframes |
+| `app/*/[id]/CardDetailClient.tsx` | Founder emblem on back labels (all 5 card types) |
+| `lib/cardImageGenerator.ts` | Draw founder emblem on downloadable images |
+| `lib/credits.ts` | `isFounder()`, `getFounderDiscountMultiplier()` helpers |
+| `lib/stripe.ts` | Added founders price tier |
+| `components/reports/DownloadReportButton.tsx` | Pass showFounderEmblem prop |
+| `migrations/add_founder_fields.sql` | Database migration for founder fields |
+
+**Database Migration:**
+```sql
+-- Add founder fields to user_credits table
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT false;
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS founder_since TIMESTAMPTZ;
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_founder_badge BOOLEAN DEFAULT true;
 ```
 
 ### v7.5 Upload Wizard, Reddit Pixel, Landing Pages (December 19, 2025)
@@ -1045,9 +1121,30 @@ const isJapaneseCard = hasJapaneseText(cardInfo?.card_name) ||
 
 | Tier | Price | Credits | First Purchase Bonus |
 |------|-------|---------|---------------------|
-| Basic | $2.99 | 2 | +1 |
-| Pro | $9.99 | 7 | +2 |
-| Elite | $19.99 | 25 | +5 |
+| Basic | $2.99 | 1 | +1 |
+| Pro | $9.99 | 5 | +3 |
+| Elite | $19.99 | 20 | +5 |
+| **Founders** | $99 | 150 | N/A (lifetime benefits) |
+
+### Founders Program (v7.6)
+
+Limited-time package available until January 1, 2026:
+- **150 grading credits** ($0.66 per grade - best value)
+- **20% lifetime discount** on all future credit purchases
+- **Founder badge** displayed on collection page
+- **Founder emblem** on card labels (toggleable in account settings)
+
+**Database Fields (user_credits table):**
+```sql
+is_founder BOOLEAN DEFAULT false
+founder_since TIMESTAMPTZ
+show_founder_badge BOOLEAN DEFAULT true
+```
+
+**Founder Discount Implementation:**
+- Checkout API applies 20% discount automatically for founders
+- Uses dynamic `price_data` instead of fixed Stripe price IDs
+- `lib/credits.ts`: `isFounder()`, `getFounderDiscountMultiplier()` helpers
 
 ### Payment Flow
 
@@ -1265,6 +1362,7 @@ STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_BASIC=price_xxx
 STRIPE_PRICE_PRO=price_xxx
 STRIPE_PRICE_ELITE=price_xxx
+STRIPE_PRICE_FOUNDERS=price_xxx
 
 # Resend
 RESEND_API_KEY=
@@ -1519,7 +1617,7 @@ node scripts/backfill-japanese-images.js
 
 ---
 
-*This guide covers active, working code as of December 2025 (v7.5). Deprecated files are not included.*
+*This guide covers active, working code as of December 2025 (v7.6). Deprecated files are not included.*
 
 ---
 
@@ -1527,6 +1625,7 @@ node scripts/backfill-japanese-images.js
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v7.6 | Dec 22, 2025 | Founders Package ($99, 150 credits, 20% lifetime discount, founder emblem on labels) |
 | v7.5 | Dec 19, 2025 | 3-step upload wizard, Reddit Pixel tracking, sports landing page, multi-select bulk delete, terms updates |
 | v7.4 | Dec 18, 2025 | Japanese Pokemon database (TCGdex), Pokemon Database page with language toggle, Japanese card grading detection |
 | v7.3 | Dec 17, 2025 | Prompt consistency overhaul: unified cap system, execution flowchart, whole numbers only, fixed contradictions |
