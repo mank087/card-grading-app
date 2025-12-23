@@ -61,19 +61,21 @@ const stripMarkdown = (text: string | null | undefined): string | null => {
 // 🎯 Helper: Build card info object (matches detail page logic from line 1999)
 const getCardInfo = (card: Card) => {
   const dvgGrading = card.ai_grading || {};
-  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name;
-  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset;
+  // Legacy ai_grading uses "Card Information" (with spaces), newer uses card_info
+  const legacyCardInfo = dvgGrading["Card Information"] || dvgGrading.card_info || {};
+  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || legacyCardInfo.set_name;
+  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || legacyCardInfo.subset;
   // Combine set name with subset if available (matching foldable label format)
   const setNameWithSubset = subset ? `${setNameRaw} - ${subset}` : setNameRaw;
   return {
-    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
-    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading.card_info?.player_or_character,
+    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || legacyCardInfo.card_name,
+    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || legacyCardInfo.player_or_character,
     set_name: setNameWithSubset,
-    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
-    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
-    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
-    serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || dvgGrading.card_info?.serial_number,
-    rookie_or_first: card.conversational_card_info?.rookie_or_first || dvgGrading.card_info?.rookie_or_first,
+    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || legacyCardInfo.year,
+    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || legacyCardInfo.manufacturer,
+    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || legacyCardInfo.card_number,
+    serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || legacyCardInfo.serial_number,
+    rookie_or_first: card.conversational_card_info?.rookie_or_first || legacyCardInfo.rookie_or_first,
     subset: subset, // Keep separate for special features display
     autographed: card.conversational_card_info?.autographed || false,
     facsimile_autograph: card.conversational_card_info?.facsimile_autograph || false,

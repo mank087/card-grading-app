@@ -42,13 +42,15 @@ const stripMarkdown = (text: string | null | undefined): string | null => {
 // Build card info object (matches collection page from line 46)
 const getCardInfo = (card: any) => {
   const dvgGrading = card.ai_grading || {}
+  // Legacy ai_grading uses "Card Information" (with spaces), newer uses card_info
+  const legacyCardInfo = dvgGrading["Card Information"] || dvgGrading.card_info || {}
   return {
-    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
-    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading.card_info?.player_or_character,
-    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name,
-    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
-    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
-    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
+    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || legacyCardInfo.card_name,
+    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || legacyCardInfo.player_or_character,
+    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || legacyCardInfo.set_name,
+    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || legacyCardInfo.year,
+    manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || legacyCardInfo.manufacturer,
+    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || legacyCardInfo.card_number,
   }
 }
 
