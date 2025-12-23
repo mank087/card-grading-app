@@ -761,18 +761,13 @@ function CreditsPageContent() {
               { src: '/DCM-Card-Lugia-217275-front.jpg', name: 'Lugia', type: 'Pokémon' },
             ].map((card, i) => (
               <div key={i} className="group">
-                <div className="relative aspect-[2.5/3.5] rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02]">
+                <div className="relative aspect-[3/4.5] rounded-xl overflow-hidden shadow-lg group-hover:shadow-xl transition-all duration-300 group-hover:scale-[1.02] bg-gray-100">
                   <Image
                     src={card.src}
                     alt={`${card.name} graded card`}
                     fill
-                    className="object-cover"
+                    className="object-contain"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                  <div className="absolute bottom-0 left-0 right-0 p-3 text-white transform translate-y-full group-hover:translate-y-0 transition-transform duration-300">
-                    <p className="font-bold text-sm">{card.name}</p>
-                    <p className="text-xs text-white/80">{card.type}</p>
-                  </div>
                 </div>
               </div>
             ))}
