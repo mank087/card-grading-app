@@ -516,7 +516,9 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
         }),
         front_url: frontUrl,
         back_url: backUrl,
-        processing_time: card.processing_time  // ✅ CRITICAL: Use stored value, NOT recalculated
+        processing_time: card.processing_time,  // ✅ CRITICAL: Use stored value, NOT recalculated
+        owner_is_founder: ownerIsFounder,
+        owner_show_founder_badge: ownerShowFounderBadge
       });
     }
 

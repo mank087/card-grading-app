@@ -462,7 +462,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         }),
         front_url: frontUrl,
         back_url: backUrl,
-        processing_time: card.processing_time  // Use stored value, not recalculated
+        processing_time: card.processing_time,  // Use stored value, not recalculated
+        // ⭐ Card owner's founder status (for founder emblem on public card labels)
+        owner_is_founder: ownerIsFounder,
+        owner_show_founder_badge: ownerShowFounderBadge
       });
     }
 
