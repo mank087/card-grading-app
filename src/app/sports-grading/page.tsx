@@ -6,11 +6,12 @@ import Link from 'next/link'
 import { getStoredSession } from '@/lib/directAuth'
 import HeroGradingAnimation from './HeroGradingAnimation'
 
-// Declare gtag for TypeScript
+// Declare tracking pixels for TypeScript
 declare global {
   interface Window {
     gtag: (...args: any[]) => void
     rdt: (...args: any[]) => void
+    fbq: (...args: any[]) => void
   }
 }
 
@@ -43,17 +44,43 @@ const trackSignupClick = (location: string, packageType?: string) => {
       console.log('[Reddit Pixel] Lead event tracked with conversionId:', leadId)
     }
 
+    // Track Meta/Facebook Lead conversion
+    if (window.fbq) {
+      window.fbq('track', 'Lead', {
+        content_name: 'sports_grading_signup',
+        content_category: 'sports',
+        value: packageType === 'pro' ? 19.99 : packageType === 'starter' ? 9.99 : 2.99,
+        currency: 'USD'
+      })
+      console.log('[Meta Pixel] Lead event tracked:', location, packageType)
+    }
+
     console.log(`[Analytics] Signup click tracked: ${location}, package: ${packageType}`)
   }
 }
 
 const trackPackageSelect = (packageType: string) => {
-  if (typeof window !== 'undefined' && window.gtag) {
-    window.gtag('event', 'select_package', {
-      event_category: 'engagement',
-      event_label: packageType,
-      page: 'sports-grading-landing'
-    })
+  if (typeof window !== 'undefined') {
+    // Google Analytics
+    if (window.gtag) {
+      window.gtag('event', 'select_package', {
+        event_category: 'engagement',
+        event_label: packageType,
+        page: 'sports-grading-landing'
+      })
+    }
+
+    // Meta/Facebook ViewContent
+    if (window.fbq) {
+      const prices: Record<string, number> = { single: 2.99, starter: 9.99, pro: 19.99 }
+      window.fbq('track', 'ViewContent', {
+        content_name: `sports_package_${packageType}`,
+        content_category: 'sports',
+        content_type: 'product',
+        value: prices[packageType] || 9.99,
+        currency: 'USD'
+      })
+    }
   }
 }
 
