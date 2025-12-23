@@ -8,6 +8,8 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// Founder status for card owner
+import { getUserCredits } from "@/lib/credits";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -170,6 +172,21 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     }
 
     console.log(`[GET /api/other/${cardId}] Other card found`);
+
+    // ⭐ Fetch card owner's founder status (for founder emblem on card labels)
+    let ownerIsFounder = false;
+    let ownerShowFounderBadge = false;
+    if (card.user_id) {
+      try {
+        const ownerCredits = await getUserCredits(card.user_id);
+        if (ownerCredits) {
+          ownerIsFounder = ownerCredits.is_founder;
+          ownerShowFounderBadge = ownerCredits.show_founder_badge;
+        }
+      } catch (err) {
+        console.error(`[GET /api/other/${cardId}] Error fetching owner founder status:`, err);
+      }
+    }
 
     // Create signed URLs for Other card images (parallel for speed)
     console.log(`[GET /api/other/${cardId}] Creating signed URLs for front: ${card.front_path}, back: ${card.back_path}`);
@@ -389,7 +406,10 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           estimated_professional_grades: parsedConversationalData.professional_grade_estimates
         }),
         front_url: frontUrl,
-        back_url: backUrl
+        back_url: backUrl,
+        // ⭐ Card owner's founder status (for founder emblem on public card labels)
+        owner_is_founder: ownerIsFounder,
+        owner_show_founder_badge: ownerShowFounderBadge
       });
     }
 
@@ -737,7 +757,10 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
     return NextResponse.json({
       ...(updatedCard || card),
       front_url: frontUrl,
-      back_url: backUrl
+      back_url: backUrl,
+      // ⭐ Card owner's founder status (for founder emblem on public card labels)
+      owner_is_founder: ownerIsFounder,
+      owner_show_founder_badge: ownerShowFounderBadge
     });
 
   } catch (error: any) {

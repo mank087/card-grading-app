@@ -9,6 +9,8 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// Founder status for card owner
+import { getUserCredits } from "@/lib/credits";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -270,6 +272,21 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
     } else {
       // Public card - anyone can view
       console.log(`[GET /api/lorcana/${cardId}] 🌐 Public card - access granted`);
+    }
+
+    // ⭐ Fetch card owner's founder status (for founder emblem on card labels)
+    let ownerIsFounder = false;
+    let ownerShowFounderBadge = false;
+    if (card.user_id) {
+      try {
+        const ownerCredits = await getUserCredits(card.user_id);
+        if (ownerCredits) {
+          ownerIsFounder = ownerCredits.is_founder;
+          ownerShowFounderBadge = ownerCredits.show_founder_badge;
+        }
+      } catch (err) {
+        console.error(`[GET /api/lorcana/${cardId}] Error fetching owner founder status:`, err);
+      }
     }
 
     // Create signed URLs for Lorcana card images (parallel for speed)
@@ -948,7 +965,10 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       ...cardFields,
       front_url: frontUrl,
       back_url: backUrl,
-      processing_time: Date.now() - startTime
+      processing_time: Date.now() - startTime,
+      // ⭐ Card owner's founder status (for founder emblem on public card labels)
+      owner_is_founder: ownerIsFounder,
+      owner_show_founder_badge: ownerShowFounderBadge
     });
 
   } catch (error: any) {

@@ -1689,24 +1689,15 @@ export function SportsCardDetails() {
     }
   }, []);
 
-  // ⭐ Fetch founder status for back label emblem
+  // ⭐ Show founder emblem based on card OWNER's founder status (not logged-in user)
+  // This allows the founder emblem to appear on public shared cards
   useEffect(() => {
-    const session = getStoredSession();
-    if (!session?.access_token) return;
-
-    fetch('/api/founders/status', {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`
-      }
-    })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.isFounder && data?.showFounderBadge) {
-          setShowFounderEmblem(true);
-        }
-      })
-      .catch(err => console.error('Error checking founder status:', err));
-  }, []);
+    if (card?.owner_is_founder && card?.owner_show_founder_badge) {
+      setShowFounderEmblem(true);
+    } else {
+      setShowFounderEmblem(false);
+    }
+  }, [card?.owner_is_founder, card?.owner_show_founder_badge]);
 
   // 📊 Track grade_card_complete when a graded card is viewed
   useEffect(() => {
