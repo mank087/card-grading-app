@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
-import { getStoredSession } from '@/lib/directAuth'
+import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from './HeroGradingAnimation'
 
 // Declare tracking pixels for TypeScript
@@ -16,14 +16,13 @@ declare global {
 }
 
 // Track conversion events
-const trackSignupClick = (location: string, packageType?: string) => {
+const trackSignupClick = (location: string) => {
   if (typeof window !== 'undefined') {
     // Send event to Google Analytics
     if (window.gtag) {
       window.gtag('event', 'signup_click', {
         event_category: 'conversion',
         event_label: location,
-        package_type: packageType || 'none',
         page: 'sports-grading-landing'
       })
 
@@ -49,45 +48,29 @@ const trackSignupClick = (location: string, packageType?: string) => {
       window.fbq('track', 'Lead', {
         content_name: 'sports_grading_signup',
         content_category: 'sports',
-        value: packageType === 'pro' ? 19.99 : packageType === 'starter' ? 9.99 : 2.99,
         currency: 'USD'
       })
-      console.log('[Meta Pixel] Lead event tracked:', location, packageType)
+      console.log('[Meta Pixel] Lead event tracked:', location)
     }
 
-    console.log(`[Analytics] Signup click tracked: ${location}, package: ${packageType}`)
-  }
-}
-
-const trackPackageSelect = (packageType: string) => {
-  if (typeof window !== 'undefined') {
-    // Google Analytics
-    if (window.gtag) {
-      window.gtag('event', 'select_package', {
-        event_category: 'engagement',
-        event_label: packageType,
-        page: 'sports-grading-landing'
-      })
-    }
-
-    // Meta/Facebook ViewContent
-    if (window.fbq) {
-      const prices: Record<string, number> = { single: 2.99, starter: 9.99, pro: 19.99 }
-      window.fbq('track', 'ViewContent', {
-        content_name: `sports_package_${packageType}`,
-        content_category: 'sports',
-        content_type: 'product',
-        value: prices[packageType] || 9.99,
-        currency: 'USD'
-      })
-    }
+    console.log(`[Analytics] Signup click tracked: ${location}`)
   }
 }
 
 export default function SportsGradingLanding() {
   const [user, setUser] = useState<any>(null)
-  const [selectedPackage, setSelectedPackage] = useState<'single' | 'starter' | 'pro'>('starter')
   const [isLoading, setIsLoading] = useState(true)
+  const [isSigningUp, setIsSigningUp] = useState(false)
+  const [oauthProvider, setOauthProvider] = useState<string | null>(null)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [emailLoading, setEmailLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const [countdown, setCountdown] = useState<{ days: number; hours: number; mins: number; secs: number } | null>(null)
+
+  // Countdown end date: January 1, 2026 at 12:00 AM EST (midnight)
+  const COUNTDOWN_END = new Date('2026-01-01T00:00:00-05:00').getTime()
 
   useEffect(() => {
     const session = getStoredSession()
@@ -105,13 +88,89 @@ export default function SportsGradingLanding() {
     }
   }, [])
 
-  const packages = {
-    single: { credits: 1, price: 2.99, perCard: 2.99, label: 'Basic', bonus: 1, popular: false },
-    starter: { credits: 5, price: 9.99, perCard: 2.00, label: 'Pro', bonus: 3, popular: true },
-    pro: { credits: 20, price: 19.99, perCard: 1.00, label: 'Elite', bonus: 5, popular: false }
+  // Countdown timer for Founders offer
+  useEffect(() => {
+    const calculateCountdown = () => {
+      const now = Date.now()
+      const difference = COUNTDOWN_END - now
+
+      if (difference <= 0) {
+        return { days: 0, hours: 0, mins: 0, secs: 0 }
+      }
+
+      return {
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+        mins: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
+        secs: Math.floor((difference % (1000 * 60)) / 1000),
+      }
+    }
+
+    setCountdown(calculateCountdown())
+
+    const timer = setInterval(() => {
+      setCountdown(calculateCountdown())
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [COUNTDOWN_END])
+
+  const handleOAuthSignup = async (provider: 'google' | 'facebook') => {
+    setIsSigningUp(true)
+    setOauthProvider(provider)
+    setError('')
+    trackSignupClick(`${provider}_signup`)
+
+    // Store redirect destination for after signup
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('auth_redirect', '/credits')
+      localStorage.setItem('signup_source', 'sports_landing')
+    }
+
+    try {
+      await signInWithOAuth(provider)
+    } catch (error: any) {
+      console.error('Signup error:', error)
+      setError(error.message || 'An error occurred')
+      setIsSigningUp(false)
+      setOauthProvider(null)
+    }
   }
 
-  const selectedPkg = packages[selectedPackage]
+  const handleEmailSignup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setEmailLoading(true)
+    setError('')
+    setSuccessMessage('')
+    trackSignupClick('email_signup')
+
+    try {
+      const result = await signUp(email, password)
+      if (result.error) {
+        setError(result.error)
+      } else {
+        // Track signup conversion
+        if (typeof window !== 'undefined') {
+          if (window.rdt) {
+            window.rdt('track', 'SignUp', { conversionId: `signup_sports_${Date.now()}` })
+          }
+          if (window.gtag) {
+            window.gtag('event', 'sign_up', { method: 'email' })
+          }
+          if (window.fbq) {
+            window.fbq('track', 'CompleteRegistration', { content_name: 'Sports Landing Email Signup' })
+          }
+        }
+        setSuccessMessage('Account created! Check your email for the confirmation link.')
+        setEmail('')
+        setPassword('')
+      }
+    } catch (error: any) {
+      setError(error.message || 'An error occurred')
+    } finally {
+      setEmailLoading(false)
+    }
+  }
 
   return (
     <main className="min-h-screen bg-gray-900">
@@ -192,19 +251,163 @@ export default function SportsGradingLanding() {
               </div>
             </div>
 
-            {/* CTA for mobile */}
-            <div className="text-center">
-              <Link
-                href={user ? "/upload/sports" : "/login?mode=signup&redirect=/upload/sports"}
-                onClick={() => trackSignupClick('hero_mobile', selectedPkg.label)}
-                className="inline-block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
-              >
-                Grade Your Cards Now
-              </Link>
+            {/* Signup CTA for mobile */}
+            <div className="max-w-sm mx-auto">
+              {isLoading ? (
+                <div className="w-full bg-gray-700 text-gray-400 font-bold text-lg px-8 py-4 rounded-xl text-center">
+                  Loading...
+                </div>
+              ) : user ? (
+                <Link
+                  href="/credits"
+                  onClick={() => trackSignupClick('hero_mobile_logged_in')}
+                  className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-8 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg shadow-emerald-500/30"
+                >
+                  Get Credits & Start Grading
+                </Link>
+              ) : (
+                <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden">
+                  {/* Header */}
+                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+                    <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
+                    <p className="text-emerald-200 text-sm text-center">Create your account</p>
+                  </div>
+
+                  <div className="p-6">
+                    {/* What you get */}
+                    <div className="space-y-2 mb-5">
+                      <div className="flex items-center gap-2 text-gray-300 text-sm">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>AI-powered 30-point inspection</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-300 text-sm">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Centering, corners, edges & surface</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-300 text-sm">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>PSA, BGS, SGC grade estimates</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-300 text-sm">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Downloadable grade report & label</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-gray-300 text-sm">
+                        <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                        </svg>
+                        <span>Results in under 60 seconds</span>
+                      </div>
+                    </div>
+
+                    {/* Pricing teaser */}
+                    <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg p-3 mb-5 text-center">
+                      <p className="text-emerald-300 text-sm">
+                        Plans starting at <span className="text-white font-bold text-lg">$0.66</span> per card
+                      </p>
+                    </div>
+
+                    {/* OAuth Buttons */}
+                    <div className="space-y-3 mb-4">
+                      <button
+                        onClick={() => handleOAuthSignup('google')}
+                        disabled={isSigningUp || emailLoading}
+                        className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-4 rounded-xl transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSigningUp && oauthProvider === 'google' ? (
+                          <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-5 h-5" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                          </svg>
+                        )}
+                        Continue with Google
+                      </button>
+
+                      <button
+                        onClick={() => handleOAuthSignup('facebook')}
+                        disabled={isSigningUp || emailLoading}
+                        className="w-full flex items-center justify-center gap-3 bg-[#1877F2] hover:bg-[#166FE5] text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isSigningUp && oauthProvider === 'facebook' ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                          </svg>
+                        )}
+                        Continue with Facebook
+                      </button>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="relative my-4">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-600"></div>
+                      </div>
+                      <div className="relative flex justify-center text-xs">
+                        <span className="px-3 bg-gray-800 text-gray-400">Or with email</span>
+                      </div>
+                    </div>
+
+                    {/* Email Form */}
+                    <form onSubmit={handleEmailSignup} className="space-y-3">
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Email address"
+                        required
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="Password (min 6 characters)"
+                        required
+                        minLength={6}
+                        className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      />
+                      {error && (
+                        <p className="text-red-400 text-sm text-center">{error}</p>
+                      )}
+                      {successMessage && (
+                        <p className="text-green-400 text-sm text-center">{successMessage}</p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={emailLoading || isSigningUp}
+                        className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {emailLoading ? 'Creating Account...' : 'Create Account'}
+                      </button>
+                    </form>
+
+                    <p className="text-center text-gray-500 text-xs mt-4">
+                      By continuing, you agree to our{' '}
+                      <Link href="/terms" className="text-emerald-400 hover:text-emerald-300">Terms of Service</Link>
+                      {' '}and{' '}
+                      <Link href="/privacy" className="text-emerald-400 hover:text-emerald-300">Privacy Policy</Link>
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Desktop: Original 3-column layout */}
+          {/* Desktop: 3-column layout */}
           <div className="hidden xl:flex flex-row items-center gap-6">
             {/* Left: Grading Animation */}
             <div className="flex-shrink-0 w-[340px]">
@@ -264,7 +467,7 @@ export default function SportsGradingLanding() {
                     </div>
                     <span className="text-white text-sm font-semibold">Market Pricing & Grade Estimates</span>
                   </div>
-                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Estimates of PSA, BGS, SGC and CGC grade equivalents & links to marketplace listings for your card</p>
+                  <p className="text-gray-400 text-xs leading-relaxed pl-11">Estimates of PSA, BGS, SGC and CGC grade equivalents & links to marketplace listings</p>
                 </div>
                 <div className="bg-white/5 rounded-lg px-4 py-4">
                   <div className="flex items-center gap-3 mb-2">
@@ -280,62 +483,17 @@ export default function SportsGradingLanding() {
               </div>
             </div>
 
-            {/* Right: Pricing Card - Desktop */}
+            {/* Right: Signup Card - Desktop */}
             <div className="w-full max-w-md">
               <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
                   <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
-                  <p className="text-emerald-200 text-sm text-center">1 credit = 1 card graded</p>
+                  <p className="text-emerald-200 text-sm text-center">Create your account</p>
                 </div>
 
-                {/* Package selector */}
                 <div className="p-6">
-                  <div className="grid grid-cols-3 gap-2 mb-6">
-                    {(Object.keys(packages) as Array<keyof typeof packages>).map((pkg) => (
-                      <button
-                        key={pkg}
-                        onClick={() => {
-                          setSelectedPackage(pkg)
-                          trackPackageSelect(packages[pkg].label)
-                        }}
-                        className={`relative py-3 px-2 rounded-lg border-2 transition-all ${
-                          selectedPackage === pkg
-                            ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                            : 'border-gray-600 bg-gray-700/50 text-gray-400 hover:border-gray-500'
-                        }`}
-                      >
-                        {packages[pkg].popular && (
-                          <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-green-500 to-emerald-500 text-[10px] font-bold text-gray-900 px-2 py-0.5 rounded-full">
-                            BEST VALUE
-                          </span>
-                        )}
-                        <div className="text-sm font-medium">{packages[pkg].label}</div>
-                        <div className="text-xs opacity-75">{packages[pkg].credits} credit{packages[pkg].credits > 1 ? 's' : ''}</div>
-                        <div className="text-xs opacity-75">${packages[pkg].price}</div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Selected package details */}
-                  <div className="bg-gray-900/50 rounded-xl p-4 mb-6">
-                    <div className="flex items-baseline justify-center gap-1 mb-2">
-                      <span className="text-4xl font-bold text-white">${selectedPkg.price.toFixed(2)}</span>
-                    </div>
-                    <div className="text-center text-gray-400 text-sm">
-                      {selectedPkg.credits} + {selectedPkg.bonus} bonus = <span className="text-white font-semibold">{selectedPkg.credits + selectedPkg.bonus} credits</span>
-                    </div>
-                    <div className="text-center text-gray-500 text-xs mt-1">
-                      ${(selectedPkg.price / (selectedPkg.credits + selectedPkg.bonus)).toFixed(2)} per card with bonus
-                    </div>
-                    {selectedPackage !== 'single' && (
-                      <div className="text-center text-green-400 text-sm font-medium mt-1">
-                        Save {Math.round((1 - selectedPkg.perCard / 2.99) * 100)}% vs single cards
-                      </div>
-                    )}
-                  </div>
-
-                  {/* What's included */}
+                  {/* What you get */}
                   <div className="space-y-3 mb-6">
                     <div className="flex items-center gap-3 text-gray-300">
                       <svg className="w-5 h-5 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
@@ -369,206 +527,117 @@ export default function SportsGradingLanding() {
                     </div>
                   </div>
 
-                  {/* Launch Special Banner */}
-                  <div className="relative overflow-hidden bg-gradient-to-r from-yellow-500/20 via-green-500/20 to-yellow-500/20 border-2 border-yellow-500/50 rounded-lg p-3 mb-4 animate-pulse-subtle">
-                    {/* Shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-
-                    <div className="relative flex items-center justify-center gap-2">
-                      {/* Sparkle icon left */}
-                      <svg className="w-5 h-5 text-yellow-400 animate-sparkle" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
-                      </svg>
-                      <span className="font-bold text-sm text-yellow-300 tracking-wide">LAUNCH SPECIAL</span>
-                      {/* Sparkle icon right */}
-                      <svg className="w-5 h-5 text-yellow-400 animate-sparkle-delayed" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
-                      </svg>
-                    </div>
-                    <p className="relative text-center text-green-300 text-sm mt-1 font-medium">
-                      {selectedPkg.label} gets <span className="font-bold text-yellow-300">+{selectedPkg.bonus} bonus credit{selectedPkg.bonus > 1 ? 's' : ''}</span> free!
+                  {/* Pricing teaser */}
+                  <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center">
+                    <p className="text-emerald-300 text-sm">
+                      Plans starting at <span className="text-white font-bold text-lg">$0.66</span> per card
                     </p>
                   </div>
 
-                  {/* CTA Button */}
+                  {/* Signup Form */}
                   {isLoading ? (
                     <div className="w-full bg-gray-700 text-gray-400 font-bold text-lg px-6 py-4 rounded-xl text-center">
                       Loading...
                     </div>
                   ) : user ? (
                     <Link
-                      href="/upload/sports"
-                      onClick={() => trackSignupClick('pricing_card_logged_in', selectedPkg.label)}
+                      href="/credits"
+                      onClick={() => trackSignupClick('signup_card_logged_in')}
                       className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg shadow-emerald-500/30"
                     >
-                      Grade Your Cards Now
+                      Get Credits & Start Grading
                     </Link>
                   ) : (
-                    <Link
-                      href="/login?mode=signup&redirect=/upload/sports"
-                      onClick={() => trackSignupClick('pricing_card_signup', selectedPkg.label)}
-                      className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg shadow-emerald-500/30"
-                    >
-                      Create Account
-                    </Link>
+                    <>
+                      {/* OAuth Buttons */}
+                      <div className="space-y-3 mb-4">
+                        <button
+                          onClick={() => handleOAuthSignup('google')}
+                          disabled={isSigningUp || emailLoading}
+                          className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-gray-800 font-semibold py-3 px-4 rounded-xl transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSigningUp && oauthProvider === 'google' ? (
+                            <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24">
+                              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                            </svg>
+                          )}
+                          Continue with Google
+                        </button>
+
+                        <button
+                          onClick={() => handleOAuthSignup('facebook')}
+                          disabled={isSigningUp || emailLoading}
+                          className="w-full flex items-center justify-center gap-3 bg-[#1877F2] hover:bg-[#166FE5] text-white font-semibold py-3 px-4 rounded-xl transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSigningUp && oauthProvider === 'facebook' ? (
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                          ) : (
+                            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                            </svg>
+                          )}
+                          Continue with Facebook
+                        </button>
+                      </div>
+
+                      {/* Divider */}
+                      <div className="relative my-4">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-gray-600"></div>
+                        </div>
+                        <div className="relative flex justify-center text-xs">
+                          <span className="px-3 bg-gray-800 text-gray-400">Or with email</span>
+                        </div>
+                      </div>
+
+                      {/* Email Form */}
+                      <form onSubmit={handleEmailSignup} className="space-y-3">
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          placeholder="Email address"
+                          required
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                        />
+                        <input
+                          type="password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="Password (min 6 characters)"
+                          required
+                          minLength={6}
+                          className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm"
+                        />
+                        {error && (
+                          <p className="text-red-400 text-sm text-center">{error}</p>
+                        )}
+                        {successMessage && (
+                          <p className="text-green-400 text-sm text-center">{successMessage}</p>
+                        )}
+                        <button
+                          type="submit"
+                          disabled={emailLoading || isSigningUp}
+                          className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold py-3 px-4 rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {emailLoading ? 'Creating Account...' : 'Create Account'}
+                        </button>
+                      </form>
+                    </>
                   )}
 
-                  <p className="text-center text-gray-500 text-xs mt-3">
-                    No subscription required. Pay only for what you use
+                  <p className="text-center text-gray-500 text-xs mt-4">
+                    By continuing, you agree to our{' '}
+                    <Link href="/terms" className="text-emerald-400 hover:text-emerald-300">Terms of Service</Link>
+                    {' '}and{' '}
+                    <Link href="/privacy" className="text-emerald-400 hover:text-emerald-300">Privacy Policy</Link>
                   </p>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Mobile: Pricing Card - shown below hero on mobile */}
-          <div className="xl:hidden mt-8">
-            <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl max-w-md mx-auto">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
-                <h2 className="text-xl font-bold text-white text-center">Start Grading Today</h2>
-                <p className="text-emerald-200 text-sm text-center">1 credit = 1 card graded</p>
-              </div>
-
-              {/* Package selector */}
-              <div className="p-6">
-                <div className="grid grid-cols-3 gap-2 mb-6">
-                  {(Object.keys(packages) as Array<keyof typeof packages>).map((pkg) => (
-                    <button
-                      key={pkg}
-                      onClick={() => {
-                        setSelectedPackage(pkg)
-                        trackPackageSelect(packages[pkg].label)
-                      }}
-                      className={`relative py-3 px-2 rounded-lg border-2 transition-all ${
-                        selectedPackage === pkg
-                          ? 'border-emerald-500 bg-emerald-500/20 text-white'
-                          : 'border-gray-600 bg-gray-700/50 text-gray-400 hover:border-gray-500'
-                      }`}
-                    >
-                      {packages[pkg].popular && (
-                        <span className="absolute -top-2 left-1/2 -translate-x-1/2 bg-gradient-to-r from-green-500 to-emerald-500 text-[10px] font-bold text-gray-900 px-2 py-0.5 rounded-full">
-                          BEST VALUE
-                        </span>
-                      )}
-                      <div className="text-sm font-medium">{packages[pkg].label}</div>
-                      <div className="text-xs opacity-75">{packages[pkg].credits} credit{packages[pkg].credits > 1 ? 's' : ''}</div>
-                      <div className="text-xs opacity-75">${packages[pkg].price}</div>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Selected package details */}
-                <div className="bg-gray-900/50 rounded-xl p-4 mb-6">
-                  <div className="flex items-baseline justify-center gap-1 mb-2">
-                    <span className="text-4xl font-bold text-white">${selectedPkg.price.toFixed(2)}</span>
-                  </div>
-                  <div className="text-center text-gray-400 text-sm">
-                    {selectedPkg.credits} + {selectedPkg.bonus} bonus = <span className="text-white font-semibold">{selectedPkg.credits + selectedPkg.bonus} credits</span>
-                  </div>
-                  <div className="text-center text-gray-500 text-xs mt-1">
-                    ${(selectedPkg.price / (selectedPkg.credits + selectedPkg.bonus)).toFixed(2)} per card with bonus
-                  </div>
-                  {selectedPackage !== 'single' && (
-                    <div className="text-center text-green-400 text-sm font-medium mt-1">
-                      Save {Math.round((1 - selectedPkg.perCard / 2.99) * 100)}% vs single cards
-                    </div>
-                  )}
-                </div>
-
-                {/* Launch Special Banner */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-yellow-500/20 via-green-500/20 to-yellow-500/20 border-2 border-yellow-500/50 rounded-lg p-3 mb-4 animate-pulse-subtle">
-                  {/* Shimmer effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
-
-                  <div className="relative flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5 text-yellow-400 animate-sparkle" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
-                    </svg>
-                    <span className="font-bold text-sm text-yellow-300 tracking-wide">LAUNCH SPECIAL</span>
-                    <svg className="w-5 h-5 text-yellow-400 animate-sparkle-delayed" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M10 2l1.5 4.5L16 8l-4.5 1.5L10 14l-1.5-4.5L4 8l4.5-1.5L10 2z" />
-                    </svg>
-                  </div>
-                  <p className="relative text-center text-green-300 text-sm mt-1 font-medium">
-                    {selectedPkg.label} gets <span className="font-bold text-yellow-300">+{selectedPkg.bonus} bonus credit{selectedPkg.bonus > 1 ? 's' : ''}</span> free!
-                  </p>
-                </div>
-
-                {/* CTA Button */}
-                {isLoading ? (
-                  <div className="w-full bg-gray-700 text-gray-400 font-bold text-lg px-6 py-4 rounded-xl text-center">
-                    Loading...
-                  </div>
-                ) : user ? (
-                  <Link
-                    href="/upload/sports"
-                    onClick={() => trackSignupClick('pricing_card_mobile', selectedPkg.label)}
-                    className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg shadow-emerald-500/30"
-                  >
-                    Grade Your Cards Now
-                  </Link>
-                ) : (
-                  <Link
-                    href="/login?mode=signup&redirect=/upload/sports"
-                    onClick={() => trackSignupClick('pricing_card_mobile_signup', selectedPkg.label)}
-                    className="block w-full bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-6 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all text-center shadow-lg shadow-emerald-500/30"
-                  >
-                    Create Account
-                  </Link>
-                )}
-
-                <p className="text-center text-gray-500 text-xs mt-3">
-                  No subscription required. Pay only for what you use
-                </p>
-              </div>
-            </div>
-
-            {/* Feature boxes - mobile */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8 max-w-xl mx-auto">
-              <div className="bg-white/5 rounded-lg px-4 py-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" />
-                    </svg>
-                  </div>
-                  <span className="text-white text-sm font-semibold">Identify Your Card</span>
-                </div>
-                <p className="text-gray-400 text-xs leading-relaxed pl-11">Player, set name, card number, manufacturer, and more</p>
-              </div>
-              <div className="bg-white/5 rounded-lg px-4 py-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <span className="text-white text-sm font-semibold">Evaluate Condition</span>
-                </div>
-                <p className="text-gray-400 text-xs leading-relaxed pl-11">Analysis of centering, corners, edges and surface for front and back of your card</p>
-              </div>
-              <div className="bg-white/5 rounded-lg px-4 py-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                    </svg>
-                  </div>
-                  <span className="text-white text-sm font-semibold">Market Pricing & Grade Estimates</span>
-                </div>
-                <p className="text-gray-400 text-xs leading-relaxed pl-11">Estimates of PSA, BGS, SGC and CGC grade equivalents & links to marketplace listings for your card</p>
-              </div>
-              <div className="bg-white/5 rounded-lg px-4 py-4">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-8 h-8 bg-emerald-500/20 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <span className="text-white text-sm font-semibold">Reports & Labels</span>
-                </div>
-                <p className="text-gray-400 text-xs leading-relaxed pl-11">Downloadable graded card images, reports and labels</p>
               </div>
             </div>
           </div>
@@ -770,8 +839,8 @@ export default function SportsGradingLanding() {
               <div className="text-gray-300">Average grading time</div>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700">
-              <div className="text-3xl font-bold text-emerald-400 mb-2">$1</div>
-              <div className="text-gray-300">Per card (with 20-pack)</div>
+              <div className="text-3xl font-bold text-emerald-400 mb-2">$0.66</div>
+              <div className="text-gray-300">Per card (best value)</div>
             </div>
             <div className="bg-gray-900/50 rounded-xl p-6 border border-gray-700">
               <div className="text-3xl font-bold text-emerald-400 mb-2">30+</div>
@@ -804,6 +873,295 @@ export default function SportsGradingLanding() {
         </div>
       </section>
 
+      {/* Pricing Section */}
+      <section className="py-16 bg-gray-900">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+              Choose the package that fits your collection. All plans include our full DCM Optic™ analysis.
+            </p>
+            {/* First Purchase Bonus Banner */}
+            <div className="mt-6 inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full px-6 py-2 shadow-lg">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+              </svg>
+              <span className="font-semibold">New Users get FREE bonus credits on first purchase!</span>
+            </div>
+          </div>
+
+          {/* Pricing Cards */}
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
+            {/* Founders Package */}
+            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-yellow-400 flex flex-col">
+              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 px-5 py-4 relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">⭐</span>
+                    <h3 className="text-xl font-bold text-gray-900">Founders</h3>
+                  </div>
+                  <div className="text-right">
+                    <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      LIMITED TIME
+                    </div>
+                    {countdown && (
+                      <div className="bg-gray-900/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded mt-1">
+                        {countdown.days}d {countdown.hours.toString().padStart(2, '0')}:{countdown.mins.toString().padStart(2, '0')}:{countdown.secs.toString().padStart(2, '0')}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-1.5 inline-block bg-white/30 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  🚀 BEST VALUE
+                </div>
+              </div>
+
+              <div className="p-5 flex flex-col flex-grow">
+                <div className="text-center mb-3">
+                  <div>
+                    <span className="text-3xl font-bold text-white">$99</span>
+                    <span className="text-gray-400 text-sm ml-1">one-time</span>
+                  </div>
+                  <p className="text-gray-500 text-xs mt-1">Lifetime benefits for early supporters</p>
+                </div>
+
+                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
+                  <span className="text-2xl font-bold text-yellow-400">150</span>
+                  <span className="text-gray-300 ml-2">credits</span>
+                </div>
+
+                <div className="mb-3 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
+                    <span className="text-lg font-bold text-yellow-400">$0.66</span>
+                  </div>
+                  <div className="text-yellow-500 text-[10px] font-semibold">Save 78% vs Basic!</div>
+                </div>
+
+                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl">
+                  <div className="text-yellow-400 font-bold text-xs mb-1.5">Lifetime Benefits:</div>
+                  <ul className="text-yellow-300/80 text-xs space-y-1">
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      20% off future purchases
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Exclusive Founder badge
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Founder emblem on labels
+                    </li>
+                  </ul>
+                </div>
+
+                <Link
+                  href="/login?mode=signup&redirect=/credits"
+                  onClick={() => trackSignupClick('pricing_founders')}
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-gray-900 shadow-lg hover:shadow-xl cursor-pointer"
+                >
+                  Sign Up to Purchase
+                </Link>
+              </div>
+            </div>
+
+            {/* Basic Package */}
+            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl flex flex-col">
+              <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">⭐</span>
+                    <h3 className="text-xl font-bold text-white">Basic</h3>
+                  </div>
+                  <div className="w-16"></div>
+                </div>
+                <div className="mt-1.5 h-[18px]"></div>
+              </div>
+
+              <div className="p-5 flex flex-col flex-grow">
+                <div className="text-center mb-3">
+                  <span className="text-3xl font-bold text-white">$2.99</span>
+                  <p className="text-gray-500 text-xs mt-1">Perfect for trying out DCM Grading</p>
+                </div>
+
+                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
+                  <span className="text-2xl font-bold text-blue-400">1</span>
+                  <span className="text-gray-300 ml-2">credit</span>
+                </div>
+
+                <div className="mb-3 p-2.5 rounded-lg bg-blue-500/10 border border-blue-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
+                    <span className="text-lg font-bold text-blue-400">$2.99</span>
+                  </div>
+                  <div className="text-gray-500 text-[10px]">Standard rate</div>
+                </div>
+
+                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400 text-lg">🎁</span>
+                    <div className="text-center">
+                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
+                      <div className="text-green-300 text-sm font-bold">+1 FREE = 2 total</div>
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  href="/login?mode=signup&redirect=/credits"
+                  onClick={() => trackSignupClick('pricing_basic')}
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-blue-500 to-blue-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                >
+                  Sign Up to Purchase
+                </Link>
+              </div>
+            </div>
+
+            {/* Pro Package */}
+            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-purple-500 flex flex-col">
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">🚀</span>
+                    <h3 className="text-xl font-bold text-white">Pro</h3>
+                  </div>
+                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
+                    <span className="text-white font-bold text-xs">Save 33%</span>
+                  </div>
+                </div>
+                <div className="mt-1.5 inline-block bg-white text-purple-600 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  ⭐ MOST POPULAR
+                </div>
+              </div>
+
+              <div className="p-5 flex flex-col flex-grow">
+                <div className="text-center mb-3">
+                  <span className="text-3xl font-bold text-white">$9.99</span>
+                  <p className="text-gray-500 text-xs mt-1">Best value for casual collectors</p>
+                </div>
+
+                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
+                  <span className="text-2xl font-bold text-purple-400">5</span>
+                  <span className="text-gray-300 ml-2">credits</span>
+                </div>
+
+                <div className="mb-3 p-2.5 rounded-lg bg-purple-500/10 border border-purple-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
+                    <span className="text-lg font-bold text-purple-400">$2.00</span>
+                  </div>
+                  <div className="text-green-400 text-[10px] font-semibold">Save $4.96 vs Basic</div>
+                </div>
+
+                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400 text-lg">🎁</span>
+                    <div className="text-center">
+                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
+                      <div className="text-green-300 text-sm font-bold">+3 FREE = 8 total</div>
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  href="/login?mode=signup&redirect=/credits"
+                  onClick={() => trackSignupClick('pricing_pro')}
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-indigo-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                >
+                  Sign Up to Purchase
+                </Link>
+              </div>
+            </div>
+
+            {/* Elite Package */}
+            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl flex flex-col">
+              <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">👑</span>
+                    <h3 className="text-xl font-bold text-white">Elite</h3>
+                  </div>
+                  <div className="bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5">
+                    <span className="text-white font-bold text-xs">Save 67%</span>
+                  </div>
+                </div>
+                <div className="mt-1.5 h-[18px]"></div>
+              </div>
+
+              <div className="p-5 flex flex-col flex-grow">
+                <div className="text-center mb-3">
+                  <span className="text-3xl font-bold text-white">$19.99</span>
+                  <p className="text-gray-500 text-xs mt-1">For serious collectors and dealers</p>
+                </div>
+
+                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
+                  <span className="text-2xl font-bold text-amber-400">20</span>
+                  <span className="text-gray-300 ml-2">credits</span>
+                </div>
+
+                <div className="mb-3 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
+                    <span className="text-lg font-bold text-amber-400">$1.00</span>
+                  </div>
+                  <div className="text-green-400 text-[10px] font-semibold">Save $39.81 vs Basic</div>
+                </div>
+
+                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-green-500/10 to-emerald-500/10 border border-green-500/20 rounded-xl flex items-center justify-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-400 text-lg">🎁</span>
+                    <div className="text-center">
+                      <div className="text-green-400 font-bold text-xs">First Purchase Bonus!</div>
+                      <div className="text-green-300 text-sm font-bold">+5 FREE = 25 total</div>
+                    </div>
+                  </div>
+                </div>
+
+                <Link
+                  href="/login?mode=signup&redirect=/credits"
+                  onClick={() => trackSignupClick('pricing_elite')}
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-amber-500 to-orange-600 hover:opacity-90 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                >
+                  Sign Up to Purchase
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* What's Included */}
+          <div className="mt-12 text-center">
+            <h3 className="text-xl font-bold text-white mb-6">Every Package Includes</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-3xl mx-auto">
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <div className="text-2xl mb-2">🎯</div>
+                <div className="text-white font-medium text-sm">DCM Optic™ Grading</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <div className="text-2xl mb-2">⚡</div>
+                <div className="text-white font-medium text-sm">Instant Results</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <div className="text-2xl mb-2">📊</div>
+                <div className="text-white font-medium text-sm">Detailed Reports</div>
+              </div>
+              <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
+                <div className="text-2xl mb-2">♾️</div>
+                <div className="text-white font-medium text-sm">Credits Never Expire</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Final CTA */}
       <section className="py-16 bg-gradient-to-r from-emerald-900 to-teal-900">
         <div className="container mx-auto px-4 text-center">
@@ -813,13 +1171,64 @@ export default function SportsGradingLanding() {
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
             Stop wondering what your cards are worth. Get instant AI grades and know exactly which rookies and parallels are worth submitting to PSA.
           </p>
-          <Link
-            href={user ? "/upload/sports" : "/login?mode=signup&redirect=/upload/sports"}
-            onClick={() => trackSignupClick('footer_cta', selectedPkg.label)}
-            className="inline-block bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
-          >
-            Start Grading Now — From $1/Card
-          </Link>
+          {user ? (
+            <Link
+              href="/credits"
+              onClick={() => trackSignupClick('footer_cta')}
+              className="inline-block bg-gradient-to-r from-green-500 to-emerald-500 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl hover:from-green-400 hover:to-emerald-400 transition-all shadow-lg shadow-emerald-500/30"
+            >
+              Get Credits & Start Grading
+            </Link>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <button
+                onClick={() => handleOAuthSignup('google')}
+                disabled={isSigningUp || emailLoading}
+                className="inline-flex items-center justify-center gap-3 bg-white hover:bg-gray-100 text-gray-800 font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSigningUp && oauthProvider === 'google' ? (
+                  <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+                  </svg>
+                )}
+                Google
+              </button>
+              <button
+                onClick={() => handleOAuthSignup('facebook')}
+                disabled={isSigningUp || emailLoading}
+                className="inline-flex items-center justify-center gap-3 bg-[#1877F2] hover:bg-[#166FE5] text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSigningUp && oauthProvider === 'facebook' ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                )}
+                Facebook
+              </button>
+              <Link
+                href="/login?mode=signup"
+                className="inline-flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Email
+              </Link>
+            </div>
+          )}
+          <p className="text-gray-400 text-sm mt-4">
+            By continuing, you agree to our{' '}
+            <Link href="/terms" className="text-emerald-300 hover:text-emerald-200">Terms of Service</Link>
+            {' '}and{' '}
+            <Link href="/privacy" className="text-emerald-300 hover:text-emerald-200">Privacy Policy</Link>
+          </p>
         </div>
       </section>
 
@@ -836,30 +1245,6 @@ export default function SportsGradingLanding() {
         @keyframes float-fast {
           0%, 100% { transform: translateY(0) rotate(5deg); }
           50% { transform: translateY(-10px) rotate(8deg); }
-        }
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        @keyframes sparkle {
-          0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
-          50% { transform: scale(1.2) rotate(15deg); opacity: 0.8; }
-        }
-        @keyframes pulse-subtle {
-          0%, 100% { box-shadow: 0 0 5px rgba(234, 179, 8, 0.3); }
-          50% { box-shadow: 0 0 15px rgba(234, 179, 8, 0.5), 0 0 25px rgba(234, 179, 8, 0.3); }
-        }
-        .animate-shimmer {
-          animation: shimmer 2s infinite;
-        }
-        .animate-sparkle {
-          animation: sparkle 1.5s ease-in-out infinite;
-        }
-        .animate-sparkle-delayed {
-          animation: sparkle 1.5s ease-in-out infinite 0.75s;
-        }
-        .animate-pulse-subtle {
-          animation: pulse-subtle 2s ease-in-out infinite;
         }
         .animate-float-slow { animation: float-slow 6s ease-in-out infinite; }
         .animate-float-medium { animation: float-medium 5s ease-in-out infinite; }

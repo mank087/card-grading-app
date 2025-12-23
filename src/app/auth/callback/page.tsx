@@ -105,10 +105,21 @@ export default function AuthCallbackPage() {
               emailConfirmedAt: storedSession.user.email_confirmed_at
             })
 
+            // Check for custom redirect from landing pages
+            const customRedirect = localStorage.getItem('auth_redirect')
+            const signupSource = localStorage.getItem('signup_source')
+
+            // Clear the stored redirect
+            localStorage.removeItem('auth_redirect')
+            localStorage.removeItem('signup_source')
+
             // Use replace to prevent back-button issues
-            // New users go to credits page for onboarding, existing users go to collection
+            // New users go to credits page for onboarding, existing users go to collection (or custom redirect)
             if (isNewUser) {
               console.log('[Auth Callback] New user detected, redirecting to credits page')
+              if (signupSource) {
+                console.log('[Auth Callback] Signup source:', signupSource)
+              }
 
               // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
               fetch('/api/email/welcome', {
@@ -122,6 +133,9 @@ export default function AuthCallbackPage() {
               }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
 
               router.replace('/credits?welcome=true')
+            } else if (customRedirect) {
+              console.log('[Auth Callback] Existing user with custom redirect:', customRedirect)
+              router.replace(customRedirect)
             } else {
               router.replace('/collection')
             }
@@ -139,6 +153,11 @@ export default function AuthCallbackPage() {
               const emailConfirmedAt = new Date(retrySession.user.email_confirmed_at || 0).getTime()
               const isNewUser = (now - createdAt) < 60000 || (now - emailConfirmedAt) < 60000
 
+              // Check for custom redirect from landing pages
+              const customRedirect = localStorage.getItem('auth_redirect')
+              localStorage.removeItem('auth_redirect')
+              localStorage.removeItem('signup_source')
+
               if (isNewUser) {
                 // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
                 fetch('/api/email/welcome', {
@@ -152,6 +171,8 @@ export default function AuthCallbackPage() {
                 }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
 
                 router.replace('/credits?welcome=true')
+              } else if (customRedirect) {
+                router.replace(customRedirect)
               } else {
                 router.replace('/collection')
               }
