@@ -290,6 +290,11 @@ function LoginPageContent() {
                 ? 'Start grading your cards with DCM Optic™ technology'
                 : 'Sign in to access your collection and grade cards'}
             </p>
+            {isSignUp && (
+              <p className="mt-2 text-green-600 font-semibold">
+                🎁 Grade Your First Card Free with Sign Up
+              </p>
+            )}
           </div>
 
           {/* Auth Form Card */}

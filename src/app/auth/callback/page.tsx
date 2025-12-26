@@ -114,9 +114,9 @@ export default function AuthCallbackPage() {
             localStorage.removeItem('signup_source')
 
             // Use replace to prevent back-button issues
-            // New users go to credits page for onboarding, existing users go to collection (or custom redirect)
+            // New users go to grade-your-first-card page for onboarding, existing users go to collection (or custom redirect)
             if (isNewUser) {
-              console.log('[Auth Callback] New user detected, redirecting to credits page')
+              console.log('[Auth Callback] New user detected, redirecting to grade-your-first-card page')
               if (signupSource) {
                 console.log('[Auth Callback] Signup source:', signupSource)
               }
@@ -132,7 +132,7 @@ export default function AuthCallbackPage() {
                 })
               }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
 
-              router.replace('/credits?welcome=true')
+              router.replace('/grade-your-first-card')
             } else if (customRedirect) {
               console.log('[Auth Callback] Existing user with custom redirect:', customRedirect)
               router.replace(customRedirect)
@@ -170,7 +170,7 @@ export default function AuthCallbackPage() {
                   })
                 }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
 
-                router.replace('/credits?welcome=true')
+                router.replace('/grade-your-first-card')
               } else if (customRedirect) {
                 router.replace(customRedirect)
               } else {

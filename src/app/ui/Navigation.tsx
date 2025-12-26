@@ -366,7 +366,7 @@ export default function Navigation() {
                     href="/login?mode=signup"
                     className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors shadow-md"
                   >
-                    Sign Up
+                    Grade 1st Card Free
                   </Link>
                 </>
               )}
@@ -413,7 +413,7 @@ export default function Navigation() {
                   href="/login?mode=signup"
                   className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-md"
                 >
-                  Sign Up
+                  1 Free Grade
                 </Link>
               </>
             )}

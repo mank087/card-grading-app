@@ -173,7 +173,7 @@ export async function DELETE(
     const searchParams = request.nextUrl.searchParams
     const reason = searchParams.get('reason') || 'No reason provided'
 
-    // Delete user's cards first (cascade)
+    // Delete user's cards first
     const { error: cardsError } = await supabaseAdmin
       .from('cards')
       .delete()
@@ -183,14 +183,52 @@ export async function DELETE(
       console.error('Error deleting user cards:', cardsError)
     }
 
-    // Delete user
+    // Delete user credits
+    const { error: creditsError } = await supabaseAdmin
+      .from('user_credits')
+      .delete()
+      .eq('user_id', id)
+
+    if (creditsError) {
+      console.error('Error deleting user credits:', creditsError)
+    }
+
+    // Delete credit transactions
+    const { error: transactionsError } = await supabaseAdmin
+      .from('credit_transactions')
+      .delete()
+      .eq('user_id', id)
+
+    if (transactionsError) {
+      console.error('Error deleting credit transactions:', transactionsError)
+    }
+
+    // Delete from profiles table
+    const { error: profilesError } = await supabaseAdmin
+      .from('profiles')
+      .delete()
+      .eq('id', id)
+
+    if (profilesError) {
+      console.error('Error deleting user profile:', profilesError)
+    }
+
+    // Delete from public.users table
     const { error: userError } = await supabaseAdmin
       .from('users')
       .delete()
       .eq('id', id)
 
     if (userError) {
-      throw userError
+      console.error('Error deleting from users table:', userError)
+    }
+
+    // Delete from auth.users (this is the critical one for allowing re-registration)
+    const { error: authError } = await supabaseAdmin.auth.admin.deleteUser(id)
+
+    if (authError) {
+      console.error('Error deleting from auth.users:', authError)
+      throw new Error(`Failed to delete user from auth: ${authError.message}`)
     }
 
     // Log the deletion

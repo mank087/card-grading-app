@@ -7,10 +7,11 @@
 CREATE TABLE IF NOT EXISTS user_credits (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
-  balance INTEGER DEFAULT 0 NOT NULL CHECK (balance >= 0),
+  balance INTEGER DEFAULT 1 NOT NULL CHECK (balance >= 0),  -- Start with 1 free signup credit
   total_purchased INTEGER DEFAULT 0 NOT NULL,
   total_used INTEGER DEFAULT 0 NOT NULL,
   first_purchase_bonus_claimed BOOLEAN DEFAULT FALSE,
+  signup_bonus_claimed BOOLEAN DEFAULT TRUE,  -- Track if signup bonus was given
   stripe_customer_id TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -79,13 +80,24 @@ CREATE TRIGGER trigger_update_user_credits_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_user_credits_updated_at();
 
--- Function to initialize credits for new users (optional - creates record with 0 credits)
-CREATE OR REPLACE FUNCTION initialize_user_credits()
+-- Function to initialize credits for new users with 1 free signup credit
+-- IMPORTANT: Use public. schema prefix for tables
+CREATE OR REPLACE FUNCTION public.initialize_user_credits()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO user_credits (user_id, balance, total_purchased, total_used)
-  VALUES (NEW.id, 0, 0, 0)
+  -- Insert user credits record with 1 free signup credit
+  INSERT INTO public.user_credits (user_id, balance, total_purchased, total_used)
+  VALUES (NEW.id, 1, 0, 0)
   ON CONFLICT (user_id) DO NOTHING;
+
+  -- Log the signup bonus transaction
+  INSERT INTO public.credit_transactions (user_id, type, amount, balance_after, description, metadata)
+  VALUES (NEW.id, 'bonus', 1, 1, 'Welcome bonus - 1 free credit for signing up', '{"bonus_type": "signup"}'::jsonb);
+
+  RETURN NEW;
+EXCEPTION WHEN OTHERS THEN
+  -- Log but don't block user creation
+  RAISE WARNING 'initialize_user_credits failed: %', SQLERRM;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

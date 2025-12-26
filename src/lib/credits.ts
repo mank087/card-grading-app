@@ -19,6 +19,7 @@ export interface UserCredits {
   total_purchased: number;
   total_used: number;
   first_purchase_bonus_claimed: boolean;
+  signup_bonus_claimed: boolean;
   stripe_customer_id: string | null;
   is_founder: boolean;
   founder_purchased_at: string | null;
@@ -60,16 +61,17 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
     return null;
   }
 
-  // If no credits record exists, create one
+  // If no credits record exists, create one with 1 free signup credit
   if (!data) {
     const { data: newCredits, error: createError } = await supabase
       .from('user_credits')
       .insert({
         user_id: userId,
-        balance: 0,
+        balance: 1, // 1 free credit for signing up
         total_purchased: 0,
         total_used: 0,
         first_purchase_bonus_claimed: false,
+        signup_bonus_claimed: true,
         is_founder: false,
         show_founder_badge: true,
       })
@@ -79,6 +81,18 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
     if (createError) {
       console.error('Error creating user credits:', createError);
       return null;
+    }
+
+    // Record the signup bonus transaction for audit trail
+    if (newCredits) {
+      await supabase.from('credit_transactions').insert({
+        user_id: userId,
+        type: 'bonus',
+        amount: 1,
+        balance_after: 1,
+        description: 'Welcome bonus - 1 free credit for signing up',
+        metadata: { bonus_type: 'signup' },
+      });
     }
 
     return newCredits;

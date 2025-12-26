@@ -346,12 +346,12 @@ function CreditsPageContent() {
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">1</div>
                       <p className="font-semibold">Create Your Account</p>
-                      <p className="text-sm text-white/70">Sign up free</p>
+                      <p className="text-sm text-white/70">Get 1 free credit</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">2</div>
-                      <p className="font-semibold">Fund Your Account</p>
-                      <p className="text-sm text-white/70">Purchase credits</p>
+                      <p className="font-semibold">Upload Your Card</p>
+                      <p className="text-sm text-white/70">Front and back photos</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">3</div>
@@ -364,7 +364,7 @@ function CreditsPageContent() {
                     <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
-                    <span>DCM Launch Special - New Users get FREE bonus Credits!</span>
+                    <span>Sign up and get 1 FREE credit to grade your first card!</span>
                   </div>
                 </div>
               </div>
@@ -391,7 +391,7 @@ function CreditsPageContent() {
                     Welcome to DCM Grading!
                   </h2>
                   <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
-                    Your account is ready! Get started by purchasing credits to grade your first card.
+                    Your account is ready with 1 free credit! Upload your first card to get started.
                     Our DCM Optic™ grading system analyzes centering, corners, edges, and surface quality.
                   </p>
 
@@ -399,8 +399,8 @@ function CreditsPageContent() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-6">
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">1</div>
-                      <p className="font-semibold">Fund Your Account</p>
-                      <p className="text-sm text-white/70">Choose a package below</p>
+                      <p className="font-semibold">Use Your Free Credit</p>
+                      <p className="text-sm text-white/70">You have 1 credit ready</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">2</div>
@@ -418,7 +418,7 @@ function CreditsPageContent() {
                     <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
-                    <span>DCM Launch Special - New Users get FREE bonus Credits!</span>
+                    <span>Your free credit is ready - grade your first card now!</span>
                   </div>
                 </div>
               </div>

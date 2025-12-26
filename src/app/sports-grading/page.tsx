@@ -308,11 +308,16 @@ export default function SportsGradingLanding() {
                       </div>
                     </div>
 
-                    {/* Pricing teaser */}
-                    <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg p-3 mb-5 text-center">
-                      <p className="text-emerald-300 text-sm">
-                        Plans starting at <span className="text-white font-bold text-lg">$0.66</span> per card
-                      </p>
+                    {/* Free credit highlight */}
+                    <div className="relative mb-5">
+                      <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl blur opacity-40 animate-pulse"></div>
+                      <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center">
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-2xl">🎁</span>
+                          <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
+                        </div>
+                        <p className="text-green-300 text-xs mt-1">1 free credit on signup</p>
+                      </div>
                     </div>
 
                     {/* OAuth Buttons */}
@@ -527,11 +532,16 @@ export default function SportsGradingLanding() {
                     </div>
                   </div>
 
-                  {/* Pricing teaser */}
-                  <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-lg p-4 mb-6 text-center">
-                    <p className="text-emerald-300 text-sm">
-                      Plans starting at <span className="text-white font-bold text-lg">$0.66</span> per card
-                    </p>
+                  {/* Free credit highlight */}
+                  <div className="relative mb-6">
+                    <div className="absolute -inset-1 bg-gradient-to-r from-green-400 to-emerald-500 rounded-xl blur opacity-40 animate-pulse"></div>
+                    <div className="relative bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-400/50 rounded-xl p-4 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-2xl">🎁</span>
+                        <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
+                      </div>
+                      <p className="text-green-300 text-xs mt-1">1 free credit on signup</p>
+                    </div>
                   </div>
 
                   {/* Signup Form */}
@@ -883,12 +893,16 @@ export default function SportsGradingLanding() {
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
               Choose the package that fits your collection. All plans include our full DCM Optic™ analysis.
             </p>
-            {/* First Purchase Bonus Banner */}
-            <div className="mt-6 inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full px-6 py-2 shadow-lg">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-              </svg>
-              <span className="font-semibold">New Users get FREE bonus credits on first purchase!</span>
+            {/* Free Credit + Bonus Banner */}
+            <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full px-5 py-2 shadow-lg">
+                <span className="text-lg">🎁</span>
+                <span className="font-semibold">1 Free Credit at Signup</span>
+              </div>
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-full px-5 py-2 shadow-lg">
+                <span className="text-lg">🎉</span>
+                <span className="font-semibold">Bonus Credits on First Purchase</span>
+              </div>
             </div>
           </div>
 
