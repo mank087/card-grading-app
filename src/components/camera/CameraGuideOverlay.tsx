@@ -12,46 +12,52 @@ export default function CameraGuideOverlay({
   onToggleOrientation,
 }: CameraGuideOverlayProps) {
   // Aspect ratio based on orientation
-  // Larger guide encourages users to hold phone closer for better detail
+  // Maximum guide size encourages users to fill frame with the card
   const aspectRatio = orientation === 'portrait' ? '2.5 / 3.5' : '3.5 / 2.5';
-  const guideWidth = orientation === 'portrait' ? '85%' : '90%';
-  const maxWidth = orientation === 'portrait' ? '380px' : '480px';
+  const guideWidth = '92%';
+  // No max-width cap - let the guide be as large as possible
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Card outline guide - centered */}
-      <div className="absolute inset-0 flex items-center justify-center">
+      {/* Card outline guide - centered, large to fill screen */}
+      <div className="absolute inset-0 flex items-center justify-center px-4">
         <div
-          className="relative border-4 border-white/80 rounded-lg shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+          className="relative border-4 border-white/90 rounded-xl shadow-[0_0_30px_rgba(255,255,255,0.4)]"
           style={{
             width: guideWidth,
-            maxWidth: maxWidth,
             aspectRatio: aspectRatio,
           }}
         >
-          {/* Corner markers */}
-          <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-white rounded-tl-lg" />
-          <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-white rounded-tr-lg" />
-          <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-white rounded-bl-lg" />
-          <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-white rounded-br-lg" />
+          {/* Corner markers - larger for visibility */}
+          <div className="absolute -top-1 -left-1 w-10 h-10 border-t-4 border-l-4 border-white rounded-tl-xl" />
+          <div className="absolute -top-1 -right-1 w-10 h-10 border-t-4 border-r-4 border-white rounded-tr-xl" />
+          <div className="absolute -bottom-1 -left-1 w-10 h-10 border-b-4 border-l-4 border-white rounded-bl-xl" />
+          <div className="absolute -bottom-1 -right-1 w-10 h-10 border-b-4 border-r-4 border-white rounded-br-xl" />
 
-          {/* Card side indicator */}
+          {/* Subtle center indicator */}
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-            <div className="bg-black/60 text-white px-6 py-2 rounded-lg">
-              <p className="text-lg font-bold text-center">
+            <div className="bg-black/40 backdrop-blur-sm text-white/80 px-4 py-1.5 rounded-full">
+              <p className="text-sm font-medium text-center">
                 {side === 'front' ? 'FRONT' : 'BACK'}
               </p>
+            </div>
+          </div>
+
+          {/* Fill frame tip inside the guide */}
+          <div className="absolute bottom-3 left-0 right-0 flex justify-center">
+            <div className="bg-black/50 backdrop-blur-sm text-white/90 px-3 py-1 rounded-full">
+              <span className="text-xs font-medium">Fill card to edges</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Orientation toggle button */}
+      {/* Orientation toggle button - positioned to not overlap with header */}
       {onToggleOrientation && (
-        <div className="absolute top-4 right-4 pointer-events-auto">
+        <div className="absolute top-16 right-4 pointer-events-auto">
           <button
             onClick={onToggleOrientation}
-            className="bg-black/70 text-white p-3 rounded-full shadow-lg active:scale-95 transition-transform"
+            className="bg-black/60 backdrop-blur-sm text-white p-3 rounded-full shadow-lg active:scale-95 transition-transform"
             aria-label={`Switch to ${orientation === 'portrait' ? 'landscape' : 'portrait'} mode`}
           >
             <svg
@@ -68,33 +74,6 @@ export default function CameraGuideOverlay({
           </button>
         </div>
       )}
-
-      {/* Top badge */}
-      <div className="absolute top-4 left-4 right-16">
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-full inline-block shadow-lg">
-          <p className="text-sm font-semibold">
-            {side === 'front' ? 'Front of Card' : 'Back of Card'}
-          </p>
-        </div>
-      </div>
-
-      {/* Bottom tips - small, below guide frame */}
-      <div className="absolute bottom-2 left-0 right-0 px-4">
-        <div className="flex justify-center gap-3">
-          <div className="bg-black/60 text-white/90 px-2 py-1 rounded-full flex items-center gap-1">
-            <span className="text-xs">💡</span>
-            <span className="text-[10px]">Good light</span>
-          </div>
-          <div className="bg-black/60 text-white/90 px-2 py-1 rounded-full flex items-center gap-1">
-            <span className="text-xs">🚫</span>
-            <span className="text-[10px]">No glare</span>
-          </div>
-          <div className="bg-black/60 text-white/90 px-2 py-1 rounded-full flex items-center gap-1">
-            <span className="text-xs">📐</span>
-            <span className="text-[10px]">Fill frame</span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

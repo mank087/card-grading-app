@@ -46,9 +46,8 @@ export async function cropToGuideFrame(
         const originalHeight = img.height;
 
         // Calculate guide frame dimensions (matches CameraGuideOverlay.tsx)
-        // Portrait: guide is 85% of width with 2.5:3.5 aspect ratio
-        // Landscape: guide is 90% of width with 3.5:2.5 aspect ratio
-        const guideWidthPercent = orientation === 'portrait' ? 0.85 : 0.90;
+        // Guide is 92% of width for both orientations to maximize card size
+        const guideWidthPercent = 0.92;
         const aspectRatio = orientation === 'portrait' ? (3.5 / 2.5) : (2.5 / 3.5);
 
         const guideWidth = originalWidth * guideWidthPercent;

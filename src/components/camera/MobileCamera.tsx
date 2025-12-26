@@ -187,41 +187,11 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     );
   }
 
-  // Main camera view
+  // Main camera view - full screen with overlaid controls
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-3 flex items-center justify-between relative z-10">
-        <button
-          onClick={onCancel}
-          className="text-white font-medium flex items-center gap-1"
-        >
-          <span>←</span>
-          <span>Cancel</span>
-        </button>
-        <div className="flex items-center gap-2">
-          <Image
-            src="/DCM-logo.png"
-            alt="DCM"
-            width={24}
-            height={24}
-            className="object-contain"
-          />
-          <span className="font-bold">Capture Card</span>
-        </div>
-        <button
-          onClick={handleSwitchCamera}
-          className="text-white p-2 rounded-full hover:bg-white/20 transition-colors"
-          title="Switch Camera"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        </button>
-      </div>
-
-      {/* Camera View */}
-      <div className="flex-1 relative overflow-hidden bg-black">
+    <div className="fixed inset-0 bg-black z-50">
+      {/* Full-screen Camera View */}
+      <div className="absolute inset-0">
         <video
           ref={videoRef}
           autoPlay
@@ -238,23 +208,69 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         />
       </div>
 
-      {/* Capture Controls */}
-      <div className="bg-gray-900 px-4 py-6 relative z-10">
-        <div className="flex items-center justify-center">
+      {/* Overlaid Header - translucent */}
+      <div className="absolute top-0 left-0 right-0 z-20">
+        <div className="bg-black/50 backdrop-blur-sm text-white px-4 py-3 flex items-center justify-between safe-area-top">
+          <button
+            onClick={onCancel}
+            className="text-white font-medium flex items-center gap-1 bg-black/30 px-3 py-1.5 rounded-full"
+          >
+            <span>←</span>
+            <span>Cancel</span>
+          </button>
+          <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-full">
+            <Image
+              src="/DCM-logo.png"
+              alt="DCM"
+              width={20}
+              height={20}
+              className="object-contain"
+            />
+            <span className="font-semibold text-sm">{side === 'front' ? 'Front' : 'Back'}</span>
+          </div>
+          <button
+            onClick={handleSwitchCamera}
+            className="text-white p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+            title="Switch Camera"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* Overlaid Capture Controls - bottom */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 safe-area-bottom pb-6">
+        {/* Tips row */}
+        <div className="flex justify-center gap-2 mb-4 px-4">
+          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2.5 py-1 rounded-full flex items-center gap-1">
+            <span className="text-xs">☀️</span>
+            <span className="text-[10px] font-medium">Good light</span>
+          </div>
+          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2.5 py-1 rounded-full flex items-center gap-1">
+            <span className="text-xs">🚫</span>
+            <span className="text-[10px] font-medium">No glare</span>
+          </div>
+          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2.5 py-1 rounded-full flex items-center gap-1">
+            <span className="text-xs">🎯</span>
+            <span className="text-[10px] font-medium">Sharp focus</span>
+          </div>
+        </div>
+
+        {/* Capture button */}
+        <div className="flex justify-center">
           <button
             onClick={handleCapture}
             disabled={isProcessing}
-            className={`w-20 h-20 rounded-full border-4 border-white bg-white/20
-              hover:bg-white/30 active:scale-95 transition-all shadow-lg
+            className={`w-20 h-20 rounded-full border-4 border-white bg-white/20 backdrop-blur-sm
+              hover:bg-white/30 active:scale-95 transition-all shadow-2xl
               ${isProcessing ? 'opacity-50' : ''}`}
             aria-label="Capture photo"
           >
-            <div className="w-full h-full rounded-full bg-white" />
+            <div className="w-full h-full rounded-full bg-white/90" />
           </button>
         </div>
-        <p className="text-center text-gray-400 text-sm mt-4">
-          Tap to capture
-        </p>
       </div>
     </div>
   );
