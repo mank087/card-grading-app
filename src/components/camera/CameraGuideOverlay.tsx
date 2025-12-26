@@ -14,13 +14,13 @@ export default function CameraGuideOverlay({
   // Aspect ratio based on orientation
   // Maximum guide size encourages users to fill frame with the card
   const aspectRatio = orientation === 'portrait' ? '2.5 / 3.5' : '3.5 / 2.5';
-  const guideWidth = '92%';
+  const guideWidth = '96%';
   // No max-width cap - let the guide be as large as possible
 
   return (
     <div className="absolute inset-0 pointer-events-none">
       {/* Card outline guide - centered, large to fill screen */}
-      <div className="absolute inset-0 flex items-center justify-center px-4">
+      <div className="absolute inset-0 flex items-center justify-center px-2">
         <div
           className="relative border-4 border-white/90 rounded-xl shadow-[0_0_30px_rgba(255,255,255,0.4)]"
           style={{
