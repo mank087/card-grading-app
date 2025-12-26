@@ -12,9 +12,10 @@ export default function CameraGuideOverlay({
   onToggleOrientation,
 }: CameraGuideOverlayProps) {
   // Aspect ratio based on orientation
+  // Larger guide encourages users to hold phone closer for better detail
   const aspectRatio = orientation === 'portrait' ? '2.5 / 3.5' : '3.5 / 2.5';
-  const guideWidth = orientation === 'portrait' ? '75%' : '85%';
-  const maxWidth = orientation === 'portrait' ? '300px' : '420px';
+  const guideWidth = orientation === 'portrait' ? '85%' : '90%';
+  const maxWidth = orientation === 'portrait' ? '380px' : '480px';
 
   return (
     <div className="absolute inset-0 pointer-events-none">
