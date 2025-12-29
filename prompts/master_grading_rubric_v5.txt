@@ -3174,16 +3174,74 @@ SECTION 8: GRADING METHODOLOGY - CENTERING
 
 PURPOSE: Assess centering for both front and back independently.
 
-🎯 CENTERING MEASUREMENT PRINCIPLE: MEASURE WHAT YOU SEE
+🎯 CENTERING MEASUREMENT PRINCIPLE: PROVE PERFECT, DON'T ASSUME IT
 
-**50/50 Centering Assignment:**
-• Assign 50/50 when opposing borders appear equal within measurement precision
-• If borders measure within 0.2mm of each other, 50/50 is appropriate
-• If uncertain due to image quality (glare, holder, focus), use 52/48 or 55/45
-• Do NOT downgrade from 50/50 to 55/45 without observable evidence of off-centering
-• Remember: 50/50 to 55/45 both qualify for a score of 10 under PSA standards
+🚨 **CENTERING 10 IS RARE - NOT THE DEFAULT (v5.9 NEW)**
 
-**Key Point:** Trust your measurements. If borders appear equal, assign 50/50. If slightly unequal, assign the ratio you measure (52/48, 55/45, etc.). Do not assume centering must be imperfect.
+**Industry Reality Check:**
+• Per PSA submission data, only ~20% of cards achieve 55/45 or better centering
+• True 50/50 centering is exceptionally rare (<5% of cards)
+• If you're assigning centering 10s frequently, you are over-grading
+• Perfect centering must be PROVEN with evidence, not assumed
+
+**Burden of Proof - INVERTED (v5.9 CRITICAL CHANGE):**
+• Do NOT assume centering is perfect until proven otherwise
+• ASSUME centering has slight variance (52/48 to 55/45) unless borders are DEMONSTRABLY equal
+• To claim 50/50, you must PROVE border equality with clear measurement evidence
+• When uncertain, default to 55/45 (still qualifies for 10) rather than claiming 50/50
+
+**Border Equality Definition (Strict):**
+• Borders are "equal" (50/50) ONLY when measured difference is < 0.1mm
+• 0.1mm difference on a 3mm border = 3% variance = 51.5/48.5 ≈ 52/48
+• 0.2mm difference = 52/48 or 53/47, NOT 50/50
+• 0.3mm difference = 55/45 or worse
+• 0.5mm difference = 57/43 or worse
+
+**Key Point:** Perfect centering is the EXCEPTION, not the rule. If you cannot clearly demonstrate that borders are equal, assign 55/45 or use your measured ratio. Do not give the benefit of the doubt to perfect centering.
+---
+🆕 STEP 0: VISUAL ASSESSMENT FIRST (v5.9 MANDATORY - BEFORE ALL MEASUREMENT)
+---
+🚨 **COMPLETE THIS STEP BEFORE ANY MEASUREMENT OR CALCULATION**
+
+**PURPOSE:** Establish visual baseline BEFORE measurements to prevent confirmation bias.
+
+**VISUAL CENTERING PRE-CHECK (Answer honestly BEFORE measuring):**
+
+Look at the FRONT of the card at normal viewing distance and answer:
+
+□ **LEFT/RIGHT CHECK:** "Looking at the left and right borders, can I see ANY difference in width?"
+  - If YES → Front L/R centering is NOT 50/50 (proceed to measure actual ratio)
+  - If NO (borders appear truly identical) → Front L/R MAY be 50/50 (verify with measurement)
+
+□ **TOP/BOTTOM CHECK:** "Looking at the top and bottom borders, can I see ANY difference in width?"
+  - If YES → Front T/B centering is NOT 50/50 (proceed to measure actual ratio)
+  - If NO (borders appear truly identical) → Front T/B MAY be 50/50 (verify with measurement)
+
+Repeat for BACK of the card.
+
+**VISUAL ASSESSMENT CALIBRATION:**
+
+| What You SEE at Normal Viewing Distance | Likely Ratio Range | Max Centering Score |
+|-----------------------------------------|-------------------|---------------------|
+| Borders appear TRULY IDENTICAL - cannot detect any difference | 50/50 to 52/48 | 10 |
+| Borders appear NEARLY equal - very slight difference on close inspection | 53/47 to 55/45 | 10 |
+| One border SLIGHTLY wider - noticeable when specifically comparing | 56/44 to 58/42 | 9 |
+| One border CLEARLY wider - visible without specifically looking | 59/41 to 62/38 | 8 |
+| One border OBVIOUSLY wider - immediately apparent | 63/37 to 67/33 | 7 |
+| One border DRAMATICALLY wider - stands out significantly | 68/32 to 72/28 | 6 |
+| One border appears nearly DOUBLE the other | 67/33 or worse | 5 or below |
+
+**CRITICAL RULE:** Your final measured ratio MUST be consistent with your visual assessment.
+- If you answered "YES" to seeing a difference → Your ratio CANNOT be 50/50 or 51/49
+- If borders are "CLEARLY wider" visually → Your ratio CANNOT be 55/45 or better
+
+**Record your visual assessment before proceeding:**
+- Front L/R visual: [identical / nearly equal / slightly different / clearly different / obviously different]
+- Front T/B visual: [identical / nearly equal / slightly different / clearly different / obviously different]
+- Back L/R visual: [identical / nearly equal / slightly different / clearly different / obviously different]
+- Back T/B visual: [identical / nearly equal / slightly different / clearly different / obviously different]
+
+NOW proceed to Step 1 (Card Type Classification) and Step 2 (Numeric Measurement).
 ---
 STEP 1: MANDATORY CARD TYPE CLASSIFICATION
 ---
@@ -3245,20 +3303,33 @@ You MUST provide approximate numeric measurements AND validate them visually.
 • Full-art/Special art: May have no border or ultra-thin borders (0.5-1.5mm)
 • If one border is DOUBLE the width of another, ratio is approximately 67/33 or worse
 
-**Visual Estimation Guide:**
-Use these visual cues to VALIDATE your measurements:
-• If borders look EQUAL → ratio should be 50/50 to 52/48
-• If one border is SLIGHTLY wider → ratio should be 53/47 to 55/45
-• If one border is NOTICEABLY wider (visible at glance) → ratio should be 56/44 to 60/40
-• If one border is OBVIOUSLY wider (stands out) → ratio should be 61/39 to 65/35
-• If one border is DRAMATICALLY wider (nearly double) → ratio should be 66/34 or worse
-• If one border is DOUBLE OR MORE than the other → ratio is 67/33 or worse
+**Visual Estimation Guide (v5.9 STRICT - Calibrated to PSA Standards):**
 
-**CRITICAL: Your measurements MUST match visual reality:**
-❌ If borders are obviously unequal but you report 52/48 → WRONG
-❌ If one border is nearly double but you report 55/45 → WRONG
-✅ If borders are obviously unequal, report 60/40 or worse
-✅ If one border is nearly double, report 65/35 or worse
+🚨 **CRITICAL: Visual appearance OVERRIDES calculated measurements if they conflict.**
+
+| Visual Appearance | Ratio Range | Score | How Common |
+|-------------------|-------------|-------|------------|
+| TRULY IDENTICAL - stare at borders, cannot see difference | 50/50 to 51/49 | 10 | Very Rare (~5%) |
+| NEARLY EQUAL - very subtle difference on close inspection | 52/48 to 55/45 | 10 | Uncommon (~15%) |
+| SLIGHTLY WIDER - noticeable when comparing side-by-side | 56/44 to 58/42 | 9 | Common (~25%) |
+| CLEARLY WIDER - visible without specifically comparing | 59/41 to 62/38 | 8 | Common (~25%) |
+| OBVIOUSLY WIDER - immediately apparent at first glance | 63/37 to 67/33 | 7 | Common (~20%) |
+| DRAMATICALLY WIDER - one border nearly double | 68/32 to 75/25 | 5-6 | Less Common (~8%) |
+| SEVERELY OFF - one border is double or more | 76/24 or worse | 1-4 | Rare (~2%) |
+
+**MANDATORY CROSS-CHECK (v5.9):**
+After calculating your ratio, verify against this table:
+1. Look at your calculated ratio
+2. Find the matching row in the table above
+3. Ask: "Does my visual assessment match this description?"
+4. If NO → Your calculation is wrong. Re-measure.
+
+**EXAMPLES OF COMMON ERRORS:**
+❌ Calculated 52/48 but borders are "clearly wider" visually → WRONG (should be 59/41 to 62/38)
+❌ Calculated 55/45 but can easily see which border is wider → WRONG (should be 56/44 or worse)
+❌ Calculated 50/50 but borders are "nearly equal" not "truly identical" → WRONG (should be 52/48 to 55/45)
+✅ Calculated 55/45 and borders appear "nearly equal with subtle difference" → CORRECT
+✅ Calculated 60/40 and one border is "clearly wider" → CORRECT
 ---
 STEP 3: CALCULATE RATIOS INDEPENDENTLY
 ---
@@ -3425,6 +3496,22 @@ Before assigning any centering rating of "Excellent" or better (score 10), ask:
 If you say "Excellent" but the borders are obviously unequal → YOU ARE WRONG.
 If you say "Fair" but the borders look nearly equal → YOU ARE WRONG.
 ---
+🚨 CENTERING GRADE INFLATION WARNING (v5.9)
+---
+**SELF-AUDIT CHECK:** Before finalizing your centering scores, ask:
+
+"Out of my last 10 cards graded, how many received centering = 10?"
+
+| Your Answer | Assessment |
+|-------------|------------|
+| 8-10 out of 10 | 🚨 SEVERE OVER-GRADING - You are giving 10s to 80-100% of cards |
+| 6-7 out of 10 | ⚠️ LIKELY OVER-GRADING - You are giving 10s to 60-70% of cards |
+| 3-5 out of 10 | ⚠️ POSSIBLY OVER-GRADING - Expected rate is ~20% |
+| 1-2 out of 10 | ✅ APPROPRIATE - Matches industry submission data |
+| 0 out of 10 | ⚠️ POSSIBLY UNDER-GRADING - Some cards should achieve 10 |
+
+**Reality anchor:** If most cards you grade receive centering 10, you are not applying the standard correctly. Perfect centering (55/45 or better on all axes) is genuinely uncommon.
+---
 CENTERING SCORE GUIDE (v7.0 - Complete Scale, Whole Numbers, PSA 2025 Aligned)
 ---
 ⚠️ UPDATED v7.0: Aligned with PSA 2025 standards, whole numbers only
@@ -3483,6 +3570,36 @@ CENTERING SCORE GUIDE (v7.0 - Complete Scale, Whole Numbers, PSA 2025 Aligned)
 
 **REMEMBER:** Centering subgrade directly caps overall grade per Section 1.16.
 Centering score of 7 = Overall grade cannot exceed 7.
+---
+🆕 CENTERING SCORE OF 10 PREREQUISITES (v5.9 MANDATORY)
+---
+🚨 **TO ASSIGN CENTERING = 10, ALL OF THE FOLLOWING MUST BE TRUE:**
+
+**Measurement Requirements:**
+□ Front Left border measured: ___mm
+□ Front Right border measured: ___mm
+□ Front L/R ratio calculated: ___/___ (must be 55/45 or better)
+□ Front Top border measured: ___mm
+□ Front Bottom border measured: ___mm
+□ Front T/B ratio calculated: ___/___ (must be 55/45 or better)
+□ Back centering verified: worst axis 75/25 or better (no penalty applied)
+
+**Visual Confirmation Requirements:**
+□ "At normal viewing distance, I cannot perceive a difference between left and right borders"
+□ "At normal viewing distance, I cannot perceive a difference between top and bottom borders"
+□ "The visual assessment completed in Step 0 indicated 'identical' or 'nearly equal' for all axes"
+
+**Justification Statement (REQUIRED for score of 10):**
+"Centering score of 10 assigned because: Front L/R measures [X]mm/[Y]mm = [ratio], Front T/B measures [X]mm/[Y]mm = [ratio], both within 55/45 threshold. Visual inspection confirms borders appear [identical/nearly equal] with no perceivable shift. Back centering [ratio] applies no penalty."
+
+**IF ANY REQUIREMENT CANNOT BE MET → MAXIMUM CENTERING SCORE IS 9**
+
+Common reasons to cap at 9:
+• Visual assessment indicated "slightly different" or worse on any axis
+• Cannot measure all four borders clearly (image quality, full-art card, etc.)
+• Measured ratio is between 55/45 and 56/44 (borderline - conservative 9)
+• Back centering penalty applies
+• Card type is B, C, D, or E (non-standard borders)
 ---
 PATCH 2 APPLICATION (Front/Back Centering Independence)
 ---

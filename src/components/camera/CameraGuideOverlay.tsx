@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+
 interface CameraGuideOverlayProps {
   side: 'front' | 'back';
   orientation?: 'portrait' | 'landscape';
@@ -11,21 +13,61 @@ export default function CameraGuideOverlay({
   orientation = 'portrait',
   onToggleOrientation,
 }: CameraGuideOverlayProps) {
-  // Aspect ratio based on orientation
-  // Maximum guide size encourages users to fill frame with the card
-  const aspectRatio = orientation === 'portrait' ? '2.5 / 3.5' : '3.5 / 2.5';
-  const guideWidth = '96%';
-  // No max-width cap - let the guide be as large as possible
+  // Card aspect ratio: 2.5" x 3.5" standard trading card
+  const cardAspectRatio = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5;
+
+  // Calculate optimal guide dimensions based on available screen space
+  const [guideDimensions, setGuideDimensions] = useState({ width: '96%', height: 'auto' });
+
+  useEffect(() => {
+    const calculateOptimalSize = () => {
+      // Available space: full screen minus header (~48px) and bottom controls (~100px)
+      const headerHeight = 48;
+      const bottomControlsHeight = 100;
+      const horizontalPadding = 4; // Minimal padding
+
+      const availableWidth = window.innerWidth - horizontalPadding;
+      const availableHeight = window.innerHeight - headerHeight - bottomControlsHeight;
+
+      // Calculate max dimensions while maintaining card aspect ratio
+      // Width-constrained: use 98% of available width
+      const widthBasedWidth = availableWidth * 0.98;
+      const widthBasedHeight = widthBasedWidth / cardAspectRatio;
+
+      // Height-constrained: use 98% of available height
+      const heightBasedHeight = availableHeight * 0.98;
+      const heightBasedWidth = heightBasedHeight * cardAspectRatio;
+
+      // Use whichever constraint allows the LARGER guide
+      if (widthBasedHeight <= availableHeight) {
+        // Width is the limiting factor - guide fits vertically
+        setGuideDimensions({
+          width: `${widthBasedWidth}px`,
+          height: `${widthBasedHeight}px`
+        });
+      } else {
+        // Height is the limiting factor - constrain by height
+        setGuideDimensions({
+          width: `${heightBasedWidth}px`,
+          height: `${heightBasedHeight}px`
+        });
+      }
+    };
+
+    calculateOptimalSize();
+    window.addEventListener('resize', calculateOptimalSize);
+    return () => window.removeEventListener('resize', calculateOptimalSize);
+  }, [cardAspectRatio, orientation]);
 
   return (
     <div className="absolute inset-0 pointer-events-none">
-      {/* Card outline guide - centered, large to fill screen */}
-      <div className="absolute inset-0 flex items-center justify-center px-2">
+      {/* Card outline guide - centered, maximized to fill available space */}
+      <div className="absolute inset-0 flex items-center justify-center">
         <div
           className="relative border-4 border-white/90 rounded-xl shadow-[0_0_30px_rgba(255,255,255,0.4)]"
           style={{
-            width: guideWidth,
-            aspectRatio: aspectRatio,
+            width: guideDimensions.width,
+            height: guideDimensions.height,
           }}
         >
           {/* Corner markers - larger for visibility */}

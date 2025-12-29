@@ -31,7 +31,7 @@ export async function cropToGuideFrame(
   options: CropOptions = {}
 ): Promise<CropResult> {
   const {
-    paddingPercent = 0.08, // 8% padding by default (~1 inch buffer at card size)
+    paddingPercent = 0.05, // 5% padding for tight crop
     maintainAspectRatio = true,
     orientation = 'portrait'
   } = options;
@@ -45,15 +45,40 @@ export async function cropToGuideFrame(
         const originalWidth = img.width;
         const originalHeight = img.height;
 
-        // Calculate guide frame dimensions (matches CameraGuideOverlay.tsx)
-        // Guide is 96% of width for both orientations to maximize card size
-        const guideWidthPercent = 0.96;
-        const aspectRatio = orientation === 'portrait' ? (3.5 / 2.5) : (2.5 / 3.5);
+        // Calculate guide frame dimensions (matches CameraGuideOverlay.tsx dynamic sizing)
+        // Card aspect ratio: 2.5" x 3.5" standard trading card
+        const cardAspectRatio = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5;
 
-        const guideWidth = originalWidth * guideWidthPercent;
-        const guideHeight = maintainAspectRatio
-          ? guideWidth * aspectRatio
-          : originalHeight * guideWidthPercent;
+        // Mirror the CameraGuideOverlay calculation logic
+        // Available space accounts for header (~48px) and bottom controls (~100px)
+        // But for the captured image, we use proportional calculation based on image dimensions
+        const headerRatio = 48 / 800; // Approximate header as % of typical screen height
+        const bottomRatio = 100 / 800; // Approximate bottom controls as % of typical screen height
+
+        const effectiveHeight = originalHeight * (1 - headerRatio - bottomRatio);
+        const effectiveWidth = originalWidth * 0.98; // 98% width usage
+
+        // Width-constrained calculation
+        const widthBasedWidth = effectiveWidth;
+        const widthBasedHeight = widthBasedWidth / cardAspectRatio;
+
+        // Height-constrained calculation
+        const heightBasedHeight = effectiveHeight * 0.98;
+        const heightBasedWidth = heightBasedHeight * cardAspectRatio;
+
+        // Use whichever allows LARGER guide (same logic as overlay)
+        let guideWidth: number;
+        let guideHeight: number;
+
+        if (widthBasedHeight <= effectiveHeight) {
+          // Width is limiting factor
+          guideWidth = widthBasedWidth;
+          guideHeight = widthBasedHeight;
+        } else {
+          // Height is limiting factor
+          guideWidth = heightBasedWidth;
+          guideHeight = heightBasedHeight;
+        }
 
         // Calculate guide position (centered)
         const guideX = (originalWidth - guideWidth) / 2;

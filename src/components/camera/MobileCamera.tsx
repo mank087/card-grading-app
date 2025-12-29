@@ -73,7 +73,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       // Process crop in background
       try {
         const cropResult = await cropToGuideFrame(captured.file, {
-          paddingPercent: 0.08,
+          paddingPercent: 0.03, // Tight 3% padding for maximum card coverage
           maintainAspectRatio: true,
           orientation: orientation,
         });
@@ -208,29 +208,29 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         />
       </div>
 
-      {/* Overlaid Header - translucent */}
+      {/* Overlaid Header - compact translucent */}
       <div className="absolute top-0 left-0 right-0 z-20">
-        <div className="bg-black/50 backdrop-blur-sm text-white px-4 py-3 flex items-center justify-between safe-area-top">
+        <div className="bg-black/50 backdrop-blur-sm text-white px-3 py-2 flex items-center justify-between safe-area-top">
           <button
             onClick={onCancel}
-            className="text-white font-medium flex items-center gap-1 bg-black/30 px-3 py-1.5 rounded-full"
+            className="text-white font-medium flex items-center gap-1 bg-black/30 px-2.5 py-1 rounded-full text-sm"
           >
             <span>←</span>
-            <span>Cancel</span>
+            <span>Back</span>
           </button>
-          <div className="flex items-center gap-2 bg-black/30 px-3 py-1.5 rounded-full">
+          <div className="flex items-center gap-1.5 bg-black/30 px-2.5 py-1 rounded-full">
             <Image
               src="/DCM-logo.png"
               alt="DCM"
-              width={20}
-              height={20}
+              width={18}
+              height={18}
               className="object-contain"
             />
             <span className="font-semibold text-sm">{side === 'front' ? 'Front' : 'Back'}</span>
           </div>
           <button
             onClick={handleSwitchCamera}
-            className="text-white p-2 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+            className="text-white p-1.5 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
             title="Switch Camera"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -240,32 +240,33 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         </div>
       </div>
 
-      {/* Overlaid Capture Controls - bottom */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 safe-area-bottom pb-6">
-        {/* Tips row */}
-        <div className="flex justify-center gap-2 mb-4 px-4">
-          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2.5 py-1 rounded-full flex items-center gap-1">
-            <span className="text-xs">☀️</span>
-            <span className="text-[10px] font-medium">Good light</span>
+      {/* Overlaid Capture Controls - bottom, compact design */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 safe-area-bottom pb-4">
+        {/* Tips row - compact */}
+        <div className="flex justify-center gap-1.5 mb-3 px-2">
+          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+            <span className="text-[10px]">☀️</span>
+            <span className="text-[9px] font-medium">Light</span>
           </div>
-          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2.5 py-1 rounded-full flex items-center gap-1">
-            <span className="text-xs">🚫</span>
-            <span className="text-[10px] font-medium">No glare</span>
+          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+            <span className="text-[10px]">🚫</span>
+            <span className="text-[9px] font-medium">Glare</span>
           </div>
-          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2.5 py-1 rounded-full flex items-center gap-1">
-            <span className="text-xs">🎯</span>
-            <span className="text-[10px] font-medium">Sharp focus</span>
+          <div className="bg-black/50 backdrop-blur-sm text-white/90 px-2 py-0.5 rounded-full flex items-center gap-0.5">
+            <span className="text-[10px]">🎯</span>
+            <span className="text-[9px] font-medium">Focus</span>
           </div>
         </div>
 
-        {/* Capture button */}
+        {/* Capture button - slightly smaller */}
         <div className="flex justify-center">
           <button
             onClick={handleCapture}
             disabled={isProcessing}
-            className={`w-20 h-20 rounded-full border-4 border-white bg-white/20 backdrop-blur-sm
+            className={`w-18 h-18 rounded-full border-4 border-white bg-white/20 backdrop-blur-sm
               hover:bg-white/30 active:scale-95 transition-all shadow-2xl
               ${isProcessing ? 'opacity-50' : ''}`}
+            style={{ width: '72px', height: '72px' }}
             aria-label="Capture photo"
           >
             <div className="w-full h-full rounded-full bg-white/90" />
