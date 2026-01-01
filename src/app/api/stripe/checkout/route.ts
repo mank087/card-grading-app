@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if founders program has expired (Dec 31, 2025)
-      const expirationDate = new Date('2025-12-31T23:59:59-05:00');
+      // Check if founders program has expired (Feb 1, 2026)
+      const expirationDate = new Date('2026-02-01T23:59:59-05:00');
       if (new Date() > expirationDate) {
         return NextResponse.json(
           { error: 'The Founders Package program has ended.' },

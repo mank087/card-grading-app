@@ -16,8 +16,8 @@ declare global {
   }
 }
 
-// Countdown end date: January 1, 2026 at 12:00 AM EST (midnight)
-const COUNTDOWN_END = new Date('2026-01-01T00:00:00-05:00').getTime()
+// Countdown end date: February 1, 2026 at 12:00 AM EST (midnight)
+const COUNTDOWN_END = new Date('2026-02-01T00:00:00-05:00').getTime()
 
 interface TimeLeft {
   days: number
@@ -464,7 +464,7 @@ export default function FoundersPage() {
             <div className="space-y-4">
               {[
                 {
-                  q: "What happens after December 31, 2025?",
+                  q: "What happens after January 31, 2026?",
                   a: "The Founders Package will no longer be available for purchase. If you've already purchased it, you keep all benefits forever — the credits, the 20% discount, and the founder badge."
                 },
                 {

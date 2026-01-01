@@ -69,8 +69,8 @@ export default function SportsGradingLanding() {
   const [successMessage, setSuccessMessage] = useState('')
   const [countdown, setCountdown] = useState<{ days: number; hours: number; mins: number; secs: number } | null>(null)
 
-  // Countdown end date: January 1, 2026 at 12:00 AM EST (midnight)
-  const COUNTDOWN_END = new Date('2026-01-01T00:00:00-05:00').getTime()
+  // Countdown end date: February 1, 2026 at 12:00 AM EST (midnight)
+  const COUNTDOWN_END = new Date('2026-02-01T00:00:00-05:00').getTime()
 
   useEffect(() => {
     const session = getStoredSession()

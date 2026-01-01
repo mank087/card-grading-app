@@ -83,8 +83,8 @@ const pricingTiers: PricingTier[] = [
   },
 ]
 
-// Countdown end date: January 1, 2026 at 12:00 AM EST (midnight)
-const COUNTDOWN_END = new Date('2026-01-01T00:00:00-05:00').getTime()
+// Countdown end date: February 1, 2026 at 12:00 AM EST (midnight)
+const COUNTDOWN_END = new Date('2026-02-01T00:00:00-05:00').getTime()
 
 function CreditsPageContent() {
   const router = useRouter()
