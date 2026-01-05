@@ -743,80 +743,81 @@ function CollectionPageContent() {
               </p>
             ) : (
               <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                {/* Bulk Action Bar */}
+                {/* Bulk Action Bar - Responsive */}
                 {isSomeSelected && viewMode === 'list' && (
-                  <div className="bg-indigo-50 border-b border-indigo-200 px-4 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-indigo-700">
-                        {selectedCardIds.size} card{selectedCardIds.size !== 1 ? 's' : ''} selected
-                      </span>
-                      <button
-                        onClick={deselectAll}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 underline"
-                      >
-                        Clear selection
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {/* Print Labels Button */}
-                      {selectedCardIds.size > 0 && selectedCardIds.size <= 18 && (
-                        <button
-                          onClick={() => setIsBatchLabelModalOpen(true)}
-                          disabled={isDeleting}
-                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                          </svg>
-                          Print Labels ({selectedCardIds.size})
-                        </button>
-                      )}
-                      {selectedCardIds.size > 18 && (
-                        <span className="text-amber-600 text-sm font-medium">
-                          Max 18 cards for label printing
+                  <div className="bg-indigo-50 border-b border-indigo-200 px-3 py-3 md:px-4">
+                    {/* Mobile: Stack vertically */}
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="flex items-center justify-between md:justify-start gap-3">
+                        <span className="text-sm font-medium text-indigo-700">
+                          {selectedCardIds.size} card{selectedCardIds.size !== 1 ? 's' : ''} selected
                         </span>
-                      )}
-                      {/* Download Reports Button */}
-                      {selectedCardIds.size > 0 && (
                         <button
-                          onClick={() => setIsBatchDownloadModalOpen(true)}
-                          disabled={isDeleting}
-                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                          onClick={deselectAll}
+                          className="text-sm text-indigo-600 hover:text-indigo-800 underline"
                         >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          Download Reports ({selectedCardIds.size})
+                          Clear
                         </button>
-                      )}
-                      <button
-                        onClick={handleBulkDelete}
-                        disabled={isDeleting}
-                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                      >
-                        {isDeleting ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            Deleting...
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      </div>
+                      {/* Action buttons - wrap on mobile */}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Print Labels Button */}
+                        {selectedCardIds.size > 0 && selectedCardIds.size <= 18 && (
+                          <button
+                            onClick={() => setIsBatchLabelModalOpen(true)}
+                            disabled={isDeleting}
+                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                            title="Print Labels"
+                          >
+                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                            </svg>
+                            <span className="hidden md:inline">Print ({selectedCardIds.size})</span>
+                          </button>
+                        )}
+                        {selectedCardIds.size > 18 && (
+                          <span className="text-amber-600 text-xs md:text-sm font-medium">
+                            Max 18 for labels
+                          </span>
+                        )}
+                        {/* Download Reports Button */}
+                        {selectedCardIds.size > 0 && (
+                          <button
+                            onClick={() => setIsBatchDownloadModalOpen(true)}
+                            disabled={isDeleting}
+                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                            title="Download Reports"
+                          >
+                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <span className="hidden md:inline">Download ({selectedCardIds.size})</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={handleBulkDelete}
+                          disabled={isDeleting}
+                          className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                          title="Delete Selected"
+                        >
+                          {isDeleting ? (
+                            <div className="animate-spin rounded-full h-5 w-5 md:h-4 md:w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                             </svg>
-                            Delete Selected
-                          </>
-                        )}
-                      </button>
+                          )}
+                          <span className="hidden md:inline">{isDeleting ? 'Deleting...' : 'Delete'}</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
-                <div className="overflow-x-auto">
-                  <table className="w-full table-fixed">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    {/* Checkbox column */}
-                    <th className="w-[4%] px-2 py-3 text-center">
+                {/* Mobile Card Layout */}
+                <div className="md:hidden">
+                  {/* Mobile Header with Select All */}
+                  <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
+                    <label className="flex items-center gap-3 cursor-pointer">
                       <input
                         type="checkbox"
                         checked={isAllSelected}
@@ -827,187 +828,325 @@ function CollectionPageContent() {
                             deselectAll()
                           }
                         }}
-                        className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        title={isAllSelected ? 'Deselect all' : 'Select all'}
+                        className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
-                    </th>
-                    <th
-                      onClick={() => handleSort('name')}
-                      className="w-[26%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                      <span className="text-sm font-medium text-gray-700">Select All</span>
+                    </label>
+                    {/* Mobile Sort Dropdown */}
+                    <select
+                      value={sortColumn || ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          handleSort(e.target.value)
+                        }
+                      }}
+                      className="text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
                     >
-                      <div className="flex items-center gap-1">
-                        Card Name
-                        {sortColumn === 'name' && (
-                          <span className="text-indigo-600">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSort('series')}
-                      className="w-[24%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        Set
-                        {sortColumn === 'series' && (
-                          <span className="text-indigo-600">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSort('year')}
-                      className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        Year
-                        {sortColumn === 'year' && (
-                          <span className="text-indigo-600">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSort('grade')}
-                      className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        Grade
-                        {sortColumn === 'grade' && (
-                          <span className="text-indigo-600">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSort('date')}
-                      className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        Date
-                        {sortColumn === 'date' && (
-                          <span className="text-indigo-600">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th
-                      onClick={() => handleSort('visibility')}
-                      className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
-                    >
-                      <div className="flex items-center gap-1">
-                        Status
-                        {sortColumn === 'visibility' && (
-                          <span className="text-indigo-600">
-                            {sortDirection === 'asc' ? '▲' : '▼'}
-                          </span>
-                        )}
-                      </div>
-                    </th>
-                    <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {displayedCards.map((card) => (
-                    <tr
-                      key={card.id}
-                      className={`hover:bg-gray-50 transition-colors ${selectedCardIds.has(card.id) ? 'bg-indigo-50' : ''}`}
-                    >
-                      {/* Checkbox cell */}
-                      <td className="px-2 py-3 text-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedCardIds.has(card.id)}
-                          onChange={() => toggleCardSelection(card.id)}
-                          className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
-                        />
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm font-medium text-gray-900 truncate" title={getPlayerName(card)}>
-                          {getPlayerName(card)}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm text-gray-900 truncate" title={getCardSet(card)}>
-                          {getCardSet(card)}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm text-gray-900">
-                          {getYear(card) || '-'}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm font-medium text-gray-900">
-                          {(() => {
-                            const grade = getCardGrade(card);
-                            const condition = card.conversational_condition_label
-                              ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
-                              : (grade ? getConditionFromGrade(grade) : '');
+                      <option value="">Sort by...</option>
+                      <option value="name">Name {sortColumn === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
+                      <option value="grade">Grade {sortColumn === 'grade' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
+                      <option value="date">Date {sortColumn === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
+                      <option value="series">Set {sortColumn === 'series' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
+                    </select>
+                  </div>
 
-                            // Check if this is an Altered/Authentic card
-                            const isAlteredAuthentic = card.conversational_condition_label &&
-                              (card.conversational_condition_label.toLowerCase().includes('altered') ||
-                               card.conversational_condition_label.toLowerCase().includes('authentic altered') ||
-                               card.conversational_condition_label.includes('(AA)'));
+                  {/* Mobile Card List */}
+                  <div className="divide-y divide-gray-200">
+                    {displayedCards.map((card) => {
+                      const grade = getCardGrade(card);
+                      const condition = card.conversational_condition_label
+                        ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                        : (grade ? getConditionFromGrade(grade) : '');
+                      const isAlteredAuthentic = card.conversational_condition_label &&
+                        (card.conversational_condition_label.toLowerCase().includes('altered') ||
+                         card.conversational_condition_label.toLowerCase().includes('authentic altered') ||
+                         card.conversational_condition_label.includes('(AA)'));
 
-                            return (
-                              <div>
-                                <span>{grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : '-')}</span>
-                                {(condition || isAlteredAuthentic) && (
-                                  <div className="text-xs text-gray-500 truncate" title={isAlteredAuthentic && !grade ? 'Authentic' : condition}>
-                                    {isAlteredAuthentic && !grade ? 'Authentic' : condition}
-                                  </div>
-                                )}
+                      return (
+                        <div
+                          key={card.id}
+                          className={`p-4 ${selectedCardIds.has(card.id) ? 'bg-indigo-50' : 'bg-white'}`}
+                        >
+                          <div className="flex gap-3">
+                            {/* Checkbox */}
+                            <div className="flex-shrink-0 pt-1">
+                              <input
+                                type="checkbox"
+                                checked={selectedCardIds.has(card.id)}
+                                onChange={() => toggleCardSelection(card.id)}
+                                className="w-5 h-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                            </div>
+
+                            {/* Card Info */}
+                            <div className="flex-1 min-w-0">
+                              {/* Name - Primary */}
+                              <div className="font-medium text-gray-900 truncate">
+                                {getPlayerName(card)}
                               </div>
-                            );
-                          })()}
+
+                              {/* Set & Year - Secondary */}
+                              <div className="text-sm text-gray-500 truncate mt-0.5">
+                                {getCardSet(card)} {getYear(card) ? `• ${getYear(card)}` : ''}
+                              </div>
+
+                              {/* Grade, Status & Actions Row */}
+                              <div className="flex items-center justify-between mt-2">
+                                <div className="flex items-center gap-3">
+                                  {/* Grade Badge */}
+                                  <div className="flex items-center gap-2">
+                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-sm">
+                                      {grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : '-')}
+                                    </span>
+                                    <span className="text-xs text-gray-500">
+                                      {isAlteredAuthentic && !grade ? 'Authentic' : condition}
+                                    </span>
+                                  </div>
+
+                                  {/* Visibility */}
+                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                    card.visibility === 'public'
+                                      ? 'bg-green-100 text-green-700'
+                                      : 'bg-gray-100 text-gray-600'
+                                  }`}>
+                                    {card.visibility === 'public' ? '🌐' : '🔒'}
+                                  </span>
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex items-center gap-2">
+                                  <Link
+                                    href={getCardLink(card)}
+                                    className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
+                                    title="View Details"
+                                  >
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                    </svg>
+                                  </Link>
+                                  <button
+                                    onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
+                                    disabled={deletingCardId === card.id}
+                                    className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-colors disabled:opacity-50"
+                                    title="Delete card"
+                                  >
+                                    {deletingCardId === card.id ? (
+                                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-red-600"></div>
+                                    ) : (
+                                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                      </svg>
+                                    )}
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="text-sm text-gray-500">
-                          {card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
-                          card.visibility === 'public'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-gray-100 text-gray-600'
-                        }`}>
-                          {card.visibility === 'public' ? '🌐' : '🔒'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-3 text-sm">
-                        <div className="flex items-center gap-2">
-                          <Link
-                            href={getCardLink(card)}
-                            className="text-purple-600 hover:text-purple-800 font-medium"
-                          >
-                            View
-                          </Link>
-                          <button
-                            onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
-                            disabled={deletingCardId === card.id}
-                            className="text-red-500 hover:text-red-700 font-medium disabled:opacity-50 cursor-pointer"
-                            title="Delete card"
-                          >
-                            {deletingCardId === card.id ? '...' : '✕'}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Desktop Table Layout */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full table-fixed">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        {/* Checkbox column */}
+                        <th className="w-[4%] px-2 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isAllSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                selectAllDisplayed(displayedCards)
+                              } else {
+                                deselectAll()
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            title={isAllSelected ? 'Deselect all' : 'Select all'}
+                          />
+                        </th>
+                        <th
+                          onClick={() => handleSort('name')}
+                          className="w-[26%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            Card Name
+                            {sortColumn === 'name' && (
+                              <span className="text-indigo-600">
+                                {sortDirection === 'asc' ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSort('series')}
+                          className="w-[24%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            Set
+                            {sortColumn === 'series' && (
+                              <span className="text-indigo-600">
+                                {sortDirection === 'asc' ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSort('year')}
+                          className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            Year
+                            {sortColumn === 'year' && (
+                              <span className="text-indigo-600">
+                                {sortDirection === 'asc' ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSort('grade')}
+                          className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            Grade
+                            {sortColumn === 'grade' && (
+                              <span className="text-indigo-600">
+                                {sortDirection === 'asc' ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSort('date')}
+                          className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            Date
+                            {sortColumn === 'date' && (
+                              <span className="text-indigo-600">
+                                {sortDirection === 'asc' ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th
+                          onClick={() => handleSort('visibility')}
+                          className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            Status
+                            {sortColumn === 'visibility' && (
+                              <span className="text-indigo-600">
+                                {sortDirection === 'asc' ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {displayedCards.map((card) => (
+                        <tr
+                          key={card.id}
+                          className={`hover:bg-gray-50 transition-colors ${selectedCardIds.has(card.id) ? 'bg-indigo-50' : ''}`}
+                        >
+                          {/* Checkbox cell */}
+                          <td className="px-2 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedCardIds.has(card.id)}
+                              onChange={() => toggleCardSelection(card.id)}
+                              className="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                            />
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="text-sm font-medium text-gray-900 truncate" title={getPlayerName(card)}>
+                              {getPlayerName(card)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="text-sm text-gray-900 truncate" title={getCardSet(card)}>
+                              {getCardSet(card)}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="text-sm text-gray-900">
+                              {getYear(card) || '-'}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="text-sm font-medium text-gray-900">
+                              {(() => {
+                                const grade = getCardGrade(card);
+                                const condition = card.conversational_condition_label
+                                  ? card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')
+                                  : (grade ? getConditionFromGrade(grade) : '');
+
+                                // Check if this is an Altered/Authentic card
+                                const isAlteredAuthentic = card.conversational_condition_label &&
+                                  (card.conversational_condition_label.toLowerCase().includes('altered') ||
+                                   card.conversational_condition_label.toLowerCase().includes('authentic altered') ||
+                                   card.conversational_condition_label.includes('(AA)'));
+
+                                return (
+                                  <div>
+                                    <span>{grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : '-')}</span>
+                                    {(condition || isAlteredAuthentic) && (
+                                      <div className="text-xs text-gray-500 truncate" title={isAlteredAuthentic && !grade ? 'Authentic' : condition}>
+                                        {isAlteredAuthentic && !grade ? 'Authentic' : condition}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="text-sm text-gray-500">
+                              {card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${
+                              card.visibility === 'public'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {card.visibility === 'public' ? '🌐' : '🔒'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-sm">
+                            <div className="flex items-center gap-2">
+                              <Link
+                                href={getCardLink(card)}
+                                className="text-purple-600 hover:text-purple-800 font-medium"
+                              >
+                                View
+                              </Link>
+                              <button
+                                onClick={() => handleDeleteCard(card.id, getPlayerName(card))}
+                                disabled={deletingCardId === card.id}
+                                className="text-red-500 hover:text-red-700 font-medium disabled:opacity-50 cursor-pointer"
+                                title="Delete card"
+                              >
+                                {deletingCardId === card.id ? '...' : '✕'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
             {/* Load More Button for List View */}
             {hasMore && (

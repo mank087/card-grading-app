@@ -12,6 +12,7 @@ import {
 import { getCardLabelData } from '../../lib/useLabelData';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 import { getAuthenticatedClient } from '../../lib/directAuth';
+import { estimateProfessionalGrades, DcmGradingInput } from '../../lib/professionalGradeMapper';
 import QRCode from 'qrcode';
 
 interface CardData {
@@ -313,12 +314,47 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       specialFeaturesString: safeFeaturesLine || '',
       cardUrl,
       qrCodeDataUrl,
-      professionalGrades: {
-        psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
-        bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',
-        sgc: card.estimated_professional_grades?.SGC?.numeric_score || 'N/A',
-        cgc: card.estimated_professional_grades?.CGC?.numeric_score || 'N/A',
-      },
+      professionalGrades: (() => {
+        // Use stored professional grades if available
+        if (card.estimated_professional_grades?.PSA?.numeric_score !== undefined) {
+          return {
+            psa: card.estimated_professional_grades.PSA.numeric_score,
+            bgs: card.estimated_professional_grades.BGS?.numeric_score || 'N/A',
+            sgc: card.estimated_professional_grades.SGC?.numeric_score || 'N/A',
+            cgc: card.estimated_professional_grades.CGC?.numeric_score || 'N/A',
+          };
+        }
+
+        // Fallback: Calculate professional grade estimates from DCM grade
+        // Same logic used by individual card detail pages
+        const dcmGrade = cleanLabelData.grade ?? card.conversational_decimal_grade ?? card.dvg_decimal_grade;
+        if (dcmGrade && typeof dcmGrade === 'number' && dcmGrade > 0) {
+          try {
+            const input: DcmGradingInput = {
+              final_grade: dcmGrade,
+              corners_score: subScores.corners?.weighted ?? weightedScores.corners,
+              edges_score: subScores.edges?.weighted ?? weightedScores.edges,
+              surface_score: subScores.surface?.weighted ?? weightedScores.surface,
+            };
+            const estimates = estimateProfessionalGrades(input);
+            return {
+              psa: estimates.PSA.numeric_score,
+              bgs: estimates.BGS.numeric_score,
+              sgc: estimates.SGC.numeric_score,
+              cgc: estimates.CGC.numeric_score,
+            };
+          } catch (e) {
+            console.error('[BatchDownloadModal] Failed to calculate professional grades:', e);
+          }
+        }
+
+        return {
+          psa: 'N/A',
+          bgs: 'N/A',
+          sgc: 'N/A',
+          cgc: 'N/A',
+        };
+      })(),
       subgrades: {
         centering: {
           score: weightedScores.centering ?? subScores.centering?.weighted ?? 0,

@@ -108,15 +108,16 @@ export async function GET(request: NextRequest) {
         back_url: urlMap.get(card.back_path) || null
       };
 
-      // If conversational_card_info is missing but conversational_grading exists, parse it
-      // This handles sports cards that have the JSON but not the extracted fields
-      if (!card.conversational_card_info && card.conversational_grading) {
+      // If conversational_grading exists, parse it and extract any missing fields
+      // This handles cards that have the JSON but not the extracted columns
+      if (card.conversational_grading) {
         try {
           const parsed = typeof card.conversational_grading === 'string'
             ? JSON.parse(card.conversational_grading)
             : card.conversational_grading;
 
-          if (parsed.card_info) {
+          // Extract card_info if missing
+          if (!card.conversational_card_info && parsed.card_info) {
             enrichedCard.conversational_card_info = parsed.card_info;
             // Also populate direct fields if they're missing
             if (!card.featured && parsed.card_info.player_or_character) {
@@ -148,6 +149,144 @@ export async function GET(request: NextRequest) {
           // Extract condition label if missing
           if (!card.conversational_condition_label && parsed.final_grade?.condition_label) {
             enrichedCard.conversational_condition_label = parsed.final_grade.condition_label;
+          }
+
+          // Extract weighted sub-scores if missing
+          // Try multiple formats: v4.0+ JSON format, then legacy structured format
+          if (!card.conversational_weighted_sub_scores) {
+            // v4.0+ JSON format: weighted_scores.centering_weighted, etc.
+            if (parsed.weighted_scores) {
+              enrichedCard.conversational_weighted_sub_scores = {
+                centering: parsed.weighted_scores.centering_weighted ?? null,
+                corners: parsed.weighted_scores.corners_weighted ?? null,
+                edges: parsed.weighted_scores.edges_weighted ?? null,
+                surface: parsed.weighted_scores.surface_weighted ?? null
+              };
+            }
+            // Legacy format: grading_passes or final_grade structure
+            else if (parsed.grading_passes?.averaged_rounded?.weighted_sub_scores) {
+              enrichedCard.conversational_weighted_sub_scores = parsed.grading_passes.averaged_rounded.weighted_sub_scores;
+            }
+            else if (parsed.final_grade?.weighted_sub_scores) {
+              enrichedCard.conversational_weighted_sub_scores = parsed.final_grade.weighted_sub_scores;
+            }
+          }
+
+          // Extract sub-scores (front/back/weighted) if missing
+          if (!card.conversational_sub_scores) {
+            // v4.0+ JSON format: raw_sub_scores + weighted_scores
+            if (parsed.raw_sub_scores || parsed.weighted_scores) {
+              enrichedCard.conversational_sub_scores = {
+                centering: {
+                  front: parsed.raw_sub_scores?.centering_front ?? 0,
+                  back: parsed.raw_sub_scores?.centering_back ?? 0,
+                  weighted: parsed.weighted_scores?.centering_weighted ?? 0
+                },
+                corners: {
+                  front: parsed.raw_sub_scores?.corners_front ?? 0,
+                  back: parsed.raw_sub_scores?.corners_back ?? 0,
+                  weighted: parsed.weighted_scores?.corners_weighted ?? 0
+                },
+                edges: {
+                  front: parsed.raw_sub_scores?.edges_front ?? 0,
+                  back: parsed.raw_sub_scores?.edges_back ?? 0,
+                  weighted: parsed.weighted_scores?.edges_weighted ?? 0
+                },
+                surface: {
+                  front: parsed.raw_sub_scores?.surface_front ?? 0,
+                  back: parsed.raw_sub_scores?.surface_back ?? 0,
+                  weighted: parsed.weighted_scores?.surface_weighted ?? 0
+                }
+              };
+            }
+            // Legacy format: grading_passes or final_grade structure
+            else if (parsed.grading_passes?.averaged_rounded?.sub_scores) {
+              enrichedCard.conversational_sub_scores = parsed.grading_passes.averaged_rounded.sub_scores;
+            }
+            else if (parsed.final_grade?.sub_scores) {
+              enrichedCard.conversational_sub_scores = parsed.final_grade.sub_scores;
+            }
+          }
+
+          // Extract corners/edges/surface summaries if missing
+          if (!card.conversational_corners_edges_surface) {
+            // v4.0+ JSON format: centering.front.summary, corners.front.summary, etc.
+            if (parsed.centering || parsed.corners || parsed.edges || parsed.surface) {
+              enrichedCard.conversational_corners_edges_surface = {
+                front_centering: {
+                  summary: parsed.centering?.front?.summary || parsed.centering?.front_summary || ''
+                },
+                back_centering: {
+                  summary: parsed.centering?.back?.summary || parsed.centering?.back_summary || ''
+                },
+                front_corners: {
+                  summary: parsed.corners?.front?.summary || parsed.corners?.front_summary || ''
+                },
+                back_corners: {
+                  summary: parsed.corners?.back?.summary || parsed.corners?.back_summary || ''
+                },
+                front_edges: {
+                  summary: parsed.edges?.front?.summary || parsed.edges?.front_summary || ''
+                },
+                back_edges: {
+                  summary: parsed.edges?.back?.summary || parsed.edges?.back_summary || ''
+                },
+                front_surface: {
+                  summary: parsed.surface?.front?.summary || parsed.surface?.front_summary || ''
+                },
+                back_surface: {
+                  summary: parsed.surface?.back?.summary || parsed.surface?.back_summary || ''
+                }
+              };
+            }
+            // Legacy format: corners_edges_surface or corners_edges_surface_json
+            else if (parsed.corners_edges_surface) {
+              enrichedCard.conversational_corners_edges_surface = parsed.corners_edges_surface;
+            }
+            else if (parsed.corners_edges_surface_json) {
+              enrichedCard.conversational_corners_edges_surface = parsed.corners_edges_surface_json;
+            }
+          }
+
+          // Extract final grade summary if missing
+          // v4.0+ uses final_grade.summary, legacy uses final_grade.final_grade_summary
+          if (!card.conversational_final_grade_summary) {
+            const summary = parsed.final_grade?.summary || parsed.final_grade?.final_grade_summary;
+            if (summary) {
+              enrichedCard.conversational_final_grade_summary = summary;
+            }
+          }
+
+          // Extract grade uncertainty if missing
+          // v4.0+ uses final_grade.grade_range, legacy uses final_grade.grade_uncertainty
+          if (!card.conversational_grade_uncertainty) {
+            const uncertainty = parsed.final_grade?.grade_range || parsed.final_grade?.grade_uncertainty;
+            if (uncertainty) {
+              enrichedCard.conversational_grade_uncertainty = uncertainty;
+            }
+          }
+
+          // Extract image confidence if missing
+          // v4.0+ uses image_quality.confidence_letter, legacy uses final_grade.image_confidence
+          if (!card.conversational_image_confidence) {
+            const confidence = parsed.image_quality?.confidence_letter || parsed.final_grade?.image_confidence;
+            if (confidence) {
+              enrichedCard.conversational_image_confidence = confidence;
+            }
+          }
+
+          // Extract estimated professional grades if missing or empty
+          // v4.0+ uses professional_grade_estimates, stored column uses estimated_professional_grades
+          const hasValidProfGrades = card.estimated_professional_grades &&
+            typeof card.estimated_professional_grades === 'object' &&
+            Object.keys(card.estimated_professional_grades).length > 0 &&
+            (card.estimated_professional_grades.PSA || card.estimated_professional_grades.psa);
+
+          if (!hasValidProfGrades) {
+            const profGrades = parsed.estimated_professional_grades || parsed.professional_grade_estimates;
+            if (profGrades && Object.keys(profGrades).length > 0) {
+              enrichedCard.estimated_professional_grades = profGrades;
+            }
           }
         } catch (e) {
           // Parsing failed, continue with original data
