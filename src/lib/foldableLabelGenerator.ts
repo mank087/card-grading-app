@@ -17,6 +17,7 @@
  */
 
 import { jsPDF } from 'jspdf';
+import { PDFDocument } from 'pdf-lib';
 import { extractAsciiSafe } from './labelDataGenerator';
 
 // Page dimensions (in inches, converted to points: 1 inch = 72 points)
@@ -627,6 +628,81 @@ export async function generateFoldableLabel(data: FoldableLabelData): Promise<Bl
  */
 export async function downloadFoldableLabel(data: FoldableLabelData, filename: string): Promise<void> {
   const blob = await generateFoldableLabel(data);
+
+  // Create download link
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+
+  // Trigger download
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Cleanup
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Generate a batch of foldable labels as a single multi-page PDF
+ * Each label gets its own page
+ */
+export async function generateBatchFoldableLabels(dataArray: FoldableLabelData[]): Promise<Blob> {
+  if (dataArray.length === 0) {
+    throw new Error('No labels to generate');
+  }
+
+  // Generate each label individually and then combine
+  // For now, we'll generate the first one to get the PDF, then add pages
+  const blobs: Blob[] = [];
+
+  for (const data of dataArray) {
+    const blob = await generateFoldableLabel(data);
+    blobs.push(blob);
+  }
+
+  // Use pdf-lib or jsPDF to merge, but simpler approach:
+  // Create a new PDF and add each blob's pages
+  // Actually, the simplest approach is to regenerate each page in a single document
+
+  // Import jsPDF for merging (we'll recreate each page)
+  const { jsPDF } = await import('jspdf');
+
+  // For batch generation, we need to draw each label on its own page
+  // Since generateFoldableLabel creates a complete document, we'll use a different approach:
+  // Generate each label separately and use pdf-lib to merge them
+  // OR, create a simpler batch version
+
+  // Simplest approach: Return first blob if only one, otherwise we need pdf merging
+  // For now, let's use a workaround with ArrayBuffer
+
+  if (dataArray.length === 1) {
+    return blobs[0];
+  }
+
+  // For multiple labels, we need to merge PDFs using pdf-lib
+  const mergedPdf = await PDFDocument.create();
+
+  for (const blob of blobs) {
+    const arrayBuffer = await blob.arrayBuffer();
+    const pdf = await PDFDocument.load(arrayBuffer);
+    const pages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+    pages.forEach(page => mergedPdf.addPage(page));
+  }
+
+  const mergedBytes = await mergedPdf.save();
+  return new Blob([mergedBytes], { type: 'application/pdf' });
+}
+
+/**
+ * Generate and download a batch of foldable labels
+ */
+export async function downloadBatchFoldableLabels(
+  dataArray: FoldableLabelData[],
+  filename: string
+): Promise<void> {
+  const blob = await generateBatchFoldableLabels(dataArray);
 
   // Create download link
   const url = URL.createObjectURL(blob);

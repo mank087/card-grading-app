@@ -460,3 +460,87 @@ export function getAveryConfig() {
     description: '18 labels per sheet (3×6 grid), 2-3/8" × 1-1/4" each'
   };
 }
+
+/**
+ * Generate an Avery 6871 label sheet with multiple labels
+ * @param labelDataArray Array of label data to render
+ * @param positionIndices Array of positions (0-17) corresponding to each label
+ * @param offsets Optional calibration offsets for printer alignment
+ * @returns Promise<Blob> - PDF blob with all labels rendered
+ */
+export async function generateAveryLabelSheet(
+  labelDataArray: FoldableLabelData[],
+  positionIndices: number[],
+  offsets?: CalibrationOffsets
+): Promise<Blob> {
+  // Validate inputs
+  if (labelDataArray.length !== positionIndices.length) {
+    throw new Error('Label data array and position indices length mismatch');
+  }
+
+  if (labelDataArray.length === 0) {
+    throw new Error('No labels to generate');
+  }
+
+  if (labelDataArray.length > TOTAL_LABELS) {
+    throw new Error(`Cannot print ${labelDataArray.length} labels on one sheet (max ${TOTAL_LABELS})`);
+  }
+
+  // Check for duplicate positions
+  const positionSet = new Set(positionIndices);
+  if (positionSet.size !== positionIndices.length) {
+    throw new Error('Duplicate position indices detected');
+  }
+
+  // Validate all positions are in range
+  for (const pos of positionIndices) {
+    if (pos < 0 || pos >= TOTAL_LABELS) {
+      throw new Error(`Invalid position index: ${pos}. Must be 0-${TOTAL_LABELS - 1}`);
+    }
+  }
+
+  // Create PDF document
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'pt',
+    format: 'letter',
+  });
+
+  // Draw all labels
+  labelDataArray.forEach((data, index) => {
+    const position = indexToPosition(positionIndices[index]);
+    drawLabel(doc, data, position, offsets);
+  });
+
+  return doc.output('blob');
+}
+
+/**
+ * Generate and download an Avery label sheet with multiple labels
+ * @param labelDataArray Array of label data to render
+ * @param positionIndices Array of positions (0-17) corresponding to each label
+ * @param filename The filename for the downloaded PDF
+ * @param offsets Optional calibration offsets for printer alignment
+ */
+export async function downloadAveryLabelSheet(
+  labelDataArray: FoldableLabelData[],
+  positionIndices: number[],
+  filename: string,
+  offsets?: CalibrationOffsets
+): Promise<void> {
+  const blob = await generateAveryLabelSheet(labelDataArray, positionIndices, offsets);
+
+  // Create download link
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+
+  // Trigger download
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  // Cleanup
+  URL.revokeObjectURL(url);
+}

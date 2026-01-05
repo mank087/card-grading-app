@@ -9,6 +9,8 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
 import { useToast } from '@/hooks/useToast'
+import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
+import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
 
 type Card = {
   id: string
@@ -222,6 +224,9 @@ function CollectionPageContent() {
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
   const [isDeleting, setIsDeleting] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
+  const [isBatchLabelModalOpen, setIsBatchLabelModalOpen] = useState(false)
+  const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState('')
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
@@ -267,10 +272,11 @@ function CollectionPageContent() {
     setSelectedCardIds(new Set())
   }
 
-  // Clear selection when category changes
+  // Clear selection when category or search changes
   useEffect(() => {
     setSelectedCardIds(new Set())
-  }, [selectedCategory])
+    setDisplayLimit(20) // Reset display limit when filtering
+  }, [selectedCategory, searchTerm])
 
   useEffect(() => {
     const fetchCards = async () => {
@@ -372,14 +378,40 @@ function CollectionPageContent() {
     return 0
   })
 
-  // Filter cards by selected category
+  // Filter cards by selected category and search term
   const filteredCards = sortedCards.filter(card => {
-    if (selectedCategory === 'all') return true;
-    if (selectedCategory === 'Sports') {
-      // Include all sport categories
-      return ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+    // Category filter
+    let categoryMatch = true;
+    if (selectedCategory !== 'all') {
+      if (selectedCategory === 'Sports') {
+        categoryMatch = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+      } else {
+        categoryMatch = card.category === selectedCategory;
+      }
     }
-    return card.category === selectedCategory;
+    if (!categoryMatch) return false;
+
+    // Search term filter (case-insensitive)
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase().trim();
+      const cardInfo = getCardInfo(card);
+
+      // Search across multiple fields
+      const searchableFields = [
+        cardInfo.player_or_character,
+        cardInfo.card_name,
+        cardInfo.set_name,
+        cardInfo.card_number,
+        cardInfo.year,
+        cardInfo.manufacturer,
+        card.serial,
+        card.category,
+      ].filter(Boolean).map(f => f?.toString().toLowerCase());
+
+      return searchableFields.some(field => field?.includes(term));
+    }
+
+    return true;
   })
 
   // Limit displayed cards for performance
@@ -568,6 +600,43 @@ function CollectionPageContent() {
           </div>
         </div>
 
+        {/* Search Input */}
+        <div className="mb-6">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search by player, card name, set, number, year..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent shadow-sm"
+            />
+            <svg
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                title="Clear search"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {searchTerm && (
+            <p className="mt-2 text-sm text-gray-500">
+              Found {filteredCards.length} card{filteredCards.length !== 1 ? 's' : ''} matching "{searchTerm}"
+            </p>
+          )}
+        </div>
+
         {/* Category Filter Tabs */}
         <div className="mb-6 flex flex-wrap gap-2">
           {[
@@ -688,25 +757,58 @@ function CollectionPageContent() {
                         Clear selection
                       </button>
                     </div>
-                    <button
-                      onClick={handleBulkDelete}
-                      disabled={isDeleting}
-                      className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                    >
-                      {isDeleting ? (
-                        <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          Deleting...
-                        </>
-                      ) : (
-                        <>
+                    <div className="flex items-center gap-2">
+                      {/* Print Labels Button */}
+                      {selectedCardIds.size > 0 && selectedCardIds.size <= 18 && (
+                        <button
+                          onClick={() => setIsBatchLabelModalOpen(true)}
+                          disabled={isDeleting}
+                          className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                           </svg>
-                          Delete Selected
-                        </>
+                          Print Labels ({selectedCardIds.size})
+                        </button>
                       )}
-                    </button>
+                      {selectedCardIds.size > 18 && (
+                        <span className="text-amber-600 text-sm font-medium">
+                          Max 18 cards for label printing
+                        </span>
+                      )}
+                      {/* Download Reports Button */}
+                      {selectedCardIds.size > 0 && (
+                        <button
+                          onClick={() => setIsBatchDownloadModalOpen(true)}
+                          disabled={isDeleting}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                          Download Reports ({selectedCardIds.size})
+                        </button>
+                      )}
+                      <button
+                        onClick={handleBulkDelete}
+                        disabled={isDeleting}
+                        className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                      >
+                        {isDeleting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Deleting...
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Delete Selected
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 )}
                 <div className="overflow-x-auto">
@@ -923,6 +1025,25 @@ function CollectionPageContent() {
           </>
         )}
       </div>
+
+      {/* Batch Label Modal */}
+      <BatchAveryLabelModal
+        isOpen={isBatchLabelModalOpen}
+        onClose={() => setIsBatchLabelModalOpen(false)}
+        selectedCards={cards.filter(c => selectedCardIds.has(c.id)).map(c => ({
+          ...c,
+          front_image_url: c.front_url || undefined
+        }))}
+        cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
+      />
+
+      {/* Batch Download Modal */}
+      <BatchDownloadModal
+        isOpen={isBatchDownloadModalOpen}
+        onClose={() => setIsBatchDownloadModalOpen(false)}
+        selectedCards={cards.filter(c => selectedCardIds.has(c.id))}
+        cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
+      />
     </main>
   )
 }

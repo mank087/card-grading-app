@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search');
 
-    // Query cards for this user - includes all fields needed for label generation
+    // Query cards for this user - includes all fields needed for label generation and batch reports
     let query = supabase
       .from('cards')
       .select(`
@@ -49,6 +49,8 @@ export async function GET(request: NextRequest) {
         dcm_grade_whole, dvg_image_quality, created_at, visibility,
         conversational_decimal_grade, conversational_whole_grade, conversational_image_confidence,
         conversational_card_info, conversational_condition_label, conversational_grading, dvg_decimal_grade,
+        conversational_weighted_sub_scores, conversational_sub_scores, conversational_corners_edges_surface,
+        conversational_final_grade_summary, conversational_grade_uncertainty, estimated_professional_grades,
         is_foil, foil_type, is_double_faced, mtg_api_verified, mtg_rarity, mtg_set_code,
         card_language, scryfall_price_usd, scryfall_price_usd_foil,
         serial_numbering, rarity_tier, rarity_description, autographed, autograph_type,
