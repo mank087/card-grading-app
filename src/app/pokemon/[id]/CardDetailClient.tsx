@@ -31,6 +31,7 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
+import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
@@ -2938,8 +2939,10 @@ export function PokemonCardDetails() {
                       <span className="text-sm font-bold text-purple-900 font-mono">{card.serial || 'N/A'}</span>
                     </div>
 
-                    {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="pokemon" showFounderEmblem={showFounderEmblem} />}
+                    {/* Owner Actions: Download Report */}
+                    {isOwner && (
+                      <DownloadReportButton card={card} cardType="pokemon" showFounderEmblem={showFounderEmblem} />
+                    )}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">
@@ -3170,9 +3173,26 @@ export function PokemonCardDetails() {
 
               {/* Card Information with Rarity Features */}
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
-                  Card Information
-                </h3>
+                <div className="flex items-center justify-between mb-6 border-b pb-3">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    Card Information
+                  </h3>
+                  {(() => {
+                    const session = getStoredSession();
+                    const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                    if (!isOwner) return null;
+                    return (
+                      <EditCardDetailsButton
+                        card={card}
+                        currentUserId={session?.user?.id}
+                        onEditComplete={(updatedCard) => {
+                          window.location.reload();
+                        }}
+                        variant="icon-only"
+                      />
+                    );
+                  })()}
+                </div>
 
                 {/* Main Card Details Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">

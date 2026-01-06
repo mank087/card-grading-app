@@ -441,6 +441,15 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         }
       }
 
+      // 🔧 FIX: Merge parsed card_info with stored conversational_card_info
+      // This ensures manual edits are preserved (column data takes precedence)
+      const mergedCardInfo = parsedConversationalData?.card_info
+        ? {
+            ...parsedConversationalData.card_info,
+            ...(card.conversational_card_info || {})
+          }
+        : card.conversational_card_info;
+
       return NextResponse.json({
         ...card,
         // Add parsed conversational data if available
@@ -453,7 +462,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
           conversational_condition_label: parsedConversationalData.condition_label,
           conversational_image_confidence: parsedConversationalData.image_confidence,
           conversational_centering_ratios: parsedConversationalData.centering_ratios,
-          conversational_card_info: parsedConversationalData.card_info,
+          conversational_card_info: mergedCardInfo,
           conversational_corners_edges_surface: parsedConversationalData.corners_edges_surface,
           conversational_case_detection: parsedConversationalData.case_detection,
           conversational_defects_front: parsedConversationalData.transformedDefects.front,

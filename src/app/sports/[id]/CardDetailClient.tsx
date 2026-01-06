@@ -30,6 +30,7 @@ import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription,
 import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
+import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
 import { useGradingQueue } from '@/contexts/GradingQueueContext';
@@ -2280,18 +2281,38 @@ export function SportsCardDetails() {
     year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
     card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
-    sport_or_category: stripMarkdown(card.conversational_card_info?.sport_or_category) || card.sport || dvgGrading.card_info?.sport_or_category,
+    // Sport field - check both 'sport' (manual edit) and 'sport_or_category' (AI detection)
+    sport_or_category: stripMarkdown(card.conversational_card_info?.sport) || stripMarkdown(card.conversational_card_info?.sport_or_category) || card.sport || dvgGrading.card_info?.sport_or_category,
     serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
     rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
     subset: subsetRaw, // Keep separate for special features display
     rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || dvgGrading.card_info?.rarity_tier,
+    // Rarity/variant description (e.g., "Prizm Silver", "Refractor")
+    rarity_or_variant: stripMarkdown(card.conversational_card_info?.rarity_or_variant) || stripMarkdown(card.conversational_card_info?.parallel_type) || card.rarity_description || dvgGrading.card_info?.rarity_or_variant,
     autographed: (card.conversational_card_info?.autographed === true || card.conversational_card_info?.autographed === 'Yes' || card.conversational_card_info?.autographed === 'yes' || (card.autograph_type && card.autograph_type !== 'none' && card.autograph_type !== 'false')) ? true : false,
     memorabilia: (card.conversational_card_info?.memorabilia === true || card.conversational_card_info?.memorabilia === 'Yes' || card.conversational_card_info?.memorabilia === 'yes' || (card.memorabilia_type && card.memorabilia_type !== 'none' && card.memorabilia_type !== 'false')) ? true : false,
-    card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text,  // 🆕 Card back description
-    // 🆕 Facsimile autograph and official reprint detection
+    // Sports-specific fields from manual edit
+    team: stripMarkdown(card.conversational_card_info?.team) || null,
+    parallel_type: stripMarkdown(card.conversational_card_info?.parallel_type) || null,
+    memorabilia_other: stripMarkdown(card.conversational_card_info?.memorabilia_other) || null,
+    // Sports special features (booleans)
+    is_refractor: card.conversational_card_info?.is_refractor || false,
+    is_numbered: card.conversational_card_info?.is_numbered || false,
+    is_patch: card.conversational_card_info?.is_patch || false,
+    is_jersey: card.conversational_card_info?.is_jersey || false,
+    is_game_used: card.conversational_card_info?.is_game_used || false,
+    is_on_card_auto: card.conversational_card_info?.is_on_card_auto || false,
+    is_sticker_auto: card.conversational_card_info?.is_sticker_auto || false,
+    is_variation: card.conversational_card_info?.is_variation || false,
+    is_short_print: card.conversational_card_info?.is_short_print || false,
+    is_case_hit: card.conversational_card_info?.is_case_hit || false,
+    first_print_rookie: card.conversational_card_info?.first_print_rookie || false,
+    card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text,  // Card back description
+    // Facsimile autograph and official reprint detection
     facsimile_autograph: card.conversational_card_info?.facsimile_autograph || false,
     official_reprint: card.conversational_card_info?.official_reprint || false,
-    special_features: card.conversational_card_info?.special_features || null
+    special_features: card.conversational_card_info?.special_features || null,
+    authentic: card.conversational_card_info?.authentic
   };
 
   // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images
@@ -3172,9 +3193,26 @@ export function SportsCardDetails() {
 
               {/* Card Information with Rarity Features */}
               <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">
-                <h3 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
-                  Card Information
-                </h3>
+                <div className="flex items-center justify-between mb-6 border-b pb-3">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    Card Information
+                  </h3>
+                  {(() => {
+                    const session = getStoredSession();
+                    const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                    if (!isOwner) return null;
+                    return (
+                      <EditCardDetailsButton
+                        card={card}
+                        currentUserId={session?.user?.id}
+                        onEditComplete={(updatedCard) => {
+                          window.location.reload();
+                        }}
+                        variant="icon-only"
+                      />
+                    );
+                  })()}
+                </div>
 
                 {/* Main Card Details Grid */}
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-6">
@@ -3202,7 +3240,21 @@ export function SportsCardDetails() {
                     <p className="text-gray-500 text-xs uppercase tracking-wide">Sport/Category</p>
                     <p className="font-semibold text-gray-900">{cardInfo.sport_or_category || 'N/A'}</p>
                   </div>
-                  {/* 🎯 v3.2: Subset field */}
+                  {/* Team field */}
+                  {cardInfo.team && (
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Team</p>
+                      <p className="font-semibold text-gray-900">{cardInfo.team}</p>
+                    </div>
+                  )}
+                  {/* Parallel/Insert Type */}
+                  {cardInfo.parallel_type && (
+                    <div className="space-y-1">
+                      <p className="text-gray-500 text-xs uppercase tracking-wide">Parallel/Insert</p>
+                      <p className="font-semibold text-gray-900">{cardInfo.parallel_type}</p>
+                    </div>
+                  )}
+                  {/* Subset field */}
                   {cardInfo.subset && (
                     <div className="space-y-1">
                       <p className="text-gray-500 text-xs uppercase tracking-wide">Subset/Insert</p>
@@ -3227,7 +3279,7 @@ export function SportsCardDetails() {
                 )}
 
                 {/* Special Features Section */}
-                {(dvgGrading.rarity_features || cardInfo.serial_number || cardInfo.rookie_or_first || dvgGrading.autograph || cardInfo.subset || cardInfo.autographed || cardInfo.memorabilia) && (
+                {(dvgGrading.rarity_features || cardInfo.serial_number || cardInfo.rookie_or_first || dvgGrading.autograph || cardInfo.subset || cardInfo.autographed || cardInfo.memorabilia || cardInfo.is_refractor || cardInfo.is_numbered || cardInfo.is_patch || cardInfo.is_jersey || cardInfo.is_game_used || cardInfo.is_short_print || cardInfo.is_variation || cardInfo.is_case_hit || cardInfo.first_print_rookie || cardInfo.is_on_card_auto || cardInfo.is_sticker_auto) && (
                   <div className="border-t pt-5">
                     <div className="flex items-center gap-2 mb-4">
                       <h3 className="text-lg font-bold text-gray-800">Special Features</h3>
@@ -3325,6 +3377,74 @@ export function SportsCardDetails() {
                           <p className={`font-bold ${cardInfo.authentic ? 'text-green-900' : 'text-red-900'}`}>
                             {cardInfo.authentic ? '✓ Licensed' : '✗ Unlicensed'}
                           </p>
+                        </div>
+                      )}
+
+                      {/* Sports-specific features from manual edit */}
+                      {cardInfo.first_print_rookie && (
+                        <div className="bg-emerald-50 rounded-lg p-3 border border-emerald-200">
+                          <p className="text-emerald-700 text-xs font-semibold mb-1">1ST BOWMAN</p>
+                          <p className="font-bold text-emerald-900">🌟 Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_on_card_auto && (
+                        <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                          <p className="text-blue-700 text-xs font-semibold mb-1">ON-CARD AUTO</p>
+                          <p className="font-bold text-blue-900">✒️ Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_sticker_auto && (
+                        <div className="bg-sky-50 rounded-lg p-3 border border-sky-200">
+                          <p className="text-sky-700 text-xs font-semibold mb-1">STICKER AUTO</p>
+                          <p className="font-bold text-sky-900">✒️ Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_refractor && (
+                        <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-200">
+                          <p className="text-cyan-700 text-xs font-semibold mb-1">REFRACTOR/PRIZM</p>
+                          <p className="font-bold text-cyan-900">✨ Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_numbered && (
+                        <div className="bg-violet-50 rounded-lg p-3 border border-violet-200">
+                          <p className="text-violet-700 text-xs font-semibold mb-1">NUMBERED</p>
+                          <p className="font-bold text-violet-900"># Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_patch && (
+                        <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                          <p className="text-amber-700 text-xs font-semibold mb-1">PATCH CARD</p>
+                          <p className="font-bold text-amber-900">🏷️ Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_jersey && (
+                        <div className="bg-teal-50 rounded-lg p-3 border border-teal-200">
+                          <p className="text-teal-700 text-xs font-semibold mb-1">JERSEY CARD</p>
+                          <p className="font-bold text-teal-900">👕 Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_game_used && (
+                        <div className="bg-orange-50 rounded-lg p-3 border border-orange-200">
+                          <p className="text-orange-700 text-xs font-semibold mb-1">GAME USED</p>
+                          <p className="font-bold text-orange-900">🏟️ Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_short_print && (
+                        <div className="bg-rose-50 rounded-lg p-3 border border-rose-200">
+                          <p className="text-rose-700 text-xs font-semibold mb-1">SHORT PRINT</p>
+                          <p className="font-bold text-rose-900">SP Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_variation && (
+                        <div className="bg-fuchsia-50 rounded-lg p-3 border border-fuchsia-200">
+                          <p className="text-fuchsia-700 text-xs font-semibold mb-1">VARIATION</p>
+                          <p className="font-bold text-fuchsia-900">🔄 Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_case_hit && (
+                        <div className="bg-yellow-50 rounded-lg p-3 border border-yellow-200">
+                          <p className="text-yellow-700 text-xs font-semibold mb-1">CASE HIT / 1 OF 1</p>
+                          <p className="font-bold text-yellow-900">💎 Yes</p>
                         </div>
                       )}
                     </div>
