@@ -9,6 +9,7 @@ import { useCredits } from "@/contexts/CreditsContext";
 
 export default function Navigation() {
   const [user, setUser] = useState<any>(null);
+  const [authChecked, setAuthChecked] = useState(false); // Track if initial auth check is done
   const [searchSerial, setSearchSerial] = useState("");
   const [gradeDropdownOpen, setGradeDropdownOpen] = useState(false);
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
@@ -30,6 +31,7 @@ export default function Navigation() {
       } catch (error: any) {
         setUser(null);
       }
+      setAuthChecked(true); // Mark auth as checked after first check
     };
 
     checkAuth();
@@ -157,8 +159,15 @@ export default function Navigation() {
           <div className="hidden md:flex items-center flex-1 justify-between ml-8">
 
             {/* Left Section - Navigation Links */}
-            <div className="flex items-center space-x-1">
-              {user ? (
+            <div className="flex items-center space-x-1 min-h-[40px]">
+              {!authChecked ? (
+                /* Skeleton placeholders to prevent CLS */
+                <>
+                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
+                </>
+              ) : user ? (
                 <>
                   {/* Logged In: My Collection */}
                   <Link
@@ -253,7 +262,13 @@ export default function Navigation() {
                 )}
               </div>
 
-              {user ? (
+              {!authChecked ? (
+                /* Skeleton placeholders for auth buttons */
+                <>
+                  <div className="h-8 w-20 bg-gray-200 rounded-full animate-pulse"></div>
+                  <div className="h-9 w-28 bg-purple-200 rounded-md animate-pulse"></div>
+                </>
+              ) : user ? (
                 <>
                   {/* Logged In: Credits Badge */}
                   <Link
@@ -376,7 +391,13 @@ export default function Navigation() {
           {/* ============ MOBILE NAVIGATION ============ */}
           <div className="flex md:hidden items-center space-x-2">
 
-            {user ? (
+            {!authChecked ? (
+              /* Skeleton placeholders for mobile */
+              <>
+                <div className="h-6 w-16 bg-gray-200 rounded-full animate-pulse"></div>
+                <div className="h-7 w-14 bg-purple-200 rounded-md animate-pulse"></div>
+              </>
+            ) : user ? (
               <>
                 {/* Logged In: Credits Badge */}
                 <Link
