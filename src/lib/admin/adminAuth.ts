@@ -3,7 +3,7 @@
  * Handles admin user authentication, session management, and authorization
  */
 
-import { supabase } from '@/lib/supabaseClient'
+import { supabaseAdmin as supabase } from '@/lib/supabaseAdmin'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 
