@@ -1,13 +1,24 @@
 'use client'
 
+import { useEffect } from 'react'
 import { Toaster } from 'react-hot-toast'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import PersistentStatusBar from '@/components/PersistentStatusBar'
 import { useBackgroundGrading } from '@/hooks/useBackgroundGrading'
+import { initSessionRefresh, cleanupSessionRefresh } from '@/lib/directAuth'
 
 function BackgroundGradingMonitor() {
   useBackgroundGrading()
+  return null
+}
+
+// Initialize session refresh monitoring to keep users logged in
+function SessionRefreshMonitor() {
+  useEffect(() => {
+    initSessionRefresh()
+    return () => cleanupSessionRefresh()
+  }, [])
   return null
 }
 
@@ -16,6 +27,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     <CreditsProvider>
       <GradingQueueProvider>
         <BackgroundGradingMonitor />
+        <SessionRefreshMonitor />
         <Toaster
           position="top-center"
           reverseOrder={false}

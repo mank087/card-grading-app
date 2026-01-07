@@ -13,6 +13,15 @@ const SESSION_STORAGE_KEY = 'supabase.auth.token'
 // Custom event name for auth state changes (works within same tab)
 export const AUTH_STATE_CHANGE_EVENT = 'dcm-auth-state-change'
 
+// Refresh token 5 minutes before expiry
+const REFRESH_THRESHOLD_SECONDS = 5 * 60
+
+// Track if refresh is in progress to prevent multiple simultaneous refreshes
+let isRefreshing = false
+
+// Track if session refresh interval is set up
+let refreshIntervalId: NodeJS.Timeout | null = null
+
 // Dispatch auth state change event (for same-tab updates)
 function dispatchAuthChange() {
   if (typeof window !== 'undefined') {
@@ -115,25 +124,196 @@ export async function signUp(email: string, password: string): Promise<AuthRespo
   }
 }
 
-export function getStoredSession() {
+// Get raw stored session without auto-refresh (internal use)
+function getStoredSessionRaw() {
   if (typeof window === 'undefined') return null
 
   try {
     const stored = localStorage.getItem(SESSION_STORAGE_KEY)
     if (!stored) return null
+    return JSON.parse(stored)
+  } catch {
+    return null
+  }
+}
 
-    const session = JSON.parse(stored)
+// Refresh the session using the refresh token
+export async function refreshSession(): Promise<{ success: boolean; error?: string }> {
+  if (isRefreshing) {
+    console.log('[Auth] Refresh already in progress, skipping...')
+    return { success: false, error: 'Refresh in progress' }
+  }
+
+  const session = getStoredSessionRaw()
+  if (!session?.refresh_token) {
+    console.log('[Auth] No refresh token available')
+    return { success: false, error: 'No refresh token' }
+  }
+
+  isRefreshing = true
+  console.log('[Auth] Refreshing session...')
+
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+      },
+      body: JSON.stringify({ refresh_token: session.refresh_token })
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      console.error('[Auth] Refresh failed:', data.error_description || data.msg)
+      // If refresh fails, clear the session - user needs to log in again
+      localStorage.removeItem(SESSION_STORAGE_KEY)
+      dispatchAuthChange()
+      return { success: false, error: data.error_description || data.msg || 'Refresh failed' }
+    }
+
+    // Store the new tokens
+    const newSession = {
+      access_token: data.access_token,
+      refresh_token: data.refresh_token,
+      expires_at: data.expires_at,
+      user: data.user || session.user // Keep existing user if not returned
+    }
+
+    localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(newSession))
+    console.log('[Auth] Session refreshed successfully, new expiry:', new Date(data.expires_at * 1000).toLocaleString())
+    dispatchAuthChange()
+
+    return { success: true }
+  } catch (err: any) {
+    console.error('[Auth] Refresh error:', err)
+    return { success: false, error: err.message || 'Network error' }
+  } finally {
+    isRefreshing = false
+  }
+}
+
+// Check if session needs refresh (within threshold of expiry)
+function sessionNeedsRefresh(session: any): boolean {
+  if (!session?.expires_at) return false
+  const now = Math.floor(Date.now() / 1000)
+  const timeUntilExpiry = session.expires_at - now
+  return timeUntilExpiry > 0 && timeUntilExpiry < REFRESH_THRESHOLD_SECONDS
+}
+
+// Check if session is expired
+function sessionIsExpired(session: any): boolean {
+  if (!session?.expires_at) return false
+  return session.expires_at < Math.floor(Date.now() / 1000)
+}
+
+export function getStoredSession() {
+  if (typeof window === 'undefined') return null
+
+  try {
+    const session = getStoredSessionRaw()
+    if (!session) return null
 
     // Check if token is expired
-    if (session.expires_at && session.expires_at < Math.floor(Date.now() / 1000)) {
+    if (sessionIsExpired(session)) {
       console.log('[Auth] Session expired, clearing...')
       localStorage.removeItem(SESSION_STORAGE_KEY)
       return null
     }
 
+    // Check if token needs refresh (but don't block - refresh in background)
+    if (sessionNeedsRefresh(session)) {
+      console.log('[Auth] Session expiring soon, triggering background refresh...')
+      refreshSession() // Fire and forget - don't await
+    }
+
     return session
   } catch {
     return null
+  }
+}
+
+// Get session with guaranteed fresh token (awaits refresh if needed)
+export async function getValidSession() {
+  if (typeof window === 'undefined') return null
+
+  const session = getStoredSessionRaw()
+  if (!session) return null
+
+  // If expired, try to refresh
+  if (sessionIsExpired(session)) {
+    console.log('[Auth] Session expired, attempting refresh...')
+    const result = await refreshSession()
+    if (!result.success) {
+      return null
+    }
+    return getStoredSessionRaw()
+  }
+
+  // If about to expire, refresh and wait
+  if (sessionNeedsRefresh(session)) {
+    console.log('[Auth] Session expiring soon, refreshing...')
+    await refreshSession()
+    return getStoredSessionRaw()
+  }
+
+  return session
+}
+
+// Initialize automatic session refresh
+// Call this once when the app loads (e.g., in a layout or auth provider)
+export function initSessionRefresh() {
+  if (typeof window === 'undefined') return
+
+  // Clear any existing interval
+  if (refreshIntervalId) {
+    clearInterval(refreshIntervalId)
+  }
+
+  // Check session and refresh if needed every 1 minute
+  refreshIntervalId = setInterval(() => {
+    const session = getStoredSessionRaw()
+    if (session && sessionNeedsRefresh(session)) {
+      console.log('[Auth] Periodic check: session needs refresh')
+      refreshSession()
+    }
+  }, 60 * 1000) // Check every minute
+
+  // Also refresh on user activity (visibility change, focus)
+  const handleVisibilityChange = () => {
+    if (document.visibilityState === 'visible') {
+      const session = getStoredSessionRaw()
+      if (session) {
+        if (sessionIsExpired(session)) {
+          console.log('[Auth] Tab became visible: session expired, refreshing...')
+          refreshSession()
+        } else if (sessionNeedsRefresh(session)) {
+          console.log('[Auth] Tab became visible: session needs refresh')
+          refreshSession()
+        }
+      }
+    }
+  }
+
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+
+  // Initial check on load
+  const session = getStoredSessionRaw()
+  if (session && sessionNeedsRefresh(session)) {
+    console.log('[Auth] Initial check: session needs refresh')
+    refreshSession()
+  }
+
+  console.log('[Auth] Session refresh monitoring initialized')
+}
+
+// Clean up session refresh (call on unmount if needed)
+export function cleanupSessionRefresh() {
+  if (refreshIntervalId) {
+    clearInterval(refreshIntervalId)
+    refreshIntervalId = null
   }
 }
 
