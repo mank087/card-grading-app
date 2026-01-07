@@ -279,3 +279,87 @@ export function getAuthenticatedClient() {
     }
   )
 }
+
+// Send password reset email
+export async function resetPasswordForEmail(email: string): Promise<{ error?: string }> {
+  try {
+    const redirectTo = typeof window !== 'undefined'
+      ? `${window.location.origin}/reset-password`
+      : 'https://www.dcmgrading.com/reset-password'
+
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+      redirectTo
+    })
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return {}
+  } catch (err: any) {
+    return { error: err.message || 'Failed to send reset email' }
+  }
+}
+
+// Update user's password (after clicking reset link)
+export async function updatePassword(newPassword: string): Promise<{ error?: string }> {
+  try {
+    const { error } = await supabaseClient.auth.updateUser({
+      password: newPassword
+    })
+
+    if (error) {
+      return { error: error.message }
+    }
+
+    return {}
+  } catch (err: any) {
+    return { error: err.message || 'Failed to update password' }
+  }
+}
+
+// Set session from URL (for password reset flow)
+export async function setSessionFromUrl(): Promise<{ error?: string }> {
+  try {
+    // Check for tokens in URL hash (Supabase sends them there for password reset)
+    if (typeof window !== 'undefined' && window.location.hash) {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1))
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+      const type = hashParams.get('type')
+
+      if (accessToken && type === 'recovery') {
+        console.log('[Auth] Recovery token found in URL, setting session...')
+
+        const { data, error } = await supabaseClient.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken || ''
+        })
+
+        if (error) {
+          return { error: error.message }
+        }
+
+        // Store session
+        if (data.session) {
+          localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify({
+            access_token: data.session.access_token,
+            refresh_token: data.session.refresh_token,
+            expires_at: Math.floor(Date.now() / 1000) + 3600,
+            user: data.session.user
+          }))
+          dispatchAuthChange()
+        }
+
+        // Clear the hash from URL
+        window.history.replaceState(null, '', window.location.pathname)
+
+        return {}
+      }
+    }
+
+    return { error: 'No recovery token found' }
+  } catch (err: any) {
+    return { error: err.message || 'Failed to set session' }
+  }
+}
