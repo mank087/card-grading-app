@@ -134,6 +134,21 @@ export default function EditCardDetailsModal({
     mtg_rarity: '',
     is_double_faced: false,
     mtg_set_code: '',
+    // MTG extended fields
+    mana_cost: '',
+    mtg_card_type: '',
+    creature_type: '',
+    power_toughness: '',
+    color_identity: '',
+    artist_name: '',
+    border_color: '',
+    frame_version: '',
+    language: '',
+    is_extended_art: false,
+    is_showcase: false,
+    is_borderless: false,
+    is_retro_frame: false,
+    is_full_art_mtg: false,
   });
 
   // Helper to convert value to boolean (handles string "false", "true", etc.)
@@ -283,6 +298,21 @@ export default function EditCardDetailsModal({
         mtg_rarity: info.mtg_rarity || card.mtg_rarity || '',
         is_double_faced: toBoolean(info.is_double_faced) || toBoolean(card.is_double_faced),
         mtg_set_code: info.expansion_code || card.mtg_set_code || '',
+        // MTG extended fields
+        mana_cost: info.mana_cost || (card as any).mana_cost || '',
+        mtg_card_type: info.mtg_card_type || (card as any).mtg_card_type || '',
+        creature_type: info.creature_type || (card as any).creature_type || '',
+        power_toughness: info.power_toughness || (card as any).power_toughness || '',
+        color_identity: info.color_identity || (card as any).color_identity || '',
+        artist_name: info.artist_name || (card as any).artist_name || '',
+        border_color: info.border_color || (card as any).border_color || '',
+        frame_version: info.frame_version || (card as any).frame_version || '',
+        language: info.language || (card as any).card_language || 'English',
+        is_extended_art: toBoolean(info.is_extended_art) || toBoolean((card as any).is_extended_art),
+        is_showcase: toBoolean(info.is_showcase) || toBoolean((card as any).is_showcase),
+        is_borderless: toBoolean(info.is_borderless) || toBoolean((card as any).is_borderless),
+        is_retro_frame: toBoolean(info.is_retro_frame) || toBoolean((card as any).is_retro_frame),
+        is_full_art_mtg: toBoolean(info.is_full_art_mtg) || toBoolean((card as any).is_full_art_mtg),
       });
       setHasChanges(false);
       setError(null);
@@ -1210,40 +1240,76 @@ export default function EditCardDetailsModal({
             {/* MTG-Specific Section */}
             {isMTG && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">MTG Details</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">MTG Card Details</h3>
                 <div className="space-y-4">
-                  <div className="flex flex-wrap gap-x-6 gap-y-3">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.is_foil}
-                        onChange={(e) => handleInputChange('is_foil', e.target.checked)}
-                        className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm text-gray-700">Foil</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={formData.is_double_faced}
-                        onChange={(e) => handleInputChange('is_double_faced', e.target.checked)}
-                        className="w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                      />
-                      <span className="text-sm text-gray-700">Double-Faced</span>
-                    </label>
-                  </div>
-
+                  {/* Card Type & Creature Type */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Foil Type
+                        Card Type
                       </label>
                       <input
                         type="text"
-                        value={formData.foil_type}
-                        onChange={(e) => handleInputChange('foil_type', e.target.value)}
+                        value={formData.mtg_card_type}
+                        onChange={(e) => handleInputChange('mtg_card_type', e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        placeholder="e.g., Standard, Etched, Surge"
+                        placeholder="e.g., Creature, Instant, Sorcery"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Creature Type
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.creature_type}
+                        onChange={(e) => handleInputChange('creature_type', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="e.g., Human Wizard, Elf Druid"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Mana Cost & Color Identity */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Mana Cost
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.mana_cost}
+                        onChange={(e) => handleInputChange('mana_cost', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent font-mono"
+                        placeholder="e.g., {2}{U}{U}, {3}{B}{B}"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Color Identity
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.color_identity}
+                        onChange={(e) => handleInputChange('color_identity', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="e.g., Blue, Red/Green, Colorless"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Power/Toughness & Set Code */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Power/Toughness
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.power_toughness}
+                        onChange={(e) => handleInputChange('power_toughness', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="e.g., 3/4, 2/2, */1+*"
                       />
                     </div>
                     <div>
@@ -1261,22 +1327,194 @@ export default function EditCardDetailsModal({
                     </div>
                   </div>
 
+                  {/* Rarity & Language */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Rarity
+                      </label>
+                      <select
+                        value={formData.mtg_rarity}
+                        onChange={(e) => handleInputChange('mtg_rarity', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="">Select rarity...</option>
+                        <option value="common">Common</option>
+                        <option value="uncommon">Uncommon</option>
+                        <option value="rare">Rare</option>
+                        <option value="mythic">Mythic Rare</option>
+                        <option value="special">Special / Bonus</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Language
+                      </label>
+                      <select
+                        value={formData.language}
+                        onChange={(e) => handleInputChange('language', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="English">English</option>
+                        <option value="Japanese">Japanese</option>
+                        <option value="German">German</option>
+                        <option value="French">French</option>
+                        <option value="Italian">Italian</option>
+                        <option value="Spanish">Spanish</option>
+                        <option value="Portuguese">Portuguese</option>
+                        <option value="Russian">Russian</option>
+                        <option value="Korean">Korean</option>
+                        <option value="Chinese (Simplified)">Chinese (Simplified)</option>
+                        <option value="Chinese (Traditional)">Chinese (Traditional)</option>
+                        <option value="Phyrexian">Phyrexian</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Artist & Border Color */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Artist
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.artist_name}
+                        onChange={(e) => handleInputChange('artist_name', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="e.g., Mark Poole, Rebecca Guay"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Border Color
+                      </label>
+                      <select
+                        value={formData.border_color}
+                        onChange={(e) => handleInputChange('border_color', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="">Select border...</option>
+                        <option value="black">Black</option>
+                        <option value="white">White</option>
+                        <option value="silver">Silver</option>
+                        <option value="gold">Gold</option>
+                        <option value="borderless">Borderless</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Foil Type (if foil) */}
+                  {formData.is_foil && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Foil Type
+                      </label>
+                      <select
+                        value={formData.foil_type}
+                        onChange={(e) => handleInputChange('foil_type', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="">Standard Foil</option>
+                        <option value="etched">Etched Foil</option>
+                        <option value="surge">Surge Foil</option>
+                        <option value="gilded">Gilded Foil</option>
+                        <option value="textured">Textured Foil</option>
+                        <option value="galaxy">Galaxy Foil</option>
+                        <option value="confetti">Confetti Foil</option>
+                        <option value="halo">Halo Foil</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Special Features Checkboxes */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Rarity
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Special Features
                     </label>
-                    <select
-                      value={formData.mtg_rarity}
-                      onChange={(e) => handleInputChange('mtg_rarity', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      <option value="">Select rarity...</option>
-                      <option value="common">Common</option>
-                      <option value="uncommon">Uncommon</option>
-                      <option value="rare">Rare</option>
-                      <option value="mythic">Mythic Rare</option>
-                      <option value="special">Special</option>
-                    </select>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-2 p-3 bg-gray-50 rounded-lg">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_foil}
+                          onChange={(e) => handleInputChange('is_foil', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Foil</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_double_faced}
+                          onChange={(e) => handleInputChange('is_double_faced', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Double-Faced</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_full_art_mtg}
+                          onChange={(e) => handleInputChange('is_full_art_mtg', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Full Art</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_extended_art}
+                          onChange={(e) => handleInputChange('is_extended_art', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Extended Art</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_showcase}
+                          onChange={(e) => handleInputChange('is_showcase', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Showcase</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_borderless}
+                          onChange={(e) => handleInputChange('is_borderless', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Borderless</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_retro_frame}
+                          onChange={(e) => handleInputChange('is_retro_frame', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Retro Frame</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.is_promo}
+                          onChange={(e) => handleInputChange('is_promo', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Promo</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.autographed}
+                          onChange={(e) => handleInputChange('autographed', e.target.checked)}
+                          className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                        />
+                        <span className="text-sm text-gray-700">Autographed</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               </div>

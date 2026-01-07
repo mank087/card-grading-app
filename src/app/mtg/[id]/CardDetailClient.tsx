@@ -38,6 +38,7 @@ import { useGradingQueue } from '@/contexts/GradingQueueContext';
 import { useCredits } from '@/contexts/CreditsContext';
 import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { UserConditionReportInput } from '@/types/conditionReport';
+import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { getCardLabelData } from '@/lib/useLabelData';
 
 interface SportsAIGrading {
@@ -2373,11 +2374,18 @@ export function MTGCardDetails() {
     is_foil: convInfo.is_foil ?? card.is_foil ?? false,
     is_promo: convInfo.is_promo ?? card.is_promo ?? false,
     is_double_faced: convInfo.is_double_faced ?? card.is_double_faced ?? false,
+    // MTG special features (from manual edit)
+    is_extended_art: convInfo.is_extended_art ?? (card as any).is_extended_art ?? false,
+    is_showcase: convInfo.is_showcase ?? (card as any).is_showcase ?? false,
+    is_borderless: convInfo.is_borderless ?? (card as any).is_borderless ?? false,
+    is_retro_frame: convInfo.is_retro_frame ?? (card as any).is_retro_frame ?? false,
+    is_full_art_mtg: convInfo.is_full_art_mtg ?? (card as any).is_full_art_mtg ?? false,
     // Other MTG fields
     border_color: stripMarkdown(convInfo.border_color) || card.border_color || null,
     frame_version: stripMarkdown(convInfo.frame_version) || card.frame_version || null,
     language: stripMarkdown(convInfo.language) || card.card_language || 'English',
     keywords: convInfo.keywords || card.keywords || null,
+    foil_type: stripMarkdown(convInfo.foil_type) || card.foil_type || null,
     // Scryfall pricing (if available from merged API data)
     scryfall_price_usd: convInfo.scryfall_price_usd || card.scryfall_price_usd || null,
     scryfall_price_usd_foil: convInfo.scryfall_price_usd_foil || card.scryfall_price_usd_foil || null
@@ -3234,9 +3242,26 @@ export function MTGCardDetails() {
 
               {/* MTG Card Information Section */}
               <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200">
-                  🎴 Card Information
-                </h2>
+                <div className="flex items-center justify-between mb-6 pb-3 border-b-2 border-gray-200">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    🎴 Card Information
+                  </h2>
+                  {(() => {
+                    const session = getStoredSession();
+                    const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                    if (!isOwner) return null;
+                    return (
+                      <EditCardDetailsButton
+                        card={card}
+                        currentUserId={session?.user?.id}
+                        onEditComplete={(updatedCard) => {
+                          window.location.reload();
+                        }}
+                        variant="icon-only"
+                      />
+                    );
+                  })()}
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -3597,7 +3622,9 @@ export function MTGCardDetails() {
                   const hasSpecialFeatures = dvgGrading.rarity_features || cardInfo.serial_number ||
                     cardInfo.rookie_or_first || dvgGrading.autograph || displaySubset ||
                     cardInfo.autographed || cardInfo.memorabilia || card.is_foil ||
-                    card.is_double_faced || card.mtg_rarity;
+                    card.is_double_faced || card.mtg_rarity ||
+                    cardInfo.is_extended_art || cardInfo.is_showcase || cardInfo.is_borderless ||
+                    cardInfo.is_retro_frame || cardInfo.is_full_art_mtg || cardInfo.is_promo;
 
                   return hasSpecialFeatures && (
                   <div className="border-t pt-5">
@@ -3721,6 +3748,44 @@ export function MTGCardDetails() {
                           <p className={`font-bold ${cardInfo.authentic ? 'text-green-900' : 'text-red-900'}`}>
                             {cardInfo.authentic ? '✓ Licensed' : '✗ Unlicensed'}
                           </p>
+                        </div>
+                      )}
+
+                      {/* MTG Special Features from manual edit */}
+                      {cardInfo.is_extended_art && (
+                        <div className="bg-cyan-50 rounded-lg p-3 border border-cyan-200">
+                          <p className="text-cyan-700 text-xs font-semibold mb-1">EXTENDED ART</p>
+                          <p className="font-bold text-cyan-900">🖼️ Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_showcase && (
+                        <div className="bg-fuchsia-50 rounded-lg p-3 border border-fuchsia-200">
+                          <p className="text-fuchsia-700 text-xs font-semibold mb-1">SHOWCASE</p>
+                          <p className="font-bold text-fuchsia-900">✨ Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_borderless && (
+                        <div className="bg-violet-50 rounded-lg p-3 border border-violet-200">
+                          <p className="text-violet-700 text-xs font-semibold mb-1">BORDERLESS</p>
+                          <p className="font-bold text-violet-900">🌌 Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_retro_frame && (
+                        <div className="bg-amber-50 rounded-lg p-3 border border-amber-200">
+                          <p className="text-amber-700 text-xs font-semibold mb-1">RETRO FRAME</p>
+                          <p className="font-bold text-amber-900">📜 Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.is_full_art_mtg && (
+                        <div className="bg-rose-50 rounded-lg p-3 border border-rose-200">
+                          <p className="text-rose-700 text-xs font-semibold mb-1">FULL ART</p>
+                          <p className="font-bold text-rose-900">🎨 Yes</p>
+                        </div>
+                      )}
+                      {cardInfo.foil_type && cardInfo.foil_type !== 'Standard Foil' && (
+                        <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-lg p-3 border border-purple-200">
+                          <p className="text-purple-700 text-xs font-semibold mb-1">FOIL TYPE</p>
+                          <p className="font-bold text-purple-900 capitalize">{cardInfo.foil_type}</p>
                         </div>
                       )}
                     </div>
