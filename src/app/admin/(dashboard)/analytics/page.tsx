@@ -1,10 +1,43 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
+
+interface ConversionAnalytics {
+  overview: {
+    total_users: number
+    users_used_free_credit: number
+    users_made_purchase: number
+    converted_users: number
+    conversion_rate: number
+    overall_purchase_rate: number
+    total_founders: number
+  }
+  time_to_purchase: {
+    average_days: number
+    median_days: number
+    min_days: number
+    max_days: number
+  }
+  purchase_timing: {
+    same_day: number
+    within_3_days: number
+    within_7_days: number
+    within_30_days: number
+    over_30_days: number
+    total: number
+  }
+  package_breakdown: {
+    counts: Record<string, number>
+    revenue: Record<string, number>
+    total_purchases: number
+    total_revenue: number
+  }
+  weekly_trends: Array<{ week: string; signups: number; conversions: number; rate: number }>
+}
 
 interface UserAnalytics {
   overview: {
@@ -59,14 +92,24 @@ interface FinancialAnalytics {
 }
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#6366f1', '#f97316']
+const PACKAGE_COLORS: Record<string, string> = {
+  basic: '#3b82f6',
+  pro: '#8b5cf6',
+  elite: '#f59e0b',
+  founders: '#fbbf24'
+}
 
 export default function AdminAnalyticsPage() {
-  const [activeTab, setActiveTab] = useState<'users' | 'grading' | 'cards' | 'financial'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'grading' | 'cards' | 'financial' | 'conversion'>('users')
   const [loading, setLoading] = useState(true)
   const [userAnalytics, setUserAnalytics] = useState<UserAnalytics | null>(null)
   const [gradingAnalytics, setGradingAnalytics] = useState<GradingAnalytics | null>(null)
   const [cardAnalytics, setCardAnalytics] = useState<CardAnalytics | null>(null)
   const [financialAnalytics, setFinancialAnalytics] = useState<FinancialAnalytics | null>(null)
+  const [conversionAnalytics, setConversionAnalytics] = useState<ConversionAnalytics | null>(null)
+  const [conversionLoading, setConversionLoading] = useState(false)
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   useEffect(() => {
     const fetchAnalytics = async () => {
@@ -93,6 +136,31 @@ export default function AdminAnalyticsPage() {
     fetchAnalytics()
   }, [])
 
+  // Fetch conversion analytics when tab is selected or date filters change
+  const fetchConversionAnalytics = useCallback(async () => {
+    setConversionLoading(true)
+    try {
+      const params = new URLSearchParams()
+      if (startDate) params.append('startDate', startDate)
+      if (endDate) params.append('endDate', endDate)
+
+      const res = await fetch(`/api/admin/analytics/conversion?${params.toString()}`)
+      if (res.ok) {
+        setConversionAnalytics(await res.json())
+      }
+    } catch (error) {
+      console.error('Error fetching conversion analytics:', error)
+    } finally {
+      setConversionLoading(false)
+    }
+  }, [startDate, endDate])
+
+  useEffect(() => {
+    if (activeTab === 'conversion' && !conversionAnalytics) {
+      fetchConversionAnalytics()
+    }
+  }, [activeTab, conversionAnalytics, fetchConversionAnalytics])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -116,7 +184,8 @@ export default function AdminAnalyticsPage() {
             { key: 'users' as const, label: 'User Analytics', icon: '👥' },
             { key: 'grading' as const, label: 'Grading Analytics', icon: '⭐' },
             { key: 'cards' as const, label: 'Card Analytics', icon: '🎴' },
-            { key: 'financial' as const, label: 'Financial', icon: '💰' }
+            { key: 'financial' as const, label: 'Financial', icon: '💰' },
+            { key: 'conversion' as const, label: 'Conversion', icon: '📈' }
           ].map(tab => (
             <button
               key={tab.key}
@@ -441,6 +510,229 @@ export default function AdminAnalyticsPage() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Conversion Analytics Tab */}
+      {activeTab === 'conversion' && (
+        <div className="space-y-6">
+          {/* Date Range Selector */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={fetchConversionAnalytics}
+                  disabled={conversionLoading}
+                  className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
+                >
+                  {conversionLoading ? 'Loading...' : 'Apply Filter'}
+                </button>
+                {(startDate || endDate) && (
+                  <button
+                    onClick={() => {
+                      setStartDate('')
+                      setEndDate('')
+                      setTimeout(fetchConversionAnalytics, 0)
+                    }}
+                    className="ml-2 text-gray-600 hover:text-gray-900 text-sm underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {conversionLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+            </div>
+          ) : conversionAnalytics ? (
+            <>
+              {/* Overview Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-600">Total Users</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">{conversionAnalytics.overview.total_users.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 mt-2">All registered users</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-600">Used Free Credit</p>
+                  <p className="text-3xl font-bold text-blue-600 mt-2">{conversionAnalytics.overview.users_used_free_credit.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 mt-2">Users who graded cards</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6">
+                  <p className="text-sm text-gray-600">Made Purchase</p>
+                  <p className="text-3xl font-bold text-green-600 mt-2">{conversionAnalytics.overview.users_made_purchase.toLocaleString()}</p>
+                  <p className="text-sm text-gray-500 mt-2">{conversionAnalytics.overview.overall_purchase_rate}% of users</p>
+                </div>
+                <div className="bg-white rounded-lg shadow p-6 border-2 border-purple-200">
+                  <p className="text-sm text-gray-600">Conversion Rate</p>
+                  <p className="text-3xl font-bold text-purple-600 mt-2">{conversionAnalytics.overview.conversion_rate}%</p>
+                  <p className="text-sm text-gray-500 mt-2">{conversionAnalytics.overview.converted_users} converted users</p>
+                </div>
+              </div>
+
+              {/* Time to Purchase Stats */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Time to First Purchase</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Average</p>
+                      <p className="text-2xl font-bold text-gray-900">{conversionAnalytics.time_to_purchase.average_days} days</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Median</p>
+                      <p className="text-2xl font-bold text-gray-900">{conversionAnalytics.time_to_purchase.median_days} days</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Minimum</p>
+                      <p className="text-2xl font-bold text-green-600">{conversionAnalytics.time_to_purchase.min_days} days</p>
+                    </div>
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">Maximum</p>
+                      <p className="text-2xl font-bold text-orange-600">{conversionAnalytics.time_to_purchase.max_days} days</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Purchase Timing Breakdown</h3>
+                  <div className="space-y-3">
+                    {[
+                      { label: 'Same Day', value: conversionAnalytics.purchase_timing.same_day, color: 'bg-green-500' },
+                      { label: 'Within 3 Days', value: conversionAnalytics.purchase_timing.within_3_days - conversionAnalytics.purchase_timing.same_day, color: 'bg-blue-500' },
+                      { label: 'Within 7 Days', value: conversionAnalytics.purchase_timing.within_7_days - conversionAnalytics.purchase_timing.within_3_days, color: 'bg-purple-500' },
+                      { label: 'Within 30 Days', value: conversionAnalytics.purchase_timing.within_30_days - conversionAnalytics.purchase_timing.within_7_days, color: 'bg-orange-500' },
+                      { label: 'Over 30 Days', value: conversionAnalytics.purchase_timing.over_30_days, color: 'bg-gray-500' }
+                    ].map(item => {
+                      const percentage = conversionAnalytics.purchase_timing.total > 0
+                        ? Math.round((item.value / conversionAnalytics.purchase_timing.total) * 100)
+                        : 0
+                      return (
+                        <div key={item.label} className="flex items-center">
+                          <span className="w-28 text-sm text-gray-600">{item.label}</span>
+                          <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
+                            <div className={`h-full ${item.color}`} style={{ width: `${percentage}%` }}></div>
+                          </div>
+                          <span className="w-16 text-right text-sm font-medium text-gray-900">{item.value} ({percentage}%)</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Package Breakdown */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Package Sales</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(conversionAnalytics.package_breakdown.counts).map(([name, value]) => ({
+                          name: name.charAt(0).toUpperCase() + name.slice(1),
+                          value
+                        }))}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={80}
+                        label
+                      >
+                        {Object.keys(conversionAnalytics.package_breakdown.counts).map((pkg, index) => (
+                          <Cell key={`cell-${index}`} fill={PACKAGE_COLORS[pkg] || COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue by Package</h3>
+                  <div className="space-y-4">
+                    {Object.entries(conversionAnalytics.package_breakdown.revenue).map(([pkg, revenue]) => (
+                      <div key={pkg} className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: PACKAGE_COLORS[pkg] || '#6b7280' }}></div>
+                          <span className="font-medium text-gray-900 capitalize">{pkg}</span>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold text-gray-900">${revenue.toFixed(2)}</p>
+                          <p className="text-xs text-gray-500">{conversionAnalytics.package_breakdown.counts[pkg]} purchases</p>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-4 border-t border-gray-200">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-gray-900">Total Revenue</span>
+                        <span className="font-bold text-green-600">${conversionAnalytics.package_breakdown.total_revenue.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Weekly Conversion Trends */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Conversion Trends (Last 12 Weeks)</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={conversionAnalytics.weekly_trends}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                    <YAxis yAxisId="left" />
+                    <YAxis yAxisId="right" orientation="right" domain={[0, 100]} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar yAxisId="left" dataKey="signups" fill="#3b82f6" name="Signups" />
+                    <Bar yAxisId="left" dataKey="conversions" fill="#10b981" name="Conversions" />
+                    <Line yAxisId="right" type="monotone" dataKey="rate" stroke="#8b5cf6" strokeWidth={2} name="Conversion Rate %" />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Founders Count */}
+              {conversionAnalytics.overview.total_founders > 0 && (
+                <div className="bg-gradient-to-r from-amber-50 to-yellow-50 border border-amber-200 rounded-lg p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-amber-900">Founders Members</h3>
+                      <p className="text-sm text-amber-700 mt-1">Lifetime unlimited grading members</p>
+                    </div>
+                    <div className="text-4xl font-bold text-amber-600">
+                      {conversionAnalytics.overview.total_founders}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="text-center py-12 text-gray-500">
+              No conversion data available
+            </div>
+          )}
         </div>
       )}
     </div>
