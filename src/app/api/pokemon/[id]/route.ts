@@ -35,6 +35,88 @@ const cleanupStuckCards = () => {
   }
 };
 
+/**
+ * 🔒 OCR VALIDATION: Reconstruct card number from OCR breakdown and validate against AI-stated values
+ * This catches AI hallucination where it correctly OCRs the number but then outputs wrong values.
+ *
+ * Example: AI OCR reads "4/102" but outputs card_number_raw: "4/25" because it "knows" about Celebrations.
+ * The OCR breakdown is: "Position 1: 4, Position 2: /, Position 3: 1, Position 4: 0, Position 5: 2"
+ * We reconstruct "4/102" from the breakdown and use that instead.
+ */
+function validateAndFixCardNumberFromOcr(cardInfo: any): any {
+  if (!cardInfo) return cardInfo;
+
+  const ocrBreakdown = cardInfo.card_number_ocr_breakdown;
+  const statedRaw = cardInfo.card_number_raw;
+  const statedTotal = cardInfo.set_total;
+
+  // If no OCR breakdown, can't validate
+  if (!ocrBreakdown || typeof ocrBreakdown !== 'string') {
+    console.log('[OCR Validation] No OCR breakdown found, using stated values');
+    return cardInfo;
+  }
+
+  // Parse the OCR breakdown to reconstruct the actual number
+  // Format: "Position 1: 4, Position 2: /, Position 3: 1, Position 4: 0, Position 5: 2"
+  const positionPattern = /Position \d+:\s*([^,]+)/gi;
+  const matches = [...ocrBreakdown.matchAll(positionPattern)];
+
+  if (matches.length === 0) {
+    console.log('[OCR Validation] Could not parse OCR breakdown format');
+    return cardInfo;
+  }
+
+  // Reconstruct the number from positions
+  const reconstructed = matches.map(m => m[1].trim()).join('');
+  console.log(`[OCR Validation] Reconstructed from breakdown: "${reconstructed}"`);
+  console.log(`[OCR Validation] AI stated card_number_raw: "${statedRaw}"`);
+
+  // Check if there's a mismatch
+  if (reconstructed && statedRaw && reconstructed !== statedRaw) {
+    console.log(`[OCR Validation] ⚠️ MISMATCH DETECTED! OCR="${reconstructed}" vs Stated="${statedRaw}"`);
+    console.log(`[OCR Validation] 🔧 Using OCR breakdown value as source of truth`);
+
+    // Extract numerator and denominator from reconstructed
+    const fractionMatch = reconstructed.match(/^(\d+)\/(\d+)$/);
+    if (fractionMatch) {
+      const [, numerator, denominator] = fractionMatch;
+
+      // Create corrected card_info
+      const corrected = {
+        ...cardInfo,
+        card_number_raw: reconstructed,
+        card_number: numerator,
+        set_total: denominator,
+        _ocr_validation: {
+          original_raw: statedRaw,
+          original_total: statedTotal,
+          reconstructed: reconstructed,
+          mismatch_corrected: true
+        }
+      };
+
+      console.log(`[OCR Validation] ✅ Corrected: card_number="${numerator}", set_total="${denominator}"`);
+      return corrected;
+    } else {
+      // Not a fraction format, but still use reconstructed if different
+      const corrected = {
+        ...cardInfo,
+        card_number_raw: reconstructed,
+        _ocr_validation: {
+          original_raw: statedRaw,
+          reconstructed: reconstructed,
+          mismatch_corrected: true
+        }
+      };
+      console.log(`[OCR Validation] ✅ Corrected card_number_raw to "${reconstructed}"`);
+      return corrected;
+    }
+  }
+
+  console.log(`[OCR Validation] ✅ OCR breakdown matches stated values`);
+  return cardInfo;
+}
+
 // Types
 type PokemonCardGradingRequest = {
   params: Promise<{ id: string }>;
@@ -423,7 +505,8 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                 summary: jsonData.surface?.back?.summary || jsonData.surface?.back_summary || 'Surface analysis not available'
               }
             },
-            card_info: jsonData.card_info || null,
+            // 🔒 OCR VALIDATION: Validate card_info against OCR breakdown to catch AI hallucination
+            card_info: validateAndFixCardNumberFromOcr(jsonData.card_info || null),
             transformedDefects: {
               front: jsonData.defect_summary?.front || null,
               back: jsonData.defect_summary?.back || null
@@ -763,7 +846,8 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
             front: jsonData.defect_summary?.front || null,
             back: jsonData.defect_summary?.back || null
           },
-          card_info: jsonData.card_info || null,
+          // 🔒 OCR VALIDATION: Validate card_info against OCR breakdown to catch AI hallucination
+          card_info: validateAndFixCardNumberFromOcr(jsonData.card_info || null),
           case_detection: jsonData.case_detection || null,
           professional_slab: jsonData.slab_detection || null,  // 🔧 FIX: Master rubric outputs slab_detection, not professional_slab
           professional_grade_estimates: jsonData.professional_grade_estimates || null,
