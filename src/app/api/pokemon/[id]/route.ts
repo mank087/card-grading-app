@@ -36,12 +36,35 @@ const cleanupStuckCards = () => {
 };
 
 /**
+ * 🔒 DENOMINATOR-TO-SET LOOKUP TABLE
+ * Maps card denominators to their correct sets. Used to override AI hallucination.
+ */
+const DENOMINATOR_TO_SET: Record<number, { set_name: string; year: string; era: string }> = {
+  // WOTC Era (1999-2003)
+  102: { set_name: 'Base Set', year: '1999', era: 'WOTC' },
+  64: { set_name: 'Jungle', year: '1999', era: 'WOTC' },
+  62: { set_name: 'Fossil', year: '1999', era: 'WOTC' },
+  82: { set_name: 'Team Rocket', year: '2000', era: 'WOTC' },
+  132: { set_name: 'Gym Heroes', year: '2000', era: 'WOTC' },
+  111: { set_name: 'Neo Genesis', year: '2000', era: 'WOTC' },
+  75: { set_name: 'Neo Discovery', year: '2001', era: 'WOTC' },
+  66: { set_name: 'Neo Revelation', year: '2001', era: 'WOTC' },
+  113: { set_name: 'Neo Destiny', year: '2002', era: 'WOTC' },
+  165: { set_name: 'Legendary Collection', year: '2002', era: 'WOTC' },
+  147: { set_name: 'Expedition Base Set', year: '2002', era: 'WOTC' },
+  182: { set_name: 'Aquapolis', year: '2003', era: 'WOTC' },
+  186: { set_name: 'Skyridge', year: '2003', era: 'WOTC' },
+};
+
+/**
  * 🔒 OCR VALIDATION: Reconstruct card number from OCR breakdown and validate against AI-stated values
  * This catches AI hallucination where it correctly OCRs the number but then outputs wrong values.
  *
  * Example: AI OCR reads "4/102" but outputs card_number_raw: "4/25" because it "knows" about Celebrations.
  * The OCR breakdown is: "Position 1: 4, Position 2: /, Position 3: 1, Position 4: 0, Position 5: 2"
  * We reconstruct "4/102" from the breakdown and use that instead.
+ *
+ * CRITICAL: Also corrects set_name and year based on denominator lookup!
  */
 function validateAndFixCardNumberFromOcr(cardInfo: any): any {
   if (!cardInfo) return cardInfo;
@@ -80,6 +103,10 @@ function validateAndFixCardNumberFromOcr(cardInfo: any): any {
     const fractionMatch = reconstructed.match(/^(\d+)\/(\d+)$/);
     if (fractionMatch) {
       const [, numerator, denominator] = fractionMatch;
+      const denominatorNum = parseInt(denominator);
+
+      // 🔒 CRITICAL: Look up correct set based on denominator
+      const setLookup = DENOMINATOR_TO_SET[denominatorNum];
 
       // Create corrected card_info
       const corrected = {
@@ -87,15 +114,29 @@ function validateAndFixCardNumberFromOcr(cardInfo: any): any {
         card_number_raw: reconstructed,
         card_number: numerator,
         set_total: denominator,
+        // Override set_name and year if we have a denominator match
+        ...(setLookup && {
+          set_name: setLookup.set_name,
+          year: setLookup.year,
+          card_era: setLookup.era,
+        }),
         _ocr_validation: {
           original_raw: statedRaw,
           original_total: statedTotal,
+          original_set_name: cardInfo.set_name,
+          original_year: cardInfo.year,
           reconstructed: reconstructed,
-          mismatch_corrected: true
+          mismatch_corrected: true,
+          set_corrected: !!setLookup,
+          corrected_set_name: setLookup?.set_name,
+          corrected_year: setLookup?.year,
         }
       };
 
       console.log(`[OCR Validation] ✅ Corrected: card_number="${numerator}", set_total="${denominator}"`);
+      if (setLookup) {
+        console.log(`[OCR Validation] ✅ Set corrected via denominator lookup: "${setLookup.set_name}" (${setLookup.year})`);
+      }
       return corrected;
     } else {
       // Not a fraction format, but still use reconstructed if different
