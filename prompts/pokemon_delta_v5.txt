@@ -185,6 +185,44 @@ REQUIRED FIELDS (All Pokemon Cards)
 • Modern cards: "Pokemon Company"
 • Vintage (1999-2003): "Wizards of the Coast"
 
+**border_color**: Card border color (CRITICAL for era identification)
+🚨 **THIS FIELD IS MANDATORY - You MUST identify and report the border color**
+• Look at the outer frame/border around the card artwork
+• Options:
+  - "yellow" = Pre-Scarlet & Violet era (1999-2022) - Most WOTC, EX, DP, BW, XY, SM, SWSH
+  - "silver" = Scarlet & Violet era (2023+)
+  - "black" = Some special sets (Cosmic Eclipse, certain promos)
+  - "gold" = Gold border secret rares
+  - "none" = Borderless/Full Art cards
+• This is CRITICAL for vintage card identification
+• Example: A 1999 Base Set card has YELLOW border, a 2023 SV card has SILVER border
+
+**card_era**: Detected card era based on visual design elements
+🚨 **THIS FIELD IS MANDATORY - Cross-validate with year and border color**
+• Options:
+  - "WOTC" = Wizards of the Coast era (1999-2003) - Yellow border, "Wizards" logo, specific fonts
+  - "EX" = EX series (2003-2007) - "ex" suffix Pokemon, specific holofoil patterns
+  - "DP" = Diamond & Pearl era (2007-2010)
+  - "BW" = Black & White era (2011-2013)
+  - "XY" = XY era (2013-2016) - EX/Mega cards
+  - "SM" = Sun & Moon era (2016-2019) - GX cards
+  - "SWSH" = Sword & Shield era (2020-2022) - V/VMAX cards, yellow border
+  - "SV" = Scarlet & Violet era (2023+) - Silver border, ex (lowercase)
+• Detect based on: border color, Pokemon suffix (GX, V, VMAX, ex), logo style, font
+• If border_color="yellow" and year shows 1999-2003, card_era MUST be "WOTC"
+
+**first_edition_stamp**: Is 1st Edition stamp present? (WOTC era only)
+• true = "1st Edition" stamp visible (extremely valuable for vintage)
+• false = No 1st Edition stamp (Unlimited or later print)
+• null = Not applicable (non-WOTC era card)
+• Location: Small stamp near the set symbol on WOTC cards (1999-2003)
+
+**shadowless**: Is this a Shadowless card? (Base Set only)
+• true = No shadow around Pokemon artwork box (very early 1999 print)
+• false = Shadow visible around Pokemon artwork
+• null = Not applicable (not Base Set)
+• Only applies to 1999 Base Set English cards
+
 **authentic**: Licensed product verification (true|false)
 • true if ALL present:
   - Official Pokemon logo
@@ -448,8 +486,45 @@ C. POKEMON SET IDENTIFICATION MODULE
    - If found → Use directly (highest confidence)
 
 ────────────────────────────────────────────────────────────────────────
-📊 COMMON MODERN SETS LOOKUP TABLE (2020-2025)
+📊 COMPLETE SETS LOOKUP TABLE (ALL ERAS)
 ────────────────────────────────────────────────────────────────────────
+
+🚨 **CRITICAL: WOTC ERA CARDS (1999-2003) - Yellow Borders, "Wizards" Logo**
+These are the most valuable vintage cards. NEVER misidentify as modern reprints.
+
+| Denominator | Set Name                | Year | Identification                           |
+|-------------|-------------------------|------|------------------------------------------|
+| 102         | Base Set / Base Set 2   | 1999/2000 | Original 102 cards, Pokéball set symbol  |
+| 64          | Jungle                  | 1999 | Jungle leaf symbol                        |
+| 62          | Fossil                  | 1999 | Fossil/bone symbol                        |
+| 82          | Team Rocket             | 2000 | "R" symbol, dark Pokemon                  |
+| 132         | Gym Heroes/Gym Challenge| 2000 | Stadium/gym badge symbols                 |
+| 111         | Neo Genesis             | 2000 | Neo symbol, baby Pokemon introduced       |
+| 75          | Neo Discovery           | 2001 | Neo symbol variant                        |
+| 66          | Neo Revelation          | 2001 | Neo symbol, Shining Pokemon               |
+| 105/113     | Neo Destiny             | 2002 | Neo symbol, Light/Dark Pokemon            |
+| 110         | Legendary Collection    | 2002 | Firework burst symbol                     |
+| 165         | Expedition              | 2002 | E-card symbol, e-Reader compatible        |
+| 147         | Aquapolis               | 2003 | E-card symbol, water theme                |
+| 144         | Skyridge                | 2003 | E-card symbol, sky theme                  |
+
+⚠️ **Base Set Charizard Example:**
+- Card shows "4/102" → Denominator 102 → MUST be Base Set or Base Set 2
+- Yellow border, "Wizards of the Coast" copyright, 1999 year
+- NEVER match to Celebrations (4/25) - different denominator!
+
+**EX ERA (2003-2007) - Yellow Borders, "ex" suffix Pokemon:**
+
+| Denominator | Set Name                | Year | Symbol Hint                              |
+|-------------|-------------------------|------|------------------------------------------|
+| 109         | Ruby & Sapphire         | 2003 | RS symbol                                |
+| 100         | Sandstorm / Emerald     | 2003/2005 | Sand/emerald symbols                   |
+| 97          | Dragon                  | 2003 | Dragon symbol                            |
+| 95          | Team Magma vs Aqua      | 2004 | Team symbols                             |
+| 101         | Hidden Legends / Unseen | 2004/2005 | Various EX symbols                     |
+| 104         | FireRed & LeafGreen     | 2004 | FRLG symbols                             |
+| 107         | Deoxys                  | 2005 | Deoxys symbol                            |
+| 92          | Delta Species           | 2005 | Delta symbol                             |
 
 **SWORD & SHIELD ERA (2020-2022) - Yellow Borders:**
 

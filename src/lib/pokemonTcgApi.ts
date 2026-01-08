@@ -1185,6 +1185,70 @@ function extractYearFromDate(releaseDate: string): number | null {
 }
 
 /**
+ * Denominator (set total) to possible Pokemon TCG API set.id mapping
+ * Used to constrain card searches when the AI extracts a fraction like "4/102"
+ * CRITICAL for vintage cards where multiple cards share the same number
+ */
+export const DENOMINATOR_TO_SETS: Record<number, { setIds: string[], era: string, sets: string[] }> = {
+  // WOTC Era (1999-2003) - Critical for vintage card identification
+  102: { setIds: ['base1', 'base4'], era: 'WOTC', sets: ['Base Set', 'Base Set 2'] },
+  64: { setIds: ['base2'], era: 'WOTC', sets: ['Jungle'] },
+  62: { setIds: ['base3'], era: 'WOTC', sets: ['Fossil'] },
+  82: { setIds: ['base5'], era: 'WOTC', sets: ['Team Rocket'] },
+  132: { setIds: ['gym1', 'gym2'], era: 'WOTC', sets: ['Gym Heroes', 'Gym Challenge'] },
+  111: { setIds: ['neo1'], era: 'WOTC', sets: ['Neo Genesis'] },
+  75: { setIds: ['neo2'], era: 'WOTC', sets: ['Neo Discovery'] },
+  66: { setIds: ['neo3'], era: 'WOTC', sets: ['Neo Revelation'] },
+  105: { setIds: ['neo4'], era: 'WOTC', sets: ['Neo Destiny'] },
+  113: { setIds: ['neo4'], era: 'WOTC', sets: ['Neo Destiny (with secrets)'] },
+  110: { setIds: ['base6'], era: 'WOTC', sets: ['Legendary Collection'] },
+  165: { setIds: ['ecard1', 'sv3pt5'], era: 'Mixed', sets: ['Expedition', 'Pokemon 151'] },
+  147: { setIds: ['ecard2'], era: 'WOTC', sets: ['Aquapolis'] },
+  144: { setIds: ['ecard3'], era: 'WOTC', sets: ['Skyridge'] },
+
+  // EX Era (2003-2007)
+  109: { setIds: ['ex1'], era: 'EX', sets: ['Ruby & Sapphire'] },
+  100: { setIds: ['ex2', 'ex9'], era: 'EX', sets: ['Sandstorm', 'Emerald'] },
+  97: { setIds: ['ex3'], era: 'EX', sets: ['Dragon'] },
+  95: { setIds: ['ex4'], era: 'EX', sets: ['Team Magma vs Team Aqua'] },
+  101: { setIds: ['ex5', 'ex10'], era: 'EX', sets: ['Hidden Legends', 'Unseen Forces'] },
+  104: { setIds: ['ex6'], era: 'EX', sets: ['FireRed & LeafGreen'] },
+  111: { setIds: ['neo1', 'ex7'], era: 'Mixed', sets: ['Neo Genesis', 'Team Rocket Returns'] },
+  107: { setIds: ['ex8'], era: 'EX', sets: ['Deoxys'] },
+  92: { setIds: ['ex11'], era: 'EX', sets: ['Delta Species'] },
+
+  // Modern Celebrations & Special Sets
+  25: { setIds: ['cel25', 'cel25c'], era: 'Modern', sets: ['Celebrations', 'Celebrations: Classic Collection'] },
+
+  // Sword & Shield Era (2020-2022)
+  202: { setIds: ['swsh1'], era: 'SWSH', sets: ['Sword & Shield Base'] },
+  192: { setIds: ['swsh1'], era: 'SWSH', sets: ['Sword & Shield Base (variant)'] },
+  209: { setIds: ['swsh2'], era: 'SWSH', sets: ['Rebel Clash'] },
+  189: { setIds: ['swsh3', 'swsh10'], era: 'SWSH', sets: ['Darkness Ablaze', 'Astral Radiance'] },
+  185: { setIds: ['swsh4'], era: 'SWSH', sets: ['Vivid Voltage'] },
+  163: { setIds: ['swsh5'], era: 'SWSH', sets: ['Battle Styles'] },
+  198: { setIds: ['swsh6', 'sv1'], era: 'Mixed', sets: ['Chilling Reign', 'Scarlet & Violet Base'] },
+  237: { setIds: ['swsh6'], era: 'SWSH', sets: ['Chilling Reign (with secrets)'] },
+  203: { setIds: ['swsh7'], era: 'SWSH', sets: ['Evolving Skies'] },
+  264: { setIds: ['swsh8'], era: 'SWSH', sets: ['Fusion Strike'] },
+  172: { setIds: ['swsh9'], era: 'SWSH', sets: ['Brilliant Stars'] },
+  216: { setIds: ['swsh9'], era: 'SWSH', sets: ['Brilliant Stars (with TG)'] },
+  196: { setIds: ['swsh11'], era: 'SWSH', sets: ['Lost Origin'] },
+  245: { setIds: ['swsh11', 'swsh12'], era: 'SWSH', sets: ['Lost Origin/Silver Tempest (with TG)'] },
+  195: { setIds: ['swsh12', 'sv8'], era: 'Mixed', sets: ['Silver Tempest', 'Surging Sparks'] },
+
+  // Scarlet & Violet Era (2023+)
+  279: { setIds: ['sv2'], era: 'SV', sets: ['Paldea Evolved'] },
+  197: { setIds: ['sv3'], era: 'SV', sets: ['Obsidian Flames'] },
+  266: { setIds: ['sv4'], era: 'SV', sets: ['Paradox Rift'] },
+  162: { setIds: ['sv4pt5'], era: 'SV', sets: ['Paldean Fates'] },
+  218: { setIds: ['sv5'], era: 'SV', sets: ['Temporal Forces'] },
+  167: { setIds: ['sv6'], era: 'SV', sets: ['Twilight Masquerade'] },
+  142: { setIds: ['sv7'], era: 'SV', sets: ['Stellar Crown'] },
+  226: { setIds: ['sv6pt5'], era: 'SV', sets: ['Shrouded Fable'] },
+};
+
+/**
  * 3-letter set code to Pokemon TCG API set.id mapping
  * These are the official set abbreviations printed on modern cards
  */

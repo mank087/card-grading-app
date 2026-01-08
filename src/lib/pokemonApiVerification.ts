@@ -415,6 +415,42 @@ async function queryByFormatAwareNumber(
 }
 
 /**
+ * Validate that a candidate match has the correct denominator
+ * Returns true if match is valid, false if it should be rejected
+ */
+function validateDenominator(candidate: PokemonCard, aiSetTotal: string | undefined): boolean {
+  if (!aiSetTotal || !candidate.set.printedTotal) {
+    return true; // Can't validate, allow the match
+  }
+
+  // Extract numeric portion from setTotal (handles cases like "102", "TG30", etc.)
+  const aiDenominatorStr = aiSetTotal.replace(/^[A-Za-z]+/, '').trim();
+  const aiDenominator = parseInt(aiDenominatorStr);
+  const dbDenominator = candidate.set.printedTotal;
+
+  if (isNaN(aiDenominator)) {
+    return true; // Can't parse, allow the match
+  }
+
+  if (aiDenominator !== dbDenominator) {
+    console.log(`[Pokemon Local Verification] Candidate rejected: ${candidate.name} from ${candidate.set.name} (${dbDenominator} cards) - AI extracted /${aiSetTotal}`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
+ * Filter an array of candidate matches to only those with matching denominator
+ */
+function filterByDenominator(candidates: PokemonCard[], aiSetTotal: string | undefined): PokemonCard[] {
+  if (!aiSetTotal) {
+    return candidates;
+  }
+  return candidates.filter(c => validateDenominator(c, aiSetTotal));
+}
+
+/**
  * Verify a Pokemon card using the LOCAL Supabase database
  * Attempts multiple lookup strategies to find the exact card
  * NO external API calls - uses local database only
@@ -519,8 +555,17 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     console.log(`[Pokemon Local Verification] Strategy 4: Name + Number only`);
 
     try {
-      const results = await searchLocalByNameNumberTotal(cardName, normalizedNumber);
+      let results = await searchLocalByNameNumberTotal(cardName, normalizedNumber);
       if (results.length > 0) {
+        // CRITICAL: Filter by denominator first to avoid misidentification
+        const denominatorFiltered = filterByDenominator(results, setTotal);
+        if (denominatorFiltered.length > 0) {
+          results = denominatorFiltered;
+          console.log(`[Pokemon Local Verification] Filtered ${results.length} results by denominator ${setTotal}`);
+        } else if (setTotal) {
+          console.log(`[Pokemon Local Verification] WARNING: No results matched denominator ${setTotal}, using unfiltered results`);
+        }
+
         // If we have year, filter by it
         if (cardInfo.year) {
           const yearMatch = results.find((c: PokemonCard) =>
@@ -539,7 +584,9 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
   }
 
   // Strategy 5: Fuzzy number matching - try nearby numbers when exact fails
-  if (!dbCard && cardName && cardNumber) {
+  // NOTE: Skip fuzzy matching for vintage cards (WOTC era) to avoid misidentification
+  const isVintageCard = setTotal && parseInt(setTotal.replace(/[^0-9]/g, '')) <= 132; // WOTC sets had <=132 cards
+  if (!dbCard && cardName && cardNumber && !isVintageCard) {
     const normalizedNumber = normalizeCardNumber(cardNumber);
     console.log(`[Pokemon Local Verification] Strategy 5: Fuzzy number matching (±3 range)`);
 
@@ -547,7 +594,7 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
     const promoSetId = getPromoSetId(cardNumberFormat);
 
     const fuzzyResult = await searchLocalFuzzyNumber(cardName, normalizedNumber, promoSetId || undefined);
-    if (fuzzyResult.card) {
+    if (fuzzyResult.card && validateDenominator(fuzzyResult.card, setTotal)) {
       dbCard = fuzzyResult.card;
       result.verification_method = 'fuzzy_match';
       result.confidence = 'medium'; // Medium because name matched but number was corrected
@@ -562,6 +609,8 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
         console.log(`[Pokemon Local Verification] Fuzzy match corrected number: ${normalizedNumber} → ${fuzzyResult.matchedNumber}`);
       }
     }
+  } else if (isVintageCard && !dbCard) {
+    console.log(`[Pokemon Local Verification] Skipping fuzzy matching for vintage card (denominator ${setTotal})`);
   }
 
   // Process results
@@ -589,6 +638,28 @@ export async function verifyPokemonCard(cardInfo: CardInfoForVerification): Prom
           result.error = `Year mismatch: expected ~${cardInfo.year}, found ${dbYear}`;
           return result;
         }
+      }
+    }
+
+    // CRITICAL VALIDATION: Reject matches where set denominator doesn't match
+    // This prevents misidentification of cards like Base Set Charizard (4/102) vs Celebrations (4/25)
+    if (setTotal && dbCard.set.printedTotal) {
+      // Extract numeric portion from setTotal (handles cases like "102", "TG30", etc.)
+      const aiDenominatorStr = setTotal.replace(/^[A-Za-z]+/, '').trim();
+      const aiDenominator = parseInt(aiDenominatorStr);
+      const dbDenominator = dbCard.set.printedTotal;
+
+      if (!isNaN(aiDenominator) && aiDenominator !== dbDenominator) {
+        console.log(`[Pokemon Local Verification] REJECTED: Denominator mismatch (AI extracted: ${setTotal} → ${aiDenominator}, DB card: ${dbDenominator})`);
+        console.log(`[Pokemon Local Verification] AI identified set total ${aiDenominator} but matched card is from set with ${dbDenominator} cards`);
+        result.success = false;
+        result.verified = false;
+        result.pokemon_api_id = null;
+        result.pokemon_api_data = null;
+        result.verification_method = 'none';
+        result.confidence = 'low';
+        result.error = `Set mismatch: card shows /${setTotal} but matched set has ${dbDenominator} cards`;
+        return result;
       }
     }
 
