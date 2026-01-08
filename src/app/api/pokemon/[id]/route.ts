@@ -1480,7 +1480,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       pokemon_type: cardFields.pokemon_type,
       pokemon_stage: cardFields.pokemon_stage,
       grade: wholeGrade,
-      ocr_corrected: !!ocrValidation?.set_corrected
+      ocr_corrected: !!ocrOverride?.denominator_lookup_used
     });
 
     const { error: updateError } = await supabase
