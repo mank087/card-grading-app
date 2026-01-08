@@ -1096,18 +1096,30 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         // 🔧 ENGLISH DATABASE VALIDATION: Query local pokemon_cards by name + number to validate/correct AI's values
         // This fixes issues where AI changes "125/094" to "125/109" or uses wrong set/year based on its knowledge
         // Skip if already validated as Japanese card
+        // 🔒 CRITICAL: Respect OCR-corrected set_total to avoid finding wrong set (e.g., Celebrations vs Base Set)
         if (!dbValidationApplied && !isJapaneseCard && cardInfo?.player_or_character && cardInfo?.card_number) {
           try {
             const pokemonName = cardInfo.player_or_character;
-            const cardNumber = cardInfo.card_number; // Numerator only, e.g., "125"
+            const cardNumber = cardInfo.card_number; // Numerator only, e.g., "4"
+            const ocrCorrectedTotal = cardInfo._ocr_validation?.set_corrected ? cardInfo.set_total : null;
 
-            console.log(`[GET /api/pokemon/${cardId}] 🔍 Validating card number against local DB: name="${pokemonName}", number="${cardNumber}"`);
+            console.log(`[GET /api/pokemon/${cardId}] 🔍 Validating card number against local DB: name="${pokemonName}", number="${cardNumber}", ocr_corrected_total="${ocrCorrectedTotal || 'N/A'}"`);
 
-            const { data: dbMatches, error: dbError } = await supabase
+            // Build query - if we have OCR-corrected denominator, use it to filter
+            let query = supabase
               .from('pokemon_cards')
               .select('name, number, set_printed_total, set_name, set_id, set_release_date')
               .ilike('name', `%${pokemonName}%`)
-              .eq('number', cardNumber)
+              .eq('number', cardNumber);
+
+            // 🔒 CRITICAL: If OCR correction detected denominator mismatch, filter by correct denominator
+            // This prevents finding Celebrations (25 cards) when the card shows /102 (Base Set)
+            if (ocrCorrectedTotal) {
+              console.log(`[GET /api/pokemon/${cardId}] 🔒 OCR CORRECTION: Filtering DB by set_printed_total=${ocrCorrectedTotal}`);
+              query = query.eq('set_printed_total', parseInt(ocrCorrectedTotal));
+            }
+
+            const { data: dbMatches, error: dbError } = await query
               .order('set_release_date', { ascending: false })
               .limit(5);
 
@@ -1117,6 +1129,8 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
               const dbSetTotal = bestMatch.set_printed_total?.toString();
               const aiSetTotal = cardInfo.set_total;
               const aiSetName = cardInfo.set_name;
+
+              console.log(`[GET /api/pokemon/${cardId}] 🎯 DB Match found: ${bestMatch.name} from ${bestMatch.set_name} (${dbSetTotal} cards)`);
 
               // Extract year from set_release_date (format: "2025-01-15" or similar)
               let dbYear: string | null = null;
@@ -1430,12 +1444,38 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       grade: labelData.gradeFormatted
     });
 
+    // 🔒 FINAL SAFETY CHECK: Enforce OCR corrections before save
+    // This catches any code paths that may have overwritten our corrections
+    const ocrValidation = conversationalGradingData?.card_info?._ocr_validation;
+    if (ocrValidation?.set_corrected && ocrValidation?.corrected_set_name) {
+      console.log(`[GET /api/pokemon/${cardId}] 🔒 FINAL OCR ENFORCEMENT: Applying corrected values`);
+      console.log(`  - card_set: "${cardFields.card_set}" → "${ocrValidation.corrected_set_name}"`);
+      console.log(`  - release_date: "${cardFields.release_date}" → "${ocrValidation.corrected_year}"`);
+
+      // Override card fields with OCR-corrected values
+      cardFields.card_set = ocrValidation.corrected_set_name;
+      cardFields.release_date = ocrValidation.corrected_year;
+
+      // Also update the card_info object for consistency
+      if (conversationalGradingData?.card_info) {
+        conversationalGradingData.card_info.set_name = ocrValidation.corrected_set_name;
+        conversationalGradingData.card_info.year = ocrValidation.corrected_year;
+        conversationalGradingData.card_info.card_number_raw = ocrValidation.reconstructed;
+      }
+
+      // Update updateData
+      updateData.card_set = ocrValidation.corrected_set_name;
+      (updateData as any).release_date = ocrValidation.corrected_year;
+      updateData.conversational_card_info = conversationalGradingData?.card_info || null;
+    }
+
     console.log(`[GET /api/pokemon/${cardId}] Updating database with extracted Pokemon fields:`, {
       card_name: cardFields.card_name,
       card_set: cardFields.card_set,
       pokemon_type: cardFields.pokemon_type,
       pokemon_stage: cardFields.pokemon_stage,
-      grade: wholeGrade
+      grade: wholeGrade,
+      ocr_corrected: !!ocrValidation?.set_corrected
     });
 
     const { error: updateError } = await supabase
