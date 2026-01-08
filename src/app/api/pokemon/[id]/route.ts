@@ -57,14 +57,12 @@ const DENOMINATOR_TO_SET: Record<number, { set_name: string; year: string; era: 
 };
 
 /**
- * 🔒 OCR VALIDATION: Reconstruct card number from OCR breakdown and validate against AI-stated values
- * This catches AI hallucination where it correctly OCRs the number but then outputs wrong values.
+ * 🔒 OCR OVERRIDE: ALWAYS use OCR breakdown as source of truth for card number
  *
- * Example: AI OCR reads "4/102" but outputs card_number_raw: "4/25" because it "knows" about Celebrations.
- * The OCR breakdown is: "Position 1: 4, Position 2: /, Position 3: 1, Position 4: 0, Position 5: 2"
- * We reconstruct "4/102" from the breakdown and use that instead.
+ * The AI correctly OCRs the card number in card_number_ocr_breakdown but then
+ * often outputs wrong values in card_number_raw due to hallucination.
  *
- * CRITICAL: Also corrects set_name and year based on denominator lookup!
+ * Solution: ALWAYS parse and use the OCR breakdown, ignoring AI's stated values.
  */
 function validateAndFixCardNumberFromOcr(cardInfo: any): any {
   if (!cardInfo) return cardInfo;
@@ -72,10 +70,12 @@ function validateAndFixCardNumberFromOcr(cardInfo: any): any {
   const ocrBreakdown = cardInfo.card_number_ocr_breakdown;
   const statedRaw = cardInfo.card_number_raw;
   const statedTotal = cardInfo.set_total;
+  const statedSetName = cardInfo.set_name;
+  const statedYear = cardInfo.year;
 
-  // If no OCR breakdown, can't validate
+  // If no OCR breakdown, can't override
   if (!ocrBreakdown || typeof ocrBreakdown !== 'string') {
-    console.log('[OCR Validation] No OCR breakdown found, using stated values');
+    console.log('[OCR Override] No OCR breakdown found, using AI stated values');
     return cardInfo;
   }
 
@@ -85,77 +85,79 @@ function validateAndFixCardNumberFromOcr(cardInfo: any): any {
   const matches = [...ocrBreakdown.matchAll(positionPattern)];
 
   if (matches.length === 0) {
-    console.log('[OCR Validation] Could not parse OCR breakdown format');
+    console.log('[OCR Override] Could not parse OCR breakdown format');
     return cardInfo;
   }
 
   // Reconstruct the number from positions
   const reconstructed = matches.map(m => m[1].trim()).join('');
-  console.log(`[OCR Validation] Reconstructed from breakdown: "${reconstructed}"`);
-  console.log(`[OCR Validation] AI stated card_number_raw: "${statedRaw}"`);
+  console.log(`[OCR Override] Reconstructed from breakdown: "${reconstructed}"`);
+  console.log(`[OCR Override] AI stated card_number_raw: "${statedRaw}"`);
 
-  // Check if there's a mismatch
-  if (reconstructed && statedRaw && reconstructed !== statedRaw) {
-    console.log(`[OCR Validation] ⚠️ MISMATCH DETECTED! OCR="${reconstructed}" vs Stated="${statedRaw}"`);
-    console.log(`[OCR Validation] 🔧 Using OCR breakdown value as source of truth`);
-
-    // Extract numerator and denominator from reconstructed
-    const fractionMatch = reconstructed.match(/^(\d+)\/(\d+)$/);
-    if (fractionMatch) {
-      const [, numerator, denominator] = fractionMatch;
-      const denominatorNum = parseInt(denominator);
-
-      // 🔒 CRITICAL: Look up correct set based on denominator
-      const setLookup = DENOMINATOR_TO_SET[denominatorNum];
-
-      // Create corrected card_info
-      const corrected = {
-        ...cardInfo,
-        card_number_raw: reconstructed,
-        card_number: numerator,
-        set_total: denominator,
-        // Override set_name and year if we have a denominator match
-        ...(setLookup && {
-          set_name: setLookup.set_name,
-          year: setLookup.year,
-          card_era: setLookup.era,
-        }),
-        _ocr_validation: {
-          original_raw: statedRaw,
-          original_total: statedTotal,
-          original_set_name: cardInfo.set_name,
-          original_year: cardInfo.year,
-          reconstructed: reconstructed,
-          mismatch_corrected: true,
-          set_corrected: !!setLookup,
-          corrected_set_name: setLookup?.set_name,
-          corrected_year: setLookup?.year,
-        }
-      };
-
-      console.log(`[OCR Validation] ✅ Corrected: card_number="${numerator}", set_total="${denominator}"`);
-      if (setLookup) {
-        console.log(`[OCR Validation] ✅ Set corrected via denominator lookup: "${setLookup.set_name}" (${setLookup.year})`);
-      }
-      return corrected;
-    } else {
-      // Not a fraction format, but still use reconstructed if different
-      const corrected = {
-        ...cardInfo,
-        card_number_raw: reconstructed,
-        _ocr_validation: {
-          original_raw: statedRaw,
-          reconstructed: reconstructed,
-          mismatch_corrected: true
-        }
-      };
-      console.log(`[OCR Validation] ✅ Corrected card_number_raw to "${reconstructed}"`);
-      return corrected;
-    }
+  // ALWAYS use reconstructed value - this is the source of truth
+  const hasMismatch = reconstructed !== statedRaw;
+  if (hasMismatch) {
+    console.log(`[OCR Override] ⚠️ MISMATCH! OCR="${reconstructed}" vs AI="${statedRaw}" - Using OCR value`);
+  } else {
+    console.log(`[OCR Override] ✅ Values match`);
   }
 
-  console.log(`[OCR Validation] ✅ OCR breakdown matches stated values`);
-  return cardInfo;
+  // Extract numerator and denominator from reconstructed
+  const fractionMatch = reconstructed.match(/^(\d+)\/(\d+)$/);
+  if (fractionMatch) {
+    const [, numerator, denominator] = fractionMatch;
+    const denominatorNum = parseInt(denominator);
+
+    // 🔒 CRITICAL: Look up correct set based on denominator from OCR
+    const setLookup = DENOMINATOR_TO_SET[denominatorNum];
+
+    if (setLookup) {
+      console.log(`[OCR Override] 🎯 Denominator ${denominatorNum} → ${setLookup.set_name} (${setLookup.year})`);
+    }
+
+    // ALWAYS create corrected card_info using OCR values
+    const corrected = {
+      ...cardInfo,
+      // ALWAYS use OCR-derived values
+      card_number_raw: reconstructed,
+      card_number: numerator,
+      set_total: denominator,
+      // Override set_name and year from denominator lookup
+      ...(setLookup && {
+        set_name: setLookup.set_name,
+        year: setLookup.year,
+        card_era: setLookup.era,
+      }),
+      _ocr_override: {
+        ocr_breakdown: ocrBreakdown,
+        ocr_reconstructed: reconstructed,
+        ai_stated_raw: statedRaw,
+        ai_stated_total: statedTotal,
+        ai_stated_set_name: statedSetName,
+        ai_stated_year: statedYear,
+        had_mismatch: hasMismatch,
+        denominator_lookup_used: !!setLookup,
+        final_set_name: setLookup?.set_name || statedSetName,
+        final_year: setLookup?.year || statedYear,
+      }
+    };
+
+    console.log(`[OCR Override] ✅ Final values: card_number="${numerator}", set_total="${denominator}", set_name="${corrected.set_name}", year="${corrected.year}"`);
+    return corrected;
+  }
+
+  // Non-fraction format - just use reconstructed for card_number_raw
+  console.log(`[OCR Override] Non-fraction format, using reconstructed: "${reconstructed}"`);
+  return {
+    ...cardInfo,
+    card_number_raw: reconstructed,
+    _ocr_override: {
+      ocr_breakdown: ocrBreakdown,
+      ocr_reconstructed: reconstructed,
+      ai_stated_raw: statedRaw,
+      had_mismatch: hasMismatch,
+    }
+  };
 }
 
 // Types
@@ -1096,27 +1098,29 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         // 🔧 ENGLISH DATABASE VALIDATION: Query local pokemon_cards by name + number to validate/correct AI's values
         // This fixes issues where AI changes "125/094" to "125/109" or uses wrong set/year based on its knowledge
         // Skip if already validated as Japanese card
-        // 🔒 CRITICAL: Respect OCR-corrected set_total to avoid finding wrong set (e.g., Celebrations vs Base Set)
+        // 🔒 CRITICAL: Use OCR-derived set_total to filter database (prevents finding wrong set)
         if (!dbValidationApplied && !isJapaneseCard && cardInfo?.player_or_character && cardInfo?.card_number) {
           try {
             const pokemonName = cardInfo.player_or_character;
             const cardNumber = cardInfo.card_number; // Numerator only, e.g., "4"
-            const ocrCorrectedTotal = cardInfo._ocr_validation?.set_corrected ? cardInfo.set_total : null;
+            // Use OCR override values if available
+            const ocrOverride = cardInfo._ocr_override;
+            const ocrDerivedTotal = ocrOverride?.ocr_reconstructed?.split('/')?.[1] || cardInfo.set_total;
 
-            console.log(`[GET /api/pokemon/${cardId}] 🔍 Validating card number against local DB: name="${pokemonName}", number="${cardNumber}", ocr_corrected_total="${ocrCorrectedTotal || 'N/A'}"`);
+            console.log(`[GET /api/pokemon/${cardId}] 🔍 Validating card number against local DB: name="${pokemonName}", number="${cardNumber}", ocr_derived_total="${ocrDerivedTotal || 'N/A'}"`);
 
-            // Build query - if we have OCR-corrected denominator, use it to filter
+            // Build query - ALWAYS filter by OCR-derived denominator when available
             let query = supabase
               .from('pokemon_cards')
               .select('name, number, set_printed_total, set_name, set_id, set_release_date')
               .ilike('name', `%${pokemonName}%`)
               .eq('number', cardNumber);
 
-            // 🔒 CRITICAL: If OCR correction detected denominator mismatch, filter by correct denominator
-            // This prevents finding Celebrations (25 cards) when the card shows /102 (Base Set)
-            if (ocrCorrectedTotal) {
-              console.log(`[GET /api/pokemon/${cardId}] 🔒 OCR CORRECTION: Filtering DB by set_printed_total=${ocrCorrectedTotal}`);
-              query = query.eq('set_printed_total', parseInt(ocrCorrectedTotal));
+            // 🔒 CRITICAL: Filter by OCR-derived denominator to find correct set
+            // This prevents finding Celebrations (25 cards) when OCR shows /102 (Base Set)
+            if (ocrDerivedTotal && !isNaN(parseInt(ocrDerivedTotal))) {
+              console.log(`[GET /api/pokemon/${cardId}] 🔒 OCR FILTER: set_printed_total=${ocrDerivedTotal}`);
+              query = query.eq('set_printed_total', parseInt(ocrDerivedTotal));
             }
 
             const { data: dbMatches, error: dbError } = await query
@@ -1444,28 +1448,29 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
       grade: labelData.gradeFormatted
     });
 
-    // 🔒 FINAL SAFETY CHECK: Enforce OCR corrections before save
-    // This catches any code paths that may have overwritten our corrections
-    const ocrValidation = conversationalGradingData?.card_info?._ocr_validation;
-    if (ocrValidation?.set_corrected && ocrValidation?.corrected_set_name) {
-      console.log(`[GET /api/pokemon/${cardId}] 🔒 FINAL OCR ENFORCEMENT: Applying corrected values`);
-      console.log(`  - card_set: "${cardFields.card_set}" → "${ocrValidation.corrected_set_name}"`);
-      console.log(`  - release_date: "${cardFields.release_date}" → "${ocrValidation.corrected_year}"`);
+    // 🔒 FINAL SAFETY CHECK: Enforce OCR override values before save
+    // This catches any code paths that may have overwritten our OCR-derived values
+    const ocrOverride = conversationalGradingData?.card_info?._ocr_override;
+    if (ocrOverride?.denominator_lookup_used && ocrOverride?.final_set_name) {
+      console.log(`[GET /api/pokemon/${cardId}] 🔒 FINAL OCR ENFORCEMENT: Applying OCR-derived values`);
+      console.log(`  - OCR reconstructed: "${ocrOverride.ocr_reconstructed}"`);
+      console.log(`  - card_set: "${cardFields.card_set}" → "${ocrOverride.final_set_name}"`);
+      console.log(`  - release_date: "${cardFields.release_date}" → "${ocrOverride.final_year}"`);
 
-      // Override card fields with OCR-corrected values
-      cardFields.card_set = ocrValidation.corrected_set_name;
-      cardFields.release_date = ocrValidation.corrected_year;
+      // Override card fields with OCR-derived values
+      cardFields.card_set = ocrOverride.final_set_name;
+      cardFields.release_date = ocrOverride.final_year;
 
       // Also update the card_info object for consistency
       if (conversationalGradingData?.card_info) {
-        conversationalGradingData.card_info.set_name = ocrValidation.corrected_set_name;
-        conversationalGradingData.card_info.year = ocrValidation.corrected_year;
-        conversationalGradingData.card_info.card_number_raw = ocrValidation.reconstructed;
+        conversationalGradingData.card_info.set_name = ocrOverride.final_set_name;
+        conversationalGradingData.card_info.year = ocrOverride.final_year;
+        conversationalGradingData.card_info.card_number_raw = ocrOverride.ocr_reconstructed;
       }
 
-      // Update updateData
-      updateData.card_set = ocrValidation.corrected_set_name;
-      (updateData as any).release_date = ocrValidation.corrected_year;
+      // Update updateData directly
+      updateData.card_set = ocrOverride.final_set_name;
+      (updateData as any).release_date = ocrOverride.final_year;
       updateData.conversational_card_info = conversationalGradingData?.card_info || null;
     }
 

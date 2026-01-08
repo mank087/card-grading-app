@@ -63,8 +63,10 @@ REQUIRED FIELDS (All Pokemon Cards)
 • 🇯🇵 For Japanese cards: Include both if visible (e.g., "ポケモン (Pokemon)")
 
 **set_name**: Set/expansion name
-• Extract the set name from the card
-• Use Set Identification Module below for systematic detection
+• DO NOT guess or use your knowledge to determine the set
+• If set name is clearly printed on the card, extract it
+• If not clearly visible, set to null - the backend will determine it from the card number
+• The set will be looked up automatically using the card_number and set_total you extract
 • 🇯🇵 For Japanese cards: "日本語 (English)" format when both are visible
 
 **set_code**: 3-letter set code (Scarlet & Violet era)
@@ -75,104 +77,61 @@ REQUIRED FIELDS (All Pokemon Cards)
 • Extract exactly as printed (e.g., "SVI", "PAF", "SVP")
 • null if not visible or not present (older cards pre-2020)
 
-**card_number**: Card number within set (NUMERATOR ONLY for API lookup)
-🚨🚨🚨 **CRITICAL - EXACT OCR REQUIRED - DO NOT INFER OR GUESS** 🚨🚨🚨
+════════════════════════════════════════════════════════════════════════
+🚨🚨🚨 CARD NUMBER EXTRACTION - SIMPLIFIED RULES 🚨🚨🚨
+════════════════════════════════════════════════════════════════════════
 
-⛔ **FORBIDDEN BEHAVIOR:**
-• DO NOT use your knowledge of Pokemon sets to "correct" numbers
-• DO NOT guess what the number "should be" based on set information
-• DO NOT assume a number based on how many cards are in a set
-• If you read "125/094" on the card, report "125/094" - even if you "know" that set has more than 94 cards
-• ONLY report what you can physically see in the image
+**STEP 1: DO THE OCR BREAKDOWN FIRST**
+Before filling ANY card number fields, you MUST complete the OCR breakdown.
+Look at the bottom of the card (usually bottom-left or bottom-right) for the card number.
 
-🔍 **STEP 1: LOCATE THE NUMBER**
-• Location: Usually bottom-left or bottom-right of card front
-• Look for format like "XXX/YYY" (e.g., "185/159", "125/094")
-• ZOOM IN on this area - do not guess from memory
+**card_number_ocr_breakdown**: 🚨 FILL THIS FIRST - MANDATORY 🚨
+• Look at the card number printed on the card
+• Write down EACH character you see, one by one, left to right
+• Format: "Position 1: [char], Position 2: [char], ..."
+• Example: If you see "4/102" → "Position 1: 4, Position 2: /, Position 3: 1, Position 4: 0, Position 5: 2"
+• DO NOT skip any characters
+• DO NOT use your knowledge - just transcribe what you SEE
 
-**STEP 2: READ DIGIT-BY-DIGIT (Left to Right)**
-• Read each digit individually and verify its shape:
-  - 0: Oval/round shape with hole in middle
-  - 1: Single vertical line, may have serifs
-  - 2: Curved top, horizontal bottom stroke
-  - 3: Two curved bumps on right side (like sideways 'W')
-  - 4: Angular, vertical line with horizontal cross
-  - 5: Flat top, curved bottom (like backwards '2' rotated)
-  - 6: Round bottom with curved top stroke
-  - 7: Horizontal top, diagonal stroke down
-  - 8: Two stacked circles (figure-8)
-  - 9: Round top with curved bottom stroke (upside-down 6)
+**STEP 2: COPY FROM YOUR OCR BREAKDOWN**
+After completing the breakdown, set these fields by copying from your breakdown:
 
-**STEP 3: VERIFY COMMONLY CONFUSED DIGITS**
-🔍 These pairs are frequently misread - DOUBLE-CHECK:
-  - 3 vs 5 vs 8 (curved shapes - look at bump direction)
-  - 1 vs 7 (presence of horizontal top stroke)
-  - 6 vs 8 vs 9 (number of loops)
-  - 0 vs O vs 8 (hole count)
+**card_number_raw**: Combine all characters from your OCR breakdown
+• Just join all the Position values together
+• If breakdown was "Position 1: 4, Position 2: /, Position 3: 1, Position 4: 0, Position 5: 2"
+• Then card_number_raw = "4/102"
+• 🚨 THIS MUST MATCH YOUR OCR BREAKDOWN EXACTLY 🚨
 
-**STEP 4: EXTRACT THE NUMERATOR**
-• **EXTRACT ONLY THE NUMBER BEFORE THE SLASH**:
-  - "240/193" → card_number: "240"
-  - "185/159" → card_number: "185"
-  - "25/102" → card_number: "25"
-  - "TG10/TG30" → card_number: "TG10"
-  - "GG33/GG70" → card_number: "GG33"
-  - "SWSH039" → card_number: "SWSH039" (no slash, use full value)
-  - "085" or "25" → card_number: "085" or "25" (single number, use as-is)
-• Keep leading zeros if present (e.g., "085" not "85")
-• Include prefixes (TG, GG, SWSH, SV) when part of the number
-• If partially obscured, report what IS visible with uncertainty note
+**card_number**: The number BEFORE the slash only
+• From "4/102" → card_number = "4"
+• From "125/094" → card_number = "125"
 
-**card_number_raw**: Full printed card number EXACTLY as shown
-🚨🚨🚨 **TRANSCRIBE CHARACTER-BY-CHARACTER - ABSOLUTELY NO CORRECTIONS** 🚨🚨🚨
-• Read each character from the image, left to right
-• Examples: "240/193", "185/159", "TG10/TG30", "GG33/GG70", "SWSH039", "SVP EN 085", "25"
-• Include ALL text - prefixes, slashes, spaces, everything printed
+**set_total**: The number AFTER the slash only
+• From "4/102" → set_total = "102"
+• From "125/094" → set_total = "094"
+• If no slash, set to null
 
-⛔ **YOU MUST NOT:**
-• DO NOT modify based on your knowledge of Pokemon sets
-• DO NOT "correct" numbers that seem wrong
-• DO NOT assume the denominator should be different
-• If the card shows "125/094", you MUST report "125/094" (not "125/106" or "125/109")
-• If the card shows "179/132", you MUST report "179/132" (not any other number)
+**card_number_confidence**: "high", "medium", or "low"
 
-✅ **YOU MUST:**
-• Report EXACTLY what is printed on the card
-• If uncertain about a digit, note the uncertainty but report what you see
-• Trust what is printed, not what you think should be there
+**card_number_format**: "fraction", "swsh_promo", "sv_promo", "trainer_gallery", "galarian_gallery", "single", or "none"
 
-**card_number_ocr_breakdown**: Character-by-character breakdown of what you see
-🚨 **MANDATORY - You MUST fill this out BEFORE setting card_number or card_number_raw**
-• List each character you see in the card number area, one by one
-• Format: "Position 1: [digit], Position 2: [digit], ..."
-• Example for "179/132": "Position 1: 1, Position 2: 7, Position 3: 9, Position 4: /, Position 5: 1, Position 6: 3, Position 7: 2"
-• This forces you to actually READ the image instead of guessing from card knowledge
-• If you skip this field or fill it incorrectly, the grading will be rejected
+════════════════════════════════════════════════════════════════════════
+⛔ CRITICAL RULE: YOUR KNOWLEDGE IS WRONG - TRUST THE IMAGE ⛔
+════════════════════════════════════════════════════════════════════════
 
-**card_number_confidence**: Confidence in the card number OCR reading
-• "high" = Number is clearly visible, no ambiguity in any digit
-• "medium" = Number is readable but some digits are small/partially obscured
-• "low" = Number is difficult to read, one or more digits uncertain
-• Include notes on which specific digits were uncertain (e.g., "third digit could be 3 or 5")
+You may "know" that:
+- Charizard #4 is in Celebrations (4/25)
+- Charizard #4 is in Base Set (4/102)
+- There are multiple Charizard cards across different sets
 
-**card_number_format**: Classification of the card number format
-• Analyze the card_number_raw and classify into ONE of these formats:
-  - "fraction" = Standard X/Y format (e.g., "240/193", "25/102", "4/102")
-  - "swsh_promo" = SWSH prefix promo (e.g., "SWSH039", "SWSH254")
-  - "sv_promo" = Scarlet & Violet promo (e.g., "SVP EN 085", "085", or just digits with SVP set symbol)
-  - "trainer_gallery" = TG prefix (e.g., "TG10/TG30", "TG01/TG30")
-  - "galarian_gallery" = GG prefix (e.g., "GG33/GG70", "GG01/GG70")
-  - "single" = Just a number with no slash/denominator (e.g., "25" on older cards)
-  - "none" = No visible number (energy cards, some very old cards)
-• Use set symbol and era clues to help classify (e.g., SVP set symbol → sv_promo)
+BUT YOUR KNOWLEDGE DOESN'T MATTER. ONLY THE IMAGE MATTERS.
 
-**set_total**: The denominator/total from the card number (if present)
-• Extract the second number after the slash in fraction formats:
-  - "240/193" → set_total: "193"
-  - "TG10/TG30" → set_total: "TG30"
-  - "GG33/GG70" → set_total: "GG70"
-• For non-fraction formats (promo, single), set to null
-• Used for set identification - helps narrow down which set the card belongs to
+If your OCR breakdown shows "4/102", then:
+- card_number_raw MUST be "4/102" (NOT "4/25")
+- set_total MUST be "102" (NOT "25")
+
+The backend will use your OCR data to look up the correct set.
+DO NOT try to identify the set yourself based on your knowledge.
 
 **year**: Year from copyright or release date
 • 4-digit year format
