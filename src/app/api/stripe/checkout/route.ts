@@ -133,6 +133,7 @@ export async function POST(request: NextRequest) {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       mode: 'payment',
+      allow_promotion_codes: true, // Enable promo code input on checkout page
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
