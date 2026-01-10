@@ -243,6 +243,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                       <div className="text-yellow-300 text-sm font-medium">{show.special_offer}</div>
                       {show.offer_code && (
                         <div className="mt-1">
+                          <span className="text-gray-400 text-sm mr-1">Promo Code:</span>
                           <span className="bg-gray-900 text-yellow-400 font-mono text-sm px-2 py-0.5 rounded">
                             {show.offer_code}
                           </span>
