@@ -40,6 +40,8 @@ import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { UserConditionReportInput } from '@/types/conditionReport';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
+import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1415,7 +1417,7 @@ export function MTGCardDetails() {
   const cardId = params?.id;
   const router = useRouter();
   const { addToQueue, updateCardStatus } = useGradingQueue();
-  const { balance, deductLocalCredit } = useCredits();
+  const { balance, deductLocalCredit, isFirstPurchase } = useCredits();
   const [card, setCard] = useState<SportsCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -1448,6 +1450,8 @@ export function MTGCardDetails() {
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   // 📊 Track grade_card_complete event (only once per card)
   const hasTrackedGradeComplete = useRef(false);
+  // 🎉 First grade conversion modal state
+  const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
 
   // Fetch MTG Card Details using MTG-specific API
   const fetchMTGCardDetails = useCallback(async () => {
@@ -1582,6 +1586,17 @@ export function MTGCardDetails() {
       setShowFounderEmblem(false);
     }
   }, [card?.owner_is_founder, card?.owner_show_founder_badge]);
+
+  // 🎉 Show first grade conversion modal when card loads and balance is 0
+  useEffect(() => {
+    if (card && !loading && balance === 0) {
+      // Check if user is logged in (owns the card or is authenticated)
+      const session = getStoredSession();
+      if (session?.user?.id) {
+        setShowFirstGradeModal(true);
+      }
+    }
+  }, [card, loading, balance]);
 
   // 📊 Track grade_card_complete when a graded card is viewed
   useEffect(() => {
@@ -6339,6 +6354,20 @@ export function MTGCardDetails() {
         imageUrl={zoomModal.imageUrl}
         alt={zoomModal.alt}
         title={zoomModal.title}
+      />
+
+      {/* First Grade Conversion Modal */}
+      {showFirstGradeModal && (
+        <FirstGradeCongratsModal
+          isFirstPurchase={isFirstPurchase}
+          onDismiss={() => setShowFirstGradeModal(false)}
+        />
+      )}
+
+      {/* Low Credits Bottom Banner */}
+      <LowCreditsBottomBanner
+        balance={balance}
+        isFirstPurchase={isFirstPurchase}
       />
     </div>
   );

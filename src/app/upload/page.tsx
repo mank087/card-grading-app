@@ -463,7 +463,7 @@ function UniversalUploadPageContent() {
         front_path: frontPath,
         back_path: backPath,
         category: config.category,
-        is_public: true,
+        visibility: 'public', // Cards are public by default so grading API can access them
         // User condition report fields
         user_condition_report: hasConditionData ? conditionReport : null,
         user_condition_processed: processedConditionReport,
