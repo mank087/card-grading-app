@@ -383,14 +383,6 @@ export default function LatestCardsShowcase() {
         </span>
         <span className="text-green-400 text-xs font-medium">Live Feed</span>
       </div>
-
-      {/* View All Link */}
-      <Link
-        href="/search"
-        className="mt-3 text-purple-400 hover:text-purple-300 text-xs font-medium transition-colors"
-      >
-        View All Graded Cards →
-      </Link>
     </div>
   )
 }
