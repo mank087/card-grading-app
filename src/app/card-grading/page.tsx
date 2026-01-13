@@ -43,14 +43,24 @@ const trackSignupClick = (location: string) => {
       console.log('[Reddit Pixel] Lead event tracked with conversionId:', leadId)
     }
 
-    // Track Meta/Facebook Lead conversion
+    // Track Meta/Facebook - Use InitiateCheckout for signup clicks (better for optimization)
+    // Lead event fires on actual form submission, InitiateCheckout fires on button click
     if (window.fbq) {
+      // InitiateCheckout signals intent to convert
+      window.fbq('track', 'InitiateCheckout', {
+        content_name: 'card_grading_signup_click',
+        content_category: 'all_cards',
+        content_ids: [location],
+        num_items: 1
+      })
+      // Also fire Lead for broader optimization
       window.fbq('track', 'Lead', {
         content_name: 'card_grading_signup',
         content_category: 'all_cards',
+        value: 0,
         currency: 'USD'
       })
-      console.log('[Meta Pixel] Lead event tracked:', location)
+      console.log('[Meta Pixel] InitiateCheckout + Lead tracked:', location)
     }
 
     console.log(`[Analytics] Signup click tracked: ${location}`)
@@ -77,14 +87,32 @@ export default function CardGradingLanding() {
     setUser(session?.user || null)
     setIsLoading(false)
 
-    // Track landing page view
-    if (typeof window !== 'undefined' && window.gtag) {
-      window.gtag('event', 'page_view', {
-        page_title: 'Card Grading Landing',
-        page_location: window.location.href,
-        page_path: '/card-grading',
-        traffic_source: 'retargeting'
-      })
+    // Track landing page view - Google Analytics
+    if (typeof window !== 'undefined') {
+      if (window.gtag) {
+        window.gtag('event', 'page_view', {
+          page_title: 'Card Grading Landing',
+          page_location: window.location.href,
+          page_path: '/card-grading',
+          traffic_source: 'retargeting'
+        })
+      }
+
+      // Track Meta/Facebook PageView (in addition to the automatic one)
+      // This ensures the retargeting page is tracked with custom parameters
+      if (window.fbq) {
+        window.fbq('track', 'ViewContent', {
+          content_name: 'Card Grading Landing Page',
+          content_category: 'retargeting',
+          content_type: 'landing_page'
+        })
+        console.log('[Meta Pixel] ViewContent tracked for card-grading landing')
+      }
+
+      // Track Reddit page view
+      if (window.rdt) {
+        window.rdt('track', 'ViewContent')
+      }
     }
   }, [])
 
@@ -224,22 +252,26 @@ export default function CardGradingLanding() {
         <div className="relative z-10 container mx-auto px-4 py-8 md:py-24">
           {/* Mobile: Animation First */}
           <div className="xl:hidden mb-8">
-            <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="flex items-center justify-center mb-4">
               <Image src="/DCM Logo white.png" alt="DCM" width={40} height={40} />
-              <span className="text-white/80 text-xs font-medium tracking-wider uppercase">AI Card Grading</span>
             </div>
 
             {/* Headline right below logo */}
-            <div className="text-center mb-6">
-              <h1 className="text-3xl sm:text-4xl font-bold text-white mb-2 leading-tight">
-                Grade Any Card
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
-                  Instantly
-                </span>
+            <div className="text-center mb-4">
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2 leading-tight">
+                Grade Any Card Instantly
               </h1>
               <p className="text-base text-gray-300">
-                <span className="text-white font-semibold">No shipping. No waiting.</span> Results in 60 seconds.
+                No shipping. No waiting. Results in 60 seconds.
               </p>
+            </div>
+
+            {/* Bonus Credits Banner - Above the fold */}
+            <div className="flex justify-center mb-4">
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/50 rounded-full px-4 py-2">
+                <span className="text-green-400 text-lg">🎁</span>
+                <span className="text-green-300 text-sm font-semibold">Bonus credits on your first purchase!</span>
+              </div>
             </div>
 
             {/* Latest Cards Showcase - Mobile */}
@@ -417,21 +449,23 @@ export default function CardGradingLanding() {
 
             {/* Center: Hero Content */}
             <div className="flex-1 text-left">
-              <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-3 mb-4">
                 <Image src="/DCM Logo white.png" alt="DCM" width={50} height={50} />
-                <span className="text-white/80 text-sm font-medium tracking-wider uppercase">AI Card Grading</span>
               </div>
 
-              <h1 className="text-5xl lg:text-6xl font-bold text-white mb-6 leading-tight">
-                Grade Any Card
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-pink-500">
-                  Instantly
-                </span>
+              <h1 className="text-4xl lg:text-5xl font-bold text-white mb-4 leading-tight">
+                Grade Any Card Instantly
               </h1>
 
-              <p className="text-xl text-gray-300 mb-6 max-w-xl">
-                <span className="text-white font-semibold">No shipping. No waiting.</span> Get professional-grade analysis in under 60 seconds.
+              <p className="text-xl text-gray-300 mb-4 max-w-xl">
+                No shipping. No waiting. Get professional-grade analysis in under 60 seconds.
               </p>
+
+              {/* Bonus Credits Banner - Above the fold */}
+              <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-400/50 rounded-full px-5 py-2.5 mb-6">
+                <span className="text-green-400 text-xl">🎁</span>
+                <span className="text-green-300 font-semibold">Bonus credits on your first purchase!</span>
+              </div>
 
               {/* Feature bullets - desktop only */}
               <div className="grid grid-cols-2 gap-4 mb-8 max-w-xl">

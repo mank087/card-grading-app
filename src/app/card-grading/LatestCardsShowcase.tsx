@@ -321,7 +321,7 @@ export default function LatestCardsShowcase() {
                 }}
               >
                 {isCenter ? (
-                  <Link href={getCardLink(card)} className="block relative">
+                  <Link href={getCardLink(card)} target="_blank" rel="noopener noreferrer" className="block relative">
                     <MiniCardSlab card={card} isCenter={true} onClick={() => {}} />
                   </Link>
                 ) : (
