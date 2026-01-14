@@ -771,12 +771,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         backImageUrl,
         showFounderEmblem, // Show founder emblem on back label if user is founder with badge enabled
         labelStyle, // Use modern or traditional label style
-        subScores: labelStyle === 'modern' ? {
+        subScores: {
           centering: weightedScores.centering ?? subScoresData.centering?.weighted ?? 0,
           corners: weightedScores.corners ?? subScoresData.corners?.weighted ?? 0,
           edges: weightedScores.edges ?? subScoresData.edges?.weighted ?? 0,
           surface: weightedScores.surface ?? subScoresData.surface?.weighted ?? 0,
-        } : undefined,
+        },
       };
 
       console.log('[CARD IMAGES] Generating images with data:', {
