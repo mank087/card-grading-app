@@ -31,13 +31,15 @@ interface DownloadReportButtonProps {
   variant?: 'default' | 'compact';
   cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'other'; // For URL generation
   showFounderEmblem?: boolean; // Show founder emblem on back label of card images
+  labelStyle?: 'modern' | 'traditional'; // Label style preference for card images
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   card,
   variant = 'default',
   cardType = 'sports',
-  showFounderEmblem = false
+  showFounderEmblem = false,
+  labelStyle = 'modern'
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'mini-jpg' | 'card-images' | null>(null);
@@ -752,6 +754,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       // Get English fallback name for CJK cards from featured/pokemon_featured
       const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
 
+      // Get subgrades for modern back label
+      const weightedScores = card.conversational_weighted_sub_scores || {};
+      const subScoresData = card.conversational_sub_scores || {};
+
       const cardImageData: CardImageData = {
         cardName: cleanLabelData.primaryName,
         contextLine: cleanLabelData.contextLine, // Pre-formatted: "Set • Subset • #123 • 2023"
@@ -764,6 +770,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         frontImageUrl,
         backImageUrl,
         showFounderEmblem, // Show founder emblem on back label if user is founder with badge enabled
+        labelStyle, // Use modern or traditional label style
+        subScores: labelStyle === 'modern' ? {
+          centering: weightedScores.centering ?? subScoresData.centering?.weighted ?? 0,
+          corners: weightedScores.corners ?? subScoresData.corners?.weighted ?? 0,
+          edges: weightedScores.edges ?? subScoresData.edges?.weighted ?? 0,
+          surface: weightedScores.surface ?? subScoresData.surface?.weighted ?? 0,
+        } : undefined,
       };
 
       console.log('[CARD IMAGES] Generating images with data:', {

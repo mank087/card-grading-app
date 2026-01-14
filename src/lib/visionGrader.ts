@@ -392,6 +392,99 @@ export interface DetailedInspectionResult {
   };
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// THREE-PASS VALIDATION (v7.4)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+interface ThreePassValidationResult {
+  valid: boolean;
+  warnings: string[];
+  passesIdentical: boolean;
+  defectsIdentical: boolean;
+}
+
+/**
+ * Validate three-pass grading data to ensure:
+ * 1. All three passes exist with required fields
+ * 2. Passes are not mechanically duplicated (copy-paste detection)
+ * 3. Defect descriptions are not word-for-word identical across all passes
+ */
+function validateThreePassData(threePassData: any): ThreePassValidationResult {
+  const warnings: string[] = [];
+
+  // Check if grading_passes exists at all
+  if (!threePassData) {
+    return { valid: false, warnings: ['grading_passes object missing'], passesIdentical: false, defectsIdentical: false };
+  }
+
+  // Check for required structure
+  const pass1 = threePassData.pass_1;
+  const pass2 = threePassData.pass_2;
+  const pass3 = threePassData.pass_3;
+  const averaged = threePassData.averaged_rounded;
+
+  if (!pass1 || !pass2 || !pass3) {
+    warnings.push('Missing one or more passes (pass_1, pass_2, pass_3)');
+    return { valid: false, warnings, passesIdentical: false, defectsIdentical: false };
+  }
+
+  if (!averaged?.final) {
+    warnings.push('Missing averaged_rounded.final');
+    return { valid: false, warnings, passesIdentical: false, defectsIdentical: false };
+  }
+
+  // Check each pass has required fields
+  const requiredFields = ['centering', 'corners', 'edges', 'surface', 'final'];
+  for (const field of requiredFields) {
+    if (pass1[field] === undefined) warnings.push(`pass_1 missing ${field}`);
+    if (pass2[field] === undefined) warnings.push(`pass_2 missing ${field}`);
+    if (pass3[field] === undefined) warnings.push(`pass_3 missing ${field}`);
+  }
+
+  // Check for copy-paste shortcuts (all passes identical)
+  const scoresIdentical =
+    pass1.centering === pass2.centering && pass2.centering === pass3.centering &&
+    pass1.corners === pass2.corners && pass2.corners === pass3.corners &&
+    pass1.edges === pass2.edges && pass2.edges === pass3.edges &&
+    pass1.surface === pass2.surface && pass2.surface === pass3.surface &&
+    pass1.final === pass2.final && pass2.final === pass3.final;
+
+  // Check for identical defects_noted arrays (strong indicator of shortcuts)
+  const defects1 = JSON.stringify(pass1.defects_noted || []);
+  const defects2 = JSON.stringify(pass2.defects_noted || []);
+  const defects3 = JSON.stringify(pass3.defects_noted || []);
+  const defectsIdentical = defects1 === defects2 && defects2 === defects3 && defects1.length > 2; // > 2 means not just "[]"
+
+  // Scores being identical is OK (especially for pristine or heavily damaged cards)
+  // But if scores AND defects are identical, that's suspicious unless defects is empty
+  if (scoresIdentical && defectsIdentical) {
+    warnings.push('⚠️ POSSIBLE SHORTCUT DETECTED: All three passes have identical scores AND identical defect descriptions. This may indicate the AI copied pass_1 to all passes instead of performing genuine re-evaluations.');
+  } else if (defectsIdentical && (pass1.defects_noted?.length || 0) > 0) {
+    warnings.push('⚠️ SUSPICIOUS: defects_noted arrays are word-for-word identical across all passes. Independent evaluations should produce slightly different wording.');
+  }
+
+  // Calculate and validate variance
+  const finals = [pass1.final, pass2.final, pass3.final];
+  const calculatedVariance = Math.max(...finals) - Math.min(...finals);
+  if (threePassData.variance !== undefined && Math.abs(threePassData.variance - calculatedVariance) > 0.1) {
+    warnings.push(`Reported variance (${threePassData.variance}) doesn't match calculated variance (${calculatedVariance})`);
+  }
+
+  // Validate averaging
+  const calculatedAvg = (pass1.final + pass2.final + pass3.final) / 3;
+  const expectedRounded = Math.floor(calculatedAvg);
+  if (averaged.final !== expectedRounded && averaged.final !== Math.round(calculatedAvg)) {
+    warnings.push(`averaged_rounded.final (${averaged.final}) doesn't match expected floor(${calculatedAvg.toFixed(2)}) = ${expectedRounded}`);
+  }
+
+  return {
+    valid: warnings.filter(w => !w.startsWith('⚠️')).length === 0, // Only hard errors make it invalid
+    warnings,
+    passesIdentical: scoresIdentical,
+    defectsIdentical
+  };
+}
+
 // Load grading prompts from files
 let gradingPrompt: string | null = null;
 let professionalGradingPrompt: string | null = null;
@@ -1563,10 +1656,13 @@ Provide detailed analysis as markdown with all required sections.`
         throw new Error('Failed to parse JSON response from AI');
       }
 
-      // 🆕 v6.0 THREE-PASS GRADING: Extract grades from grading_passes.averaged_rounded
+      // 🆕 v7.4 THREE-PASS GRADING: Extract grades from grading_passes.averaged_rounded
       // Priority: grading_passes.averaged_rounded > final_grade > scoring (for backward compatibility)
       const threePassData = jsonData.grading_passes;
-      const hasThreePass = threePassData?.averaged_rounded?.final !== undefined;
+
+      // 🆕 v7.4: Validate three-pass structure
+      const threePassValidation = validateThreePassData(threePassData);
+      const hasThreePass = threePassValidation.valid;
 
       let extractedGrade: { decimal_grade: number | null; whole_grade: number | null; uncertainty: string };
 
@@ -1582,6 +1678,12 @@ Provide detailed analysis as markdown with all required sections.`
         console.log(`[CONVERSATIONAL JSON] Pass 1: ${threePassData.pass_1?.final}, Pass 2: ${threePassData.pass_2?.final}, Pass 3: ${threePassData.pass_3?.final}`);
         console.log(`[CONVERSATIONAL JSON] Averaged: ${threePassData.averaged?.final?.toFixed(2)}, Rounded: ${avgRounded.final}`);
         console.log(`[CONVERSATIONAL JSON] Variance: ${threePassData.variance}, Consistency: ${threePassData.consistency}`);
+
+        // Log any three-pass warnings
+        if (threePassValidation.warnings.length > 0) {
+          console.log(`[CONVERSATIONAL JSON] ⚠️ THREE-PASS WARNINGS:`);
+          threePassValidation.warnings.forEach(w => console.log(`   - ${w}`));
+        }
       } else {
         // Fallback: Use direct final_grade (for backward compatibility)
         extractedGrade = {
@@ -1590,6 +1692,7 @@ Provide detailed analysis as markdown with all required sections.`
           uncertainty: jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±1'
         };
         console.log(`[CONVERSATIONAL JSON] ⚠️ No three-pass data found, using direct final_grade`);
+        console.log(`[CONVERSATIONAL JSON] ⚠️ THREE-PASS VALIDATION FAILED: ${threePassValidation.warnings.join(', ')}`);
       }
 
       console.log(`[CONVERSATIONAL JSON] Extracted grade: ${extractedGrade.decimal_grade} (${extractedGrade.uncertainty})`);

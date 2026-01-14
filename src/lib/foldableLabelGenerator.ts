@@ -208,6 +208,32 @@ export async function loadLogoAsBase64(): Promise<string> {
 }
 
 /**
+ * Load white DCM logo as base64 data URL (for dark backgrounds)
+ */
+export async function loadWhiteLogoAsBase64(): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      } else {
+        reject(new Error('Failed to get canvas context'));
+      }
+    };
+
+    img.onerror = () => reject(new Error('Failed to load white logo'));
+    img.src = '/DCM%20Logo%20white.png';
+  });
+}
+
+/**
  * Draw rounded rectangle helper
  */
 function drawRoundedRect(

@@ -1,0 +1,179 @@
+'use client'
+
+import { QRCodeCanvas } from 'qrcode.react'
+
+interface SubScores {
+  centering: number
+  corners: number
+  edges: number
+  surface: number
+}
+
+interface ModernBackLabelProps {
+  serial: string
+  grade: number | null
+  condition?: string
+  qrCodeUrl?: string
+  subScores?: SubScores
+  isAlteredAuthentic?: boolean
+  size?: 'sm' | 'md' | 'lg'
+}
+
+// Helper: Format grade for display
+const formatGrade = (grade: number): string => {
+  return Math.round(grade).toString()
+}
+
+// Helper: Format sub-score (whole number)
+const formatSubScore = (score: number): string => {
+  return Math.round(score).toString()
+}
+
+// Size configurations for modern back label
+const sizeConfig = {
+  sm: {
+    height: 'h-[70px]',
+    padding: 'px-2 py-1.5',
+    qrSize: 50,
+    gradeSize: 'text-2xl',
+    conditionSize: 'text-[8px]',
+    subScoreSize: 'text-[8px]',
+    founderStarSize: 'text-[10px]',
+    founderTextSize: 'text-[6px]',
+  },
+  md: {
+    height: 'h-[80px]',
+    padding: 'px-3 py-2',
+    qrSize: 58,
+    gradeSize: 'text-3xl',
+    conditionSize: 'text-[9px]',
+    subScoreSize: 'text-[9px]',
+    founderStarSize: 'text-[12px]',
+    founderTextSize: 'text-[7px]',
+  },
+  lg: {
+    height: 'h-[90px]',
+    padding: 'px-4 py-2.5',
+    qrSize: 66,
+    gradeSize: 'text-4xl',
+    conditionSize: 'text-[10px]',
+    subScoreSize: 'text-[10px]',
+    founderStarSize: 'text-[14px]',
+    founderTextSize: 'text-[8px]',
+  },
+}
+
+export function ModernBackLabel({
+  serial,
+  grade,
+  condition = '',
+  qrCodeUrl,
+  subScores,
+  isAlteredAuthentic = false,
+  size = 'md',
+}: ModernBackLabelProps) {
+  const config = sizeConfig[size]
+
+  return (
+    <div
+      className={`${config.height} ${config.padding} relative overflow-hidden`}
+      style={{
+        background: 'linear-gradient(135deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+      }}
+    >
+      {/* Subtle inner glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at center, rgba(139, 92, 246, 0.1) 0%, transparent 70%)',
+        }}
+      />
+
+      <div className="relative flex items-center justify-between h-full gap-2">
+        {/* LEFT: QR Code with styled background + Founder badge */}
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {/* QR Code with modern styled background */}
+          {qrCodeUrl && (
+            <div
+              className="p-1.5 rounded"
+              style={{
+                background: '#1a1625',
+                boxShadow: '0 0 12px rgba(139, 92, 246, 0.5)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+              }}
+            >
+              <div className="bg-white p-1 rounded">
+                <QRCodeCanvas
+                  value={qrCodeUrl}
+                  size={config.qrSize}
+                  level="H"
+                  includeMargin={false}
+                  fgColor="#000000"
+                  bgColor="#FFFFFF"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Founder badge - star at top, FOUNDER sideways below */}
+          <div className="flex flex-col items-center justify-start h-full py-1">
+            <span className={`${config.founderStarSize} leading-none`} style={{ color: '#FFD700' }}>
+              ★
+            </span>
+            <span
+              className={`${config.founderTextSize} font-bold`}
+              style={{
+                color: '#FFFFFF',
+                writingMode: 'vertical-rl',
+                transform: 'rotate(180deg)',
+                marginTop: '2px',
+              }}
+            >
+              FOUNDER
+            </span>
+          </div>
+        </div>
+
+        {/* CENTER: Large Grade + Condition (centered, no founding member text) */}
+        <div className="flex-1 flex flex-col items-center justify-center">
+          {/* Grade */}
+          <div
+            className={`font-bold ${config.gradeSize} leading-none`}
+            style={{ color: '#ffffff' }}
+          >
+            {grade !== null ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
+          </div>
+          {/* Condition */}
+          {(condition || isAlteredAuthentic) && (
+            <div
+              className={`font-semibold ${config.conditionSize} leading-tight mt-1 uppercase tracking-wide`}
+              style={{ color: 'rgba(255, 255, 255, 0.8)' }}
+            >
+              {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
+            </div>
+          )}
+        </div>
+
+        {/* RIGHT: Four Sub-Grades formatted as "Label: Score" */}
+        {subScores && (
+          <div className="flex flex-col justify-center gap-0.5 flex-shrink-0 text-right">
+            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+              Centering: {formatSubScore(subScores.centering)}
+            </div>
+            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+              Corners: {formatSubScore(subScores.corners)}
+            </div>
+            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+              Edges: {formatSubScore(subScores.edges)}
+            </div>
+            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+              Surface: {formatSubScore(subScores.surface)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+export default ModernBackLabel

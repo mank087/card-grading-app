@@ -3,6 +3,16 @@
 import { ReactNode } from 'react'
 import Image from 'next/image'
 import { QRCodeCanvas } from 'qrcode.react'
+import { ModernFrontLabel } from './labels/ModernFrontLabel'
+import { ModernBackLabel } from './labels/ModernBackLabel'
+
+// Sub-scores interface for modern labels
+export interface SubScores {
+  centering: number
+  corners: number
+  edges: number
+  surface: number
+}
 
 // Props for the CardSlab component
 export interface CardSlabProps {
@@ -38,6 +48,12 @@ export interface CardSlabProps {
 
   // For Altered/Authentic cards
   isAlteredAuthentic?: boolean
+
+  // Label style preference
+  labelStyle?: 'modern' | 'traditional'
+
+  // Sub-scores for modern back label
+  subScores?: SubScores
 }
 
 // Helper: Format grade for display - v6.0: Always whole numbers
@@ -68,7 +84,10 @@ export function CardSlab({
   showZoomHint = false,
   className = '',
   isAlteredAuthentic = false,
+  labelStyle = 'modern',
+  subScores,
 }: CardSlabProps) {
+  const isModern = labelStyle === 'modern'
   // Size configurations
   const sizeConfig = {
     sm: {
@@ -135,13 +154,19 @@ export function CardSlab({
     : setLineText.length > 30 ? '10px'
     : config.setFontSize
 
-  // Metallic purple gradient for slab border
-  const slabBorderStyle = {
-    background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
-    boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
-  }
+  // Slab border styles - modern has dark with glow, traditional has metallic purple
+  const slabBorderStyle = isModern
+    ? {
+        background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+        boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+        border: '1px solid rgba(139, 92, 246, 0.4)',
+      }
+    : {
+        background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
+        boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
+      }
 
-  // Label component (reused for front and back)
+  // Traditional label component (reused for front and back)
   const FrontLabel = () => (
     <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding}`}>
       <div className="flex items-center justify-between h-full gap-1.5">
@@ -279,6 +304,15 @@ export function CardSlab({
     </div>
   )
 
+  // Separator style - modern uses darker glow, traditional uses purple gradient
+  const separatorStyle = isModern
+    ? {
+        background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
+      }
+    : {
+        background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
+      }
+
   return (
     <div className={`inline-block ${className}`}>
       <div className="flex flex-col md:flex-row gap-4 justify-center">
@@ -287,15 +321,23 @@ export function CardSlab({
           className="rounded-xl p-1 overflow-hidden"
           style={slabBorderStyle}
         >
-          <div className="bg-white rounded-lg overflow-hidden">
-            <FrontLabel />
-            {/* Purple Separator - mimics slab divider */}
-            <div
-              className="h-1"
-              style={{
-                background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
-              }}
-            />
+          <div className={`${isModern ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+            {isModern ? (
+              <ModernFrontLabel
+                displayName={displayName}
+                setLineText={setLineText}
+                features={features}
+                serial={serial}
+                grade={grade}
+                condition={condition}
+                isAlteredAuthentic={isAlteredAuthentic}
+                size={size}
+              />
+            ) : (
+              <FrontLabel />
+            )}
+            {/* Separator - mimics slab divider */}
+            <div className="h-1" style={separatorStyle} />
             <CardImage
               url={frontImageUrl}
               alt={`${altText} front`}
@@ -313,15 +355,22 @@ export function CardSlab({
             className="rounded-xl p-1 overflow-hidden"
             style={slabBorderStyle}
           >
-            <div className="bg-white rounded-lg overflow-hidden">
-              <BackLabel />
-              {/* Purple Separator - mimics slab divider */}
-              <div
-                className="h-1"
-                style={{
-                  background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
-                }}
-              />
+            <div className={`${isModern ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+              {isModern ? (
+                <ModernBackLabel
+                  serial={serial}
+                  grade={grade}
+                  condition={condition}
+                  qrCodeUrl={qrCodeUrl}
+                  subScores={subScores}
+                  isAlteredAuthentic={isAlteredAuthentic}
+                  size={size}
+                />
+              ) : (
+                <BackLabel />
+              )}
+              {/* Separator - mimics slab divider */}
+              <div className="h-1" style={separatorStyle} />
               <CardImage
                 url={backImageUrl || null}
                 alt={`${altText} back`}
@@ -353,6 +402,7 @@ export interface CardSlabGridProps {
   isAlteredAuthentic?: boolean
   children?: ReactNode // For additional content like buttons
   className?: string
+  labelStyle?: 'modern' | 'traditional'
 }
 
 export function CardSlabGrid({
@@ -366,7 +416,10 @@ export function CardSlabGrid({
   isAlteredAuthentic = false,
   children,
   className = '',
+  labelStyle = 'modern',
 }: CardSlabGridProps) {
+  const isModern = labelStyle === 'modern'
+
   // Calculate scale for name to fit on single line
   const maxCharsAtFullSize = 20
   const nameScaleX = displayName.length <= maxCharsAtFullSize
@@ -379,98 +432,126 @@ export function CardSlabGrid({
     : setLineText.length > 30 ? '10px'
     : '11px'
 
-  // Metallic purple gradient for slab border
-  const slabBorderStyle = {
-    background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
-    boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
-  }
+  // Slab border styles - modern has dark with glow, traditional has metallic purple
+  const slabBorderStyle = isModern
+    ? {
+        background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+        boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+        border: '1px solid rgba(139, 92, 246, 0.4)',
+      }
+    : {
+        background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
+        boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
+      }
+
+  // Separator style
+  const separatorStyle = isModern
+    ? {
+        background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
+      }
+    : {
+        background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
+      }
+
+  // Traditional label for grid
+  const TraditionalLabel = () => (
+    <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[95px]">
+      <div className="flex items-center justify-between gap-1.5 h-full">
+        {/* Left: DCM Logo */}
+        <div className="flex-shrink-0 -ml-1">
+          <img
+            src="/DCM-logo.png"
+            alt="DCM"
+            className="h-9 w-auto"
+          />
+        </div>
+
+        {/* Center: Card Information */}
+        <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
+          {/* Line 1: Player/Card Name */}
+          <div
+            className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
+            style={{
+              fontSize: '13px',
+              transform: `scaleX(${nameScaleX})`,
+              lineHeight: '1.2'
+            }}
+            title={displayName}
+          >
+            {displayName}
+          </div>
+
+          {/* Line 2: Set Name */}
+          <div
+            className="text-gray-700 leading-tight"
+            style={{
+              fontSize: dynamicSetFontSize,
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              wordBreak: 'break-word'
+            }}
+            title={setLineText}
+          >
+            {setLineText}
+          </div>
+
+          {/* Line 3: Special Features */}
+          {features.length > 0 && (
+            <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+              {features.join(' • ')}
+            </div>
+          )}
+
+          {/* Line 4: DCM Serial Number */}
+          <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
+            {serial}
+          </div>
+        </div>
+
+        {/* Right: Grade Display */}
+        <div className="text-center flex-shrink-0">
+          <div className="font-bold text-purple-700 text-3xl leading-none">
+            {grade !== null ? Math.round(grade).toString() : (isAlteredAuthentic ? 'A' : 'N/A')}
+          </div>
+          {(condition || isAlteredAuthentic) && (
+            <>
+              <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+              <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
+                {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 
   return (
     <div
       className={`rounded-xl p-1 overflow-hidden ${className}`}
       style={slabBorderStyle}
     >
-      <div className="bg-white rounded-lg overflow-hidden">
+      <div className={`${isModern ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
         {/* Label */}
-        <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[95px]">
-          <div className="flex items-center justify-between gap-1.5 h-full">
-            {/* Left: DCM Logo */}
-            <div className="flex-shrink-0 -ml-1">
-              <img
-                src="/DCM-logo.png"
-                alt="DCM"
-                className="h-9 w-auto"
-              />
-            </div>
+        {isModern ? (
+          <ModernFrontLabel
+            displayName={displayName}
+            setLineText={setLineText}
+            features={features}
+            serial={serial}
+            grade={grade}
+            condition={condition}
+            isAlteredAuthentic={isAlteredAuthentic}
+            size="md"
+          />
+        ) : (
+          <TraditionalLabel />
+        )}
 
-            {/* Center: Card Information */}
-            <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-              {/* Line 1: Player/Card Name */}
-              <div
-                className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
-                style={{
-                  fontSize: '13px',
-                  transform: `scaleX(${nameScaleX})`,
-                  lineHeight: '1.2'
-                }}
-                title={displayName}
-              >
-                {displayName}
-              </div>
-
-              {/* Line 2: Set Name */}
-              <div
-                className="text-gray-700 leading-tight"
-                style={{
-                  fontSize: dynamicSetFontSize,
-                  display: '-webkit-box',
-                  WebkitLineClamp: 2,
-                  WebkitBoxOrient: 'vertical',
-                  overflow: 'hidden',
-                  wordBreak: 'break-word'
-                }}
-                title={setLineText}
-              >
-                {setLineText}
-              </div>
-
-              {/* Line 3: Special Features */}
-              {features.length > 0 && (
-                <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                  {features.join(' • ')}
-                </div>
-              )}
-
-              {/* Line 4: DCM Serial Number */}
-              <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
-                {serial}
-              </div>
-            </div>
-
-            {/* Right: Grade Display */}
-            <div className="text-center flex-shrink-0">
-              <div className="font-bold text-purple-700 text-3xl leading-none">
-                {grade !== null ? Math.round(grade).toString() : (isAlteredAuthentic ? 'A' : 'N/A')}
-              </div>
-              {(condition || isAlteredAuthentic) && (
-                <>
-                  <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                  <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                    {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Purple Separator - mimics slab divider */}
-        <div
-          className="h-1"
-          style={{
-            background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
-          }}
-        />
+        {/* Separator - mimics slab divider */}
+        <div className="h-1" style={separatorStyle} />
 
         {/* Card Image */}
         <div className="aspect-[3/4] relative bg-gray-100">

@@ -227,9 +227,29 @@ function CollectionPageContent() {
   const [isBatchLabelModalOpen, setIsBatchLabelModalOpen] = useState(false)
   const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
+
+  // Fetch label style preference
+  useEffect(() => {
+    const session = getStoredSession()
+    if (!session?.access_token) return
+
+    fetch('/api/user/label-style', {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.labelStyle) {
+          setLabelStyle(data.labelStyle)
+        }
+      })
+      .catch(err => console.error('Error fetching label style:', err))
+  }, [])
 
   // Check founder status
   useEffect(() => {
@@ -543,12 +563,12 @@ function CollectionPageContent() {
   if (cards.length === 0) return <p className="p-6 text-center">You have not uploaded any cards yet.</p>
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-8">
+    <main className="flex min-h-screen flex-col items-center p-4 sm:p-8">
       <div className="w-full max-w-6xl">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold">My Collection</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold">My Collection</h1>
               {isFounder && (
                 <span className="inline-flex items-center gap-1 bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 text-sm font-semibold px-3 py-1 rounded-full shadow">
                   <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -564,9 +584,9 @@ function CollectionPageContent() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {/* View Toggle */}
-            <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+            <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 rounded-lg p-1">
               <button
                 onClick={() => setViewMode('grid')}
                 className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
@@ -594,8 +614,49 @@ function CollectionPageContent() {
                 </svg>
               </button>
             </div>
-            <div className="text-sm text-gray-500">
-              {cards.length} card{cards.length !== 1 ? 's' : ''} found
+            {/* Label Style Toggle */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              <span className={`text-xs font-medium ${labelStyle === 'traditional' ? 'text-purple-600' : 'text-gray-400'}`}>
+                <span className="hidden sm:inline">Traditional</span>
+                <span className="sm:hidden">Trad</span>
+              </span>
+              <button
+                onClick={async () => {
+                  const newStyle = labelStyle === 'modern' ? 'traditional' : 'modern';
+                  setLabelStyle(newStyle);
+                  const session = getStoredSession();
+                  if (session?.access_token) {
+                    try {
+                      await fetch('/api/user/label-style', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({ labelStyle: newStyle }),
+                      });
+                    } catch (err) {
+                      console.error('Failed to update label style:', err);
+                    }
+                  }
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                  labelStyle === 'modern' ? 'bg-purple-600' : 'bg-gray-300'
+                }`}
+                title="Toggle between modern and traditional label style"
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    labelStyle === 'modern' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-xs font-medium ${labelStyle === 'modern' ? 'text-purple-600' : 'text-gray-400'}`}>
+                Modern
+              </span>
+            </div>
+            <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
+              {cards.length} card{cards.length !== 1 ? 's' : ''}
             </div>
           </div>
         </div>
@@ -689,6 +750,7 @@ function CollectionPageContent() {
                   condition={labelData.condition}
                   frontImageUrl={card.front_url || null}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
+                  labelStyle={labelStyle}
                   className="hover:shadow-xl transition-shadow duration-200"
                 >
                   {/* Visibility Badge */}

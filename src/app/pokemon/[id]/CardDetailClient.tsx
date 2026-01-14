@@ -41,6 +41,8 @@ import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { UserConditionReportInput } from '@/types/conditionReport';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
+import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
+import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1420,6 +1422,8 @@ export function PokemonCardDetails() {
   const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
   // ⭐ Founder emblem state (for back label)
   const [showFounderEmblem, setShowFounderEmblem] = useState(false);
+  // 🎨 Label style preference (modern or traditional)
+  const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern');
   // 🐛 Parsing error state
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
@@ -1562,6 +1566,25 @@ export function PokemonCardDetails() {
       setShowFounderEmblem(false);
     }
   }, [card?.owner_is_founder, card?.owner_show_founder_badge]);
+
+  // 🎨 Fetch label style preference for the logged-in user
+  useEffect(() => {
+    const session = getStoredSession();
+    if (!session?.access_token) return;
+
+    fetch('/api/user/label-style', {
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`
+      }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.labelStyle) {
+          setLabelStyle(data.labelStyle);
+        }
+      })
+      .catch(err => console.error('Error fetching label style:', err));
+  }, []);
 
   // 🎉 Show first grade conversion modal when card loads and balance is 0
   useEffect(() => {
@@ -2520,14 +2543,45 @@ export function PokemonCardDetails() {
                 >
                   <span>{isTogglingVisibility ? 'Updating...' : visibility === 'public' ? 'Public' : 'Private'}</span>
                 </button>
-                <button
-                  onClick={handleRegradeClick}
-                  disabled={loading}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                  title="Re-grade this card with the latest model"
-                >
-                  <span>{loading ? 'Re-grading...' : 'Re-grade Card'}</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-medium ${labelStyle === 'traditional' ? 'text-purple-600' : 'text-gray-400'}`}>
+                    Traditional
+                  </span>
+                  <button
+                    onClick={async () => {
+                      const newStyle = labelStyle === 'modern' ? 'traditional' : 'modern';
+                      const session = getStoredSession();
+                      if (session?.access_token) {
+                        try {
+                          await fetch('/api/user/label-style', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'Authorization': `Bearer ${session.access_token}`,
+                            },
+                            body: JSON.stringify({ labelStyle: newStyle }),
+                          });
+                          window.location.reload();
+                        } catch (err) {
+                          console.error('Failed to update label style:', err);
+                        }
+                      }
+                    }}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                      labelStyle === 'modern' ? 'bg-purple-600' : 'bg-gray-300'
+                    }`}
+                    title="Toggle between modern and traditional label style"
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        labelStyle === 'modern' ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                  <span className={`text-xs font-medium ${labelStyle === 'modern' ? 'text-purple-600' : 'text-gray-400'}`}>
+                    Modern
+                  </span>
+                </div>
               </>
             );
           })()}
@@ -2542,91 +2596,110 @@ export function PokemonCardDetails() {
             {/* Front Card with Label - Metallic Slab */}
             <div
               className="rounded-xl p-1 overflow-hidden"
-              style={{
+              style={labelStyle === 'modern' ? {
+                background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+                boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+              } : {
                 background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
                 boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
               }}
             >
-              <div className="bg-white rounded-lg overflow-hidden">
-              {/* Front Label - PSA Style */}
-              <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[110px]">
-                <div className="flex items-center justify-between h-full">
-                  {/* Left: DCM Logo */}
-                  <div className="flex-shrink-0">
-                    <img
-                      src="/DCM-logo.png"
-                      alt="DCM"
-                      className="h-14 w-auto"
-                    />
-                  </div>
-
-                  {/* Center: Card Information - Unified 4-Line Structure (matches downloadable labels) */}
-                  <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
-                    {/* Line 1: Primary Name (from unified labelData) */}
-                    <div
-                      className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(labelData.primaryName) ? 'font-noto-sans-jp' : ''}`}
-                      style={{
-                        fontSize: (() => {
-                          const name = labelData.primaryName;
-                          if (name.length > 35) return '11px';
-                          if (name.length > 25) return '12px';
-                          return '14px';
-                        })()
-                      }}
-                      title={labelData.primaryName}
-                    >
-                      {labelData.primaryName}
+              <div className={`${labelStyle === 'modern' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+              {/* Front Label */}
+              {labelStyle === 'modern' ? (
+                <ModernFrontLabel
+                  displayName={labelData.primaryName}
+                  setLineText={labelData.contextLine || 'Card Details'}
+                  features={labelData.features}
+                  serial={labelData.serial}
+                  grade={labelData.grade}
+                  condition={labelData.condition}
+                  isAlteredAuthentic={labelData.isAlteredAuthentic}
+                  size="lg"
+                />
+              ) : (
+                <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[110px]">
+                  <div className="flex items-center justify-between h-full">
+                    {/* Left: DCM Logo */}
+                    <div className="flex-shrink-0">
+                      <img
+                        src="/DCM-logo.png"
+                        alt="DCM"
+                        className="h-14 w-auto"
+                      />
                     </div>
 
-                    {/* Line 2: Context Line (Set • Subset • #Number • Year) */}
-                    <div
-                      className="text-gray-700 leading-tight"
-                      style={{
-                        fontSize: labelData.contextLine.length > 30 ? '10px' : '11px',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 2,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden'
-                      }}
-                      title={labelData.contextLine}
-                    >
-                      {labelData.contextLine || 'Card Details'}
-                    </div>
-
-                    {/* Line 3: Special Features (from unified labelData) - Only if present */}
-                    {labelData.featuresLine && (
-                      <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
-                        {labelData.featuresLine}
+                    {/* Center: Card Information - Unified 4-Line Structure (matches downloadable labels) */}
+                    <div className="flex-1 min-w-0 mx-3 flex flex-col justify-center gap-0.5">
+                      {/* Line 1: Primary Name (from unified labelData) */}
+                      <div
+                        className={`font-bold text-gray-900 leading-tight truncate ${/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF]/.test(labelData.primaryName) ? 'font-noto-sans-jp' : ''}`}
+                        style={{
+                          fontSize: (() => {
+                            const name = labelData.primaryName;
+                            if (name.length > 35) return '11px';
+                            if (name.length > 25) return '12px';
+                            return '14px';
+                          })()
+                        }}
+                        title={labelData.primaryName}
+                      >
+                        {labelData.primaryName}
                       </div>
-                    )}
 
-                    {/* Line 4: DCM Serial Number */}
-                    <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
-                      {labelData.serial}
-                    </div>
-                  </div>
+                      {/* Line 2: Context Line (Set • Subset • #Number • Year) */}
+                      <div
+                        className="text-gray-700 leading-tight"
+                        style={{
+                          fontSize: labelData.contextLine.length > 30 ? '10px' : '11px',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden'
+                        }}
+                        title={labelData.contextLine}
+                      >
+                        {labelData.contextLine || 'Card Details'}
+                      </div>
 
-                  {/* Right: Grade Display (from unified labelData) */}
-                  <div className="text-center flex-shrink-0">
-                    <div className="font-bold text-purple-700 text-3xl leading-none">
-                      {labelData.gradeFormatted || 'N/A'}
-                    </div>
-                    {labelData.condition && (
-                      <>
-                        <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
-                        <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
-                          {labelData.condition}
+                      {/* Line 3: Special Features (from unified labelData) - Only if present */}
+                      {labelData.featuresLine && (
+                        <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+                          {labelData.featuresLine}
                         </div>
-                      </>
-                    )}
+                      )}
+
+                      {/* Line 4: DCM Serial Number */}
+                      <div className="text-gray-500 text-[10px] leading-tight font-mono truncate">
+                        {labelData.serial}
+                      </div>
+                    </div>
+
+                    {/* Right: Grade Display (from unified labelData) */}
+                    <div className="text-center flex-shrink-0">
+                      <div className="font-bold text-purple-700 text-3xl leading-none">
+                        {labelData.gradeFormatted || 'N/A'}
+                      </div>
+                      {labelData.condition && (
+                        <>
+                          <div className="border-t-2 border-purple-600 w-8 mx-auto my-1"></div>
+                          <div className="font-semibold text-purple-600 text-[0.65rem] leading-tight">
+                            {labelData.condition}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Purple Separator - mimics slab divider */}
+              {/* Separator */}
               <div
                 className="h-1"
-                style={{
+                style={labelStyle === 'modern' ? {
+                  background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
+                } : {
                   background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
                 }}
               />
@@ -2652,63 +2725,86 @@ export function PokemonCardDetails() {
             {/* Back Card with Label - Metallic Slab */}
             <div
               className="rounded-xl p-1 overflow-hidden"
-              style={{
+              style={labelStyle === 'modern' ? {
+                background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+                boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+                border: '1px solid rgba(139, 92, 246, 0.4)',
+              } : {
                 background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
                 boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
               }}
             >
-              <div className="bg-white rounded-lg overflow-hidden">
-              {/* Back Label - QR Code Centered with optional Founder Emblem */}
-              <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] flex items-center justify-center p-3">
-                <div className="flex items-center gap-3">
-                  {/* QR Code with Logo Overlay */}
-                  <div className="bg-white p-1 rounded relative">
-                    <QRCodeCanvas
-                      value={currentUrl}
-                      size={58}
-                      level="H"
-                      includeMargin={false}
-                    />
-                    {/* DCM Logo Overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <div className="bg-white rounded-full p-0.5 flex items-center justify-center" style={{ width: '20px', height: '20px' }}>
-                        <img
-                          src="/DCM-logo.png"
-                          alt="DCM"
-                          className="w-full h-full object-contain"
-                        />
+              <div className={`${labelStyle === 'modern' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+              {/* Back Label */}
+              {labelStyle === 'modern' ? (
+                <ModernBackLabel
+                  serial={labelData.serial}
+                  grade={labelData.grade}
+                  condition={labelData.condition}
+                  qrCodeUrl={currentUrl}
+                  subScores={card.conversational_sub_scores ? {
+                    centering: card.conversational_sub_scores.centering?.weighted ?? 0,
+                    corners: card.conversational_sub_scores.corners?.weighted ?? 0,
+                    edges: card.conversational_sub_scores.edges?.weighted ?? 0,
+                    surface: card.conversational_sub_scores.surface?.weighted ?? 0,
+                  } : undefined}
+                  isAlteredAuthentic={labelData.isAlteredAuthentic}
+                  size="lg"
+                />
+              ) : (
+                <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] flex items-center justify-center p-3">
+                  <div className="flex items-center gap-3">
+                    {/* QR Code with Logo Overlay */}
+                    <div className="bg-white p-1 rounded relative">
+                      <QRCodeCanvas
+                        value={currentUrl}
+                        size={58}
+                        level="H"
+                        includeMargin={false}
+                      />
+                      {/* DCM Logo Overlay */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                        <div className="bg-white rounded-full p-0.5 flex items-center justify-center" style={{ width: '20px', height: '20px' }}>
+                          <img
+                            src="/DCM-logo.png"
+                            alt="DCM"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Founder Emblem - shown when user is founder with badge enabled */}
-                  {showFounderEmblem && (
-                    <div className="flex flex-col items-center justify-center">
-                      <div
-                        className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-full flex items-center justify-center shadow-md"
-                        style={{ width: '40px', height: '40px' }}
-                      >
-                        <svg
-                          className="text-white"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                          style={{ width: '24px', height: '24px' }}
+                    {/* Founder Emblem - shown when user is founder with badge enabled */}
+                    {showFounderEmblem && (
+                      <div className="flex flex-col items-center justify-center">
+                        <div
+                          className="bg-gradient-to-br from-yellow-400 to-orange-400 rounded-full flex items-center justify-center shadow-md"
+                          style={{ width: '40px', height: '40px' }}
                         >
-                          <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                        </svg>
+                          <svg
+                            className="text-white"
+                            fill="currentColor"
+                            viewBox="0 0 20 20"
+                            style={{ width: '24px', height: '24px' }}
+                          >
+                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                          </svg>
+                        </div>
+                        <span className="text-yellow-600 font-bold mt-0.5" style={{ fontSize: '9px' }}>
+                          FOUNDER
+                        </span>
                       </div>
-                      <span className="text-yellow-600 font-bold mt-0.5" style={{ fontSize: '9px' }}>
-                        FOUNDER
-                      </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* Purple Separator - mimics slab divider */}
+              {/* Separator */}
               <div
                 className="h-1"
-                style={{
+                style={labelStyle === 'modern' ? {
+                  background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
+                } : {
                   background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
                 }}
               />
@@ -2962,7 +3058,7 @@ export function PokemonCardDetails() {
 
                     {/* Owner Actions: Download Report */}
                     {isOwner && (
-                      <DownloadReportButton card={card} cardType="pokemon" showFounderEmblem={showFounderEmblem} />
+                      <DownloadReportButton card={card} cardType="pokemon" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />
                     )}
 
                     {/* Social Sharing Buttons */}

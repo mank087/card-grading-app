@@ -49,6 +49,10 @@ export default function AccountPage() {
   const [showFounderBadge, setShowFounderBadge] = useState(true)
   const [isTogglingBadge, setIsTogglingBadge] = useState(false)
 
+  // Label style preference
+  const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
+  const [isTogglingLabelStyle, setIsTogglingLabelStyle] = useState(false)
+
   useEffect(() => {
     const fetchAccountData = async () => {
       try {
@@ -193,6 +197,21 @@ export default function AccountPage() {
           console.error('Error fetching founder status:', err)
         }
 
+        // Fetch label style preference
+        try {
+          const labelRes = await fetch('/api/user/label-style', {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
+          if (labelRes.ok) {
+            const labelData = await labelRes.json()
+            setLabelStyle(labelData.labelStyle || 'modern')
+          }
+        } catch (err) {
+          console.error('Error fetching label style:', err)
+        }
+
         setLoading(false)
       } catch (err) {
         console.error('Error fetching account data:', err)
@@ -317,6 +336,35 @@ export default function AccountPage() {
       console.error('Error toggling founder badge:', err)
     } finally {
       setIsTogglingBadge(false)
+    }
+  }
+
+  // Handle label style toggle
+  const handleLabelStyleToggle = async () => {
+    setIsTogglingLabelStyle(true)
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        return
+      }
+
+      const newStyle = labelStyle === 'modern' ? 'traditional' : 'modern'
+      const response = await fetch('/api/user/label-style', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ labelStyle: newStyle }),
+      })
+
+      if (response.ok) {
+        setLabelStyle(newStyle)
+      }
+    } catch (err) {
+      console.error('Error toggling label style:', err)
+    } finally {
+      setIsTogglingLabelStyle(false)
     }
   }
 
@@ -609,9 +657,69 @@ export default function AccountPage() {
           </div>
         </div>
 
+        {/* Label Style Settings */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+            <svg className="w-6 h-6 mr-2 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+            </svg>
+            Label Style
+          </h2>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="font-medium text-gray-900">Card Label Design</h3>
+              <p className="text-sm text-gray-600">
+                Choose between the modern dark style or traditional light style for your card labels
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className={`text-sm font-medium ${labelStyle === 'traditional' ? 'text-purple-600' : 'text-gray-400'}`}>
+                Traditional
+              </span>
+              <button
+                onClick={handleLabelStyleToggle}
+                disabled={isTogglingLabelStyle}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                  labelStyle === 'modern' ? 'bg-purple-600' : 'bg-gray-300'
+                } ${isTogglingLabelStyle ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    labelStyle === 'modern' ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+              <span className={`text-sm font-medium ${labelStyle === 'modern' ? 'text-purple-600' : 'text-gray-400'}`}>
+                Modern
+              </span>
+            </div>
+          </div>
+
+          {/* Style Preview */}
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div className={`p-3 rounded-lg border-2 ${labelStyle === 'traditional' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="text-center">
+                <div className="bg-gradient-to-b from-gray-50 to-white rounded-lg p-2 mb-2 shadow-sm">
+                  <p className="text-xs font-bold text-gray-700">Traditional</p>
+                </div>
+                <p className="text-xs text-gray-500">Light background with purple accents</p>
+              </div>
+            </div>
+            <div className={`p-3 rounded-lg border-2 ${labelStyle === 'modern' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+              <div className="text-center">
+                <div className="rounded-lg p-2 mb-2 shadow-sm" style={{ background: 'linear-gradient(135deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)' }}>
+                  <p className="text-xs font-bold text-white">Modern</p>
+                </div>
+                <p className="text-xs text-gray-500">Dark background with glow effects</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Founder Settings - Only show for founders */}
         {isFounder && (
-          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg shadow-md p-6 border border-yellow-200">
+          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg shadow-md p-6 border border-yellow-200 mb-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
               <svg className="w-6 h-6 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
