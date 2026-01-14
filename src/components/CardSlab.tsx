@@ -241,36 +241,88 @@ export function CardSlab({
     </div>
   )
 
-  // Back label with QR code
-  const BackLabel = () => (
-    <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} flex items-center justify-center ${config.padding}`}>
-      {qrCodeUrl ? (
-        <div className="bg-white p-1 rounded relative">
-          <QRCodeCanvas
-            value={qrCodeUrl}
-            size={config.qrSize}
-            level="H"
-            includeMargin={false}
-          />
-          {/* DCM Logo Overlay */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="bg-white rounded-full p-0.5 flex items-center justify-center"
-              style={{ width: config.qrLogoSize, height: config.qrLogoSize }}
-            >
-              <img
-                src="/DCM-logo.png"
-                alt="DCM"
-                className="w-full h-full object-contain"
-              />
+  // Back label with QR code, grade, and sub-scores (matches modern layout)
+  const BackLabel = () => {
+    // Size-specific configurations for back label elements
+    const backLabelConfig = {
+      sm: { gradeSize: 'text-2xl', conditionSize: 'text-[8px]', subScoreSize: 'text-[8px]', founderStarSize: 'text-[10px]', founderTextSize: 'text-[6px]' },
+      md: { gradeSize: 'text-3xl', conditionSize: 'text-[9px]', subScoreSize: 'text-[9px]', founderStarSize: 'text-[12px]', founderTextSize: 'text-[7px]' },
+      lg: { gradeSize: 'text-4xl', conditionSize: 'text-[10px]', subScoreSize: 'text-[10px]', founderStarSize: 'text-[14px]', founderTextSize: 'text-[8px]' },
+    }
+    const backConfig = backLabelConfig[size]
+
+    return (
+      <div className={`bg-gradient-to-b from-gray-50 to-white ${config.labelHeight} ${config.padding}`}>
+        <div className="flex items-center justify-between h-full gap-2">
+          {/* LEFT: QR Code + Founder badge */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {qrCodeUrl ? (
+              <div className="bg-white p-1 rounded shadow-sm">
+                <QRCodeCanvas
+                  value={qrCodeUrl}
+                  size={config.qrSize}
+                  level="H"
+                  includeMargin={false}
+                  fgColor="#000000"
+                  bgColor="#FFFFFF"
+                />
+              </div>
+            ) : (
+              <div className="text-gray-400 text-sm">Back</div>
+            )}
+
+            {/* Founder badge - star at top, FOUNDER sideways below */}
+            <div className="flex flex-col items-center justify-start h-full py-1">
+              <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#d97706' }}>
+                ★
+              </span>
+              <span
+                className={`${backConfig.founderTextSize} font-bold`}
+                style={{
+                  color: '#7c3aed',
+                  writingMode: 'vertical-rl',
+                  transform: 'rotate(180deg)',
+                  marginTop: '2px',
+                }}
+              >
+                FOUNDER
+              </span>
             </div>
           </div>
+
+          {/* CENTER: Large Grade + Condition */}
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className={`font-bold text-purple-700 ${backConfig.gradeSize} leading-none`}>
+              {grade !== null ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
+            </div>
+            {(condition || isAlteredAuthentic) && (
+              <div className={`font-semibold text-purple-600 ${backConfig.conditionSize} leading-tight mt-1 uppercase tracking-wide`}>
+                {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT: Four Sub-Grades */}
+          {subScores && (
+            <div className="flex flex-col justify-center gap-0.5 flex-shrink-0 text-right">
+              <div className={`${backConfig.subScoreSize} text-gray-700`}>
+                Centering: {Math.round(subScores.centering)}
+              </div>
+              <div className={`${backConfig.subScoreSize} text-gray-700`}>
+                Corners: {Math.round(subScores.corners)}
+              </div>
+              <div className={`${backConfig.subScoreSize} text-gray-700`}>
+                Edges: {Math.round(subScores.edges)}
+              </div>
+              <div className={`${backConfig.subScoreSize} text-gray-700`}>
+                Surface: {Math.round(subScores.surface)}
+              </div>
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="text-gray-400 text-sm">Back</div>
-      )}
-    </div>
-  )
+      </div>
+    )
+  }
 
   // Card image component
   const CardImage = ({

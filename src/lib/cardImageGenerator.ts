@@ -337,118 +337,121 @@ async function drawFrontLabel(
 }
 
 /**
- * Draw the back label with QR code and optional founder emblem
+ * Draw the back label with QR code, grade, and sub-scores (matches modern layout)
  */
 async function drawBackLabel(
   ctx: CanvasRenderingContext2D,
+  data: CardImageData,
   qrCodeDataUrl: string,
-  logoDataUrl: string | undefined,
   startY: number,
   contentWidth: number,
-  borderWidth: number,
-  showFounderEmblem: boolean = false
+  borderWidth: number
 ) {
   const labelX = borderWidth;
   const labelY = startY;
   const labelWidth = contentWidth;
   const labelHeight = LABEL_HEIGHT;
 
-  // Label background gradient
+  // Label background gradient (light theme)
   const bgGradient = ctx.createLinearGradient(labelX, labelY, labelX, labelY + labelHeight);
   bgGradient.addColorStop(0, COLORS.bgGradientStart);
   bgGradient.addColorStop(1, COLORS.bgGradientEnd);
   ctx.fillStyle = bgGradient;
   ctx.fillRect(labelX, labelY, labelWidth, labelHeight);
 
-  // QR Code - adjust position if founder emblem is shown
+  const padding = 24;
+
+  // LEFT: QR Code with simple white background
   const qrSize = 140;
-  const founderEmblemSize = 80;
-  const gap = 24;
-
-  // If founder emblem shown, offset QR code to the left
-  const totalWidth = showFounderEmblem ? qrSize + gap + founderEmblemSize : qrSize;
-  const startX = labelX + (labelWidth - totalWidth) / 2;
-
-  const qrX = startX;
+  const qrX = labelX + padding;
   const qrY = labelY + (labelHeight - qrSize) / 2;
 
-  // White background for QR
+  // White background for QR code with subtle shadow
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+  ctx.shadowBlur = 4;
   ctx.fillStyle = COLORS.white;
-  ctx.fillRect(qrX - 8, qrY - 8, qrSize + 16, qrSize + 16);
+  ctx.fillRect(qrX - 6, qrY - 6, qrSize + 12, qrSize + 12);
+  ctx.shadowBlur = 0;
 
   try {
     const qrImg = await loadImage(qrCodeDataUrl);
     ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
   } catch {
-    // Draw placeholder if QR fails
     ctx.strokeStyle = COLORS.textLight;
     ctx.lineWidth = 2;
     ctx.strokeRect(qrX, qrY, qrSize, qrSize);
-    ctx.fillStyle = COLORS.textLight;
-    ctx.font = '14px "Helvetica Neue", Arial, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('QR Code', qrX + qrSize / 2, qrY + qrSize / 2);
   }
 
-  // Draw founder emblem if enabled
-  if (showFounderEmblem) {
-    const emblemX = qrX + qrSize + gap;
-    const emblemY = labelY + (labelHeight - founderEmblemSize - 24) / 2; // 24px for "FOUNDER" text
-    const emblemRadius = founderEmblemSize / 2;
-    const emblemCenterX = emblemX + emblemRadius;
-    const emblemCenterY = emblemY + emblemRadius;
+  // Founder badge - star at top, FOUNDER text rotated below (compact style)
+  if (data.showFounderEmblem) {
+    const founderX = qrX + qrSize + 20;
+    const founderStartY = qrY + 8;
 
-    // Draw gradient circle background (yellow to orange)
-    const emblemGradient = ctx.createLinearGradient(
-      emblemX, emblemY, emblemX + founderEmblemSize, emblemY + founderEmblemSize
-    );
-    emblemGradient.addColorStop(0, '#facc15'); // yellow-400
-    emblemGradient.addColorStop(1, '#f97316'); // orange-400
-
-    ctx.beginPath();
-    ctx.arc(emblemCenterX, emblemCenterY, emblemRadius, 0, Math.PI * 2);
-    ctx.fillStyle = emblemGradient;
-    ctx.fill();
-
-    // Add shadow effect
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.2)';
-    ctx.shadowBlur = 8;
-    ctx.shadowOffsetX = 2;
-    ctx.shadowOffsetY = 2;
-    ctx.fill();
-    ctx.shadowColor = 'transparent';
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetX = 0;
-    ctx.shadowOffsetY = 0;
-
-    // Draw star icon (simplified 5-point star)
-    const starSize = founderEmblemSize * 0.5;
-    ctx.fillStyle = COLORS.white;
-    ctx.beginPath();
-    const spikes = 5;
-    const outerRadius = starSize / 2;
-    const innerRadius = outerRadius * 0.4;
-    for (let i = 0; i < spikes * 2; i++) {
-      const radius = i % 2 === 0 ? outerRadius : innerRadius;
-      const angle = (Math.PI / 2) + (Math.PI * i / spikes);
-      const x = emblemCenterX + Math.cos(angle) * radius;
-      const y = emblemCenterY - Math.sin(angle) * radius;
-      if (i === 0) {
-        ctx.moveTo(x, y);
-      } else {
-        ctx.lineTo(x, y);
-      }
-    }
-    ctx.closePath();
-    ctx.fill();
-
-    // Draw "FOUNDER" text below emblem
-    ctx.fillStyle = '#ca8a04'; // yellow-600
-    ctx.font = 'bold 18px "Helvetica Neue", Arial, sans-serif';
+    // Gold/amber star at top
+    ctx.fillStyle = '#d97706'; // amber-600
+    ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
-    ctx.fillText('FOUNDER', emblemCenterX, emblemY + founderEmblemSize + 4);
+    ctx.fillText('\u2605', founderX, founderStartY);
+
+    // "FOUNDER" text rotated -90 degrees below star
+    ctx.save();
+    ctx.translate(founderX, founderStartY + 32);
+    ctx.rotate(-Math.PI / 2);
+
+    ctx.fillStyle = COLORS.purplePrimary;
+    ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FOUNDER', 0, 0);
+
+    ctx.restore();
+  }
+
+  // CENTER: Large Grade + Condition
+  const centerX = labelX + labelWidth / 2;
+  const gradeText = formatGradeDisplay(data.grade);
+
+  // Calculate vertical centering for grade + condition
+  const gradeHeight = 72;
+  const conditionHeight = data.conditionLabel ? 28 : 0;
+  const totalCenterHeight = gradeHeight + conditionHeight;
+  const centerStartY = labelY + (labelHeight - totalCenterHeight) / 2;
+
+  ctx.fillStyle = COLORS.purplePrimary;
+  ctx.font = 'bold 72px "Helvetica Neue", Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText(gradeText, centerX, centerStartY);
+
+  // Condition label (centered below grade)
+  if (data.conditionLabel) {
+    ctx.fillStyle = COLORS.purpleDark;
+    ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
+    ctx.fillText(data.conditionLabel.toUpperCase(), centerX, centerStartY + gradeHeight + 5);
+  }
+
+  // RIGHT: Four Sub-Grades (whole numbers, formatted as "Label: Score")
+  if (data.subScores) {
+    const rightEdge = labelX + labelWidth - padding;
+    const subStartY = labelY + 32;
+    const lineHeight = 42;
+
+    const drawSubScore = (label: string, value: number, yOffset: number) => {
+      const y = subStartY + yOffset;
+      const scoreText = `${label}: ${Math.round(value)}`;
+
+      ctx.fillStyle = COLORS.textMedium;
+      ctx.font = '18px "Helvetica Neue", Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(scoreText, rightEdge, y);
+    };
+
+    drawSubScore('Centering', data.subScores.centering, 0);
+    drawSubScore('Corners', data.subScores.corners, lineHeight);
+    drawSubScore('Edges', data.subScores.edges, lineHeight * 2);
+    drawSubScore('Surface', data.subScores.surface, lineHeight * 3);
   }
 }
 
@@ -860,7 +863,7 @@ async function generateCardImage(
     if (side === 'front') {
       await drawFrontLabel(ctx, data, logoDataUrl, borderWidth, contentWidth, borderWidth);
     } else {
-      await drawBackLabel(ctx, qrCodeDataUrl, logoDataUrl, borderWidth, contentWidth, borderWidth, data.showFounderEmblem);
+      await drawBackLabel(ctx, data, qrCodeDataUrl, borderWidth, contentWidth, borderWidth);
     }
   }
 
