@@ -172,6 +172,9 @@ function MiniCardSlab({ card, isCenter, onClick }: { card: any; isCenter: boolea
                 sizes={isCenter ? '220px' : '160px'}
                 className="object-contain"
                 unoptimized={card.front_url.includes('supabase')}
+                loading={isCenter ? 'eager' : 'lazy'}
+                placeholder="blur"
+                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAQMEAQUAAAAAAAAAAAAAAQIDBAAFBhEhEhMiMUH/xAAVAQEBAAAAAAAAAAAAAAAAAAADBP/EABkRAAIDAQAAAAAAAAAAAAAAAAABAhEhMf/aAAwDAQACEQMRAD8AyTF8hv0O4W9q33S4wI1wjJkx0suq0tJWNdJPsb0djxSlVKlxCj0P/9k="
               />
             ) : (
               <div className="flex items-center justify-center h-full text-gray-400 text-xs">
@@ -202,10 +205,11 @@ export default function LatestCardsShowcase() {
   const containerRef = useRef<HTMLDivElement>(null)
 
   // Fetch latest graded cards
+  // Only fetch 8 cards (5 visible + 3 buffer) to reduce bandwidth
   useEffect(() => {
     const fetchCards = async () => {
       try {
-        const response = await fetch('/api/cards/latest-grades?limit=20')
+        const response = await fetch('/api/cards/latest-grades?limit=8')
         const data = await response.json()
         if (data.cards && data.cards.length > 0) {
           setCards(data.cards)

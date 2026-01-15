@@ -208,44 +208,45 @@ export default function CardGradingLanding() {
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900" />
 
         {/* Animated cards background - mix of all card types, hidden on mobile */}
+        {/* All background images use loading="lazy" since they're decorative */}
         <div className="absolute inset-0 opacity-15 hidden md:block">
           {/* Left side cards - Pokemon */}
           <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
-            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" />
+            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" loading="lazy" sizes="112px" />
           </div>
           <div className="absolute bottom-24 left-[8%] w-24 h-34 animate-float-medium">
-            <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[8deg]" />
+            <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[8deg]" loading="lazy" sizes="96px" />
           </div>
 
           {/* Center-left cards */}
           <div className="absolute top-8 left-[22%] w-24 h-34 animate-float-fast">
-            <Image src="/promo-umbreon.png" alt="" fill className="object-contain rotate-[6deg]" />
+            <Image src="/promo-umbreon.png" alt="" fill className="object-contain rotate-[6deg]" loading="lazy" sizes="96px" />
           </div>
           <div className="absolute bottom-16 left-[28%] w-26 h-36 animate-float-slow">
-            <Image src="/Sports/DCM-Card-Shohei-Ohtani-192904-front.jpg" alt="" fill className="object-contain rotate-[-8deg]" />
+            <Image src="/Sports/DCM-Card-Shohei-Ohtani-192904-front.jpg" alt="" fill className="object-contain rotate-[-8deg]" loading="lazy" sizes="104px" />
           </div>
 
           {/* Center cards - only visible on large screens */}
           <div className="absolute top-32 left-[42%] w-24 h-34 animate-float-medium hidden lg:block">
-            <Image src="/homepage-cards/Black Lotus MTG.png" alt="" fill className="object-contain rotate-[10deg]" />
+            <Image src="/homepage-cards/Black Lotus MTG.png" alt="" fill className="object-contain rotate-[10deg]" loading="lazy" sizes="96px" />
           </div>
           <div className="absolute bottom-8 left-[38%] w-22 h-32 animate-float-fast hidden lg:block">
-            <Image src="/DCM-Card-Mega-Charizard-X-EX-261763-front.jpg" alt="" fill className="object-contain rotate-[-5deg]" />
+            <Image src="/DCM-Card-Mega-Charizard-X-EX-261763-front.jpg" alt="" fill className="object-contain rotate-[-5deg]" loading="lazy" sizes="88px" />
           </div>
 
           {/* Extra cards for very wide screens */}
           <div className="absolute top-20 left-[15%] w-20 h-28 animate-float-slow hidden xl:block">
-            <Image src="/homepage-cards/Mickey Mouse Brave Little Prince.png" alt="" fill className="object-contain rotate-[15deg]" />
+            <Image src="/homepage-cards/Mickey Mouse Brave Little Prince.png" alt="" fill className="object-contain rotate-[15deg]" loading="lazy" sizes="80px" />
           </div>
         </div>
 
         {/* Simplified mobile background - 2 cards in top hero area only */}
         <div className="absolute inset-0 opacity-10 md:hidden">
           <div className="absolute top-16 left-[5%] w-20 h-28 animate-float-slow">
-            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-10deg]" />
+            <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-10deg]" loading="lazy" sizes="80px" />
           </div>
           <div className="absolute top-24 right-[8%] w-18 h-26 animate-float-medium">
-            <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[8deg]" />
+            <Image src="/Sports/DCM-Card-LeBron-James-547249-front.jpg" alt="" fill className="object-contain rotate-[8deg]" loading="lazy" sizes="72px" />
           </div>
         </div>
 

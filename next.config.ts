@@ -11,12 +11,26 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   images: {
+    // Enable modern image formats for better compression
+    formats: ['image/avif', 'image/webp'],
+    // Optimize device sizes for responsive images
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    // Cache optimized images for 1 hour
+    minimumCacheTTL: 3600,
     remotePatterns: [
       {
         protocol: 'https',
         hostname: 'zyxtqcvwkbpvsjsszbzg.supabase.co',
         port: '',
         pathname: '/storage/v1/object/**',
+      },
+      {
+        // Supabase image transform endpoint (for resized images)
+        protocol: 'https',
+        hostname: 'zyxtqcvwkbpvsjsszbzg.supabase.co',
+        port: '',
+        pathname: '/storage/v1/render/image/**',
       },
       {
         protocol: 'https',
