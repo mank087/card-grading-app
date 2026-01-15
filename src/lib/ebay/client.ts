@@ -6,7 +6,7 @@
  */
 
 import eBayApi from 'ebay-api';
-import { EBAY_API_URLS, TOKEN_CONFIG } from './constants';
+import { EBAY_API_URLS, TOKEN_CONFIG, EBAY_OAUTH_SCOPES } from './constants';
 import type { EbayConnection, EbayTokens } from './types';
 
 // =============================================================================
@@ -153,7 +153,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<EbayToke
     body: new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
-      scope: 'https://api.ebay.com/oauth/api_scope/sell.inventory https://api.ebay.com/oauth/api_scope/sell.account https://api.ebay.com/oauth/api_scope/commerce.media.upload',
+      scope: EBAY_OAUTH_SCOPES.join(' '),
     }),
   });
 
