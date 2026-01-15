@@ -18,6 +18,7 @@ const EBAY_CONFIG = {
   certId: process.env.EBAY_CERT_ID || '',
   devId: process.env.EBAY_DEV_ID || '',
   redirectUri: process.env.EBAY_REDIRECT_URI || '',
+  ruName: process.env.EBAY_RUNAME || '', // eBay Redirect URL Name
   sandbox: process.env.EBAY_SANDBOX === 'true',
 };
 
@@ -25,7 +26,7 @@ const EBAY_CONFIG = {
  * Validate that required eBay environment variables are set
  */
 export function validateEbayConfig(): { valid: boolean; missing: string[] } {
-  const required = ['EBAY_APP_ID', 'EBAY_CERT_ID', 'EBAY_DEV_ID', 'EBAY_REDIRECT_URI'];
+  const required = ['EBAY_APP_ID', 'EBAY_CERT_ID', 'EBAY_DEV_ID', 'EBAY_RUNAME'];
   const missing = required.filter(key => !process.env[key]);
   return { valid: missing.length === 0, missing };
 }
@@ -76,15 +77,19 @@ export function createAuthenticatedClient(connection: EbayConnection): eBayApi {
 
 /**
  * Get the eBay authorization URL for OAuth flow
+ * Note: eBay requires the RuName (Redirect URL Name) not the actual redirect URL
  */
 export function getAuthorizationUrl(state: string, scopes: string[]): string {
   const baseUrl = EBAY_CONFIG.sandbox
     ? EBAY_API_URLS.sandbox.auth
     : EBAY_API_URLS.production.auth;
 
+  // eBay uses RuName (Redirect URL Name) as the redirect_uri parameter
+  const redirectParam = EBAY_CONFIG.ruName || EBAY_CONFIG.redirectUri;
+
   const params = new URLSearchParams({
     client_id: EBAY_CONFIG.appId,
-    redirect_uri: EBAY_CONFIG.redirectUri,
+    redirect_uri: redirectParam,
     response_type: 'code',
     scope: scopes.join(' '),
     state: state,
@@ -218,7 +223,7 @@ export function isEbayConfigured(): boolean {
     EBAY_CONFIG.appId &&
     EBAY_CONFIG.certId &&
     EBAY_CONFIG.devId &&
-    EBAY_CONFIG.redirectUri
+    (EBAY_CONFIG.ruName || EBAY_CONFIG.redirectUri)
   );
 }
 
