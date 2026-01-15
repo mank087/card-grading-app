@@ -35,29 +35,23 @@ export default function EbayConnectPage() {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
           },
-          redirect: 'manual', // Don't auto-follow redirects
         })
 
-        if (response.type === 'opaqueredirect' || response.status === 302 || response.status === 307) {
-          // Get the redirect URL from the response
-          const redirectUrl = response.headers.get('Location')
-          if (redirectUrl) {
-            window.location.href = redirectUrl
-            return
-          }
+        const data = await response.json()
+
+        if (data.error) {
+          setError(data.error)
+          setStatus('error')
+          return
         }
 
-        // If we get a JSON response, it might be an error
-        if (response.headers.get('content-type')?.includes('application/json')) {
-          const data = await response.json()
-          if (data.error) {
-            setError(data.error)
-            setStatus('error')
-            return
-          }
+        if (data.authUrl) {
+          // Redirect to eBay authorization page
+          window.location.href = data.authUrl
+          return
         }
 
-        // If response is ok but no redirect, something is wrong
+        // If no authUrl in response, something is wrong
         setError('Unexpected response from server')
         setStatus('error')
       } catch (err) {

@@ -10,11 +10,12 @@ import {
 /**
  * GET /api/ebay/auth
  *
- * Initiates the eBay OAuth flow by redirecting the user to eBay's authorization page.
+ * Initiates the eBay OAuth flow by returning the authorization URL.
  * Requires the user to be authenticated.
  *
  * Query Parameters:
  * - return_url: Optional URL to redirect to after successful connection
+ * - redirect: If 'true', redirect directly instead of returning JSON
  */
 export async function GET(request: NextRequest) {
   try {
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
     // Get optional return URL from query params
     const { searchParams } = new URL(request.url);
     const returnUrl = searchParams.get('return_url') || '/account';
+    const shouldRedirect = searchParams.get('redirect') === 'true';
 
     // Create state parameter with user ID and return URL
     const state = createAuthState(user.id, returnUrl);
@@ -73,8 +75,13 @@ export async function GET(request: NextRequest) {
     // Generate authorization URL
     const authUrl = getAuthorizationUrl(state, [...EBAY_OAUTH_SCOPES]);
 
-    // Redirect to eBay authorization page
-    return NextResponse.redirect(authUrl);
+    // If redirect=true, redirect directly (for direct browser navigation)
+    if (shouldRedirect) {
+      return NextResponse.redirect(authUrl);
+    }
+
+    // Otherwise return the URL as JSON (for client-side handling)
+    return NextResponse.json({ authUrl });
   } catch (error) {
     console.error('[eBay Auth] Error:', error);
     return NextResponse.json(
