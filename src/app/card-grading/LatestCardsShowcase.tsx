@@ -2,49 +2,10 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
-import { getConditionFromGrade } from '@/lib/conditionAssessment'
+import { CardSlabGrid } from '@/components/CardSlab'
+import { getCardLabelData } from '@/lib/useLabelData'
 
-// Helper functions to extract card info
-const stripMarkdown = (text: string | null | undefined): string | null => {
-  if (!text) return null
-  return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '')
-}
-
-const getCardInfo = (card: any) => {
-  const dvgGrading = card.ai_grading || {}
-  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name
-  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset
-  const setNameWithSubset = subset ? `${setNameRaw} - ${subset}` : setNameRaw
-  return {
-    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
-    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading.card_info?.player_or_character,
-    set_name: setNameWithSubset,
-    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
-    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
-    rookie_or_first: card.conversational_card_info?.rookie_or_first || dvgGrading.card_info?.rookie_or_first,
-    autographed: card.conversational_card_info?.autographed || false,
-  }
-}
-
-const getPlayerName = (card: any) => {
-  const cardInfo = getCardInfo(card)
-  const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
-  return isSportsCard
-    ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown Player')
-    : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card')
-}
-
-const getCardGrade = (card: any) => {
-  if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
-    return card.conversational_decimal_grade
-  }
-  if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
-    return card.dvg_decimal_grade
-  }
-  return null
-}
-
+// Get card detail page link based on category
 const getCardLink = (card: any) => {
   const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
   if (card.category && sportCategories.includes(card.category)) return `/sports/${card.id}`
@@ -55,15 +16,7 @@ const getCardLink = (card: any) => {
   return `/card/${card.id}`
 }
 
-const buildSetLineText = (card: any) => {
-  const cardInfo = getCardInfo(card)
-  const parts: string[] = []
-  if (cardInfo.set_name) parts.push(cardInfo.set_name)
-  if (cardInfo.card_number) parts.push(`#${cardInfo.card_number}`)
-  if (cardInfo.year) parts.push(cardInfo.year)
-  return parts.join(' • ') || 'Unknown Set'
-}
-
+// Category badge colors and labels
 const getCategoryColor = (category: string) => {
   if (category === 'Pokemon') return 'bg-yellow-500 text-gray-900'
   if (['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(category)) return 'bg-emerald-500 text-white'
@@ -77,145 +30,24 @@ const getCategoryLabel = (category: string) => {
   return category
 }
 
-// Mini card slab for the carousel
-function MiniCardSlab({ card, isCenter, onClick }: { card: any; isCenter: boolean; onClick: () => void }) {
-  const displayName = getPlayerName(card)
-  const grade = getCardGrade(card)
-  const condition = grade !== null ? getConditionFromGrade(Math.round(grade)) : ''
-  const setLineText = buildSetLineText(card)
-
-  // Calculate scale for name
-  const maxChars = isCenter ? 16 : 12
-  const nameScaleX = displayName.length <= maxChars ? 1 : Math.max(0.5, maxChars / displayName.length)
-
-  const slabBorderStyle = {
-    background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
-    boxShadow: isCenter
-      ? '0 8px 30px rgba(147, 51, 234, 0.6), inset 0 1px 0 rgba(255,255,255,0.2)'
-      : '0 4px 15px rgba(147, 51, 234, 0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
-  }
-
-  return (
-    <div
-      onClick={onClick}
-      className={`cursor-pointer transition-all duration-500 ${isCenter ? 'z-20' : 'z-10'}`}
-    >
-      <div
-        className="rounded-xl p-1 overflow-hidden"
-        style={{
-          ...slabBorderStyle,
-          width: isCenter ? '220px' : '160px',
-        }}
-      >
-        <div className="bg-white rounded-lg overflow-hidden">
-          {/* Compact Label */}
-          <div className={`bg-gradient-to-b from-gray-50 to-white ${isCenter ? 'p-2.5 h-[70px]' : 'p-1.5 h-[50px]'}`}>
-            <div className="flex items-center justify-between gap-1 h-full">
-              {/* DCM Logo */}
-              <div className="flex-shrink-0">
-                <img
-                  src="/DCM-logo.png"
-                  alt="DCM"
-                  className={isCenter ? 'h-6 w-auto' : 'h-4 w-auto'}
-                />
-              </div>
-
-              {/* Card Info */}
-              <div className="flex-1 min-w-0 mx-1">
-                <div
-                  className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
-                  style={{
-                    fontSize: isCenter ? '10px' : '8px',
-                    transform: `scaleX(${nameScaleX})`,
-                  }}
-                >
-                  {displayName}
-                </div>
-                {isCenter && (
-                  <div
-                    className="text-gray-600 leading-tight truncate"
-                    style={{ fontSize: '8px' }}
-                  >
-                    {setLineText}
-                  </div>
-                )}
-              </div>
-
-              {/* Grade */}
-              <div className="text-center flex-shrink-0">
-                <div className={`font-bold text-purple-700 leading-none ${isCenter ? 'text-xl' : 'text-lg'}`}>
-                  {grade !== null ? Math.round(grade).toString() : 'N/A'}
-                </div>
-                {isCenter && condition && (
-                  <div className="text-purple-600 text-[7px] font-semibold">{condition}</div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Purple Separator */}
-          <div
-            className="h-0.5"
-            style={{ background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)' }}
-          />
-
-          {/* Card Image */}
-          <div
-            className="relative bg-gray-100"
-            style={{ aspectRatio: '3/4' }}
-          >
-            {card.front_url ? (
-              <Image
-                src={card.front_url}
-                alt={displayName}
-                fill
-                sizes={isCenter ? '220px' : '160px'}
-                className="object-contain"
-                unoptimized={card.front_url.includes('supabase')}
-                loading={isCenter ? 'eager' : 'lazy'}
-                placeholder="blur"
-                blurDataURL="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBQYFBAYGBQYHBwYIChAKCgkJChQODwwQFxQYGBcUFhYaHSUfGhsjHBYWICwgIyYnKSopGR8tMC0oMCUoKSj/2wBDAQcHBwoIChMKChMoGhYaKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCgoKCj/wAARCAAIAAoDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAAAAUH/8QAIhAAAQMEAQUAAAAAAAAAAAAAAQIDBAAFBhEhEhMiMUH/xAAVAQEBAAAAAAAAAAAAAAAAAAADBP/EABkRAAIDAQAAAAAAAAAAAAAAAAABAhEhMf/aAAwDAQACEQMRAD8AyTF8hv0O4W9q33S4wI1wjJkx0suq0tJWNdJPsb0djxSlVKlxCj0P/9k="
-              />
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-400 text-xs">
-                No Image
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Category Badge - Center card only */}
-      {isCenter && (
-        <div className="absolute -top-2 -right-2 z-30">
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg ${getCategoryColor(card.category)}`}>
-            {getCategoryLabel(card.category)}
-          </span>
-        </div>
-      )}
-    </div>
-  )
-}
-
-export default function LatestCardsShowcase() {
+export default function FeaturedCardsShowcase() {
   const [cards, setCards] = useState<any[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
   const [isPaused, setIsPaused] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  // Fetch latest graded cards
-  // Only fetch 8 cards (5 visible + 3 buffer) to reduce bandwidth
+  // Fetch featured cards (admin-selected showcase cards)
   useEffect(() => {
     const fetchCards = async () => {
       try {
-        const response = await fetch('/api/cards/latest-grades?limit=8')
+        const response = await fetch('/api/cards/featured')
         const data = await response.json()
         if (data.cards && data.cards.length > 0) {
           setCards(data.cards)
         }
       } catch (err) {
-        console.error('Error fetching cards:', err)
+        console.error('Error fetching featured cards:', err)
       } finally {
         setIsLoading(false)
       }
@@ -257,7 +89,7 @@ export default function LatestCardsShowcase() {
     return (
       <div className="flex flex-col items-center justify-center py-12">
         <div className="w-10 h-10 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-3" />
-        <p className="text-gray-400 text-sm">Loading latest grades...</p>
+        <p className="text-gray-400 text-sm">Loading featured cards...</p>
       </div>
     )
   }
@@ -265,23 +97,22 @@ export default function LatestCardsShowcase() {
   if (cards.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12">
-        <p className="text-gray-400">No graded cards available</p>
+        <p className="text-gray-400">No featured cards available</p>
       </div>
     )
   }
 
   const visibleCards = getVisibleCards()
-  const centerCard = cards[currentIndex]
 
   return (
     <div className="flex flex-col items-center w-full">
       {/* Header */}
       <div className="text-center mb-4">
         <h3 className="text-lg sm:text-xl font-bold text-white mb-0.5">
-          Latest Cards Graded by DCM!
+          Featured Grades
         </h3>
         <p className="text-purple-300 text-xs sm:text-sm">
-          Click to View Card Reports
+          Professionally graded cards from our community
         </p>
       </div>
 
@@ -289,7 +120,7 @@ export default function LatestCardsShowcase() {
       <div
         ref={containerRef}
         className="relative w-full overflow-hidden"
-        style={{ height: '380px' }}
+        style={{ height: '440px' }}
         onMouseEnter={() => setIsPaused(true)}
         onMouseLeave={() => setIsPaused(false)}
       >
@@ -306,13 +137,16 @@ export default function LatestCardsShowcase() {
 
             // Calculate transform based on position
             let translateX = position * (isCenter ? 0 : position > 0 ? 130 : 130)
-            let scale = isCenter ? 1 : isAdjacent ? 0.8 : 0.6
+            let scale = isCenter ? 1 : isAdjacent ? 0.75 : 0.55
             let opacity = isCenter ? 1 : isAdjacent ? 0.7 : 0.4
             let zIndex = isCenter ? 20 : isAdjacent ? 15 : 10
 
-            // Adjust translateX for smooth spacing
-            if (isAdjacent) translateX = position * 140
-            if (isFar) translateX = position * 220
+            // Adjust translateX for smooth spacing with wider cards
+            if (isAdjacent) translateX = position * 165
+            if (isFar) translateX = position * 260
+
+            // Get label data for modern display
+            const labelData = getCardLabelData(card)
 
             return (
               <div
@@ -326,14 +160,41 @@ export default function LatestCardsShowcase() {
               >
                 {isCenter ? (
                   <Link href={getCardLink(card)} target="_blank" rel="noopener noreferrer" className="block relative">
-                    <MiniCardSlab card={card} isCenter={true} onClick={() => {}} />
+                    <div className="w-[220px]">
+                      <CardSlabGrid
+                        displayName={labelData.primaryName}
+                        setLineText={labelData.contextLine}
+                        features={labelData.features}
+                        serial={labelData.serial}
+                        grade={labelData.grade}
+                        condition={labelData.condition}
+                        frontImageUrl={card.front_url}
+                        isAlteredAuthentic={labelData.isAlteredAuthentic}
+                        className="hover:shadow-xl transition-shadow duration-200"
+                      />
+                    </div>
+                    {/* Category Badge */}
+                    <div className="absolute -top-2 -right-2 z-30">
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold shadow-lg ${getCategoryColor(card.category)}`}>
+                        {getCategoryLabel(card.category)}
+                      </span>
+                    </div>
                   </Link>
                 ) : (
                   <div
-                    className="cursor-pointer hover:opacity-90 transition-opacity"
+                    className="cursor-pointer hover:opacity-90 transition-opacity w-[220px]"
                     onClick={() => goToCard(index)}
                   >
-                    <MiniCardSlab card={card} isCenter={false} onClick={() => goToCard(index)} />
+                    <CardSlabGrid
+                      displayName={labelData.primaryName}
+                      setLineText={labelData.contextLine}
+                      features={labelData.features}
+                      serial={labelData.serial}
+                      grade={labelData.grade}
+                      condition={labelData.condition}
+                      frontImageUrl={card.front_url}
+                      isAlteredAuthentic={labelData.isAlteredAuthentic}
+                    />
                   </div>
                 )}
               </div>
@@ -377,15 +238,6 @@ export default function LatestCardsShowcase() {
             aria-label={`Go to card ${index + 1}`}
           />
         ))}
-      </div>
-
-      {/* "Live" indicator */}
-      <div className="flex items-center gap-2 mt-3">
-        <span className="relative flex h-2 w-2">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-        </span>
-        <span className="text-green-400 text-xs font-medium">Live Feed</span>
       </div>
     </div>
   )

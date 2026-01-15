@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
-import LatestCardsShowcase from './LatestCardsShowcase'
+import FeaturedCardsShowcase from './LatestCardsShowcase'
 
 // Declare tracking pixels for TypeScript
 declare global {
@@ -277,7 +277,7 @@ export default function CardGradingLanding() {
 
             {/* Latest Cards Showcase - Mobile */}
             <div className="flex justify-center mb-6">
-              <LatestCardsShowcase />
+              <FeaturedCardsShowcase />
             </div>
 
             {/* Signup CTA for mobile */}
@@ -445,7 +445,7 @@ export default function CardGradingLanding() {
           <div className="hidden xl:flex flex-row items-center gap-6">
             {/* Left: Latest Cards Showcase */}
             <div className="flex-shrink-0 w-[340px]">
-              <LatestCardsShowcase />
+              <FeaturedCardsShowcase />
             </div>
 
             {/* Center: Hero Content */}
