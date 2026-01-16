@@ -92,9 +92,26 @@ export async function getAdvertisingEligibility(
         };
       }
 
+      // If 404, the endpoint might not exist for this marketplace/account type
+      if (response.status === 404) {
+        return {
+          eligible: false,
+          reason: 'Promoted Listings is not available for your account type.',
+        };
+      }
+
+      // Parse error details if available
+      let errorDetail = '';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.errors?.[0]?.message || errorJson.message || '';
+      } catch {
+        errorDetail = errorText.substring(0, 100);
+      }
+
       return {
         eligible: false,
-        reason: 'Unable to check eligibility',
+        reason: `Unable to check eligibility (${response.status}${errorDetail ? ': ' + errorDetail : ''})`,
       };
     }
 
@@ -134,7 +151,7 @@ export async function getAdvertisingEligibility(
     console.error('[Marketing API] getAdvertisingEligibility error:', error);
     return {
       eligible: false,
-      reason: 'Failed to check eligibility',
+      reason: `Failed to check eligibility: ${error instanceof Error ? error.message : 'Network error'}`,
     };
   }
 }
