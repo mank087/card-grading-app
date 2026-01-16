@@ -17,7 +17,6 @@ import {
   getEbayGradeId,
   DCM_TO_EBAY_CATEGORY,
   EBAY_CATEGORIES,
-  GRADER_IDS,
 } from '@/lib/ebay/constants';
 import {
   addFixedPriceItem,
@@ -25,6 +24,7 @@ import {
   type ListingDetails,
   type ShippingDetails,
   type ReturnDetails,
+  type PackageDimensions,
 } from '@/lib/ebay/tradingApi';
 import type { EbayListing } from '@/lib/ebay/types';
 
@@ -53,15 +53,35 @@ interface CreateListingRequest {
   imageUrls: string[];
   itemSpecifics?: ItemSpecific[];
 
-  // Shipping options (inline, not policy-based)
+  // Shipping options
   shippingType: 'FREE' | 'FLAT_RATE' | 'CALCULATED';
+  domesticShippingService: string;
   flatRateAmount?: number;
   handlingDays: number;
+  postalCode: string;
 
-  // Return options (inline, not policy-based)
-  returnsAccepted: boolean;
-  returnPeriodDays?: number;
-  returnShippingPaidBy?: 'BUYER' | 'SELLER';
+  // Package dimensions
+  packageWeightOz: number;
+  packageLengthIn: number;
+  packageWidthIn: number;
+  packageDepthIn: number;
+
+  // International shipping
+  offerInternational: boolean;
+  internationalShippingType?: 'FLAT_RATE' | 'CALCULATED';
+  internationalShippingService?: string;
+  internationalFlatRateCost?: number;
+  internationalShipToLocations?: string[];
+
+  // Domestic return options
+  domesticReturnsAccepted: boolean;
+  domesticReturnPeriodDays?: number;
+  domesticReturnShippingPaidBy?: 'BUYER' | 'SELLER';
+
+  // International return options
+  internationalReturnsAccepted: boolean;
+  internationalReturnPeriodDays?: number;
+  internationalReturnShippingPaidBy?: 'BUYER' | 'SELLER';
 }
 
 interface ListingResponse {
@@ -160,18 +180,45 @@ export async function POST(request: NextRequest) {
       duration,
       imageUrls,
       itemSpecifics = [],
+      // Shipping
       shippingType = 'CALCULATED',
+      domesticShippingService = 'USPSPriority',
       flatRateAmount = 5.00,
       handlingDays = 1,
-      returnsAccepted = false,
-      returnPeriodDays = 30,
-      returnShippingPaidBy = 'BUYER',
+      postalCode = '10001',
+      // Package dimensions (defaults for small bubble mailer)
+      packageWeightOz = 4,
+      packageLengthIn = 10,
+      packageWidthIn = 6,
+      packageDepthIn = 1,
+      // International shipping
+      offerInternational = false,
+      internationalShippingType = 'CALCULATED',
+      internationalShippingService = 'USPSPriorityMailInternational',
+      internationalFlatRateCost = 15.00,
+      internationalShipToLocations = ['Worldwide'],
+      // Domestic returns
+      domesticReturnsAccepted = false,
+      domesticReturnPeriodDays = 30,
+      domesticReturnShippingPaidBy = 'BUYER',
+      // International returns
+      internationalReturnsAccepted = false,
+      internationalReturnPeriodDays = 30,
+      internationalReturnShippingPaidBy = 'BUYER',
     } = body;
 
     // Validate required fields
     if (!cardId || !title || !price || !imageUrls?.length) {
       return NextResponse.json(
         { error: 'Missing required fields: cardId, title, price, imageUrls' },
+        { status: 400 }
+      );
+    }
+
+    // Validate postal code
+    if (!postalCode || postalCode.length < 5) {
+      return NextResponse.json(
+        { error: 'Valid postal code is required for shipping' },
         { status: 400 }
       );
     }
@@ -255,21 +302,41 @@ export async function POST(request: NextRequest) {
       certificationNumber: card.serial,
     };
 
+    // Prepare package dimensions
+    const packageDimensions: PackageDimensions = {
+      weightOz: packageWeightOz,
+      lengthIn: packageLengthIn,
+      widthIn: packageWidthIn,
+      depthIn: packageDepthIn,
+    };
+
     // Prepare shipping details
     const shippingDetails: ShippingDetails = {
       shippingType,
+      domesticShippingService,
       flatRateCost: flatRateAmount,
       handlingDays,
+      postalCode,
+      packageDimensions,
+      // International shipping
+      offerInternational,
+      internationalShippingType: offerInternational ? internationalShippingType : undefined,
+      internationalShippingService: offerInternational ? internationalShippingService : undefined,
+      internationalFlatRateCost: offerInternational && internationalShippingType === 'FLAT_RATE' ? internationalFlatRateCost : undefined,
+      internationalShipToLocations: offerInternational ? internationalShipToLocations : undefined,
     };
 
     // Prepare return details
     const returnDetails: ReturnDetails = {
-      returnsAccepted,
-      returnPeriodDays,
-      returnShippingPaidBy,
+      domesticReturnsAccepted,
+      domesticReturnPeriodDays: domesticReturnsAccepted ? domesticReturnPeriodDays : undefined,
+      domesticReturnShippingPaidBy: domesticReturnsAccepted ? domesticReturnShippingPaidBy : undefined,
+      internationalReturnsAccepted,
+      internationalReturnPeriodDays: internationalReturnsAccepted ? internationalReturnPeriodDays : undefined,
+      internationalReturnShippingPaidBy: internationalReturnsAccepted ? internationalReturnShippingPaidBy : undefined,
     };
 
-    console.log('[eBay Listing] Creating listing via Trading API:', { sku, categoryId, title });
+    console.log('[eBay Listing] Creating listing via Trading API:', { sku, categoryId, title, shippingType, offerInternational });
 
     // Create listing via Trading API
     const result = await addFixedPriceItem(

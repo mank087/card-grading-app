@@ -9,6 +9,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
+import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
 
 // Helper: Get condition label from grade
 function getConditionLabel(grade: number): string {
@@ -176,12 +177,31 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
   // Shipping & Returns form state (inline, not policy-based)
   const [shippingForm, setShippingForm] = useState({
+    // Domestic shipping
     shippingType: 'CALCULATED' as 'FREE' | 'FLAT_RATE' | 'CALCULATED',
+    domesticShippingService: 'USPSPriority',
     flatRateAmount: 5.00,
     handlingDays: 1,
-    returnsAccepted: false,
-    returnPeriodDays: 30,
-    returnShippingPaidBy: 'BUYER' as 'BUYER' | 'SELLER',
+    postalCode: '',
+    // Package dimensions (small bubble mailer defaults)
+    packageWeightOz: 4,
+    packageLengthIn: 10,
+    packageWidthIn: 6,
+    packageDepthIn: 1,
+    // International shipping
+    offerInternational: false,
+    internationalShippingType: 'CALCULATED' as 'FLAT_RATE' | 'CALCULATED',
+    internationalShippingService: 'USPSPriorityMailInternational',
+    internationalFlatRateCost: 15.00,
+    internationalShipToLocations: ['Worldwide'] as string[],
+    // Domestic returns
+    domesticReturnsAccepted: false,
+    domesticReturnPeriodDays: 30,
+    domesticReturnShippingPaidBy: 'BUYER' as 'BUYER' | 'SELLER',
+    // International returns
+    internationalReturnsAccepted: false,
+    internationalReturnPeriodDays: 30,
+    internationalReturnShippingPaidBy: 'BUYER' as 'BUYER' | 'SELLER',
   });
 
   // Result state
@@ -532,14 +552,31 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           itemSpecifics: itemSpecifics
             .filter(spec => spec.name && spec.value && (Array.isArray(spec.value) ? spec.value.length > 0 : spec.value.trim()))
             .map(spec => ({ name: spec.name, value: spec.value })),
-          // Inline shipping options (not policy-based)
+          // Shipping options
           shippingType: shippingForm.shippingType,
+          domesticShippingService: shippingForm.domesticShippingService,
           flatRateAmount: shippingForm.flatRateAmount,
           handlingDays: shippingForm.handlingDays,
-          // Inline return options (not policy-based)
-          returnsAccepted: shippingForm.returnsAccepted,
-          returnPeriodDays: shippingForm.returnPeriodDays,
-          returnShippingPaidBy: shippingForm.returnShippingPaidBy,
+          postalCode: shippingForm.postalCode,
+          // Package dimensions
+          packageWeightOz: shippingForm.packageWeightOz,
+          packageLengthIn: shippingForm.packageLengthIn,
+          packageWidthIn: shippingForm.packageWidthIn,
+          packageDepthIn: shippingForm.packageDepthIn,
+          // International shipping
+          offerInternational: shippingForm.offerInternational,
+          internationalShippingType: shippingForm.internationalShippingType,
+          internationalShippingService: shippingForm.internationalShippingService,
+          internationalFlatRateCost: shippingForm.internationalFlatRateCost,
+          internationalShipToLocations: shippingForm.internationalShipToLocations,
+          // Domestic returns
+          domesticReturnsAccepted: shippingForm.domesticReturnsAccepted,
+          domesticReturnPeriodDays: shippingForm.domesticReturnPeriodDays,
+          domesticReturnShippingPaidBy: shippingForm.domesticReturnShippingPaidBy,
+          // International returns
+          internationalReturnsAccepted: shippingForm.internationalReturnsAccepted,
+          internationalReturnPeriodDays: shippingForm.internationalReturnPeriodDays,
+          internationalReturnShippingPaidBy: shippingForm.internationalReturnShippingPaidBy,
         }),
       });
 
@@ -588,6 +625,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         setStep('shipping');
         break;
       case 'shipping':
+        if (!shippingForm.postalCode || shippingForm.postalCode.length < 5) {
+          setError('Please enter your ZIP code for shipping');
+          return;
+        }
         setError(null);
         setStep('review');
         break;
@@ -1178,22 +1219,23 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 <p className="text-sm text-gray-500">Configure shipping and return options for this listing.</p>
               </div>
 
-              {/* Shipping Section */}
-              <div className="space-y-3">
+              {/* Domestic Shipping Section */}
+              <div className="space-y-4">
                 <h4 className="font-medium text-gray-900 flex items-center gap-2">
                   <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
                   </svg>
-                  Shipping
+                  Domestic Shipping
                 </h4>
 
+                {/* Shipping Type Selection - Calculated first */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Cost</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Cost Type</label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
+                      { value: 'CALCULATED', label: 'Calculated', desc: 'Based on buyer location' },
                       { value: 'FREE', label: 'Free Shipping', desc: 'You cover shipping' },
                       { value: 'FLAT_RATE', label: 'Flat Rate', desc: 'Set your price' },
-                      { value: 'CALCULATED', label: 'Calculated', desc: 'Based on location' },
                     ].map((option) => (
                       <button
                         key={option.value}
@@ -1212,6 +1254,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </div>
                 </div>
 
+                {/* Flat Rate Amount */}
                 {shippingForm.shippingType === 'FLAT_RATE' && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Price</label>
@@ -1229,12 +1272,92 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </div>
                 )}
 
+                {/* Shipping Service */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Service</label>
+                  <select
+                    value={shippingForm.domesticShippingService}
+                    onChange={(e) => setShippingForm(f => ({ ...f, domesticShippingService: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    {DOMESTIC_SHIPPING_SERVICES.map((service) => (
+                      <option key={service.value} value={service.value}>{service.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Package Details */}
+                <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                  <h5 className="text-sm font-medium text-gray-700">Package Details</h5>
+                  <p className="text-xs text-gray-500">Pre-filled for a small bubble mailer. Adjust if needed.</p>
+
+                  <div className="grid grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Weight (oz)</label>
+                      <input
+                        type="number"
+                        value={shippingForm.packageWeightOz}
+                        onChange={(e) => setShippingForm(f => ({ ...f, packageWeightOz: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Length (in)</label>
+                      <input
+                        type="number"
+                        value={shippingForm.packageLengthIn}
+                        onChange={(e) => setShippingForm(f => ({ ...f, packageLengthIn: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Width (in)</label>
+                      <input
+                        type="number"
+                        value={shippingForm.packageWidthIn}
+                        onChange={(e) => setShippingForm(f => ({ ...f, packageWidthIn: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                        min="1"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Depth (in)</label>
+                      <input
+                        type="number"
+                        value={shippingForm.packageDepthIn}
+                        onChange={(e) => setShippingForm(f => ({ ...f, packageDepthIn: parseInt(e.target.value) || 0 }))}
+                        className="w-full px-2 py-1.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                        min="1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Postal Code */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ship From ZIP Code</label>
+                  <input
+                    type="text"
+                    value={shippingForm.postalCode}
+                    onChange={(e) => setShippingForm(f => ({ ...f, postalCode: e.target.value.replace(/\D/g, '').slice(0, 5) }))}
+                    placeholder="Enter your ZIP code"
+                    className="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    maxLength={5}
+                  />
+                  {!shippingForm.postalCode && (
+                    <p className="text-xs text-amber-600 mt-1">Required for shipping calculations</p>
+                  )}
+                </div>
+
+                {/* Handling Time */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Handling Time</label>
                   <select
                     value={shippingForm.handlingDays}
                     onChange={(e) => setShippingForm(f => ({ ...f, handlingDays: parseInt(e.target.value) }))}
-                    className="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-48 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   >
                     <option value={1}>1 business day</option>
                     <option value={2}>2 business days</option>
@@ -1244,8 +1367,94 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 </div>
               </div>
 
+              {/* International Shipping Section */}
+              <div className="space-y-4 pt-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    International Shipping
+                  </h4>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={shippingForm.offerInternational}
+                      onChange={(e) => setShippingForm(f => ({ ...f, offerInternational: e.target.checked }))}
+                      className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-medium text-gray-700">Ship internationally</span>
+                  </label>
+                </div>
+
+                {shippingForm.offerInternational && (
+                  <div className="pl-4 space-y-3 border-l-2 border-purple-200">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Type</label>
+                        <select
+                          value={shippingForm.internationalShippingType}
+                          onChange={(e) => setShippingForm(f => ({ ...f, internationalShippingType: e.target.value as any }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="CALCULATED">Calculated</option>
+                          <option value="FLAT_RATE">Flat Rate</option>
+                        </select>
+                      </div>
+
+                      {shippingForm.internationalShippingType === 'FLAT_RATE' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">International Rate</label>
+                          <div className="relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                            <input
+                              type="number"
+                              value={shippingForm.internationalFlatRateCost}
+                              onChange={(e) => setShippingForm(f => ({ ...f, internationalFlatRateCost: parseFloat(e.target.value) || 0 }))}
+                              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              min="0.01"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">International Service</label>
+                      <select
+                        value={shippingForm.internationalShippingService}
+                        onChange={(e) => setShippingForm(f => ({ ...f, internationalShippingService: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        {INTERNATIONAL_SHIPPING_SERVICES.map((service) => (
+                          <option key={service.value} value={service.value}>{service.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Ship To</label>
+                      <select
+                        value={shippingForm.internationalShipToLocations[0] || 'Worldwide'}
+                        onChange={(e) => setShippingForm(f => ({ ...f, internationalShipToLocations: [e.target.value] }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="Worldwide">Worldwide</option>
+                        <option value="Americas">Americas</option>
+                        <option value="Europe">Europe</option>
+                        <option value="Asia">Asia</option>
+                        <option value="CA">Canada</option>
+                        <option value="GB">United Kingdom</option>
+                        <option value="AU">Australia</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {/* Returns Section */}
-              <div className="space-y-3 pt-2 border-t border-gray-200">
+              <div className="space-y-4 pt-4 border-t border-gray-200">
                 <h4 className="font-medium text-gray-900 flex items-center gap-2">
                   <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
@@ -1253,44 +1462,93 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   Returns
                 </h4>
 
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={shippingForm.returnsAccepted}
-                      onChange={(e) => setShippingForm(f => ({ ...f, returnsAccepted: e.target.checked }))}
-                      className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900">Accept returns</span>
-                  </label>
+                {/* Domestic Returns */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={shippingForm.domesticReturnsAccepted}
+                        onChange={(e) => setShippingForm(f => ({ ...f, domesticReturnsAccepted: e.target.checked }))}
+                        className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                      />
+                      <span className="text-sm font-medium text-gray-900">Accept domestic returns</span>
+                    </label>
+                  </div>
+
+                  {shippingForm.domesticReturnsAccepted && (
+                    <div className="grid grid-cols-2 gap-4 pl-7">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
+                        <select
+                          value={shippingForm.domesticReturnPeriodDays}
+                          onChange={(e) => setShippingForm(f => ({ ...f, domesticReturnPeriodDays: parseInt(e.target.value) }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value={14}>14 days</option>
+                          <option value={30}>30 days</option>
+                          <option value={60}>60 days</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
+                        <select
+                          value={shippingForm.domesticReturnShippingPaidBy}
+                          onChange={(e) => setShippingForm(f => ({ ...f, domesticReturnShippingPaidBy: e.target.value as any }))}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="BUYER">Buyer pays</option>
+                          <option value="SELLER">Seller pays (free returns)</option>
+                        </select>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                {shippingForm.returnsAccepted && (
-                  <div className="grid grid-cols-2 gap-4 pl-7">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
-                      <select
-                        value={shippingForm.returnPeriodDays}
-                        onChange={(e) => setShippingForm(f => ({ ...f, returnPeriodDays: parseInt(e.target.value) }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                        <option value={14}>14 days</option>
-                        <option value={30}>30 days</option>
-                        <option value={60}>60 days</option>
-                      </select>
+                {/* International Returns */}
+                {shippingForm.offerInternational && (
+                  <div className="space-y-3 pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={shippingForm.internationalReturnsAccepted}
+                          onChange={(e) => setShippingForm(f => ({ ...f, internationalReturnsAccepted: e.target.checked }))}
+                          className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
+                        <span className="text-sm font-medium text-gray-900">Accept international returns</span>
+                      </label>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
-                      <select
-                        value={shippingForm.returnShippingPaidBy}
-                        onChange={(e) => setShippingForm(f => ({ ...f, returnShippingPaidBy: e.target.value as any }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                        <option value="BUYER">Buyer pays</option>
-                        <option value="SELLER">Seller pays (free returns)</option>
-                      </select>
-                    </div>
+                    {shippingForm.internationalReturnsAccepted && (
+                      <div className="grid grid-cols-2 gap-4 pl-7">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
+                          <select
+                            value={shippingForm.internationalReturnPeriodDays}
+                            onChange={(e) => setShippingForm(f => ({ ...f, internationalReturnPeriodDays: parseInt(e.target.value) }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value={14}>14 days</option>
+                            <option value={30}>30 days</option>
+                            <option value={60}>60 days</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
+                          <select
+                            value={shippingForm.internationalReturnShippingPaidBy}
+                            onChange={(e) => setShippingForm(f => ({ ...f, internationalReturnShippingPaidBy: e.target.value as any }))}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="BUYER">Buyer pays</option>
+                            <option value="SELLER">Seller pays (free returns)</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -1380,33 +1638,62 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               {/* Shipping & Returns Summary */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Shipping & Returns</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Shipping:</span>
-                    <span className="font-medium text-gray-900">
-                      {shippingForm.shippingType === 'FREE' ? 'Free Shipping' :
-                       shippingForm.shippingType === 'FLAT_RATE' ? `$${shippingForm.flatRateAmount.toFixed(2)} Flat Rate` :
-                       'Calculated'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Handling:</span>
-                    <span className="font-medium text-gray-900">{shippingForm.handlingDays} business day{shippingForm.handlingDays > 1 ? 's' : ''}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Returns:</span>
-                    <span className="font-medium text-gray-900">
-                      {shippingForm.returnsAccepted ? `${shippingForm.returnPeriodDays} days` : 'Not accepted'}
-                    </span>
-                  </div>
-                  {shippingForm.returnsAccepted && (
+                <div className="space-y-2 text-sm">
+                  {/* Domestic Shipping */}
+                  <div className="grid grid-cols-2 gap-2">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Return Shipping:</span>
+                      <span className="text-gray-500">Domestic:</span>
                       <span className="font-medium text-gray-900">
-                        {shippingForm.returnShippingPaidBy === 'BUYER' ? 'Buyer pays' : 'Seller pays'}
+                        {shippingForm.shippingType === 'FREE' ? 'Free Shipping' :
+                         shippingForm.shippingType === 'FLAT_RATE' ? `$${shippingForm.flatRateAmount.toFixed(2)} Flat Rate` :
+                         'Calculated'}
                       </span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Handling:</span>
+                      <span className="font-medium text-gray-900">{shippingForm.handlingDays} day{shippingForm.handlingDays > 1 ? 's' : ''}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Ship From:</span>
+                      <span className="font-medium text-gray-900">{shippingForm.postalCode}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Package:</span>
+                      <span className="font-medium text-gray-900">{shippingForm.packageWeightOz}oz, {shippingForm.packageLengthIn}&quot;x{shippingForm.packageWidthIn}&quot;x{shippingForm.packageDepthIn}&quot;</span>
+                    </div>
+                  </div>
+
+                  {/* International Shipping */}
+                  {shippingForm.offerInternational && (
+                    <div className="pt-2 border-t border-gray-200">
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">International:</span>
+                        <span className="font-medium text-gray-900">
+                          {shippingForm.internationalShippingType === 'FLAT_RATE'
+                            ? `$${shippingForm.internationalFlatRateCost.toFixed(2)} Flat Rate`
+                            : 'Calculated'}
+                        </span>
+                      </div>
+                    </div>
                   )}
+
+                  {/* Returns */}
+                  <div className="pt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Domestic Returns:</span>
+                      <span className="font-medium text-gray-900">
+                        {shippingForm.domesticReturnsAccepted ? `${shippingForm.domesticReturnPeriodDays} days` : 'Not accepted'}
+                      </span>
+                    </div>
+                    {shippingForm.offerInternational && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Int&apos;l Returns:</span>
+                        <span className="font-medium text-gray-900">
+                          {shippingForm.internationalReturnsAccepted ? `${shippingForm.internationalReturnPeriodDays} days` : 'Not accepted'}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 

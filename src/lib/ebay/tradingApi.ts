@@ -23,23 +23,77 @@ const EBAY_SITE_ID = {
   CA: '2',
 };
 
+// Common domestic shipping services
+export const DOMESTIC_SHIPPING_SERVICES = [
+  { value: 'USPSPriority', label: 'USPS Priority Mail' },
+  { value: 'USPSFirstClass', label: 'USPS First Class' },
+  { value: 'USPSPriorityMailExpress', label: 'USPS Priority Mail Express' },
+  { value: 'UPSGround', label: 'UPS Ground' },
+  { value: 'UPS3rdDay', label: 'UPS 3 Day Select' },
+  { value: 'UPS2ndDay', label: 'UPS 2nd Day Air' },
+  { value: 'UPSNextDay', label: 'UPS Next Day Air' },
+  { value: 'FedExHomeDelivery', label: 'FedEx Home Delivery' },
+  { value: 'FedExGround', label: 'FedEx Ground' },
+  { value: 'FedEx2Day', label: 'FedEx 2Day' },
+];
+
+// Common international shipping services
+export const INTERNATIONAL_SHIPPING_SERVICES = [
+  { value: 'USPSPriorityMailInternational', label: 'USPS Priority Mail International' },
+  { value: 'USPSFirstClassMailInternational', label: 'USPS First Class Mail International' },
+  { value: 'USPSPriorityMailExpressInternational', label: 'USPS Priority Mail Express International' },
+  { value: 'UPSWorldWideExpedited', label: 'UPS Worldwide Expedited' },
+  { value: 'UPSWorldWideExpress', label: 'UPS Worldwide Express' },
+  { value: 'FedExInternationalEconomy', label: 'FedEx International Economy' },
+  { value: 'FedExInternationalPriority', label: 'FedEx International Priority' },
+];
+
+// eBay Global Shipping Program location
+export const GSP_SHIP_TO_LOCATIONS = ['Worldwide'];
+
 export interface TradingApiConfig {
   accessToken: string;
   sandbox: boolean;
   siteId?: string;
 }
 
+export interface PackageDimensions {
+  weightOz: number; // Weight in ounces
+  lengthIn: number; // Length in inches
+  widthIn: number;  // Width in inches
+  depthIn: number;  // Depth in inches
+}
+
+export interface InternationalShippingOption {
+  shippingService: string;
+  shippingCost?: number; // For flat rate international
+  shipToLocations: string[]; // e.g., ['Worldwide', 'CA', 'GB']
+}
+
 export interface ShippingDetails {
   shippingType: 'FREE' | 'FLAT_RATE' | 'CALCULATED';
+  domesticShippingService: string;
   flatRateCost?: number;
   handlingDays: number;
-  shippingService?: string;
+  postalCode: string;
+  packageDimensions: PackageDimensions;
+  // International shipping
+  offerInternational: boolean;
+  internationalShippingType?: 'FLAT_RATE' | 'CALCULATED';
+  internationalShippingService?: string;
+  internationalFlatRateCost?: number;
+  internationalShipToLocations?: string[];
 }
 
 export interface ReturnDetails {
-  returnsAccepted: boolean;
-  returnPeriodDays?: number;
-  returnShippingPaidBy?: 'BUYER' | 'SELLER';
+  // Domestic returns
+  domesticReturnsAccepted: boolean;
+  domesticReturnPeriodDays?: number;
+  domesticReturnShippingPaidBy?: 'BUYER' | 'SELLER';
+  // International returns
+  internationalReturnsAccepted: boolean;
+  internationalReturnPeriodDays?: number;
+  internationalReturnShippingPaidBy?: 'BUYER' | 'SELLER';
 }
 
 export interface ListingDetails {
@@ -97,28 +151,36 @@ function buildAddFixedPriceItemXml(
     .map(url => `<PictureURL>${escapeXml(url)}</PictureURL>`)
     .join('\n          ');
 
-  // Build shipping details XML
+  // Convert weight from oz to lbs + oz
+  const weightLbs = Math.floor(shipping.packageDimensions.weightOz / 16);
+  const weightOz = shipping.packageDimensions.weightOz % 16;
+
+  // Build shipping details XML based on type
   let shippingXml = '';
+  let shippingPackageXml = '';
+
   if (shipping.shippingType === 'FREE') {
     shippingXml = `
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>USPSPriority</ShippingService>
+          <ShippingService>${shipping.domesticShippingService}</ShippingService>
           <ShippingServiceCost currencyID="USD">0.00</ShippingServiceCost>
           <FreeShipping>true</FreeShipping>
           <ShippingServicePriority>1</ShippingServicePriority>
         </ShippingServiceOptions>
+        ${buildInternationalShippingXml(shipping)}
       </ShippingDetails>`;
   } else if (shipping.shippingType === 'FLAT_RATE') {
     shippingXml = `
       <ShippingDetails>
         <ShippingType>Flat</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.shippingService || 'USPSPriority'}</ShippingService>
+          <ShippingService>${shipping.domesticShippingService}</ShippingService>
           <ShippingServiceCost currencyID="USD">${(shipping.flatRateCost || 0).toFixed(2)}</ShippingServiceCost>
           <ShippingServicePriority>1</ShippingServicePriority>
         </ShippingServiceOptions>
+        ${buildInternationalShippingXml(shipping)}
       </ShippingDetails>`;
   } else {
     // Calculated shipping
@@ -126,36 +188,29 @@ function buildAddFixedPriceItemXml(
       <ShippingDetails>
         <ShippingType>Calculated</ShippingType>
         <ShippingServiceOptions>
-          <ShippingService>${shipping.shippingService || 'USPSPriority'}</ShippingService>
+          <ShippingService>${shipping.domesticShippingService}</ShippingService>
           <ShippingServicePriority>1</ShippingServicePriority>
         </ShippingServiceOptions>
+        ${buildInternationalShippingXml(shipping)}
         <CalculatedShippingRate>
-          <OriginatingPostalCode>10001</OriginatingPostalCode>
+          <OriginatingPostalCode>${escapeXml(shipping.postalCode)}</OriginatingPostalCode>
           <PackagingHandlingCosts currencyID="USD">0.00</PackagingHandlingCosts>
         </CalculatedShippingRate>
-      </ShippingDetails>
+      </ShippingDetails>`;
+
+    // Package details needed for calculated shipping
+    shippingPackageXml = `
       <ShippingPackageDetails>
-        <WeightMajor unit="lbs">0</WeightMajor>
-        <WeightMinor unit="oz">3</WeightMinor>
-        <PackageLength unit="in">6</PackageLength>
-        <PackageWidth unit="in">4</PackageWidth>
-        <PackageDepth unit="in">1</PackageDepth>
+        <WeightMajor unit="lbs">${weightLbs}</WeightMajor>
+        <WeightMinor unit="oz">${weightOz}</WeightMinor>
+        <PackageLength unit="in">${shipping.packageDimensions.lengthIn}</PackageLength>
+        <PackageWidth unit="in">${shipping.packageDimensions.widthIn}</PackageWidth>
+        <PackageDepth unit="in">${shipping.packageDimensions.depthIn}</PackageDepth>
       </ShippingPackageDetails>`;
   }
 
-  // Build return policy XML
-  const returnPolicyXml = returns.returnsAccepted
-    ? `
-      <ReturnPolicy>
-        <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
-        <ReturnsWithinOption>Days_${returns.returnPeriodDays || 30}</ReturnsWithinOption>
-        <ShippingCostPaidByOption>${returns.returnShippingPaidBy === 'SELLER' ? 'Seller' : 'Buyer'}</ShippingCostPaidByOption>
-        <RefundOption>MoneyBack</RefundOption>
-      </ReturnPolicy>`
-    : `
-      <ReturnPolicy>
-        <ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>
-      </ReturnPolicy>`;
+  // Build return policy XML with domestic and international options
+  const returnPolicyXml = buildReturnPolicyXml(returns);
 
   // Build best offer XML if enabled
   const bestOfferXml = listing.bestOfferEnabled
@@ -181,6 +236,14 @@ function buildAddFixedPriceItemXml(
           <Value>${escapeXml(listing.certificationNumber)}</Value>
         </ConditionDescriptor>` : ''}
       </ConditionDescriptors>`;
+  }
+
+  // Build ship to locations for international shipping
+  let shipToLocationsXml = '';
+  if (shipping.offerInternational && shipping.internationalShipToLocations?.length) {
+    shipToLocationsXml = shipping.internationalShipToLocations
+      .map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`)
+      .join('\n    ');
   }
 
   return `<?xml version="1.0" encoding="utf-8"?>
@@ -210,16 +273,84 @@ function buildAddFixedPriceItemXml(
     <PictureDetails>
       ${pictureUrlsXml}
     </PictureDetails>
-    <PostalCode>10001</PostalCode>
+    <PostalCode>${escapeXml(shipping.postalCode)}</PostalCode>
     <ItemSpecifics>
       ${itemSpecificsXml}
     </ItemSpecifics>
     <SKU>${escapeXml(listing.sku)}</SKU>
     ${shippingXml}
+    ${shippingPackageXml}
     ${returnPolicyXml}
     ${bestOfferXml}
+    ${shipToLocationsXml ? `<ShipToLocations>${shipToLocationsXml}</ShipToLocations>` : ''}
   </Item>
 </AddFixedPriceItemRequest>`;
+}
+
+/**
+ * Build international shipping XML section
+ */
+function buildInternationalShippingXml(shipping: ShippingDetails): string {
+  if (!shipping.offerInternational || !shipping.internationalShippingService) {
+    return '';
+  }
+
+  const intlService = shipping.internationalShippingService;
+  const intlLocations = shipping.internationalShipToLocations || ['Worldwide'];
+
+  if (shipping.internationalShippingType === 'FLAT_RATE') {
+    return `
+        <InternationalShippingServiceOption>
+          <ShippingService>${intlService}</ShippingService>
+          <ShippingServiceCost currencyID="USD">${(shipping.internationalFlatRateCost || 0).toFixed(2)}</ShippingServiceCost>
+          <ShippingServicePriority>1</ShippingServicePriority>
+          ${intlLocations.map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`).join('\n          ')}
+        </InternationalShippingServiceOption>`;
+  } else {
+    // Calculated international shipping
+    return `
+        <InternationalShippingServiceOption>
+          <ShippingService>${intlService}</ShippingService>
+          <ShippingServicePriority>1</ShippingServicePriority>
+          ${intlLocations.map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`).join('\n          ')}
+        </InternationalShippingServiceOption>`;
+  }
+}
+
+/**
+ * Build return policy XML with domestic and international options
+ */
+function buildReturnPolicyXml(returns: ReturnDetails): string {
+  // Domestic returns
+  let domesticXml = '';
+  if (returns.domesticReturnsAccepted) {
+    domesticXml = `
+        <ReturnsAcceptedOption>ReturnsAccepted</ReturnsAcceptedOption>
+        <ReturnsWithinOption>Days_${returns.domesticReturnPeriodDays || 30}</ReturnsWithinOption>
+        <ShippingCostPaidByOption>${returns.domesticReturnShippingPaidBy === 'SELLER' ? 'Seller' : 'Buyer'}</ShippingCostPaidByOption>
+        <RefundOption>MoneyBack</RefundOption>`;
+  } else {
+    domesticXml = `
+        <ReturnsAcceptedOption>ReturnsNotAccepted</ReturnsAcceptedOption>`;
+  }
+
+  // International returns
+  let internationalXml = '';
+  if (returns.internationalReturnsAccepted) {
+    internationalXml = `
+        <InternationalReturnsAcceptedOption>ReturnsAccepted</InternationalReturnsAcceptedOption>
+        <InternationalReturnsWithinOption>Days_${returns.internationalReturnPeriodDays || 30}</InternationalReturnsWithinOption>
+        <InternationalShippingCostPaidByOption>${returns.internationalReturnShippingPaidBy === 'SELLER' ? 'Seller' : 'Buyer'}</InternationalShippingCostPaidByOption>`;
+  } else {
+    internationalXml = `
+        <InternationalReturnsAcceptedOption>ReturnsNotAccepted</InternationalReturnsAcceptedOption>`;
+  }
+
+  return `
+      <ReturnPolicy>
+        ${domesticXml}
+        ${internationalXml}
+      </ReturnPolicy>`;
 }
 
 /**
@@ -245,11 +376,6 @@ function parseAddItemResponse(xmlResponse: string): AddItemResponse {
     return match ? match[1] : null;
   };
 
-  const getAllTagValues = (xml: string, tag: string): string[] => {
-    const matches = xml.matchAll(new RegExp(`<${tag}[^>]*>([^<]*)</${tag}>`, 'gi'));
-    return Array.from(matches).map(m => m[1]);
-  };
-
   const ack = getTagValue(xmlResponse, 'Ack');
   const success = ack === 'Success' || ack === 'Warning';
   const itemId = getTagValue(xmlResponse, 'ItemID');
@@ -269,7 +395,8 @@ function parseAddItemResponse(xmlResponse: string): AddItemResponse {
 
   // Parse warnings
   const warnings: Array<{ code: string; message: string }> = [];
-  for (const match of errorMatches) {
+  const warningMatches = xmlResponse.matchAll(/<Errors>([\s\S]*?)<\/Errors>/gi);
+  for (const match of warningMatches) {
     const errorBlock = match[1];
     const severity = getTagValue(errorBlock, 'SeverityCode') || '';
     if (severity === 'Warning') {
