@@ -82,6 +82,9 @@ interface CreateListingRequest {
   internationalReturnsAccepted: boolean;
   internationalReturnPeriodDays?: number;
   internationalReturnShippingPaidBy?: 'BUYER' | 'SELLER';
+
+  // Regulatory documents (Certificate of Analysis, etc.)
+  regulatoryDocumentIds?: string[];
 }
 
 interface ListingResponse {
@@ -205,6 +208,8 @@ export async function POST(request: NextRequest) {
       internationalReturnsAccepted = false,
       internationalReturnPeriodDays = 30,
       internationalReturnShippingPaidBy = 'BUYER',
+      // Regulatory documents
+      regulatoryDocumentIds = [],
     } = body;
 
     // Validate required fields
@@ -300,6 +305,8 @@ export async function POST(request: NextRequest) {
       professionalGrader: DCM_GRADER_ID,
       grade: gradeId,
       certificationNumber: card.serial,
+      // Regulatory documents (Certificate of Analysis)
+      regulatoryDocumentIds: regulatoryDocumentIds.length > 0 ? regulatoryDocumentIds : undefined,
     };
 
     // Prepare package dimensions

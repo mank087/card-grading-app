@@ -113,6 +113,8 @@ export interface ListingDetails {
   professionalGrader?: string;
   grade?: string;
   certificationNumber?: string;
+  // Regulatory documents (e.g., Certificate of Analysis)
+  regulatoryDocumentIds?: string[];
 }
 
 export interface AddItemResponse {
@@ -246,6 +248,22 @@ function buildAddFixedPriceItemXml(
       .join('\n    ');
   }
 
+  // Build regulatory documents XML (Certificate of Analysis, etc.)
+  let regulatoryXml = '';
+  if (listing.regulatoryDocumentIds?.length) {
+    const documentsXml = listing.regulatoryDocumentIds
+      .map(docId => `
+          <Document>
+            <DocumentID>${escapeXml(docId)}</DocumentID>
+          </Document>`)
+      .join('');
+    regulatoryXml = `
+      <Regulatory>
+        <Documents>${documentsXml}
+        </Documents>
+      </Regulatory>`;
+  }
+
   return `<?xml version="1.0" encoding="utf-8"?>
 <AddFixedPriceItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <RequesterCredentials>
@@ -282,6 +300,7 @@ function buildAddFixedPriceItemXml(
     ${shippingPackageXml}
     ${returnPolicyXml}
     ${bestOfferXml}
+    ${regulatoryXml}
     ${shipToLocationsXml ? `<ShipToLocations>${shipToLocationsXml}</ShipToLocations>` : ''}
   </Item>
 </AddFixedPriceItemRequest>`;

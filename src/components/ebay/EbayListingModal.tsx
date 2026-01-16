@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { pdf } from '@react-pdf/renderer';
 import { generateCardImages, CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { FoldableLabelData, generateQRCodeWithLogo, loadLogoAsBase64 } from '@/lib/foldableLabelGenerator';
@@ -10,6 +11,7 @@ import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
+import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 
 // Helper: Get condition label from grade
 function getConditionLabel(grade: number): string {
@@ -203,6 +205,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     internationalReturnPeriodDays: 30,
     internationalReturnShippingPaidBy: 'BUYER' as 'BUYER' | 'SELLER',
   });
+
+  // Grading report document state
+  const [includeGradingReport, setIncludeGradingReport] = useState(true);
+  const [gradingReportDocId, setGradingReportDocId] = useState<string | null>(null);
+  const [uploadingReport, setUploadingReport] = useState(false);
 
   // Result state
   const [listingResult, setListingResult] = useState<{
@@ -516,6 +523,153 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     return urls;
   };
 
+  /**
+   * Generate and upload the grading report as a Certificate of Analysis
+   */
+  const uploadGradingReport = async (): Promise<string | null> => {
+    const session = getStoredSession();
+    if (!session?.access_token) {
+      throw new Error('Not logged in');
+    }
+
+    try {
+      setUploadingReport(true);
+
+      // Prepare label data
+      const labelData = getCardLabelData(card);
+      const grade = labelData.grade ?? 0;
+      const cardInfo = card.conversational_card_info || {};
+      const weightedScores = card.conversational_weighted_sub_scores || {};
+      const subScores = card.conversational_sub_scores || {};
+
+      // Convert card image to base64 for PDF
+      const imageToBase64 = async (imageUrl: string): Promise<string> => {
+        const response = await fetch(imageUrl);
+        const blob = await response.blob();
+
+        // Create canvas to convert to JPEG (PDF library doesn't support WEBP)
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+
+        return new Promise((resolve, reject) => {
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/jpeg', 0.95));
+          };
+          img.onerror = reject;
+          img.src = URL.createObjectURL(blob);
+        });
+      };
+
+      // Get card images
+      let frontImageBase64 = '';
+      let backImageBase64 = '';
+
+      if (card.front_url) {
+        try {
+          frontImageBase64 = await imageToBase64(card.front_url);
+        } catch (e) {
+          console.warn('[eBay Report] Failed to load front image:', e);
+        }
+      }
+
+      if (card.back_url) {
+        try {
+          backImageBase64 = await imageToBase64(card.back_url);
+        } catch (e) {
+          console.warn('[eBay Report] Failed to load back image:', e);
+        }
+      }
+
+      // Generate QR code
+      const qrCodeDataUrl = await generateQRCodeWithLogo(
+        `https://dcmgrading.com/verify/${card.serial}`,
+        await loadLogoAsBase64()
+      );
+
+      // Prepare report data
+      const reportData: ReportCardData = {
+        id: card.id,
+        serial: card.serial,
+        frontImageUrl: frontImageBase64,
+        backImageUrl: backImageBase64,
+        qrCodeUrl: qrCodeDataUrl,
+        overallGrade: grade,
+        confidenceScore: card.conversational_confidence_score || 95,
+        uncertaintyScore: card.conversational_uncertainty_score || 5,
+        conditionLabel: labelData.condition || getConditionLabel(grade),
+        conditionSummary: card.conversational_final_grade_summary || card.conversational_summary || '',
+        // Card info
+        line1: labelData.line1 || '',
+        line2: labelData.line2 || '',
+        line3: labelData.line3 || '',
+        line4: labelData.line4 || `DCM ${card.serial}`,
+        // Front subgrades
+        frontSubgrades: {
+          centering: weightedScores.front_centering ?? subScores.front_centering ?? grade,
+          corners: weightedScores.front_corners ?? subScores.front_corners ?? grade,
+          edges: weightedScores.front_edges ?? subScores.front_edges ?? grade,
+          surface: weightedScores.front_surface ?? subScores.front_surface ?? grade,
+        },
+        // Back subgrades
+        backSubgrades: {
+          centering: weightedScores.back_centering ?? subScores.back_centering ?? grade,
+          corners: weightedScores.back_corners ?? subScores.back_corners ?? grade,
+          edges: weightedScores.back_edges ?? subScores.back_edges ?? grade,
+          surface: weightedScores.back_surface ?? subScores.back_surface ?? grade,
+        },
+        // Professional grades mapping
+        professionalGrades: card.conversational_equivalency_scores || {},
+        // Metadata
+        gradedAt: card.graded_at || card.created_at || new Date().toISOString(),
+        category: card.category,
+      };
+
+      console.log('[eBay Report] Generating PDF report...');
+
+      // Generate PDF blob
+      const pdfDoc = await pdf(<CardGradingReport card={reportData} />);
+      const pdfBlob = await pdfDoc.toBlob();
+
+      console.log('[eBay Report] PDF generated, uploading to eBay...');
+
+      // Upload to eBay via our API
+      const formData = new FormData();
+      formData.append('file', pdfBlob, `DCM-Report-${card.serial}.pdf`);
+      formData.append('fileName', `DCM-Report-${card.serial}.pdf`);
+
+      const response = await fetch('/api/ebay/document', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        console.error('[eBay Report] Upload failed:', data.error);
+        // Don't throw - we can still create the listing without the report
+        return null;
+      }
+
+      const data = await response.json();
+      console.log('[eBay Report] Document uploaded:', data.documentId);
+
+      return data.documentId;
+    } catch (error) {
+      console.error('[eBay Report] Failed to generate/upload report:', error);
+      // Don't throw - we can still create the listing without the report
+      return null;
+    } finally {
+      setUploadingReport(false);
+    }
+  };
+
   const createListing = async () => {
     setStep('publishing');
     setIsLoading(true);
@@ -532,6 +686,16 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
       if (uploadedUrls.length === 0) {
         throw new Error('No images selected for listing');
+      }
+
+      // Upload grading report as Certificate of Analysis if enabled
+      let regulatoryDocumentIds: string[] = [];
+      if (includeGradingReport) {
+        const docId = await uploadGradingReport();
+        if (docId) {
+          regulatoryDocumentIds.push(docId);
+          setGradingReportDocId(docId);
+        }
       }
 
       // Create listing via Trading API with inline shipping/returns
@@ -577,6 +741,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           internationalReturnsAccepted: shippingForm.internationalReturnsAccepted,
           internationalReturnPeriodDays: shippingForm.internationalReturnPeriodDays,
           internationalReturnShippingPaidBy: shippingForm.internationalReturnShippingPaidBy,
+          // Regulatory documents (Certificate of Analysis)
+          regulatoryDocumentIds,
         }),
       });
 
@@ -1697,6 +1863,25 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 </div>
               </div>
 
+              {/* Product Documents */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Product Documents</h4>
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeGradingReport}
+                    onChange={(e) => setIncludeGradingReport(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-900">Include DCM Grading Report</span>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Attach the full DCM grading report as a Certificate of Analysis. This provides buyers with detailed condition information.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
                 Your listing will be published immediately on eBay.
               </div>
@@ -1707,8 +1892,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           {step === 'publishing' && (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4" />
-              <p className="text-gray-600">Publishing to eBay...</p>
-              <p className="text-sm text-gray-500 mt-1">This may take a moment</p>
+              <p className="text-gray-600">
+                {uploadingReport ? 'Generating grading report...' : 'Publishing to eBay...'}
+              </p>
+              <p className="text-sm text-gray-500 mt-1">
+                {uploadingReport ? 'Uploading Certificate of Analysis' : 'This may take a moment'}
+              </p>
             </div>
           )}
 
