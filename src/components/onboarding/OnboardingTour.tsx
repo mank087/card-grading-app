@@ -117,11 +117,13 @@ interface OnboardingTourProps {
 
 export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0)
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 })
+  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({})
   const [arrowPosition, setArrowPosition] = useState<'top' | 'bottom' | 'left' | 'right'>('top')
   const [isVisible, setIsVisible] = useState(false)
   const [showFinalModal, setShowFinalModal] = useState(false)
+  const [elementFound, setElementFound] = useState(true)
   const tooltipRef = useRef<HTMLDivElement>(null)
+  const retryCountRef = useRef(0)
 
   // Get current step config
   const step = TOUR_STEPS[currentStep]
@@ -132,17 +134,30 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
 
     const targetEl = document.getElementById(step.targetId)
     if (!targetEl) {
-      // Element not found, try next step
-      console.log(`[Tour] Element not found: ${step.targetId}, skipping...`)
+      console.log(`[Tour] Element not found: ${step.targetId}`)
+      setElementFound(false)
+
+      // Retry a few times (element might be loading)
+      if (retryCountRef.current < 3) {
+        retryCountRef.current++
+        setTimeout(updatePosition, 500)
+        return
+      }
+
+      // Skip to next step if element truly doesn't exist
+      retryCountRef.current = 0
       if (currentStep < TOUR_STEPS.length - 1) {
         setCurrentStep(prev => prev + 1)
       }
       return
     }
 
+    setElementFound(true)
+    retryCountRef.current = 0
+
     const rect = targetEl.getBoundingClientRect()
-    const tooltipWidth = 320
-    const tooltipHeight = 180
+    const tooltipWidth = 340
+    const tooltipHeight = 200
     const padding = 16
     const arrowSize = 12
 
@@ -150,7 +165,7 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
     let left = 0
     let arrow: 'top' | 'bottom' | 'left' | 'right' = 'top'
 
-    // Calculate position based on step config
+    // Calculate position based on step config (using viewport coordinates for fixed positioning)
     switch (step.position) {
       case 'bottom':
         top = rect.bottom + arrowSize + padding
@@ -180,19 +195,31 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
 
     if (left < padding) left = padding
     if (left + tooltipWidth > viewportWidth - padding) left = viewportWidth - tooltipWidth - padding
+
+    // If tooltip would be above viewport, flip to bottom
     if (top < padding) {
       top = rect.bottom + arrowSize + padding
       arrow = 'top'
     }
+
+    // If tooltip would be below viewport, flip to top
     if (top + tooltipHeight > viewportHeight - padding) {
       top = rect.top - tooltipHeight - arrowSize - padding
       arrow = 'bottom'
+
+      // If still off screen, just position at bottom of viewport
+      if (top < padding) {
+        top = viewportHeight - tooltipHeight - padding
+      }
     }
 
-    // Add scroll offset for fixed positioning
-    top += window.scrollY
-
-    setTooltipPosition({ top, left })
+    setTooltipStyle({
+      position: 'fixed',
+      top: `${top}px`,
+      left: `${left}px`,
+      width: `${tooltipWidth}px`,
+      zIndex: 57,
+    })
     setArrowPosition(arrow)
   }, [step, currentStep])
 
@@ -201,19 +228,27 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
     if (!step) return
 
     const targetEl = document.getElementById(step.targetId)
-    if (!targetEl) return
+    if (!targetEl) {
+      // Will be handled by updatePosition retry logic
+      updatePosition()
+      return
+    }
 
     // Scroll element into view with some padding
     const rect = targetEl.getBoundingClientRect()
-    const scrollTop = window.scrollY + rect.top - window.innerHeight / 3
+    const elementTop = window.scrollY + rect.top
+    const viewportHeight = window.innerHeight
+
+    // Calculate scroll position to center element in viewport
+    const scrollTo = elementTop - (viewportHeight / 3)
 
     window.scrollTo({
-      top: Math.max(0, scrollTop),
+      top: Math.max(0, scrollTo),
       behavior: 'smooth'
     })
 
-    // Update position after scroll
-    setTimeout(updatePosition, 500)
+    // Update position after scroll completes
+    setTimeout(updatePosition, 600)
   }, [step, updatePosition])
 
   // Initialize tour
@@ -224,7 +259,7 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
       const timer = setTimeout(() => {
         setIsVisible(true)
         scrollToElement()
-      }, 300)
+      }, 500)
       return () => clearTimeout(timer)
     }
   }, [isActive, showFinalModal, scrollToElement])
@@ -236,16 +271,26 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
     }
   }, [currentStep, isVisible, showFinalModal, scrollToElement])
 
-  // Update position on resize
+  // Update position on scroll and resize
   useEffect(() => {
     if (!isVisible || showFinalModal) return
 
-    const handleResize = () => updatePosition()
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
+    const handleUpdate = () => {
+      // Debounce updates
+      setTimeout(updatePosition, 100)
+    }
+
+    window.addEventListener('scroll', handleUpdate)
+    window.addEventListener('resize', handleUpdate)
+
+    return () => {
+      window.removeEventListener('scroll', handleUpdate)
+      window.removeEventListener('resize', handleUpdate)
+    }
   }, [isVisible, showFinalModal, updatePosition])
 
   const handleNext = () => {
+    retryCountRef.current = 0
     if (currentStep < TOUR_STEPS.length - 1) {
       setCurrentStep(prev => prev + 1)
     } else {
@@ -337,43 +382,57 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   // Tour tooltip
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/40 z-[55]" onClick={handleSkip} />
+      {/* Overlay - clicking skips the tour */}
+      <div
+        className="fixed inset-0 bg-black/50 z-[54]"
+        onClick={(e) => {
+          e.stopPropagation()
+          // Don't skip on overlay click, just prevent interaction
+        }}
+      />
 
-      {/* Highlight the target element */}
-      <style jsx global>{`
-        #${step?.targetId} {
-          position: relative;
-          z-index: 56;
-          box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.5), 0 0 20px rgba(124, 58, 237, 0.3);
-          border-radius: 8px;
-        }
-      `}</style>
+      {/* Highlight ring around target element */}
+      {elementFound && step && (() => {
+        const targetEl = document.getElementById(step.targetId)
+        if (!targetEl) return null
+
+        const rect = targetEl.getBoundingClientRect()
+        return (
+          <div
+            className="fixed pointer-events-none z-[55] rounded-lg"
+            style={{
+              top: rect.top - 4,
+              left: rect.left - 4,
+              width: rect.width + 8,
+              height: rect.height + 8,
+              boxShadow: '0 0 0 4px rgba(124, 58, 237, 0.6), 0 0 0 9999px rgba(0, 0, 0, 0.5)',
+              background: 'transparent',
+            }}
+          />
+        )
+      })()}
 
       {/* Tooltip */}
       <div
         ref={tooltipRef}
-        className="fixed z-[57] w-80 bg-white rounded-xl shadow-2xl animate-fadeIn"
-        style={{
-          top: tooltipPosition.top,
-          left: tooltipPosition.left,
-        }}
+        className="bg-white rounded-xl shadow-2xl animate-fadeIn"
+        style={tooltipStyle}
       >
         {/* Arrow */}
         <div
           className={`absolute w-4 h-4 bg-white transform rotate-45 ${
-            arrowPosition === 'top' ? '-top-2 left-1/2 -translate-x-1/2' :
-            arrowPosition === 'bottom' ? '-bottom-2 left-1/2 -translate-x-1/2' :
-            arrowPosition === 'left' ? '-left-2 top-1/2 -translate-y-1/2' :
-            '-right-2 top-1/2 -translate-y-1/2'
+            arrowPosition === 'top' ? '-top-2 left-1/2 -translate-x-1/2 shadow-[-2px_-2px_4px_rgba(0,0,0,0.1)]' :
+            arrowPosition === 'bottom' ? '-bottom-2 left-1/2 -translate-x-1/2 shadow-[2px_2px_4px_rgba(0,0,0,0.1)]' :
+            arrowPosition === 'left' ? '-left-2 top-1/2 -translate-y-1/2 shadow-[-2px_2px_4px_rgba(0,0,0,0.1)]' :
+            '-right-2 top-1/2 -translate-y-1/2 shadow-[2px_-2px_4px_rgba(0,0,0,0.1)]'
           }`}
         />
 
         {/* Content */}
-        <div className="p-4">
+        <div className="p-5">
           {/* Progress indicator */}
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-purple-600 font-medium">
+            <span className="text-xs text-purple-600 font-semibold">
               Step {currentStep + 1} of {TOUR_STEPS.length}
             </span>
             <button
@@ -385,9 +444,9 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
           </div>
 
           {/* Progress bar */}
-          <div className="h-1 bg-gray-100 rounded-full mb-4 overflow-hidden">
+          <div className="h-1.5 bg-gray-100 rounded-full mb-4 overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-300"
+              className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-500"
               style={{ width: `${((currentStep + 1) / TOUR_STEPS.length) * 100}%` }}
             />
           </div>
@@ -396,13 +455,19 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
           <h3 className="text-lg font-bold text-gray-800 mb-2">{step?.title}</h3>
 
           {/* Description */}
-          <p className="text-sm text-gray-600 leading-relaxed mb-4">{step?.description}</p>
+          <p className="text-sm text-gray-600 leading-relaxed mb-5">{step?.description}</p>
 
           {/* Navigation */}
-          <div className="flex justify-end">
+          <div className="flex justify-between items-center">
+            <button
+              onClick={handleSkip}
+              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              Exit tour
+            </button>
             <button
               onClick={handleNext}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-2 px-6 rounded-lg transition-all duration-200 flex items-center gap-2"
+              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
             >
               {currentStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
