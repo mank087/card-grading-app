@@ -120,18 +120,6 @@ function generateHtmlDescription(data: {
 `.trim();
 }
 
-interface EbayPolicy {
-  policyId: string;
-  name: string;
-  description?: string;
-}
-
-interface PoliciesData {
-  fulfillment: EbayPolicy[];
-  payment: EbayPolicy[];
-  return: EbayPolicy[];
-}
-
 interface EbayListingModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -141,7 +129,7 @@ interface EbayListingModalProps {
   labelStyle?: 'modern' | 'traditional';
 }
 
-type ListingStep = 'images' | 'details' | 'specifics' | 'policies' | 'review' | 'publishing' | 'success' | 'error';
+type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error';
 
 export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   isOpen,
@@ -186,17 +174,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [categoryId, setCategoryId] = useState('');
   const [aspectsLoaded, setAspectsLoaded] = useState(false);
 
-  // Policies state
-  const [policies, setPolicies] = useState<PoliciesData | null>(null);
-  const [fulfillmentPolicyId, setFulfillmentPolicyId] = useState('');
-  const [paymentPolicyId, setPaymentPolicyId] = useState('');
-  const [returnPolicyId, setReturnPolicyId] = useState('');
-  const [showPolicyCreator, setShowPolicyCreator] = useState(false);
-  const [creatingPolicies, setCreatingPolicies] = useState(false);
-  const [optingIn, setOptingIn] = useState(false);
-
-  // Policy creation form state
-  const [policyForm, setPolicyForm] = useState({
+  // Shipping & Returns form state (inline, not policy-based)
+  const [shippingForm, setShippingForm] = useState({
     shippingType: 'CALCULATED' as 'FREE' | 'FLAT_RATE' | 'CALCULATED',
     flatRateAmount: 5.00,
     handlingDays: 1,
@@ -304,13 +283,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       generateImages();
     }
   }, [isOpen, step]);
-
-  // Fetch policies when we reach that step
-  useEffect(() => {
-    if (step === 'policies' && !policies) {
-      fetchPolicies();
-    }
-  }, [step, policies]);
 
   // Fetch available aspects when we reach the specifics step
   useEffect(() => {
@@ -470,135 +442,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     }
   };
 
-  const fetchPolicies = async () => {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const session = getStoredSession();
-      if (!session?.access_token) {
-        throw new Error('Not logged in');
-      }
-
-      const response = await fetch('/api/ebay/policies', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to fetch policies');
-      }
-
-      const data = await response.json();
-      setPolicies(data);
-
-      // Auto-select first policy of each type
-      if (data.fulfillment?.length) setFulfillmentPolicyId(data.fulfillment[0].policyId);
-      if (data.payment?.length) setPaymentPolicyId(data.payment[0].policyId);
-      if (data.return?.length) setReturnPolicyId(data.return[0].policyId);
-
-      // Show policy creator if no policies exist
-      const noPolicies = !data.fulfillment?.length && !data.payment?.length && !data.return?.length;
-      setShowPolicyCreator(noPolicies);
-    } catch (err) {
-      console.error('[eBay Listing] Failed to fetch policies:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch policies');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const createPolicies = async () => {
-    setCreatingPolicies(true);
-    setError(null);
-
-    try {
-      const session = getStoredSession();
-      if (!session?.access_token) {
-        throw new Error('Not logged in');
-      }
-
-      const response = await fetch('/api/ebay/policies/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(policyForm),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Show detailed error if available
-        const errorDetails = data.details ? `\n${data.details.join('\n')}` : '';
-        throw new Error((data.error || 'Failed to create policies') + errorDetails);
-      }
-
-      // Set the created policy IDs
-      setFulfillmentPolicyId(data.fulfillmentPolicyId);
-      setPaymentPolicyId(data.paymentPolicyId);
-      setReturnPolicyId(data.returnPolicyId);
-
-      // Update policies state with new policies
-      setPolicies({
-        fulfillment: [{ policyId: data.fulfillmentPolicyId, name: `DCM Shipping - ${policyForm.shippingType === 'FREE' ? 'Free' : policyForm.shippingType === 'FLAT_RATE' ? `$${policyForm.flatRateAmount}` : 'Calculated'}` }],
-        payment: [{ policyId: data.paymentPolicyId, name: 'DCM Payment Policy' }],
-        return: [{ policyId: data.returnPolicyId, name: policyForm.returnsAccepted ? `DCM Returns - ${policyForm.returnPeriodDays} Days` : 'DCM No Returns' }],
-      });
-
-      setShowPolicyCreator(false);
-
-      // Advance to review step
-      setStep('review');
-    } catch (err) {
-      console.error('[eBay Listing] Failed to create policies:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create policies');
-    } finally {
-      setCreatingPolicies(false);
-    }
-  };
-
-  const optInToBusinessPolicies = async () => {
-    setOptingIn(true);
-    setError(null);
-
-    try {
-      const session = getStoredSession();
-      if (!session?.access_token) {
-        throw new Error('Not logged in');
-      }
-
-      const response = await fetch('/api/ebay/opt-in', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to enable Business Policies');
-      }
-
-      // Show success message and suggest retry
-      if (data.alreadyOptedIn) {
-        setError('Business Policies already enabled. Try creating policies again.');
-      } else {
-        setError('Business Policies enabled! eBay may take a few minutes to process. Click "Retry" to try again.');
-      }
-    } catch (err) {
-      console.error('[eBay Listing] Failed to opt-in:', err);
-      setError(err instanceof Error ? err.message : 'Failed to enable Business Policies');
-    } finally {
-      setOptingIn(false);
-    }
-  };
-
   const uploadImages = async (): Promise<string[]> => {
     const session = getStoredSession();
     if (!session?.access_token) {
@@ -671,7 +514,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         throw new Error('No images selected for listing');
       }
 
-      // Create listing
+      // Create listing via Trading API with inline shipping/returns
       const response = await fetch('/api/ebay/listing', {
         method: 'POST',
         headers: {
@@ -683,17 +526,20 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           title,
           description,
           price: parseFloat(price),
-          listingFormat,
           bestOfferEnabled: listingFormat === 'FIXED_PRICE' ? bestOfferEnabled : false,
           duration,
-          fulfillmentPolicyId,
-          paymentPolicyId,
-          returnPolicyId,
           imageUrls: uploadedUrls,
           itemSpecifics: itemSpecifics
             .filter(spec => spec.name && spec.value && (Array.isArray(spec.value) ? spec.value.length > 0 : spec.value.trim()))
             .map(spec => ({ name: spec.name, value: spec.value })),
-          publish: true,
+          // Inline shipping options (not policy-based)
+          shippingType: shippingForm.shippingType,
+          flatRateAmount: shippingForm.flatRateAmount,
+          handlingDays: shippingForm.handlingDays,
+          // Inline return options (not policy-based)
+          returnsAccepted: shippingForm.returnsAccepted,
+          returnPeriodDays: shippingForm.returnPeriodDays,
+          returnShippingPaidBy: shippingForm.returnShippingPaidBy,
         }),
       });
 
@@ -739,17 +585,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         // Don't validate required fields here - let eBay validate on publish
         // This way users aren't blocked by fields that may not actually be required
         setError(null);
-        setStep('policies');
+        setStep('shipping');
         break;
-      case 'policies':
-        if (showPolicyCreator) {
-          setError('Please configure and save your shipping & return policies first');
-          return;
-        }
-        if (!fulfillmentPolicyId || !paymentPolicyId || !returnPolicyId) {
-          setError('Please select your policies');
-          return;
-        }
+      case 'shipping':
         setError(null);
         setStep('review');
         break;
@@ -768,11 +606,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       case 'specifics':
         setStep('details');
         break;
-      case 'policies':
+      case 'shipping':
         setStep('specifics');
         break;
       case 'review':
-        setStep('policies');
+        setStep('shipping');
         break;
       case 'error':
         setStep('review');
@@ -806,13 +644,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         {/* Progress Steps */}
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            {['images', 'details', 'specifics', 'policies', 'review'].map((s, i) => (
+            {['images', 'details', 'specifics', 'shipping', 'review'].map((s, i) => (
               <div key={s} className="flex items-center">
                 <div
                   className={`w-7 h-7 rounded-full flex items-center justify-center text-sm font-medium ${
                     step === s
                       ? 'bg-purple-600 text-white'
-                      : ['images', 'details', 'specifics', 'policies', 'review'].indexOf(step) > i
+                      : ['images', 'details', 'specifics', 'shipping', 'review'].indexOf(step) > i
                       ? 'bg-purple-200 text-purple-700'
                       : 'bg-gray-200 text-gray-500'
                   }`}
@@ -822,7 +660,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 {i < 4 && (
                   <div
                     className={`w-10 h-0.5 mx-1 ${
-                      ['images', 'details', 'specifics', 'policies', 'review'].indexOf(step) > i
+                      ['images', 'details', 'specifics', 'shipping', 'review'].indexOf(step) > i
                         ? 'bg-purple-200'
                         : 'bg-gray-200'
                     }`}
@@ -835,7 +673,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             <span>Images</span>
             <span>Details</span>
             <span>Specifics</span>
-            <span>Policies</span>
+            <span>Shipping</span>
             <span>Review</span>
           </div>
         </div>
@@ -1332,289 +1170,134 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             </div>
           )}
 
-          {/* Step 4: Policies */}
-          {step === 'policies' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Shipping & Returns</h3>
+          {/* Step 4: Shipping & Returns */}
+          {step === 'shipping' && (
+            <div className="space-y-5">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Shipping & Returns</h3>
+                <p className="text-sm text-gray-500">Configure shipping and return options for this listing.</p>
+              </div>
 
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
-                  <span className="ml-3 text-gray-600">Loading policies...</span>
-                </div>
-              ) : showPolicyCreator || !policies?.fulfillment?.length ? (
-                // Inline policy creation form
-                <div className="space-y-5">
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
-                    Set up your shipping and return preferences. These will be saved to your eBay account for future listings.
+              {/* Shipping Section */}
+              <div className="space-y-3">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  Shipping
+                </h4>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Cost</label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'FREE', label: 'Free Shipping', desc: 'You cover shipping' },
+                      { value: 'FLAT_RATE', label: 'Flat Rate', desc: 'Set your price' },
+                      { value: 'CALCULATED', label: 'Calculated', desc: 'Based on location' },
+                    ].map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setShippingForm(f => ({ ...f, shippingType: option.value as any }))}
+                        className={`p-3 rounded-lg border-2 text-left transition-all ${
+                          shippingForm.shippingType === option.value
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="font-medium text-sm">{option.label}</div>
+                        <div className="text-xs text-gray-500">{option.desc}</div>
+                      </button>
+                    ))}
                   </div>
+                </div>
 
-                  {/* Shipping Section */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-                      </svg>
-                      Shipping
-                    </h4>
+                {shippingForm.shippingType === 'FLAT_RATE' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Price</label>
+                    <div className="relative w-32">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        value={shippingForm.flatRateAmount}
+                        onChange={(e) => setShippingForm(f => ({ ...f, flatRateAmount: parseFloat(e.target.value) || 0 }))}
+                        className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        min="0.01"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                )}
 
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Handling Time</label>
+                  <select
+                    value={shippingForm.handlingDays}
+                    onChange={(e) => setShippingForm(f => ({ ...f, handlingDays: parseInt(e.target.value) }))}
+                    className="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value={1}>1 business day</option>
+                    <option value={2}>2 business days</option>
+                    <option value={3}>3 business days</option>
+                    <option value={5}>5 business days</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Returns Section */}
+              <div className="space-y-3 pt-2 border-t border-gray-200">
+                <h4 className="font-medium text-gray-900 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
+                  </svg>
+                  Returns
+                </h4>
+
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={shippingForm.returnsAccepted}
+                      onChange={(e) => setShippingForm(f => ({ ...f, returnsAccepted: e.target.checked }))}
+                      className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900">Accept returns</span>
+                  </label>
+                </div>
+
+                {shippingForm.returnsAccepted && (
+                  <div className="grid grid-cols-2 gap-4 pl-7">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Shipping Cost</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {[
-                          { value: 'FREE', label: 'Free Shipping', desc: 'You cover shipping' },
-                          { value: 'FLAT_RATE', label: 'Flat Rate', desc: 'Set your price' },
-                          { value: 'CALCULATED', label: 'Calculated', desc: 'Based on location' },
-                        ].map((option) => (
-                          <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setPolicyForm(f => ({ ...f, shippingType: option.value as any }))}
-                            className={`p-3 rounded-lg border-2 text-left transition-all ${
-                              policyForm.shippingType === option.value
-                                ? 'border-purple-500 bg-purple-50'
-                                : 'border-gray-200 hover:border-gray-300'
-                            }`}
-                          >
-                            <div className="font-medium text-sm">{option.label}</div>
-                            <div className="text-xs text-gray-500">{option.desc}</div>
-                          </button>
-                        ))}
-                      </div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
+                      <select
+                        value={shippingForm.returnPeriodDays}
+                        onChange={(e) => setShippingForm(f => ({ ...f, returnPeriodDays: parseInt(e.target.value) }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value={14}>14 days</option>
+                        <option value={30}>30 days</option>
+                        <option value={60}>60 days</option>
+                      </select>
                     </div>
 
-                    {policyForm.shippingType === 'FLAT_RATE' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Price</label>
-                        <div className="relative w-32">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                          <input
-                            type="number"
-                            value={policyForm.flatRateAmount}
-                            onChange={(e) => setPolicyForm(f => ({ ...f, flatRateAmount: parseFloat(e.target.value) || 0 }))}
-                            className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                            min="0.01"
-                            step="0.01"
-                          />
-                        </div>
-                      </div>
-                    )}
-
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Handling Time</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
                       <select
-                        value={policyForm.handlingDays}
-                        onChange={(e) => setPolicyForm(f => ({ ...f, handlingDays: parseInt(e.target.value) }))}
-                        className="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        value={shippingForm.returnShippingPaidBy}
+                        onChange={(e) => setShippingForm(f => ({ ...f, returnShippingPaidBy: e.target.value as any }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                       >
-                        <option value={1}>1 business day</option>
-                        <option value={2}>2 business days</option>
-                        <option value={3}>3 business days</option>
-                        <option value={5}>5 business days</option>
+                        <option value="BUYER">Buyer pays</option>
+                        <option value="SELLER">Seller pays (free returns)</option>
                       </select>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  {/* Returns Section */}
-                  <div className="space-y-3 pt-2 border-t border-gray-200">
-                    <h4 className="font-medium text-gray-900 flex items-center gap-2">
-                      <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 15v-1a4 4 0 00-4-4H8m0 0l3 3m-3-3l3-3m9 14V5a2 2 0 00-2-2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2z" />
-                      </svg>
-                      Returns
-                    </h4>
-
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={policyForm.returnsAccepted}
-                          onChange={(e) => setPolicyForm(f => ({ ...f, returnsAccepted: e.target.checked }))}
-                          className="w-5 h-5 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                        />
-                        <span className="text-sm font-medium text-gray-900">Accept returns</span>
-                      </label>
-                    </div>
-
-                    {policyForm.returnsAccepted && (
-                      <div className="grid grid-cols-2 gap-4 pl-7">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Return Window</label>
-                          <select
-                            value={policyForm.returnPeriodDays}
-                            onChange={(e) => setPolicyForm(f => ({ ...f, returnPeriodDays: parseInt(e.target.value) }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          >
-                            <option value={14}>14 days</option>
-                            <option value={30}>30 days</option>
-                            <option value={60}>60 days</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Return Shipping</label>
-                          <select
-                            value={policyForm.returnShippingPaidBy}
-                            onChange={(e) => setPolicyForm(f => ({ ...f, returnShippingPaidBy: e.target.value as any }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          >
-                            <option value="BUYER">Buyer pays</option>
-                            <option value="SELLER">Seller pays (free returns)</option>
-                          </select>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Error with guidance */}
-                  {error && error.includes('Shipping:') && (
-                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-                      <p className="font-medium mb-2">Unable to create policies automatically</p>
-                      {error.includes('not opted in') || error.includes('BP opted') ? (
-                        <>
-                          <p className="mb-2">
-                            Your eBay account doesn&apos;t have <strong>Business Policies</strong> enabled. This is required before creating shipping, payment, and return policies.
-                          </p>
-                          <button
-                            type="button"
-                            onClick={optInToBusinessPolicies}
-                            disabled={optingIn}
-                            className="mt-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-2"
-                          >
-                            {optingIn ? (
-                              <>
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                Enabling...
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                </svg>
-                                Enable Business Policies
-                              </>
-                            )}
-                          </button>
-                          <p className="mt-2 text-xs text-amber-600">
-                            After enabling, click &quot;Retry&quot; below to create your policies.
-                          </p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="mb-2">
-                            There was an issue creating policies. You can create them directly on eBay instead.
-                          </p>
-                          <a
-                            href="https://www.ebay.com/sh/settings/create-policy"
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-purple-600 hover:text-purple-700 underline"
-                          >
-                            Create on eBay →
-                          </a>
-                        </>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Create Policies Button */}
-                  <button
-                    type="button"
-                    onClick={createPolicies}
-                    disabled={creatingPolicies}
-                    className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
-                  >
-                    {creatingPolicies ? (
-                      <>
-                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Creating policies...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        {error && error.includes('Shipping:') ? 'Retry' : 'Save & Continue'}
-                      </>
-                    )}
-                  </button>
-
-                  <div className="flex gap-2">
-                    {(policies?.fulfillment?.length ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setShowPolicyCreator(false)}
-                        className="flex-1 text-sm text-gray-600 hover:text-gray-900"
-                      >
-                        Use existing policies instead
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setError(null);
-                        fetchPolicies();
-                      }}
-                      className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      Refresh Policies
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // Existing policies selection
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Shipping Policy</label>
-                    <select
-                      value={fulfillmentPolicyId}
-                      onChange={(e) => setFulfillmentPolicyId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      {policies.fulfillment.map((p) => (
-                        <option key={p.policyId} value={p.policyId}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Policy</label>
-                    <select
-                      value={paymentPolicyId}
-                      onChange={(e) => setPaymentPolicyId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      {policies.payment.map((p) => (
-                        <option key={p.policyId} value={p.policyId}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Return Policy</label>
-                    <select
-                      value={returnPolicyId}
-                      onChange={(e) => setReturnPolicyId(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    >
-                      {policies.return.map((p) => (
-                        <option key={p.policyId} value={p.policyId}>{p.name}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowPolicyCreator(true)}
-                    className="text-sm text-purple-600 hover:text-purple-800"
-                  >
-                    + Create new policies
-                  </button>
-                </div>
-              )}
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+                <strong>No account changes:</strong> These shipping and return options apply only to this listing and won&apos;t modify your eBay account settings.
+              </div>
             </div>
           )}
 
@@ -1694,8 +1377,41 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 </div>
               )}
 
+              {/* Shipping & Returns Summary */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Shipping & Returns</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Shipping:</span>
+                    <span className="font-medium text-gray-900">
+                      {shippingForm.shippingType === 'FREE' ? 'Free Shipping' :
+                       shippingForm.shippingType === 'FLAT_RATE' ? `$${shippingForm.flatRateAmount.toFixed(2)} Flat Rate` :
+                       'Calculated'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Handling:</span>
+                    <span className="font-medium text-gray-900">{shippingForm.handlingDays} business day{shippingForm.handlingDays > 1 ? 's' : ''}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Returns:</span>
+                    <span className="font-medium text-gray-900">
+                      {shippingForm.returnsAccepted ? `${shippingForm.returnPeriodDays} days` : 'Not accepted'}
+                    </span>
+                  </div>
+                  {shippingForm.returnsAccepted && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Return Shipping:</span>
+                      <span className="font-medium text-gray-900">
+                        {shippingForm.returnShippingPaidBy === 'BUYER' ? 'Buyer pays' : 'Seller pays'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
-                Your listing will be published immediately on eBay (Sandbox mode).
+                Your listing will be published immediately on eBay.
               </div>
             </div>
           )}

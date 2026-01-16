@@ -1,10 +1,9 @@
 /**
- * eBay Listing API
+ * eBay Listing API (Trading API)
  *
- * Creates eBay listings for graded cards. This handles the full flow:
- * 1. Create/update inventory item
- * 2. Create offer
- * 3. Optionally publish the offer
+ * Creates eBay listings for graded cards using the Trading API.
+ * This allows inline shipping/payment/return details without
+ * creating permanent business policies on the seller's account.
  *
  * POST /api/ebay/listing
  */
@@ -14,16 +13,20 @@ import { createClient } from '@supabase/supabase-js';
 import { getConnectionForUser, refreshTokenIfNeeded } from '@/lib/ebay/auth';
 import {
   EBAY_CONDITIONS,
-  CONDITION_DESCRIPTORS,
   DCM_GRADER_ID,
   getEbayGradeId,
   DCM_TO_EBAY_CATEGORY,
   EBAY_CATEGORIES,
-  MARKETPLACES,
-  LISTING_FORMATS,
-  EBAY_API_URLS,
+  GRADER_IDS,
 } from '@/lib/ebay/constants';
-import type { CardForEbayListing, EbayListing } from '@/lib/ebay/types';
+import {
+  addFixedPriceItem,
+  type TradingApiConfig,
+  type ListingDetails,
+  type ShippingDetails,
+  type ReturnDetails,
+} from '@/lib/ebay/tradingApi';
+import type { EbayListing } from '@/lib/ebay/types';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -44,27 +47,33 @@ interface CreateListingRequest {
   title: string;
   description?: string;
   price: number;
-  currency?: string;
   quantity?: number;
-  listingFormat?: 'FIXED_PRICE' | 'AUCTION';
-  bestOfferEnabled?: boolean;  // Allow Best Offer (only for FIXED_PRICE)
+  bestOfferEnabled?: boolean;
   duration?: string;
-  fulfillmentPolicyId: string;
-  paymentPolicyId: string;
-  returnPolicyId: string;
-  imageUrls: string[];  // Already uploaded to Supabase
-  itemSpecifics?: ItemSpecific[];  // Category-specific attributes
-  publish?: boolean;    // Whether to publish immediately
+  imageUrls: string[];
+  itemSpecifics?: ItemSpecific[];
+
+  // Shipping options (inline, not policy-based)
+  shippingType: 'FREE' | 'FLAT_RATE' | 'CALCULATED';
+  flatRateAmount?: number;
+  handlingDays: number;
+
+  // Return options (inline, not policy-based)
+  returnsAccepted: boolean;
+  returnPeriodDays?: number;
+  returnShippingPaidBy?: 'BUYER' | 'SELLER';
 }
 
 interface ListingResponse {
   success: boolean;
   listingId?: string;
   sku: string;
-  offerId?: string;
   listingUrl?: string;
   status: string;
+  fees?: Array<{ name: string; amount: number }>;
+  warnings?: Array<{ code: string; message: string }>;
   error?: string;
+  errors?: Array<{ code: string; message: string }>;
 }
 
 /**
@@ -84,37 +93,19 @@ function getEbayCategoryId(category: string): string {
 }
 
 /**
- * Make authenticated request to eBay API
+ * Map listing duration to Trading API format
  */
-async function ebayRequest(
-  endpoint: string,
-  method: string,
-  accessToken: string,
-  body?: object,
-  sandbox: boolean = true
-): Promise<Response> {
-  const baseUrl = sandbox
-    ? EBAY_API_URLS.sandbox.api
-    : EBAY_API_URLS.production.api;
-
-  const url = `${baseUrl}${endpoint}`;
-
-  const headers: Record<string, string> = {
-    'Authorization': `Bearer ${accessToken}`,
-    'Content-Type': 'application/json',
-    'Content-Language': 'en-US',
-  };
-
-  const options: RequestInit = {
-    method,
-    headers,
-  };
-
-  if (body) {
-    options.body = JSON.stringify(body);
+function mapListingDuration(duration?: string): string {
+  switch (duration) {
+    case 'DAYS_3': return 'Days_3';
+    case 'DAYS_5': return 'Days_5';
+    case 'DAYS_7': return 'Days_7';
+    case 'DAYS_10': return 'Days_10';
+    case 'DAYS_30': return 'Days_30';
+    case 'GTC':
+    default:
+      return 'GTC';
   }
-
-  return fetch(url, options);
 }
 
 export async function POST(request: NextRequest) {
@@ -164,30 +155,23 @@ export async function POST(request: NextRequest) {
       title,
       description,
       price,
-      currency = 'USD',
       quantity = 1,
-      listingFormat = 'FIXED_PRICE',
       bestOfferEnabled = false,
       duration,
-      fulfillmentPolicyId,
-      paymentPolicyId,
-      returnPolicyId,
       imageUrls,
       itemSpecifics = [],
-      publish = false,
+      shippingType = 'CALCULATED',
+      flatRateAmount = 5.00,
+      handlingDays = 1,
+      returnsAccepted = false,
+      returnPeriodDays = 30,
+      returnShippingPaidBy = 'BUYER',
     } = body;
 
     // Validate required fields
     if (!cardId || !title || !price || !imageUrls?.length) {
       return NextResponse.json(
         { error: 'Missing required fields: cardId, title, price, imageUrls' },
-        { status: 400 }
-      );
-    }
-
-    if (!fulfillmentPolicyId || !paymentPolicyId || !returnPolicyId) {
-      return NextResponse.json(
-        { error: 'Missing required policy IDs' },
         { status: 400 }
       );
     }
@@ -239,193 +223,99 @@ export async function POST(request: NextRequest) {
     // Get eBay category
     const categoryId = getEbayCategoryId(card.category);
 
-    // Get grade ID for condition descriptors
+    // Get grade for condition descriptors
     const grade = card.conversational_whole_grade || card.conversational_decimal_grade || 1;
     const gradeId = getEbayGradeId(grade);
 
-    // Format item specifics for eBay API
-    // eBay expects: aspects: { "Name": ["Value1", "Value2"], ... }
-    const aspects: Record<string, string[]> = {};
-    for (const spec of itemSpecifics) {
-      if (spec.name && spec.value) {
-        const values = Array.isArray(spec.value) ? spec.value : [spec.value];
-        // Filter out empty values
-        const filteredValues = values.filter(v => v && v.trim());
-        if (filteredValues.length > 0) {
-          aspects[spec.name] = filteredValues;
-        }
-      }
-    }
-
-    // Build inventory item payload
-    const inventoryItem: Record<string, any> = {
-      availability: {
-        shipToLocationAvailability: {
-          quantity: quantity,
-        },
-      },
-      condition: EBAY_CONDITIONS.GRADED,
-      conditionDescriptors: [
-        {
-          name: CONDITION_DESCRIPTORS.PROFESSIONAL_GRADER,
-          values: [DCM_GRADER_ID], // "Other" grader for DCM
-        },
-        {
-          name: CONDITION_DESCRIPTORS.GRADE,
-          values: [gradeId],
-        },
-        {
-          name: CONDITION_DESCRIPTORS.CERTIFICATION_NUMBER,
-          values: [card.serial],
-        },
-      ],
-      product: {
-        title: title,
-        description: description || card.conversational_summary || `DCM Graded ${card.card_name || 'Trading Card'} - Grade ${grade}`,
-        imageUrls: imageUrls,
-        // Include item specifics as aspects
-        ...(Object.keys(aspects).length > 0 && { aspects }),
-      },
+    // Prepare Trading API config
+    const tradingConfig: TradingApiConfig = {
+      accessToken: connection.access_token,
+      sandbox: connection.is_sandbox,
     };
 
-    console.log('[eBay Listing] Creating inventory item:', { sku, categoryId });
-
-    // Step 1: Create/Update Inventory Item
-    const inventoryResponse = await ebayRequest(
-      `/sell/inventory/v1/inventory_item/${encodeURIComponent(sku)}`,
-      'PUT',
-      connection.access_token,
-      inventoryItem,
-      connection.is_sandbox
-    );
-
-    if (!inventoryResponse.ok) {
-      const errorData = await inventoryResponse.text();
-      console.error('[eBay Listing] Inventory item creation failed:', errorData);
-      return NextResponse.json(
-        { error: `Failed to create inventory item: ${inventoryResponse.status}`, details: errorData },
-        { status: inventoryResponse.status }
-      );
-    }
-
-    // Step 2: Create Offer
-    const offer: Record<string, any> = {
-      sku: sku,
-      marketplaceId: MARKETPLACES.US,
-      format: listingFormat,
-      listingDuration: duration,
-      pricingSummary: {
-        price: {
-          value: price.toFixed(2),
-          currency: currency,
-        },
-      },
-      listingPolicies: {
-        fulfillmentPolicyId: fulfillmentPolicyId,
-        paymentPolicyId: paymentPolicyId,
-        returnPolicyId: returnPolicyId,
-        // Enable Best Offer for Fixed Price listings
-        ...(listingFormat === 'FIXED_PRICE' && bestOfferEnabled && {
-          bestOfferTerms: {
-            bestOfferEnabled: true,
-          },
-        }),
-      },
-      categoryId: categoryId,
+    // Prepare listing details
+    const listingDetails: ListingDetails = {
+      title,
+      description: description || card.conversational_summary || `DCM Graded ${card.card_name || 'Trading Card'} - Grade ${grade}`,
+      categoryId,
+      price,
+      quantity,
+      conditionId: EBAY_CONDITIONS.GRADED,
+      imageUrls,
+      itemSpecifics: itemSpecifics.map(spec => ({
+        name: spec.name,
+        value: spec.value,
+      })),
+      sku,
+      listingDuration: mapListingDuration(duration),
+      bestOfferEnabled,
+      // Graded card specific
+      professionalGrader: DCM_GRADER_ID,
+      grade: gradeId,
+      certificationNumber: card.serial,
     };
 
-    console.log('[eBay Listing] Creating offer:', { sku, marketplaceId: MARKETPLACES.US });
+    // Prepare shipping details
+    const shippingDetails: ShippingDetails = {
+      shippingType,
+      flatRateCost: flatRateAmount,
+      handlingDays,
+    };
 
-    const offerResponse = await ebayRequest(
-      '/sell/inventory/v1/offer',
-      'POST',
-      connection.access_token,
-      offer,
-      connection.is_sandbox
+    // Prepare return details
+    const returnDetails: ReturnDetails = {
+      returnsAccepted,
+      returnPeriodDays,
+      returnShippingPaidBy,
+    };
+
+    console.log('[eBay Listing] Creating listing via Trading API:', { sku, categoryId, title });
+
+    // Create listing via Trading API
+    const result = await addFixedPriceItem(
+      tradingConfig,
+      listingDetails,
+      shippingDetails,
+      returnDetails
     );
 
-    if (!offerResponse.ok) {
-      const errorData = await offerResponse.text();
-      console.error('[eBay Listing] Offer creation failed:', errorData);
-      return NextResponse.json(
-        { error: `Failed to create offer: ${offerResponse.status}`, details: errorData },
-        { status: offerResponse.status }
-      );
+    if (!result.success) {
+      console.error('[eBay Listing] Trading API error:', result.errors);
+      return NextResponse.json({
+        success: false,
+        error: result.errors?.[0]?.message || 'Failed to create listing',
+        errors: result.errors,
+        sku,
+        status: 'error',
+      }, { status: 400 });
     }
 
-    const offerData = await offerResponse.json();
-    const offerId = offerData.offerId;
-
-    console.log('[eBay Listing] Offer created:', { offerId });
+    console.log('[eBay Listing] Listing created successfully:', { itemId: result.itemId, listingUrl: result.listingUrl });
 
     // Store listing record in database
     const listingRecord: Partial<EbayListing> = {
       card_id: cardId,
       user_id: user.id,
       sku: sku,
-      offer_id: offerId,
+      listing_id: result.itemId,
+      listing_url: result.listingUrl,
       title: title,
       description: description || null,
       price: price,
-      currency: currency,
+      currency: 'USD',
       quantity: quantity,
-      listing_format: listingFormat,
-      duration: duration || null,
+      listing_format: 'FIXED_PRICE',
+      duration: duration || 'GTC',
       category_id: categoryId,
-      fulfillment_policy_id: fulfillmentPolicyId,
-      payment_policy_id: paymentPolicyId,
-      return_policy_id: returnPolicyId,
       ebay_image_urls: imageUrls,
-      status: 'draft',
+      status: 'active',
+      published_at: new Date().toISOString(),
     };
 
-    let listingId: string | undefined;
-    let listingUrl: string | undefined;
-
-    // Step 3: Publish if requested
-    if (publish) {
-      console.log('[eBay Listing] Publishing offer:', offerId);
-
-      const publishResponse = await ebayRequest(
-        `/sell/inventory/v1/offer/${offerId}/publish`,
-        'POST',
-        connection.access_token,
-        undefined,
-        connection.is_sandbox
-      );
-
-      if (!publishResponse.ok) {
-        const errorData = await publishResponse.text();
-        console.error('[eBay Listing] Publish failed:', errorData);
-
-        // Save as draft with error
-        listingRecord.status = 'error';
-        listingRecord.error_message = `Publish failed: ${errorData}`;
-      } else {
-        const publishData = await publishResponse.json();
-        listingId = publishData.listingId;
-
-        // Build listing URL
-        const baseUrl = connection.is_sandbox
-          ? 'https://sandbox.ebay.com/itm'
-          : 'https://www.ebay.com/itm';
-        listingUrl = `${baseUrl}/${listingId}`;
-
-        listingRecord.listing_id = listingId;
-        listingRecord.listing_url = listingUrl;
-        listingRecord.status = 'active';
-        listingRecord.published_at = new Date().toISOString();
-
-        console.log('[eBay Listing] Published successfully:', { listingId, listingUrl });
-      }
-    }
-
     // Save to database
-    const { data: savedListing, error: saveError } = await supabase
+    const { error: saveError } = await supabase
       .from('ebay_listings')
-      .insert(listingRecord)
-      .select()
-      .single();
+      .insert(listingRecord);
 
     if (saveError) {
       console.error('[eBay Listing] Failed to save listing record:', saveError);
@@ -435,17 +325,18 @@ export async function POST(request: NextRequest) {
     const response: ListingResponse = {
       success: true,
       sku,
-      offerId,
-      listingId,
-      listingUrl,
-      status: listingRecord.status as string,
+      listingId: result.itemId,
+      listingUrl: result.listingUrl,
+      status: 'active',
+      fees: result.fees,
+      warnings: result.warnings,
     };
 
     return NextResponse.json(response);
   } catch (error) {
     console.error('[eBay Listing] Unexpected error:', error);
     return NextResponse.json(
-      { error: 'An unexpected error occurred' },
+      { error: 'An unexpected error occurred', details: String(error) },
       { status: 500 }
     );
   }
