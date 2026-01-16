@@ -8,7 +8,7 @@ import { FoldableLabelData, generateQRCodeWithLogo, loadLogoAsBase64 } from '@/l
 import { getCardLabelData } from '@/lib/useLabelData';
 import { getStoredSession } from '@/lib/directAuth';
 import { getAuthenticatedClient } from '@/lib/directAuth';
-import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
+import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES, MARKETING_SCOPE } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
@@ -228,6 +228,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [suggestedAdRate, setSuggestedAdRate] = useState(10);
   const [checkingPromotion, setCheckingPromotion] = useState(false);
 
+  // eBay connection state
+  const [ebayConnectionStatus, setEbayConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'needs_reauth'>('checking');
+  const [ebayUsername, setEbayUsername] = useState<string | null>(null);
+  const [connectingEbay, setConnectingEbay] = useState(false);
+
   // Result state
   const [listingResult, setListingResult] = useState<{
     listingId?: string;
@@ -348,6 +353,147 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       contentRef.current.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [step]);
+
+  // Check eBay connection status when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      checkEbayConnection();
+    }
+  }, [isOpen]);
+
+  // Listen for messages from eBay auth popup
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === 'EBAY_AUTH_COMPLETE') {
+        console.log('[eBay Listing] Auth complete from popup:', event.data);
+        if (event.data.success) {
+          setEbayConnectionStatus('connected');
+          setEbayUsername(event.data.username || null);
+          // Re-check disclaimer status since they now have a connection
+          checkDisclaimerStatus();
+        } else {
+          setError(event.data.message || 'Failed to connect eBay account');
+        }
+        setConnectingEbay(false);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  const checkEbayConnection = async () => {
+    setEbayConnectionStatus('checking');
+    try {
+      const session = getStoredSession();
+      if (!session?.access_token) {
+        setEbayConnectionStatus('not_connected');
+        return;
+      }
+
+      const response = await fetch('/api/ebay/status', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.connected && data.connection) {
+          const { connection } = data;
+          setEbayUsername(connection.ebay_username || null);
+
+          // Check if token is expired or about to expire (within 5 minutes)
+          const tokenExpiry = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
+          const isTokenExpired = tokenExpiry && tokenExpiry.getTime() < Date.now() + 5 * 60 * 1000;
+
+          // Check if marketing scope is missing (needed for Promoted Listings)
+          const hasMarketingScope = connection.scopes?.includes(MARKETING_SCOPE);
+
+          if (isTokenExpired || !hasMarketingScope) {
+            console.log('[eBay Listing] Needs reauth:', { isTokenExpired, hasMarketingScope });
+            setEbayConnectionStatus('needs_reauth');
+          } else {
+            setEbayConnectionStatus('connected');
+          }
+        } else {
+          setEbayConnectionStatus('not_connected');
+        }
+      } else {
+        setEbayConnectionStatus('not_connected');
+      }
+    } catch (error) {
+      console.error('[eBay Listing] Failed to check connection:', error);
+      setEbayConnectionStatus('not_connected');
+    }
+  };
+
+  const initiateEbayAuth = async () => {
+    setConnectingEbay(true);
+    setError(null);
+
+    try {
+      const session = getStoredSession();
+      if (!session?.access_token) {
+        setError('Please log in first');
+        setConnectingEbay(false);
+        return;
+      }
+
+      // Get the auth URL with return_url set to our success page
+      const response = await fetch('/api/ebay/auth?return_url=/ebay-auth-success', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.error || 'Failed to initiate eBay authorization');
+        setConnectingEbay(false);
+        return;
+      }
+
+      const data = await response.json();
+
+      // Open auth URL in a popup
+      const width = 600;
+      const height = 700;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const popup = window.open(
+        data.authUrl,
+        'ebay_auth',
+        `width=${width},height=${height},left=${left},top=${top},toolbar=no,menubar=no`
+      );
+
+      // Check if popup was blocked
+      if (!popup || popup.closed) {
+        setError('Popup was blocked. Please allow popups for this site and try again.');
+        setConnectingEbay(false);
+        return;
+      }
+
+      // Poll to check if popup was closed without completing auth
+      const pollTimer = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(pollTimer);
+          // Give a moment for the message to arrive
+          setTimeout(() => {
+            if (connectingEbay) {
+              setConnectingEbay(false);
+            }
+          }, 500);
+        }
+      }, 500);
+    } catch (error) {
+      console.error('[eBay Listing] Failed to initiate auth:', error);
+      setError('Failed to start eBay authorization');
+      setConnectingEbay(false);
+    }
+  };
 
   const checkDisclaimerStatus = async () => {
     setDisclaimerStatus('checking');
@@ -1079,16 +1225,147 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             </div>
           )}
 
-          {/* Disclaimer - Loading State */}
-          {disclaimerStatus === 'checking' && (
+          {/* eBay Connection - Checking State */}
+          {ebayConnectionStatus === 'checking' && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4" />
+              <p className="text-gray-600">Checking eBay connection...</p>
+            </div>
+          )}
+
+          {/* eBay Connection - Not Connected */}
+          {ebayConnectionStatus === 'not_connected' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M6.5 3C4.015 3 2 5.015 2 7.5c0 2.066 1.395 3.797 3.293 4.313L12 22l6.707-10.187C20.605 11.297 22 9.566 22 7.5 22 5.015 19.985 3 17.5 3c-1.67 0-3.138.912-3.916 2.267a.5.5 0 01-.868 0L12.5 5C11.638 3.912 10.17 3 8.5 3h-2z"/>
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">Connect Your eBay Account</h3>
+                <p className="text-gray-600 max-w-sm mx-auto">
+                  To list your DCM graded cards on eBay, you need to connect your eBay seller account.
+                </p>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-purple-600 font-bold text-sm">1</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Click Connect below</p>
+                    <p className="text-sm text-gray-500">A secure eBay login window will open</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-purple-600 font-bold text-sm">2</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Sign in to eBay</p>
+                    <p className="text-sm text-gray-500">Use your eBay seller account credentials</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                    <span className="text-purple-600 font-bold text-sm">3</span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Authorize DCM</p>
+                    <p className="text-sm text-gray-500">Grant permission to create listings on your behalf</p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={initiateEbayAuth}
+                disabled={connectingEbay}
+                className="w-full py-3 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                {connectingEbay ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                    Connect eBay Account
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-gray-500 text-center">
+                Your eBay credentials are never stored by DCM. We only receive a secure token to create listings.
+              </p>
+            </div>
+          )}
+
+          {/* eBay Connection - Needs Re-authorization */}
+          {ebayConnectionStatus === 'needs_reauth' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-20 h-20 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
+                  <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">eBay Re-authorization Required</h3>
+                <p className="text-gray-600 max-w-sm mx-auto">
+                  {ebayUsername ? `Your eBay connection as ${ebayUsername} has expired or requires additional permissions.` : 'Your eBay connection has expired or requires additional permissions.'}
+                </p>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <p className="text-sm text-amber-800">
+                  <strong>Why do I need to re-authorize?</strong>
+                </p>
+                <ul className="mt-2 text-sm text-amber-700 space-y-1">
+                  <li>• Your eBay authorization token may have expired</li>
+                  <li>• New features may require additional permissions</li>
+                  <li>• This is a normal part of keeping your account secure</li>
+                </ul>
+              </div>
+
+              <button
+                onClick={initiateEbayAuth}
+                disabled={connectingEbay}
+                className="w-full py-3 px-4 bg-amber-600 text-white rounded-lg font-medium hover:bg-amber-700 disabled:bg-amber-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+              >
+                {connectingEbay ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Connecting...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    Re-authorize eBay Account
+                  </>
+                )}
+              </button>
+
+              <p className="text-xs text-gray-500 text-center">
+                You&apos;ll be redirected to eBay to re-authorize DCM. This only takes a moment.
+              </p>
+            </div>
+          )}
+
+          {/* Disclaimer - Loading State (only show if eBay is connected) */}
+          {ebayConnectionStatus === 'connected' && disclaimerStatus === 'checking' && (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4" />
               <p className="text-gray-600">Loading...</p>
             </div>
           )}
 
-          {/* Disclaimer - Needs Acceptance */}
-          {disclaimerStatus === 'needs_acceptance' && (
+          {/* Disclaimer - Needs Acceptance (only show if eBay is connected) */}
+          {ebayConnectionStatus === 'connected' && disclaimerStatus === 'needs_acceptance' && (
             <div className="space-y-6">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
@@ -2402,19 +2679,25 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
-          {/* Hide footer during disclaimer checking or show cancel during disclaimer acceptance */}
-          {disclaimerStatus === 'checking' ? (
+          {/* Left side - Cancel/Back button */}
+          {ebayConnectionStatus === 'checking' ? (
+            <div />
+          ) : ebayConnectionStatus === 'not_connected' || ebayConnectionStatus === 'needs_reauth' ? (
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Cancel
+            </button>
+          ) : disclaimerStatus === 'checking' ? (
             <div />
           ) : disclaimerStatus === 'needs_acceptance' ? (
-            <>
-              <button
-                onClick={onClose}
-                className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                Cancel
-              </button>
-              <div />
-            </>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              Cancel
+            </button>
           ) : step === 'success' || step === 'publishing' ? (
             <div />
           ) : (
@@ -2427,7 +2710,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             </button>
           )}
 
-          {disclaimerStatus !== 'accepted' ? (
+          {/* Right side - Next/Action button */}
+          {ebayConnectionStatus !== 'connected' ? (
+            <div />
+          ) : disclaimerStatus !== 'accepted' ? (
             <div />
           ) : step === 'success' ? (
             <button
