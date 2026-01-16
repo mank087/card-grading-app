@@ -288,8 +288,11 @@ export async function POST(request: NextRequest) {
       // Graded card specific
       professionalGrader: DCM_GRADER_ID,
       grade: gradeId,
-      // Use serial if available, otherwise use card ID as certificate number
-      certificationNumber: card.serial?.trim() || `DCM-${cardId.slice(0, 8).toUpperCase()}`,
+      // Format certification number with DCM prefix - eBay requires specific format
+      // Use serial if available, otherwise use card ID
+      certificationNumber: card.serial?.trim()
+        ? `DCM-${card.serial.trim()}`
+        : `DCM-${cardId.slice(0, 8).toUpperCase()}`,
       // Regulatory documents (Certificate of Analysis)
       regulatoryDocumentIds: regulatoryDocumentIds.length > 0 ? regulatoryDocumentIds : undefined,
     };
