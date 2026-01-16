@@ -1539,9 +1539,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     }`}
                     onClick={() => setSelectedImages(s => ({ ...s, front: !s.front }))}
                   >
-                    {imageUrls.front && (
-                      <img src={imageUrls.front} alt="Front" className="w-full aspect-[3/4] object-cover" />
-                    )}
+                    <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                      {imageUrls.front && (
+                        <img src={imageUrls.front} alt="Front" className="max-w-full max-h-full object-contain" />
+                      )}
+                    </div>
                     <div className="absolute top-2 right-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                         selectedImages.front ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
@@ -1565,9 +1567,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     }`}
                     onClick={() => setSelectedImages(s => ({ ...s, back: !s.back }))}
                   >
-                    {imageUrls.back && (
-                      <img src={imageUrls.back} alt="Back" className="w-full aspect-[3/4] object-cover" />
-                    )}
+                    <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                      {imageUrls.back && (
+                        <img src={imageUrls.back} alt="Back" className="max-w-full max-h-full object-contain" />
+                      )}
+                    </div>
                     <div className="absolute top-2 right-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                         selectedImages.back ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
@@ -1591,9 +1595,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     }`}
                     onClick={() => setSelectedImages(s => ({ ...s, miniReport: !s.miniReport }))}
                   >
-                    {imageUrls.miniReport && (
-                      <img src={imageUrls.miniReport} alt="Mini Report" className="w-full aspect-[3/4] object-cover" />
-                    )}
+                    <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                      {imageUrls.miniReport && (
+                        <img src={imageUrls.miniReport} alt="Mini Report" className="max-w-full max-h-full object-contain" />
+                      )}
+                    </div>
                     <div className="absolute top-2 right-2">
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
                         selectedImages.miniReport ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
