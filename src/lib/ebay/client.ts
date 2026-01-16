@@ -222,28 +222,41 @@ export async function getEbayUserInfo(accessToken: string): Promise<{
     ? 'https://api.sandbox.ebay.com'
     : 'https://api.ebay.com';
 
-  // Use the Commerce Identity API
-  const response = await fetch(`${apiUrl}/commerce/identity/v1/user/`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-  });
+  try {
+    // Use the Commerce Identity API
+    const response = await fetch(`${apiUrl}/commerce/identity/v1/user/`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    });
 
-  if (!response.ok) {
-    console.error('[eBay] Failed to get user info:', response.status);
-    // Return a placeholder if we can't get user info
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[eBay] Failed to get user info:', response.status, errorText);
+      // Return a placeholder if we can't get user info
+      return {
+        userId: 'unknown',
+        username: 'eBay User',
+      };
+    }
+
+    const data = await response.json();
+    console.log('[eBay] User info response:', JSON.stringify(data));
+
+    // eBay Identity API returns 'username' directly
+    return {
+      userId: data.userId || data.user_id || 'unknown',
+      username: data.username || data.userName || data.accountName || 'eBay User',
+    };
+  } catch (error) {
+    console.error('[eBay] Error fetching user info:', error);
     return {
       userId: 'unknown',
       username: 'eBay User',
     };
   }
-
-  const data = await response.json();
-  return {
-    userId: data.userId || 'unknown',
-    username: data.username || 'eBay User',
-  };
 }
 
 // =============================================================================

@@ -19,6 +19,7 @@ export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.marketing',
   'https://api.ebay.com/oauth/api_scope/sell.marketing.readonly',
+  'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly', // For getting user info
   'https://api.ebay.com/oauth/api_scope/commerce.media.upload', // For regulatory document uploads
 ] as const;
 
