@@ -330,6 +330,16 @@ export function mapOtherCardToSpecifics(card: any): ItemSpecific[] {
   const cardInfo = card.conversational_card_info || {};
   const specifics: ItemSpecific[] = [];
 
+  // Franchise (REQUIRED for Non-Sport Trading Cards category)
+  // Use set name, manufacturer, or a generic value
+  const franchise = cardInfo.set_name || cardInfo.manufacturer || card.card_set || 'Entertainment';
+  specifics.push({
+    name: 'Franchise',
+    value: franchise,
+    required: true,
+    editable: true,
+  });
+
   // Type/Category
   const type = cardInfo.category || card.category || 'Trading Card';
   specifics.push({
@@ -699,19 +709,39 @@ export function mapLorcanaCardToSpecifics(card: any): ItemSpecific[] {
  * Main function to map any card to item specifics based on card type
  */
 export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecific[] {
+  let specifics: ItemSpecific[];
+
   switch (cardType.toLowerCase()) {
     case 'pokemon':
-      return mapPokemonCardToSpecifics(card);
+      specifics = mapPokemonCardToSpecifics(card);
+      break;
     case 'sports':
-      return mapSportsCardToSpecifics(card);
+      specifics = mapSportsCardToSpecifics(card);
+      break;
     case 'mtg':
-      return mapMTGCardToSpecifics(card);
+      specifics = mapMTGCardToSpecifics(card);
+      break;
     case 'lorcana':
-      return mapLorcanaCardToSpecifics(card);
+      specifics = mapLorcanaCardToSpecifics(card);
+      break;
     case 'other':
     default:
-      return mapOtherCardToSpecifics(card);
+      specifics = mapOtherCardToSpecifics(card);
+      break;
   }
+
+  // Add DCM Certification Number (the DCM serial) as an item specific
+  // This is separate from the condition descriptor 27503 which doesn't work with "Other" grader
+  if (card.serial) {
+    specifics.push({
+      name: 'Certification Number',
+      value: card.serial,
+      required: false,
+      editable: true,
+    });
+  }
+
+  return specifics;
 }
 
 // Helper functions
