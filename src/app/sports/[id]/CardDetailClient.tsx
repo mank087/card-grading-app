@@ -4527,7 +4527,7 @@ export function SportsCardDetails() {
               </div>
                   {/* Professional Grades Tab Content - Grade Estimates */}
               {/* Section Header: Professional Grades */}
-              <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
+              <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
                 <h2 className="text-xl font-bold">
                   Professional Grades
                 </h2>
@@ -4535,7 +4535,7 @@ export function SportsCardDetails() {
 
               {/* Professional Grading Company Estimates */}
               {professionalGrades && (
-                <div id="tour-pro-estimates" className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
+                <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
                   <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
                     Professional Grading Estimates
                   </h2>
@@ -4919,10 +4919,14 @@ export function SportsCardDetails() {
           })()}
 
           {/* 4. DCM Confidence and Image Quality */}
+          {/* Section Header: DCM Confidence - Always visible for tour */}
+          <div id="tour-optic-score" className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
+            <h2 className="text-xl font-bold">
+              DCM Confidence & Image Quality
+            </h2>
+          </div>
           {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
-            <div id="tour-optic-score" className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Confidence and Image Quality</h2>
-
+            <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="grid md:grid-cols-2 gap-6">
                 {/* DCM Confidence Section */}
                 {card.ai_grading?.["AI Confidence Assessment"] && (

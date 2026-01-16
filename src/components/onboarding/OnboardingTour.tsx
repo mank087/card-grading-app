@@ -88,7 +88,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'pro-estimates',
     targetId: 'tour-pro-estimates',
     title: 'Professional Grading Estimates',
-    description: 'See estimated grades from major grading companies like PSA, BGS, and CGC. These help you understand how your card might score with traditional graders.',
+    description: 'See estimated grades from mail away companies like PSA, BGS and CGC (calculated using their published grading rubrics). These scores help you understand how your card might score if sent out.',
     position: 'top',
   },
   {
@@ -137,10 +137,10 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
       console.log(`[Tour] Element not found: ${step.targetId}`)
       setElementFound(false)
 
-      // Retry a few times (element might be loading)
-      if (retryCountRef.current < 3) {
+      // Retry more times (element might be loading or needs scrolling into view)
+      if (retryCountRef.current < 6) {
         retryCountRef.current++
-        setTimeout(updatePosition, 500)
+        setTimeout(updatePosition, 800)
         return
       }
 
@@ -240,7 +240,7 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
         top: 0,
         behavior: 'smooth'
       })
-      setTimeout(updatePosition, 600)
+      setTimeout(updatePosition, 1000)
       return
     }
 
@@ -257,8 +257,8 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
       behavior: 'smooth'
     })
 
-    // Update position after scroll completes
-    setTimeout(updatePosition, 600)
+    // Update position after scroll completes (increased delay for reliability)
+    setTimeout(updatePosition, 1000)
   }, [step, currentStep, updatePosition])
 
   // Initialize tour
