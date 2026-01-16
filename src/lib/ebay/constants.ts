@@ -9,7 +9,6 @@
 // OAuth Scopes
 // =============================================================================
 // Note: Only request scopes that are granted to your app in the eBay Developer Portal
-// commerce.media.upload may require special access - we'll use sell.inventory for images
 export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
@@ -20,6 +19,7 @@ export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.marketing',
   'https://api.ebay.com/oauth/api_scope/sell.marketing.readonly',
+  'https://api.ebay.com/oauth/api_scope/commerce.media.upload', // For regulatory document uploads
 ] as const;
 
 // Marketing scope for checking if user needs to re-authorize

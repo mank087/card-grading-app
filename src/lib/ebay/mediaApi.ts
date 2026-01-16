@@ -8,9 +8,10 @@
 import { EBAY_API_URLS } from './constants';
 
 // Media API endpoints
+// Note: Uses api.ebay.com, not apim.ebay.com
 const MEDIA_API_ENDPOINTS = {
-  production: 'https://apim.ebay.com/commerce/media/v1',
-  sandbox: 'https://apim.sandbox.ebay.com/commerce/media/v1',
+  production: 'https://api.ebay.com/commerce/media/v1',
+  sandbox: 'https://api.sandbox.ebay.com/commerce/media/v1',
 };
 
 export type DocumentType =
@@ -74,9 +75,17 @@ export async function createDocument(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Media API] createDocument failed:', response.status, errorText);
+      // Parse error for better messaging
+      let errorDetail = '';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.errors?.[0]?.message || errorJson.message || '';
+      } catch {
+        errorDetail = errorText.substring(0, 200);
+      }
       return {
         success: false,
-        error: `Failed to create document: ${response.status}`,
+        error: `Failed to create document: ${response.status}${errorDetail ? ' - ' + errorDetail : ''}`,
       };
     }
 
