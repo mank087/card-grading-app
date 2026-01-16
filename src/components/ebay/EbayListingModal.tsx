@@ -883,42 +883,86 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         await loadLogoAsBase64()
       );
 
-      // Prepare report data
+      // Extract sub-scores for the report
+      const centeringScore = weightedScores.centering ?? subScores.centering?.weighted ?? grade;
+      const cornersScore = weightedScores.corners ?? subScores.corners?.weighted ?? grade;
+      const edgesScore = weightedScores.edges ?? subScores.edges?.weighted ?? grade;
+      const surfaceScore = weightedScores.surface ?? subScores.surface?.weighted ?? grade;
+
+      // Prepare report data matching ReportCardData interface
       const reportData: ReportCardData = {
-        id: card.id,
+        // Unified label data
+        primaryName: labelData.primaryName || labelData.line1 || '',
+        contextLine: labelData.line2 || '',
+        featuresLine: labelData.line3 || null,
         serial: card.serial,
+        grade: grade,
+        gradeFormatted: grade % 1 === 0 ? grade.toString() : grade.toFixed(1),
+        condition: labelData.condition || getConditionLabel(grade),
+        // Legacy fields
+        cardName: cardInfo.card_name || card.card_name || '',
+        playerName: cardInfo.player_or_character || card.featured || card.pokemon_featured || '',
+        setName: cardInfo.set_name || card.card_set || '',
+        year: cardInfo.year || '',
+        manufacturer: cardInfo.manufacturer || '',
+        cardNumber: cardInfo.card_number || card.card_number || '',
+        sport: card.category || 'Other',
         frontImageUrl: frontImageBase64,
         backImageUrl: backImageBase64,
-        qrCodeUrl: qrCodeDataUrl,
-        overallGrade: grade,
-        confidenceScore: card.conversational_confidence_score || 95,
-        uncertaintyScore: card.conversational_uncertainty_score || 5,
         conditionLabel: labelData.condition || getConditionLabel(grade),
-        conditionSummary: card.conversational_final_grade_summary || card.conversational_summary || '',
-        // Card info
-        line1: labelData.line1 || '',
-        line2: labelData.line2 || '',
-        line3: labelData.line3 || '',
-        line4: labelData.line4 || `DCM ${card.serial}`,
-        // Front subgrades
-        frontSubgrades: {
-          centering: weightedScores.front_centering ?? subScores.front_centering ?? grade,
-          corners: weightedScores.front_corners ?? subScores.front_corners ?? grade,
-          edges: weightedScores.front_edges ?? subScores.front_edges ?? grade,
-          surface: weightedScores.front_surface ?? subScores.front_surface ?? grade,
+        labelCondition: labelData.condition || getConditionLabel(grade),
+        gradeRange: card.conversational_grade_uncertainty || '±0.5',
+        // Professional grades
+        professionalGrades: {
+          psa: card.estimated_professional_grades?.psa?.grade || '-',
+          bgs: card.estimated_professional_grades?.bgs?.grade || '-',
+          sgc: card.estimated_professional_grades?.sgc?.grade || '-',
+          cgc: card.estimated_professional_grades?.cgc?.grade || '-',
         },
-        // Back subgrades
-        backSubgrades: {
-          centering: weightedScores.back_centering ?? subScores.back_centering ?? grade,
-          corners: weightedScores.back_corners ?? subScores.back_corners ?? grade,
-          edges: weightedScores.back_edges ?? subScores.back_edges ?? grade,
-          surface: weightedScores.back_surface ?? subScores.back_surface ?? grade,
+        // Subgrades in expected format
+        subgrades: {
+          centering: {
+            score: centeringScore,
+            summary: subScores.centering?.notes || 'Centering assessed',
+            frontScore: subScores.centering?.front ?? centeringScore,
+            backScore: subScores.centering?.back ?? centeringScore,
+            frontSummary: '',
+            backSummary: '',
+          },
+          corners: {
+            score: cornersScore,
+            summary: subScores.corners?.notes || 'Corners assessed',
+            frontScore: subScores.corners?.front ?? cornersScore,
+            backScore: subScores.corners?.back ?? cornersScore,
+            frontSummary: '',
+            backSummary: '',
+          },
+          edges: {
+            score: edgesScore,
+            summary: subScores.edges?.notes || 'Edges assessed',
+            frontScore: subScores.edges?.front ?? edgesScore,
+            backScore: subScores.edges?.back ?? edgesScore,
+            frontSummary: '',
+            backSummary: '',
+          },
+          surface: {
+            score: surfaceScore,
+            summary: subScores.surface?.notes || 'Surface assessed',
+            frontScore: subScores.surface?.front ?? surfaceScore,
+            backScore: subScores.surface?.back ?? surfaceScore,
+            frontSummary: '',
+            backSummary: '',
+          },
         },
-        // Professional grades mapping
-        professionalGrades: card.conversational_equivalency_scores || {},
+        // Optional features
+        specialFeatures: {
+          autographed: cardInfo.autographed || false,
+          serialNumbered: cardInfo.serial_number || undefined,
+          subset: cardInfo.subset || undefined,
+        },
         // Metadata
         gradedAt: card.graded_at || card.created_at || new Date().toISOString(),
-        category: card.category,
+        qrCodeUrl: qrCodeDataUrl,
       };
 
       console.log('[eBay Report] Generating PDF report...');
