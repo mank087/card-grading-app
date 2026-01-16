@@ -2731,7 +2731,43 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
+        <div className="px-6 py-4 border-t border-gray-200">
+          {/* eBay Account Status */}
+          {ebayConnectionStatus === 'connected' && ebayUsername && step !== 'success' && step !== 'publishing' && (
+            <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span>Connected as <span className="font-medium text-gray-900">{ebayUsername}</span></span>
+              </div>
+              <button
+                onClick={async () => {
+                  if (!confirm('Are you sure you want to disconnect your eBay account?')) return;
+                  try {
+                    const session = getStoredSession();
+                    if (!session?.access_token) return;
+                    const response = await fetch('/api/ebay/disconnect', {
+                      method: 'POST',
+                      headers: { Authorization: `Bearer ${session.access_token}` },
+                    });
+                    if (response.ok) {
+                      setEbayConnectionStatus('not_connected');
+                      setEbayUsername(null);
+                    }
+                  } catch (error) {
+                    console.error('Failed to disconnect:', error);
+                  }
+                }}
+                className="text-sm text-gray-500 hover:text-red-600 transition-colors"
+              >
+                Disconnect
+              </button>
+            </div>
+          )}
+
+          {/* Navigation buttons */}
+          <div className="flex justify-between">
           {/* Left side - Cancel/Back button */}
           {ebayConnectionStatus === 'checking' ? (
             <div />
@@ -2791,6 +2827,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               {step === 'review' ? 'Publish Listing' : 'Next'}
             </button>
           )}
+          </div>
         </div>
       </div>
     </div>
