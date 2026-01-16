@@ -222,6 +222,16 @@ function buildAddFixedPriceItemXml(
   // Build condition descriptors for graded cards
   let conditionDescriptorsXml = '';
   if (listing.conditionId === '2750' && listing.professionalGrader && listing.grade) {
+    // Log the certification number for debugging
+    console.log('[Trading API] Building condition descriptors:', {
+      professionalGrader: listing.professionalGrader,
+      grade: listing.grade,
+      certificationNumber: listing.certificationNumber,
+      certNumberType: typeof listing.certificationNumber,
+      certNumberTrimmed: listing.certificationNumber?.trim(),
+      willIncludeCertNumber: !!listing.certificationNumber?.trim(),
+    });
+
     conditionDescriptorsXml = `
       <ConditionDescriptors>
         <ConditionDescriptor>

@@ -236,6 +236,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     console.log('[eBay Listing] Card query result - card:', card?.id, 'user_id:', card?.user_id, 'error:', cardError?.message);
+    console.log('[eBay Listing] Card serial from DB:', JSON.stringify(card?.serial), 'type:', typeof card?.serial, 'length:', card?.serial?.length);
 
     if (cardError || !card) {
       console.error('[eBay Listing] Card not found. ID:', cardId, 'Error:', cardError?.message, 'Code:', cardError?.code, 'Details:', JSON.stringify(cardError));
