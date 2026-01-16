@@ -288,7 +288,8 @@ export async function POST(request: NextRequest) {
       // Graded card specific
       professionalGrader: DCM_GRADER_ID,
       grade: gradeId,
-      certificationNumber: card.serial,
+      // Use serial if available, otherwise use card ID as certificate number
+      certificationNumber: card.serial?.trim() || `DCM-${cardId.slice(0, 8).toUpperCase()}`,
       // Regulatory documents (Certificate of Analysis)
       regulatoryDocumentIds: regulatoryDocumentIds.length > 0 ? regulatoryDocumentIds : undefined,
     };
@@ -327,7 +328,15 @@ export async function POST(request: NextRequest) {
       internationalReturnShippingPaidBy: internationalReturnsAccepted ? internationalReturnShippingPaidBy : undefined,
     };
 
-    console.log('[eBay Listing] Creating listing via Trading API:', { sku, categoryId, title, shippingType, offerInternational });
+    console.log('[eBay Listing] Creating listing via Trading API:', {
+      sku,
+      categoryId,
+      title,
+      shippingType,
+      offerInternational,
+      certificationNumber: listingDetails.certificationNumber,
+      cardSerial: card.serial,
+    });
 
     // Create listing via Trading API
     const result = await addFixedPriceItem(

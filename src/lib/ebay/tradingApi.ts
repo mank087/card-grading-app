@@ -232,10 +232,10 @@ function buildAddFixedPriceItemXml(
           <Name>27502</Name>
           <Value>${escapeXml(listing.grade)}</Value>
         </ConditionDescriptor>
-        ${listing.certificationNumber ? `
+        ${listing.certificationNumber?.trim() ? `
         <ConditionDescriptor>
           <Name>27503</Name>
-          <Value>${escapeXml(listing.certificationNumber)}</Value>
+          <Value>${escapeXml(listing.certificationNumber.trim())}</Value>
         </ConditionDescriptor>` : ''}
       </ConditionDescriptors>`;
   }
