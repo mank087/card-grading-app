@@ -289,9 +289,14 @@ export async function POST(request: NextRequest) {
       // Graded card specific
       professionalGrader: DCM_GRADER_ID,  // '2750123' = "Other" grader
       grade: gradeId,                      // eBay grade value ID (e.g., '275020' for grade 10)
-      // Certification number: DCM serial (required by eBay for "Other" grader)
-      // Use card serial if available, otherwise generate from card ID
-      certificationNumber: card.serial?.trim() || cardId.replace(/-/g, '').slice(0, 12).toUpperCase(),
+      // Certification number: DCM serial (REQUIRED by eBay for "Other" grader)
+      certificationNumber: (() => {
+        const serial = card.serial?.trim();
+        const fallback = cardId.replace(/-/g, '').slice(0, 12).toUpperCase();
+        const certNum = serial && serial.length > 0 ? serial : fallback;
+        console.log('[eBay Listing] Certification number computed:', { serial, fallback, certNum });
+        return certNum;
+      })(),
       // Regulatory documents (Certificate of Analysis)
       regulatoryDocumentIds: regulatoryDocumentIds.length > 0 ? regulatoryDocumentIds : undefined,
     };

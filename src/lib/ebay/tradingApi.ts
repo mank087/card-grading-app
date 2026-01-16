@@ -222,14 +222,16 @@ function buildAddFixedPriceItemXml(
   // Build condition descriptors for graded cards
   let conditionDescriptorsXml = '';
   if (listing.conditionId === '2750' && listing.professionalGrader && listing.grade) {
+    // Certification number is REQUIRED for "Other" grader (2750123)
+    const certNumber = listing.certificationNumber?.trim() || 'PENDING';
+
     // Log the certification number for debugging
     console.log('[Trading API] Building condition descriptors:', {
       professionalGrader: listing.professionalGrader,
       grade: listing.grade,
-      certificationNumber: listing.certificationNumber,
+      certificationNumberRaw: listing.certificationNumber,
       certNumberType: typeof listing.certificationNumber,
-      certNumberTrimmed: listing.certificationNumber?.trim(),
-      willIncludeCertNumber: !!listing.certificationNumber?.trim(),
+      certNumberFinal: certNumber,
     });
 
     conditionDescriptorsXml = `
@@ -242,11 +244,10 @@ function buildAddFixedPriceItemXml(
           <Name>27502</Name>
           <Value>${escapeXml(listing.grade)}</Value>
         </ConditionDescriptor>
-        ${listing.certificationNumber?.trim() ? `
         <ConditionDescriptor>
           <Name>27503</Name>
-          <Value>${escapeXml(listing.certificationNumber.trim())}</Value>
-        </ConditionDescriptor>` : ''}
+          <Value>${escapeXml(certNumber)}</Value>
+        </ConditionDescriptor>
       </ConditionDescriptors>`;
   }
 
