@@ -211,6 +211,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [gradingReportDocId, setGradingReportDocId] = useState<string | null>(null);
   const [uploadingReport, setUploadingReport] = useState(false);
 
+  // Disclaimer state
+  const [disclaimerStatus, setDisclaimerStatus] = useState<'checking' | 'needs_acceptance' | 'accepted'>('checking');
+  const [disclaimerCheckbox, setDisclaimerCheckbox] = useState(false);
+  const [acceptingDisclaimer, setAcceptingDisclaimer] = useState(false);
+
   // Result state
   const [listingResult, setListingResult] = useState<{
     listingId?: string;
@@ -317,6 +322,77 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       fetchAndMergeAspects();
     }
   }, [step, aspectsLoaded, categoryId]);
+
+  // Check disclaimer status when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      checkDisclaimerStatus();
+    }
+  }, [isOpen]);
+
+  const checkDisclaimerStatus = async () => {
+    setDisclaimerStatus('checking');
+    setDisclaimerCheckbox(false);
+
+    try {
+      const session = getStoredSession();
+      if (!session?.access_token) {
+        setDisclaimerStatus('needs_acceptance');
+        return;
+      }
+
+      const response = await fetch('/api/ebay/disclaimer', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.accepted) {
+          setDisclaimerStatus('accepted');
+        } else {
+          setDisclaimerStatus('needs_acceptance');
+        }
+      } else {
+        setDisclaimerStatus('needs_acceptance');
+      }
+    } catch (error) {
+      console.error('[eBay Listing] Failed to check disclaimer status:', error);
+      setDisclaimerStatus('needs_acceptance');
+    }
+  };
+
+  const acceptDisclaimer = async () => {
+    if (!disclaimerCheckbox) return;
+
+    setAcceptingDisclaimer(true);
+    try {
+      const session = getStoredSession();
+      if (!session?.access_token) {
+        throw new Error('Not logged in');
+      }
+
+      const response = await fetch('/api/ebay/disclaimer', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (response.ok) {
+        setDisclaimerStatus('accepted');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to accept disclaimer');
+      }
+    } catch (error) {
+      console.error('[eBay Listing] Failed to accept disclaimer:', error);
+      setError('Failed to accept disclaimer. Please try again.');
+    } finally {
+      setAcceptingDisclaimer(false);
+    }
+  };
 
   const fetchAndMergeAspects = async () => {
     try {
@@ -894,8 +970,126 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             </div>
           )}
 
+          {/* Disclaimer - Loading State */}
+          {disclaimerStatus === 'checking' && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4" />
+              <p className="text-gray-600">Loading...</p>
+            </div>
+          )}
+
+          {/* Disclaimer - Needs Acceptance */}
+          {disclaimerStatus === 'needs_acceptance' && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">eBay Listing Terms & Conditions</h3>
+                <p className="text-gray-600">Please review and accept before listing on eBay</p>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 max-h-[400px] overflow-y-auto text-sm text-gray-700 space-y-4">
+                <p className="font-semibold text-gray-900">
+                  By using DCM&apos;s eBay listing feature, you acknowledge and agree to the following:
+                </p>
+
+                <div className="space-y-3">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">1. DCM is Not a Party to Your eBay Transactions</h4>
+                    <p>DCM (Digital Card Marketplace) provides this listing tool solely as a convenience feature to help you list your DCM-graded cards on eBay. DCM is not a party to any transaction that occurs on the eBay platform. All sales, purchases, and related activities are conducted exclusively between you and the buyer through eBay.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900">2. No Liability for eBay Transactions</h4>
+                    <p>DCM shall not be held liable for any disputes, claims, damages, losses, or issues arising from your eBay listings or sales, including but not limited to: buyer complaints, return requests, refund disputes, shipping issues, payment problems, listing violations, account suspensions, or any other matters related to your eBay activity.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900">3. Grading Opinions</h4>
+                    <p>DCM grades represent our professional assessment of card condition at the time of grading. Grades are opinions and are not guarantees of value, authenticity, or future market performance. Buyers may have different opinions regarding condition, and you are responsible for handling any disputes that may arise.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900">4. Your Responsibilities</h4>
+                    <p>You are solely responsible for:</p>
+                    <ul className="list-disc ml-5 mt-1 space-y-1">
+                      <li>The accuracy of all listing information (titles, descriptions, prices, shipping terms)</li>
+                      <li>Compliance with eBay&apos;s terms of service, listing policies, and all applicable laws</li>
+                      <li>Handling all buyer communications, shipping, returns, and refunds</li>
+                      <li>Any fees, taxes, or costs associated with your eBay sales</li>
+                      <li>Ensuring you have the legal right to sell the items you list</li>
+                    </ul>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900">5. Indemnification</h4>
+                    <p>You agree to indemnify, defend, and hold harmless DCM, its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, costs, or expenses (including reasonable attorneys&apos; fees) arising from or related to your use of this eBay listing feature or any eBay transactions.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900">6. eBay Account</h4>
+                    <p>You are responsible for maintaining your eBay account in good standing. DCM is not responsible for any actions eBay may take against your account, including but not limited to listing removals, selling restrictions, or account suspensions.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900">7. Service Availability</h4>
+                    <p>DCM provides this listing feature &quot;as is&quot; and makes no guarantees regarding its availability, accuracy, or functionality. DCM may modify, suspend, or discontinue this feature at any time without notice.</p>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-gray-900">8. Governing Law</h4>
+                    <p>These terms shall be governed by and construed in accordance with applicable laws. Any disputes shall be resolved through binding arbitration or in the courts of competent jurisdiction.</p>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-500 pt-2 border-t border-gray-200">
+                  Last updated: January 2026 | Version 1.0
+                </p>
+              </div>
+
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={disclaimerCheckbox}
+                  onChange={(e) => setDisclaimerCheckbox(e.target.checked)}
+                  className="mt-0.5 w-5 h-5 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-sm text-gray-700">
+                  I have read and agree to the terms and conditions above. I understand that DCM is not responsible for any transactions that occur on eBay.
+                </span>
+              </label>
+
+              <button
+                onClick={acceptDisclaimer}
+                disabled={!disclaimerCheckbox || acceptingDisclaimer}
+                className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+                  disclaimerCheckbox && !acceptingDisclaimer
+                    ? 'bg-purple-600 text-white hover:bg-purple-700'
+                    : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                {acceptingDisclaimer ? 'Processing...' : 'Accept & Continue'}
+              </button>
+            </div>
+          )}
+
+          {/* Brief reminder banner for returning users */}
+          {disclaimerStatus === 'accepted' && step !== 'publishing' && step !== 'success' && step !== 'error' && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-xs flex items-start gap-2">
+              <svg className="w-4 h-4 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>
+                <strong>Reminder:</strong> DCM provides this listing tool as a convenience. All eBay transactions are between you and the buyer. DCM is not responsible for sales, disputes, or any issues arising from your eBay listings.
+              </span>
+            </div>
+          )}
+
           {/* Step 1: Images */}
-          {step === 'images' && (
+          {disclaimerStatus === 'accepted' && step === 'images' && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Images for Listing</h3>
               {isLoading ? (
@@ -991,7 +1185,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 2: Details */}
-          {step === 'details' && (
+          {disclaimerStatus === 'accepted' && step === 'details' && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Listing Details</h3>
 
@@ -1165,7 +1359,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 3: Item Specifics */}
-          {step === 'specifics' && (
+          {disclaimerStatus === 'accepted' && step === 'specifics' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -1378,7 +1572,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 4: Shipping & Returns */}
-          {step === 'shipping' && (
+          {disclaimerStatus === 'accepted' && step === 'shipping' && (
             <div className="space-y-5">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Shipping & Returns</h3>
@@ -1726,7 +1920,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 5: Review */}
-          {step === 'review' && (
+          {disclaimerStatus === 'accepted' && step === 'review' && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Listing</h3>
 
@@ -1946,7 +2140,20 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 py-4 border-t border-gray-200 flex justify-between">
-          {step === 'success' || step === 'publishing' ? (
+          {/* Hide footer during disclaimer checking or show cancel during disclaimer acceptance */}
+          {disclaimerStatus === 'checking' ? (
+            <div />
+          ) : disclaimerStatus === 'needs_acceptance' ? (
+            <>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <div />
+            </>
+          ) : step === 'success' || step === 'publishing' ? (
             <div />
           ) : (
             <button
@@ -1958,7 +2165,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             </button>
           )}
 
-          {step === 'success' ? (
+          {disclaimerStatus !== 'accepted' ? (
+            <div />
+          ) : step === 'success' ? (
             <button
               onClick={onClose}
               className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
