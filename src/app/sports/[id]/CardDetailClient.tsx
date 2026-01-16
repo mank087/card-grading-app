@@ -40,6 +40,7 @@ import { ConditionReportDisplay } from '@/components/UserConditionReport';
 import { UserConditionReportInput } from '@/types/conditionReport';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
+import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
@@ -1423,6 +1424,8 @@ export function SportsCardDetails() {
   const hasTrackedGradeComplete = useRef(false);
   // 🎉 First grade conversion modal state
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
+  // 🎯 Onboarding tour state
+  const [showOnboardingTour, setShowOnboardingTour] = useState(false);
 
   // Extract data from AI grading
   // DVG v1 data structure
@@ -2487,7 +2490,7 @@ export function SportsCardDetails() {
         <Link href="/upload/sports" className="text-blue-600 hover:text-blue-800">
           ← Back to Sports Upload
         </Link>
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-4" id="tour-visibility-toggle">
           <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
             🏈 Sports Card
           </div>
@@ -2578,7 +2581,7 @@ export function SportsCardDetails() {
       {/* Main Layout */}
       <div className="space-y-8">
         {/* Card Images with Professional-Style Labels in Metallic Slab */}
-        <div className="flex justify-center">
+        <div className="flex justify-center" id="tour-card-images">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl w-full">
             {/* Front Card with Label - Metallic Slab */}
             <div
@@ -2863,7 +2866,7 @@ export function SportsCardDetails() {
           {dvgGrading && Object.keys(dvgGrading).length > 0 && (
             <div className="space-y-6">
               {/* Header / Grade Summary */}
-              <div className={`${
+              <div id="tour-grade-score" className={`${
                 // 🎯 Check conversational AI grade first, then DVG v1
                 (card.conversational_decimal_grade === null && recommendedGrade.recommended_decimal_grade === null)
                   ? 'bg-gradient-to-r from-red-600 to-orange-600'
@@ -2965,7 +2968,7 @@ export function SportsCardDetails() {
                 const limitingFactor = card.conversational_limiting_factor;
 
                 return (
-                <div className="bg-white rounded-xl shadow-lg p-6 border-2 border-purple-200 -mt-3">
+                <div id="tour-subgrades" className="bg-white rounded-xl shadow-lg p-6 border-2 border-purple-200 -mt-3">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {/* Centering */}
                     <div className="text-center">
@@ -3044,7 +3047,7 @@ export function SportsCardDetails() {
                 }
 
                 return (
-                  <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-lg p-6 border-2 border-indigo-200 mt-6">
+                  <div id="tour-condition-summary" className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-lg p-6 border-2 border-indigo-200 mt-6">
                     <h3 className="text-lg font-bold text-gray-800 mb-3">
                       Overall Card Condition Summary
                     </h3>
@@ -3081,7 +3084,7 @@ export function SportsCardDetails() {
                 const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
 
                 return (
-                  <div className="flex flex-col md:flex-row items-center justify-between gap-4 my-6 px-4">
+                  <div id="tour-download-buttons" className="flex flex-col md:flex-row items-center justify-between gap-4 my-6 px-4">
                     {/* DCM Serial Number Display */}
                     <div className="flex items-center gap-2 bg-gradient-to-r from-purple-100 to-indigo-100 px-4 py-2 rounded-lg border border-purple-300">
                       <span className="text-sm font-medium text-purple-700">DCM Serial#:</span>
@@ -3319,7 +3322,7 @@ export function SportsCardDetails() {
               </div>
 
               {/* Card Information with Rarity Features */}
-              <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">
+              <div id="tour-card-info" className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">
                 <div className="flex items-center justify-between mb-6 border-b pb-3">
                   <h3 className="text-xl font-bold text-gray-800">
                     Card Information
@@ -3329,6 +3332,7 @@ export function SportsCardDetails() {
                     const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
                     if (!isOwner) return null;
                     return (
+                      <div id="tour-edit-details">
                       <EditCardDetailsButton
                         card={card}
                         currentUserId={session?.user?.id}
@@ -3337,6 +3341,7 @@ export function SportsCardDetails() {
                         }}
                         variant="icon-only"
                       />
+                      </div>
                     );
                   })()}
                 </div>
@@ -3652,7 +3657,7 @@ export function SportsCardDetails() {
 
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}
               {(card.conversational_sub_scores || centering.front_lr || centering.front_left_right_ratio_text || centering.back_lr || centering.back_left_right_ratio_text) && (
-              <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
+              <div id="tour-centering" className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
 
                 {/* Card Images with Centering Bars */}
                 <div className="mb-6">
@@ -4530,7 +4535,7 @@ export function SportsCardDetails() {
 
               {/* Professional Grading Company Estimates */}
               {professionalGrades && (
-                <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
+                <div id="tour-pro-estimates" className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
                   <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
                     Professional Grading Estimates
                   </h2>
@@ -4711,7 +4716,7 @@ export function SportsCardDetails() {
               </div>
 
               {/* Find and Price This Card */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
                   <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -4797,7 +4802,7 @@ export function SportsCardDetails() {
                 if (!isOwner) return null;
 
                 return (
-                  <div className="bg-white rounded-lg shadow-lg p-6">
+                  <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4915,7 +4920,7 @@ export function SportsCardDetails() {
 
           {/* 4. DCM Confidence and Image Quality */}
           {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <div id="tour-optic-score" className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Confidence and Image Quality</h2>
 
               <div className="grid md:grid-cols-2 gap-6">
@@ -6070,8 +6075,18 @@ export function SportsCardDetails() {
         <FirstGradeCongratsModal
           isFirstPurchase={isFirstPurchase}
           onDismiss={() => setShowFirstGradeModal(false)}
+          onStartTour={() => {
+            setShowFirstGradeModal(false)
+            setShowOnboardingTour(true)
+          }}
         />
       )}
+
+      {/* Onboarding Tour */}
+      <OnboardingTour
+        isActive={showOnboardingTour}
+        onComplete={() => setShowOnboardingTour(false)}
+      />
 
       {/* Low Credits Bottom Banner */}
       <LowCreditsBottomBanner

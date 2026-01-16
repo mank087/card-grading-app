@@ -6,13 +6,15 @@ import Link from 'next/link'
 interface FirstGradeCongratsModalProps {
   isFirstPurchase: boolean
   onDismiss: () => void
+  onStartTour?: () => void // New prop to trigger the guided tour
 }
 
 const MODAL_DISMISSED_KEY = 'dcm_first_grade_modal_dismissed'
 
 export function FirstGradeCongratsModal({
   isFirstPurchase,
-  onDismiss
+  onDismiss,
+  onStartTour
 }: FirstGradeCongratsModalProps) {
   const [isVisible, setIsVisible] = useState(false)
 
@@ -30,6 +32,17 @@ export function FirstGradeCongratsModal({
     localStorage.setItem(MODAL_DISMISSED_KEY, 'true')
     setIsVisible(false)
     onDismiss()
+  }
+
+  const handleStartTour = () => {
+    localStorage.setItem(MODAL_DISMISSED_KEY, 'true')
+    setIsVisible(false)
+    // Trigger the guided tour
+    if (onStartTour) {
+      onStartTour()
+    } else {
+      onDismiss()
+    }
   }
 
   if (!isVisible) return null
@@ -126,10 +139,10 @@ export function FirstGradeCongratsModal({
               Grade More Cards
             </Link>
             <button
-              onClick={handleDismiss}
+              onClick={handleStartTour}
               className="block w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-medium py-3 px-6 rounded-xl transition-all duration-200 text-center"
             >
-              Explore My Card First
+              Take a Quick Tour
             </button>
           </div>
         </div>
