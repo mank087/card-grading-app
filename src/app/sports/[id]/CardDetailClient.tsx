@@ -3088,13 +3088,8 @@ export function SportsCardDetails() {
                       <span className="text-sm font-bold text-purple-900 font-mono">{card.serial || 'N/A'}</span>
                     </div>
 
-                    {/* Only show action buttons to card owner */}
-                    {isOwner && (
-                      <div className="flex items-center gap-3">
-                        <DownloadReportButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />
-                        <EbayListingButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />
-                      </div>
-                    )}
+                    {/* Only show download button to card owner */}
+                    {isOwner && <DownloadReportButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">
@@ -4794,6 +4789,53 @@ export function SportsCardDetails() {
                   </p>
                 </div>
               </div>
+
+              {/* Insta-List on eBay Section */}
+              {(() => {
+                const session = getStoredSession();
+                const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                if (!isOwner) return null;
+
+                return (
+                  <div className="bg-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
+                        <p className="text-sm text-gray-500">List this card directly to eBay with one click</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="text-sm text-gray-700">
+                          <p className="font-medium mb-1">Automatically includes:</p>
+                          <ul className="list-disc list-inside space-y-0.5 text-gray-600">
+                            <li>Front & back card images with DCM grade labels</li>
+                            <li>Mini grading report image</li>
+                            <li>Pre-filled title and condition descriptors</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    <EbayListingButton
+                      card={card}
+                      cardType="sports"
+                      showFounderEmblem={showFounderEmblem}
+                      labelStyle={labelStyle}
+                      className="w-full"
+                    />
+                  </div>
+                );
+              })()}
 
               </div>
             </div>
