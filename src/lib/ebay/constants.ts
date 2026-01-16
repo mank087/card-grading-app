@@ -18,7 +18,12 @@ export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.account.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment',
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
+  'https://api.ebay.com/oauth/api_scope/sell.marketing',
+  'https://api.ebay.com/oauth/api_scope/sell.marketing.readonly',
 ] as const;
+
+// Marketing scope for checking if user needs to re-authorize
+export const MARKETING_SCOPE = 'https://api.ebay.com/oauth/api_scope/sell.marketing';
 
 // =============================================================================
 // eBay Category IDs
