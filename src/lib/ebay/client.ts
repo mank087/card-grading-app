@@ -144,6 +144,8 @@ export async function refreshAccessToken(refreshToken: string): Promise<EbayToke
     `${EBAY_CONFIG.appId}:${EBAY_CONFIG.certId}`
   ).toString('base64');
 
+  console.log('[eBay] Attempting token refresh to:', tokenUrl);
+
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
@@ -158,12 +160,45 @@ export async function refreshAccessToken(refreshToken: string): Promise<EbayToke
   });
 
   if (!response.ok) {
-    const error = await response.text();
-    console.error('[eBay] Token refresh failed:', error);
-    throw new Error(`Failed to refresh token: ${response.status}`);
+    const errorText = await response.text();
+    console.error('[eBay] Token refresh failed (status ' + response.status + '):', errorText);
+
+    // Try to parse error for more details
+    let errorMessage = `Token refresh failed (${response.status})`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error_description) {
+        errorMessage = errorJson.error_description;
+      } else if (errorJson.error) {
+        errorMessage = errorJson.error;
+      }
+    } catch {
+      // Use raw error text if not JSON
+      if (errorText.length < 200) {
+        errorMessage = errorText;
+      }
+    }
+
+    throw new Error(errorMessage);
   }
 
-  return response.json();
+  const tokens = await response.json();
+  console.log('[eBay] Token refresh response keys:', Object.keys(tokens));
+
+  // Validate response has required fields
+  if (!tokens.access_token) {
+    console.error('[eBay] Token refresh response missing access_token:', tokens);
+    throw new Error('Invalid token response: missing access_token');
+  }
+
+  // eBay refresh might not return a new refresh_token - use the old one if not provided
+  if (!tokens.refresh_token) {
+    console.log('[eBay] No new refresh_token in response, will keep existing');
+    tokens.refresh_token = refreshToken; // Use the original refresh token
+  }
+
+  console.log('[eBay] Token refresh successful');
+  return tokens;
 }
 
 /**

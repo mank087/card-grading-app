@@ -26,6 +26,10 @@ const ENCRYPTION_ALGORITHM = 'aes-256-gcm';
  * Encrypt sensitive data (tokens) before storing in database
  */
 export function encryptToken(plaintext: string): string {
+  if (!plaintext) {
+    throw new Error('Cannot encrypt empty or undefined token');
+  }
+
   if (!ENCRYPTION_KEY) {
     console.warn('[eBay] No encryption key configured, storing token in plaintext');
     return plaintext;
@@ -333,4 +337,43 @@ export async function hasActiveEbayConnection(userId: string): Promise<boolean> 
   }
 
   return true;
+}
+
+// =============================================================================
+// Convenience Functions (Aliases)
+// =============================================================================
+
+/**
+ * Alias for getEbayConnection - for consistency in API routes
+ */
+export const getConnectionForUser = getEbayConnection;
+
+/**
+ * Get connection and refresh token if needed
+ * Returns updated connection or null if refresh fails
+ */
+export async function refreshTokenIfNeeded(
+  connection: EbayConnection
+): Promise<EbayConnection | null> {
+  if (!needsTokenRefresh(connection)) {
+    return connection;
+  }
+
+  console.log('[eBay] Refreshing access token...');
+
+  try {
+    const newTokens = await refreshAccessToken(connection.refresh_token);
+    await updateEbayTokens(connection.user_id, newTokens);
+
+    // Return updated connection
+    return {
+      ...connection,
+      access_token: newTokens.access_token,
+      refresh_token: newTokens.refresh_token,
+      token_expires_at: new Date(Date.now() + newTokens.expires_in * 1000).toISOString(),
+    };
+  } catch (error) {
+    console.error('[eBay] Token refresh failed:', error);
+    return null;
+  }
 }
