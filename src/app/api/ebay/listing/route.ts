@@ -366,11 +366,15 @@ export async function POST(request: NextRequest) {
       shippingType,
       offerInternational,
       // Graded card condition descriptors
-      professionalGrader: listingDetails.professionalGrader,  // Should be '2750117' for Other
+      professionalGrader: listingDetails.professionalGrader,  // Should be '2750123' for Other
       gradeValueId: listingDetails.grade,                     // Should be like '275020' for grade 10
       cardGrade: grade,                                       // Actual DCM grade (1-10)
       certificationNumber: listingDetails.certificationNumber, // Raw serial or undefined
       cardSerial: card.serial,
+      // Item specifics (check for Franchise)
+      itemSpecificsCount: listingDetails.itemSpecifics.length,
+      itemSpecificsNames: listingDetails.itemSpecifics.map(s => s.name),
+      hasFranchise: listingDetails.itemSpecifics.some(s => s.name === 'Franchise'),
     });
 
     // Create listing via Trading API

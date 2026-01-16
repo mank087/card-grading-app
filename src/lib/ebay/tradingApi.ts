@@ -234,6 +234,13 @@ function buildAddFixedPriceItemXml(
     const isOtherGrader = listing.professionalGrader === '2750123';
     const certNumber = listing.certificationNumber?.trim();
 
+    console.log('[Trading API] Condition descriptor check:', {
+      professionalGrader: listing.professionalGrader,
+      isOtherGrader,
+      certNumber,
+      willInclude27503: !isOtherGrader && !!certNumber,
+    });
+
     conditionDescriptorsXml = `
       <ConditionDescriptors>
         <ConditionDescriptor>
