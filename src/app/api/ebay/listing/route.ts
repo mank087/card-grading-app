@@ -123,9 +123,11 @@ function mapListingDuration(duration?: string): string {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('[eBay Listing] === START REQUEST ===');
   try {
     // Authenticate user
     const authHeader = request.headers.get('Authorization');
+    console.log('[eBay Listing] Auth header present:', !!authHeader);
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json(
         { error: 'Unauthorized. Please log in first.' },
@@ -134,17 +136,21 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.slice(7);
+    console.log('[eBay Listing] Token length:', token.length);
     const supabase = supabaseServer();
+    console.log('[eBay Listing] Supabase client created');
 
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    console.log('[eBay Listing] Auth result - user:', user?.id, 'error:', userError?.message);
     if (userError || !user) {
       return NextResponse.json(
-        { error: 'Invalid or expired session' },
+        { error: 'Invalid or expired session', debug: { errorMsg: userError?.message } },
         { status: 401 }
       );
     }
 
     // Get eBay connection and refresh token if needed
+    console.log('[eBay Listing] Getting eBay connection for user:', user.id);
     let connection = await getConnectionForUser(user.id);
     if (!connection) {
       return NextResponse.json(
@@ -220,7 +226,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch card data
-    console.log('[eBay Listing] Looking up card with ID:', cardId, 'Type:', typeof cardId);
+    console.log('[eBay Listing] Looking up card with ID:', cardId, 'Type:', typeof cardId, 'User ID:', user.id);
+
+    // First, let's try a simple count query to verify DB connectivity
+    const { count, error: countError } = await supabase
+      .from('cards')
+      .select('*', { count: 'exact', head: true })
+      .eq('id', cardId);
+    console.log('[eBay Listing] Count query result - count:', count, 'error:', countError?.message);
 
     const { data: card, error: cardError } = await supabase
       .from('cards')
@@ -246,10 +259,12 @@ export async function POST(request: NextRequest) {
       .eq('id', cardId)
       .single();
 
+    console.log('[eBay Listing] Card query result - card:', card?.id, 'error:', cardError?.message, 'code:', cardError?.code);
+
     if (cardError || !card) {
-      console.error('[eBay Listing] Card not found. ID:', cardId, 'Error:', cardError?.message, 'Code:', cardError?.code);
+      console.error('[eBay Listing] Card not found. ID:', cardId, 'Error:', cardError?.message, 'Code:', cardError?.code, 'Details:', JSON.stringify(cardError));
       return NextResponse.json(
-        { error: 'Card not found', debug: { cardId, errorMessage: cardError?.message, errorCode: cardError?.code } },
+        { error: 'Card not found', debug: { cardId, errorMessage: cardError?.message, errorCode: cardError?.code, errorDetails: cardError } },
         { status: 404 }
       );
     }
