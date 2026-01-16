@@ -68,7 +68,7 @@ export async function getAdvertisingEligibility(
 
   try {
     const response = await fetch(
-      `${apiBase}/sell/account/v1/advertising_eligibility?program_types=PROMOTED_LISTINGS`,
+      `${apiBase}/sell/account/v1/advertising_eligibility?program_types=PROMOTED_LISTINGS_STANDARD`,
       {
         method: 'GET',
         headers: {
@@ -121,7 +121,7 @@ export async function getAdvertisingEligibility(
     // Parse the response - structure varies based on eligibility
     // The API returns an array of program eligibilities
     const promotedListings = data.advertisingEligibility?.find(
-      (p: any) => p.programType === 'PROMOTED_LISTINGS'
+      (p: any) => p.programType === 'PROMOTED_LISTINGS_STANDARD'
     );
 
     if (!promotedListings) {
