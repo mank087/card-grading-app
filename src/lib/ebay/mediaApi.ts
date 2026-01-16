@@ -51,7 +51,7 @@ export interface UploadDocumentResult {
 export async function createDocument(
   accessToken: string,
   documentType: DocumentType,
-  languages: string[] = ['en'],
+  languages: string[] = ['ENGLISH'],  // eBay expects full language name, not ISO code
   sandbox: boolean = false
 ): Promise<{ success: boolean; documentId?: string; error?: string }> {
   const endpoint = sandbox
@@ -263,7 +263,7 @@ export async function uploadGradingReport(
   const createResult = await createDocument(
     accessToken,
     'CERTIFICATE_OF_ANALYSIS',
-    ['en'],
+    ['ENGLISH'],  // eBay expects full language name
     sandbox
   );
 
