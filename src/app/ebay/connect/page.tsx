@@ -1,20 +1,24 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getStoredSession } from '@/lib/directAuth'
+import { Suspense } from 'react'
 
 /**
- * eBay Connect Page
+ * eBay Connect Page Content
  *
- * This page initiates the eBay OAuth flow.
- * User must be logged in to connect their eBay account.
+ * Separated to use useSearchParams with Suspense
  */
-export default function EbayConnectPage() {
+function EbayConnectContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [status, setStatus] = useState<'loading' | 'not_logged_in' | 'redirecting' | 'error'>('loading')
   const [error, setError] = useState<string | null>(null)
+
+  // Get redirect URL from query params, default to /account
+  const redirectUrl = searchParams.get('redirect') || '/account'
 
   useEffect(() => {
     const initiateOAuth = async () => {
@@ -29,8 +33,8 @@ export default function EbayConnectPage() {
       setStatus('redirecting')
 
       try {
-        // Call our auth endpoint with the token
-        const response = await fetch('/api/ebay/auth?return_url=/account', {
+        // Call our auth endpoint with the return URL
+        const response = await fetch(`/api/ebay/auth?return_url=${encodeURIComponent(redirectUrl)}`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -89,7 +93,7 @@ export default function EbayConnectPage() {
             You need to be logged in to connect your eBay account.
           </p>
           <Link
-            href="/login?redirect=/ebay/connect"
+            href={`/login?redirect=${encodeURIComponent(`/ebay/connect?redirect=${encodeURIComponent(redirectUrl)}`)}`}
             className="inline-block bg-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-purple-700 transition-colors"
           >
             Log In to Continue
@@ -140,5 +144,27 @@ export default function EbayConnectPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+/**
+ * eBay Connect Page
+ *
+ * This page initiates the eBay OAuth flow.
+ * User must be logged in to connect their eBay account.
+ * Accepts ?redirect= parameter to return to that page after connection.
+ */
+export default function EbayConnectPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    }>
+      <EbayConnectContent />
+    </Suspense>
   )
 }

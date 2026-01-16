@@ -64,8 +64,9 @@ export const EbayListingButton: React.FC<EbayListingButtonProps> = ({
 
   const handleClick = () => {
     if (!ebayStatus.connected) {
-      // Redirect to eBay connect page
-      window.location.href = '/ebay/connect';
+      // Redirect to eBay connect page with current URL as redirect
+      const currentUrl = window.location.pathname + window.location.search;
+      window.location.href = `/ebay/connect?redirect=${encodeURIComponent(currentUrl)}`;
       return;
     }
     setIsModalOpen(true);
