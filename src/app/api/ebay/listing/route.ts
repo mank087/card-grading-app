@@ -250,8 +250,6 @@ export async function POST(request: NextRequest) {
         conversational_decimal_grade,
         conversational_whole_grade,
         conversational_condition_label,
-        conversational_summary,
-        conversational_sub_scores,
         front_url,
         back_url,
         user_id
@@ -296,7 +294,7 @@ export async function POST(request: NextRequest) {
     // Prepare listing details
     const listingDetails: ListingDetails = {
       title,
-      description: description || card.conversational_summary || `DCM Graded ${card.card_name || 'Trading Card'} - Grade ${grade}`,
+      description: description || `DCM Graded ${card.card_name || 'Trading Card'} - Grade ${grade}`,
       categoryId,
       price,
       quantity,
