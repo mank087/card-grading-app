@@ -286,13 +286,11 @@ export async function POST(request: NextRequest) {
       listingDuration: mapListingDuration(duration),
       bestOfferEnabled,
       // Graded card specific
-      professionalGrader: DCM_GRADER_ID,
-      grade: gradeId,
-      // Format certification number with DCM prefix - eBay requires specific format
-      // Use serial if available, otherwise use card ID
-      certificationNumber: card.serial?.trim()
-        ? `DCM-${card.serial.trim()}`
-        : `DCM-${cardId.slice(0, 8).toUpperCase()}`,
+      professionalGrader: DCM_GRADER_ID,  // '2750117' = "Other" grader
+      grade: gradeId,                      // eBay grade value ID (e.g., '275020' for grade 10)
+      // Certification number: raw DCM serial number (6 digits)
+      // Only include if card has a serial, otherwise omit entirely
+      certificationNumber: card.serial?.trim() || undefined,
       // Regulatory documents (Certificate of Analysis)
       regulatoryDocumentIds: regulatoryDocumentIds.length > 0 ? regulatoryDocumentIds : undefined,
     };
@@ -337,7 +335,11 @@ export async function POST(request: NextRequest) {
       title,
       shippingType,
       offerInternational,
-      certificationNumber: listingDetails.certificationNumber,
+      // Graded card condition descriptors
+      professionalGrader: listingDetails.professionalGrader,  // Should be '2750117' for Other
+      gradeValueId: listingDetails.grade,                     // Should be like '275020' for grade 10
+      cardGrade: grade,                                       // Actual DCM grade (1-10)
+      certificationNumber: listingDetails.certificationNumber, // Raw serial or undefined
       cardSerial: card.serial,
     });
 
