@@ -414,6 +414,101 @@ export default function TermsPage() {
             </p>
           </section>
 
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">14. Third-Party Marketplace Integrations</h2>
+            <p>
+              DCM Grading may offer features that allow you to list your DCM-graded cards on third-party marketplaces such as eBay.
+              By using these integration features, you agree to the following additional terms:
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.1 DCM Is Not a Party to Marketplace Transactions</h3>
+            <p>
+              DCM Grading provides marketplace listing tools solely as a convenience feature to help you list your DCM-graded cards.
+              <strong> DCM Grading is not a party to any transaction that occurs on third-party marketplaces.</strong> All sales,
+              purchases, and related activities are conducted exclusively between you and the buyer through the respective marketplace
+              platform. DCM Grading does not participate in, facilitate, mediate, or guarantee any aspect of these transactions.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.2 No Liability for Marketplace Transactions</h3>
+            <p>
+              <strong>DCM GRADING SHALL NOT BE HELD LIABLE FOR ANY DISPUTES, CLAIMS, DAMAGES, LOSSES, OR ISSUES ARISING FROM YOUR
+              MARKETPLACE LISTINGS OR SALES.</strong> This includes, but is not limited to:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Buyer complaints, disputes, or negative feedback</li>
+              <li>Return requests, refund demands, or chargebacks</li>
+              <li>Shipping delays, damage, or lost packages</li>
+              <li>Payment processing issues or fund holds</li>
+              <li>Listing violations, policy infractions, or account actions taken by the marketplace</li>
+              <li>Marketplace fees, taxes, or other financial obligations</li>
+              <li>Claims of item not as described, authenticity disputes, or condition disagreements</li>
+              <li>Any other matters related to your marketplace activity</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.3 Grading Opinions in the Context of Sales</h3>
+            <p>
+              DCM grades represent our professional assessment of card condition at the time of grading. <strong>Grades are opinions
+              and are not guarantees of value, authenticity, future market performance, or buyer satisfaction.</strong> Buyers may have
+              different opinions regarding condition, and you are solely responsible for handling any disputes that may arise from
+              differences in condition perception. DCM Grading will not intervene in buyer-seller disputes regarding grading accuracy.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.4 Your Responsibilities When Using Marketplace Integrations</h3>
+            <p>When using DCM Grading&apos;s marketplace integration features, you are solely responsible for:</p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li><strong>Listing Accuracy:</strong> The accuracy of all listing information, including titles, descriptions, prices,
+                images, condition descriptions, and shipping terms</li>
+              <li><strong>Platform Compliance:</strong> Compliance with all marketplace terms of service, listing policies, seller
+                standards, and applicable laws and regulations</li>
+              <li><strong>Customer Service:</strong> Handling all buyer communications, inquiries, and customer service matters</li>
+              <li><strong>Fulfillment:</strong> Packaging, shipping, delivery, and any shipping-related issues</li>
+              <li><strong>Returns and Refunds:</strong> Processing returns, issuing refunds, and handling post-sale disputes</li>
+              <li><strong>Financial Obligations:</strong> All marketplace fees, payment processing fees, taxes, duties, and any other
+                costs associated with your sales</li>
+              <li><strong>Legal Compliance:</strong> Ensuring you have the legal right to sell the items you list and that your sales
+                comply with all applicable consumer protection laws</li>
+              <li><strong>Account Standing:</strong> Maintaining your marketplace account in good standing</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.5 Indemnification for Marketplace Activities</h3>
+            <p>
+              In addition to the general indemnification provisions in Section 8, you specifically agree to indemnify, defend, and
+              hold harmless DCM Grading, its officers, directors, employees, and agents from and against any claims, liabilities,
+              damages, losses, costs, or expenses (including reasonable attorneys&apos; fees) arising from or related to:
+            </p>
+            <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
+              <li>Your use of marketplace integration features</li>
+              <li>Any transactions conducted through third-party marketplaces</li>
+              <li>Disputes with buyers, marketplaces, or payment processors</li>
+              <li>Claims that items sold did not match their described condition</li>
+              <li>Any violation of marketplace policies or applicable laws</li>
+              <li>Intellectual property claims related to your listings</li>
+            </ul>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.6 Marketplace Account Responsibility</h3>
+            <p>
+              You are responsible for maintaining your marketplace accounts (such as eBay) in good standing. DCM Grading is not
+              responsible for any actions the marketplace may take against your account, including but not limited to listing removals,
+              selling restrictions, fee assessments, fund holds, or account suspensions. Any consequences resulting from your use of
+              marketplace integration features are your sole responsibility.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.7 Integration Service Availability</h3>
+            <p>
+              DCM Grading provides marketplace integration features &quot;as is&quot; and makes no guarantees regarding their availability,
+              accuracy, or functionality. We may modify, suspend, or discontinue marketplace integration features at any time without
+              notice. We are not responsible for any losses resulting from integration service interruptions, errors, or discontinuation.
+            </p>
+
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.8 Third-Party Platform Terms</h3>
+            <p>
+              Your use of third-party marketplaces is also subject to those platforms&apos; terms of service, policies, and user agreements.
+              It is your responsibility to review and comply with all applicable third-party terms. In the event of any conflict between
+              these Terms and third-party marketplace terms, the more restrictive provision shall apply to your use of DCM Grading&apos;s
+              integration features.
+            </p>
+          </section>
+
         </div>
       </div>
     </main>
