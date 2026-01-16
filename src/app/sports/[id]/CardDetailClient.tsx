@@ -30,6 +30,7 @@ import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription,
 import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
+import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -3087,8 +3088,13 @@ export function SportsCardDetails() {
                       <span className="text-sm font-bold text-purple-900 font-mono">{card.serial || 'N/A'}</span>
                     </div>
 
-                    {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />}
+                    {/* Only show action buttons to card owner */}
+                    {isOwner && (
+                      <div className="flex items-center gap-3">
+                        <DownloadReportButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />
+                        <EbayListingButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />
+                      </div>
+                    )}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">
