@@ -32,7 +32,7 @@ const TOUR_STEPS: TourStep[] = [
     id: 'grade-score',
     targetId: 'tour-grade-score',
     title: 'Your DCM Grade',
-    description: 'This is your card\'s overall grade on a 1-10 scale. The confidence indicator (A, B, or C) shows how certain our AI is about the grade based on image quality and card clarity.',
+    description: 'This is your card\'s overall grade on a 1-10 scale. The confidence indicator (A, B, C, or D) shows how certain DCM Optic™ is about the grade based on image quality and card clarity.',
     position: 'bottom',
   },
   {
@@ -46,35 +46,35 @@ const TOUR_STEPS: TourStep[] = [
     id: 'download-buttons',
     targetId: 'tour-download-buttons',
     title: 'Download Reports & Labels',
-    description: 'Download your official DCM grading report as a PDF, or get printable labels for your card holders. You can also list directly to eBay from here!',
+    description: 'Download your official DCM grading report as a PDF, or get printable labels for your card holders. You can also download images of your cards with their graded labels included!',
     position: 'top',
   },
   {
     id: 'card-info',
     targetId: 'tour-card-info',
     title: 'Card Information',
-    description: 'Our AI has identified your card\'s details including the player/character, set name, card number, and more. This information is used for market pricing and eBay listings.',
+    description: 'DCM Optic™ has identified your card\'s details including the player/character, set name, card number, and more. This information is used for market pricing and eBay listings.',
     position: 'top',
   },
   {
     id: 'edit-details',
     targetId: 'tour-edit-details',
     title: 'Edit Card Details',
-    description: 'Sometimes our AI makes mistakes! Use this button to correct any card information. Your edits help improve future grading accuracy.',
+    description: 'Sometimes our system can misidentify cards. Use this button to correct any card information.',
     position: 'bottom',
+  },
+  {
+    id: 'subgrades',
+    targetId: 'tour-subgrades',
+    title: 'Sub-Grade Scores',
+    description: 'Individual grades for Centering, Corners, Edges, and Surface. These four categories combine to determine your overall grade.',
+    position: 'top',
   },
   {
     id: 'centering',
     targetId: 'tour-centering',
     title: 'Centering Analysis',
     description: 'Precise measurements of your card\'s centering ratios for both front and back. Perfect centering (50/50) scores highest, with detailed analysis of any misalignment.',
-    position: 'top',
-  },
-  {
-    id: 'subgrades',
-    targetId: 'tour-subgrades',
-    title: 'Corners, Edges & Surface',
-    description: 'Individual grades for each condition category. Our AI examines corner sharpness, edge wear, and surface imperfections to provide detailed sub-grades.',
     position: 'top',
   },
   {
@@ -234,13 +234,23 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
       return
     }
 
+    // For the first step, scroll to the very top to ensure tooltip is visible on mobile
+    if (currentStep === 0) {
+      window.scrollTo({
+        top: 0,
+        behavior: 'smooth'
+      })
+      setTimeout(updatePosition, 600)
+      return
+    }
+
     // Scroll element into view with some padding
     const rect = targetEl.getBoundingClientRect()
     const elementTop = window.scrollY + rect.top
     const viewportHeight = window.innerHeight
 
-    // Calculate scroll position to center element in viewport
-    const scrollTo = elementTop - (viewportHeight / 3)
+    // Calculate scroll position to put element in upper third of viewport
+    const scrollTo = elementTop - (viewportHeight / 4)
 
     window.scrollTo({
       top: Math.max(0, scrollTo),
@@ -249,7 +259,7 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
 
     // Update position after scroll completes
     setTimeout(updatePosition, 600)
-  }, [step, updatePosition])
+  }, [step, currentStep, updatePosition])
 
   // Initialize tour
   useEffect(() => {
@@ -298,6 +308,13 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
       setShowFinalModal(true)
       // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }
+
+  const handleBack = () => {
+    retryCountRef.current = 0
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1)
     }
   }
 
@@ -459,12 +476,26 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
 
           {/* Navigation */}
           <div className="flex justify-between items-center">
-            <button
-              onClick={handleSkip}
-              className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-            >
-              Exit tour
-            </button>
+            <div className="flex items-center gap-2">
+              {currentStep > 0 ? (
+                <button
+                  onClick={handleBack}
+                  className="text-sm text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  Back
+                </button>
+              ) : (
+                <button
+                  onClick={handleSkip}
+                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Exit tour
+                </button>
+              )}
+            </div>
             <button
               onClick={handleNext}
               className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
