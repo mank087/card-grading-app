@@ -1093,9 +1093,17 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const data = await response.json();
 
       // Create promotion if enabled and we have a listing ID
+      console.log('[eBay Listing] Promotion check:', {
+        promotionEnabled,
+        promotionEligible,
+        listingId: data.listingId,
+        adRate: promotionAdRate,
+        willCreatePromotion: !!(promotionEnabled && promotionEligible && data.listingId),
+      });
+
       if (promotionEnabled && promotionEligible && data.listingId) {
         try {
-          console.log('[eBay Listing] Creating promotion for listing:', data.listingId);
+          console.log('[eBay Listing] Creating promotion for listing:', data.listingId, 'with rate:', promotionAdRate);
           const promoResponse = await fetch('/api/ebay/promotion/create', {
             method: 'POST',
             headers: {
