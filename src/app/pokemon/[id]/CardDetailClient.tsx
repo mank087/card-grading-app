@@ -31,6 +31,7 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
+import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -5178,6 +5179,54 @@ export function PokemonCardDetails() {
                 </div>
 
               </div>
+
+              {/* Insta-List on eBay Section */}
+              {(() => {
+                const session = getStoredSession();
+                const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                if (!isOwner) return null;
+
+                return (
+                  <div className="bg-white rounded-lg shadow-lg p-6">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
+                        <p className="text-sm text-gray-500">List this Pokémon card directly to eBay</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="text-sm text-gray-700">
+                          <p className="font-medium mb-1">Automatically includes:</p>
+                          <ul className="list-disc list-inside space-y-0.5 text-gray-600">
+                            <li>Front & back card images with DCM grade labels</li>
+                            <li>Mini grading report image</li>
+                            <li>Pre-filled Pokémon TCG item specifics</li>
+                            <li>Set name, card number, and rarity</li>
+                          </ul>
+                        </div>
+                      </div>
+                    </div>
+
+                    <EbayListingButton
+                      card={card}
+                      cardType="pokemon"
+                      showFounderEmblem={showFounderEmblem}
+                      labelStyle={labelStyle}
+                      className="w-full"
+                    />
+                  </div>
+                );
+              })()}
 
               </div>
             </div>
