@@ -77,7 +77,12 @@ export async function POST(request: NextRequest) {
     const arrayBuffer = await file.arrayBuffer();
     const blob = new Blob([arrayBuffer], { type: file.type || 'application/pdf' });
 
-    console.log('[eBay Document] Uploading grading report:', fileName || file.name);
+    console.log('[eBay Document] Uploading grading report:', {
+      fileName: fileName || file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      sandbox: connection.is_sandbox,
+    });
 
     // Upload the document to eBay Media API
     const result = await uploadGradingReport(

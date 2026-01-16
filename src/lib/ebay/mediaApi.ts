@@ -7,11 +7,11 @@
 
 import { EBAY_API_URLS } from './constants';
 
-// Media API endpoints
-// Note: Uses api.ebay.com, not apim.ebay.com
+// Media API endpoints for document uploads
+// Note: Uses v1_beta endpoint per eBay documentation
 const MEDIA_API_ENDPOINTS = {
-  production: 'https://api.ebay.com/commerce/media/v1',
-  sandbox: 'https://api.sandbox.ebay.com/commerce/media/v1',
+  production: 'https://api.ebay.com/commerce/media/v1_beta',
+  sandbox: 'https://api.sandbox.ebay.com/commerce/media/v1_beta',
 };
 
 export type DocumentType =
@@ -59,17 +59,22 @@ export async function createDocument(
     : MEDIA_API_ENDPOINTS.production;
 
   try {
-    const response = await fetch(`${endpoint}/document`, {
+    const url = `${endpoint}/document`;
+    const body = {
+      documentType,
+      languages,
+    };
+
+    console.log('[Media API] createDocument request:', { url, body });
+
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      body: JSON.stringify({
-        documentType,
-        languages,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
