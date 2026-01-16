@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { supabaseServer } from '@/lib/supabaseServer';
 import { getConnectionForUser, refreshTokenIfNeeded } from '@/lib/ebay/auth';
 import {
   EBAY_CONDITIONS,
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.slice(7);
-    const supabase = supabaseAdmin;
+    const supabase = supabaseServer();
 
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
