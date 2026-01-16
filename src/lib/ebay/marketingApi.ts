@@ -259,11 +259,28 @@ export async function getTrendingAdRate(
 export async function createCampaign(
   accessToken: string,
   campaignName: string,
-  sandbox: boolean = false
+  sandbox: boolean = false,
+  bidPercentage: number = 10
 ): Promise<CreateCampaignResult> {
   const apiBase = getApiBase(sandbox);
 
+  // Start date: now (in UTC format)
+  const startDate = new Date().toISOString().replace(/\.\d{3}Z$/, 'Z');
+
   try {
+    const requestBody = {
+      campaignName,
+      marketplaceId: 'EBAY_US',
+      startDate,
+      // CPS (Cost Per Sale) funding model with fixed ad rate
+      fundingStrategy: {
+        fundingModel: 'COST_PER_SALE',
+        bidPercentage: bidPercentage.toFixed(1), // Must be string like "10.0"
+      },
+    };
+
+    console.log('[Marketing API] Creating campaign with:', JSON.stringify(requestBody));
+
     const response = await fetch(`${apiBase}/sell/marketing/v1/ad_campaign`, {
       method: 'POST',
       headers: {
@@ -271,22 +288,26 @@ export async function createCampaign(
         'Content-Type': 'application/json',
         'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
       },
-      body: JSON.stringify({
-        campaignName,
-        marketplaceId: 'EBAY_US',
-        // CPS (Cost Per Sale) uses SALE funding model
-        fundingStrategy: {
-          fundingModel: 'COST_PER_SALE',
-        },
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Marketing API] createCampaign failed:', response.status, errorText);
+
+      // Parse error details for better messaging
+      let errorDetail = '';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.errors?.[0]?.message || errorJson.error_description || errorJson.message || '';
+        console.error('[Marketing API] createCampaign error details:', JSON.stringify(errorJson, null, 2));
+      } catch {
+        errorDetail = errorText.substring(0, 200);
+      }
+
       return {
         success: false,
-        error: `Failed to create campaign: ${response.status}`,
+        error: `Failed to create campaign: ${response.status}${errorDetail ? ' - ' + errorDetail : ''}`,
       };
     }
 
@@ -352,9 +373,20 @@ export async function createAd(
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Marketing API] createAd failed:', response.status, errorText);
+
+      // Parse error details for better messaging
+      let errorDetail = '';
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetail = errorJson.errors?.[0]?.message || errorJson.error_description || errorJson.message || '';
+        console.error('[Marketing API] createAd error details:', JSON.stringify(errorJson, null, 2));
+      } catch {
+        errorDetail = errorText.substring(0, 200);
+      }
+
       return {
         success: false,
-        error: `Failed to create ad: ${response.status}`,
+        error: `Failed to create ad: ${response.status}${errorDetail ? ' - ' + errorDetail : ''}`,
       };
     }
 
@@ -386,13 +418,15 @@ export async function createAd(
  */
 export async function findOrCreateDcmCampaign(
   accessToken: string,
-  sandbox: boolean = false
+  sandbox: boolean = false,
+  bidPercentage: number = 10
 ): Promise<CreateCampaignResult> {
   const apiBase = getApiBase(sandbox);
   const dcmCampaignName = 'DCM Graded Cards';
 
   try {
     // First, try to find an existing DCM campaign
+    console.log('[Marketing API] Searching for existing DCM campaign...');
     const searchResponse = await fetch(
       `${apiBase}/sell/marketing/v1/ad_campaign?campaign_name=${encodeURIComponent(dcmCampaignName)}&campaign_status=RUNNING,PAUSED`,
       {
@@ -407,6 +441,7 @@ export async function findOrCreateDcmCampaign(
 
     if (searchResponse.ok) {
       const data = await searchResponse.json();
+      console.log('[Marketing API] Campaign search response:', JSON.stringify(data));
       const existingCampaign = data.campaigns?.find(
         (c: any) => c.campaignName === dcmCampaignName
       );
@@ -418,15 +453,18 @@ export async function findOrCreateDcmCampaign(
           campaignId: existingCampaign.campaignId,
         };
       }
+    } else {
+      const errorText = await searchResponse.text();
+      console.error('[Marketing API] Campaign search failed:', searchResponse.status, errorText);
     }
 
     // No existing campaign found, create a new one
-    console.log('[Marketing API] Creating new DCM campaign');
-    return await createCampaign(accessToken, dcmCampaignName, sandbox);
+    console.log('[Marketing API] No existing DCM campaign found, creating new one...');
+    return await createCampaign(accessToken, dcmCampaignName, sandbox, bidPercentage);
   } catch (error) {
     console.error('[Marketing API] findOrCreateDcmCampaign error:', error);
     // Fall back to creating a new campaign
-    return await createCampaign(accessToken, dcmCampaignName, sandbox);
+    return await createCampaign(accessToken, dcmCampaignName, sandbox, bidPercentage);
   }
 }
 
@@ -446,7 +484,7 @@ export async function promoteListing(
 ): Promise<PromotedListingResult> {
   try {
     // Find or create the DCM campaign
-    const campaignResult = await findOrCreateDcmCampaign(accessToken, sandbox);
+    const campaignResult = await findOrCreateDcmCampaign(accessToken, sandbox, bidPercentage);
 
     if (!campaignResult.success || !campaignResult.campaignId) {
       return {

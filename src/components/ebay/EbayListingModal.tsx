@@ -592,11 +592,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           setSuggestedAdRate(data.suggestedRate);
           setPromotionAdRate(data.suggestedRate);
         }
-
-        // If eligible, enable promotion by default
-        if (data.eligible) {
-          setPromotionEnabled(true);
-        }
+        // Promotion toggle stays off by default - user must opt-in
       } else {
         setPromotionEligible(false);
         setPromotionReason('Failed to check eligibility');
@@ -2731,7 +2727,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </svg>
                 </a>
               </div>
-              <p className="text-xs text-gray-500 mt-4">SKU: {listingResult.sku}</p>
             </div>
           )}
 
