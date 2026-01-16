@@ -240,6 +240,14 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     sku: string;
   } | null>(null);
 
+  // Existing listing state (to prevent duplicate listings)
+  const [existingListing, setExistingListing] = useState<{
+    listingId: string;
+    listingUrl: string;
+    status: string;
+  } | null>(null);
+  const [checkingExistingListing, setCheckingExistingListing] = useState(false);
+
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
@@ -249,6 +257,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setImageBlobs({});
       setSelectedImages({ front: true, back: true, miniReport: true });
       setListingResult(null);
+      setExistingListing(null);
+      setCheckingExistingListing(false);
       setListingFormat('FIXED_PRICE');
       setBestOfferEnabled(true);
       setDuration('GTC');
@@ -360,6 +370,44 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       checkEbayConnection();
     }
   }, [isOpen]);
+
+  // Check if card already has an active eBay listing
+  useEffect(() => {
+    const checkExistingListing = async () => {
+      if (!isOpen || !card?.id) return;
+
+      setCheckingExistingListing(true);
+      setExistingListing(null);
+
+      try {
+        const session = getStoredSession();
+        if (!session?.access_token) return;
+
+        const response = await fetch(`/api/ebay/listing/check?cardId=${card.id}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.hasListing && data.listing) {
+            setExistingListing({
+              listingId: data.listing.listing_id,
+              listingUrl: data.listing.listing_url,
+              status: data.listing.status,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('[eBay Listing] Failed to check existing listing:', error);
+      } finally {
+        setCheckingExistingListing(false);
+      }
+    };
+
+    checkExistingListing();
+  }, [isOpen, card?.id]);
 
   // Listen for messages from eBay auth popup
   useEffect(() => {
@@ -1417,16 +1465,85 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             </div>
           )}
 
-          {/* Disclaimer - Loading State (only show if eBay is connected) */}
-          {ebayConnectionStatus === 'connected' && disclaimerStatus === 'checking' && (
+          {/* Existing Listing Warning */}
+          {ebayConnectionStatus === 'connected' && existingListing && (
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Card Already Listed</h3>
+                <p className="text-gray-600 mb-4">
+                  This card already has an active listing on eBay.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="w-6 h-6 text-blue-600" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M19.5 3h-15A1.5 1.5 0 003 4.5v15A1.5 1.5 0 004.5 21h15a1.5 1.5 0 001.5-1.5v-15A1.5 1.5 0 0019.5 3zm-7.5 15a1.5 1.5 0 110-3 1.5 1.5 0 010 3zm1.5-6a1.5 1.5 0 01-3 0V7.5a1.5 1.5 0 013 0V12z"/>
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-800">
+                      Listing ID: {existingListing.listingId}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Status: {existingListing.status.charAt(0).toUpperCase() + existingListing.status.slice(1)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-3">
+                {existingListing.listingUrl && (
+                  <a
+                    href={existingListing.listingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-center font-medium flex items-center justify-center gap-2"
+                  >
+                    View Existing Listing on eBay
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </a>
+                )}
+                <button
+                  onClick={onClose}
+                  className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Close
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                To create a new listing for this card, first end the existing listing on eBay.
+              </p>
+            </div>
+          )}
+
+          {/* Checking for existing listing */}
+          {ebayConnectionStatus === 'connected' && checkingExistingListing && !existingListing && (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4" />
+              <p className="text-gray-600">Checking listing status...</p>
+            </div>
+          )}
+
+          {/* Disclaimer - Loading State (only show if eBay is connected and no existing listing) */}
+          {ebayConnectionStatus === 'connected' && !existingListing && !checkingExistingListing && disclaimerStatus === 'checking' && (
             <div className="flex flex-col items-center justify-center py-12">
               <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin mb-4" />
               <p className="text-gray-600">Loading...</p>
             </div>
           )}
 
-          {/* Disclaimer - Needs Acceptance (only show if eBay is connected) */}
-          {ebayConnectionStatus === 'connected' && disclaimerStatus === 'needs_acceptance' && (
+          {/* Disclaimer - Needs Acceptance (only show if eBay is connected and no existing listing) */}
+          {ebayConnectionStatus === 'connected' && !existingListing && !checkingExistingListing && disclaimerStatus === 'needs_acceptance' && (
             <div className="space-y-6">
               <div className="text-center">
                 <div className="w-16 h-16 mx-auto mb-4 bg-amber-100 rounded-full flex items-center justify-center">
@@ -1536,7 +1653,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 1: Images */}
-          {disclaimerStatus === 'accepted' && step === 'images' && (
+          {disclaimerStatus === 'accepted' && !existingListing && step === 'images' && (
             <div>
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Images for Listing</h3>
               {isLoading ? (
@@ -1638,7 +1755,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 2: Details */}
-          {disclaimerStatus === 'accepted' && step === 'details' && (
+          {disclaimerStatus === 'accepted' && !existingListing && step === 'details' && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Listing Details</h3>
 
@@ -1812,7 +1929,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 3: Item Specifics */}
-          {disclaimerStatus === 'accepted' && step === 'specifics' && (
+          {disclaimerStatus === 'accepted' && !existingListing && step === 'specifics' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between mb-4">
                 <div>
@@ -2037,7 +2154,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 4: Shipping & Returns */}
-          {disclaimerStatus === 'accepted' && step === 'shipping' && (
+          {disclaimerStatus === 'accepted' && !existingListing && step === 'shipping' && (
             <div className="space-y-5">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Shipping & Returns</h3>
@@ -2385,7 +2502,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 5: Promotion */}
-          {disclaimerStatus === 'accepted' && step === 'promotion' && (
+          {disclaimerStatus === 'accepted' && !existingListing && step === 'promotion' && (
             <div className="space-y-5">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Promoted Listings</h3>
@@ -2515,7 +2632,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           )}
 
           {/* Step 6: Review */}
-          {disclaimerStatus === 'accepted' && step === 'review' && (
+          {disclaimerStatus === 'accepted' && !existingListing && step === 'review' && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Listing</h3>
 

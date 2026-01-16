@@ -254,6 +254,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if card already has an active eBay listing
+    const { data: existingListing } = await supabase
+      .from('ebay_listings')
+      .select('id, listing_id, listing_url, status')
+      .eq('card_id', cardId)
+      .eq('user_id', user.id)
+      .in('status', ['active', 'pending'])
+      .single();
+
+    if (existingListing) {
+      console.log('[eBay Listing] Card already has active listing:', existingListing.listing_id);
+      return NextResponse.json(
+        {
+          error: 'This card already has an active eBay listing',
+          existingListing: {
+            listingId: existingListing.listing_id,
+            listingUrl: existingListing.listing_url,
+            status: existingListing.status,
+          },
+        },
+        { status: 409 } // Conflict
+      );
+    }
+
     // Generate SKU
     const sku = generateSku(cardId, user.id);
 
