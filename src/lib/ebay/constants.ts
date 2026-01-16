@@ -90,10 +90,20 @@ export const GRADER_IDS = {
   CSG: '275014',
   CGC: '275015',
   SGC: '275016',
+  KSA: '275017',
   GMA: '275018',
-  HGA: '2750110',
-  // Use this for DCM
-  OTHER: '2750117',
+  HGA: '275019',
+  ISA: '2750110',
+  GSG: '2750112',
+  PGS: '2750113',
+  MNT: '2750114',
+  TAG: '2750115',
+  RARE: '2750116',
+  RCG: '2750117',  // Revolution Card Grading
+  CGA: '2750120',
+  TCG: '2750121',
+  // Use this for DCM - "Other" grader
+  OTHER: '2750123',
 } as const;
 
 // DCM uses "Other" grader ID
