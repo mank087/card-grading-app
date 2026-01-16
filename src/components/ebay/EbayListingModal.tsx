@@ -184,7 +184,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [shippingForm, setShippingForm] = useState({
     // Domestic shipping
     shippingType: 'CALCULATED' as 'FREE' | 'FLAT_RATE' | 'CALCULATED',
-    domesticShippingService: 'USPSPriority',
+    domesticShippingService: 'UPSGround',
     flatRateAmount: 5.00,
     handlingDays: 1,
     postalCode: '',
