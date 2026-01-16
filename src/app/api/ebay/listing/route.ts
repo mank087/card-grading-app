@@ -228,36 +228,14 @@ export async function POST(request: NextRequest) {
     // Fetch card data
     console.log('[eBay Listing] Looking up card with ID:', cardId, 'Type:', typeof cardId, 'User ID:', user.id);
 
-    // First, let's try a simple count query to verify DB connectivity
-    const { count, error: countError } = await supabase
-      .from('cards')
-      .select('*', { count: 'exact', head: true })
-      .eq('id', cardId);
-    console.log('[eBay Listing] Count query result - count:', count, 'error:', countError?.message);
-
+    // Fetch card data - use select('*') like /api/other route which works
     const { data: card, error: cardError } = await supabase
       .from('cards')
-      .select(`
-        id,
-        serial,
-        category,
-        card_name,
-        card_set,
-        card_number,
-        release_date,
-        featured,
-        pokemon_featured,
-        conversational_decimal_grade,
-        conversational_whole_grade,
-        conversational_condition_label,
-        front_url,
-        back_url,
-        user_id
-      `)
+      .select('*')
       .eq('id', cardId)
       .single();
 
-    console.log('[eBay Listing] Card query result - card:', card?.id, 'error:', cardError?.message, 'code:', cardError?.code);
+    console.log('[eBay Listing] Card query result - card:', card?.id, 'user_id:', card?.user_id, 'error:', cardError?.message);
 
     if (cardError || !card) {
       console.error('[eBay Listing] Card not found. ID:', cardId, 'Error:', cardError?.message, 'Code:', cardError?.code, 'Details:', JSON.stringify(cardError));
