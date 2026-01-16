@@ -247,6 +247,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     status: string;
   } | null>(null);
   const [checkingExistingListing, setCheckingExistingListing] = useState(false);
+  // Previous listing state (for sold/ended cards that can be relisted)
+  const [previousListing, setPreviousListing] = useState<{
+    listingId: string;
+    status: string;
+    message: string;
+  } | null>(null);
+  const [previousListingDismissed, setPreviousListingDismissed] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -259,6 +266,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setListingResult(null);
       setExistingListing(null);
       setCheckingExistingListing(false);
+      setPreviousListing(null);
+      setPreviousListingDismissed(false);
       setListingFormat('FIXED_PRICE');
       setBestOfferEnabled(true);
       setDuration('GTC');
@@ -392,10 +401,18 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         if (response.ok) {
           const data = await response.json();
           if (data.hasListing && data.listing) {
+            // Card has an active listing - block relisting
             setExistingListing({
               listingId: data.listing.listing_id,
               listingUrl: data.listing.listing_url,
               status: data.listing.status,
+            });
+          } else if (data.previousListing) {
+            // Card was previously listed but is now sold/ended - show warning
+            setPreviousListing({
+              listingId: data.previousListing.listing_id,
+              status: data.previousListing.status,
+              message: data.message || `This card was previously ${data.previousListing.status} on eBay.`,
             });
           }
         }
@@ -1655,6 +1672,40 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           {/* Step 1: Images */}
           {disclaimerStatus === 'accepted' && !existingListing && step === 'images' && (
             <div>
+              {/* Previous listing warning banner */}
+              {previousListing && !previousListingDismissed && (
+                <div className="mb-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <svg className="w-5 h-5 text-amber-500 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-medium text-amber-800">
+                        {previousListing.status === 'sold' ? 'Previously Sold' : 'Previously Listed'}
+                      </h4>
+                      <p className="text-sm text-amber-700 mt-1">
+                        {previousListing.status === 'sold'
+                          ? 'This card was previously sold on eBay. If you still have the card (e.g., the sale fell through or you repurchased it), you can create a new listing.'
+                          : 'This card was previously listed on eBay but the listing ended. You can create a new listing.'}
+                      </p>
+                      <p className="text-xs text-amber-600 mt-2">
+                        Previous Listing ID: {previousListing.listingId}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPreviousListingDismissed(true)}
+                      className="flex-shrink-0 p-1 text-amber-400 hover:text-amber-600 transition-colors"
+                      title="Dismiss"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Images for Listing</h3>
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
