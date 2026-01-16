@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { generateCardImages, CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
@@ -145,6 +145,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [step, setStep] = useState<ListingStep>('images');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Ref for scrollable content container
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Image state
   const [imageUrls, setImageUrls] = useState<{
@@ -338,6 +341,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       checkDisclaimerStatus();
     }
   }, [isOpen]);
+
+  // Scroll to top when step changes
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.scrollTo({ top: 0, behavior: 'instant' });
+    }
+  }, [step]);
 
   const checkDisclaimerStatus = async () => {
     setDisclaimerStatus('checking');
@@ -1061,7 +1071,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div ref={contentRef} className="flex-1 overflow-y-auto p-6">
           {/* Error display */}
           {error && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
@@ -1801,8 +1811,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     type="text"
                     value={shippingForm.postalCode}
                     onChange={(e) => setShippingForm(f => ({ ...f, postalCode: e.target.value.replace(/\D/g, '').slice(0, 5) }))}
-                    placeholder="Enter your ZIP code"
-                    className="w-40 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="e.g. 90210"
+                    className="w-32 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     maxLength={5}
                   />
                   {!shippingForm.postalCode && (
