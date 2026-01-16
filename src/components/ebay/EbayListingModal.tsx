@@ -1008,6 +1008,16 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     setError(null);
 
     try {
+      // Validate required item specifics before proceeding
+      const missingRequired = itemSpecifics
+        .filter(spec => spec.required)
+        .filter(spec => !spec.value || (Array.isArray(spec.value) ? spec.value.length === 0 : !spec.value.trim()));
+
+      if (missingRequired.length > 0) {
+        const fieldNames = missingRequired.map(s => s.name).join(', ');
+        throw new Error(`Required fields are missing: ${fieldNames}`);
+      }
+
       const session = getStoredSession();
       if (!session?.access_token) {
         throw new Error('Not logged in');
@@ -1837,31 +1847,43 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
                 return (
                   <>
-                    {/* eBay recommended fields section */}
+                    {/* eBay recommended/required fields section */}
                     {requiredFields.length > 0 && (
                       <div className="space-y-3">
                         <h4 className="text-sm font-medium text-gray-700 flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-amber-500" />
-                          eBay Recommended
+                          Required by eBay
                         </h4>
                         {requiredFields.map((spec) => {
                           const index = itemSpecifics.indexOf(spec);
+                          const currentValue = Array.isArray(spec.value) ? spec.value.join(', ') : (spec.value || '');
+                          const isEmpty = !currentValue.trim();
                           return (
                             <div key={index} className="flex gap-3 items-start">
                               <div className="flex-1">
                                 <label className="block text-sm font-medium text-gray-700 mb-1">
                                   {spec.name}
+                                  <span className="text-red-500 ml-1">*</span>
                                 </label>
                                 <input
                                   type="text"
-                                  value={Array.isArray(spec.value) ? spec.value.join(', ') : (spec.value || '')}
+                                  required
+                                  value={currentValue}
                                   onChange={(e) => {
                                     const newSpecifics = [...itemSpecifics];
                                     newSpecifics[index] = { ...spec, value: e.target.value };
                                     setItemSpecifics(newSpecifics);
                                   }}
-                                  className="w-full px-3 py-2 border border-amber-200 bg-amber-50 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm ${
+                                    isEmpty
+                                      ? 'border-red-300 bg-red-50'
+                                      : 'border-amber-200 bg-amber-50'
+                                  }`}
+                                  placeholder={`Enter ${spec.name.toLowerCase()}`}
                                 />
+                                {isEmpty && (
+                                  <p className="text-xs text-red-500 mt-1">This field is required by eBay</p>
+                                )}
                               </div>
                             </div>
                           );
@@ -2832,15 +2854,27 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             >
               Try Again
             </button>
-          ) : step !== 'publishing' && (
-            <button
-              onClick={handleNext}
-              disabled={isLoading || (step === 'images' && !Object.values(selectedImages).some(Boolean))}
-              className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-            >
-              {step === 'review' ? 'Publish Listing' : 'Next'}
-            </button>
-          )}
+          ) : step !== 'publishing' && (() => {
+            // Check if any required item specifics are empty
+            const hasEmptyRequired = itemSpecifics.some(s =>
+              s.required && (!s.value || (Array.isArray(s.value) ? s.value.length === 0 : !s.value.trim()))
+            );
+            const isDisabled =
+              isLoading ||
+              (step === 'images' && !Object.values(selectedImages).some(Boolean)) ||
+              ((step === 'specifics' || step === 'review') && hasEmptyRequired);
+
+            return (
+              <button
+                onClick={handleNext}
+                disabled={isDisabled}
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                title={hasEmptyRequired && (step === 'specifics' || step === 'review') ? 'Please fill in all required fields' : undefined}
+              >
+                {step === 'review' ? 'Publish Listing' : 'Next'}
+              </button>
+            );
+          })()}
           </div>
         </div>
       </div>
