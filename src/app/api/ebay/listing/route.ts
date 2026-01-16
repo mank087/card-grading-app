@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { getConnectionForUser, refreshTokenIfNeeded } from '@/lib/ebay/auth';
 import {
   EBAY_CONDITIONS,
@@ -26,7 +27,18 @@ import {
   type PackageDimensions,
 } from '@/lib/ebay/tradingApi';
 import type { EbayListing } from '@/lib/ebay/types';
-import { supabaseServer } from '@/lib/supabaseServer';
+
+// Create Supabase client with explicit env var handling
+function getSupabaseClient() {
+  const url = (process.env.NEXT_PUBLIC_SUPABASE_URL || '').trim();
+  const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+  if (!url || !key) {
+    console.error('[eBay Listing] Missing Supabase config:', { hasUrl: !!url, hasKey: !!key });
+  }
+
+  return createClient(url, key);
+}
 
 interface ItemSpecific {
   name: string;
@@ -134,7 +146,7 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.slice(7);
-    const supabase = supabaseServer();
+    const supabase = getSupabaseClient();
 
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
     if (userError || !user) {
