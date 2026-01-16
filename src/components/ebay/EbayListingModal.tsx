@@ -991,6 +991,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       }
 
       // Create listing via Trading API with inline shipping/returns
+      console.log('[eBay Listing] Creating listing for card:', card.id, 'Card object keys:', Object.keys(card));
       const response = await fetch('/api/ebay/listing', {
         method: 'POST',
         headers: {
@@ -1040,7 +1041,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error || data.details || 'Failed to create listing');
+        console.error('[eBay Listing] API error:', data);
+        const debugInfo = data.debug ? ` (cardId: ${data.debug.cardId})` : '';
+        throw new Error((data.error || data.details || 'Failed to create listing') + debugInfo);
       }
 
       const data = await response.json();

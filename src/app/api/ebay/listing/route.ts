@@ -229,6 +229,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch card data
+    console.log('[eBay Listing] Looking up card with ID:', cardId, 'Type:', typeof cardId);
+
     const { data: card, error: cardError } = await supabase
       .from('cards')
       .select(`
@@ -254,9 +256,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (cardError || !card) {
-      console.error('[eBay Listing] Card not found:', cardError);
+      console.error('[eBay Listing] Card not found. ID:', cardId, 'Error:', cardError?.message, 'Code:', cardError?.code);
       return NextResponse.json(
-        { error: 'Card not found' },
+        { error: 'Card not found', debug: { cardId, errorMessage: cardError?.message, errorCode: cardError?.code } },
         { status: 404 }
       );
     }
