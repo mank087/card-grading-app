@@ -534,3 +534,120 @@ export async function verifyAddItem(
 
   return parseAddItemResponse(xmlResponse);
 }
+
+// =============================================================================
+// Get Item Status
+// =============================================================================
+
+export interface ItemStatus {
+  itemId: string;
+  listingStatus: 'Active' | 'Completed' | 'Ended' | 'Unknown';
+  title?: string;
+  currentPrice?: number;
+  quantityAvailable?: number;
+  endTime?: string;
+  viewItemUrl?: string;
+}
+
+export interface GetItemStatusResponse {
+  success: boolean;
+  item?: ItemStatus;
+  error?: string;
+}
+
+/**
+ * Build XML for GetItem call
+ */
+function buildGetItemXml(itemId: string): string {
+  return `<?xml version="1.0" encoding="utf-8"?>
+<GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>TOKEN_PLACEHOLDER</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>Low</WarningLevel>
+  <ItemID>${escapeXml(itemId)}</ItemID>
+  <DetailLevel>ReturnAll</DetailLevel>
+  <IncludeItemSpecifics>false</IncludeItemSpecifics>
+</GetItemRequest>`;
+}
+
+/**
+ * Parse GetItem response
+ */
+function parseGetItemResponse(xmlResponse: string): GetItemStatusResponse {
+  // Check for errors
+  const ackMatch = xmlResponse.match(/<Ack>(\w+)<\/Ack>/);
+  const ack = ackMatch?.[1];
+
+  if (ack === 'Failure') {
+    // Extract error message
+    const errorCodeMatch = xmlResponse.match(/<ErrorCode>(\d+)<\/ErrorCode>/);
+    const errorMsgMatch = xmlResponse.match(/<ShortMessage>([^<]+)<\/ShortMessage>/);
+    const errorCode = errorCodeMatch?.[1];
+    const errorMsg = errorMsgMatch?.[1];
+
+    // Error code 17 = Item not found (deleted/removed)
+    if (errorCode === '17') {
+      return {
+        success: true,
+        item: {
+          itemId: '',
+          listingStatus: 'Ended',
+        },
+      };
+    }
+
+    return {
+      success: false,
+      error: errorMsg || `Error code: ${errorCode}`,
+    };
+  }
+
+  // Extract item details
+  const itemIdMatch = xmlResponse.match(/<ItemID>(\d+)<\/ItemID>/);
+  const titleMatch = xmlResponse.match(/<Title>([^<]+)<\/Title>/);
+  const listingStatusMatch = xmlResponse.match(/<ListingStatus>(\w+)<\/ListingStatus>/);
+  const currentPriceMatch = xmlResponse.match(/<CurrentPrice[^>]*>([^<]+)<\/CurrentPrice>/);
+  const quantityMatch = xmlResponse.match(/<QuantityAvailable>(\d+)<\/QuantityAvailable>/);
+  const endTimeMatch = xmlResponse.match(/<EndTime>([^<]+)<\/EndTime>/);
+  const viewItemUrlMatch = xmlResponse.match(/<ViewItemURL>([^<]+)<\/ViewItemURL>/);
+
+  const listingStatus = listingStatusMatch?.[1] as 'Active' | 'Completed' | 'Ended' | undefined;
+
+  return {
+    success: true,
+    item: {
+      itemId: itemIdMatch?.[1] || '',
+      listingStatus: listingStatus || 'Unknown',
+      title: titleMatch?.[1],
+      currentPrice: currentPriceMatch?.[1] ? parseFloat(currentPriceMatch[1]) : undefined,
+      quantityAvailable: quantityMatch?.[1] ? parseInt(quantityMatch[1]) : undefined,
+      endTime: endTimeMatch?.[1],
+      viewItemUrl: viewItemUrlMatch?.[1],
+    },
+  };
+}
+
+/**
+ * Get the status of an existing eBay listing
+ */
+export async function getItemStatus(
+  config: TradingApiConfig,
+  itemId: string
+): Promise<GetItemStatusResponse> {
+  try {
+    const xmlRequest = buildGetItemXml(itemId);
+    const xmlResponse = await callTradingApi(config, 'GetItem', xmlRequest);
+
+    console.log('[Trading API] GetItem response for', itemId, ':', xmlResponse.substring(0, 500) + '...');
+
+    return parseGetItemResponse(xmlResponse);
+  } catch (error) {
+    console.error('[Trading API] getItemStatus error:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
