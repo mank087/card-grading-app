@@ -968,7 +968,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       console.log('[eBay Report] Generating PDF report...');
 
       // Generate PDF blob
-      const pdfDoc = await pdf(<CardGradingReport card={reportData} />);
+      const pdfDoc = await pdf(<CardGradingReport cardData={reportData} />);
       const pdfBlob = await pdfDoc.toBlob();
 
       console.log('[eBay Report] PDF generated, uploading to eBay...');
