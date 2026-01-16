@@ -222,25 +222,18 @@ function buildAddFixedPriceItemXml(
   // Build condition descriptors for graded cards
   let conditionDescriptorsXml = '';
   if (listing.conditionId === '2750' && listing.professionalGrader && listing.grade) {
+    const certNumber = listing.certificationNumber?.trim();
+
     // Log the values for debugging
     console.log('[Trading API] Building condition descriptors:', {
       professionalGrader: listing.professionalGrader,
       grade: listing.grade,
-      certificationNumber: listing.certificationNumber,
+      certificationNumber: certNumber,
+      willInclude27503: !!certNumber,
     });
 
-    // "Other" grader (2750123) may not support certification numbers
-    // Only include 27503 for known graders, not for "Other"
-    const isOtherGrader = listing.professionalGrader === '2750123';
-    const certNumber = listing.certificationNumber?.trim();
-
-    console.log('[Trading API] Condition descriptor check:', {
-      professionalGrader: listing.professionalGrader,
-      isOtherGrader,
-      certNumber,
-      willInclude27503: !isOtherGrader && !!certNumber,
-    });
-
+    // Always include certification number (27503) when available
+    // eBay requires it for all graded cards, including "Other" grader
     conditionDescriptorsXml = `
       <ConditionDescriptors>
         <ConditionDescriptor>
@@ -250,7 +243,7 @@ function buildAddFixedPriceItemXml(
         <ConditionDescriptor>
           <Name>27502</Name>
           <Value>${escapeXml(listing.grade)}</Value>
-        </ConditionDescriptor>${!isOtherGrader && certNumber ? `
+        </ConditionDescriptor>${certNumber ? `
         <ConditionDescriptor>
           <Name>27503</Name>
           <Value>${escapeXml(certNumber)}</Value>

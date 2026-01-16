@@ -8,7 +8,7 @@ import { FoldableLabelData, generateQRCodeWithLogo, loadLogoAsBase64 } from '@/l
 import { getCardLabelData } from '@/lib/useLabelData';
 import { getStoredSession } from '@/lib/directAuth';
 import { getAuthenticatedClient } from '@/lib/directAuth';
-import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES, MARKETING_SCOPE } from '@/lib/ebay/constants';
+import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
@@ -132,7 +132,7 @@ interface EbayListingModalProps {
   labelStyle?: 'modern' | 'traditional';
 }
 
-type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'promotion' | 'review' | 'publishing' | 'success' | 'error';
+type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error';
 
 export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   isOpen,
@@ -219,14 +219,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [disclaimerCheckbox, setDisclaimerCheckbox] = useState(false);
   const [acceptingDisclaimer, setAcceptingDisclaimer] = useState(false);
 
-  // Promotion state
-  const [promotionEnabled, setPromotionEnabled] = useState(false);
-  const [promotionEligible, setPromotionEligible] = useState<boolean | null>(null);
-  const [promotionReason, setPromotionReason] = useState<string | null>(null);
-  const [promotionNeedsReauth, setPromotionNeedsReauth] = useState(false);
-  const [promotionAdRate, setPromotionAdRate] = useState(10); // Default 10%
-  const [suggestedAdRate, setSuggestedAdRate] = useState(10);
-  const [checkingPromotion, setCheckingPromotion] = useState(false);
 
   // eBay connection state
   const [ebayConnectionStatus, setEbayConnectionStatus] = useState<'checking' | 'connected' | 'not_connected' | 'needs_reauth'>('checking');
@@ -473,11 +465,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           const tokenExpiry = connection.token_expires_at ? new Date(connection.token_expires_at) : null;
           const isTokenExpired = tokenExpiry && tokenExpiry.getTime() < Date.now() + 5 * 60 * 1000;
 
-          // Check if marketing scope is missing (needed for Promoted Listings)
-          const hasMarketingScope = connection.scopes?.includes(MARKETING_SCOPE);
-
-          if (isTokenExpired || !hasMarketingScope) {
-            console.log('[eBay Listing] Needs reauth:', { isTokenExpired, hasMarketingScope });
+          if (isTokenExpired) {
+            console.log('[eBay Listing] Token expired, needs reauth');
             setEbayConnectionStatus('needs_reauth');
           } else {
             setEbayConnectionStatus('connected');
@@ -621,53 +610,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setError('Failed to accept disclaimer. Please try again.');
     } finally {
       setAcceptingDisclaimer(false);
-    }
-  };
-
-  // Check promotion eligibility when reaching that step
-  useEffect(() => {
-    if (step === 'promotion' && promotionEligible === null) {
-      checkPromotionEligibility();
-    }
-  }, [step, promotionEligible]);
-
-  const checkPromotionEligibility = async () => {
-    setCheckingPromotion(true);
-    try {
-      const session = getStoredSession();
-      if (!session?.access_token) {
-        setPromotionEligible(false);
-        setPromotionReason('Not logged in');
-        return;
-      }
-
-      const response = await fetch(`/api/ebay/promotion/eligibility?categoryId=${categoryId}`, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setPromotionEligible(data.eligible);
-        setPromotionReason(data.reason || null);
-        setPromotionNeedsReauth(data.needsReauth || false);
-
-        if (data.suggestedRate) {
-          setSuggestedAdRate(data.suggestedRate);
-          setPromotionAdRate(data.suggestedRate);
-        }
-        // Promotion toggle stays off by default - user must opt-in
-      } else {
-        setPromotionEligible(false);
-        setPromotionReason('Failed to check eligibility');
-      }
-    } catch (error) {
-      console.error('[eBay Listing] Failed to check promotion eligibility:', error);
-      setPromotionEligible(false);
-      setPromotionReason('Failed to check eligibility');
-    } finally {
-      setCheckingPromotion(false);
     }
   };
 
@@ -1163,44 +1105,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
       const data = await response.json();
 
-      // Create promotion if enabled and we have a listing ID
-      console.log('[eBay Listing] Promotion check:', {
-        promotionEnabled,
-        promotionEligible,
-        listingId: data.listingId,
-        adRate: promotionAdRate,
-        willCreatePromotion: !!(promotionEnabled && promotionEligible && data.listingId),
-      });
-
-      if (promotionEnabled && promotionEligible && data.listingId) {
-        try {
-          console.log('[eBay Listing] Creating promotion for listing:', data.listingId, 'with rate:', promotionAdRate);
-          const promoResponse = await fetch('/api/ebay/promotion/create', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({
-              listingId: data.listingId,
-              bidPercentage: promotionAdRate,
-            }),
-          });
-
-          if (promoResponse.ok) {
-            const promoData = await promoResponse.json();
-            console.log('[eBay Listing] Promotion created:', promoData);
-          } else {
-            // Log but don't fail the listing - promotion is optional
-            const promoError = await promoResponse.json();
-            console.warn('[eBay Listing] Promotion creation failed:', promoError);
-          }
-        } catch (promoErr) {
-          // Log but don't fail the listing - promotion is optional
-          console.warn('[eBay Listing] Promotion creation error:', promoErr);
-        }
-      }
-
       setListingResult({
         listingId: data.listingId,
         listingUrl: data.listingUrl,
@@ -1245,10 +1149,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           return;
         }
         setError(null);
-        setStep('promotion');
-        break;
-      case 'promotion':
-        setError(null);
         setStep('review');
         break;
       case 'review':
@@ -1269,11 +1169,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       case 'shipping':
         setStep('specifics');
         break;
-      case 'promotion':
-        setStep('shipping');
-        break;
       case 'review':
-        setStep('promotion');
+        setStep('shipping');
         break;
       case 'error':
         setStep('review');
@@ -1307,23 +1204,23 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         {/* Progress Steps */}
         <div className="px-6 py-3 bg-gray-50 border-b border-gray-200">
           <div className="flex items-center justify-between">
-            {['images', 'details', 'specifics', 'shipping', 'promotion', 'review'].map((s, i) => (
+            {['images', 'details', 'specifics', 'shipping', 'review'].map((s, i) => (
               <div key={s} className="flex items-center">
                 <div
                   className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
                     step === s
                       ? 'bg-purple-600 text-white'
-                      : ['images', 'details', 'specifics', 'shipping', 'promotion', 'review'].indexOf(step) > i
+                      : ['images', 'details', 'specifics', 'shipping', 'review'].indexOf(step) > i
                       ? 'bg-purple-200 text-purple-700'
                       : 'bg-gray-200 text-gray-500'
                   }`}
                 >
                   {i + 1}
                 </div>
-                {i < 5 && (
+                {i < 4 && (
                   <div
-                    className={`w-6 h-0.5 mx-0.5 ${
-                      ['images', 'details', 'specifics', 'shipping', 'promotion', 'review'].indexOf(step) > i
+                    className={`w-8 h-0.5 mx-1 ${
+                      ['images', 'details', 'specifics', 'shipping', 'review'].indexOf(step) > i
                         ? 'bg-purple-200'
                         : 'bg-gray-200'
                     }`}
@@ -1337,7 +1234,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             <span>Details</span>
             <span>Specifics</span>
             <span>Shipping</span>
-            <span>Promo</span>
             <span>Review</span>
           </div>
         </div>
@@ -2552,137 +2448,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
             </div>
           )}
 
-          {/* Step 5: Promotion */}
-          {disclaimerStatus === 'accepted' && !existingListing && step === 'promotion' && (
-            <div className="space-y-5">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Promoted Listings</h3>
-                <p className="text-sm text-gray-500">Boost your listing&apos;s visibility in search results. You only pay when your item sells.</p>
-              </div>
-
-              {checkingPromotion ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
-                  <span className="ml-3 text-gray-600">Checking eligibility...</span>
-                </div>
-              ) : promotionEligible === false ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center flex-shrink-0">
-                      <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">Promoted Listings Unavailable</h4>
-                      <p className="text-sm text-gray-600 mt-1">{promotionReason}</p>
-                      {promotionNeedsReauth && (
-                        <p className="text-sm text-purple-600 mt-2">
-                          You can reconnect your eBay account from your Account page to enable this feature.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Enable/Disable Toggle */}
-                  <label className="flex items-center justify-between p-4 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                        </svg>
-                      </div>
-                      <div>
-                        <span className="font-medium text-gray-900">Promote this listing</span>
-                        <p className="text-xs text-gray-500">Increase visibility in eBay search results</p>
-                      </div>
-                    </div>
-                    <div className="relative">
-                      <input
-                        type="checkbox"
-                        checked={promotionEnabled}
-                        onChange={(e) => setPromotionEnabled(e.target.checked)}
-                        className="sr-only"
-                      />
-                      <div className={`w-11 h-6 rounded-full transition-colors ${promotionEnabled ? 'bg-purple-600' : 'bg-gray-300'}`}>
-                        <div className={`w-5 h-5 bg-white rounded-full shadow transform transition-transform mt-0.5 ${promotionEnabled ? 'translate-x-5 ml-0.5' : 'translate-x-0.5'}`} />
-                      </div>
-                    </div>
-                  </label>
-
-                  {/* Ad Rate Slider */}
-                  {promotionEnabled && (
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">Ad Rate</span>
-                        <span className="text-lg font-bold text-purple-600">{promotionAdRate}%</span>
-                      </div>
-
-                      <input
-                        type="range"
-                        min="2"
-                        max="30"
-                        step="1"
-                        value={promotionAdRate}
-                        onChange={(e) => setPromotionAdRate(parseInt(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
-                      />
-
-                      <div className="flex justify-between text-xs text-gray-500">
-                        <span>2%</span>
-                        <span>Suggested: {suggestedAdRate}%</span>
-                        <span>30%</span>
-                      </div>
-
-                      {/* Quick select buttons */}
-                      <div className="flex gap-2">
-                        {[5, 10, 15, 20].map((rate) => (
-                          <button
-                            key={rate}
-                            onClick={() => setPromotionAdRate(rate)}
-                            className={`flex-1 py-1.5 text-sm rounded-lg border transition-colors ${
-                              promotionAdRate === rate
-                                ? 'bg-purple-100 border-purple-300 text-purple-700'
-                                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                            }`}
-                          >
-                            {rate}%
-                          </button>
-                        ))}
-                      </div>
-
-                      {/* Fee estimate */}
-                      <div className="pt-3 border-t border-gray-100">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">If sold at ${parseFloat(price || '0').toFixed(2)}:</span>
-                          <span className="font-medium text-gray-900">
-                            ${(parseFloat(price || '0') * promotionAdRate / 100).toFixed(2)} ad fee
-                          </span>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">
-                          You only pay this fee if your item sells through a promoted placement.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Info box */}
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm flex items-start gap-2">
-                    <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                    <div>
-                      <strong>How it works:</strong> Promoted Listings appear higher in search results. You set an ad rate (% of sale price) and only pay when your item sells through a promoted placement.
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Step 6: Review */}
+          {/* Step 5: Review */}
           {disclaimerStatus === 'accepted' && !existingListing && step === 'review' && (
             <div className="space-y-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Review Listing</h3>
@@ -2820,28 +2586,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 </div>
               </div>
 
-              {/* Promotion Summary */}
-              {promotionEligible && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="text-sm font-medium text-gray-700 mb-3">Promoted Listing</h4>
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Promotion:</span>
-                    <span className="font-medium text-gray-900">
-                      {promotionEnabled ? (
-                        <span className="text-purple-600">{promotionAdRate}% ad rate</span>
-                      ) : (
-                        <span className="text-gray-500">Not enabled</span>
-                      )}
-                    </span>
-                  </div>
-                  {promotionEnabled && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      If sold at ${parseFloat(price || '0').toFixed(2)} through promotion: ${(parseFloat(price || '0') * promotionAdRate / 100).toFixed(2)} ad fee
-                    </p>
-                  )}
-                </div>
-              )}
-
               {/* Product Documents */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-gray-700 mb-3">Product Documents</h4>
@@ -2863,7 +2607,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
               <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-700 text-sm">
                 Your listing will be published immediately on eBay.
-                {promotionEnabled && promotionEligible && ' Promotion will be activated after publishing.'}
               </div>
             </div>
           )}

@@ -731,7 +731,7 @@ export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecifi
   }
 
   // Add DCM Certification Number (the DCM serial) as an item specific
-  // This is separate from the condition descriptor 27503 which doesn't work with "Other" grader
+  // This supplements the condition descriptor 27503 for additional visibility
   if (card.serial) {
     specifics.push({
       name: 'Certification Number',
