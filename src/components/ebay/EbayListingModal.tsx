@@ -1049,6 +1049,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
       // Create listing via Trading API with inline shipping/returns
       console.log('[eBay Listing] Creating listing for card:', card.id, 'Card object keys:', Object.keys(card));
+
+      // Get grade from labelData (same grade used in title)
+      const labelData = getCardLabelData(card);
+      const gradeForListing = labelData.grade ?? 0;
+      console.log('[eBay Listing] Grade from labelData:', gradeForListing);
+
       const response = await fetch('/api/ebay/listing', {
         method: 'POST',
         headers: {
@@ -1057,6 +1063,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         },
         body: JSON.stringify({
           cardId: card.id,
+          grade: gradeForListing,  // Pass grade directly to avoid re-lookup issues
           title,
           description,
           price: parseFloat(price),

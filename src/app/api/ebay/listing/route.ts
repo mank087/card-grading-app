@@ -172,6 +172,7 @@ export async function POST(request: NextRequest) {
     const body: CreateListingRequest = await request.json();
     const {
       cardId,
+      grade: passedGrade,  // Grade passed from modal (preferred)
       title,
       description,
       price,
@@ -285,35 +286,44 @@ export async function POST(request: NextRequest) {
     const categoryId = getEbayCategoryId(card.category);
 
     // Get grade for condition descriptors
-    // Check multiple sources for the grade since different card types store it differently
-    // Priority: direct grade > conversational grades > dvg grades > ai_grading recommended grades > dcm grades
-    // Use ?? (nullish coalescing) to only skip null/undefined, not 0
-    const dvgGrading = card.ai_grading?.dvg_grading;
-    const recommendedGrade = dvgGrading?.recommended_grade;
-    const grade =
-      card.grade ??
-      card.conversational_whole_grade ??
-      card.conversational_decimal_grade ??
-      card.dvg_whole_grade ??
-      card.dvg_decimal_grade ??
-      recommendedGrade?.recommended_whole_grade ??
-      recommendedGrade?.recommended_decimal_grade ??
-      card.dcm_grade_whole ??
-      card.dcm_grade_decimal ??
-      1;
+    // PREFERRED: Use grade passed from modal (same grade shown in UI)
+    // FALLBACK: Check multiple sources in the card data
+    let grade: number;
 
-    console.log('[eBay Listing] Grade lookup:', {
-      card_grade: card.grade,
-      conversational_whole_grade: card.conversational_whole_grade,
-      conversational_decimal_grade: card.conversational_decimal_grade,
-      dvg_whole_grade: card.dvg_whole_grade,
-      dvg_decimal_grade: card.dvg_decimal_grade,
-      recommended_whole_grade: recommendedGrade?.recommended_whole_grade,
-      recommended_decimal_grade: recommendedGrade?.recommended_decimal_grade,
-      dcm_grade_whole: card.dcm_grade_whole,
-      dcm_grade_decimal: card.dcm_grade_decimal,
-      finalGrade: grade,
-    });
+    if (passedGrade !== null && passedGrade !== undefined && passedGrade > 0) {
+      // Use grade passed from modal - this is the same grade displayed in the UI
+      grade = passedGrade;
+      console.log('[eBay Listing] Using grade passed from modal:', grade);
+    } else {
+      // Fallback: look up grade from card data
+      const dvgGrading = card.ai_grading?.dvg_grading;
+      const recommendedGrade = dvgGrading?.recommended_grade;
+      grade =
+        card.grade ??
+        card.conversational_whole_grade ??
+        card.conversational_decimal_grade ??
+        card.dvg_whole_grade ??
+        card.dvg_decimal_grade ??
+        recommendedGrade?.recommended_whole_grade ??
+        recommendedGrade?.recommended_decimal_grade ??
+        card.dcm_grade_whole ??
+        card.dcm_grade_decimal ??
+        1;
+
+      console.log('[eBay Listing] Grade lookup from card data:', {
+        passedGrade,
+        card_grade: card.grade,
+        conversational_whole_grade: card.conversational_whole_grade,
+        conversational_decimal_grade: card.conversational_decimal_grade,
+        dvg_whole_grade: card.dvg_whole_grade,
+        dvg_decimal_grade: card.dvg_decimal_grade,
+        recommended_whole_grade: recommendedGrade?.recommended_whole_grade,
+        recommended_decimal_grade: recommendedGrade?.recommended_decimal_grade,
+        dcm_grade_whole: card.dcm_grade_whole,
+        dcm_grade_decimal: card.dcm_grade_decimal,
+        finalGrade: grade,
+      });
+    }
 
     const gradeId = getEbayGradeId(grade);
 
