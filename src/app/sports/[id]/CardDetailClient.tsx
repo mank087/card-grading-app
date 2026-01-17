@@ -4277,7 +4277,7 @@ export function SportsCardDetails() {
 
 
               {/* DCM Optic™ Confidence Score */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
+              <div id="tour-optic-score" className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-800">
                   DCM Optic™ Confidence Score
                 </h2>
@@ -4923,7 +4923,7 @@ export function SportsCardDetails() {
           {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
             <>
               {/* Section Header */}
-              <div id="tour-optic-score" className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
+              <div className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
                 <h2 className="text-xl font-bold">
                   DCM Confidence & Image Quality
                 </h2>
