@@ -326,6 +326,7 @@ export async function POST(request: NextRequest) {
     }
 
     const gradeId = getEbayGradeId(grade);
+    console.log('[eBay Listing] Grade conversion:', { dcmGrade: grade, ebayGradeId: gradeId });
 
     // Prepare Trading API config
     const tradingConfig: TradingApiConfig = {
