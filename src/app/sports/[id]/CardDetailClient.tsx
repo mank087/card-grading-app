@@ -4526,19 +4526,19 @@ export function SportsCardDetails() {
                 })()}
               </div>
                   {/* Professional Grades Tab Content - Grade Estimates */}
-              {/* Section Header: Professional Grades */}
-              <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Professional Grades
-                </h2>
-              </div>
-
               {/* Professional Grading Company Estimates */}
               {professionalGrades && (
-                <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
-                  <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
-                    Professional Grading Estimates
-                  </h2>
+                <>
+                  {/* Section Header: Professional Grades */}
+                  <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
+                    <h2 className="text-xl font-bold">
+                      Professional Grades
+                    </h2>
+                  </div>
+                  <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
+                    <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
+                      Professional Grading Estimates
+                    </h2>
                   <p className="text-sm text-gray-600 mb-6">
                     Estimated grades from major grading companies based on measured DCM metrics. These are projections only and not official grades.
                   </p>
@@ -4705,6 +4705,7 @@ export function SportsCardDetails() {
                     </p>
                   </div>
                 </div>
+                </>
               )}
 
                   {/* Market & Pricing Tab Content */}
@@ -4919,14 +4920,15 @@ export function SportsCardDetails() {
           })()}
 
           {/* 4. DCM Confidence and Image Quality */}
-          {/* Section Header: DCM Confidence - Always visible for tour */}
-          <div id="tour-optic-score" className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
-            <h2 className="text-xl font-bold">
-              DCM Confidence & Image Quality
-            </h2>
-          </div>
           {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
+            <>
+              {/* Section Header */}
+              <div id="tour-optic-score" className="bg-gradient-to-r from-teal-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
+                <h2 className="text-xl font-bold">
+                  DCM Confidence & Image Quality
+                </h2>
+              </div>
+              <div className="bg-white rounded-lg shadow-lg p-6">
               <div className="grid md:grid-cols-2 gap-6">
                 {/* DCM Confidence Section */}
                 {card.ai_grading?.["AI Confidence Assessment"] && (
@@ -5069,6 +5071,7 @@ export function SportsCardDetails() {
                 </div>
               )}
             </div>
+            </>
           )}
 
           {/* 4. Card Detection Assessment */}
