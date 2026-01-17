@@ -418,7 +418,7 @@ function getCleanValue(value: string | null | undefined): string | null {
 
 /**
  * Get grade from card, checking multiple possible fields
- * Priority: conversational grades > dvg grades > ai_grading nested grades
+ * Priority: conversational grades > dvg grades > nested grades
  */
 function getGrade(card: CardForLabel): number | null {
   // 1. Conversational grades (newest system)
@@ -437,16 +437,29 @@ function getGrade(card: CardForLabel): number | null {
     return card.dvg_whole_grade;
   }
 
-  // 3. Nested ai_grading grades (for sports cards)
-  const aiGrading = (card as any).ai_grading;
-  const dvgGrading = aiGrading?.dvg_grading;
-  const recommendedGrade = dvgGrading?.recommended_grade;
-
-  if (recommendedGrade?.recommended_decimal_grade !== null && recommendedGrade?.recommended_decimal_grade !== undefined) {
-    return recommendedGrade.recommended_decimal_grade;
+  // 3. Check card.dvg_grading.recommended_grade (sports cards use this)
+  const topLevelDvgGrading = (card as any).dvg_grading;
+  if (topLevelDvgGrading?.recommended_grade) {
+    const recGrade = topLevelDvgGrading.recommended_grade;
+    if (recGrade.recommended_decimal_grade !== null && recGrade.recommended_decimal_grade !== undefined) {
+      return recGrade.recommended_decimal_grade;
+    }
+    if (recGrade.recommended_whole_grade !== null && recGrade.recommended_whole_grade !== undefined) {
+      return recGrade.recommended_whole_grade;
+    }
   }
-  if (recommendedGrade?.recommended_whole_grade !== null && recommendedGrade?.recommended_whole_grade !== undefined) {
-    return recommendedGrade.recommended_whole_grade;
+
+  // 4. Check card.ai_grading.dvg_grading.recommended_grade (alternative structure)
+  const aiGrading = (card as any).ai_grading;
+  const nestedDvgGrading = aiGrading?.dvg_grading;
+  if (nestedDvgGrading?.recommended_grade) {
+    const recGrade = nestedDvgGrading.recommended_grade;
+    if (recGrade.recommended_decimal_grade !== null && recGrade.recommended_decimal_grade !== undefined) {
+      return recGrade.recommended_decimal_grade;
+    }
+    if (recGrade.recommended_whole_grade !== null && recGrade.recommended_whole_grade !== undefined) {
+      return recGrade.recommended_whole_grade;
+    }
   }
 
   return null;

@@ -44,9 +44,10 @@ export function getCardLabelData(card: any): LabelData {
     foil_type: card.foil_type,
     is_double_faced: card.is_double_faced,
     mtg_rarity: card.mtg_rarity,
-    // Pass ai_grading for nested grade lookup (sports cards)
-    ai_grading: card.ai_grading,
-  } as CardForLabel & { ai_grading?: any };
+    // Pass grading data for nested grade lookup
+    dvg_grading: card.dvg_grading,  // Sports cards use this top-level field
+    ai_grading: card.ai_grading,     // Alternative nested structure
+  } as CardForLabel & { dvg_grading?: any; ai_grading?: any };
 
   return generateLabelData(cardForLabel);
 }
