@@ -71,9 +71,10 @@ export async function GET(request: NextRequest) {
       query = query.or('is_featured.is.null,is_featured.eq.false')
     }
 
-    // Apply search filter (search by card ID)
+    // Apply search filter (search by card name, serial, or featured player)
     if (search) {
-      query = query.ilike('id', `%${search}%`)
+      // Search across multiple text fields - can't use ilike on UUID
+      query = query.or(`card_name.ilike.%${search}%,serial.ilike.%${search}%,featured.ilike.%${search}%`)
     }
 
     // Apply sorting
