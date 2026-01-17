@@ -286,21 +286,24 @@ export async function POST(request: NextRequest) {
 
     // Get grade for condition descriptors
     // Check multiple sources for the grade since different card types store it differently
-    // Priority: conversational grades > dvg grades > ai_grading recommended grades > dcm grades
+    // Priority: direct grade > conversational grades > dvg grades > ai_grading recommended grades > dcm grades
+    // Use ?? (nullish coalescing) to only skip null/undefined, not 0
     const dvgGrading = card.ai_grading?.dvg_grading;
     const recommendedGrade = dvgGrading?.recommended_grade;
     const grade =
-      card.conversational_whole_grade ||
-      card.conversational_decimal_grade ||
-      card.dvg_whole_grade ||
-      card.dvg_decimal_grade ||
-      recommendedGrade?.recommended_whole_grade ||
-      recommendedGrade?.recommended_decimal_grade ||
-      card.dcm_grade_whole ||
-      card.dcm_grade_decimal ||
+      card.grade ??
+      card.conversational_whole_grade ??
+      card.conversational_decimal_grade ??
+      card.dvg_whole_grade ??
+      card.dvg_decimal_grade ??
+      recommendedGrade?.recommended_whole_grade ??
+      recommendedGrade?.recommended_decimal_grade ??
+      card.dcm_grade_whole ??
+      card.dcm_grade_decimal ??
       1;
 
     console.log('[eBay Listing] Grade lookup:', {
+      card_grade: card.grade,
       conversational_whole_grade: card.conversational_whole_grade,
       conversational_decimal_grade: card.conversational_decimal_grade,
       dvg_whole_grade: card.dvg_whole_grade,
