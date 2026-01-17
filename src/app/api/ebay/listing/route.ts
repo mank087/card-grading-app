@@ -285,7 +285,33 @@ export async function POST(request: NextRequest) {
     const categoryId = getEbayCategoryId(card.category);
 
     // Get grade for condition descriptors
-    const grade = card.conversational_whole_grade || card.conversational_decimal_grade || 1;
+    // Check multiple sources for the grade since different card types store it differently
+    // Priority: conversational grades > dvg grades > ai_grading recommended grades > dcm grades
+    const dvgGrading = card.ai_grading?.dvg_grading;
+    const recommendedGrade = dvgGrading?.recommended_grade;
+    const grade =
+      card.conversational_whole_grade ||
+      card.conversational_decimal_grade ||
+      card.dvg_whole_grade ||
+      card.dvg_decimal_grade ||
+      recommendedGrade?.recommended_whole_grade ||
+      recommendedGrade?.recommended_decimal_grade ||
+      card.dcm_grade_whole ||
+      card.dcm_grade_decimal ||
+      1;
+
+    console.log('[eBay Listing] Grade lookup:', {
+      conversational_whole_grade: card.conversational_whole_grade,
+      conversational_decimal_grade: card.conversational_decimal_grade,
+      dvg_whole_grade: card.dvg_whole_grade,
+      dvg_decimal_grade: card.dvg_decimal_grade,
+      recommended_whole_grade: recommendedGrade?.recommended_whole_grade,
+      recommended_decimal_grade: recommendedGrade?.recommended_decimal_grade,
+      dcm_grade_whole: card.dcm_grade_whole,
+      dcm_grade_decimal: card.dcm_grade_decimal,
+      finalGrade: grade,
+    });
+
     const gradeId = getEbayGradeId(grade);
 
     // Prepare Trading API config
