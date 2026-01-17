@@ -246,6 +246,7 @@ export interface CardForLabel {
   conversational_whole_grade?: number | null;
   conversational_condition_label?: string | null;
   dvg_decimal_grade?: number | null;
+  dvg_whole_grade?: number | null;
 
   // Legacy fields (fallbacks)
   card_name?: string | null;
@@ -417,14 +418,37 @@ function getCleanValue(value: string | null | undefined): string | null {
 
 /**
  * Get grade from card, checking multiple possible fields
+ * Priority: conversational grades > dvg grades > ai_grading nested grades
  */
 function getGrade(card: CardForLabel): number | null {
+  // 1. Conversational grades (newest system)
   if (card.conversational_decimal_grade !== null && card.conversational_decimal_grade !== undefined) {
     return card.conversational_decimal_grade;
   }
+  if (card.conversational_whole_grade !== null && card.conversational_whole_grade !== undefined) {
+    return card.conversational_whole_grade;
+  }
+
+  // 2. Top-level DVG grades
   if (card.dvg_decimal_grade !== null && card.dvg_decimal_grade !== undefined) {
     return card.dvg_decimal_grade;
   }
+  if (card.dvg_whole_grade !== null && card.dvg_whole_grade !== undefined) {
+    return card.dvg_whole_grade;
+  }
+
+  // 3. Nested ai_grading grades (for sports cards)
+  const aiGrading = (card as any).ai_grading;
+  const dvgGrading = aiGrading?.dvg_grading;
+  const recommendedGrade = dvgGrading?.recommended_grade;
+
+  if (recommendedGrade?.recommended_decimal_grade !== null && recommendedGrade?.recommended_decimal_grade !== undefined) {
+    return recommendedGrade.recommended_decimal_grade;
+  }
+  if (recommendedGrade?.recommended_whole_grade !== null && recommendedGrade?.recommended_whole_grade !== undefined) {
+    return recommendedGrade.recommended_whole_grade;
+  }
+
   return null;
 }
 

@@ -24,6 +24,7 @@ export function getCardLabelData(card: any): LabelData {
     conversational_condition_label: card.conversational_condition_label,
     conversational_card_info: card.conversational_card_info,
     dvg_decimal_grade: card.dvg_decimal_grade,
+    dvg_whole_grade: card.dvg_whole_grade,
     card_name: card.card_name,
     card_set: card.card_set,
     card_number: card.card_number,
@@ -43,7 +44,9 @@ export function getCardLabelData(card: any): LabelData {
     foil_type: card.foil_type,
     is_double_faced: card.is_double_faced,
     mtg_rarity: card.mtg_rarity,
-  };
+    // Pass ai_grading for nested grade lookup (sports cards)
+    ai_grading: card.ai_grading,
+  } as CardForLabel & { ai_grading?: any };
 
   return generateLabelData(cardForLabel);
 }
