@@ -5,15 +5,15 @@ export const homeMetadata: Metadata = {
   title: 'DCM Grading - AI-Powered Trading Card Grading | Sports, Pokemon, MTG',
   description: 'Professional AI card grading powered by DCM Optic™. Get instant, accurate grades for Sports Cards, Pokemon, Magic: The Gathering, Disney Lorcana and more. 30-point inspection with downloadable labels and reports.',
   // Icons for Google Search, browsers, and mobile devices
-  // Google requires icons to be at least 48x48, prefers 192x192+
-  // To generate proper icons: use https://realfavicongenerator.net/
   icons: {
     icon: [
       { url: '/favicon.ico', sizes: 'any' },
-      { url: '/DCM-logo.png', sizes: '512x512', type: 'image/png' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+      { url: '/web-app-manifest-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/web-app-manifest-512x512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
-      { url: '/DCM-logo.png', sizes: '180x180', type: 'image/png' },
+      { url: '/web-app-manifest-192x192.png', sizes: '180x180', type: 'image/png' },
     ],
     shortcut: '/favicon.ico',
   },
