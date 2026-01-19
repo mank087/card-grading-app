@@ -2,29 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 
-// Thumbnail transform parameters for collection grid view
-// Appended to signed URLs to reduce egress (requires Supabase Pro plan)
-const THUMBNAIL_TRANSFORM = 'width=400&quality=70';
-
-// Helper to add transform params to a signed URL
-function addTransformToUrl(signedUrl: string): string {
-  // Supabase signed URLs have the format:
-  // .../object/sign/bucket/path?token=xxx
-  // We need to add transform params: &transform=...
-  // The transform is applied via the /render/image endpoint
-  try {
-    const url = new URL(signedUrl);
-    // Replace /object/sign/ with /render/image/sign/ for transforms
-    url.pathname = url.pathname.replace('/object/sign/', '/render/image/sign/');
-    // Add transform parameters
-    url.searchParams.set('width', '400');
-    url.searchParams.set('quality', '70');
-    return url.toString();
-  } catch {
-    return signedUrl; // Return original if URL parsing fails
-  }
-}
-
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication - user must be logged in
@@ -91,12 +68,12 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Build a map of path -> transformed signedUrl for quick lookup
+    // Build a map of path -> signedUrl for quick lookup
+    // Note: Client-side Next.js Image component handles optimization
     const urlMap = new Map<string, string>();
     signedUrls?.forEach(item => {
       if (item.signedUrl) {
-        // Add transform parameters to reduce image size (requires Pro plan)
-        urlMap.set(item.path, addTransformToUrl(item.signedUrl));
+        urlMap.set(item.path, item.signedUrl);
       }
     });
 

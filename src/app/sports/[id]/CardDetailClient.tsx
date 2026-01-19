@@ -31,6 +31,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
+import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -4715,6 +4716,22 @@ export function SportsCardDetails() {
                   Market & Pricing
                 </h2>
               </div>
+
+              {/* eBay Live Prices - Fetched from Browse API */}
+              <EbayPriceLookup
+                card={{
+                  card_name: cardInfo.card_name || card.card_name,
+                  featured: cardInfo.player_or_character || card.featured,
+                  card_set: cardInfo.set_name || card.card_set,
+                  card_number: cardInfo.card_number || card.card_number,
+                  release_date: cardInfo.year || card.release_date,
+                  subset: cardInfo.subset,
+                  rarity_or_variant: cardInfo.rarity_or_variant,
+                  manufacturer: cardInfo.manufacturer,
+                  category: card.category,
+                }}
+                category="sports"
+              />
 
               {/* Find and Price This Card */}
               <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">

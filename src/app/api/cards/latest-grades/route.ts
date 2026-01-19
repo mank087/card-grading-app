@@ -1,22 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-// Thumbnail transform parameters for carousel/grid view
-// Appended to signed URLs to reduce egress (requires Supabase Pro plan)
-function addTransformToUrl(signedUrl: string): string {
-  try {
-    const url = new URL(signedUrl);
-    // Replace /object/sign/ with /render/image/sign/ for transforms
-    url.pathname = url.pathname.replace('/object/sign/', '/render/image/sign/');
-    // Add transform parameters - optimized for carousel thumbnails
-    url.searchParams.set('width', '400');
-    url.searchParams.set('quality', '75');
-    return url.toString();
-  } catch {
-    return signedUrl; // Return original if URL parsing fails
-  }
-}
-
 /**
  * GET /api/cards/latest-grades
  *
@@ -72,12 +56,12 @@ export async function GET(request: Request) {
       }, { status: 200 })
     }
 
-    // Build a map of path -> transformed signedUrl for quick lookup
-    // Apply image transforms to reduce bandwidth (carousel uses smaller images)
+    // Build a map of path -> signedUrl for quick lookup
+    // Note: Client-side Next.js Image component handles optimization
     const urlMap = new Map<string, string>()
     signedUrls?.forEach(item => {
       if (item.signedUrl) {
-        urlMap.set(item.path, addTransformToUrl(item.signedUrl))
+        urlMap.set(item.path, item.signedUrl)
       }
     })
 

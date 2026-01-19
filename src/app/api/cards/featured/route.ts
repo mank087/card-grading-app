@@ -1,24 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-// Helper to add transform params to a signed URL for thumbnails
-function addTransformToUrl(signedUrl: string): string {
-  // Supabase signed URLs have the format:
-  // .../object/sign/bucket/path?token=xxx
-  // Transform is applied via the /render/image endpoint
-  try {
-    const url = new URL(signedUrl)
-    // Replace /object/sign/ with /render/image/sign/ for transforms
-    url.pathname = url.pathname.replace('/object/sign/', '/render/image/sign/')
-    // Add transform parameters (400px width, 70% quality)
-    url.searchParams.set('width', '400')
-    url.searchParams.set('quality', '70')
-    return url.toString()
-  } catch {
-    return signedUrl // Return original if URL parsing fails
-  }
-}
-
 export async function GET() {
   try {
     // Fetch featured cards (public, graded, and marked as featured)
@@ -66,12 +48,12 @@ export async function GET() {
       }, { status: 200 })
     }
 
-    // Build a map of path -> transformed signedUrl for quick lookup
+    // Build a map of path -> signedUrl for quick lookup
+    // Note: Client-side Next.js Image component handles optimization
     const urlMap = new Map<string, string>()
     signedUrls?.forEach(item => {
       if (item.signedUrl) {
-        // Add transform parameters to reduce image size (requires Pro plan)
-        urlMap.set(item.path, addTransformToUrl(item.signedUrl))
+        urlMap.set(item.path, item.signedUrl)
       }
     })
 
