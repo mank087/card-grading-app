@@ -176,7 +176,9 @@ export async function searchEbayPrices(
   }
 
   if (options.categoryId) {
-    filters.push(`categoryIds:{${options.categoryId}}`);
+    // Single category ID - no curly braces needed
+    // Curly braces are only for multiple categories: {id1|id2|id3}
+    filters.push(`categoryIds:${options.categoryId}`);
   }
 
   // Build query params
