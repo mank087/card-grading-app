@@ -37,6 +37,9 @@ export interface EbayPriceSearchResult {
   lowestPrice?: number;
   highestPrice?: number;
   averagePrice?: number;
+  medianPrice?: number;
+  queryUsed?: string;
+  queryStrategy?: 'specific' | 'moderate' | 'broad' | 'minimal';
 }
 
 // =============================================================================
@@ -66,22 +69,11 @@ let appTokenCache: { token: string; expiresAt: number } | null = null;
 async function getApplicationToken(): Promise<string> {
   // Validate credentials
   if (!EBAY_CONFIG.appId || !EBAY_CONFIG.certId) {
-    console.error('[eBay Browse] Missing credentials:');
-    console.error('  EBAY_PROD_APP_ID:', !!process.env.EBAY_PROD_APP_ID);
-    console.error('  EBAY_PROD_CERT_ID:', !!process.env.EBAY_PROD_CERT_ID);
-    console.error('  EBAY_APP_ID:', !!process.env.EBAY_APP_ID);
-    console.error('  EBAY_CERT_ID:', !!process.env.EBAY_CERT_ID);
     throw new Error('eBay API credentials not configured');
   }
 
-  console.log('[eBay Browse] Using credentials:');
-  console.log('  App ID:', EBAY_CONFIG.appId.substring(0, 20) + '...');
-  console.log('  Cert ID:', EBAY_CONFIG.certId.substring(0, 10) + '...');
-  console.log('  Is Production:', EBAY_CONFIG.appId.includes('PRD'));
-
   // Check cache first
   if (appTokenCache && Date.now() < appTokenCache.expiresAt - 60000) {
-    console.log('[eBay Browse] Using cached token');
     return appTokenCache.token;
   }
 
@@ -92,8 +84,6 @@ async function getApplicationToken(): Promise<string> {
   const credentials = Buffer.from(
     `${EBAY_CONFIG.appId}:${EBAY_CONFIG.certId}`
   ).toString('base64');
-
-  console.log('[eBay Browse] Getting application token from:', tokenUrl);
 
   const response = await fetch(tokenUrl, {
     method: 'POST',
@@ -110,9 +100,6 @@ async function getApplicationToken(): Promise<string> {
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[eBay Browse] Failed to get application token:', response.status);
-    console.error('[eBay Browse] Error response:', errorText);
-    console.error('[eBay Browse] Token URL used:', tokenUrl);
-    console.error('[eBay Browse] App ID (first 8 chars):', EBAY_CONFIG.appId.substring(0, 8) + '...');
 
     // Parse error for more details
     let errorDetail = `Failed to get eBay application token: ${response.status}`;
@@ -138,7 +125,6 @@ async function getApplicationToken(): Promise<string> {
     expiresAt: Date.now() + (data.expires_in * 1000),
   };
 
-  console.log('[eBay Browse] Got application token, expires in', data.expires_in, 'seconds');
   return data.access_token;
 }
 
@@ -195,9 +181,6 @@ export async function searchEbayPrices(
   params.set('sort', 'price');
 
   const searchUrl = `${apiUrl}/buy/browse/v1/item_summary/search?${params.toString()}`;
-  console.log('[eBay Browse] Searching:', searchUrl);
-  console.log('[eBay Browse] Query:', query);
-  console.log('[eBay Browse] Using production API:', apiUrl);
 
   const response = await fetch(searchUrl, {
     headers: {
@@ -220,14 +203,6 @@ export async function searchEbayPrices(
   } catch (e) {
     console.error('[eBay Browse] Failed to parse response:', responseText.substring(0, 500));
     throw new Error('Failed to parse eBay response');
-  }
-
-  console.log('[eBay Browse] Found', data.total || 0, 'items');
-  console.log('[eBay Browse] Response keys:', Object.keys(data));
-
-  // Log warnings if any
-  if (data.warnings) {
-    console.warn('[eBay Browse] Warnings:', JSON.stringify(data.warnings));
   }
 
   // Parse results
@@ -265,14 +240,29 @@ export async function searchEbayPrices(
     ? Math.round((prices.reduce((a, b) => a + b, 0) / prices.length) * 100) / 100
     : undefined;
 
+  // Calculate median price (more resistant to outliers than average)
+  let medianPrice: number | undefined;
+  if (prices.length > 0) {
+    const sorted = [...prices].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    medianPrice = sorted.length % 2 !== 0
+      ? sorted[mid]
+      : Math.round(((sorted[mid - 1] + sorted[mid]) / 2) * 100) / 100;
+  }
+
   return {
     total: data.total || 0,
     items,
     lowestPrice,
     highestPrice,
     averagePrice,
+    medianPrice,
   };
 }
+
+// =============================================================================
+// Query Building Utilities
+// =============================================================================
 
 /**
  * Clean up a string for eBay search - remove special chars and extra info
@@ -305,17 +295,52 @@ function extractPlayerName(featured: string): string {
  * Extract the main set/brand name without subset details
  */
 function extractMainSetName(cardSet: string): string {
-  const cleaned = cleanSearchTerm(cardSet);
-  // Get just the main brand (e.g., "Score Football" from "Score Football - Protential")
-  const mainSet = cleaned.split(/\s*-\s*/)[0].trim();
+  // Split on hyphen FIRST before cleaning (cleanSearchTerm removes hyphens)
+  // e.g., "SELECT WWE - Prizm" -> "SELECT WWE"
+  const mainSet = cardSet.split(/\s*-\s*/)[0].trim();
+  return cleanSearchTerm(mainSet);
+}
+
+/**
+ * Extract just the brand name (e.g., "Prizm" from "Panini Prizm")
+ */
+function extractBrandOnly(cardSet: string): string {
+  const mainSet = extractMainSetName(cardSet);
+  // Common patterns: "Panini Prizm" -> "Prizm", "Topps Chrome" -> "Chrome"
+  const words = mainSet.split(' ');
+  if (words.length >= 2) {
+    // Skip manufacturer names (but keep product line names like "Select", "Prizm", etc.)
+    const skipWords = ['panini', 'topps', 'upper', 'deck', 'bowman', 'donruss', 'fleer', 'score'];
+    const filtered = words.filter(w => !skipWords.includes(w.toLowerCase()));
+    if (filtered.length > 0) {
+      return filtered.join(' ');
+    }
+  }
   return mainSet;
 }
 
 /**
- * Build a search query for a sports card
- * Creates a specific query to find the exact card or very similar ones
+ * Get the parallel/variant name in eBay bracket format
+ * eBay listings commonly use: "[Silver Prizm]", "[Refractor]", etc.
  */
-export function buildSportsCardQuery(card: {
+function formatParallelForSearch(subset?: string, rarity?: string): string | null {
+  // Prefer subset (specific name like "Silver Prizm") over rarity type ("Parallel")
+  const parallel = subset || rarity;
+  if (!parallel) return null;
+
+  const cleaned = cleanSearchTerm(parallel);
+
+  // Skip generic rarity types that don't help search
+  const genericTypes = ['base', 'common', 'parallel', 'insert', 'variant'];
+  if (genericTypes.includes(cleaned.toLowerCase())) {
+    return null;
+  }
+
+  // Return cleaned parallel name (without brackets - we'll add strategically)
+  return cleaned;
+}
+
+export interface SportsCardQueryOptions {
   card_name?: string;
   featured?: string;
   card_set?: string;
@@ -324,68 +349,217 @@ export function buildSportsCardQuery(card: {
   subset?: string;
   rarity_or_variant?: string;
   manufacturer?: string;
-}): string {
-  const parts: string[] = [];
+  serial_numbering?: string;
+  rookie_card?: boolean;
+}
 
-  // 1. Player name - most important
-  if (card.featured) {
-    const playerName = extractPlayerName(card.featured);
-    if (playerName) {
-      parts.push(playerName);
+export interface QueryStrategy {
+  query: string;
+  strategy: 'specific' | 'moderate' | 'broad' | 'minimal';
+  description: string;
+}
+
+/**
+ * Clean and extract card number from various formats
+ * Handles: "RA-ABS", "#123", "NO. 45", "Card Number: 123", etc.
+ */
+function cleanCardNumber(cardNumber?: string): string | null {
+  if (!cardNumber) return null;
+
+  let cleaned = cardNumber
+    // Remove common label prefixes that might be included
+    .replace(/^(Card\s*Number|Card\s*#|Number|No\.?)\s*:?\s*/i, '')
+    // Remove # prefix (we'll add it back)
+    .replace(/^#\s*/, '')
+    // Remove "NO." prefix
+    .replace(/^NO\.?\s*/i, '')
+    // Remove newlines and extra whitespace
+    .replace(/[\r\n]+/g, ' ')
+    .trim();
+
+  // If empty after cleaning, return null
+  if (!cleaned || cleaned.length === 0) return null;
+
+  // Take only the first "word" if there are multiple (avoid label text)
+  // But preserve hyphens within card numbers like "RA-ABS"
+  const firstPart = cleaned.split(/\s+/)[0];
+
+  return firstPart || null;
+}
+
+/**
+ * Build multiple search queries with fallback strategies
+ * Returns queries from most specific to most broad
+ */
+export function buildSportsCardQueries(card: SportsCardQueryOptions): QueryStrategy[] {
+  const queries: QueryStrategy[] = [];
+
+  // Extract components
+  const playerName = card.featured ? extractPlayerName(card.featured) : null;
+  const year = card.release_date?.substring(0, 4);
+  const validYear = year && !isNaN(Number(year)) && parseInt(year) >= 1900 ? year : null;
+  const mainSet = card.card_set ? extractMainSetName(card.card_set) : null;
+  const brandOnly = card.card_set ? extractBrandOnly(card.card_set) : null;
+  const cardNumber = cleanCardNumber(card.card_number);
+  const parallel = formatParallelForSearch(card.subset, card.rarity_or_variant);
+
+
+  // Check if it's a numbered card (serial like /99)
+  const isNumbered = card.serial_numbering && /\/\d+/.test(card.serial_numbering);
+  const serialStr = isNumbered ? card.serial_numbering : null;
+
+  // Strategy 1: SPECIFIC - Player + [Parallel] + #Number + Year + Set
+  // Example: "Patrick Mahomes [Silver Prizm] #1 2024 Panini Prizm"
+  if (playerName) {
+    const parts: string[] = [playerName];
+    if (parallel) parts.push(`[${parallel}]`);
+    if (cardNumber) parts.push(`#${cardNumber}`);
+    if (validYear) parts.push(validYear);
+    if (mainSet) parts.push(mainSet);
+    if (serialStr) parts.push(serialStr);
+
+    if (parts.length >= 3) {
+      queries.push({
+        query: parts.join(' '),
+        strategy: 'specific',
+        description: 'Exact match with parallel and card number',
+      });
     }
   }
 
-  // 2. Year - very important for narrowing down
-  if (card.release_date) {
-    const year = card.release_date.substring(0, 4);
-    if (year && !isNaN(Number(year)) && parseInt(year) >= 1900) {
-      parts.push(year);
+  // Strategy 2: MODERATE - Player + #Number + Year + Set + Parallel (no brackets)
+  // Example: "Patrick Mahomes #1 2024 Prizm Silver"
+  if (playerName) {
+    const parts: string[] = [playerName];
+    if (cardNumber) parts.push(`#${cardNumber}`);
+    if (validYear) parts.push(validYear);
+    if (brandOnly) parts.push(brandOnly);
+    if (parallel) parts.push(parallel);
+
+    if (parts.length >= 3) {
+      queries.push({
+        query: parts.join(' '),
+        strategy: 'moderate',
+        description: 'Card number with parallel name',
+      });
     }
   }
 
-  // 3. Main set name (e.g., "Score", "Prizm", "Topps Chrome")
-  if (card.card_set) {
-    const mainSet = extractMainSetName(card.card_set);
-    if (mainSet && mainSet.length > 2) {
-      parts.push(mainSet);
+  // Strategy 3: BROAD - Player + Year + Set + #Number (no parallel)
+  // Example: "Patrick Mahomes 2024 Prizm #1"
+  if (playerName) {
+    const parts: string[] = [playerName];
+    if (validYear) parts.push(validYear);
+    if (brandOnly) parts.push(brandOnly);
+    if (cardNumber) parts.push(`#${cardNumber}`);
+
+    if (parts.length >= 2) {
+      queries.push({
+        query: parts.join(' '),
+        strategy: 'broad',
+        description: 'Player with year and set',
+      });
     }
   }
 
-  // 4. Card number - crucial for finding exact card
-  if (card.card_number) {
-    // Clean up the card number - remove prefixes like "NO." or "#"
-    const cleanNumber = card.card_number
-      .replace(/^(NO\.?|#)\s*/i, '')
-      .trim();
-    if (cleanNumber) {
-      // Add # prefix which is common on eBay
-      parts.push(`#${cleanNumber}`);
+  // Strategy 4: MINIMAL - Player + Brand + Rookie (if applicable)
+  // Example: "Patrick Mahomes Prizm Rookie"
+  if (playerName) {
+    const parts: string[] = [playerName];
+    if (brandOnly) parts.push(brandOnly);
+    if (card.rookie_card) parts.push('Rookie');
+    else if (validYear) parts.push(validYear);
+
+    queries.push({
+      query: parts.join(' '),
+      strategy: 'minimal',
+      description: 'Basic player and brand search',
+    });
+  }
+
+  // Fallback: Just player name if nothing else works
+  if (queries.length === 0 && playerName) {
+    queries.push({
+      query: playerName,
+      strategy: 'minimal',
+      description: 'Player name only',
+    });
+  }
+
+  return queries;
+}
+
+/**
+ * Build a single search query for a sports card (legacy compatibility)
+ * Uses the moderate strategy by default
+ */
+export function buildSportsCardQuery(card: SportsCardQueryOptions): string {
+  const queries = buildSportsCardQueries(card);
+  // Return the moderate strategy query, or first available
+  const moderate = queries.find(q => q.strategy === 'moderate');
+  return moderate?.query || queries[0]?.query || '';
+}
+
+/**
+ * Search with fallback - tries multiple queries until finding results
+ * Returns the first query that finds at least minResults listings
+ */
+export async function searchEbayPricesWithFallback(
+  card: SportsCardQueryOptions,
+  options: {
+    categoryId?: string;
+    limit?: number;
+    minResults?: number;
+  } = {}
+): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
+  const queries = buildSportsCardQueries(card);
+  const minResults = options.minResults ?? 3;
+  const limit = options.limit ?? 25;
+
+  let lastResult: EbayPriceSearchResult | null = null;
+  let lastQuery: QueryStrategy | null = null;
+
+  for (const queryInfo of queries) {
+    try {
+      const result = await searchEbayPrices(queryInfo.query, {
+        categoryId: options.categoryId,
+        limit,
+      });
+
+      // If we found enough results, return immediately
+      if (result.total >= minResults) {
+        return {
+          ...result,
+          queryUsed: queryInfo.query,
+          queryStrategy: queryInfo.strategy,
+        };
+      }
+
+      // Track this result in case all queries fail to meet threshold
+      if (!lastResult || result.total > lastResult.total) {
+        lastResult = result;
+        lastQuery = queryInfo;
+      }
+    } catch (error) {
+      // Continue to next query on error
+      console.error(`[eBay Search] Query failed: "${queryInfo.query}"`, error);
     }
   }
 
-  // 5. Subset/Insert name if available (e.g., "Prizm", "Refractor", "Rookie")
-  if (card.subset) {
-    const cleanSubset = cleanSearchTerm(card.subset);
-    // Only add if it's meaningful and not already in the set name
-    if (cleanSubset && cleanSubset.length > 2 &&
-        !parts.some(p => p.toLowerCase().includes(cleanSubset.toLowerCase()))) {
-      parts.push(cleanSubset);
-    }
+  // Return best result we found, even if below threshold
+  if (lastResult && lastQuery) {
+    return {
+      ...lastResult,
+      queryUsed: lastQuery.query,
+      queryStrategy: lastQuery.strategy,
+    };
   }
 
-  // 6. Variant/parallel type if available (e.g., "Silver", "Gold", "Holo")
-  if (card.rarity_or_variant) {
-    const variant = cleanSearchTerm(card.rarity_or_variant);
-    if (variant && variant.length > 2 &&
-        !parts.some(p => p.toLowerCase().includes(variant.toLowerCase()))) {
-      parts.push(variant);
-    }
-  }
-
-  const query = parts.join(' ');
-
-  console.log('[eBay Query Builder] Input:', card);
-  console.log('[eBay Query Builder] Output:', query);
-
-  return query;
+  // No results from any query
+  return {
+    total: 0,
+    items: [],
+    queryUsed: queries[0]?.query || '',
+    queryStrategy: queries[0]?.strategy || 'minimal',
+  };
 }

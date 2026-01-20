@@ -22,12 +22,26 @@ interface EbayPriceResult {
 interface EbayPriceData {
   success: boolean;
   query: string;
+  queryStrategy?: 'specific' | 'moderate' | 'broad' | 'minimal' | 'custom';
   total: number;
   items: EbayPriceResult[];
   lowestPrice?: number;
   highestPrice?: number;
   averagePrice?: number;
+  medianPrice?: number;
   error?: string;
+}
+
+interface PriceHistoryData {
+  success: boolean;
+  has_history: boolean;
+  latest?: {
+    recorded_at: string;
+    median_price: number | null;
+    listing_count: number;
+    price_change: number | null;
+    price_change_percent: number | null;
+  };
 }
 
 interface EbayPriceLookupProps {
@@ -41,15 +55,35 @@ interface EbayPriceLookupProps {
     subset?: string;
     rarity_or_variant?: string;
     manufacturer?: string;
+    serial_numbering?: string;
+    rookie_card?: boolean;
   };
+  cardId?: string;
   category?: 'sports' | 'ccg' | 'other';
 }
 
-export function EbayPriceLookup({ card, category = 'sports' }: EbayPriceLookupProps) {
+export function EbayPriceLookup({ card, cardId, category = 'sports' }: EbayPriceLookupProps) {
   const [priceData, setPriceData] = useState<EbayPriceData | null>(null);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showListings, setShowListings] = useState(false);
+
+  // Fetch price history if cardId is provided
+  const fetchPriceHistory = async () => {
+    if (!cardId) return;
+
+    try {
+      const response = await fetch(`/api/ebay/price-history?card_id=${cardId}&latest_only=true`);
+      const data = await response.json();
+      if (data.success) {
+        setPriceHistory(data);
+      }
+    } catch (err) {
+      // Silently fail - price history is optional
+      console.error('[EbayPriceLookup] Error fetching price history:', err);
+    }
+  };
 
   const fetchPrices = async () => {
     setLoading(true);
@@ -59,7 +93,17 @@ export function EbayPriceLookup({ card, category = 'sports' }: EbayPriceLookupPr
       const response = await fetch('/api/ebay/prices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card, category, limit: 10 }),
+        body: JSON.stringify({
+          card: {
+            ...card,
+            serial_numbering: card.serial_numbering,
+            rookie_card: card.rookie_card,
+          },
+          category,
+          limit: 25,  // Increased for better price statistics
+          useFallback: true,  // Enable multi-query fallback
+          minResults: 3,  // Try broader query if fewer than 3 results
+        }),
       });
 
       const data = await response.json();
@@ -81,8 +125,9 @@ export function EbayPriceLookup({ card, category = 'sports' }: EbayPriceLookupPr
   useEffect(() => {
     if (card.featured || card.card_name) {
       fetchPrices();
+      fetchPriceHistory();
     }
-  }, [card.featured, card.card_name, card.card_set]);
+  }, [card.featured, card.card_name, card.card_set, cardId]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -130,26 +175,75 @@ export function EbayPriceLookup({ card, category = 'sports' }: EbayPriceLookupPr
       {priceData && (
         <>
           {/* Price Summary */}
-          <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+          <div className="grid grid-cols-4 gap-3 mb-4">
+            <div className="bg-white rounded-lg p-3 text-center shadow-sm">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Lowest</p>
-              <p className="text-2xl font-bold text-green-600">
+              <p className="text-xl font-bold text-green-600">
                 {priceData.lowestPrice ? formatPrice(priceData.lowestPrice) : 'N/A'}
               </p>
             </div>
-            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+            <div className="bg-white rounded-lg p-3 text-center shadow-sm border-2 border-blue-200">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Median</p>
+              <p className="text-xl font-bold text-blue-600">
+                {priceData.medianPrice ? formatPrice(priceData.medianPrice) : 'N/A'}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg p-3 text-center shadow-sm">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Average</p>
-              <p className="text-2xl font-bold text-blue-600">
+              <p className="text-xl font-bold text-indigo-600">
                 {priceData.averagePrice ? formatPrice(priceData.averagePrice) : 'N/A'}
               </p>
             </div>
-            <div className="bg-white rounded-lg p-4 text-center shadow-sm">
+            <div className="bg-white rounded-lg p-3 text-center shadow-sm">
               <p className="text-xs text-gray-500 uppercase tracking-wide mb-1">Highest</p>
-              <p className="text-2xl font-bold text-purple-600">
+              <p className="text-xl font-bold text-purple-600">
                 {priceData.highestPrice ? formatPrice(priceData.highestPrice) : 'N/A'}
               </p>
             </div>
           </div>
+
+          {/* Price History Trend (if available) */}
+          {priceHistory?.has_history && priceHistory.latest && (
+            <div className="bg-white/50 rounded-lg p-3 mb-4 border border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                  </svg>
+                  <span className="text-sm text-gray-600">Historical Trend</span>
+                </div>
+                {priceHistory.latest.price_change !== null && (
+                  <div className={`flex items-center gap-1 text-sm font-medium ${
+                    priceHistory.latest.price_change > 0 ? 'text-green-600' :
+                    priceHistory.latest.price_change < 0 ? 'text-red-600' :
+                    'text-gray-500'
+                  }`}>
+                    {priceHistory.latest.price_change > 0 ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
+                      </svg>
+                    ) : priceHistory.latest.price_change < 0 ? (
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
+                      </svg>
+                    ) : null}
+                    <span>
+                      {priceHistory.latest.price_change_percent !== null
+                        ? `${priceHistory.latest.price_change_percent > 0 ? '+' : ''}${priceHistory.latest.price_change_percent}%`
+                        : 'No change'}
+                    </span>
+                    <span className="text-gray-400 font-normal">vs last week</span>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-gray-400 mt-1">
+                Last tracked: {new Date(priceHistory.latest.recorded_at).toLocaleDateString()}
+                {priceHistory.latest.median_price && (
+                  <span> • Median was {formatPrice(priceHistory.latest.median_price)}</span>
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Listings Count & Toggle */}
           <div className="flex items-center justify-between mb-3">
@@ -166,10 +260,20 @@ export function EbayPriceLookup({ card, category = 'sports' }: EbayPriceLookupPr
             )}
           </div>
 
-          {/* Search Query Used */}
-          <p className="text-xs text-gray-400 mb-3">
-            Search: "{priceData.query}"
-          </p>
+          {/* Search Query & Strategy */}
+          <div className="flex items-center gap-2 text-xs text-gray-400 mb-3 flex-wrap">
+            <span>Search: "{priceData.query}"</span>
+            {priceData.queryStrategy && priceData.queryStrategy !== 'custom' && (
+              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                priceData.queryStrategy === 'specific' ? 'bg-green-100 text-green-700' :
+                priceData.queryStrategy === 'moderate' ? 'bg-blue-100 text-blue-700' :
+                priceData.queryStrategy === 'broad' ? 'bg-yellow-100 text-yellow-700' :
+                'bg-gray-100 text-gray-700'
+              }`}>
+                {priceData.queryStrategy}
+              </span>
+            )}
+          </div>
 
           {/* Individual Listings */}
           {showListings && priceData.items.length > 0 && (

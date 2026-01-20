@@ -4729,7 +4729,10 @@ export function SportsCardDetails() {
                   rarity_or_variant: cardInfo.rarity_or_variant,
                   manufacturer: cardInfo.manufacturer,
                   category: card.category,
+                  serial_numbering: cardInfo.serial_number || card.serial_numbering,
+                  rookie_card: cardInfo.rookie_or_first === true || card.rookie_card === true,
                 }}
+                cardId={card.id}
                 category="sports"
               />
 
