@@ -626,6 +626,26 @@ async function drawModernFrontLabel(
   const infoMaxWidth = gradeX - infoX - 50;
   let currentY = labelY + 28;
 
+  // Helper: Wrap text to multiple lines
+  const wrapText = (text: string, maxWidth: number, fontSize: number, fontStyle: string = ''): string[] => {
+    ctx.font = `${fontStyle} ${fontSize}px 'Helvetica Neue', Arial, sans-serif`.trim();
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = testLine;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+  };
+
   // Line 1: Card Name
   const safeCardName = extractAsciiSafe(data.cardName, 'Card', data.englishName);
   ctx.fillStyle = MODERN_COLORS.textWhite;
@@ -641,12 +661,17 @@ async function drawModernFrontLabel(
   ctx.fillText(safeCardName, infoX, currentY);
   currentY += nameFontSize + 8;
 
-  // Line 2: Context line
+  // Line 2: Context line (Set • Subset • #Number • Year) - with text wrapping
   ctx.fillStyle = MODERN_COLORS.textWhiteMuted;
   const setInfo = data.contextLine ? extractAsciiSafe(data.contextLine, '') : '';
-  ctx.font = '22px "Helvetica Neue", Arial, sans-serif';
-  ctx.fillText(setInfo, infoX, currentY);
-  currentY += 28;
+  const setFontSize = 22;
+  const setLines = wrapText(setInfo, infoMaxWidth, setFontSize);
+  ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+  for (const line of setLines) {
+    ctx.fillText(line, infoX, currentY);
+    currentY += setFontSize + 4;
+  }
+  currentY += 2; // Small gap after set info
 
   // Line 3: Special Features
   if (data.specialFeatures) {
