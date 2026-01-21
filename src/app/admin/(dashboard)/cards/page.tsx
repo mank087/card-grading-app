@@ -113,6 +113,11 @@ const getCardGrade = (card: Card): number | null => {
   // LEGACY: Old grade fields
   if (card.dcm_grade_whole) return card.dcm_grade_whole
   if (card.grade_numeric) return card.grade_numeric
+  // SPORTS CARDS: Check ai_grading JSON for recommended grade
+  if (card.ai_grading?.recommended_grade?.recommended_decimal_grade !== null &&
+      card.ai_grading?.recommended_grade?.recommended_decimal_grade !== undefined) {
+    return card.ai_grading.recommended_grade.recommended_decimal_grade
+  }
   return null
 }
 
