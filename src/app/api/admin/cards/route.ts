@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
         created_at,
         dvg_decimal_grade,
         dcm_grade_whole,
+        grade_numeric,
         ebay_price_median,
         ebay_price_listing_count,
         ebay_price_updated_at,

@@ -32,6 +32,7 @@ interface Card {
   created_at: string
   dvg_decimal_grade: number | null
   dcm_grade_whole: number | null
+  grade_numeric: number | null
   ebay_price_median: number | null
   ebay_price_listing_count: number | null
   ebay_price_updated_at: string | null
@@ -111,6 +112,7 @@ const getCardGrade = (card: Card): number | null => {
   }
   // LEGACY: Old grade fields
   if (card.dcm_grade_whole) return card.dcm_grade_whole
+  if (card.grade_numeric) return card.grade_numeric
   return null
 }
 
