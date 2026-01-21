@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { createClient } from '@supabase/supabase-js'
+
+// Initialize storage client for signed URLs
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,7 +23,7 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const searchParams = request.nextUrl.searchParams
     const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '20')
+    const limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
     const category = searchParams.get('category') || 'all'
     const graded = searchParams.get('graded') || 'all' // all, graded, ungraded
@@ -29,6 +34,7 @@ export async function GET(request: NextRequest) {
     const offset = (page - 1) * limit
 
     // Build query with all fields needed for collection-style display
+    // Matches My Collection page fields for consistent display
     let query = supabaseAdmin
       .from('cards')
       .select(`
@@ -38,18 +44,30 @@ export async function GET(request: NextRequest) {
         card_name,
         category,
         conversational_decimal_grade,
+        conversational_whole_grade,
         conversational_condition_label,
         conversational_card_info,
+        conversational_grading,
         ai_grading,
         featured,
+        pokemon_featured,
         card_set,
         release_date,
         manufacturer_name,
         card_number,
         front_path,
+        back_path,
         visibility,
         is_featured,
-        created_at
+        created_at,
+        dvg_decimal_grade,
+        dcm_grade_whole,
+        ebay_price_median,
+        ebay_price_listing_count,
+        ebay_price_updated_at,
+        is_foil,
+        scryfall_price_usd,
+        scryfall_price_usd_foil
       `, { count: 'exact' })
 
     // Apply category filter
@@ -71,14 +89,25 @@ export async function GET(request: NextRequest) {
       query = query.or('is_featured.is.null,is_featured.eq.false')
     }
 
-    // Apply search filter (search by card name, serial, or featured player)
+    // Apply search filter (search across multiple fields)
     if (search) {
-      // Search across multiple text fields - can't use ilike on UUID
-      query = query.or(`card_name.ilike.%${search}%,serial.ilike.%${search}%,featured.ilike.%${search}%`)
+      // Search across multiple text fields for comprehensive search
+      query = query.or(`card_name.ilike.%${search}%,serial.ilike.%${search}%,featured.ilike.%${search}%,card_set.ilike.%${search}%,manufacturer_name.ilike.%${search}%,card_number.ilike.%${search}%,pokemon_featured.ilike.%${search}%`)
     }
 
-    // Apply sorting
-    query = query.order(sortBy, { ascending: sortOrder === 'asc' })
+    // Apply sorting - map frontend column names to database fields
+    const sortFieldMap: Record<string, string> = {
+      'name': 'card_name',
+      'series': 'card_set',
+      'year': 'release_date',
+      'grade': 'conversational_decimal_grade',
+      'date': 'created_at',
+      'price': 'ebay_price_median',
+      'visibility': 'visibility',
+      'created_at': 'created_at',
+    }
+    const dbSortField = sortFieldMap[sortBy] || 'created_at'
+    query = query.order(dbSortField, { ascending: sortOrder === 'asc', nullsFirst: false })
 
     // Apply pagination
     query = query.range(offset, offset + limit - 1)
@@ -101,11 +130,45 @@ export async function GET(request: NextRequest) {
       userMap[user.id] = user.email
     })
 
-    // Enrich card data
+    // Generate signed URLs for card images (batch operation)
+    const storageClient = createClient(supabaseUrl, supabaseServiceKey)
+    const frontPaths = cards?.filter(c => c.front_path).map(c => c.front_path) || []
+
+    const signedUrlMap: Record<string, string> = {}
+    if (frontPaths.length > 0) {
+      // Generate signed URLs in batch (1 hour expiry)
+      const { data: signedUrls } = await storageClient.storage
+        .from('card-images')
+        .createSignedUrls(frontPaths, 3600)
+
+      signedUrls?.forEach((item) => {
+        if (item.signedUrl && item.path) {
+          signedUrlMap[item.path] = item.signedUrl
+        }
+      })
+    }
+
+    // Enrich card data with user email and signed URL
     const enrichedCards = cards?.map(card => ({
       ...card,
-      user_email: userMap[card.user_id] || 'Unknown'
+      user_email: userMap[card.user_id] || 'Unknown',
+      front_url: card.front_path ? signedUrlMap[card.front_path] || null : null,
     }))
+
+    // Get category stats for the header
+    const { data: statsData } = await supabaseAdmin
+      .from('cards')
+      .select('category, conversational_decimal_grade')
+
+    const stats = {
+      total: statsData?.length || 0,
+      graded: statsData?.filter(c => c.conversational_decimal_grade !== null).length || 0,
+      byCategory: {} as Record<string, number>
+    }
+    statsData?.forEach(card => {
+      const cat = card.category || 'Unknown'
+      stats.byCategory[cat] = (stats.byCategory[cat] || 0) + 1
+    })
 
     return NextResponse.json({
       cards: enrichedCards,
@@ -114,7 +177,8 @@ export async function GET(request: NextRequest) {
         limit,
         total: count || 0,
         total_pages: Math.ceil((count || 0) / limit)
-      }
+      },
+      stats
     }, { status: 200 })
   } catch (error) {
     console.error('Error fetching cards:', error)
