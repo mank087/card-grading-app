@@ -149,12 +149,40 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Enrich card data with user email and signed URL
-    const enrichedCards = cards?.map(card => ({
-      ...card,
-      user_email: userMap[card.user_id] || 'Unknown',
-      front_url: card.front_path ? signedUrlMap[card.front_path] || null : null,
-    }))
+    // Enrich card data with user email, signed URL, and extract grade from JSON if needed
+    const enrichedCards = cards?.map(card => {
+      let enrichedCard: any = {
+        ...card,
+        user_email: userMap[card.user_id] || 'Unknown',
+        front_url: card.front_path ? signedUrlMap[card.front_path] || null : null,
+      }
+
+      // If conversational_grading exists, parse it and extract grade if missing
+      // This matches the My Collection API enrichment logic
+      if (card.conversational_grading && !card.conversational_decimal_grade) {
+        try {
+          const parsed = typeof card.conversational_grading === 'string'
+            ? JSON.parse(card.conversational_grading)
+            : card.conversational_grading
+
+          // Extract grade from JSON structure
+          const grade = parsed.grading_passes?.averaged_rounded?.final ?? parsed.final_grade?.decimal_grade
+          if (grade !== undefined && grade !== null) {
+            enrichedCard.conversational_decimal_grade = grade
+            enrichedCard.conversational_whole_grade = Math.floor(grade)
+          }
+
+          // Extract condition label if missing
+          if (!card.conversational_condition_label && parsed.final_grade?.condition_label) {
+            enrichedCard.conversational_condition_label = parsed.final_grade.condition_label
+          }
+        } catch (e) {
+          // Parsing failed, continue with original data
+        }
+      }
+
+      return enrichedCard
+    })
 
     // Get category stats for the header
     const { data: statsData } = await supabaseAdmin
