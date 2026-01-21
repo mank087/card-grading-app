@@ -31,7 +31,9 @@ export async function GET(request: NextRequest) {
         is_foil, foil_type, is_double_faced, mtg_api_verified, mtg_rarity, mtg_set_code,
         card_language, scryfall_price_usd, scryfall_price_usd_foil,
         serial_numbering, rarity_tier, rarity_description, autographed, autograph_type,
-        memorabilia_type, rookie_card, first_print_rookie, holofoil
+        memorabilia_type, rookie_card, first_print_rookie, holofoil,
+        ebay_price_lowest, ebay_price_median, ebay_price_average, ebay_price_highest,
+        ebay_price_listing_count, ebay_price_updated_at
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });

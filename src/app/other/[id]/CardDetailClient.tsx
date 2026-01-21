@@ -43,6 +43,7 @@ import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottom
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
+import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -4872,6 +4873,25 @@ export function OtherCardDetails() {
                   </a>
                 </div>
 
+              </div>
+
+              {/* eBay Price Lookup Section */}
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <EbayPriceLookup
+                  card={{
+                    card_name: cardInfo.card_name || card.card_name,
+                    featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                    card_set: extractEnglishForSearch(cardInfo.set_name) || card.card_set,
+                    card_number: cardInfo.card_number || card.card_number,
+                    release_date: cardInfo.year || card.release_date,
+                    subset: cardInfo.subset,
+                    rarity_or_variant: cardInfo.rarity_or_variant,
+                    manufacturer: cardInfo.manufacturer || card.manufacturer,
+                    game_type: 'other',
+                  }}
+                  cardId={card.id}
+                  category="other"
+                />
               </div>
 
               {/* Insta-List on eBay Section */}

@@ -32,6 +32,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
+import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -5183,6 +5184,25 @@ export function PokemonCardDetails() {
                   </a>
                 </div>
 
+              </div>
+
+              {/* eBay Price Lookup Section */}
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <EbayPriceLookup
+                  card={{
+                    card_name: cardInfo.card_name || card.card_name,
+                    featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured) || card.pokemon_featured,
+                    card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(cardInfo.set_era) || card.card_set,
+                    card_number: cardInfo.card_number || card.card_number,
+                    release_date: cardInfo.year || card.release_date,
+                    subset: cardInfo.rarity_tier || cardInfo.subset || card.subset,
+                    rarity_or_variant: cardInfo.rarity_or_variant || cardInfo.variant_type,
+                    manufacturer: cardInfo.manufacturer || 'Pokemon',
+                    category: 'ccg',
+                  }}
+                  cardId={card.id}
+                  category="ccg"
+                />
               </div>
 
               {/* Insta-List on eBay Section */}

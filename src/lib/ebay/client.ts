@@ -144,8 +144,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<EbayToke
     `${EBAY_CONFIG.appId}:${EBAY_CONFIG.certId}`
   ).toString('base64');
 
-  console.log('[eBay] Attempting token refresh to:', tokenUrl);
-
   const response = await fetch(tokenUrl, {
     method: 'POST',
     headers: {
@@ -183,7 +181,6 @@ export async function refreshAccessToken(refreshToken: string): Promise<EbayToke
   }
 
   const tokens = await response.json();
-  console.log('[eBay] Token refresh response keys:', Object.keys(tokens));
 
   // Validate response has required fields
   if (!tokens.access_token) {
@@ -193,11 +190,9 @@ export async function refreshAccessToken(refreshToken: string): Promise<EbayToke
 
   // eBay refresh might not return a new refresh_token - use the old one if not provided
   if (!tokens.refresh_token) {
-    console.log('[eBay] No new refresh_token in response, will keep existing');
     tokens.refresh_token = refreshToken; // Use the original refresh token
   }
 
-  console.log('[eBay] Token refresh successful');
   return tokens;
 }
 
@@ -243,7 +238,6 @@ export async function getEbayUserInfo(accessToken: string): Promise<{
     }
 
     const data = await response.json();
-    console.log('[eBay] User info response:', JSON.stringify(data));
 
     // eBay Identity API returns 'username' directly
     return {

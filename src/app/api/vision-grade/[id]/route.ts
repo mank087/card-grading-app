@@ -28,6 +28,7 @@ import {
   parseCenteringMeasurements,
   parseGradingMetadata
 } from "@/lib/conversationalDefectParser";
+import { fetchAndCacheCardPrice } from "@/lib/ebay/priceTracker";
 
 // Track cards currently being processed
 const processingCards = new Map<string, number>();
@@ -2001,6 +2002,36 @@ EXTRACTION RULES:
         console.error(`[MTG API] Verification error:`, mtgError.message);
         // Don't fail grading - MTG verification is optional enhancement
       }
+    }
+
+    // 💰 eBay Price Caching (Post-Grading)
+    // Fetch initial eBay prices and cache for display
+    try {
+      console.log(`[EBAY PRICE] Starting post-grading price caching for card ${cardId}`);
+
+      const cardForPricing = {
+        id: cardId,
+        category: cardCategory || 'Other',
+        conversational_card_info: conversationalGradingData?.card_info || null,
+      };
+
+      // Fire and forget - don't wait for price caching to complete
+      // This prevents slowing down the grading response
+      fetchAndCacheCardPrice(cardForPricing)
+        .then((cachedPrice) => {
+          if (cachedPrice) {
+            console.log(`[EBAY PRICE] Cached prices for card ${cardId}: $${cachedPrice.median_price} median (${cachedPrice.listing_count} listings)`);
+          } else {
+            console.log(`[EBAY PRICE] No price data available for card ${cardId}`);
+          }
+        })
+        .catch((priceError) => {
+          console.error(`[EBAY PRICE] Price caching failed for card ${cardId}:`, priceError.message);
+          // Don't fail grading - price caching is optional enhancement
+        });
+    } catch (priceError: any) {
+      console.error(`[EBAY PRICE] Price caching setup error:`, priceError.message);
+      // Don't fail grading - price caching is optional enhancement
     }
 
     const processingTime = Date.now() - startTime;

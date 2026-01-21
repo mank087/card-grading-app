@@ -27,6 +27,7 @@ import {
   type CardSharingData
 } from "@/lib/socialUtils";
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
+import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
@@ -4993,6 +4994,25 @@ export function MTGCardDetails() {
                   )}
                 </div>
 
+              </div>
+
+              {/* eBay Price Lookup Section */}
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <EbayPriceLookup
+                  card={{
+                    card_name: cardInfo.card_name || card.card_name,
+                    card_set: cardInfo.set_name || card.card_set,
+                    card_number: cardInfo.card_number || card.card_number,
+                    release_date: cardInfo.year || card.release_date,
+                    rarity_or_variant: cardInfo.rarity || cardInfo.rarity_tier,
+                    ink_color: cardInfo.ink_color,
+                    is_foil: cardInfo.is_foil || card.is_foil || false,
+                    manufacturer: 'Ravensburger',
+                    game_type: 'lorcana',
+                  }}
+                  cardId={card.id}
+                  category="ccg"
+                />
               </div>
 
               {/* Insta-List on eBay Section */}

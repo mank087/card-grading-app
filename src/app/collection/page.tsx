@@ -52,6 +52,13 @@ type Card = {
   card_language?: string | null
   scryfall_price_usd?: number | null
   scryfall_price_usd_foil?: number | null
+  // 💰 eBay Price Cache fields
+  ebay_price_lowest?: number | null
+  ebay_price_median?: number | null
+  ebay_price_average?: number | null
+  ebay_price_highest?: number | null
+  ebay_price_listing_count?: number | null
+  ebay_price_updated_at?: string | null
 }
 
 // 🎯 Helper: Strip markdown formatting from text
@@ -147,6 +154,44 @@ const getGradeSource = (card: Card): 'conversational' | 'structured' | null => {
   return null;
 };
 
+// 💰 Helper: Format price for display
+const formatPrice = (price: number | null | undefined): string | null => {
+  if (price === null || price === undefined) return null;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(price);
+};
+
+// 💰 Helper: Get card's market value (median price from eBay cache)
+const getMarketValue = (card: Card): number | null => {
+  // Use eBay median price if available
+  if (card.ebay_price_median !== null && card.ebay_price_median !== undefined) {
+    return card.ebay_price_median;
+  }
+  // Fallback to Scryfall price for MTG cards
+  if (card.category === 'MTG') {
+    if (card.is_foil && card.scryfall_price_usd_foil) {
+      return card.scryfall_price_usd_foil;
+    }
+    if (card.scryfall_price_usd) {
+      return card.scryfall_price_usd;
+    }
+  }
+  return null;
+};
+
+// 💰 Helper: Check if price data is stale (> 7 days)
+const isPriceStale = (updatedAt: string | null | undefined): boolean => {
+  if (!updatedAt) return true;
+  const updated = new Date(updatedAt);
+  const now = new Date();
+  const diffDays = (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24);
+  return diffDays > 7;
+};
+
 const getImageQualityGrade = (card: Card) => {
   // Match the exact logic from the detail page (line 2267, 3508)
   // 🎯 PRIMARY: Try conversational AI confidence first (current system)
@@ -228,6 +273,8 @@ function CollectionPageContent() {
   const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
+  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
+  const [priceRefreshCount, setPriceRefreshCount] = useState(0)
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
@@ -341,6 +388,114 @@ function CollectionPageContent() {
     fetchCards()
   }, [searchQuery])
 
+  // Background price refresh for stale cards (>= 7 days old)
+  useEffect(() => {
+    // Only run when we have cards and not currently loading
+    if (loading || cards.length === 0) return;
+
+    const refreshStalePrices = async () => {
+      const session = getStoredSession();
+      if (!session?.access_token) {
+        console.log('[Collection] No session token, skipping price refresh');
+        return;
+      }
+
+      // Find cards with stale prices OR null prices that might benefit from retry
+      // Include cards with null prices that were attempted recently (our improved search might find them now)
+      const staleCards = cards.filter(card => {
+        const isStale = isPriceStale(card.ebay_price_updated_at);
+        const hasNullPrice = card.ebay_price_median === null || card.ebay_price_median === undefined;
+        // Refresh if: stale OR (null price AND is Pokemon/CCG card that might benefit from improved search)
+        const isPokemonOrCCG = card.category === 'Pokemon' || card.category === 'MTG' || card.category === 'Lorcana';
+        return isStale || (hasNullPrice && isPokemonOrCCG);
+      });
+      const staleCardIds = staleCards.map(card => card.id);
+
+      console.log(`[Collection] Found ${staleCardIds.length} cards to refresh out of ${cards.length} total`);
+
+      if (staleCardIds.length === 0) return;
+
+      setIsRefreshingPrices(true);
+      setPriceRefreshCount(staleCardIds.length);
+
+      try {
+        // Process in batches of 10
+        const batchSize = 10;
+        let totalRefreshed = 0;
+
+        // Check if any cards need force refresh (Pokemon/CCG with null prices)
+        const cardsNeedingForceRefresh = staleCards.filter(card => {
+          const hasNullPrice = card.ebay_price_median === null || card.ebay_price_median === undefined;
+          const isPokemonOrCCG = card.category === 'Pokemon' || card.category === 'MTG' || card.category === 'Lorcana';
+          return hasNullPrice && isPokemonOrCCG && card.ebay_price_updated_at; // Has updatedAt but null price
+        });
+        const forceRefreshIds = new Set(cardsNeedingForceRefresh.map(c => c.id));
+
+        for (let i = 0; i < staleCardIds.length; i += batchSize) {
+          const batch = staleCardIds.slice(i, i + batchSize);
+          // Force refresh if any card in batch needs it
+          const needsForce = batch.some(id => forceRefreshIds.has(id));
+
+          const response = await fetch('/api/ebay/batch-refresh-prices', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify({ card_ids: batch, force: needsForce }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`[Collection] Batch refresh response:`, data);
+
+            // Update cards state with new prices
+            if (data.results && data.results.length > 0) {
+              setCards(prevCards => {
+                const updatedCards = [...prevCards];
+                data.results.forEach((result: { id: string; success: boolean; median_price?: number | null }) => {
+                  if (result.success) {
+                    const cardIndex = updatedCards.findIndex(c => c.id === result.id);
+                    if (cardIndex !== -1) {
+                      updatedCards[cardIndex] = {
+                        ...updatedCards[cardIndex],
+                        ebay_price_median: result.median_price ?? null,
+                        ebay_price_updated_at: new Date().toISOString(),
+                      };
+                    }
+                  }
+                });
+                return updatedCards;
+              });
+              totalRefreshed += data.refreshed || 0;
+            }
+          }
+
+          // Update remaining count
+          setPriceRefreshCount(prev => Math.max(0, prev - batch.length));
+
+          // Small delay between batches to avoid overwhelming the API
+          if (i + batchSize < staleCardIds.length) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+
+        if (totalRefreshed > 0) {
+          console.log(`[Collection] Refreshed prices for ${totalRefreshed} cards`);
+        }
+      } catch (err) {
+        console.error('Error refreshing prices:', err);
+      } finally {
+        setIsRefreshingPrices(false);
+        setPriceRefreshCount(0);
+      }
+    };
+
+    // Delay the refresh slightly to let the page render first
+    const timeoutId = setTimeout(refreshStalePrices, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [loading, cards.length]); // Re-run when cards are loaded
+
   // Handle column sorting
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -388,6 +543,10 @@ function CollectionPageContent() {
       case 'visibility':
         aValue = a.visibility || 'private'
         bValue = b.visibility || 'private'
+        break
+      case 'price':
+        aValue = getMarketValue(a) || 0
+        bValue = getMarketValue(b) || 0
         break
       default:
         return 0
@@ -585,6 +744,33 @@ function CollectionPageContent() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            {/* Price Refresh Indicator */}
+            {isRefreshingPrices && (
+              <div className="hidden sm:flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 animate-pulse">
+                <svg className="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span className="text-xs font-medium text-blue-600">
+                  Updating {priceRefreshCount} price{priceRefreshCount !== 1 ? 's' : ''}...
+                </span>
+              </div>
+            )}
+            {/* Collection Value Summary */}
+            {!isRefreshingPrices && (() => {
+              const cardsWithPrices = filteredCards.filter(c => getMarketValue(c) !== null);
+              if (cardsWithPrices.length === 0) return null;
+
+              const totalValue = cardsWithPrices.reduce((sum, c) => sum + (getMarketValue(c) || 0), 0);
+
+              return (
+                <div className="hidden sm:flex items-center gap-2 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg px-3 py-1.5">
+                  <span className="text-xs font-medium text-gray-600">Est. Value:</span>
+                  <span className="text-sm font-bold text-green-600">{formatPrice(totalValue)}</span>
+                  <span className="text-xs text-gray-400">({cardsWithPrices.length} priced)</span>
+                </div>
+              );
+            })()}
             {/* View Toggle */}
             <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 rounded-lg p-1">
               <button
@@ -753,8 +939,9 @@ function CollectionPageContent() {
                   labelStyle={labelStyle}
                   className="hover:shadow-xl transition-shadow duration-200"
                 >
-                  {/* Visibility Badge */}
+                  {/* Visibility & Price Badges */}
                   <div className="relative">
+                    {/* Visibility Badge - Left */}
                     <div className={`absolute -top-8 left-2 px-2 py-1 rounded-full text-xs font-semibold border-2 ${
                       card.visibility === 'public'
                         ? 'bg-green-100 text-green-800 border-green-500'
@@ -762,6 +949,31 @@ function CollectionPageContent() {
                     }`} title={card.visibility === 'public' ? 'This card is public (anyone can view)' : 'This card is private (only you can view)'}>
                       {card.visibility === 'public' ? '🌐 Public' : '🔒 Private'}
                     </div>
+
+                    {/* Price Badge - Right */}
+                    {(() => {
+                      const marketValue = getMarketValue(card);
+                      const priceStr = formatPrice(marketValue);
+                      if (!priceStr) return null;
+
+                      const isStale = isPriceStale(card.ebay_price_updated_at);
+                      return (
+                        <div
+                          className={`absolute -top-8 right-2 px-2 py-1 rounded-full text-xs font-semibold border-2 flex items-center gap-1 ${
+                            isStale
+                              ? 'bg-amber-50 text-amber-700 border-amber-400'
+                              : 'bg-green-50 text-green-700 border-green-400'
+                          }`}
+                          title={`eBay median price${isStale ? ' (stale - updating soon)' : ''}`}
+                        >
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.941c-.391-.127-.68-.317-.843-.504a1 1 0 10-1.51 1.31c.562.649 1.413 1.076 2.353 1.253V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.151c.391.127.68.317.843.504a1 1 0 101.511-1.31c-.563-.649-1.413-1.076-2.354-1.253V5z" clipRule="evenodd"/>
+                          </svg>
+                          {priceStr}
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   {/* View Details Button */}
@@ -907,6 +1119,7 @@ function CollectionPageContent() {
                       <option value="">Sort by...</option>
                       <option value="name">Name {sortColumn === 'name' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
                       <option value="grade">Grade {sortColumn === 'grade' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
+                      <option value="price">Value {sortColumn === 'price' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
                       <option value="date">Date {sortColumn === 'date' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
                       <option value="series">Set {sortColumn === 'series' ? (sortDirection === 'asc' ? '▲' : '▼') : ''}</option>
                     </select>
@@ -952,31 +1165,45 @@ function CollectionPageContent() {
                                 {getCardSet(card)} {getYear(card) ? `• ${getYear(card)}` : ''}
                               </div>
 
-                              {/* Grade, Status & Actions Row */}
-                              <div className="flex items-center justify-between mt-2">
-                                <div className="flex items-center gap-3">
-                                  {/* Grade Badge */}
-                                  <div className="flex items-center gap-2">
-                                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-sm">
-                                      {grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : '-')}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      {isAlteredAuthentic && !grade ? 'Authentic' : condition}
-                                    </span>
-                                  </div>
-
-                                  {/* Visibility */}
-                                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                                    card.visibility === 'public'
-                                      ? 'bg-green-100 text-green-700'
-                                      : 'bg-gray-100 text-gray-600'
-                                  }`}>
-                                    {card.visibility === 'public' ? '🌐' : '🔒'}
+                              {/* Grade & Price Row */}
+                              <div className="flex items-center gap-3 mt-2">
+                                {/* Grade Badge */}
+                                <div className="flex items-center gap-2">
+                                  <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 text-white font-bold text-sm">
+                                    {grade ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : '-')}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {isAlteredAuthentic && !grade ? 'Authentic' : condition}
                                   </span>
                                 </div>
 
-                                {/* Actions */}
-                                <div className="flex items-center gap-2">
+                                {/* Market Value */}
+                                {(() => {
+                                  const marketValue = getMarketValue(card);
+                                  const priceStr = formatPrice(marketValue);
+                                  const isStale = isPriceStale(card.ebay_price_updated_at);
+                                  if (priceStr) {
+                                    return (
+                                      <span className={`text-sm font-semibold px-2 py-0.5 rounded ${isStale ? 'text-amber-600 bg-amber-50' : 'text-green-600 bg-green-50'}`}>
+                                        {priceStr}
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+
+                                {/* Visibility */}
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
+                                  card.visibility === 'public'
+                                    ? 'bg-green-100 text-green-700'
+                                    : 'bg-gray-100 text-gray-600'
+                                }`}>
+                                  {card.visibility === 'public' ? '🌐' : '🔒'}
+                                </span>
+                              </div>
+
+                              {/* Actions Row */}
+                              <div className="flex items-center justify-end gap-2 mt-2">
                                   <Link
                                     href={getCardLink(card)}
                                     className="inline-flex items-center justify-center w-10 h-10 rounded-lg bg-purple-100 text-purple-600 hover:bg-purple-200 transition-colors"
@@ -1001,7 +1228,6 @@ function CollectionPageContent() {
                                       </svg>
                                     )}
                                   </button>
-                                </div>
                               </div>
                             </div>
                           </div>
@@ -1034,7 +1260,7 @@ function CollectionPageContent() {
                         </th>
                         <th
                           onClick={() => handleSort('name')}
-                          className="w-[26%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="w-[22%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <div className="flex items-center gap-1">
                             Card Name
@@ -1047,7 +1273,7 @@ function CollectionPageContent() {
                         </th>
                         <th
                           onClick={() => handleSort('series')}
-                          className="w-[24%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="w-[20%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <div className="flex items-center gap-1">
                             Set
@@ -1060,7 +1286,7 @@ function CollectionPageContent() {
                         </th>
                         <th
                           onClick={() => handleSort('year')}
-                          className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="w-[7%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <div className="flex items-center gap-1">
                             Year
@@ -1073,7 +1299,7 @@ function CollectionPageContent() {
                         </th>
                         <th
                           onClick={() => handleSort('grade')}
-                          className="w-[12%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <div className="flex items-center gap-1">
                             Grade
@@ -1086,7 +1312,7 @@ function CollectionPageContent() {
                         </th>
                         <th
                           onClick={() => handleSort('date')}
-                          className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="w-[9%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <div className="flex items-center gap-1">
                             Date
@@ -1098,8 +1324,21 @@ function CollectionPageContent() {
                           </div>
                         </th>
                         <th
+                          onClick={() => handleSort('price')}
+                          className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-1">
+                            Value
+                            {sortColumn === 'price' && (
+                              <span className="text-indigo-600">
+                                {sortDirection === 'asc' ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </th>
+                        <th
                           onClick={() => handleSort('visibility')}
-                          className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                          className="w-[6%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                         >
                           <div className="flex items-center gap-1">
                             Status
@@ -1110,7 +1349,7 @@ function CollectionPageContent() {
                             )}
                           </div>
                         </th>
-                        <th className="w-[10%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="w-[8%] px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
@@ -1176,6 +1415,31 @@ function CollectionPageContent() {
                             <div className="text-sm text-gray-500">
                               {card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '-'}
                             </div>
+                          </td>
+                          <td className="px-3 py-3">
+                            {(() => {
+                              const marketValue = getMarketValue(card);
+                              const priceStr = formatPrice(marketValue);
+                              const isStale = isPriceStale(card.ebay_price_updated_at);
+                              const listingCount = card.ebay_price_listing_count;
+
+                              if (!priceStr) {
+                                return <span className="text-sm text-gray-400">-</span>;
+                              }
+
+                              return (
+                                <div className="text-sm">
+                                  <span className={`font-medium ${isStale ? 'text-amber-600' : 'text-green-600'}`}>
+                                    {priceStr}
+                                  </span>
+                                  {listingCount !== null && listingCount !== undefined && (
+                                    <div className="text-xs text-gray-400">
+                                      {listingCount} listing{listingCount !== 1 ? 's' : ''}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-3 py-3">
                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${

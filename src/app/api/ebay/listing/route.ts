@@ -123,11 +123,9 @@ function mapListingDuration(duration?: string): string {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('[eBay Listing] === START REQUEST ===');
   try {
     // Authenticate user
     const authHeader = request.headers.get('Authorization');
-    console.log('[eBay Listing] Auth header present:', !!authHeader);
     if (!authHeader?.startsWith('Bearer ')) {
       return NextResponse.json(
         { error: 'Unauthorized. Please log in first.' },
@@ -136,12 +134,9 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.slice(7);
-    console.log('[eBay Listing] Token length:', token.length);
     const supabase = supabaseServer();
-    console.log('[eBay Listing] Supabase client created');
 
     const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-    console.log('[eBay Listing] Auth result - user:', user?.id, 'error:', userError?.message);
     if (userError || !user) {
       return NextResponse.json(
         { error: 'Invalid or expired session', debug: { errorMsg: userError?.message } },
@@ -150,7 +145,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Get eBay connection and refresh token if needed
-    console.log('[eBay Listing] Getting eBay connection for user:', user.id);
     let connection = await getConnectionForUser(user.id);
     if (!connection) {
       return NextResponse.json(
@@ -227,22 +221,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch card data
-    console.log('[eBay Listing] Looking up card with ID:', cardId, 'Type:', typeof cardId, 'User ID:', user.id);
-
-    // Fetch card data - use select('*') like /api/other route which works
     const { data: card, error: cardError } = await supabase
       .from('cards')
       .select('*')
       .eq('id', cardId)
       .single();
 
-    console.log('[eBay Listing] Card query result - card:', card?.id, 'user_id:', card?.user_id, 'error:', cardError?.message);
-    console.log('[eBay Listing] Card serial from DB:', JSON.stringify(card?.serial), 'type:', typeof card?.serial, 'length:', card?.serial?.length);
-
     if (cardError || !card) {
-      console.error('[eBay Listing] Card not found. ID:', cardId, 'Error:', cardError?.message, 'Code:', cardError?.code, 'Details:', JSON.stringify(cardError));
+      console.error('[eBay Listing] Card not found:', cardId, cardError?.message);
       return NextResponse.json(
-        { error: 'Card not found', debug: { cardId, errorMessage: cardError?.message, errorCode: cardError?.code, errorDetails: cardError } },
+        { error: 'Card not found' },
         { status: 404 }
       );
     }
@@ -265,7 +253,6 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (existingListing) {
-      console.log('[eBay Listing] Card already has active listing:', existingListing.listing_id);
       return NextResponse.json(
         {
           error: 'This card already has an active eBay listing',
@@ -293,7 +280,6 @@ export async function POST(request: NextRequest) {
     if (passedGrade !== null && passedGrade !== undefined && passedGrade > 0) {
       // Use grade passed from modal - this is the same grade displayed in the UI
       grade = passedGrade;
-      console.log('[eBay Listing] Using grade passed from modal:', grade);
     } else {
       // Fallback: look up grade from card data
       const dvgGrading = card.ai_grading?.dvg_grading;
@@ -309,24 +295,9 @@ export async function POST(request: NextRequest) {
         card.dcm_grade_whole ??
         card.dcm_grade_decimal ??
         1;
-
-      console.log('[eBay Listing] Grade lookup from card data:', {
-        passedGrade,
-        card_grade: card.grade,
-        conversational_whole_grade: card.conversational_whole_grade,
-        conversational_decimal_grade: card.conversational_decimal_grade,
-        dvg_whole_grade: card.dvg_whole_grade,
-        dvg_decimal_grade: card.dvg_decimal_grade,
-        recommended_whole_grade: recommendedGrade?.recommended_whole_grade,
-        recommended_decimal_grade: recommendedGrade?.recommended_decimal_grade,
-        dcm_grade_whole: card.dcm_grade_whole,
-        dcm_grade_decimal: card.dcm_grade_decimal,
-        finalGrade: grade,
-      });
     }
 
     const gradeId = getEbayGradeId(grade);
-    console.log('[eBay Listing] Grade conversion:', { dcmGrade: grade, ebayGradeId: gradeId });
 
     // Prepare Trading API config
     const tradingConfig: TradingApiConfig = {
@@ -357,9 +328,7 @@ export async function POST(request: NextRequest) {
       certificationNumber: (() => {
         const serial = card.serial?.trim();
         const fallback = cardId.replace(/-/g, '').slice(0, 12).toUpperCase();
-        const certNum = serial && serial.length > 0 ? serial : fallback;
-        console.log('[eBay Listing] Certification number computed:', { serial, fallback, certNum });
-        return certNum;
+        return serial && serial.length > 0 ? serial : fallback;
       })(),
       // Regulatory documents (Certificate of Analysis)
       regulatoryDocumentIds: regulatoryDocumentIds.length > 0 ? regulatoryDocumentIds : undefined,
@@ -399,24 +368,6 @@ export async function POST(request: NextRequest) {
       internationalReturnShippingPaidBy: internationalReturnsAccepted ? internationalReturnShippingPaidBy : undefined,
     };
 
-    console.log('[eBay Listing] Creating listing via Trading API:', {
-      sku,
-      categoryId,
-      title,
-      shippingType,
-      offerInternational,
-      // Graded card condition descriptors
-      professionalGrader: listingDetails.professionalGrader,  // Should be '2750123' for Other
-      gradeValueId: listingDetails.grade,                     // Should be like '275020' for grade 10
-      cardGrade: grade,                                       // Actual DCM grade (1-10)
-      certificationNumber: listingDetails.certificationNumber, // Raw serial or undefined
-      cardSerial: card.serial,
-      // Item specifics (check for Franchise)
-      itemSpecificsCount: listingDetails.itemSpecifics.length,
-      itemSpecificsNames: listingDetails.itemSpecifics.map(s => s.name),
-      hasFranchise: listingDetails.itemSpecifics.some(s => s.name === 'Franchise'),
-    });
-
     // Create listing via Trading API
     const result = await addFixedPriceItem(
       tradingConfig,
@@ -435,8 +386,6 @@ export async function POST(request: NextRequest) {
         status: 'error',
       }, { status: 400 });
     }
-
-    console.log('[eBay Listing] Listing created successfully:', { itemId: result.itemId, listingUrl: result.listingUrl });
 
     // Store listing record in database
     const listingRecord: Partial<EbayListing> = {

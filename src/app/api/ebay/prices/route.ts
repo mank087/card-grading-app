@@ -14,8 +14,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   searchEbayPrices,
   searchEbayPricesWithFallback,
+  searchPokemonPricesWithFallback,
+  searchMTGPricesWithFallback,
+  searchLorcanaPricesWithFallback,
+  searchOtherPricesWithFallback,
   buildSportsCardQuery,
   type SportsCardQueryOptions,
+  type PokemonCardQueryOptions,
+  type MTGCardQueryOptions,
+  type LorcanaCardQueryOptions,
+  type OtherCardQueryOptions,
 } from '@/lib/ebay/browseApi';
 import { EBAY_CATEGORIES } from '@/lib/ebay/constants';
 
@@ -56,35 +64,131 @@ export async function POST(request: NextRequest) {
 
     // If card object provided, use fallback strategy for better results
     if (card) {
-      const cardOptions: SportsCardQueryOptions = {
-        card_name: card.card_name,
-        featured: card.featured,
-        card_set: card.card_set,
-        card_number: card.card_number,
-        release_date: card.release_date,
-        subset: card.subset,
-        rarity_or_variant: card.rarity_or_variant,
-        manufacturer: card.manufacturer,
-        serial_numbering: card.serial_numbering,
-        rookie_card: card.rookie_card,
-      };
-
       if (useFallback) {
-        // Use multi-query fallback strategy
-        const result = await searchEbayPricesWithFallback(cardOptions, {
-          categoryId,
-          limit,
-          minResults,
-        });
+        let result;
+
+        // Determine game type for CCG cards
+        const gameType = card.game_type || (category === 'ccg' ? 'pokemon' : null);
+
+        // Use game-specific search for CCG cards
+        if (gameType === 'pokemon' || (category === 'ccg' && !gameType)) {
+          const pokemonOptions: PokemonCardQueryOptions = {
+            card_name: card.card_name,
+            featured: card.featured,
+            card_set: card.card_set,
+            card_number: card.card_number,
+            release_date: card.release_date,
+            subset: card.subset,
+            rarity_or_variant: card.rarity_or_variant,
+            manufacturer: card.manufacturer,
+          };
+
+          result = await searchPokemonPricesWithFallback(pokemonOptions, {
+            categoryId,
+            limit,
+            minResults,
+          });
+        } else if (gameType === 'mtg') {
+          const mtgOptions: MTGCardQueryOptions = {
+            card_name: card.card_name,
+            card_set: card.card_set,
+            card_number: card.card_number,
+            release_date: card.release_date,
+            rarity: card.rarity_or_variant,
+            is_foil: card.is_foil || false,
+            foil_type: card.foil_type,
+            manufacturer: card.manufacturer,
+          };
+
+          result = await searchMTGPricesWithFallback(mtgOptions, {
+            categoryId,
+            limit,
+            minResults,
+          });
+        } else if (gameType === 'lorcana') {
+          const lorcanaOptions: LorcanaCardQueryOptions = {
+            card_name: card.card_name,
+            card_set: card.card_set,
+            card_number: card.card_number,
+            release_date: card.release_date,
+            rarity: card.rarity_or_variant,
+            ink_color: card.ink_color,
+            is_foil: card.is_foil || false,
+          };
+
+          result = await searchLorcanaPricesWithFallback(lorcanaOptions, {
+            categoryId,
+            limit,
+            minResults,
+          });
+        } else if (gameType === 'other' || category === 'other') {
+          // Use Other card search for miscellaneous/non-sport cards
+          console.log('[eBay Prices API] Other card data received:', {
+            card_name: card.card_name,
+            featured: card.featured,
+            card_set: card.card_set,
+            card_number: card.card_number,
+            subset: card.subset,
+          });
+
+          const otherOptions: OtherCardQueryOptions = {
+            card_name: card.card_name,
+            featured: card.featured,
+            card_set: card.card_set,
+            card_number: card.card_number,
+            release_date: card.release_date,
+            subset: card.subset,
+            rarity_or_variant: card.rarity_or_variant,
+            manufacturer: card.manufacturer,
+          };
+
+          result = await searchOtherPricesWithFallback(otherOptions, {
+            categoryId,
+            limit,
+            minResults,
+          });
+        } else {
+          // Use sports card search for sports cards
+          const cardOptions: SportsCardQueryOptions = {
+            card_name: card.card_name,
+            featured: card.featured,
+            card_set: card.card_set,
+            card_number: card.card_number,
+            release_date: card.release_date,
+            subset: card.subset,
+            rarity_or_variant: card.rarity_or_variant,
+            manufacturer: card.manufacturer,
+            serial_numbering: card.serial_numbering,
+            rookie_card: card.rookie_card,
+          };
+
+          result = await searchEbayPricesWithFallback(cardOptions, {
+            categoryId,
+            limit,
+            minResults,
+          });
+        }
 
         return NextResponse.json({
           success: true,
           query: result.queryUsed,
-          queryStrategy: result.queryStrategy,
           ...result,
         });
       } else {
-        // Use single query (legacy behavior)
+        // Use single query (legacy behavior) - sports cards only
+        const cardOptions: SportsCardQueryOptions = {
+          card_name: card.card_name,
+          featured: card.featured,
+          card_set: card.card_set,
+          card_number: card.card_number,
+          release_date: card.release_date,
+          subset: card.subset,
+          rarity_or_variant: card.rarity_or_variant,
+          manufacturer: card.manufacturer,
+          serial_numbering: card.serial_numbering,
+          rookie_card: card.rookie_card,
+        };
+
         const searchQuery = buildSportsCardQuery(cardOptions);
         const result = await searchEbayPrices(searchQuery, { categoryId, limit });
 

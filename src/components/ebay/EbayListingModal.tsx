@@ -1054,18 +1054,6 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const labelData = getCardLabelData(card);
       const gradeForListing = labelData.grade ?? 0;
 
-      // Detailed logging to debug grade extraction
-      console.log('[eBay Listing] Grade debug:', {
-        'labelData.grade': labelData.grade,
-        'gradeForListing': gradeForListing,
-        'card.conversational_decimal_grade': card.conversational_decimal_grade,
-        'card.conversational_whole_grade': card.conversational_whole_grade,
-        'card.dvg_decimal_grade': card.dvg_decimal_grade,
-        'card.dvg_grading exists': !!card.dvg_grading,
-        'card.dvg_grading?.recommended_grade': card.dvg_grading?.recommended_grade,
-        'card.ai_grading exists': !!card.ai_grading,
-      });
-
       const response = await fetch('/api/ebay/listing', {
         method: 'POST',
         headers: {

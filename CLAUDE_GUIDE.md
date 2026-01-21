@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: December 22, 2025 (v7.6 - Founders Package)
+> Last Updated: January 20, 2026 (v7.7 - eBay Price Caching)
 
 ---
 
@@ -33,6 +33,7 @@
 
 **Core Features:**
 - AI-powered card grading with three-pass consensus system
+- **v7.7: eBay price caching with auto-refresh, collection value tracking, price charts**
 - **v7.6: Founders Package with lifetime benefits (150 credits, 20% discount, founder emblem)**
 - **v7.3: Unified cap system, execution flowchart, prompt consistency**
 - **v7.2: Visual Defect Identification Guide with defect hunting protocol**
@@ -225,6 +226,16 @@ src/
 |----------|--------|---------|
 | `/api/pokemon-database/search` | GET | Search Pokemon cards (EN/JA/All) |
 | `/api/pokemon-database/sets` | GET | Get sets list by language |
+
+### eBay Price Caching (v7.7)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/ebay/prices` | POST | Live eBay price search with listings |
+| `/api/ebay/cached-price` | GET | Get cached prices for a card (auto-refreshes if stale) |
+| `/api/ebay/batch-refresh-prices` | POST | Batch refresh prices for multiple cards |
+| `/api/ebay/price-history` | GET | Get historical price data for charts |
+| `/api/cron/update-card-prices` | GET | Weekly cron job for price history tracking |
 
 ### Payments & Credits
 
@@ -428,6 +439,113 @@ src/
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT false;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS founder_since TIMESTAMPTZ;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_founder_badge BOOLEAN DEFAULT true;
+```
+
+### v7.7 eBay Price Caching System (January 20, 2026)
+
+**Key Features:**
+
+1. **Automatic Price Caching**
+   - Prices are cached when a card is first graded (fire-and-forget in vision-grade route)
+   - Cached prices refresh automatically after 7 days
+   - Collection page triggers background refresh for stale cards on load
+
+2. **Collection Page Price Display**
+   - **Desktop List View**: "Value" column showing median price + listing count
+   - **Mobile List View**: Price badge next to grade
+   - **Grid View**: Price badge in top-right corner (opposite visibility badge)
+   - **Collection Total**: Summary badge showing total estimated value
+   - **Sort by Value**: New sorting option in all views
+
+3. **Card Detail Page (EbayPriceLookup Component)**
+   - Shows cached prices on initial load (fast)
+   - "Refresh" button fetches live data with actual listings
+   - Price distribution histogram chart
+   - Price history line chart (collapsible)
+   - Clickable listing links to eBay
+
+4. **Background Batch Refresh**
+   - Collection page automatically refreshes stale prices in background
+   - Rate limited: 10 cards per batch, 500ms between eBay API calls
+   - Visual indicator: "Updating X prices..." with spinner
+   - Updates UI in real-time as prices come back
+
+**Files Created/Modified:**
+
+| File | Purpose |
+|------|---------|
+| `api/ebay/cached-price/route.ts` | Get/refresh cached prices for a card |
+| `api/ebay/batch-refresh-prices/route.ts` | Batch refresh multiple cards |
+| `lib/ebay/priceTracker.ts` | Price caching utilities and batch job logic |
+| `lib/ebay/browseApi.ts` | eBay Browse API with fallback search strategies |
+| `components/ebay/EbayPriceLookup.tsx` | Card detail page price component |
+| `components/ebay/charts/PriceDistributionChart.tsx` | Histogram chart |
+| `components/ebay/charts/PriceHistoryChart.tsx` | Trend line chart |
+| `app/collection/page.tsx` | Added price display, sorting, batch refresh |
+| `api/cards/my-collection/route.ts` | Added eBay price fields to query |
+| `api/vision-grade/[id]/route.ts` | Added price caching after grading |
+
+**Price Caching Flow:**
+
+```
+1. Card Graded → vision-grade API fires fetchAndCacheCardPrice() (async, non-blocking)
+   └── Searches eBay → Caches lowest/median/average/highest to cards table
+
+2. Collection Page Loads → Fetches cards with cached prices
+   └── 2 seconds later → Background refresh starts for stale cards (>7 days)
+   └── Batch refresh API processes 10 cards at a time
+   └── UI updates in real-time as prices return
+
+3. Card Detail Page → EbayPriceLookup component
+   └── Initial: Uses cached prices (fast load)
+   └── Refresh button: Fetches live eBay data with listings, charts, links
+   └── Also updates cache in background
+```
+
+**Field Mapping (conversational_card_info → eBay Search):**
+
+The `fetchAndCacheCardPrice()` function maps fields from the database to eBay search:
+```typescript
+// Database field → eBay search field
+player_or_character → featured
+set_name → card_set
+year → release_date
+card_number_raw/card_number → card_number
+serial_number → serial_numbering
+rookie_or_first → rookie_card
+```
+
+**Fallback Data Sources (batch-refresh-prices API):**
+
+1. `conversational_card_info` (direct field from DB)
+2. `conversational_grading` JSON → `card_info` (parsed)
+3. Legacy direct fields: `featured`, `card_name`, `card_set`, etc.
+
+**Database Migration:**
+```sql
+-- Add eBay price cache columns to cards table
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_price_lowest DECIMAL;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_price_median DECIMAL;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_price_average DECIMAL;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_price_highest DECIMAL;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_price_listing_count INTEGER;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS ebay_price_updated_at TIMESTAMPTZ;
+
+-- Price history table for tracking trends
+CREATE TABLE IF NOT EXISTS card_price_history (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  card_id UUID REFERENCES cards(id),
+  card_type TEXT,
+  lowest_price DECIMAL,
+  median_price DECIMAL,
+  highest_price DECIMAL,
+  average_price DECIMAL,
+  listing_count INTEGER,
+  query_used TEXT,
+  query_strategy TEXT,
+  recorded_at TIMESTAMPTZ DEFAULT NOW(),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
 ```
 
 ### v7.5 Upload Wizard, Reddit Pixel, Landing Pages (December 19, 2025)
@@ -700,6 +818,17 @@ interface LabelData {
 }
 ```
 
+### eBay Integration (v7.7)
+
+| File | Purpose |
+|------|---------|
+| `lib/ebay/browseApi.ts` | eBay Browse API client with fallback search strategies |
+| `lib/ebay/priceTracker.ts` | Price caching and batch job logic |
+| `lib/ebay/constants.ts` | eBay category IDs and constants |
+| `components/ebay/EbayPriceLookup.tsx` | Card detail page price display component |
+| `components/ebay/charts/PriceDistributionChart.tsx` | Histogram showing listing price distribution |
+| `components/ebay/charts/PriceHistoryChart.tsx` | Line chart showing price trends over time |
+
 ### Utilities
 
 | File | Purpose |
@@ -928,6 +1057,31 @@ pokemon_import_log (
   completed_at TIMESTAMPTZ,
   status TEXT DEFAULT 'running',          -- "running", "completed", "failed"
   error_message TEXT,
+  created_at TIMESTAMPTZ
+)
+
+-- eBay Price Caching (v7.7 - added to cards table)
+-- These columns store cached eBay prices on the cards table
+cards.ebay_price_lowest DECIMAL,          -- Lowest listing price
+cards.ebay_price_median DECIMAL,          -- Median listing price (primary display)
+cards.ebay_price_average DECIMAL,         -- Average listing price
+cards.ebay_price_highest DECIMAL,         -- Highest listing price
+cards.ebay_price_listing_count INTEGER,   -- Number of active listings
+cards.ebay_price_updated_at TIMESTAMPTZ   -- When prices were last cached
+
+-- eBay Price History (v7.7 - for tracking trends)
+card_price_history (
+  id UUID PRIMARY KEY,
+  card_id UUID REFERENCES cards(id),
+  card_type TEXT,                         -- 'sports', 'pokemon', 'other'
+  lowest_price DECIMAL,
+  median_price DECIMAL,
+  highest_price DECIMAL,
+  average_price DECIMAL,
+  listing_count INTEGER,
+  query_used TEXT,                        -- Search query that was used
+  query_strategy TEXT,                    -- 'specific', 'moderate', 'broad', 'minimal'
+  recorded_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ
 )
 
@@ -1604,6 +1758,42 @@ node scripts/backfill-japanese-images.js
 - Sets dropdown updates based on language selection
 - Clear selected set when language changes
 
+### eBay Prices Not Showing on Collection Page
+- v7.7: Prices are cached to `ebay_price_*` columns on cards table
+- If prices show null: check `conversational_card_info` has required fields
+- Batch refresh uses 3 fallback sources: `conversational_card_info`, `conversational_grading` JSON, legacy direct fields
+- Check server logs for: `[PriceTracker] Skipping card - insufficient info`
+- Required fields: `player_or_character` OR `card_name` (at minimum)
+
+### eBay Prices Show "null" After Batch Refresh
+- Field name mapping may be wrong - check `fetchAndCacheCardPrice()` in `lib/ebay/priceTracker.ts`
+- Database uses: `player_or_character`, `set_name`, `year`
+- eBay search expects: `featured`, `card_set`, `release_date`
+- Mapping happens in priceTracker.ts - verify the mapping is correct
+
+### Card Detail Page Shows Empty Search Query
+- v7.7: When using cached prices, search query is not stored (only aggregate stats)
+- UI now shows "Using cached prices • Click Refresh for live data" instead of empty query
+- Click Refresh to get live eBay data with actual search query and listings
+
+### Card Detail Page Charts/Listings Missing
+- Charts and listings require live eBay data (not cached data)
+- Cached data only stores: lowest, median, average, highest, listing_count
+- Click "Refresh" button to fetch live data with individual listings
+- Fixed in v7.7: Refresh now always fetches live data, not cached
+
+### Background Price Refresh Not Working
+- Check browser console for errors on collection page
+- Look for network request to `/api/ebay/batch-refresh-prices`
+- Check server logs for `[PriceTracker]` or `[Batch Refresh]` messages
+- Refresh only triggers for cards where `ebay_price_updated_at` is null or >7 days old
+
+### eBay API Rate Limits
+- Default eBay API limit: 5,000 calls/day
+- Batch refresh uses 500ms delay between calls
+- Collection page processes 10 cards per batch with 1 second between batches
+- For 1,000 cards/day pricing: well within limits
+
 ---
 
 ## File Naming Conventions
@@ -1617,7 +1807,7 @@ node scripts/backfill-japanese-images.js
 
 ---
 
-*This guide covers active, working code as of December 2025 (v7.6). Deprecated files are not included.*
+*This guide covers active, working code as of January 2026 (v7.7). Deprecated files are not included.*
 
 ---
 
@@ -1625,6 +1815,7 @@ node scripts/backfill-japanese-images.js
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v7.7 | Jan 20, 2026 | eBay price caching system, collection page pricing, batch refresh, price charts |
 | v7.6 | Dec 22, 2025 | Founders Package ($99, 150 credits, 20% lifetime discount, founder emblem on labels) |
 | v7.5 | Dec 19, 2025 | 3-step upload wizard, Reddit Pixel tracking, sports landing page, multi-select bulk delete, terms updates |
 | v7.4 | Dec 18, 2025 | Japanese Pokemon database (TCGdex), Pokemon Database page with language toggle, Japanese card grading detection |
