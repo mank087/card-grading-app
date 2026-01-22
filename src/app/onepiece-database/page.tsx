@@ -456,6 +456,7 @@ export default function OnePieceDatabasePage() {
                       fill
                       className="object-contain p-1"
                       sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
+                      unoptimized
                       onError={(e) => {
                         // Fallback to OPTCG image if official image fails
                         if (card.card_image) {
@@ -546,6 +547,7 @@ export default function OnePieceDatabasePage() {
                 className="object-contain"
                 sizes="280px"
                 priority
+                unoptimized
                 onError={(e) => {
                   // Fallback to OPTCG image if official image fails
                   if (selectedCard.card_image) {
