@@ -159,8 +159,8 @@ async function importSets() {
 async function importCardsForSet(set) {
   console.log(`\n  Fetching cards for ${set.code} - ${set.name}...`);
 
-  // Search for all cards in this set
-  const data = await fetchFromApi(`/cards/search?q=set:${set.code}`);
+  // Search for all cards in this set (unique=prints gets ALL variations including Enchanted)
+  const data = await fetchFromApi(`/cards/search?q=set:${set.code}&unique=prints`);
   const cards = data.results || [];
 
   console.log(`    Found ${cards.length} cards`);
