@@ -81,8 +81,8 @@ export default function LorcanaDatabasePage() {
   // Ink color options for Lorcana
   const inkOptions = ['Amber', 'Amethyst', 'Emerald', 'Ruby', 'Sapphire', 'Steel']
 
-  // Rarity options
-  const rarityOptions = ['Common', 'Uncommon', 'Rare', 'Super Rare', 'Legendary', 'Enchanted']
+  // Rarity options (must match database values exactly)
+  const rarityOptions = ['Common', 'Uncommon', 'Rare', 'Super rare', 'Legendary', 'Enchanted', 'Promo']
 
   // Load auth and credits
   useEffect(() => {
