@@ -225,6 +225,11 @@ export default function OnePieceDatabasePage() {
     }).format(price)
   }
 
+  // Get official Bandai card image URL (clean images without watermarks)
+  const getOfficialCardImage = (cardId: string) => {
+    return `https://en.onepiece-cardgame.com/images/cardlist/card/${cardId}.png`
+  }
+
   // Calculate total cards from sets
   const totalCards = sets.reduce((acc, set) => acc + (set.total_cards || 0), 0)
 
@@ -445,21 +450,19 @@ export default function OnePieceDatabasePage() {
                 >
                   {/* Card Image */}
                   <div className="relative aspect-[2.5/3.5] bg-gray-900">
-                    {card.card_image ? (
-                      <Image
-                        src={card.card_image}
-                        alt={card.card_name}
-                        fill
-                        className="object-contain p-1"
-                        sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-gray-600">
-                        <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                    )}
+                    <Image
+                      src={getOfficialCardImage(card.id)}
+                      alt={card.card_name}
+                      fill
+                      className="object-contain p-1"
+                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 25vw, 16vw"
+                      onError={(e) => {
+                        // Fallback to OPTCG image if official image fails
+                        if (card.card_image) {
+                          (e.target as HTMLImageElement).src = card.card_image
+                        }
+                      }}
+                    />
                     {/* Color Badge */}
                     {card.card_color && (
                       <div className={`absolute top-1 right-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${getColorStyle(card.card_color)}`}>
@@ -536,20 +539,20 @@ export default function OnePieceDatabasePage() {
 
             {/* Card Image */}
             <div className="relative aspect-[2.5/3.5] bg-gray-800 rounded-xl overflow-hidden mb-6 max-w-[280px] mx-auto">
-              {selectedCard.card_image ? (
-                <Image
-                  src={selectedCard.card_image}
-                  alt={selectedCard.card_name}
-                  fill
-                  className="object-contain"
-                  sizes="280px"
-                  priority
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center text-gray-600">
-                  <span>No Image</span>
-                </div>
-              )}
+              <Image
+                src={getOfficialCardImage(selectedCard.id)}
+                alt={selectedCard.card_name}
+                fill
+                className="object-contain"
+                sizes="280px"
+                priority
+                onError={(e) => {
+                  // Fallback to OPTCG image if official image fails
+                  if (selectedCard.card_image) {
+                    (e.target as HTMLImageElement).src = selectedCard.card_image
+                  }
+                }}
+              />
             </div>
 
             {/* Card Name & Basic Info */}
@@ -699,7 +702,7 @@ export default function OnePieceDatabasePage() {
       {/* Footer */}
       <footer className="py-8 bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          <p>Data from OPTCG API. One Piece is a trademark of Shueisha/Toei Animation.</p>
+          <p>Data from OPTCG API. Card images from Bandai. One Piece is a trademark of Shueisha/Toei Animation.</p>
           <div className="flex justify-center gap-6 mt-4">
             <Link href="/other" className="hover:text-gray-300 transition-colors">Grade Cards</Link>
             <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms</Link>
