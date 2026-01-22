@@ -151,6 +151,16 @@ export default function Footer() {
                   Pokémon Database
                 </Link>
               </li>
+              <li>
+                <Link href="/onepiece-database" className="text-gray-400 hover:text-white transition-colors">
+                  One Piece Database
+                </Link>
+              </li>
+              <li>
+                <Link href="/lorcana-database" className="text-gray-400 hover:text-white transition-colors">
+                  Lorcana Database
+                </Link>
+              </li>
             </ul>
           </div>
 
