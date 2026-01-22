@@ -225,9 +225,11 @@ export default function OnePieceDatabasePage() {
     }).format(price)
   }
 
-  // Get official Bandai card image URL (clean images without watermarks)
-  const getOfficialCardImage = (cardId: string) => {
-    return `https://en.onepiece-cardgame.com/images/cardlist/card/${cardId}.png`
+  // Get clean card image URL from Limitless TCG CDN (no watermarks)
+  const getCleanCardImage = (cardId: string) => {
+    // Extract set code from card ID (e.g., "OP01" from "OP01-001")
+    const setCode = cardId.split('-')[0]
+    return `https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/one-piece/${setCode}/${cardId}_EN.webp`
   }
 
   // Calculate total cards from sets
@@ -451,7 +453,7 @@ export default function OnePieceDatabasePage() {
                   {/* Card Image */}
                   <div className="relative aspect-[2.5/3.5] bg-gray-900">
                     <Image
-                      src={getOfficialCardImage(card.id)}
+                      src={getCleanCardImage(card.id)}
                       alt={card.card_name}
                       fill
                       className="object-contain p-1"
@@ -541,7 +543,7 @@ export default function OnePieceDatabasePage() {
             {/* Card Image */}
             <div className="relative aspect-[2.5/3.5] bg-gray-800 rounded-xl overflow-hidden mb-6 max-w-[280px] mx-auto">
               <Image
-                src={getOfficialCardImage(selectedCard.id)}
+                src={getCleanCardImage(selectedCard.id)}
                 alt={selectedCard.card_name}
                 fill
                 className="object-contain"
@@ -704,7 +706,7 @@ export default function OnePieceDatabasePage() {
       {/* Footer */}
       <footer className="py-8 bg-gray-900 border-t border-gray-800">
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
-          <p>Data from OPTCG API. Card images from Bandai. One Piece is a trademark of Shueisha/Toei Animation.</p>
+          <p>Data from OPTCG API. Card images from Limitless TCG. One Piece is a trademark of Shueisha/Toei Animation.</p>
           <div className="flex justify-center gap-6 mt-4">
             <Link href="/other" className="hover:text-gray-300 transition-colors">Grade Cards</Link>
             <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms</Link>

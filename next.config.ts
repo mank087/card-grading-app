@@ -52,11 +52,18 @@ const nextConfig: NextConfig = {
         pathname: '/media/**',
       },
       {
-        // Official One Piece TCG card images from Bandai
+        // Official One Piece TCG card images from Bandai (has watermarks)
         protocol: 'https',
         hostname: 'en.onepiece-cardgame.com',
         port: '',
         pathname: '/images/cardlist/**',
+      },
+      {
+        // Limitless TCG One Piece card images (clean, no watermarks)
+        protocol: 'https',
+        hostname: 'limitlesstcg.nyc3.cdn.digitaloceanspaces.com',
+        port: '',
+        pathname: '/one-piece/**',
       },
     ],
   },
