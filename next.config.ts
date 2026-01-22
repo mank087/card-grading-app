@@ -44,6 +44,13 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        // One Piece TCG card images from OPTCG API
+        protocol: 'https',
+        hostname: 'optcgapi.com',
+        port: '',
+        pathname: '/media/**',
+      },
     ],
   },
 };
