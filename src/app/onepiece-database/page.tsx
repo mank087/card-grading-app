@@ -95,7 +95,7 @@ export default function OnePieceDatabasePage() {
     loadAuth()
   }, [])
 
-  // Load sets on mount
+  // Load sets on mount and select latest booster set by default
   useEffect(() => {
     const loadSets = async () => {
       try {
@@ -103,6 +103,12 @@ export default function OnePieceDatabasePage() {
         const data = await res.json()
         setSets(data.sets || [])
         setSetsByType(data.setsByType || {})
+
+        // Auto-select the latest booster set on page load
+        const boosterSets = data.setsByType?.['Booster Sets'] || []
+        if (boosterSets.length > 0) {
+          setSelectedSetId(boosterSets[0].id)
+        }
       } catch (err) {
         console.error('Failed to fetch sets:', err)
       }
