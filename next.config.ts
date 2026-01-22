@@ -65,6 +65,13 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/one-piece/**',
       },
+      {
+        // Lorcast Lorcana card images
+        protocol: 'https',
+        hostname: 'cards.lorcast.io',
+        port: '',
+        pathname: '/card/**',
+      },
     ],
   },
 };
