@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: January 20, 2026 (v7.7 - eBay Price Caching)
+> Last Updated: January 23, 2026 (v7.8 - One Piece TCG Support)
 
 ---
 
@@ -29,17 +29,18 @@
 
 ## 1. Project Overview
 
-**DCM Grading** is a full-stack card grading platform that uses AI (GPT-4o vision) to grade trading cards (Pokemon, MTG, Sports, Lorcana, Other). Users upload card images, receive AI-powered condition grades, and can download professional labels/reports.
+**DCM Grading** is a full-stack card grading platform that uses AI (GPT-4o vision) to grade trading cards (Pokemon, MTG, Sports, Lorcana, One Piece, Other). Users upload card images, receive AI-powered condition grades, and can download professional labels/reports.
 
 **Core Features:**
 - AI-powered card grading with three-pass consensus system
+- **v7.8: One Piece TCG support with variant-aware eBay search (parallel, manga, alt art, SP)**
 - **v7.7: eBay price caching with auto-refresh, collection value tracking, price charts**
 - **v7.6: Founders Package with lifetime benefits (150 credits, 20% discount, founder emblem)**
 - **v7.3: Unified cap system, execution flowchart, prompt consistency**
 - **v7.2: Visual Defect Identification Guide with defect hunting protocol**
 - **v7.1: Transparent subgrade-to-overall caps with 1:1 mapping**
 - **v7.0: Whole number grades only (1-10, no half-points)**
-- Support for multiple card types (Pokemon, MTG, Sports, Lorcana, Other)
+- Support for multiple card types (Pokemon, MTG, Sports, Lorcana, One Piece, Other)
 - Credit-based payment system via Stripe
 - User collection management
 - Public card search by serial number
@@ -86,6 +87,7 @@ src/
 │   ├── mtg/[id]/                 # MTG card detail
 │   ├── sports/[id]/              # Sports card detail
 │   ├── lorcana/[id]/             # Lorcana card detail
+│   ├── onepiece/[id]/            # One Piece card detail
 │   ├── other/[id]/               # Other card detail
 │   ├── unsubscribe/              # Email unsubscribe
 │   ├── admin/                    # Admin dashboard
@@ -165,6 +167,7 @@ src/
 | `/mtg/[id]` | `app/mtg/[id]/page.tsx` | MTG card details |
 | `/sports/[id]` | `app/sports/[id]/page.tsx` | Sports card details |
 | `/lorcana/[id]` | `app/lorcana/[id]/page.tsx` | Lorcana card details |
+| `/onepiece/[id]` | `app/onepiece/[id]/page.tsx` | One Piece card details |
 | `/other/[id]` | `app/other/[id]/page.tsx` | Other card details |
 
 ### Admin Pages
@@ -218,6 +221,7 @@ src/
 | `/api/mtg/[id]` | GET/DELETE | MTG card operations |
 | `/api/sports/[id]` | GET/DELETE | Sports card operations |
 | `/api/lorcana/[id]` | GET/DELETE | Lorcana card operations |
+| `/api/onepiece/[id]` | GET/DELETE | One Piece card operations |
 | `/api/other/[id]` | GET/DELETE | Other card operations |
 
 ### Pokemon Database (v7.4)
@@ -439,6 +443,99 @@ src/
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT false;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS founder_since TIMESTAMPTZ;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_founder_badge BOOLEAN DEFAULT true;
+```
+
+### v7.8 One Piece TCG Support (January 23, 2026)
+
+**Key Features:**
+
+1. **Full One Piece Card Grading Support**
+   - One Piece grading API route (`/api/onepiece/[id]`)
+   - One Piece card detail page (`/onepiece/[id]`)
+   - Upload pages for One Piece cards (`/upload/onepiece`, `/onepiece/upload`)
+   - Added to "Grade a Card" navigation dropdown
+   - Background grading polling support (`useBackgroundGrading.ts`)
+   - Grading prompt: `prompts/onepiece_delta_v5.txt`
+
+2. **One Piece-Specific eBay Integration**
+   - Variant-aware search: parallel, manga, alternate_art, sp, sec, promo
+   - `buildOnePieceCardQueries()` in `lib/ebay/browseApi.ts`
+   - `getOnePieceVariantSearchTerm()` maps variants to eBay search terms:
+     - `parallel`, `parallel_manga` → "parallel"
+     - `alternate_art`, `alt_art` → "alt art"
+     - `manga` → "manga art"
+     - `sp`, `special_parallel` → "SP"
+     - `sec`, `secret` → "secret rare"
+   - Progressive fallback query strategies (specific → moderate → broad)
+   - eBay category: `261330` (One Piece Card Game)
+
+3. **One Piece eBay Search URL Generation**
+   - `generateOnePieceEbaySearchUrl()` in `lib/ebayUtils.ts`
+   - Uses card name, card number, set name
+   - Proper category filtering for One Piece TCG
+
+4. **Label Data Generation**
+   - `getOnePieceName()`, `getOnePieceSetInfo()`, `getOnePieceFeatures()` in `labelDataGenerator.ts`
+   - Handles variant display (Parallel, Manga, Alt Art, SP, SEC)
+
+5. **Onboarding Tour Update**
+   - Added "Live Market Pricing" step to onboarding tour
+   - Description: "Live pricing from active online listings help provide a sense for card value. Historical pricing is updated weekly to provide a sense of on-going card fluctuations."
+   - Added `id="tour-live-market-pricing"` to all card detail pages (Sports, Pokemon, MTG, Lorcana, One Piece, Other)
+
+**Files Created:**
+
+| File | Purpose |
+|------|---------|
+| `app/api/onepiece/[id]/route.ts` | One Piece grading API (GET/DELETE) |
+| `app/onepiece/[id]/page.tsx` | One Piece card detail server component |
+| `app/onepiece/[id]/CardDetailClient.tsx` | One Piece card detail client component |
+| `app/onepiece/[id]/ImageZoomModal.tsx` | Image zoom modal for One Piece |
+| `app/onepiece/upload/page.tsx` | One Piece upload redirect |
+| `app/upload/onepiece/page.tsx` | One Piece upload page |
+| `prompts/onepiece_delta_v5.txt` | One Piece grading prompt delta |
+| `migrations/add_onepiece_card_reference_columns.sql` | Database migration |
+
+**Files Modified:**
+
+| File | Changes |
+|------|---------|
+| `app/ui/Navigation.tsx` | Added One Piece to Grade a Card dropdown |
+| `app/ui/Footer.tsx` | Added One Piece card grading link |
+| `app/upload/page.tsx` | Added One Piece category option |
+| `hooks/useBackgroundGrading.ts` | Added 'One Piece' to CARD_TYPES_CONFIG |
+| `lib/promptLoader_v5.ts` | Added 'onepiece' card type |
+| `lib/cardGradingSchema_v5.ts` | Added 'onepiece' to card type enum |
+| `lib/labelDataGenerator.ts` | Added One Piece label data functions |
+| `lib/ebay/browseApi.ts` | Added One Piece search functions with variant handling |
+| `lib/ebay/constants.ts` | Added 'One Piece' to DCM_TO_EBAY_CATEGORY |
+| `lib/ebayUtils.ts` | Added `generateOnePieceEbaySearchUrl()` |
+| `components/ebay/EbayPriceLookup.tsx` | Added 'onepiece' game_type, variant_type prop |
+| `components/ebay/EbayListingButton.tsx` | Added 'onepiece' cardType |
+| `components/ebay/EbayListingModal.tsx` | Added 'onepiece' cardType |
+| `app/api/ebay/prices/route.ts` | Added One Piece handler with variant support |
+| `components/onboarding/OnboardingTour.tsx` | Added Live Market Pricing tour step |
+| `app/*/[id]/CardDetailClient.tsx` | Added tour-live-market-pricing ID (all 6 card types) |
+
+**One Piece Variant Types:**
+- `parallel` - Foil/holo versions (most common variant)
+- `parallel_manga` - Manga art with parallel treatment
+- `manga` - Manga art style (non-foil)
+- `alternate_art` / `alt_art` - Different artwork from standard
+- `sp` / `special_parallel` - Premium special parallel
+- `sec` / `secret` - Secret rare variants
+- `promo` - Promotional cards
+- `don` / `leader` - DON!! cards and Leader cards
+
+**Database Migration:**
+```sql
+-- Add One Piece reference columns to cards table
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS onepiece_card_id TEXT;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS op_variant_type TEXT;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS onepiece_reference_image TEXT;
+ALTER TABLE cards ADD COLUMN IF NOT EXISTS onepiece_database_match_confidence VARCHAR(20);
+
+CREATE INDEX IF NOT EXISTS idx_cards_onepiece_card_id ON cards(onepiece_card_id) WHERE onepiece_card_id IS NOT NULL;
 ```
 
 ### v7.7 eBay Price Caching System (January 20, 2026)
@@ -1417,12 +1514,73 @@ PROMO CARD SUPPORT (v7.2):
   3. lookupSetByCardNumber() queries with set constraint
 ```
 
-### Scryfall API
+### Scryfall API (MTG Database)
 
 ```
 Base URL: https://api.scryfall.com
-Purpose: Verify MTG card info
-File: lib/mtgApiVerification.ts
+Purpose: Verify MTG card info and populate local database
+Files:
+  - lib/mtgApiVerification.ts     # MTG API verification
+  - lib/mtgCardMatcher.ts         # Database lookup + fuzzy matching
+  - scripts/import-mtg-database.js # Import script from Scryfall
+
+MTG LOCAL DATABASE:
+  Tables:
+  - mtg_sets (~700+ sets)
+  - mtg_cards (~80,000+ unique cards including all printings)
+
+  Import Script: scripts/import-mtg-database.js
+  Migration: migrations/add_mtg_cards_database.sql
+
+  Usage:
+    node scripts/import-mtg-database.js --full      # Full import
+    node scripts/import-mtg-database.js --sets-only # Only sets
+    node scripts/import-mtg-database.js --set MKM   # Single set
+
+DATABASE PAGE: /mtg-database
+  - Browse all MTG cards with search and filters
+  - Filter by set, colors, rarity, card type
+  - View card details and market links
+```
+
+### Lorcana Database (Lorcanito API)
+
+```
+Purpose: Disney Lorcana card database for validation
+Files:
+  - lib/lorcanaCardMatcher.ts         # Database lookup
+  - scripts/import-lorcana-database.js # Import script
+
+LORCANA LOCAL DATABASE:
+  Tables:
+  - lorcana_sets
+  - lorcana_cards
+
+  Import Script: scripts/import-lorcana-database.js
+  Migration: migrations/add_lorcana_cards_database.sql
+
+DATABASE PAGE: /lorcana-database
+  - Browse Lorcana cards with search and filters
+  - Filter by set, ink color, rarity
+  - View card details and market links
+```
+
+### One Piece Database (Future)
+
+```
+NOTE: One Piece TCG does not currently have a local database.
+      Cards are identified by AI grading only.
+
+POTENTIAL DATA SOURCES:
+  - One Piece TCG API (unofficial community APIs)
+  - Manual data entry
+  - Web scraping from official Bandai site
+
+When implementing, follow the pattern of:
+  - migrations/add_onepiece_cards_database.sql
+  - scripts/import-onepiece-database.js
+  - lib/onepieceCardMatcher.ts
+  - /onepiece-database page
 ```
 
 ### TCGdex API (Japanese Cards - v7.4)
@@ -1758,6 +1916,29 @@ node scripts/backfill-japanese-images.js
 - Sets dropdown updates based on language selection
 - Clear selected set when language changes
 
+### One Piece Card Grading Not Working
+- v7.8: Ensure 'One Piece' (with space) is used as category, not 'OnePiece'
+- Check `useBackgroundGrading.ts` has 'One Piece' in CARD_TYPES_CONFIG
+- Verify `prompts/onepiece_delta_v5.txt` exists
+- Check `lib/promptLoader_v5.ts` has 'onepiece' case in switch statement
+- Run migration: `migrations/add_onepiece_card_reference_columns.sql`
+
+### One Piece eBay Search Returns Wrong Card Version
+- v7.8: Variant type must be passed through the chain:
+  - `CardDetailClient.tsx` → `EbayPriceLookup` (variant_type prop)
+  - `EbayPriceLookup` → `/api/ebay/prices` (variant_type in request body)
+  - API → `searchOnePiecePricesWithFallback()` (variant_type in options)
+- Check `getOnePieceVariantSearchTerm()` maps the variant correctly
+- Common variants: parallel, manga, alternate_art, sp, sec
+- Debug: Server logs show `[eBay One Piece] Building queries - variant_type: "..."`
+
+### One Piece Card Label Shows Wrong Data
+- Check `labelDataGenerator.ts` has One Piece handlers:
+  - `getOnePieceName()` - card name extraction
+  - `getOnePieceSetInfo()` - set name and year
+  - `getOnePieceFeatures()` - variant badges
+- Verify `conversational_card_info` has correct fields from grading
+
 ### eBay Prices Not Showing on Collection Page
 - v7.7: Prices are cached to `ebay_price_*` columns on cards table
 - If prices show null: check `conversational_card_info` has required fields
@@ -1807,7 +1988,7 @@ node scripts/backfill-japanese-images.js
 
 ---
 
-*This guide covers active, working code as of January 2026 (v7.7). Deprecated files are not included.*
+*This guide covers active, working code as of January 2026 (v7.8). Deprecated files are not included.*
 
 ---
 
@@ -1815,6 +1996,7 @@ node scripts/backfill-japanese-images.js
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v7.8 | Jan 23, 2026 | One Piece TCG support, variant-aware eBay search, onboarding tour Live Market Pricing step |
 | v7.7 | Jan 20, 2026 | eBay price caching system, collection page pricing, batch refresh, price charts |
 | v7.6 | Dec 22, 2025 | Founders Package ($99, 150 credits, 20% lifetime discount, founder emblem on labels) |
 | v7.5 | Dec 19, 2025 | 3-step upload wizard, Reddit Pixel tracking, sports landing page, multi-select bulk delete, terms updates |
