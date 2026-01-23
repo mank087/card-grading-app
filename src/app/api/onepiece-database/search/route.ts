@@ -56,10 +56,11 @@ export async function GET(request: NextRequest) {
       query = query.eq('card_color', cardColor);
     }
 
-    // Order by set_id and card_number
+    // Order by set_id, card_number, and variant_type (base cards first)
     const { data, error, count } = await query
       .order('set_id', { ascending: false })
       .order('card_number', { ascending: true })
+      .order('variant_type', { nullsFirst: true })
       .range(offset, offset + limit - 1);
 
     if (error) {

@@ -24,6 +24,10 @@ interface OnePieceCard {
   card_image: string | null
   market_price: number | null
   inventory_price: number | null
+  // Variant fields
+  variant_type: string | null
+  base_card_id: string | null
+  original_name: string | null
 }
 
 interface OnePieceSet {
@@ -65,6 +69,11 @@ export default function OnePieceDatabasePage() {
   // Detail panel state
   const [selectedCard, setSelectedCard] = useState<OnePieceCard | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
+
+  // Variants state (for "See All Variants" feature)
+  const [variants, setVariants] = useState<OnePieceCard[]>([])
+  const [isLoadingVariants, setIsLoadingVariants] = useState(false)
+  const [showVariants, setShowVariants] = useState(false)
 
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -173,7 +182,46 @@ export default function OnePieceDatabasePage() {
   // Close card detail panel
   const closeCardDetail = () => {
     setIsPanelOpen(false)
+    setShowVariants(false)
+    setVariants([])
     setTimeout(() => setSelectedCard(null), 300)
+  }
+
+  // Get base card ID (strip variant suffix)
+  const getBaseCardId = (cardId: string) => {
+    // If card has base_card_id, use that, otherwise strip any variant suffix
+    return cardId.replace(/_[a-z_]+$/, '')
+  }
+
+  // Fetch all variants of a card
+  const fetchVariants = async (card: OnePieceCard) => {
+    const baseId = card.base_card_id || getBaseCardId(card.id)
+    setIsLoadingVariants(true)
+    try {
+      const res = await fetch(`/api/onepiece-database/variants?base_card_id=${baseId}`)
+      const data = await res.json()
+      setVariants(data.variants || [])
+      setShowVariants(true)
+    } catch (err) {
+      console.error('Failed to fetch variants:', err)
+    } finally {
+      setIsLoadingVariants(false)
+    }
+  }
+
+  // Switch to a different variant
+  const switchToVariant = (card: OnePieceCard) => {
+    setSelectedCard(card)
+    setShowVariants(false)
+  }
+
+  // Format variant type for display
+  const formatVariantType = (variantType: string | null) => {
+    if (!variantType) return 'Base'
+    return variantType
+      .split('_')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ')
   }
 
   // Get Grade CTA link based on auth state
@@ -644,13 +692,116 @@ export default function OnePieceDatabasePage() {
             )}
 
             {/* Set Info */}
-            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+            <div className="bg-gray-800 rounded-lg p-4 mb-4">
               <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">Set Information</div>
               <div className="text-white font-medium">{selectedCard.set_name}</div>
               <div className="text-gray-400 text-sm">
                 Set ID: {selectedCard.set_id}
               </div>
+              {selectedCard.variant_type && (
+                <div className="mt-2">
+                  <span className="inline-block px-2 py-1 bg-amber-600/30 border border-amber-500/50 rounded text-xs text-amber-300">
+                    {formatVariantType(selectedCard.variant_type)}
+                  </span>
+                </div>
+              )}
             </div>
+
+            {/* See All Variants Button */}
+            {!showVariants && (
+              <button
+                onClick={() => fetchVariants(selectedCard)}
+                disabled={isLoadingVariants}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-red-400 font-medium py-3 px-4 rounded-lg mb-4 transition-colors flex items-center justify-center gap-2"
+              >
+                {isLoadingVariants ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    See All Variants (Parallel, Manga, etc.)
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* All Variants View */}
+            {showVariants && variants.length > 0 && (
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">
+                    All Variants ({variants.length})
+                  </div>
+                  <button
+                    onClick={() => setShowVariants(false)}
+                    className="text-xs text-gray-400 hover:text-white"
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {variants.map((variant) => (
+                    <button
+                      key={variant.id}
+                      onClick={() => switchToVariant(variant)}
+                      className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                        variant.id === selectedCard.id
+                          ? 'bg-red-600/30 border border-red-500/50'
+                          : 'bg-gray-700/50 hover:bg-gray-700'
+                      }`}
+                    >
+                      <div className="relative w-10 h-14 flex-shrink-0 bg-gray-900 rounded overflow-hidden">
+                        <Image
+                          src={getCleanCardImage(variant.id)}
+                          alt={variant.card_name}
+                          fill
+                          className="object-contain"
+                          sizes="40px"
+                          unoptimized
+                          onError={(e) => {
+                            if (variant.card_image) {
+                              (e.target as HTMLImageElement).src = variant.card_image
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-white text-sm font-medium truncate">
+                          {formatVariantType(variant.variant_type)}
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          {variant.id}
+                        </div>
+                        {variant.market_price && (
+                          <div className="text-green-400 text-xs">
+                            {formatPrice(variant.market_price)}
+                          </div>
+                        )}
+                      </div>
+                      {variant.id === selectedCard.id && (
+                        <div className="text-red-400 text-xs">Current</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showVariants && variants.length === 1 && (
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="text-center text-gray-400 text-sm">
+                  No other variants found for this card.
+                </div>
+              </div>
+            )}
 
             {/* Market Price */}
             {(selectedCard.market_price || selectedCard.inventory_price) && (

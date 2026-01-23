@@ -91,6 +91,11 @@ export default function MtgDatabasePage() {
   const [selectedCard, setSelectedCard] = useState<MtgCard | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
 
+  // Printings state (for "See All Printings" feature)
+  const [printings, setPrintings] = useState<MtgCard[]>([])
+  const [isLoadingPrintings, setIsLoadingPrintings] = useState(false)
+  const [showPrintings, setShowPrintings] = useState(false)
+
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -217,7 +222,31 @@ export default function MtgDatabasePage() {
   // Close card detail panel
   const closeCardDetail = () => {
     setIsPanelOpen(false)
+    setShowPrintings(false)
+    setPrintings([])
     setTimeout(() => setSelectedCard(null), 300)
+  }
+
+  // Fetch all printings of a card
+  const fetchPrintings = async (oracleId: string) => {
+    if (!oracleId) return
+    setIsLoadingPrintings(true)
+    try {
+      const res = await fetch(`/api/mtg-database/printings?oracle_id=${oracleId}`)
+      const data = await res.json()
+      setPrintings(data.printings || [])
+      setShowPrintings(true)
+    } catch (err) {
+      console.error('Failed to fetch printings:', err)
+    } finally {
+      setIsLoadingPrintings(false)
+    }
+  }
+
+  // Switch to a different printing
+  const switchToPrinting = (card: MtgCard) => {
+    setSelectedCard(card)
+    setShowPrintings(false)
   }
 
   // Get Grade CTA link based on auth state
@@ -758,6 +787,91 @@ export default function MtgDatabasePage() {
                 </div>
               )}
             </div>
+
+            {/* See All Printings Button */}
+            {selectedCard.oracle_id && !showPrintings && (
+              <button
+                onClick={() => fetchPrintings(selectedCard.oracle_id!)}
+                disabled={isLoadingPrintings}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-indigo-400 font-medium py-3 px-4 rounded-lg mb-4 transition-colors flex items-center justify-center gap-2"
+              >
+                {isLoadingPrintings ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    See All Printings
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* All Printings View */}
+            {showPrintings && printings.length > 0 && (
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">
+                    All Printings ({printings.length})
+                  </div>
+                  <button
+                    onClick={() => setShowPrintings(false)}
+                    className="text-xs text-gray-400 hover:text-white"
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {printings.map((printing) => (
+                    <button
+                      key={printing.id}
+                      onClick={() => switchToPrinting(printing)}
+                      className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                        printing.id === selectedCard.id
+                          ? 'bg-indigo-600/30 border border-indigo-500/50'
+                          : 'bg-gray-700/50 hover:bg-gray-700'
+                      }`}
+                    >
+                      <div className="relative w-10 h-14 flex-shrink-0 bg-gray-900 rounded overflow-hidden">
+                        <Image
+                          src={printing.image_small || '/card-placeholder.png'}
+                          alt={printing.name}
+                          fill
+                          className="object-contain"
+                          sizes="40px"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="text-white text-sm font-medium truncate">
+                          {printing.set_name}
+                        </div>
+                        <div className="text-gray-400 text-xs">
+                          {printing.set_code.toUpperCase()} #{printing.collector_number}
+                          {printing.promo && ' (Promo)'}
+                          {printing.full_art && ' (Full Art)'}
+                        </div>
+                        {printing.price_usd && (
+                          <div className="text-green-400 text-xs">
+                            {formatPrice(printing.price_usd)}
+                          </div>
+                        )}
+                      </div>
+                      {printing.id === selectedCard.id && (
+                        <div className="text-indigo-400 text-xs">Current</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Legalities */}
             {selectedCard.legalities && Object.keys(selectedCard.legalities).length > 0 && (

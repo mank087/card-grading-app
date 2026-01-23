@@ -75,6 +75,11 @@ export default function LorcanaDatabasePage() {
   const [selectedCard, setSelectedCard] = useState<LorcanaCard | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
 
+  // Versions state (for "See All Versions" feature)
+  const [versions, setVersions] = useState<LorcanaCard[]>([])
+  const [isLoadingVersions, setIsLoadingVersions] = useState(false)
+  const [showVersions, setShowVersions] = useState(false)
+
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
 
@@ -182,7 +187,45 @@ export default function LorcanaDatabasePage() {
   // Close card detail panel
   const closeCardDetail = () => {
     setIsPanelOpen(false)
+    setShowVersions(false)
+    setVersions([])
     setTimeout(() => setSelectedCard(null), 300)
+  }
+
+  // Fetch all versions of a card
+  const fetchVersions = async (cardName: string) => {
+    if (!cardName) return
+    setIsLoadingVersions(true)
+    try {
+      const res = await fetch(`/api/lorcana-database/versions?name=${encodeURIComponent(cardName)}`)
+      const data = await res.json()
+      setVersions(data.versions || [])
+      setShowVersions(true)
+    } catch (err) {
+      console.error('Failed to fetch versions:', err)
+    } finally {
+      setIsLoadingVersions(false)
+    }
+  }
+
+  // Switch to a different version
+  const switchToVersion = (card: LorcanaCard) => {
+    setSelectedCard(card)
+    setShowVersions(false)
+  }
+
+  // Get rarity badge color
+  const getRarityBadgeStyle = (rarity: string | null) => {
+    const styles: Record<string, string> = {
+      'Common': 'bg-gray-600 text-white',
+      'Uncommon': 'bg-green-600 text-white',
+      'Rare': 'bg-blue-600 text-white',
+      'Super rare': 'bg-purple-600 text-white',
+      'Legendary': 'bg-amber-500 text-white',
+      'Enchanted': 'bg-gradient-to-r from-pink-500 to-purple-500 text-white',
+      'Promo': 'bg-red-600 text-white',
+    }
+    return styles[rarity || ''] || 'bg-gray-600 text-white'
   }
 
   // Get Grade CTA link based on auth state
@@ -650,13 +693,106 @@ export default function LorcanaDatabasePage() {
             )}
 
             {/* Set Info */}
-            <div className="bg-gray-800 rounded-lg p-4 mb-6">
+            <div className="bg-gray-800 rounded-lg p-4 mb-4">
               <div className="text-xs text-gray-500 uppercase tracking-wide mb-2">Set Information</div>
               <div className="text-white font-medium">{selectedCard.set_name}</div>
               <div className="text-gray-400 text-sm">
                 Set {selectedCard.set_code} · Card #{selectedCard.collector_number}
               </div>
             </div>
+
+            {/* See All Versions Button */}
+            {!showVersions && (
+              <button
+                onClick={() => fetchVersions(selectedCard.name)}
+                disabled={isLoadingVersions}
+                className="w-full bg-gray-800 hover:bg-gray-700 text-purple-400 font-medium py-3 px-4 rounded-lg mb-4 transition-colors flex items-center justify-center gap-2"
+              >
+                {isLoadingVersions ? (
+                  <>
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                    </svg>
+                    Loading...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    See All Versions (Enchanted, Promo, etc.)
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* All Versions View */}
+            {showVersions && versions.length > 0 && (
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-xs text-gray-500 uppercase tracking-wide">
+                    All Versions ({versions.length})
+                  </div>
+                  <button
+                    onClick={() => setShowVersions(false)}
+                    className="text-xs text-gray-400 hover:text-white"
+                  >
+                    Hide
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-64 overflow-y-auto">
+                  {versions.map((version) => (
+                    <button
+                      key={version.id}
+                      onClick={() => switchToVersion(version)}
+                      className={`w-full flex items-center gap-3 p-2 rounded-lg transition-colors ${
+                        version.id === selectedCard.id
+                          ? 'bg-purple-600/30 border border-purple-500/50'
+                          : 'bg-gray-700/50 hover:bg-gray-700'
+                      }`}
+                    >
+                      <div className="relative w-10 h-14 flex-shrink-0 bg-gray-900 rounded overflow-hidden">
+                        <Image
+                          src={version.image_small || version.image_normal || '/card-placeholder.png'}
+                          alt={version.full_name || version.name}
+                          fill
+                          className="object-contain"
+                          sizes="40px"
+                          unoptimized
+                        />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getRarityBadgeStyle(version.rarity)}`}>
+                            {version.rarity}
+                          </span>
+                        </div>
+                        <div className="text-gray-400 text-xs mt-0.5">
+                          {version.set_name} #{version.collector_number}
+                        </div>
+                        {version.price_usd && (
+                          <div className="text-green-400 text-xs">
+                            {formatPrice(version.price_usd)}
+                          </div>
+                        )}
+                      </div>
+                      {version.id === selectedCard.id && (
+                        <div className="text-purple-400 text-xs">Current</div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {showVersions && versions.length === 1 && (
+              <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                <div className="text-center text-gray-400 text-sm">
+                  No other versions found for this card.
+                </div>
+              </div>
+            )}
 
             {/* Market Price */}
             {(selectedCard.price_usd || selectedCard.price_usd_foil) && (
