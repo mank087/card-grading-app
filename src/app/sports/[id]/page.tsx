@@ -17,14 +17,38 @@ function stripMarkdown(text: string | null | undefined): string {
 function generateMetaKeywords(card: any, dvgGrading: any): string {
   const keywords: string[] = [];
 
-  // 🎯 v3.2: Extract card data - Use conversational_card_info first, then database fields, then DVG
-  // Supabase returns JSONB as objects - access directly like CardDetailClient does
-  const playerName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading?.card_info?.player_or_character || '';
-  const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading?.card_info?.year || '';
-  const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading?.card_info?.manufacturer || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading?.card_info?.set_name || '';
-  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading?.card_info?.subset || '';
-  const sport = stripMarkdown(card.conversational_card_info?.sport_or_category) || card.sport || dvgGrading?.card_info?.sport_or_category || card.category || 'sports';
+  // 🎯 v3.3: Prioritize database columns with proper validation
+  const playerName = getFirstValidValue(
+    card.featured,
+    card.conversational_card_info?.player_or_character,
+    dvgGrading?.card_info?.player_or_character
+  );
+  const year = getFirstValidValue(
+    card.release_date,
+    card.conversational_card_info?.year,
+    dvgGrading?.card_info?.year
+  );
+  const manufacturer = getFirstValidValue(
+    card.manufacturer_name,
+    card.conversational_card_info?.manufacturer,
+    dvgGrading?.card_info?.manufacturer
+  );
+  const setName = getFirstValidValue(
+    card.card_set,
+    card.conversational_card_info?.set_name,
+    dvgGrading?.card_info?.set_name
+  );
+  const subset = getFirstValidValue(
+    card.subset,
+    card.conversational_card_info?.subset,
+    dvgGrading?.card_info?.subset
+  );
+  const sport = getFirstValidValue(
+    card.sport,
+    card.conversational_card_info?.sport_or_category,
+    dvgGrading?.card_info?.sport_or_category,
+    card.category
+  ) || 'sports';
   const position = dvgGrading?.card_info?.position || '';
   const team = dvgGrading?.card_info?.team_association || '';
   const grade = card.conversational_decimal_grade ?? dvgGrading?.recommended_grade?.recommended_decimal_grade;
@@ -78,7 +102,7 @@ function generateMetaKeywords(card: any, dvgGrading: any): string {
     }
   }
 
-  const serialNum = stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading?.rarity_features?.serial_number;
+  const serialNum = getFirstValidValue(card.serial_numbering, card.conversational_card_info?.serial_number, dvgGrading?.rarity_features?.serial_number);
   if (serialNum && serialNum !== 'N/A') {
     keywords.push('serial numbered', 'limited edition', 'numbered card');
     keywords.push(serialNum.toLowerCase());
@@ -112,20 +136,56 @@ function isValidValue(value: any): boolean {
   if (cleaned === 'n/a') return false;
   if (cleaned === 'unknown player') return false;
   if (cleaned === 'unknown set') return false;
+  if (cleaned === 'null') return false;
+  if (cleaned === 'not visible') return false;
+  if (cleaned.startsWith('unknown ')) return false;
   return true;
+}
+
+// Helper: Get first valid value from a list of candidates (validates before fallback)
+function getFirstValidValue(...values: (string | null | undefined)[]): string {
+  for (const value of values) {
+    const stripped = stripMarkdown(value);
+    if (isValidValue(stripped)) return stripped;
+  }
+  return '';
 }
 
 // Helper: Build enhanced title
 function buildTitle(card: any, dvgGrading: any): string {
-  // 🎯 v3.2: Use conversational AI data first, then database fields, then DVG fallback
-  // Supabase returns JSONB as objects - access directly like CardDetailClient does
-  const playerName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading?.card_info?.player_or_character || '';
-  const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading?.card_info?.year || '';
-  const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading?.card_info?.manufacturer || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading?.card_info?.set_name || '';
-  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading?.card_info?.subset || '';
+  // 🎯 v3.3: Prioritize database columns (populated by AI grading) over JSONB, with proper validation
+  // Use getFirstValidValue to skip invalid values like "Unknown Player" before falling back
+  const playerName = getFirstValidValue(
+    card.featured,  // Database column first (populated by grading)
+    card.conversational_card_info?.player_or_character,
+    dvgGrading?.card_info?.player_or_character
+  );
+  const year = getFirstValidValue(
+    card.release_date,  // Database column first
+    card.conversational_card_info?.year,
+    dvgGrading?.card_info?.year
+  );
+  const manufacturer = getFirstValidValue(
+    card.manufacturer_name,  // Database column first
+    card.conversational_card_info?.manufacturer,
+    dvgGrading?.card_info?.manufacturer
+  );
+  const setName = getFirstValidValue(
+    card.card_set,  // Database column first
+    card.conversational_card_info?.set_name,
+    dvgGrading?.card_info?.set_name
+  );
+  const subset = getFirstValidValue(
+    card.subset,  // Database column first
+    card.conversational_card_info?.subset,
+    dvgGrading?.card_info?.subset
+  );
+  const cardName = getFirstValidValue(
+    card.card_name,  // Database column first
+    card.conversational_card_info?.card_name,
+    dvgGrading?.card_info?.card_name
+  );
   const grade = card.conversational_decimal_grade ?? dvgGrading?.recommended_grade?.recommended_decimal_grade ?? card.dvg_decimal_grade;
-  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading?.card_info?.card_name || '';
 
   // Special features - v3.2 conversational AI first
   const isRookie = card.conversational_card_info?.rookie_or_first ||
@@ -135,7 +195,7 @@ function buildTitle(card: any, dvgGrading: any): string {
   const hasAuto = card.conversational_card_info?.autographed ||
                   (card.autograph_type && card.autograph_type !== 'none') ||
                   dvgGrading?.rarity_features?.autograph?.present;
-  const serialNum = stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading?.rarity_features?.serial_number;
+  const serialNum = getFirstValidValue(card.serial_numbering, card.conversational_card_info?.serial_number, dvgGrading?.rarity_features?.serial_number);
 
   const titleParts: string[] = [];
 
@@ -202,15 +262,38 @@ function buildTitle(card: any, dvgGrading: any): string {
 
 // Helper: Build enhanced description
 function buildDescription(card: any, dvgGrading: any): string {
-  // 🎯 v3.2: Use conversational AI data first, then database fields, then DVG fallback
-  // Supabase returns JSONB as objects - access directly like CardDetailClient does
-  const playerName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || dvgGrading?.card_info?.player_or_character || '';
-  const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading?.card_info?.year || '';
-  const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading?.card_info?.manufacturer || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading?.card_info?.set_name || '';
-  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading?.card_info?.subset || '';
+  // 🎯 v3.3: Prioritize database columns with proper validation
+  const playerName = getFirstValidValue(
+    card.featured,
+    card.conversational_card_info?.player_or_character,
+    dvgGrading?.card_info?.player_or_character
+  );
+  const year = getFirstValidValue(
+    card.release_date,
+    card.conversational_card_info?.year,
+    dvgGrading?.card_info?.year
+  );
+  const manufacturer = getFirstValidValue(
+    card.manufacturer_name,
+    card.conversational_card_info?.manufacturer,
+    dvgGrading?.card_info?.manufacturer
+  );
+  const setName = getFirstValidValue(
+    card.card_set,
+    card.conversational_card_info?.set_name,
+    dvgGrading?.card_info?.set_name
+  );
+  const subset = getFirstValidValue(
+    card.subset,
+    card.conversational_card_info?.subset,
+    dvgGrading?.card_info?.subset
+  );
+  const cardName = getFirstValidValue(
+    card.card_name,
+    card.conversational_card_info?.card_name,
+    dvgGrading?.card_info?.card_name
+  );
   const grade = card.conversational_decimal_grade ?? dvgGrading?.recommended_grade?.recommended_decimal_grade;
-  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading?.card_info?.card_name || '';
 
   // 🎯 v3.2: Use condition_label if available, otherwise derive from grade
   const gradeDesc = card.conversational_condition_label?.replace(/\s*\([A-Z]+\)/, '') || (grade !== null && grade !== undefined ? (() => {
@@ -240,7 +323,7 @@ function buildDescription(card: any, dvgGrading: any): string {
     features.push(autoType === 'on-card' ? 'on-card auto' : autoType);
   }
 
-  const serialNum = stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading?.rarity_features?.serial_number;
+  const serialNum = getFirstValidValue(card.serial_numbering, card.conversational_card_info?.serial_number, dvgGrading?.rarity_features?.serial_number);
   if (serialNum && serialNum !== 'N/A') {
     features.push(serialNum);
   }

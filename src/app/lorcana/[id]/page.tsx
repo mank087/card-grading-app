@@ -23,20 +23,33 @@ function isValidValue(value: any): boolean {
   if (cleaned === 'n/a') return false;
   if (cleaned === 'not visible') return false;
   if (cleaned === 'null') return false;
+  if (cleaned.startsWith('unknown ')) return false;
   return true;
+}
+
+// Helper: Get first valid value from a list of candidates (validates before fallback)
+function getFirstValidValue(...values: (string | null | undefined)[]): string {
+  for (const value of values) {
+    const stripped = stripMarkdown(value);
+    if (isValidValue(stripped)) return stripped;
+  }
+  return '';
 }
 
 // Helper: Generate meta keywords for Lorcana cards
 function generateMetaKeywords(card: any): string {
   const keywords: string[] = [];
 
-  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
-  const characterName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
-  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
-  const year = card.conversational_card_info?.set_year || card.set_year || '';
-  const rarity = stripMarkdown(card.conversational_card_info?.rarity) || card.rarity || '';
-  const inkColor = stripMarkdown(card.conversational_card_info?.ink_color) || card.ink_color || '';
+  // 🎯 v3.3: Prioritize database columns (verified from internal database) over JSONB
+  const cardName = getFirstValidValue(card.card_name, card.conversational_card_info?.card_name);
+  const characterName = getFirstValidValue(card.featured, card.conversational_card_info?.player_or_character);
+  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  const cardNumber = getFirstValidValue(card.card_number, card.conversational_card_info?.card_number);
+  // Extract year from release_date if it's a full date string
+  const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year, card.set_year);
+  const rarity = getFirstValidValue(card.rarity, card.conversational_card_info?.rarity);
+  const inkColor = getFirstValidValue(card.ink_color, card.conversational_card_info?.ink_color);
   const grade = card.conversational_decimal_grade;
 
   // Core keywords - card name and character variations
@@ -96,11 +109,13 @@ function generateMetaKeywords(card: any): string {
 // Helper: Build dynamic title for Lorcana cards
 // Format matches Sports cards: Card Name Year Set #Number - DCM Grade X
 function buildTitle(card: any): string {
-  // Use conversational AI data first, then database fields
-  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
-  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
-  const year = card.conversational_card_info?.set_year || card.set_year || '';
+  // 🎯 v3.3: Prioritize database columns (verified from internal database) over JSONB
+  const cardName = getFirstValidValue(card.card_name, card.conversational_card_info?.card_name);
+  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  const cardNumber = getFirstValidValue(card.card_number, card.conversational_card_info?.card_number);
+  // Extract year from release_date if it's a full date string
+  const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year, card.set_year);
   const grade = card.conversational_decimal_grade;
 
   const titleParts: string[] = [];
@@ -152,9 +167,12 @@ function buildTitle(card: any): string {
 
 // Helper: Build description for Lorcana cards
 function buildDescription(card: any): string {
-  const cardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
-  const year = card.conversational_card_info?.set_year || card.set_year || '';
+  // 🎯 v3.3: Prioritize database columns (verified from internal database) over JSONB
+  const cardName = getFirstValidValue(card.card_name, card.conversational_card_info?.card_name);
+  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  // Extract year from release_date if it's a full date string
+  const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year, card.set_year);
   const grade = card.conversational_decimal_grade;
 
   const gradeDesc = card.conversational_condition_label?.replace(/\s*\([A-Z]+\)/, '') || (grade !== null && grade !== undefined ? (() => {

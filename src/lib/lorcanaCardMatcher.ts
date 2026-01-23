@@ -8,7 +8,7 @@ import { supabaseServer } from './supabaseServer';
  * Lorcana card data from our local database
  */
 export interface LorcanaCard {
-  id: string;                    // Card UUID from Lorcast
+  id: string;                    // Card UUID from Lorcast (format: crd_xxx)
   name: string;                  // "Elsa", "Mickey Mouse"
   version: string | null;        // "Spirit of Winter", "True Friend"
   full_name: string;             // "Elsa - Spirit of Winter"
@@ -24,6 +24,7 @@ export interface LorcanaCard {
   strength: number | null;       // Strength value
   willpower: number | null;      // Willpower value
   lore: number | null;           // Lore gained when questing
+  move_cost: number | null;      // Move cost for location cards
   card_text: string | null;      // Ability text
   flavor_text: string | null;    // Flavor text
   keywords: string[] | null;     // ["Challenger", "Evasive"]
@@ -34,6 +35,8 @@ export interface LorcanaCard {
   illustrators: string[] | null; // Artist names
   price_usd: number | null;      // TCGPlayer USD price
   price_usd_foil: number | null; // Foil price
+  released_at: string | null;    // Release date "2025-05-30"
+  lang: string | null;           // Language "en"
 }
 
 /**
@@ -145,12 +148,48 @@ export function parseCardNumber(cardNumber: string): { setCode: string | null; c
 }
 
 /**
- * Normalize collector number (remove leading zeros, etc.)
+ * Normalize collector number (remove leading zeros, handle complex formats, etc.)
+ * Handles formats like:
+ * - "214" → "214"
+ * - "214/204" → "214"
+ * - "214/204 • EN • 8" → "214"
  */
 export function normalizeCollectorNumber(num: string): string {
   if (!num) return '';
+
+  let normalized = num.trim();
+
+  // Handle complex format "214/204 • EN • 8" - extract just the first number
+  // This format includes: cardNumber/setTotal • language • setCode
+  const complexMatch = normalized.match(/^(\d+)\s*[\/•]/);
+  if (complexMatch) {
+    normalized = complexMatch[1];
+  } else {
+    // Handle simple "214/204" format
+    const slashMatch = normalized.match(/^(\d+)\s*\/\s*\d+$/);
+    if (slashMatch) {
+      normalized = slashMatch[1];
+    }
+  }
+
   // Remove leading zeros but keep at least one digit
-  return num.replace(/^0+/, '') || '0';
+  return normalized.replace(/^0+/, '') || '0';
+}
+
+/**
+ * Extract set code from complex card number format
+ * Handles formats like "214/204 • EN • 8" where 8 is the set code
+ */
+export function extractSetCodeFromCardNumber(cardNumber: string): string | null {
+  if (!cardNumber) return null;
+
+  // Format: "214/204 • EN • 8" - the last number after bullets is often the set code
+  const complexMatch = cardNumber.match(/•\s*(\d+)\s*$/);
+  if (complexMatch) {
+    return complexMatch[1];
+  }
+
+  return null;
 }
 
 /**
@@ -427,6 +466,42 @@ export async function lookupLorcanaCard(
           warnings: []
         }
       };
+    }
+    // Strategy 1b: Set+number failed, try just collector number across ALL sets
+    // This handles AI misidentifying the set name
+    console.log('[Lorcana Matcher] Set/number lookup failed, trying collector number across all sets...');
+    const numberResults = await searchByCollectorNumber(aiIdentification.collectorNumber);
+    if (numberResults.length > 0) {
+      console.log(`[Lorcana Matcher] Found ${numberResults.length} cards with collector number ${normalizeCollectorNumber(aiIdentification.collectorNumber)}`);
+      // Use name to find best match among results
+      if (aiIdentification.name) {
+        const bestMatch = findBestMatchWithConfidence(numberResults, aiIdentification);
+        if (bestMatch.card && bestMatch.confidence.overallConfidence !== 'low') {
+          console.log(`[Lorcana Matcher] Best match by number+name: ${bestMatch.card.full_name} (${bestMatch.card.set_name})`);
+          bestMatch.confidence.warnings.push(`AI set "${aiIdentification.set}" was incorrect, found in "${bestMatch.card.set_name}"`);
+          return bestMatch;
+        }
+      }
+      // If only one result, use it with medium confidence
+      if (numberResults.length === 1) {
+        console.log(`[Lorcana Matcher] Single match by number: ${numberResults[0].full_name} (${numberResults[0].set_name})`);
+        return {
+          card: numberResults[0],
+          score: 0.8,
+          confidence: {
+            setCodeMatched: false,
+            setCodeScore: 0,
+            numberMatched: true,
+            numberScore: 1.0,
+            nameMatched: false,
+            nameScore: 0,
+            overallConfidence: 'medium',
+            matchedFeatures: 1,
+            totalFeatures: 2,
+            warnings: [`AI set "${aiIdentification.set}" was incorrect, found in "${numberResults[0].set_name}"`]
+          }
+        };
+      }
     }
   }
 

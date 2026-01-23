@@ -11,6 +11,8 @@ import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
+// CARD IDENTIFICATION: Local Supabase database lookup for Lorcana cards
+import { lookupLorcanaCard, extractSetCodeFromCardNumber, type LorcanaCard } from "@/lib/lorcanaCardMatcher";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -809,6 +811,134 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       }
     }
 
+    // 🎯 DATABASE LOOKUP: Cross-reference AI identification with internal Lorcana database
+    let matchedDatabaseCard: LorcanaCard | null = null;
+    let databaseMatchConfidence: string | null = null;
+
+    if (conversationalGradingData?.card_info) {
+      try {
+        const aiCardInfo = conversationalGradingData.card_info;
+        console.log(`[GET /api/lorcana/${cardId}] 🔍 Looking up card in internal database...`);
+        console.log(`[GET /api/lorcana/${cardId}]   AI identified: name="${aiCardInfo.card_name}", set="${aiCardInfo.set_name}", number="${aiCardInfo.card_number}"`);
+
+        // Extract set code from AI response (may be in expansion_code or derived from set_name)
+        let setCode = aiCardInfo.expansion_code || null;
+
+        // Try to derive set code from set name if not provided
+        // Lorcana sets are numbered: "The First Chapter" = "1", "Rise of the Floodborn" = "2", etc.
+        if (!setCode && aiCardInfo.set_name) {
+          const setNameLower = aiCardInfo.set_name.toLowerCase();
+          // Main sets (1-11+)
+          if (setNameLower.includes('first chapter')) setCode = '1';
+          else if (setNameLower.includes('rise of the floodborn') || setNameLower.includes('floodborn')) setCode = '2';
+          else if (setNameLower.includes('into the inklands') || setNameLower.includes('inklands')) setCode = '3';
+          else if (setNameLower.includes('ursula\'s return') || setNameLower.includes('ursulas return')) setCode = '4';
+          else if (setNameLower.includes('shimmering skies')) setCode = '5';
+          else if (setNameLower.includes('azurite sea') || setNameLower.includes('azurite')) setCode = '6';
+          else if (setNameLower.includes('archazia\'s island') || setNameLower.includes('archazia')) setCode = '7';
+          else if (setNameLower.includes('reign of jafar') || setNameLower.includes('jafar')) setCode = '8';
+          else if (setNameLower.includes('fabled')) setCode = '9';
+          else if (setNameLower.includes('whispers in the well') || setNameLower.includes('whispers')) setCode = '10';
+          else if (setNameLower.includes('winterspell')) setCode = '11';
+          // Promo and special sets
+          else if (setNameLower.includes('promo set 1') || setNameLower === 'p1') setCode = 'P1';
+          else if (setNameLower.includes('promo set 2') || setNameLower === 'p2') setCode = 'P2';
+          else if (setNameLower.includes('challenge promo')) setCode = 'cp';
+          else if (setNameLower.includes('d23')) setCode = 'D23';
+
+          if (setCode) {
+            console.log(`[GET /api/lorcana/${cardId}]   Derived set code: "${setCode}" from set name: "${aiCardInfo.set_name}"`);
+          }
+        }
+
+        // If still no set code, try to extract from card number format "214/204 • EN • 8"
+        // The last number after bullets is often the set code
+        if (!setCode && aiCardInfo.card_number) {
+          const extractedSetCode = extractSetCodeFromCardNumber(aiCardInfo.card_number);
+          if (extractedSetCode) {
+            setCode = extractedSetCode;
+            console.log(`[GET /api/lorcana/${cardId}]   Extracted set code: "${setCode}" from card number: "${aiCardInfo.card_number}"`);
+          }
+        }
+
+        const matchResult = await lookupLorcanaCard({
+          setCode: setCode,
+          collectorNumber: aiCardInfo.card_number,
+          name: aiCardInfo.card_name,
+          set: aiCardInfo.set_name
+        });
+
+        if (matchResult.card && matchResult.confidence.overallConfidence !== 'low') {
+          matchedDatabaseCard = matchResult.card;
+          databaseMatchConfidence = matchResult.confidence.overallConfidence;
+
+          console.log(`[GET /api/lorcana/${cardId}] ✅ Database match found (${databaseMatchConfidence} confidence):`);
+          console.log(`[GET /api/lorcana/${cardId}]   DB: ${matchResult.card.full_name} (${matchResult.card.set_name}) #${matchResult.card.collector_number}`);
+          console.log(`[GET /api/lorcana/${cardId}]   Rarity: ${matchResult.card.rarity}, Ink: ${matchResult.card.ink}`);
+
+          // Enhance card_info with verified database data
+          // IMPORTANT: Database values take priority over AI-identified values for accuracy
+          // AI should only be trusted for: card name (OCR), card number (OCR), and grading
+          // All other details come from our verified internal database
+          const dbCard = matchResult.card;
+          const releaseYear = dbCard.released_at ? new Date(dbCard.released_at).getFullYear().toString() : null;
+
+          conversationalGradingData.card_info = {
+            ...conversationalGradingData.card_info,
+            // === CORE IDENTIFICATION (verified from database) ===
+            card_name: dbCard.full_name,
+            character_name: dbCard.name,
+            character_version: dbCard.version,
+            set_name: dbCard.set_name,
+            card_number: dbCard.collector_number,
+            expansion_code: dbCard.set_code,
+            // === RELEASE INFO (from database, not AI) ===
+            year: releaseYear,
+            set_year: releaseYear,
+            release_date: dbCard.released_at,
+            // === LORCANA-SPECIFIC ATTRIBUTES (from database) ===
+            ink_color: dbCard.ink,
+            lorcana_card_type: dbCard.card_type ? dbCard.card_type.join(', ') : null,
+            inkwell: dbCard.inkwell,
+            ink_cost: dbCard.cost,
+            strength: dbCard.strength,
+            willpower: dbCard.willpower,
+            lore_value: dbCard.lore,
+            move_cost: dbCard.move_cost,
+            // === CARD TEXT & ABILITIES (from database) ===
+            card_front_text: dbCard.card_text,
+            flavor_text: dbCard.flavor_text,
+            classifications: dbCard.classifications || null,
+            abilities: dbCard.keywords || null,
+            // === RARITY & ARTIST (from database) ===
+            rarity_or_variant: dbCard.rarity,
+            rarity_tier: dbCard.rarity,
+            illustrators: dbCard.illustrators || null,
+            artist_name: dbCard.illustrators ? dbCard.illustrators.join(', ') : null,
+            // === PRICING (from database if available) ===
+            price_usd: dbCard.price_usd,
+            price_usd_foil: dbCard.price_usd_foil,
+            // === DATABASE REFERENCE ===
+            _database_match: {
+              lorcana_card_id: dbCard.id,
+              match_confidence: databaseMatchConfidence,
+              match_score: matchResult.score,
+              image_url: dbCard.image_normal || dbCard.image_large
+            }
+          };
+
+          console.log(`[GET /api/lorcana/${cardId}] ✅ Card info enhanced with database data`);
+        } else {
+          console.log(`[GET /api/lorcana/${cardId}] ⚠️ No high-confidence database match found`);
+          if (matchResult.confidence.warnings.length > 0) {
+            matchResult.confidence.warnings.forEach(w => console.log(`[GET /api/lorcana/${cardId}]   Warning: ${w}`));
+          }
+        }
+      } catch (dbLookupError) {
+        console.error(`[GET /api/lorcana/${cardId}] ⚠️ Database lookup failed:`, dbLookupError);
+      }
+    }
+
     // Extract Lorcana card grade information
     const { rawGrade, wholeGrade, confidence } = extractLorcanaGradeInfo(gradingResult);
 
@@ -890,6 +1020,15 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       // Individual searchable/sortable columns (Lorcana-specific - merged from both sources)
       ...cardFields,
 
+      // 🎯 Database-matched card reference (for verified card identification)
+      // Note: lorcana_card_id column requires TEXT type (Lorcast IDs are "crd_xxx" format, not UUID)
+      // Run migrations/fix_lorcana_card_id_type.sql if you want to store the ID in a dedicated column
+      ...(matchedDatabaseCard && {
+        // lorcana_card_id: matchedDatabaseCard.id,  // Commented out until column type is fixed
+        lorcana_reference_image: matchedDatabaseCard.image_normal || matchedDatabaseCard.image_large,
+        database_match_confidence: databaseMatchConfidence
+      }),
+
       // Processing metadata
       processing_time: Date.now() - startTime
     };
@@ -968,6 +1107,10 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       front_url: frontUrl,
       back_url: backUrl,
       processing_time: Date.now() - startTime,
+      // 🎯 Database-matched card reference
+      lorcana_card_id: matchedDatabaseCard?.id || null,
+      lorcana_reference_image: matchedDatabaseCard?.image_normal || matchedDatabaseCard?.image_large || null,
+      database_match_confidence: databaseMatchConfidence,
       // ⭐ Card owner's founder status (for founder emblem on public card labels)
       owner_is_founder: ownerIsFounder,
       owner_show_founder_badge: ownerShowFounderBadge

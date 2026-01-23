@@ -2339,34 +2339,37 @@ export function PokemonCardDetails() {
     return englishPart ? englishPart.trim() : text;
   };
 
-  // 🎯 v3.2: Use conversational_card_info first, then database fields, then DVG fallback
-  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name;
+  // 🎯 v3.3: Prioritize database columns (verified from OCR override/internal DB) over JSONB (AI-provided)
+  // This ensures verified data takes precedence, consistent with Lorcana approach
+  const setNameRaw = card.card_set || stripMarkdown(card.conversational_card_info?.set_name) || dvgGrading.card_info?.set_name;
   const subsetRaw = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset;
   // Combine set name with subset if available (matching foldable label format)
   const setNameWithSubset = subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw;
+  // Extract year from release_date if it's a full date string (e.g., "2024-01-15" -> "2024")
+  const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
   const cardInfo = {
-    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
-    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
+    card_name: card.card_name || stripMarkdown(card.conversational_card_info?.card_name) || dvgGrading.card_info?.card_name,
+    player_or_character: card.pokemon_featured || card.featured || stripMarkdown(card.conversational_card_info?.player_or_character) || dvgGrading.card_info?.player_or_character,
     set_name: setNameWithSubset,
     set_era: stripMarkdown(card.conversational_card_info?.set_era) || dvgGrading.card_info?.set_era,  // 🆕 Set era fallback when set_name is unknown
-    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
+    year: releaseYear || stripMarkdown(card.conversational_card_info?.year) || dvgGrading.card_info?.year,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
-    // Prefer card_number_raw for display (full "94/102"), fallback to card_number (numerator "94")
-    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
-    sport_or_category: stripMarkdown(card.conversational_card_info?.sport_or_category) || card.category || dvgGrading.card_info?.sport_or_category,
-    serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
-    rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
+    // Prefer database column for card_number (verified), then card_number_raw for display (full "94/102")
+    card_number: card.card_number || stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || dvgGrading.card_info?.card_number,
+    sport_or_category: card.category || stripMarkdown(card.conversational_card_info?.sport_or_category) || dvgGrading.card_info?.sport_or_category,
+    serial_number: card.serial_numbering || stripMarkdown(card.conversational_card_info?.serial_number) || dvgGrading.card_info?.serial_number,
+    rookie_or_first: card.rookie_card || card.conversational_card_info?.rookie_or_first || dvgGrading.card_info?.rookie_or_first,
     subset: subsetRaw, // Keep separate for special features display
-    rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || card.rarity_description || dvgGrading.card_info?.rarity_tier,
-    autographed: card.conversational_card_info?.autographed === true || card.autographed === true || card.autograph_type === 'authentic',
-    memorabilia: card.conversational_card_info?.memorabilia === true || card.memorabilia_type !== 'none',
+    rarity_tier: card.rarity_tier || card.rarity_description || stripMarkdown(card.conversational_card_info?.rarity_tier) || dvgGrading.card_info?.rarity_tier,
+    autographed: card.autographed === true || card.autograph_type === 'authentic' || card.conversational_card_info?.autographed === true,
+    memorabilia: card.memorabilia_type !== 'none' || card.conversational_card_info?.memorabilia === true,
     card_front_text: card.conversational_card_info?.card_front_text || dvgGrading.card_info?.card_front_text,  // 🆕 Card front text (abilities, attacks)
     card_back_text: card.conversational_card_info?.card_back_text || dvgGrading.card_info?.card_back_text,  // 🆕 Card back description
-    // Pokemon-specific fields
-    pokemon_type: stripMarkdown(card.conversational_card_info?.pokemon_type) || card.pokemon_type || null,
-    pokemon_stage: stripMarkdown(card.conversational_card_info?.pokemon_stage) || card.pokemon_stage || null,
-    hp: stripMarkdown(card.conversational_card_info?.hp) || card.hp || null,
-    card_type: stripMarkdown(card.conversational_card_info?.card_type) || card.card_type || null
+    // Pokemon-specific fields - prioritize database columns
+    pokemon_type: card.pokemon_type || stripMarkdown(card.conversational_card_info?.pokemon_type) || null,
+    pokemon_stage: card.pokemon_stage || stripMarkdown(card.conversational_card_info?.pokemon_stage) || null,
+    hp: card.hp || stripMarkdown(card.conversational_card_info?.hp) || null,
+    card_type: card.card_type || stripMarkdown(card.conversational_card_info?.card_type) || null
   };
 
   // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images

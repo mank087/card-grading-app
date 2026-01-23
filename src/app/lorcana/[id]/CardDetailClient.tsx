@@ -2334,19 +2334,42 @@ export function MTGCardDetails() {
     return englishPart ? englishPart.trim() : str;
   };
 
-  // 🎯 v3.2: Use conversational_card_info first, then database fields, then DVG fallback
-  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || dvgGrading.card_info?.set_name;
+  // 🎯 v3.2: Use database columns FIRST (they have enhanced/verified data), then conversational_card_info, then DVG fallback
+  // IMPORTANT: For Lorcana, the grading route enhances card_info with verified database data
+  // The individual columns (card_set, ink_color, etc.) are updated with these verified values
+  // So we prioritize individual columns over the JSONB field which may contain original AI values
+
+  // Helper to check if a value is valid (not empty, not "Unknown", etc.)
+  const isValidSetName = (value: any): boolean => {
+    if (!value) return false;
+    if (typeof value !== 'string') return false;
+    const cleaned = value.trim().toLowerCase();
+    if (cleaned === '') return false;
+    if (cleaned === 'unknown') return false;
+    if (cleaned.includes('unknown lorcana')) return false;
+    if (cleaned === 'n/a') return false;
+    return true;
+  };
+
+  // Prioritize individual columns over JSONB for fields that are enhanced from database
+  const setNameRaw = isValidSetName(card.card_set) ? card.card_set :
+                     isValidSetName(card.conversational_card_info?.set_name) ? stripMarkdown(card.conversational_card_info?.set_name) :
+                     dvgGrading.card_info?.set_name || 'Unknown Set';
   const subsetRaw = stripMarkdown(card.conversational_card_info?.subset) || card.subset || dvgGrading.card_info?.subset;
   // Combine set name with subset if available (matching foldable label format)
-  const setNameWithSubset = subsetRaw ? `${setNameRaw} - ${subsetRaw}` : setNameRaw;
+  const setNameWithSubset = subsetRaw && !setNameRaw.toLowerCase().includes(subsetRaw.toLowerCase()) ? `${setNameRaw} - ${subsetRaw}` : setNameRaw;
+
+  // Get year from database release_date first (enhanced from Lorcana database), then AI
+  const yearRaw = card.release_date || stripMarkdown(card.conversational_card_info?.year) || dvgGrading.card_info?.year;
+
   const cardInfo = {
     card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || dvgGrading.card_info?.card_name,
     player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
     set_name: setNameWithSubset,
     set_era: stripMarkdown(card.conversational_card_info?.set_era) || dvgGrading.card_info?.set_era,  // 🆕 Set era fallback when set_name is unknown
-    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || dvgGrading.card_info?.year,
+    year: yearRaw,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || dvgGrading.card_info?.manufacturer,
-    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || dvgGrading.card_info?.card_number,
+    card_number: card.card_number || stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || dvgGrading.card_info?.card_number,
     sport_or_category: stripMarkdown(card.conversational_card_info?.sport_or_category) || card.category || dvgGrading.card_info?.sport_or_category,
     serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
     rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
@@ -2361,27 +2384,27 @@ export function MTGCardDetails() {
     pokemon_stage: stripMarkdown(card.conversational_card_info?.pokemon_stage) || card.pokemon_stage || null,
     hp: stripMarkdown(card.conversational_card_info?.hp) || card.hp || null,
     card_type: stripMarkdown(card.conversational_card_info?.card_type) || card.card_type || null,
-    // ✨ LORCANA-SPECIFIC FIELDS
-    ink_color: stripMarkdown(card.conversational_card_info?.ink_color) || card.ink_color || null,
-    lorcana_card_type: stripMarkdown(card.conversational_card_info?.lorcana_card_type) || card.lorcana_card_type || null,
-    character_version: stripMarkdown(card.conversational_card_info?.character_version) || card.character_version || null,
-    inkwell: card.conversational_card_info?.inkwell !== undefined ? card.conversational_card_info.inkwell : (card.inkwell || false),
-    ink_cost: stripMarkdown(card.conversational_card_info?.ink_cost) || card.ink_cost || null,
-    strength: stripMarkdown(card.conversational_card_info?.strength) || card.strength || null,
-    willpower: stripMarkdown(card.conversational_card_info?.willpower) || card.willpower || null,
-    lore_value: stripMarkdown(card.conversational_card_info?.lore_value) || card.lore_value || null,
-    move_cost: stripMarkdown(card.conversational_card_info?.move_cost) || card.move_cost || null,
-    quest_value: stripMarkdown(card.conversational_card_info?.quest_value) || card.quest_value || null,
-    classifications: card.conversational_card_info?.classifications || card.classifications || null,
-    abilities: card.conversational_card_info?.abilities || card.abilities || null,
-    flavor_text: stripMarkdown(card.conversational_card_info?.flavor_text) || card.flavor_text || null,
-    is_enchanted: card.conversational_card_info?.is_enchanted !== undefined ? card.conversational_card_info.is_enchanted : (card.is_enchanted || false),
-    is_foil: card.conversational_card_info?.is_foil !== undefined ? card.conversational_card_info.is_foil : (card.is_foil || false),
-    expansion_code: stripMarkdown(card.conversational_card_info?.expansion_code) || card.expansion_code || null,
-    artist_name: stripMarkdown(card.conversational_card_info?.artist_name) || card.artist_name || null,
-    language: stripMarkdown(card.conversational_card_info?.language) || card.language || 'English',
-    franchise: stripMarkdown(card.conversational_card_info?.franchise) || card.franchise || 'Disney',
-    rarity_or_variant: stripMarkdown(card.conversational_card_info?.rarity_or_variant) || card.rarity_description || null
+    // ✨ LORCANA-SPECIFIC FIELDS (prioritize database columns which have verified data)
+    ink_color: card.ink_color || stripMarkdown(card.conversational_card_info?.ink_color) || null,
+    lorcana_card_type: card.lorcana_card_type || stripMarkdown(card.conversational_card_info?.lorcana_card_type) || null,
+    character_version: card.character_version || stripMarkdown(card.conversational_card_info?.character_version) || null,
+    inkwell: card.inkwell !== undefined ? card.inkwell : (card.conversational_card_info?.inkwell || false),
+    ink_cost: card.ink_cost || stripMarkdown(card.conversational_card_info?.ink_cost) || null,
+    strength: card.strength || stripMarkdown(card.conversational_card_info?.strength) || null,
+    willpower: card.willpower || stripMarkdown(card.conversational_card_info?.willpower) || null,
+    lore_value: card.lore_value || stripMarkdown(card.conversational_card_info?.lore_value) || null,
+    move_cost: card.move_cost || stripMarkdown(card.conversational_card_info?.move_cost) || null,
+    quest_value: card.quest_value || stripMarkdown(card.conversational_card_info?.quest_value) || null,
+    classifications: card.classifications || card.conversational_card_info?.classifications || null,
+    abilities: card.abilities || card.conversational_card_info?.abilities || null,
+    flavor_text: card.flavor_text || stripMarkdown(card.conversational_card_info?.flavor_text) || null,
+    is_enchanted: card.is_enchanted !== undefined ? card.is_enchanted : (card.conversational_card_info?.is_enchanted || false),
+    is_foil: card.is_foil !== undefined ? card.is_foil : (card.conversational_card_info?.is_foil || false),
+    expansion_code: card.expansion_code || stripMarkdown(card.conversational_card_info?.expansion_code) || null,
+    artist_name: card.artist_name || stripMarkdown(card.conversational_card_info?.artist_name) || null,
+    language: card.language || stripMarkdown(card.conversational_card_info?.language) || 'English',
+    franchise: card.franchise || stripMarkdown(card.conversational_card_info?.franchise) || 'Disney',
+    rarity_or_variant: card.rarity_description || stripMarkdown(card.conversational_card_info?.rarity_or_variant) || null
   };
 
   // 🏷️ Unified label data - ensures consistency between card detail page and downloadable images

@@ -850,10 +850,20 @@ export function generateLabelData(card: CardForLabel): LabelData {
   // LINE 2: Context (Set • Subset • #Number • Year)
   // ========================================
   // Use getCleanValue to strip explanatory text and validate
-  const rawSetName = stripMarkdown(cardInfo.set_name) ||
-                     stripMarkdown(cardInfo.set_era) ||
-                     card.card_set ||
-                     null;
+  // For Lorcana and Pokemon cards, prioritize database columns (verified data) over JSONB (AI-provided)
+  let rawSetName: string | null;
+  if (category === 'Lorcana' || category === 'Pokemon') {
+    // Lorcana/Pokemon: Database column first (verified from internal database or OCR override)
+    rawSetName = card.card_set ||
+                 stripMarkdown(cardInfo.set_name) ||
+                 stripMarkdown(cardInfo.set_era) ||
+                 null;
+  } else {
+    rawSetName = stripMarkdown(cardInfo.set_name) ||
+                 stripMarkdown(cardInfo.set_era) ||
+                 card.card_set ||
+                 null;
+  }
   const setName = getCleanValue(rawSetName);
 
   let rawSubset: string | null;
@@ -878,11 +888,22 @@ export function generateLabelData(card: CardForLabel): LabelData {
 
   // Prefer card_number_raw for full format (e.g., "94/102", "SM226")
   // This matches the logic in CardDetailClient.tsx for the Card Information section
-  const rawCardNumber = stripMarkdown(cardInfo.card_number_raw) ||
-                        stripMarkdown(cardInfo.card_number) ||
-                        stripMarkdown(cardInfo.collector_number) ||
-                        card.card_number ||
-                        null;
+  // For Lorcana and Pokemon cards, prioritize database column (verified from internal database or OCR override)
+  let rawCardNumber: string | null;
+  if (category === 'Lorcana' || category === 'Pokemon') {
+    // Lorcana/Pokemon: Database column first (verified from internal database or OCR override)
+    rawCardNumber = card.card_number ||
+                    stripMarkdown(cardInfo.card_number_raw) ||
+                    stripMarkdown(cardInfo.card_number) ||
+                    stripMarkdown(cardInfo.collector_number) ||
+                    null;
+  } else {
+    rawCardNumber = stripMarkdown(cardInfo.card_number_raw) ||
+                    stripMarkdown(cardInfo.card_number) ||
+                    stripMarkdown(cardInfo.collector_number) ||
+                    card.card_number ||
+                    null;
+  }
   // Clean card number - remove explanatory text like "(printed as 125/094★...)"
   let cardNumber = getCleanValue(rawCardNumber);
 
@@ -930,10 +951,22 @@ export function generateLabelData(card: CardForLabel): LabelData {
     formattedCardNumber = `#${cardNumber}`;
   }
 
-  const rawYear = stripMarkdown(cardInfo.year) ||
-                  stripMarkdown(cardInfo.set_year) ||
-                  card.release_date ||
-                  null;
+  // For Lorcana and Pokemon cards, prioritize database column (verified from internal database or OCR override)
+  let rawYear: string | null;
+  if (category === 'Lorcana' || category === 'Pokemon') {
+    // Lorcana/Pokemon: Database column first (verified from internal database or OCR override)
+    // Extract year from release_date if it's a full date string
+    const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+    rawYear = releaseYear ||
+              stripMarkdown(cardInfo.year) ||
+              stripMarkdown(cardInfo.set_year) ||
+              null;
+  } else {
+    rawYear = stripMarkdown(cardInfo.year) ||
+              stripMarkdown(cardInfo.set_year) ||
+              card.release_date ||
+              null;
+  }
   const year = getCleanValue(rawYear);
 
   // Build context line: Set • Subset • #Number • Year

@@ -17,15 +17,28 @@ function stripMarkdown(text: string | null | undefined): string {
 function generateMetaKeywords(card: any): string {
   const keywords: string[] = [];
 
-  // Extract Pokemon card data - Use conversational_card_info first
-  const pokemonName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || card.pokemon_featured || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
-  const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || '';
-  const manufacturer = stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || 'The Pokemon Company';
-  const rarity = stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || '';
-  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
-  const pokemonType = card.conversational_card_info?.pokemon_type || card.pokemon_type || '';
-  const hp = card.conversational_card_info?.hp || card.hp || '';
+  // 🎯 v3.3: Prioritize database columns (verified from OCR override/internal DB) over JSONB
+  const pokemonName = getFirstValidValue(
+    card.pokemon_featured,
+    card.featured,
+    card.conversational_card_info?.player_or_character
+  );
+  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  // Extract year from release_date if it's a full date string
+  const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.year);
+  const manufacturer = getFirstValidValue(
+    card.manufacturer_name,
+    card.conversational_card_info?.manufacturer
+  ) || 'The Pokemon Company';
+  const rarity = getFirstValidValue(card.rarity_tier, card.conversational_card_info?.rarity_tier);
+  const cardNumber = getFirstValidValue(
+    card.card_number,
+    card.conversational_card_info?.card_number_raw,
+    card.conversational_card_info?.card_number
+  );
+  const pokemonType = getFirstValidValue(card.pokemon_type, card.conversational_card_info?.pokemon_type);
+  const hp = getFirstValidValue(card.hp, card.conversational_card_info?.hp);
   const grade = card.conversational_decimal_grade;
 
   // Core keywords - Pokemon name variations
@@ -93,23 +106,44 @@ function isValidValue(value: any): boolean {
   if (cleaned === 'unknown') return false;
   if (cleaned === 'n/a') return false;
   if (cleaned === 'not visible') return false;
+  if (cleaned === 'null') return false;
+  if (cleaned.startsWith('unknown ')) return false;
   return true;
+}
+
+// Helper: Get first valid value from a list of candidates (validates before fallback)
+function getFirstValidValue(...values: (string | null | undefined)[]): string {
+  for (const value of values) {
+    const stripped = stripMarkdown(value);
+    if (isValidValue(stripped)) return stripped;
+  }
+  return '';
 }
 
 // Helper: Build enhanced title for Pokemon cards
 // Format matches Sports cards: Name Year Set Subset Features - DCM Grade X
 function buildTitle(card: any): string {
-  // Use conversational AI data first, then database fields
-  const pokemonName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || card.pokemon_featured || '';
-  const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || '';
-  const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
-  const cardNumber = stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
-  const rarity = stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || '';
+  // 🎯 v3.3: Prioritize database columns (verified from OCR override/internal DB) over JSONB
+  const pokemonName = getFirstValidValue(
+    card.pokemon_featured,  // Database column first
+    card.featured,
+    card.conversational_card_info?.player_or_character
+  );
+  // Extract year from release_date if it's a full date string
+  const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.year);
+  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  const cardNumber = getFirstValidValue(
+    card.card_number,
+    card.conversational_card_info?.card_number_raw,
+    card.conversational_card_info?.card_number
+  );
+  const rarity = getFirstValidValue(card.rarity_tier, card.conversational_card_info?.rarity_tier);
   const grade = card.conversational_decimal_grade;
 
   // Special features
-  const isFirstEdition = card.conversational_card_info?.rookie_or_first || card.first_print_rookie;
-  const serialNum = stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering;
+  const isFirstEdition = card.first_print_rookie || card.conversational_card_info?.rookie_or_first;
+  const serialNum = getFirstValidValue(card.serial_numbering, card.conversational_card_info?.serial_number);
 
   const titleParts: string[] = [];
 
