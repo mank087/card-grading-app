@@ -4,6 +4,9 @@
  * Fetches all One Piece cards and sets from the OPTCG API
  * and imports them into our local Supabase database.
  *
+ * IMPORTANT: This script preserves ALL card variants (Parallel, Manga, Alternate Art, etc.)
+ * Each variant gets a unique ID with a suffix (e.g., OP01-120_parallel, OP01-120_manga)
+ *
  * Usage:
  *   node scripts/import-onepiece-database.js [--full|--sets-only|--promos-only]
  *
@@ -16,6 +19,9 @@
  *   - NEXT_PUBLIC_SUPABASE_URL
  *   - SUPABASE_SERVICE_ROLE_KEY
  */
+
+// Load environment variables from .env.local
+require('dotenv').config({ path: '.env.local' });
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -125,6 +131,86 @@ function parseCardPower(power) {
 }
 
 /**
+ * Variant type mappings - order matters for detection priority
+ */
+const VARIANT_PATTERNS = [
+  { pattern: /\(Red Super Alternate Art\)/i, type: 'red_super_alt_art', suffix: '_red_super_alt' },
+  { pattern: /\(Super Alternate Art\)/i, type: 'super_alt_art', suffix: '_super_alt' },
+  { pattern: /\(Gold-Stamped Signature\)/i, type: 'gold_stamped', suffix: '_gold_stamped' },
+  { pattern: /\(Wanted Poster\)/i, type: 'wanted_poster', suffix: '_wanted' },
+  { pattern: /\(Box Topper\)/i, type: 'box_topper', suffix: '_box_topper' },
+  { pattern: /\(Jolly Roger Foil\)/i, type: 'jolly_roger_foil', suffix: '_jolly_roger' },
+  { pattern: /\(Textured Foil\)/i, type: 'textured_foil', suffix: '_textured' },
+  { pattern: /\(Pirate Foil\)/i, type: 'pirate_foil', suffix: '_pirate_foil' },
+  { pattern: /\(Alternate Art\)/i, type: 'alternate_art', suffix: '_alt_art' },
+  { pattern: /\(Full Art\)/i, type: 'full_art', suffix: '_full_art' },
+  { pattern: /\(Parallel\).*\(Manga\)/i, type: 'parallel_manga', suffix: '_parallel_manga' },
+  { pattern: /\(Manga\)/i, type: 'manga', suffix: '_manga' },
+  { pattern: /\(Parallel\)/i, type: 'parallel', suffix: '_parallel' },
+  { pattern: /\(SP\)\s*\(Gold\)/i, type: 'sp_gold', suffix: '_sp_gold' },
+  { pattern: /\(SP\)/i, type: 'sp', suffix: '_sp' },
+  { pattern: /\(Reprint\)/i, type: 'reprint', suffix: '_reprint' },
+  { pattern: /\(Dash Pack\)/i, type: 'dash_pack', suffix: '_dash' },
+  { pattern: /\(Pre-Release\)/i, type: 'prerelease', suffix: '_prerelease' },
+  { pattern: /\(Promo\)/i, type: 'promo', suffix: '_promo' },
+];
+
+/**
+ * Extract variant type and clean card name from original name
+ * Returns: { variantType, variantSuffix, cleanName, originalName }
+ */
+function extractVariantInfo(cardName) {
+  if (!cardName) return { variantType: null, variantSuffix: '', cleanName: cardName, originalName: cardName };
+
+  let cleanName = cardName;
+  let variantType = null;
+  let variantSuffix = '';
+
+  // Check for variant patterns (first match wins for type, but we remove all patterns from name)
+  for (const { pattern, type, suffix } of VARIANT_PATTERNS) {
+    if (pattern.test(cardName)) {
+      if (!variantType) {
+        // First match determines the variant type
+        variantType = type;
+        variantSuffix = suffix;
+      }
+      // Remove all variant indicators from name
+      cleanName = cleanName.replace(pattern, '').trim();
+    }
+  }
+
+  // Also remove trailing card number in parentheses like "(003)" or "(061)"
+  cleanName = cleanName.replace(/\s*\(\d+\)$/, '').trim();
+
+  // Clean up any double spaces
+  cleanName = cleanName.replace(/\s+/g, ' ').trim();
+
+  return {
+    variantType,
+    variantSuffix,
+    cleanName,
+    originalName: cardName
+  };
+}
+
+/**
+ * Generate unique card ID with variant suffix
+ */
+function generateUniqueCardId(baseCardSetId, variantSuffix, seenIds) {
+  let uniqueId = baseCardSetId + variantSuffix;
+
+  // Handle edge case where same variant appears multiple times (shouldn't happen but be safe)
+  let counter = 1;
+  while (seenIds.has(uniqueId)) {
+    uniqueId = `${baseCardSetId}${variantSuffix}_${counter}`;
+    counter++;
+  }
+
+  seenIds.add(uniqueId);
+  return uniqueId;
+}
+
+/**
  * Parse card cost to integer
  */
 function parseCardCost(cost) {
@@ -190,16 +276,20 @@ async function importSets(cards) {
 }
 
 /**
- * Import cards from OPTCG API
+ * Import cards from OPTCG API (preserves ALL variants)
  */
 async function importCards(cardData, source) {
-  console.log(`\n=== Importing ${source} Cards ===\n`);
+  console.log(`\n=== Importing ${source} Cards (with variants) ===\n`);
 
   const startTime = Date.now();
   let totalImported = 0;
   let totalErrors = 0;
+  let totalVariants = 0;
 
   console.log(`Processing ${cardData.length} cards from ${source}...`);
+
+  // Track seen IDs to ensure uniqueness
+  const seenIds = new Set();
 
   // Process cards in batches
   const BATCH_SIZE = 100;
@@ -207,29 +297,45 @@ async function importCards(cardData, source) {
   for (let i = 0; i < cardData.length; i += BATCH_SIZE) {
     const batch = cardData.slice(i, i + BATCH_SIZE);
 
-    const cardBatch = batch.map(card => ({
-      id: card.card_set_id,
-      card_name: card.card_name?.replace(/\s*\(\d+\)$/, '') || 'Unknown', // Remove trailing number like "(001)"
-      card_number: parseCardNumber(card.card_set_id),
-      set_id: parseSetId(card.card_set_id),
-      card_type: card.card_type || null,
-      card_color: card.card_color || null,
-      rarity: card.rarity || null,
-      card_cost: parseCardCost(card.card_cost),
-      card_power: parseCardPower(card.card_power),
-      life: card.life ? parseInt(card.life) : null,
-      counter_amount: card.counter_amount ? parseInt(card.counter_amount) : null,
-      attribute: card.attribute || null,
-      sub_types: card.sub_types || null,
-      card_text: card.card_text || null,
-      card_image: card.card_image || null,
-      card_image_id: card.card_image_id || null,
-      market_price: card.market_price || null,
-      inventory_price: card.inventory_price || null,
-      date_scraped: card.date_scraped || null,
-      set_name: card.set_name || null,
-      updated_at: new Date().toISOString()
-    }));
+    const cardBatch = batch.map(card => {
+      const baseCardSetId = card.card_set_id;
+      const { variantType, variantSuffix, cleanName, originalName } = extractVariantInfo(card.card_name);
+
+      // Generate unique ID with variant suffix
+      const uniqueId = generateUniqueCardId(baseCardSetId, variantSuffix, seenIds);
+
+      if (variantType) {
+        totalVariants++;
+      }
+
+      return {
+        id: uniqueId,
+        card_name: cleanName || 'Unknown',
+        card_number: parseCardNumber(card.card_set_id),
+        set_id: parseSetId(card.card_set_id),
+        card_type: card.card_type || null,
+        card_color: card.card_color || null,
+        rarity: card.rarity || null,
+        card_cost: parseCardCost(card.card_cost),
+        card_power: parseCardPower(card.card_power),
+        life: card.life ? parseInt(card.life) : null,
+        counter_amount: card.counter_amount ? parseInt(card.counter_amount) : null,
+        attribute: card.attribute || null,
+        sub_types: card.sub_types || null,
+        card_text: card.card_text || null,
+        card_image: card.card_image || null,
+        card_image_id: card.card_image_id || null,
+        market_price: card.market_price || null,
+        inventory_price: card.inventory_price || null,
+        date_scraped: card.date_scraped || null,
+        set_name: card.set_name || null,
+        // New variant columns
+        variant_type: variantType,
+        base_card_id: baseCardSetId,
+        original_name: originalName,
+        updated_at: new Date().toISOString()
+      };
+    });
 
     try {
       const { error } = await supabase
@@ -246,7 +352,7 @@ async function importCards(cardData, source) {
       // Progress
       const progress = Math.round(((i + batch.length) / cardData.length) * 100);
       if (progress % 10 === 0 || i + batch.length >= cardData.length) {
-        console.log(`  Progress: ${totalImported} cards imported (${progress}%)`);
+        console.log(`  Progress: ${totalImported} cards imported, ${totalVariants} variants (${progress}%)`);
       }
 
     } catch (error) {
@@ -258,8 +364,8 @@ async function importCards(cardData, source) {
     await sleep(REQUEST_DELAY_MS);
   }
 
-  console.log(`\n${source} cards import complete: ${totalImported} imported, ${totalErrors} errors (${getElapsedTime(startTime)})`);
-  return { imported: totalImported, errors: totalErrors };
+  console.log(`\n${source} cards import complete: ${totalImported} imported (${totalVariants} variants), ${totalErrors} errors (${getElapsedTime(startTime)})`);
+  return { imported: totalImported, errors: totalErrors, variants: totalVariants };
 }
 
 /**
@@ -337,42 +443,78 @@ async function verifyImport() {
     .from('onepiece_cards')
     .select('*', { count: 'exact', head: true });
 
+  // Count variants
+  const { count: variantCount } = await supabase
+    .from('onepiece_cards')
+    .select('*', { count: 'exact', head: true })
+    .not('variant_type', 'is', null);
+
+  const baseCount = cardsCount - variantCount;
+
   console.log(`Database now contains:`);
   console.log(`  - ${setsCount} sets`);
-  console.log(`  - ${cardsCount} cards`);
+  console.log(`  - ${cardsCount} total cards`);
+  console.log(`    - ${baseCount} base cards`);
+  console.log(`    - ${variantCount} variants`);
 
   // Test a sample lookup
   console.log('\nTesting sample lookup (Roronoa Zoro)...');
   const { data: testResults } = await supabase
     .from('onepiece_cards')
-    .select('id, card_name, set_name, rarity, card_type')
+    .select('id, card_name, set_name, rarity, variant_type, market_price')
     .ilike('card_name', '%Roronoa Zoro%')
-    .limit(5);
+    .order('base_card_id')
+    .order('variant_type', { nullsFirst: true })
+    .limit(10);
 
   if (testResults && testResults.length > 0) {
     console.log(`Found ${testResults.length} Roronoa Zoro cards:`);
     testResults.forEach(card => {
-      console.log(`  - ${card.id}: ${card.card_name} (${card.set_name}) [${card.rarity}] ${card.card_type}`);
+      const variantLabel = card.variant_type ? ` [${card.variant_type}]` : '';
+      console.log(`  - ${card.id}: ${card.card_name}${variantLabel} (${card.set_name}) [${card.rarity}] $${card.market_price || 'N/A'}`);
     });
   } else {
     console.log('  No results found (this might be an issue)');
   }
 
-  // Test card ID lookup
-  console.log('\nTesting card ID lookup (OP01-001)...');
-  const { data: idResult } = await supabase
+  // Test card with variants (Shanks OP01-120)
+  console.log('\nTesting card with variants (Shanks OP01-120)...');
+  const { data: shanksResults } = await supabase
     .from('onepiece_cards')
-    .select('id, card_name, set_name, card_type, card_power')
-    .eq('id', 'OP01-001')
-    .single();
+    .select('id, card_name, variant_type, rarity, market_price')
+    .eq('base_card_id', 'OP01-120')
+    .order('variant_type', { nullsFirst: true });
 
-  if (idResult) {
-    console.log(`  Found: ${idResult.card_name} - ${idResult.card_type} (Power: ${idResult.card_power})`);
+  if (shanksResults && shanksResults.length > 0) {
+    console.log(`Found ${shanksResults.length} Shanks OP01-120 variants:`);
+    shanksResults.forEach(card => {
+      const variantLabel = card.variant_type || 'base';
+      console.log(`  - ${card.id}: ${card.card_name} [${variantLabel}] $${card.market_price || 'N/A'}`);
+    });
   } else {
-    console.log('  No result found for OP01-001');
+    console.log('  No Shanks variants found');
   }
 
-  return { setsCount, cardsCount };
+  // Show variant type distribution
+  console.log('\nVariant type distribution:');
+  const { data: variantTypes } = await supabase
+    .from('onepiece_cards')
+    .select('variant_type')
+    .not('variant_type', 'is', null);
+
+  if (variantTypes) {
+    const typeCounts = {};
+    variantTypes.forEach(v => {
+      typeCounts[v.variant_type] = (typeCounts[v.variant_type] || 0) + 1;
+    });
+    Object.entries(typeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .forEach(([type, count]) => {
+        console.log(`  - ${type}: ${count}`);
+      });
+  }
+
+  return { setsCount, cardsCount, variantCount };
 }
 
 /**
@@ -416,18 +558,10 @@ async function main() {
 
     console.log(`\nTotal cards fetched: ${allCards.length}`);
 
-    // Deduplicate cards by card_set_id (API returns variants like regular + parallel)
-    // Keep the first occurrence (usually the standard version with lower price)
-    const uniqueCards = [];
-    const seenIds = new Set();
-    for (const card of allCards) {
-      if (!seenIds.has(card.card_set_id)) {
-        seenIds.add(card.card_set_id);
-        uniqueCards.push(card);
-      }
-    }
-    console.log(`Deduplicated to ${uniqueCards.length} unique cards`);
-    allCards = uniqueCards;
+    // Count unique base card IDs vs total (for logging)
+    const uniqueBaseIds = new Set(allCards.map(c => c.card_set_id));
+    console.log(`Base cards: ${uniqueBaseIds.size}, Total with variants: ${allCards.length}`);
+    console.log(`Variants to import: ${allCards.length - uniqueBaseIds.size}`);
 
     // Import sets first (extracted from cards)
     setsResult = await importSets(allCards);

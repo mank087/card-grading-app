@@ -161,6 +161,11 @@ export default function Footer() {
                   Lorcana Database
                 </Link>
               </li>
+              <li>
+                <Link href="/mtg-database" className="text-gray-400 hover:text-white transition-colors">
+                  MTG Database
+                </Link>
+              </li>
             </ul>
           </div>
 

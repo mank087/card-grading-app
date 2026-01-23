@@ -13,6 +13,8 @@ import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
+// 🃏 CARD IDENTIFICATION: Local Supabase database lookup for MTG cards
+import { lookupMtgCard, type MtgCard } from "@/lib/mtgCardMatcher";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -855,6 +857,91 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           }
         }
 
+        // 🃏 LOCAL DATABASE LOOKUP: Verify card against our internal MTG database
+        // This provides fast, local verification without external API calls
+        let matchedDatabaseCard: MtgCard | null = null;
+        let databaseMatchConfidence: 'high' | 'medium' | 'low' | null = null;
+
+        if (conversationalGradingData?.card_info) {
+          try {
+            console.log(`[GET /api/mtg/${cardId}] 🔍 Looking up card in internal MTG database...`);
+            const aiCardInfo = conversationalGradingData.card_info;
+
+            const matchResult = await lookupMtgCard({
+              card_name: aiCardInfo.card_name,
+              expansion_code: aiCardInfo.expansion_code,
+              card_number: aiCardInfo.collector_number || aiCardInfo.card_number,
+              set_name: aiCardInfo.set_name
+            });
+
+            if (matchResult.card && matchResult.confidence.overallConfidence !== 'low') {
+              matchedDatabaseCard = matchResult.card;
+              databaseMatchConfidence = matchResult.confidence.overallConfidence;
+
+              console.log(`[GET /api/mtg/${cardId}] ✅ Internal database match found (${databaseMatchConfidence} confidence):`);
+              console.log(`[GET /api/mtg/${cardId}]   DB: ${matchResult.card.name} (${matchResult.card.set_name}) #${matchResult.card.collector_number}`);
+              console.log(`[GET /api/mtg/${cardId}]   Rarity: ${matchResult.card.rarity}, Type: ${matchResult.card.type_line}`);
+
+              // Enhance card_info with verified database data
+              // IMPORTANT: Database values take priority over AI-identified values for accuracy
+              const dbCard = matchResult.card;
+              const releaseYear = dbCard.released_at ? new Date(dbCard.released_at).getFullYear().toString() : null;
+
+              // Format power/toughness
+              const powerToughness = (dbCard.power && dbCard.toughness)
+                ? `${dbCard.power}/${dbCard.toughness}`
+                : null;
+
+              conversationalGradingData.card_info = {
+                ...conversationalGradingData.card_info,
+                // === CORE IDENTIFICATION (verified from database) ===
+                card_name: dbCard.name,
+                set_name: dbCard.set_name,
+                collector_number: dbCard.collector_number,
+                expansion_code: dbCard.set_code,
+                // === RELEASE INFO (from database, not AI) ===
+                year: releaseYear,
+                release_date: dbCard.released_at,
+                // === MTG-SPECIFIC ATTRIBUTES (from database) ===
+                mana_cost: dbCard.mana_cost,
+                mtg_card_type: dbCard.type_line,
+                color_identity: dbCard.colors?.join('') || null,
+                power_toughness: powerToughness,
+                rarity_or_variant: dbCard.rarity,
+                artist_name: dbCard.artist,
+                keywords: dbCard.keywords?.join(', ') || null,
+                // === CARD VARIANT INFO (from database) ===
+                is_promo: dbCard.promo || false,
+                is_reprint: dbCard.reprint || false,
+                is_full_art: dbCard.full_art || false,
+                border_color: dbCard.border_color,
+                frame_version: dbCard.frame,
+                // === DATABASE REFERENCE (for future lookups) ===
+                mtg_database_id: dbCard.id,
+                mtg_database_oracle_id: dbCard.oracle_id,
+                mtg_database_match_confidence: databaseMatchConfidence,
+                // === PRICING (from database) ===
+                scryfall_price_usd: dbCard.price_usd,
+                scryfall_price_usd_foil: dbCard.price_usd_foil,
+                // === IMAGE REFERENCE (from database) ===
+                mtg_reference_image: dbCard.image_normal || dbCard.image_large
+              };
+
+              console.log(`[GET /api/mtg/${cardId}] 📝 Enhanced card_info with database data:`, {
+                card_name: conversationalGradingData.card_info.card_name,
+                set_name: conversationalGradingData.card_info.set_name,
+                mana_cost: conversationalGradingData.card_info.mana_cost,
+                rarity: conversationalGradingData.card_info.rarity_or_variant
+              });
+            } else {
+              console.log(`[GET /api/mtg/${cardId}] ⚠️ No internal database match found (or low confidence)`);
+            }
+          } catch (dbLookupError: any) {
+            console.error(`[GET /api/mtg/${cardId}] ⚠️ Internal database lookup failed:`, dbLookupError.message);
+            // Don't fail grading - database lookup is optional enhancement
+          }
+        }
+
       } catch (error) {
         console.error(`[GET /api/mtg/${cardId}] ⚠️ Failed to parse conversational JSON:`, error);
       }
@@ -968,6 +1055,11 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
 
       // Individual searchable/sortable columns (MTG-specific - merged from both sources)
       ...cardFields,
+
+      // 🃏 MTG Database reference columns (from internal database lookup)
+      mtg_card_id: conversationalGradingData?.card_info?.mtg_database_id || null,
+      mtg_reference_image: conversationalGradingData?.card_info?.mtg_reference_image || null,
+      mtg_database_match_confidence: conversationalGradingData?.card_info?.mtg_database_match_confidence || null,
 
       // Processing metadata
       processing_time: Date.now() - startTime

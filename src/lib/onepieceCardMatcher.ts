@@ -8,8 +8,8 @@ import { supabaseServer } from './supabaseServer';
  * One Piece card data from our local database
  */
 export interface OnePieceCard {
-  id: string;                    // Card ID: "OP01-001"
-  card_name: string;             // "Roronoa Zoro"
+  id: string;                    // Card ID: "OP01-001" or "OP01-001_parallel" for variants
+  card_name: string;             // "Roronoa Zoro" (cleaned, without variant indicators)
   card_number: string;           // "001"
   set_id: string;                // "OP-01"
   set_name: string;              // "Romance Dawn"
@@ -26,6 +26,10 @@ export interface OnePieceCard {
   card_image: string | null;     // Image URL
   market_price: number | null;   // TCGPlayer price
   inventory_price: number | null;
+  // Variant fields
+  variant_type: string | null;   // "parallel", "manga", "alternate_art", "sp", etc. NULL = base card
+  base_card_id: string | null;   // Links to base card ID (e.g., "OP01-001") for grouping variants
+  original_name: string | null;  // Original API name with variant indicators
 }
 
 /**
@@ -129,16 +133,25 @@ export function normalizeCardId(cardId: string): string {
 /**
  * Look up a One Piece card directly by card ID
  * This is the most reliable method when AI extracts the card number
+ * Returns the base card (non-variant) by default
  */
-export async function lookupByCardId(cardId: string): Promise<OnePieceCard | null> {
+export async function lookupByCardId(cardId: string, includeVariants: boolean = false): Promise<OnePieceCard | null> {
   const supabase = supabaseServer();
   const normalizedId = normalizeCardId(cardId);
 
-  // Try exact match first
-  const { data, error } = await supabase
+  // Try exact match first (base card)
+  let query = supabase
     .from('onepiece_cards')
     .select('*')
-    .ilike('id', normalizedId)
+    .or(`id.ilike.${normalizedId},base_card_id.ilike.${normalizedId}`);
+
+  // If not including variants, prefer base card (variant_type is null)
+  if (!includeVariants) {
+    query = query.is('variant_type', null);
+  }
+
+  const { data, error } = await query
+    .order('variant_type', { nullsFirst: true })
     .limit(1)
     .single();
 
@@ -147,7 +160,8 @@ export async function lookupByCardId(cardId: string): Promise<OnePieceCard | nul
     const { data: partialData } = await supabase
       .from('onepiece_cards')
       .select('*')
-      .ilike('id', `%${cardId}%`)
+      .or(`id.ilike.%${cardId}%,base_card_id.ilike.%${cardId}%`)
+      .order('variant_type', { nullsFirst: true })
       .limit(1)
       .single();
 
@@ -158,15 +172,76 @@ export async function lookupByCardId(cardId: string): Promise<OnePieceCard | nul
 }
 
 /**
- * Search for One Piece cards by name
+ * Get all variants of a card by its base card ID
+ * Returns base card plus all variants, sorted by price (highest first)
  */
-export async function searchByName(name: string, limit: number = 10): Promise<OnePieceCard[]> {
+export async function getCardVariants(baseCardId: string): Promise<OnePieceCard[]> {
   const supabase = supabaseServer();
+  const normalizedId = normalizeCardId(baseCardId);
 
   const { data, error } = await supabase
     .from('onepiece_cards')
     .select('*')
-    .ilike('card_name', `%${name}%`)
+    .or(`id.eq.${normalizedId},base_card_id.eq.${normalizedId}`)
+    .order('variant_type', { nullsFirst: true })
+    .order('market_price', { ascending: false, nullsFirst: false });
+
+  if (error) {
+    console.error('[OnePiece Matcher] Error fetching variants:', error.message);
+    return [];
+  }
+
+  return (data || []) as OnePieceCard[];
+}
+
+/**
+ * Look up a specific variant of a card
+ */
+export async function lookupCardVariant(
+  baseCardId: string,
+  variantType: string
+): Promise<OnePieceCard | null> {
+  const supabase = supabaseServer();
+  const normalizedId = normalizeCardId(baseCardId);
+
+  const { data, error } = await supabase
+    .from('onepiece_cards')
+    .select('*')
+    .eq('base_card_id', normalizedId)
+    .eq('variant_type', variantType)
+    .limit(1)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data as OnePieceCard;
+}
+
+/**
+ * Search for One Piece cards by name
+ * By default returns only base cards (no variants) for cleaner search results
+ */
+export async function searchByName(
+  name: string,
+  limit: number = 10,
+  includeVariants: boolean = false
+): Promise<OnePieceCard[]> {
+  const supabase = supabaseServer();
+
+  let query = supabase
+    .from('onepiece_cards')
+    .select('*')
+    .ilike('card_name', `%${name}%`);
+
+  // By default, only return base cards (not variants)
+  if (!includeVariants) {
+    query = query.is('variant_type', null);
+  }
+
+  const { data, error } = await query
+    .order('variant_type', { nullsFirst: true })
     .limit(limit);
 
   if (error) {
@@ -179,19 +254,29 @@ export async function searchByName(name: string, limit: number = 10): Promise<On
 
 /**
  * Search for One Piece cards by name and set
+ * By default returns only base cards (no variants)
  */
 export async function searchByNameAndSet(
   name: string,
   setName: string,
-  limit: number = 10
+  limit: number = 10,
+  includeVariants: boolean = false
 ): Promise<OnePieceCard[]> {
   const supabase = supabaseServer();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('onepiece_cards')
     .select('*')
     .ilike('card_name', `%${name}%`)
-    .ilike('set_name', `%${setName}%`)
+    .ilike('set_name', `%${setName}%`);
+
+  // By default, only return base cards (not variants)
+  if (!includeVariants) {
+    query = query.is('variant_type', null);
+  }
+
+  const { data, error } = await query
+    .order('variant_type', { nullsFirst: true })
     .limit(limit);
 
   if (error) {
@@ -398,15 +483,27 @@ export async function lookupOnePieceCard(
 
 /**
  * Get all cards from a specific set
+ * By default returns only base cards (no variants)
  */
-export async function getCardsFromSet(setId: string): Promise<OnePieceCard[]> {
+export async function getCardsFromSet(
+  setId: string,
+  includeVariants: boolean = false
+): Promise<OnePieceCard[]> {
   const supabase = supabaseServer();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('onepiece_cards')
     .select('*')
-    .ilike('set_id', `%${setId}%`)
-    .order('card_number', { ascending: true });
+    .ilike('set_id', `%${setId}%`);
+
+  // By default, only return base cards (not variants)
+  if (!includeVariants) {
+    query = query.is('variant_type', null);
+  }
+
+  const { data, error } = await query
+    .order('card_number', { ascending: true })
+    .order('variant_type', { nullsFirst: true });
 
   if (error) {
     console.error('[OnePiece Matcher] Error fetching set cards:', error.message);
