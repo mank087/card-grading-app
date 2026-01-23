@@ -99,6 +99,13 @@ const TOUR_STEPS: TourStep[] = [
     position: 'top',
   },
   {
+    id: 'live-market-pricing',
+    targetId: 'tour-live-market-pricing',
+    title: 'Live Market Pricing',
+    description: 'Live pricing from active online listings help provide a sense for card value. Historical pricing is updated weekly to provide a sense of on-going card fluctuations.',
+    position: 'top',
+  },
+  {
     id: 'insta-list',
     targetId: 'tour-insta-list',
     title: 'Insta-List on eBay',

@@ -5190,7 +5190,7 @@ export function PokemonCardDetails() {
               </div>
 
               {/* eBay Price Lookup Section */}
-              <div className="bg-white rounded-lg shadow-lg p-6">
+              <div id="tour-live-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
                 <EbayPriceLookup
                   card={{
                     card_name: cardInfo.card_name || card.card_name,
