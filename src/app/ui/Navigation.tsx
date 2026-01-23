@@ -128,6 +128,13 @@ export default function Navigation() {
         Lorcana Cards
       </Link>
       <Link
+        href={`/upload?category=One Piece&t=${Date.now()}`}
+        className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+        onClick={onItemClick}
+      >
+        One Piece Cards
+      </Link>
+      <Link
         href={`/upload?category=Other&t=${Date.now()}`}
         className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 hover:text-gray-800 transition-colors"
         onClick={onItemClick}

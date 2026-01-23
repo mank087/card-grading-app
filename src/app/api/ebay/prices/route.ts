@@ -17,12 +17,14 @@ import {
   searchPokemonPricesWithFallback,
   searchMTGPricesWithFallback,
   searchLorcanaPricesWithFallback,
+  searchOnePiecePricesWithFallback,
   searchOtherPricesWithFallback,
   buildSportsCardQuery,
   type SportsCardQueryOptions,
   type PokemonCardQueryOptions,
   type MTGCardQueryOptions,
   type LorcanaCardQueryOptions,
+  type OnePieceCardQueryOptions,
   type OtherCardQueryOptions,
 } from '@/lib/ebay/browseApi';
 import { EBAY_CATEGORIES } from '@/lib/ebay/constants';
@@ -117,6 +119,23 @@ export async function POST(request: NextRequest) {
           };
 
           result = await searchLorcanaPricesWithFallback(lorcanaOptions, {
+            categoryId,
+            limit,
+            minResults,
+          });
+        } else if (gameType === 'onepiece') {
+          const onePieceOptions: OnePieceCardQueryOptions = {
+            card_name: card.card_name,
+            featured: card.featured,
+            card_set: card.card_set,
+            card_number: card.card_number,
+            release_date: card.release_date,
+            rarity: card.rarity_or_variant,
+            variant_type: card.variant_type,
+            is_foil: card.is_foil || false,
+          };
+
+          result = await searchOnePiecePricesWithFallback(onePieceOptions, {
             categoryId,
             limit,
             minResults,

@@ -28,7 +28,7 @@ const MetaSchema = z.object({
   provider: z.string().describe('AI provider (e.g., "openai")'),
   version: z.string().describe('Schema version (e.g., "v6.2")'),
   prompt_version: z.string().describe('Grading prompt version (e.g., "Conversational_Grading_v6.2_THREE_PASS")'),
-  card_type: z.enum(['sports', 'pokemon', 'mtg', 'lorcana', 'other']).describe('Card type determines which delta rules were applied')
+  card_type: z.enum(['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'other']).describe('Card type determines which delta rules were applied')
 });
 
 /**

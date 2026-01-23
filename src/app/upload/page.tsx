@@ -99,6 +99,22 @@ const CARD_TYPES = {
       ]
     }
   },
+  'One Piece': {
+    label: 'One Piece TCG Card',
+    icon: '',
+    category: 'One Piece',
+    apiEndpoint: '/api/onepiece',
+    route: '/onepiece',
+    description: {
+      title: 'One Piece TCG',
+      items: [
+        'All One Piece TCG sets and starter decks',
+        'Leader, Character, Event, and Stage cards',
+        'Parallel, Manga, and SP variants',
+        'Color and power/cost analysis'
+      ]
+    }
+  },
   Other: {
     label: 'Other Collectible Card',
     icon: '',

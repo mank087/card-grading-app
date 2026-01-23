@@ -110,6 +110,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/upload?category=One Piece" className="text-gray-400 hover:text-white transition-colors">
+                  One Piece Cards
+                </Link>
+              </li>
+              <li>
                 <Link href="/upload?category=Other" className="text-gray-400 hover:text-white transition-colors">
                   Other Cards
                 </Link>

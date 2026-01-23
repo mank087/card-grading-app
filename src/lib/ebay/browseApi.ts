@@ -1155,6 +1155,244 @@ export async function searchLorcanaPricesWithFallback(
 }
 
 // =============================================================================
+// One Piece Card Query Building
+// =============================================================================
+
+export interface OnePieceCardQueryOptions {
+  card_name?: string;        // Card name like "Monkey D. Luffy"
+  featured?: string;         // Character name
+  card_set?: string;         // Set name like "Romance Dawn" or "OP-01"
+  card_number?: string;      // Card number like "OP01-001"
+  release_date?: string;     // Year like "2024"
+  rarity?: string;           // Rarity like "L", "SR", "SEC"
+  variant_type?: string;     // Variant like "parallel", "manga", "sp"
+  is_foil?: boolean;         // Foil/parallel card
+}
+
+/**
+ * Clean One Piece card name for search
+ */
+function cleanOnePieceCardName(name: string): string {
+  return name
+    // Remove special characters except spaces, alphanumeric, periods, and hyphens
+    .replace(/[^\w\s.'-]/g, ' ')
+    // Collapse multiple spaces
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Get the search term for a One Piece card variant
+ * Maps variant types to common eBay listing terminology
+ */
+function getOnePieceVariantSearchTerm(variant: string | null): string | null {
+  if (!variant) return null;
+
+  const v = variant.toLowerCase();
+
+  // Parallel variants (foil/holo versions)
+  if (v === 'parallel' || v === 'parallel_manga') return 'parallel';
+
+  // Alternate art versions
+  if (v === 'alternate_art' || v === 'alt_art' || v === 'alternate') return 'alt art';
+
+  // Manga art versions (different artwork style)
+  if (v === 'manga') return 'manga art';
+
+  // SP (Special Parallel) - premium foil variants
+  if (v === 'sp' || v === 'special_parallel') return 'SP';
+
+  // SEC (Secret Rare) variants
+  if (v === 'sec' || v === 'secret') return 'secret rare';
+
+  // Don/Leader cards
+  if (v === 'don' || v === 'leader') return v;
+
+  // Promo variants
+  if (v === 'promo') return 'promo';
+
+  return null;
+}
+
+/**
+ * Build search queries specifically for One Piece cards
+ * One Piece cards are best found by: Card Name + Card Number (e.g., "Luffy OP01-001")
+ * Variants include: parallel, manga, alternate_art, sp, sec, promo
+ */
+export function buildOnePieceCardQueries(card: OnePieceCardQueryOptions): QueryStrategy[] {
+  const queries: QueryStrategy[] = [];
+
+  const cardName = card.card_name ? cleanOnePieceCardName(card.card_name) : null;
+  const featured = card.featured ? cleanOnePieceCardName(card.featured) : null;
+  const displayName = cardName || featured;
+  const cardNumber = card.card_number ? card.card_number.trim() : null;
+  const setName = card.card_set ? cleanSearchTerm(card.card_set) : null;
+  const variant = card.variant_type ? card.variant_type.toLowerCase() : null;
+  const variantTerm = getOnePieceVariantSearchTerm(variant);
+  const hasVariant = variantTerm !== null || card.is_foil;
+
+  // Log variant info for debugging
+  console.log(`[eBay One Piece] Building queries - variant_type: "${variant}", variantTerm: "${variantTerm}", is_foil: ${card.is_foil}`);
+
+  // Strategy 1: SPECIFIC - Card name + card number + variant
+  // Example: "Luffy OP01-001 alt art One Piece" or "Luffy OP01-001 parallel One Piece"
+  if (displayName && cardNumber) {
+    const parts = [displayName, cardNumber];
+    if (variantTerm) {
+      parts.push(variantTerm);
+    } else if (card.is_foil) {
+      parts.push('parallel'); // Default foil = parallel in One Piece TCG
+    }
+    parts.push('One Piece');
+
+    queries.push({
+      query: parts.join(' '),
+      strategy: 'specific',
+      description: `Card name with number${hasVariant ? ' and variant' : ''}`,
+    });
+  }
+
+  // Strategy 2: MODERATE - Card number + variant (One Piece card numbers are fairly unique)
+  // Example: "OP01-001 alt art One Piece card"
+  if (cardNumber) {
+    const parts = [cardNumber];
+    if (variantTerm) {
+      parts.push(variantTerm);
+    } else if (card.is_foil) {
+      parts.push('parallel');
+    }
+    parts.push('One Piece card');
+
+    queries.push({
+      query: parts.join(' '),
+      strategy: 'moderate',
+      description: `Card number${hasVariant ? ' with variant' : ''}`,
+    });
+  }
+
+  // Strategy 3: MODERATE - Card name + set + variant
+  // Example: "Luffy Romance Dawn alt art One Piece"
+  if (displayName && setName) {
+    const parts = [displayName, setName];
+    if (variantTerm) {
+      parts.push(variantTerm);
+    } else if (card.is_foil) {
+      parts.push('parallel');
+    }
+    parts.push('One Piece');
+
+    queries.push({
+      query: parts.join(' '),
+      strategy: 'moderate',
+      description: `Card name with set${hasVariant ? ' and variant' : ''}`,
+    });
+  }
+
+  // Strategy 4: BROAD - Card name + variant + One Piece (without number)
+  // Example: "Monkey D. Luffy alt art One Piece card"
+  if (displayName && hasVariant) {
+    const parts = [displayName];
+    if (variantTerm) {
+      parts.push(variantTerm);
+    } else if (card.is_foil) {
+      parts.push('parallel');
+    }
+    parts.push('One Piece card');
+
+    queries.push({
+      query: parts.join(' '),
+      strategy: 'broad',
+      description: 'Card name with variant',
+    });
+  }
+
+  // Strategy 5: BROAD - Just card name + One Piece (fallback without variant)
+  // Example: "Monkey D. Luffy One Piece card"
+  if (displayName) {
+    queries.push({
+      query: `${displayName} One Piece card`,
+      strategy: 'broad',
+      description: 'Card name only (no variant)',
+    });
+  }
+
+  // Final fallback - card number only
+  if (queries.length === 0 && cardNumber) {
+    queries.push({
+      query: `${cardNumber} One Piece TCG`,
+      strategy: 'minimal',
+      description: 'Card number with TCG',
+    });
+  }
+
+  return queries;
+}
+
+/**
+ * Search with fallback for One Piece cards
+ */
+export async function searchOnePiecePricesWithFallback(
+  card: OnePieceCardQueryOptions,
+  options: {
+    categoryId?: string;
+    limit?: number;
+    minResults?: number;
+  } = {}
+): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
+  const queries = buildOnePieceCardQueries(card);
+  const minResults = options.minResults ?? 3;
+  const limit = options.limit ?? 25;
+
+  console.log(`[eBay One Piece] Searching with ${queries.length} query strategies`);
+
+  let lastResult: EbayPriceSearchResult | null = null;
+  let lastQuery: QueryStrategy | null = null;
+
+  for (const queryInfo of queries) {
+    try {
+      console.log(`[eBay One Piece] Trying: "${queryInfo.query}" (${queryInfo.strategy})`);
+
+      const result = await searchEbayPrices(queryInfo.query, {
+        categoryId: options.categoryId,
+        limit,
+      });
+
+      console.log(`[eBay One Piece] Found ${result.total} results`);
+
+      if (result.total >= minResults) {
+        return {
+          ...result,
+          queryUsed: queryInfo.query,
+          queryStrategy: queryInfo.strategy,
+        };
+      }
+
+      if (!lastResult || result.total > lastResult.total) {
+        lastResult = result;
+        lastQuery = queryInfo;
+      }
+    } catch (error) {
+      console.error(`[eBay One Piece] Query failed:`, error);
+    }
+  }
+
+  if (lastResult && lastQuery) {
+    return {
+      ...lastResult,
+      queryUsed: lastQuery.query,
+      queryStrategy: lastQuery.strategy,
+    };
+  }
+
+  return {
+    total: 0,
+    items: [],
+    queryUsed: queries[0]?.query || '',
+    queryStrategy: queries[0]?.strategy || 'minimal',
+  };
+}
+
+// =============================================================================
 // Other/Generic Card Query Building
 // =============================================================================
 

@@ -266,6 +266,80 @@ export function generateEbayGradedSearchUrl(cardData: CardData): string {
 }
 
 /**
+ * Generate eBay search URL for One Piece TCG cards
+ * Simplified: Card Name + Card Number only for more accurate searches
+ */
+export function generateOnePieceEbaySearchUrl(cardData: CardData): string {
+  const searchTerms: string[] = [];
+
+  // 1. Card/Character name (primary identifier)
+  if (cardData.card_name) {
+    searchTerms.push(cardData.card_name);
+  } else if (cardData.featured) {
+    searchTerms.push(cardData.featured);
+  }
+
+  // 2. Card number (for precise identification) - One Piece uses format like "OP01-001"
+  if (cardData.card_number) {
+    searchTerms.push(cardData.card_number);
+  }
+
+  // 3. Add "One Piece" keyword for better search results
+  searchTerms.push('One Piece');
+
+  const searchQuery = searchTerms.join(' ');
+
+  // eBay search URL with One Piece Card Game category
+  const baseUrl = 'https://www.ebay.com/sch/i.html';
+  const params = new URLSearchParams({
+    _nkw: searchQuery,
+    _sacat: '261330', // One Piece Card Game category
+    LH_TitleDesc: '0', // Search title only
+    _udlo: '1', // Minimum price $1
+    _sop: '16', // Sort by: Best Match
+  });
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
+ * Generate eBay sold listings URL for One Piece TCG cards
+ * Simplified: Card Name + Card Number only for more accurate searches
+ */
+export function generateOnePieceEbaySoldListingsUrl(cardData: CardData): string {
+  const searchTerms: string[] = [];
+
+  // 1. Card/Character name (primary identifier)
+  if (cardData.card_name) {
+    searchTerms.push(cardData.card_name);
+  } else if (cardData.featured) {
+    searchTerms.push(cardData.featured);
+  }
+
+  // 2. Card number (for precise identification)
+  if (cardData.card_number) {
+    searchTerms.push(cardData.card_number);
+  }
+
+  // 3. Add "One Piece" keyword for better search results
+  searchTerms.push('One Piece');
+
+  const searchQuery = searchTerms.join(' ');
+
+  const baseUrl = 'https://www.ebay.com/sch/i.html';
+  const params = new URLSearchParams({
+    _nkw: searchQuery,
+    _sacat: '261330', // One Piece Card Game category
+    LH_Sold: '1', // Sold listings only
+    LH_Complete: '1', // Completed listings
+    _udlo: '1', // Minimum price $1
+    _sop: '13', // Sort by: Price + Shipping: lowest first
+  });
+
+  return `${baseUrl}?${params.toString()}`;
+}
+
+/**
  * Generate eBay search URL for Lorcana cards
  * Simplified: Card Name + Card Number only for more accurate searches
  */

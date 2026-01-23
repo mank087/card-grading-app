@@ -6,7 +6,7 @@ import { getStoredSession } from '@/lib/directAuth';
 
 interface EbayListingButtonProps {
   card: any;
-  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'other';
+  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
   showFounderEmblem?: boolean;
   labelStyle?: 'modern' | 'traditional';
   variant?: 'default' | 'compact' | 'icon';

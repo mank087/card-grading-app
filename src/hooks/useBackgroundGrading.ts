@@ -8,6 +8,7 @@ const CARD_TYPES_CONFIG = {
   Pokemon: { apiEndpoint: '/api/pokemon', route: '/pokemon' },
   MTG: { apiEndpoint: '/api/mtg', route: '/mtg' },
   Lorcana: { apiEndpoint: '/api/lorcana', route: '/lorcana' },
+  'One Piece': { apiEndpoint: '/api/onepiece', route: '/onepiece' },
   Other: { apiEndpoint: '/api/other', route: '/other' }
 }
 

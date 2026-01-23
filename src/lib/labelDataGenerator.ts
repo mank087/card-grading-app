@@ -234,6 +234,17 @@ export interface ConversationalCardInfo {
   inkwell?: boolean | null;
   ink_cost?: number | null;
   is_enchanted?: boolean | null;
+
+  // One Piece-specific
+  op_card_type?: string | null;     // Leader, Character, Event, Stage
+  op_card_color?: string | null;    // Red, Blue, Green, Purple, Black, Yellow
+  op_variant_type?: string | null;  // parallel, manga, parallel_manga, sp, alternate_art
+  op_card_power?: number | null;
+  op_card_cost?: number | null;
+  op_life?: number | null;
+  op_counter?: number | null;
+  op_attribute?: string | null;
+  op_sub_types?: string | null;     // Affiliations/types
 }
 
 export interface CardForLabel {
@@ -563,6 +574,20 @@ function getLorcanaName(cardInfo: ConversationalCardInfo, card: CardForLabel): s
 }
 
 /**
+ * Get the primary name for One Piece cards
+ * One Piece: Full card name is primary (e.g., "Monkey.D.Luffy", "Roronoa Zoro")
+ */
+function getOnePieceName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
+  const cardName = stripMarkdown(cardInfo.card_name);
+  const characterName = stripMarkdown(cardInfo.player_or_character);
+  if (isValidValue(cardName)) return cardName!;
+  if (isValidValue(characterName)) return characterName!;
+  if (isValidValue(card.card_name)) return card.card_name!;
+  if (isValidValue(card.featured)) return card.featured!;
+  return 'Card';
+}
+
+/**
  * Get the primary name for Other cards
  */
 function getOtherName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
@@ -636,6 +661,36 @@ function getMTGSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): str
  */
 function getLorcanaSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): string | null {
   return stripMarkdown(cardInfo.subset);
+}
+
+/**
+ * Get subset for One Piece cards
+ * One Piece: Variant type (Parallel, Manga Art, SP, etc.)
+ */
+function getOnePieceSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): string | null {
+  const subset = stripMarkdown(cardInfo.subset);
+  if (subset) return subset;
+
+  // Check variant type
+  const variantType = cardInfo.op_variant_type;
+  if (variantType) {
+    switch (variantType.toLowerCase()) {
+      case 'parallel':
+        return 'Parallel';
+      case 'manga':
+        return 'Manga Art';
+      case 'parallel_manga':
+        return 'Parallel Manga';
+      case 'sp':
+        return 'SP';
+      case 'alternate_art':
+        return 'Alt Art';
+      default:
+        return variantType;
+    }
+  }
+
+  return null;
 }
 
 // ============================================================================
@@ -777,6 +832,53 @@ function getLorcanaFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel
 }
 
 /**
+ * Build features array for One Piece cards
+ */
+function getOnePieceFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): string[] {
+  const features: string[] = [];
+
+  // Card type - show if Leader (notable)
+  if (cardInfo.op_card_type?.toLowerCase() === 'leader') {
+    features.push('Leader');
+  }
+
+  // Variant types
+  const variantType = cardInfo.op_variant_type?.toLowerCase();
+  if (variantType) {
+    switch (variantType) {
+      case 'parallel':
+        features.push('Parallel');
+        break;
+      case 'manga':
+        features.push('Manga');
+        break;
+      case 'parallel_manga':
+        features.push('Parallel Manga');
+        break;
+      case 'sp':
+        features.push('SP');
+        break;
+      case 'alternate_art':
+        features.push('Alt Art');
+        break;
+    }
+  }
+
+  // Foil (if applicable)
+  if (cardInfo.is_foil === true) {
+    features.push('Foil');
+  }
+
+  // Serial Number
+  const serialNum = stripMarkdown(cardInfo.serial_number);
+  if (isValidSerialNumber(serialNum)) {
+    features.push(serialNum!);
+  }
+
+  return features;
+}
+
+/**
  * Build features array for Other cards
  */
 function getOtherFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): string[] {
@@ -838,6 +940,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
       case 'Lorcana':
         rawPrimaryName = getLorcanaName(cardInfo, card);
         break;
+      case 'One Piece':
+        rawPrimaryName = getOnePieceName(cardInfo, card);
+        break;
       default:
         rawPrimaryName = getOtherName(cardInfo, card);
     }
@@ -879,6 +984,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
         break;
       case 'Lorcana':
         rawSubset = getLorcanaSubset(cardInfo, card);
+        break;
+      case 'One Piece':
+        rawSubset = getOnePieceSubset(cardInfo, card);
         break;
       default:
         rawSubset = stripMarkdown(cardInfo.subset);
@@ -995,6 +1103,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
         break;
       case 'Lorcana':
         features = getLorcanaFeatures(cardInfo, card);
+        break;
+      case 'One Piece':
+        features = getOnePieceFeatures(cardInfo, card);
         break;
       default:
         features = getOtherFeatures(cardInfo, card);

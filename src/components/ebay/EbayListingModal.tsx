@@ -127,7 +127,7 @@ interface EbayListingModalProps {
   isOpen: boolean;
   onClose: () => void;
   card: any;
-  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'other';
+  cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
   showFounderEmblem?: boolean;
   labelStyle?: 'modern' | 'traditional';
 }

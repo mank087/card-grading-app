@@ -85,10 +85,11 @@ interface EbayPriceLookupProps {
     serial_numbering?: string;
     rookie_card?: boolean;
     // Game type for specialized search strategies
-    game_type?: 'pokemon' | 'mtg' | 'lorcana' | 'other';
+    game_type?: 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
     is_foil?: boolean;
     foil_type?: string;
     ink_color?: string;  // Lorcana-specific
+    variant_type?: string;  // One Piece-specific (parallel, manga, sp, etc.)
   };
   cardId?: string;
   category?: 'sports' | 'ccg' | 'other';
@@ -225,6 +226,8 @@ export function EbayPriceLookup({ card, cardId, category = 'sports' }: EbayPrice
       card_set: card.card_set,
       subset: card.subset,
       game_type: card.game_type,
+      variant_type: card.variant_type,
+      is_foil: card.is_foil,
     });
 
     try {
