@@ -129,8 +129,10 @@ function buildTitle(card: any): string {
     card.featured,
     card.conversational_card_info?.player_or_character
   );
-  // Extract year from release_date if it's a full date string
-  const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+  // Extract year from release_date if it's a full date string (safely handle non-string values)
+  const releaseYear = card.release_date && typeof card.release_date === 'string'
+    ? card.release_date.slice(0, 4)
+    : null;
   const year = getFirstValidValue(releaseYear, card.conversational_card_info?.year);
   const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
   const cardNumber = getFirstValidValue(
@@ -207,7 +209,11 @@ function buildDescription(card: any): string {
   // Use conversational AI data first, then database fields
   const pokemonName = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || card.pokemon_featured || '';
   const setName = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || '';
-  const year = stripMarkdown(card.conversational_card_info?.year) || card.release_date || '';
+  // Safely handle release_date which might not be a string
+  const releaseYear = card.release_date && typeof card.release_date === 'string'
+    ? card.release_date.slice(0, 4)
+    : (typeof card.release_date === 'string' ? card.release_date : '');
+  const year = stripMarkdown(card.conversational_card_info?.year) || releaseYear || '';
   const cardNumber = stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || '';
   const rarity = stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || '';
   const pokemonType = card.conversational_card_info?.pokemon_type || card.pokemon_type || '';

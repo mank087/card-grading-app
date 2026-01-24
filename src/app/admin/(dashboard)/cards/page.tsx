@@ -176,6 +176,7 @@ const getCategoryBadge = (category: string | null) => {
     'Pokemon': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '⚡ Pokemon' },
     'MTG': { bg: 'bg-indigo-100', text: 'text-indigo-800', label: '🎴 MTG' },
     'Lorcana': { bg: 'bg-pink-100', text: 'text-pink-800', label: '✨ Lorcana' },
+    'One Piece': { bg: 'bg-rose-100', text: 'text-rose-800', label: '🏴‍☠️ One Piece' },
     'Other': { bg: 'bg-gray-100', text: 'text-gray-800', label: '📦 Other' },
   }
   return categoryConfig[category || ''] || { bg: 'bg-gray-100', text: 'text-gray-600', label: category || 'Unknown' }
@@ -451,6 +452,7 @@ function CardsContent() {
               <option value="Pokemon">⚡ Pokemon</option>
               <option value="MTG">🎴 MTG</option>
               <option value="Lorcana">✨ Lorcana</option>
+              <option value="One Piece">🏴‍☠️ One Piece</option>
               <option value="Other">📦 Other</option>
             </select>
           </div>
@@ -540,7 +542,7 @@ function CardsContent() {
         </div>
       )}
 
-      {/* Cards Table */}
+      {/* Cards Table/List */}
       {loading ? (
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">
           <svg className="animate-spin h-8 w-8 mx-auto mb-2 text-purple-600" viewBox="0 0 24 24">
@@ -553,7 +555,129 @@ function CardsContent() {
         <div className="bg-white rounded-lg shadow p-8 text-center text-gray-500">No cards found</div>
       ) : (
         <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Mobile Card Layout */}
+          <div className="block lg:hidden">
+            {/* Mobile Select All */}
+            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={cards.length > 0 && cards.every(c => selectedCards.has(c.id))}
+                  onChange={(e) => e.target.checked ? selectAllOnPage() : clearSelection()}
+                  className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                />
+                Select all
+              </label>
+              <span className="text-xs text-gray-500">{pagination.total} cards</span>
+            </div>
+
+            {/* Mobile Cards */}
+            <div className="divide-y divide-gray-200">
+              {cards.map((card) => {
+                const categoryRoutes: Record<string, string> = {
+                  'Football': '/sports', 'Baseball': '/sports', 'Basketball': '/sports',
+                  'Hockey': '/sports', 'Soccer': '/sports', 'Wrestling': '/sports',
+                  'Sports': '/sports', 'Pokemon': '/pokemon', 'MTG': '/mtg',
+                  'Lorcana': '/lorcana', 'One Piece': '/onepiece', 'Other': '/other'
+                }
+                const route = categoryRoutes[card.category || ''] || '/other'
+                const badge = getCategoryBadge(card.category)
+                const grade = getCardGrade(card)
+                const marketValue = getMarketValue(card)
+
+                return (
+                  <div key={card.id} className={`p-4 ${selectedCards.has(card.id) ? 'bg-purple-50' : ''}`}>
+                    <div className="flex gap-3">
+                      {/* Checkbox + Image */}
+                      <div className="flex flex-col items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedCards.has(card.id)}
+                          onChange={() => toggleCardSelection(card.id)}
+                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
+                        />
+                        <div className="w-12 h-16 relative rounded overflow-hidden bg-gray-100 flex-shrink-0">
+                          {card.front_url ? (
+                            <Image
+                              src={card.front_url}
+                              alt={getPlayerName(card)}
+                              fill
+                              className="object-cover"
+                              sizes="48px"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px]">
+                              No img
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <h3 className="text-sm font-semibold text-gray-900 truncate">
+                            {getPlayerName(card)}
+                          </h3>
+                          {grade !== null && (
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-purple-100 text-purple-800 font-bold text-sm flex-shrink-0">
+                              {formatGrade(grade)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${badge.bg} ${badge.text}`}>
+                            {badge.label}
+                          </span>
+                          {marketValue !== null && (
+                            <span className="text-xs font-medium text-green-700">
+                              {formatPrice(marketValue)}
+                            </span>
+                          )}
+                        </div>
+
+                        <p className="text-xs text-gray-500 truncate mb-1">
+                          {getCardSet(card)} {getYear(card) !== 'N/A' && `• ${getYear(card)}`}
+                        </p>
+
+                        <p className="text-[10px] text-gray-400 truncate">
+                          {card.user_email} • {card.created_at ? new Date(card.created_at).toLocaleDateString() : '-'}
+                        </p>
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex flex-col items-end gap-2">
+                        <Link
+                          href={`${route}/${card.id}`}
+                          className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 bg-purple-50 rounded"
+                        >
+                          View
+                        </Link>
+                        <button
+                          onClick={() => handleToggleFeatured(card.id, card.is_featured || false)}
+                          className={`text-lg ${card.is_featured ? 'text-yellow-500' : 'text-gray-300'}`}
+                          title="Toggle featured"
+                        >
+                          ⭐
+                        </button>
+                        <button
+                          onClick={() => openDeleteModal(card.id, getPlayerName(card))}
+                          disabled={deletingCardId === card.id}
+                          className="text-xs text-red-600 hover:text-red-800 font-medium disabled:opacity-50"
+                        >
+                          {deletingCardId === card.id ? '...' : 'Delete'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Desktop Table Layout */}
+          <div className="hidden lg:block overflow-x-auto">
             <table className="w-full table-fixed">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -679,6 +803,7 @@ function CardsContent() {
                     'Pokemon': '/pokemon',
                     'MTG': '/mtg',
                     'Lorcana': '/lorcana',
+                    'One Piece': '/onepiece',
                     'Other': '/other'
                   }
                   const route = categoryRoutes[card.category || ''] || '/other'
@@ -830,8 +955,8 @@ function CardsContent() {
           </div>
 
           {/* Pagination */}
-          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between border-t border-gray-200">
-            <div className="text-sm text-gray-700">
+          <div className="bg-gray-50 px-4 lg:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-gray-200">
+            <div className="text-sm text-gray-700 text-center sm:text-left">
               Showing <span className="font-medium">{(pagination.page - 1) * pagination.limit + 1}</span> to{' '}
               <span className="font-medium">
                 {Math.min(pagination.page * pagination.limit, pagination.total)}

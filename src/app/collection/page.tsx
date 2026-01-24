@@ -247,6 +247,11 @@ const getCardLink = (card: Card) => {
     return `/lorcana/${card.id}`;
   }
 
+  // One Piece cards → /onepiece/[id]
+  if (card.category === 'One Piece') {
+    return `/onepiece/${card.id}`;
+  }
+
   // Other cards → /other/[id]
   if (card.category === 'Other') {
     return `/other/${card.id}`;
@@ -892,6 +897,7 @@ function CollectionPageContent() {
             { id: 'Pokemon', label: 'Pokemon', icon: '⚡' },
             { id: 'MTG', label: 'Magic', icon: '🎴' },
             { id: 'Lorcana', label: 'Lorcana', icon: '✨' },
+            { id: 'One Piece', label: 'One Piece', icon: '🏴‍☠️' },
             { id: 'Other', label: 'Other', icon: '🃏' }
           ].map((category) => (
             <button
