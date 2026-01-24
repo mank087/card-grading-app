@@ -9,6 +9,7 @@ interface PageProps {
 // Helper: Strip markdown formatting
 function stripMarkdown(text: string | null | undefined): string {
   if (!text) return '';
+  if (typeof text !== 'string') return String(text); // Handle numbers/objects
   // Remove **bold** formatting
   return text.replace(/\*\*/g, '').trim();
 }
