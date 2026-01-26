@@ -6,7 +6,37 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { addCredits, updateStripeCustomerId, setFounderStatus } from '@/lib/credits';
+import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+
+// Create Supabase client for idempotency checks
+function getServiceClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
+/**
+ * Check if a Stripe session has already been processed (idempotency check)
+ * Prevents duplicate credit additions if Stripe retries the webhook
+ */
+async function checkSessionProcessed(sessionId: string): Promise<{ hasBeenProcessed: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  const { data, error } = await supabase
+    .from('credit_transactions')
+    .select('id')
+    .eq('stripe_session_id', sessionId)
+    .limit(1);
+
+  if (error) {
+    console.error('Error checking session idempotency:', error);
+    return { hasBeenProcessed: false, error: error.message };
+  }
+
+  return { hasBeenProcessed: data && data.length > 0 };
+}
 
 // Disable body parsing - we need raw body for signature verification
 export const runtime = 'nodejs';
@@ -88,6 +118,16 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
 
   if (!userId || !credits) {
     console.error('Missing required metadata:', { userId, credits });
+    return;
+  }
+
+  // IDEMPOTENCY CHECK: Prevent duplicate processing if Stripe retries the webhook
+  const { hasBeenProcessed, error: idempotencyError } = await checkSessionProcessed(session.id);
+  if (idempotencyError) {
+    console.error('Error checking idempotency:', idempotencyError);
+    // Continue anyway - better to risk duplicate than to fail a legitimate payment
+  } else if (hasBeenProcessed) {
+    console.log('Session already processed, skipping:', session.id);
     return;
   }
 

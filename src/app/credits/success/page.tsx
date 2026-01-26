@@ -77,8 +77,14 @@ function PurchaseSuccessContent() {
 
     // Refresh credits after successful purchase
     const loadCredits = async () => {
-      await refreshCredits()
-      setIsLoading(false)
+      try {
+        await refreshCredits()
+      } catch (error) {
+        console.error('Failed to refresh credits:', error)
+        // Still show the page even if refresh fails - user can manually refresh
+      } finally {
+        setIsLoading(false)
+      }
     }
 
     // Small delay to ensure webhook has processed

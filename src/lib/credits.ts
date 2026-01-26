@@ -85,7 +85,7 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
 
     // Record the signup bonus transaction for audit trail
     if (newCredits) {
-      await supabase.from('credit_transactions').insert({
+      const { error: transactionError } = await supabase.from('credit_transactions').insert({
         user_id: userId,
         type: 'bonus',
         amount: 1,
@@ -93,6 +93,10 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
         description: 'Welcome bonus - 1 free credit for signing up',
         metadata: { bonus_type: 'signup' },
       });
+
+      if (transactionError) {
+        console.error('Failed to record signup bonus transaction:', transactionError);
+      }
     }
 
     return newCredits;
@@ -161,7 +165,7 @@ export async function addCredits(
   }
 
   // Record the purchase transaction
-  await supabase.from('credit_transactions').insert({
+  const { error: transactionError } = await supabase.from('credit_transactions').insert({
     user_id: userId,
     type: 'purchase',
     amount: amount,
@@ -171,9 +175,14 @@ export async function addCredits(
     stripe_payment_intent_id: options.stripePaymentIntentId,
   });
 
+  if (transactionError) {
+    console.error('Failed to record purchase transaction:', transactionError);
+    // Don't fail the operation - credits were added, just audit log is incomplete
+  }
+
   // Record bonus transaction separately if applicable
   if (bonusAdded) {
-    await supabase.from('credit_transactions').insert({
+    const { error: bonusError } = await supabase.from('credit_transactions').insert({
       user_id: userId,
       type: 'bonus',
       amount: bonusAmount,
@@ -181,6 +190,10 @@ export async function addCredits(
       description: `DCM Launch Special - ${bonusAmount} bonus credit${bonusAmount !== 1 ? 's' : ''}`,
       stripe_session_id: options.stripeSessionId,
     });
+
+    if (bonusError) {
+      console.error('Failed to record bonus transaction:', bonusError);
+    }
   }
 
   return { success: true, newBalance, bonusAdded, bonusAmount };
@@ -231,7 +244,7 @@ export async function deductCredit(
     ? 'Re-grade card'
     : options.description || 'Grade card';
 
-  await supabase.from('credit_transactions').insert({
+  const { error: transactionError } = await supabase.from('credit_transactions').insert({
     user_id: userId,
     type: transactionType,
     amount: -1,
@@ -239,6 +252,11 @@ export async function deductCredit(
     description,
     card_id: options.cardId,
   });
+
+  if (transactionError) {
+    console.error('Failed to record grade transaction:', transactionError);
+    // Don't fail - credit was deducted, just audit log is incomplete
+  }
 
   return { success: true, newBalance };
 }
@@ -349,7 +367,7 @@ export async function setFounderStatus(
   }
 
   // Record the transaction
-  await supabase.from('credit_transactions').insert({
+  const { error: transactionError } = await supabase.from('credit_transactions').insert({
     user_id: userId,
     type: 'purchase',
     amount: founderCredits,
@@ -359,6 +377,11 @@ export async function setFounderStatus(
     stripe_payment_intent_id: options.stripePaymentIntentId,
     metadata: { package: 'founders' },
   });
+
+  if (transactionError) {
+    console.error('Failed to record founder transaction:', transactionError);
+    // Don't fail - founder status was set, just audit log is incomplete
+  }
 
   return { success: true };
 }
