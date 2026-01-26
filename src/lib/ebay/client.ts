@@ -230,7 +230,8 @@ export async function getEbayUserInfo(accessToken: string): Promise<{
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[eBay] Failed to get user info:', response.status, errorText);
-      // Return a placeholder if we can't get user info
+      console.log('[eBay] User may need to reconnect their eBay account to grant commerce.identity.readonly scope');
+      // Return a placeholder if we can't get user info - connection still works
       return {
         userId: 'unknown',
         username: 'eBay User',

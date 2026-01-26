@@ -88,6 +88,65 @@ interface ListingResponse {
   warnings?: Array<{ code: string; message: string }>;
   error?: string;
   errors?: Array<{ code: string; message: string }>;
+  userAction?: string;
+}
+
+/**
+ * Map eBay error codes/messages to user-friendly error messages
+ * with actionable guidance
+ */
+function getEbayErrorDetails(error: { code?: string; message?: string }): {
+  userMessage: string;
+  userAction?: string;
+} {
+  const code = error?.code || '';
+  const message = error?.message?.toLowerCase() || '';
+
+  // Seller account not set up (code 120)
+  if (code === '120' || message.includes('seller') && message.includes('account')) {
+    return {
+      userMessage: 'Your eBay seller account needs to be set up before you can create listings.',
+      userAction: 'Please visit eBay.com → My eBay → Selling to complete your seller account setup. You may need to add a payment method and verify your identity.',
+    };
+  }
+
+  // Account restrictions/suspensions
+  if (message.includes('restriction') || message.includes('suspended') || message.includes('blocked')) {
+    return {
+      userMessage: 'Your eBay account has restrictions that prevent listing.',
+      userAction: 'Please check your eBay account status and resolve any outstanding issues at eBay.com → My eBay → Account.',
+    };
+  }
+
+  // Payment method issues
+  if (message.includes('payment') || message.includes('paypal') || message.includes('managed payments')) {
+    return {
+      userMessage: 'Your eBay payment method needs to be configured.',
+      userAction: 'Please set up or verify your payment method in eBay Seller Hub → Payments.',
+    };
+  }
+
+  // Category-specific restrictions
+  if (message.includes('category') || message.includes('approval') || message.includes('permission')) {
+    return {
+      userMessage: 'This item category requires special approval on eBay.',
+      userAction: 'Some categories require seller approval. Check eBay\'s category requirements or try a different category.',
+    };
+  }
+
+  // Verification required
+  if (message.includes('verify') || message.includes('verification') || message.includes('identity')) {
+    return {
+      userMessage: 'eBay requires additional verification for your account.',
+      userAction: 'Please complete the identity verification process at eBay.com → My eBay → Account.',
+    };
+  }
+
+  // Default: return original message
+  return {
+    userMessage: error?.message || 'Failed to create eBay listing.',
+    userAction: undefined,
+  };
 }
 
 /**
@@ -378,9 +437,15 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       console.error('[eBay Listing] Trading API error:', result.errors);
+
+      // Map eBay error to user-friendly message with actionable guidance
+      const firstError = result.errors?.[0];
+      const errorDetails = getEbayErrorDetails(firstError || {});
+
       return NextResponse.json({
         success: false,
-        error: result.errors?.[0]?.message || 'Failed to create listing',
+        error: errorDetails.userMessage,
+        userAction: errorDetails.userAction,
         errors: result.errors,
         sku,
         status: 'error',

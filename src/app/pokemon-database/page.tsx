@@ -94,6 +94,9 @@ export default function PokemonDatabasePage() {
   const searchInputRef = useRef<HTMLInputElement>(null)
   const latestGradesRef = useRef<HTMLDivElement>(null)
 
+  // Mobile filter toggle
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+
   // Load auth and credits
   useEffect(() => {
     const loadAuth = async () => {
@@ -407,35 +410,35 @@ export default function PokemonDatabasePage() {
         </div>
       </section>
 
-      {/* Search Section */}
-      <section className="bg-gray-800 border-b border-gray-700 sticky top-0 z-30">
-        <div className="container mx-auto px-4 py-4">
-          {/* Language Toggle */}
-          <div className="flex justify-center mb-4">
+      {/* Search Section - sticky on desktop only */}
+      <section className="bg-gray-800 border-b border-gray-700 md:sticky md:top-0 z-30">
+        <div className="container mx-auto px-4 py-3 md:py-4">
+          {/* Language Toggle - always visible */}
+          <div className="flex justify-center mb-3 md:mb-4">
             <div className="inline-flex bg-gray-900 rounded-lg p-1 border border-gray-700">
               <button
                 onClick={() => setSearchLanguage('en')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`px-3 md:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                   searchLanguage === 'en'
                     ? 'bg-purple-600 text-white'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                English
+                EN
               </button>
               <button
                 onClick={() => setSearchLanguage('ja')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`px-3 md:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                   searchLanguage === 'ja'
                     ? 'bg-purple-600 text-white'
                     : 'text-gray-400 hover:text-white'
                 }`}
               >
-                Japanese
+                JA
               </button>
               <button
                 onClick={() => setSearchLanguage('all')}
-                className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                className={`px-3 md:px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
                   searchLanguage === 'all'
                     ? 'bg-purple-600 text-white'
                     : 'text-gray-400 hover:text-white'
@@ -446,12 +449,101 @@ export default function PokemonDatabasePage() {
             </div>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-3">
+          {/* Mobile: Name search + Filter toggle button */}
+          <div className="flex gap-2 md:hidden">
+            <div className="flex-1">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                placeholder="Search cards..."
+                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+              />
+            </div>
+            <button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className={`px-3 py-2.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                showMobileFilters || selectedSetId || searchNumber || searchSetTotal
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-700 text-gray-300'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span className="text-sm">Filters</span>
+              {(selectedSetId || searchNumber || searchSetTotal) && (
+                <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">
+                  {[selectedSetId, searchNumber, searchSetTotal].filter(Boolean).length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Mobile: Collapsible filters */}
+          <div className={`md:hidden overflow-hidden transition-all duration-300 ${showMobileFilters ? 'max-h-60 mt-3' : 'max-h-0'}`}>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Card #</label>
+                <input
+                  type="text"
+                  value={searchNumber}
+                  onChange={(e) => setSearchNumber(e.target.value.toUpperCase())}
+                  placeholder="e.g. 4"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors text-sm text-center"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Set Total</label>
+                <input
+                  type="text"
+                  value={searchSetTotal}
+                  onChange={(e) => setSearchSetTotal(e.target.value.replace(/\D/g, ''))}
+                  placeholder="e.g. 102"
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors text-sm text-center"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-gray-400 mb-1">Set</label>
+                <select
+                  value={selectedSetId}
+                  onChange={(e) => setSelectedSetId(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                >
+                  <option value="">All Sets</option>
+                  {Object.entries(setsBySeries).map(([series, seriesSets]) => (
+                    <optgroup key={series} label={series}>
+                      {seriesSets.map((set) => (
+                        <option key={set.id} value={set.id}>{set.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            </div>
+            {(searchName || searchNumber || searchSetTotal || selectedSetId) && (
+              <button
+                onClick={() => {
+                  setSearchName('')
+                  setSearchNumber('')
+                  setSearchSetTotal('')
+                  setSelectedSetId('')
+                  setShowMobileFilters(false)
+                }}
+                className="mt-2 w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors text-sm"
+              >
+                Clear All Filters
+              </button>
+            )}
+          </div>
+
+          {/* Desktop: All filters in a row */}
+          <div className="hidden md:flex md:flex-row gap-3">
             {/* Name Search */}
             <div className="flex-1">
               <label className="block text-xs text-gray-400 mb-1">Card Name</label>
               <input
-                ref={searchInputRef}
                 type="text"
                 value={searchName}
                 onChange={(e) => setSearchName(e.target.value)}
@@ -461,7 +553,7 @@ export default function PokemonDatabasePage() {
             </div>
 
             {/* Card Number / Set Total */}
-            <div className="w-full md:w-52">
+            <div className="w-52">
               <label className="block text-xs text-gray-400 mb-1 text-center">Card # / Set Total</label>
               <div className="flex items-center gap-1">
                 <input
@@ -483,7 +575,7 @@ export default function PokemonDatabasePage() {
             </div>
 
             {/* Set Filter */}
-            <div className="w-full md:w-64">
+            <div className="w-64">
               <label className="block text-xs text-gray-400 mb-1">
                 Set {searchLanguage === 'ja' && <span className="text-red-400">(Japanese)</span>}
                 {searchLanguage === 'all' && <span className="text-purple-400">(All Languages)</span>}
@@ -515,7 +607,6 @@ export default function PokemonDatabasePage() {
                     setSearchNumber('')
                     setSearchSetTotal('')
                     setSelectedSetId('')
-                    searchInputRef.current?.focus()
                   }}
                   className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
                 >
@@ -527,14 +618,14 @@ export default function PokemonDatabasePage() {
 
           {/* Results count */}
           {hasSearched && (
-            <div className="mt-3 text-sm text-gray-400">
+            <div className="mt-2 md:mt-3 text-sm text-gray-400">
               {isLoading ? (
                 'Searching...'
               ) : (
                 <>
                   Found <span className="text-white font-medium">{pagination.total.toLocaleString()}</span> cards
                   {selectedSetId && sets.find(s => s.id === selectedSetId) && (
-                    <span> in {sets.find(s => s.id === selectedSetId)?.name}</span>
+                    <span className="hidden sm:inline"> in {sets.find(s => s.id === selectedSetId)?.name}</span>
                   )}
                 </>
               )}

@@ -99,6 +99,9 @@ export default function MtgDatabasePage() {
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
 
+  // Mobile filter toggle
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
+
   // MTG color options (WUBRG)
   const colorOptions = [
     { code: 'W', name: 'White', bg: 'bg-amber-100', text: 'text-amber-900', border: 'border-amber-300' },
@@ -393,17 +396,146 @@ export default function MtgDatabasePage() {
         </div>
       </section>
 
-      {/* Search Section */}
-      <section className="bg-gray-800 border-b border-gray-700 sticky top-0 z-30">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-col gap-3">
+      {/* Search Section - sticky on desktop only */}
+      <section className="bg-gray-800 border-b border-gray-700 md:sticky md:top-0 z-30">
+        <div className="container mx-auto px-4 py-3 md:py-4">
+          {/* Mobile: Name search + Filter toggle button */}
+          <div className="flex gap-2 md:hidden">
+            <div className="flex-1">
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                placeholder="Search cards..."
+                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+            </div>
+            <button
+              onClick={() => setShowMobileFilters(!showMobileFilters)}
+              className={`px-3 py-2.5 rounded-lg transition-colors flex items-center gap-1.5 ${
+                showMobileFilters || selectedSetCode || selectedColors.length > 0 || selectedRarity || selectedTypeLine || searchNumber
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-gray-700 text-gray-300'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+              </svg>
+              <span className="text-sm">Filters</span>
+              {(selectedSetCode || selectedColors.length > 0 || selectedRarity || selectedTypeLine || searchNumber) && (
+                <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">
+                  {[selectedSetCode, selectedRarity, selectedTypeLine, searchNumber].filter(Boolean).length + selectedColors.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Mobile: Collapsible filters */}
+          <div className={`md:hidden overflow-hidden transition-all duration-300 ${showMobileFilters ? 'max-h-[400px] mt-3' : 'max-h-0'}`}>
+            <div className="space-y-3">
+              {/* Color Filter */}
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Colors</label>
+                <div className="flex gap-1">
+                  {colorOptions.map((color) => (
+                    <button
+                      key={color.code}
+                      onClick={() => toggleColor(color.code)}
+                      className={`w-9 h-9 rounded-lg font-bold text-sm transition-all ${
+                        selectedColors.includes(color.code)
+                          ? `${color.bg} ${color.text} ring-2 ring-white`
+                          : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                      }`}
+                      title={color.name}
+                    >
+                      {color.code}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Card #</label>
+                  <input
+                    type="text"
+                    value={searchNumber}
+                    onChange={(e) => setSearchNumber(e.target.value)}
+                    placeholder="e.g. 234"
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 transition-colors text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Set</label>
+                  <select
+                    value={selectedSetCode}
+                    onChange={(e) => setSelectedSetCode(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm"
+                  >
+                    <option value="">All Sets</option>
+                    {Object.entries(setsByType).map(([type, typeSets]) => (
+                      <optgroup key={type} label={type}>
+                        {typeSets.map((set) => (
+                          <option key={set.id} value={set.code}>{set.name}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Rarity</label>
+                  <select
+                    value={selectedRarity}
+                    onChange={(e) => setSelectedRarity(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm capitalize"
+                  >
+                    <option value="">All</option>
+                    {rarityOptions.map((rarity) => (
+                      <option key={rarity} value={rarity} className="capitalize">{rarity}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Type</label>
+                  <select
+                    value={selectedTypeLine}
+                    onChange={(e) => setSelectedTypeLine(e.target.value)}
+                    className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-indigo-500 transition-colors text-sm"
+                  >
+                    <option value="">All</option>
+                    {typeOptions.map((type) => (
+                      <option key={type} value={type}>{type}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              {(searchName || searchNumber || selectedSetCode || selectedColors.length > 0 || selectedRarity || selectedTypeLine) && (
+                <button
+                  onClick={() => {
+                    setSearchName('')
+                    setSearchNumber('')
+                    setSelectedSetCode('')
+                    setSelectedColors([])
+                    setSelectedRarity('')
+                    setSelectedTypeLine('')
+                    setShowMobileFilters(false)
+                  }}
+                  className="w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors text-sm"
+                >
+                  Clear All Filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Desktop: All filters in rows */}
+          <div className="hidden md:flex md:flex-col gap-3">
             {/* Row 1: Name, Number, Set */}
-            <div className="flex flex-col md:flex-row gap-3">
+            <div className="flex flex-row gap-3">
               {/* Name Search */}
               <div className="flex-1">
                 <label className="block text-xs text-gray-400 mb-1">Card Name</label>
                 <input
-                  ref={searchInputRef}
                   type="text"
                   value={searchName}
                   onChange={(e) => setSearchName(e.target.value)}
@@ -413,7 +545,7 @@ export default function MtgDatabasePage() {
               </div>
 
               {/* Collector Number Search */}
-              <div className="w-full md:w-32">
+              <div className="w-32">
                 <label className="block text-xs text-gray-400 mb-1">Card #</label>
                 <input
                   type="text"
@@ -425,7 +557,7 @@ export default function MtgDatabasePage() {
               </div>
 
               {/* Set Filter */}
-              <div className="w-full md:w-64">
+              <div className="w-64">
                 <label className="block text-xs text-gray-400 mb-1">Set</label>
                 <select
                   value={selectedSetCode}
@@ -447,9 +579,9 @@ export default function MtgDatabasePage() {
             </div>
 
             {/* Row 2: Colors, Rarity, Type, Clear */}
-            <div className="flex flex-col md:flex-row gap-3 items-end">
+            <div className="flex flex-row gap-3 items-end">
               {/* Color Filter (toggle buttons) */}
-              <div className="w-full md:w-auto">
+              <div className="w-auto">
                 <label className="block text-xs text-gray-400 mb-1">Colors</label>
                 <div className="flex gap-1">
                   {colorOptions.map((color) => (
@@ -470,7 +602,7 @@ export default function MtgDatabasePage() {
               </div>
 
               {/* Rarity Filter */}
-              <div className="w-full md:w-36">
+              <div className="w-36">
                 <label className="block text-xs text-gray-400 mb-1">Rarity</label>
                 <select
                   value={selectedRarity}
@@ -485,7 +617,7 @@ export default function MtgDatabasePage() {
               </div>
 
               {/* Type Filter */}
-              <div className="w-full md:w-40">
+              <div className="w-40">
                 <label className="block text-xs text-gray-400 mb-1">Card Type</label>
                 <select
                   value={selectedTypeLine}
@@ -509,7 +641,6 @@ export default function MtgDatabasePage() {
                     setSelectedColors([])
                     setSelectedRarity('')
                     setSelectedTypeLine('')
-                    searchInputRef.current?.focus()
                   }}
                   className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors whitespace-nowrap"
                 >
@@ -521,14 +652,14 @@ export default function MtgDatabasePage() {
 
           {/* Results count */}
           {hasSearched && (
-            <div className="mt-3 text-sm text-gray-400">
+            <div className="mt-2 md:mt-3 text-sm text-gray-400">
               {isLoading ? (
                 'Searching...'
               ) : (
                 <>
                   Found <span className="text-white font-medium">{pagination.total.toLocaleString()}</span> cards
                   {selectedSetCode && sets.find(s => s.code === selectedSetCode) && (
-                    <span> in {sets.find(s => s.code === selectedSetCode)?.name}</span>
+                    <span className="hidden sm:inline"> in {sets.find(s => s.code === selectedSetCode)?.name}</span>
                   )}
                 </>
               )}

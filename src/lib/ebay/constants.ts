@@ -9,7 +9,8 @@
 // OAuth Scopes
 // =============================================================================
 // Note: Only request scopes that are granted to your app in the eBay Developer Portal
-// Some scopes (commerce.identity.readonly, commerce.media.upload) may require special approval
+// commerce.identity.readonly - Required to fetch eBay username after OAuth
+// commerce.media.upload - May require special approval for image uploads
 export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope',
   'https://api.ebay.com/oauth/api_scope/sell.inventory',
@@ -20,6 +21,7 @@ export const EBAY_OAUTH_SCOPES = [
   'https://api.ebay.com/oauth/api_scope/sell.fulfillment.readonly',
   'https://api.ebay.com/oauth/api_scope/sell.marketing',
   'https://api.ebay.com/oauth/api_scope/sell.marketing.readonly',
+  'https://api.ebay.com/oauth/api_scope/commerce.identity.readonly',
 ] as const;
 
 // Marketing scope for checking if user needs to re-authorize
