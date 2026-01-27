@@ -279,11 +279,6 @@ function drawFrontLabel(
   doc.setTextColor(COLORS.purplePrimary);
   doc.setFont('helvetica', 'bold');
   doc.text(conditionText, gradeX, y + labelH * 0.78, { align: 'center' });
-
-  // STEP 7: Draw border around entire label - thicker for printer tolerance
-  doc.setDrawColor(COLORS.purplePrimary);
-  doc.setLineWidth(1.5);
-  doc.roundedRect(x, y, labelW, labelH, CORNER_RADIUS, CORNER_RADIUS, 'S');
 }
 
 /**
@@ -345,11 +340,6 @@ async function drawBackLabel(
 
   // Draw QR code centered (on top of watermark)
   doc.addImage(qrCodeBase64, 'PNG', qrX, qrY, qrSize, qrSize);
-
-  // Draw border around entire label - thicker for printer tolerance
-  doc.setDrawColor(COLORS.purplePrimary);
-  doc.setLineWidth(1.5);
-  doc.roundedRect(x, y, labelW, labelH, CORNER_RADIUS, CORNER_RADIUS, 'S');
 }
 
 /**
