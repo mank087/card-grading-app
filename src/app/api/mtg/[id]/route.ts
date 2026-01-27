@@ -574,10 +574,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         // Store full result for enhanced data extraction
         conversationalResultV3_3 = conversationalResult;
 
-        // Detect if we're using JSON format (v4.0+)
-        isJSONMode = conversationalResult.meta?.version === 'conversational-v4.2-json' ||
-                     conversationalResult.meta?.version === 'conversational-v4.0-json';
-        console.log(`[MTG CONVERSATIONAL AI] Output format detected: ${isJSONMode ? 'JSON (v4.2)' : 'Markdown (v3.8)'}`);
+        // Detect if we're using JSON format (version string contains 'json')
+        isJSONMode = conversationalResult.meta?.version?.includes('json') === true;
+        console.log(`[MTG CONVERSATIONAL AI] Output format detected: ${isJSONMode ? 'JSON' : 'Markdown'} (${conversationalResult.meta?.version || 'unknown'})`);
 
         console.log(`[GET /api/mtg/${cardId}] ✅ Conversational grading completed: ${conversationalResult.extracted_grade?.decimal_grade || 'N/A'}`);
 

@@ -12,6 +12,7 @@ const STAGE_CONFIG: Record<GradingStage, { label: string; shortLabel: string; co
   grading: { label: 'DCM Optic™ Analyzing', shortLabel: 'DCM Optic™', color: 'bg-purple-400' },
   calculating: { label: 'Calculating Grade', shortLabel: 'Calculate', color: 'bg-indigo-400' },
   saving: { label: 'Saving Results', shortLabel: 'Save', color: 'bg-cyan-400' },
+  slow: { label: 'Taking Longer...', shortLabel: 'Slow', color: 'bg-amber-400' },
   completed: { label: 'Complete', shortLabel: 'Done', color: 'bg-green-400' },
   error: { label: 'Error', shortLabel: 'Error', color: 'bg-red-400' },
 }
@@ -31,10 +32,12 @@ function getStageMessage(stage: GradingStage, cardName?: string): string {
       return 'Computing final grade...'
     case 'saving':
       return 'Saving results...'
+    case 'slow':
+      return 'Taking longer than expected — still processing...'
     case 'completed':
       return 'Grading complete!'
     case 'error':
-      return 'Card may need extra time. Check My Collection or contact admin@dcmgrading.com'
+      return 'This is taking longer than expected. Your card may be ready in My Collection.'
     default:
       return STAGE_CONFIG[stage]?.label || 'Processing...'
   }
@@ -121,7 +124,7 @@ export default function PersistentStatusBar() {
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 bg-red-400 rounded-full" />
               <span className="text-sm font-medium">
-                {errorCount} failed
+                {errorCount} needs attention
               </span>
             </div>
           )}
@@ -228,6 +231,18 @@ export default function PersistentStatusBar() {
                       className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-sm rounded font-medium transition-colors"
                     >
                       View
+                    </button>
+                  )}
+
+                  {card.status === 'error' && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        router.push('/collection')
+                      }}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-sm rounded font-medium transition-colors"
+                    >
+                      Check Collection
                     </button>
                   )}
 

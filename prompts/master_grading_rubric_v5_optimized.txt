@@ -129,14 +129,17 @@ SECTION 3: HUMAN EYE GRADING STANDARD (v5.12)
 "Corner partially obscured by holder. Visible portion shows sharp geometry with no fiber exposure detected. Confidence: B (reduced due to partial obstruction). Score: 9.5 based on visible area."
 
 ---
-SECTION 4: THREE-PASS CONSENSUS GRADING (v5.5)
+SECTION 4: THREE-PASS CONSENSUS GRADING (v5.5) — PASSES FIRST, NARRATIVE AFTER
 ---
 Perform THREE independent evaluations, then average for final grade.
 
+🚨 **GENERATION ORDER REQUIREMENT:**
+Complete ALL three grading passes and output the grading_passes object BEFORE writing any detailed centering, corner, edge, or surface narrative. The detailed analysis sections must reflect the consensus from your three passes, not the other way around. You MUST commit to all three pass scores before writing detailed narratives. The narrative sections explain your pass consensus — they do NOT drive it.
+
 **Pass Structure:**
-- Pass 1: Initial evaluation with fresh perspective
-- Pass 2: Re-examine focusing on areas you might have missed
-- Pass 3: Final evaluation with particular attention to defect verification
+- Pass 1: Initial evaluation with fresh perspective — commit scores BEFORE any narrative
+- Pass 2: Re-examine focusing on areas you might have missed — independent scores
+- Pass 3: Final evaluation with particular attention to defect verification — independent scores
 
 **For Each Component (centering, corners, edges, surface):**
 ```json
@@ -698,7 +701,13 @@ SECTION 15: OUTPUT JSON SCHEMA
     "impact_level": "none|minor|moderate|high",
     "adjusted_uncertainty": "±0.0|±0.25|±0.5|±1.0"
   },
-  "centering": {
+  "grading_passes": {             /* 🚨 GENERATED FIRST — before detailed narratives */
+    "centering": { "pass_1": 9.0, "pass_2": 9.0, "pass_3": 9.5, "final": 9.0, "variance": 0.5 },
+    "corners": { /* same structure */ },
+    "edges": { /* same structure */ },
+    "surface": { /* same structure */ }
+  },
+  "centering": {                  /* Derived from pass consensus above */
     "front": { /* as defined in Section 9 */ },
     "back": { /* as defined in Section 9 */ }
   },
@@ -713,12 +722,6 @@ SECTION 15: OUTPUT JSON SCHEMA
   "surface": {
     "front": { /* as defined in Section 12 */ },
     "back": { /* as defined in Section 12 */ }
-  },
-  "grading_passes": {
-    "centering": { "pass_1": 9.0, "pass_2": 9.0, "pass_3": 9.5, "final": 9.0, "variance": 0.5 },
-    "corners": { /* same structure */ },
-    "edges": { /* same structure */ },
-    "surface": { /* same structure */ }
   },
   "raw_sub_scores": {
     "centering_front": 9.0,

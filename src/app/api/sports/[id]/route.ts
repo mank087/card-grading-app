@@ -513,10 +513,9 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         console.log(`[GET /api/sports/${cardId}] 🏆 Rarity: ${conversationalResult.rarity_classification?.rarity_tier || 'Not detected'}`);
         console.log(`[GET /api/sports/${cardId}] 📍 Defects: Front=${conversationalResult.defect_coordinates_front.length}, Back=${conversationalResult.defect_coordinates_back.length}`);
 
-        // Detect if we're using JSON format (v4.x) or markdown format (v3.x)
-        isJSONMode = conversationalResult.meta?.version === 'conversational-v4.2-json' ||
-                     conversationalResult.meta?.version === 'conversational-v4.0-json';
-        console.log(`[GET /api/sports/${cardId}] Output format detected: ${isJSONMode ? 'JSON (v4.2)' : 'Markdown (v3.x)'}`);
+        // Detect if we're using JSON format (version string contains 'json')
+        isJSONMode = conversationalResult.meta?.version?.includes('json') === true;
+        console.log(`[GET /api/sports/${cardId}] Output format detected: ${isJSONMode ? 'JSON' : 'Markdown'} (${conversationalResult.meta?.version || 'unknown'})`);
 
         // Create legacy gradingResult structure for backward compatibility
         // This ensures old frontend code paths still work while we transition fully to conversational

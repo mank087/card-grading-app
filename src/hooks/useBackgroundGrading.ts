@@ -60,6 +60,7 @@ export function useBackgroundGrading() {
   const { queue, updateCardStatus } = useGradingQueue()
   const pollingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const notifiedCardsRef = useRef<Set<string>>(new Set())
+  const retriggeredCardsRef = useRef<Set<string>>(new Set()) // Track cards we've re-triggered grading for
   const isPollingRef = useRef(false) // Prevent overlapping polls
   const queueRef = useRef(queue) // Keep latest queue in ref to avoid stale closures
   const hasStartedPollingRef = useRef(false) // Track if we've started polling for current processing cards
@@ -82,8 +83,8 @@ export function useBackgroundGrading() {
       if (!response.ok) {
         console.log(`[BackgroundGrading] ❌ Card ${card.cardId} fetch returned ${response.status}`)
 
-        // If card has been erroring for too long (5 minutes), mark as error
-        if (elapsed > 300000) {
+        // If card has been erroring for too long (10 minutes), mark as error
+        if (elapsed > 600000) {
           try {
             const errorData = await response.json()
             console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} failed after ${Math.floor(elapsed/1000)}s:`, errorData.error)
@@ -145,14 +146,47 @@ export function useBackgroundGrading() {
           })
         }
       } else if (data.status === 'pending' && !data.is_processing && elapsed > 120000) {
-        // Card is stuck: API says 'pending' but we've been waiting over 2 minutes
-        // This means grading never started or the processing lock was lost
-        console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} stuck in pending state after ${Math.floor(elapsed/1000)}s`)
-        updateCardStatus(card.id, {
-          status: 'error',
-          stage: 'error',
-          errorMessage: 'Grading failed to start. Please try re-uploading the card.'
-        })
+        // Card appears stuck: API says 'pending' but we've been waiting over 2 minutes
+        // Use tiered approach instead of immediately marking as error
+        // Serverless instances may have lost the processing lock or request hit a different instance
+
+        if (elapsed > 600000) {
+          // 10+ minutes: now mark as error with helpful message
+          console.error(`[BackgroundGrading] ⚠️ Card ${card.cardId} stuck after ${Math.floor(elapsed/1000)}s, marking as error`)
+          updateCardStatus(card.id, {
+            status: 'error',
+            stage: 'error',
+            errorMessage: 'This is taking longer than expected. Your card may be ready in My Collection. If not, try re-uploading.'
+          })
+        } else if (elapsed > 300000) {
+          // 5-10 minutes: attempt re-trigger once, keep as slow
+          console.warn(`[BackgroundGrading] ⚠️ Card ${card.cardId} slow after ${Math.floor(elapsed/1000)}s, attempting re-trigger`)
+          updateCardStatus(card.id, {
+            status: 'processing',
+            stage: 'slow',
+            estimatedTimeRemaining: null
+          })
+
+          // Fire-and-forget re-trigger (only once per card)
+          if (!retriggeredCardsRef.current.has(card.cardId)) {
+            retriggeredCardsRef.current.add(card.cardId)
+            const config = CARD_TYPES_CONFIG[card.category as keyof typeof CARD_TYPES_CONFIG]
+            if (config) {
+              console.log(`[BackgroundGrading] 🔄 Re-triggering grading for card ${card.cardId}`)
+              fetch(`${config.apiEndpoint}/${card.cardId}`, { method: 'GET' }).catch(() => {
+                // Ignore errors - this is a best-effort recovery
+              })
+            }
+          }
+        } else {
+          // 2-5 minutes: show slow stage, keep processing
+          console.log(`[BackgroundGrading] ⏳ Card ${card.cardId} taking longer than expected (${Math.floor(elapsed/1000)}s)`)
+          updateCardStatus(card.id, {
+            status: 'processing',
+            stage: 'slow',
+            estimatedTimeRemaining: null
+          })
+        }
       } else {
         // Still processing, update progress based on elapsed time
         const estimatedTotal = 90000 // 90 seconds base estimate

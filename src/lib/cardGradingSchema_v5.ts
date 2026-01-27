@@ -572,6 +572,17 @@ export const CardGradingResponseSchemaV5 = z.object({
   // Image quality (affects confidence/uncertainty)
   image_quality: ImageQualitySchema,
 
+  // Three-Pass Consensus Grading (v5.5) — GENERATED FIRST
+  // The model commits to three independent pass scores BEFORE writing any detailed narratives.
+  // Centering, defects, raw_sub_scores, weighted_scores, and final_grade derive from these passes.
+  grading_passes: GradingPassesSchema.describe(
+    'THREE-PASS CONSENSUS GRADING — GENERATE FIRST. Complete all three independent grading passes ' +
+    '(pass_1, pass_2, pass_3) with scores and defects_noted BEFORE writing any detailed centering, ' +
+    'corner, edge, or surface narratives. The detailed analysis sections that follow must reflect ' +
+    'the consensus from these passes. Contains scores from three independent evaluations, ' +
+    'averaged results, variance/consistency metrics, and notes about defects detected in only 1 pass.'
+  ),
+
   // Centering analysis
   centering: z.object({
     front: CenteringAnalysisSchema.describe('Front centering analysis'),
@@ -637,14 +648,7 @@ export const CardGradingResponseSchemaV5 = z.object({
     back_observations: z.array(z.string()).describe('Key observations from back'),
     positives: z.array(z.string()).describe('Positive aspects of card condition'),
     negatives: z.array(z.string()).describe('Negative aspects / defects found')
-  }).optional(),
-
-  // Three-Pass Consensus Grading (v5.5)
-  // Contains individual pass scores, averages, and consensus notes
-  grading_passes: GradingPassesSchema.describe(
-    'Three-pass consensus grading results. Contains scores from three independent evaluations, ' +
-    'averaged results, variance/consistency metrics, and notes about defects detected in only 1 pass.'
-  )
+  }).optional()
 }).describe('Complete card grading analysis v5.5 with three-pass consensus grading');
 
 // Export type for TypeScript usage

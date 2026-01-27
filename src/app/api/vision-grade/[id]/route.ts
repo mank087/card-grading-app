@@ -440,9 +440,9 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
         // 🆕 v3.3: Store full result for enhanced data extraction
         conversationalResultV3_3 = conversationalResult;
 
-        // 🆕 v4.0: Detect if we're using JSON format (check metadata)
-        isJSONMode = conversationalResult.meta?.version === 'conversational-v4.0-json';
-        console.log(`[CONVERSATIONAL AI] Output format detected: ${isJSONMode ? 'JSON (v4.0)' : 'Markdown (v3.8)'}`);
+        // Detect if we're using JSON format (version string contains 'json')
+        isJSONMode = conversationalResult.meta?.version?.includes('json') === true;
+        console.log(`[CONVERSATIONAL AI] Output format detected: ${isJSONMode ? 'JSON' : 'Markdown'} (${conversationalResult.meta?.version || 'unknown'})`);
 
         let parsedJSONData = null;
         if (isJSONMode) {

@@ -233,6 +233,14 @@ export async function gradeCardV5(options: GradeCardOptionsV5): Promise<GradeRes
               type: 'text',
               text: `Grade these card images following the master grading rubric v5.5 and ${cardType} delta rules.
 
+🚨 GENERATION ORDER — PASSES FIRST, NARRATIVE AFTER:
+
+**STEP 1: Complete all three grading passes FIRST.**
+Generate the grading_passes object (pass_1, pass_2, pass_3) with scores and defects_noted BEFORE writing any detailed centering, corner, edge, or surface narrative. Commit to all pass scores before any narrative exists.
+
+**STEP 2: Write detailed narratives based on pass consensus.**
+The centering, defects, and final_grade sections derive from and explain your pass consensus — they do NOT drive it.
+
 🔄 THREE-PASS CONSENSUS GRADING (Section 1.5):
 
 **CRITICAL: Perform THREE complete, independent evaluations of this card.**
@@ -265,7 +273,7 @@ Output the complete grading_passes object with pass_1, pass_2, pass_3, averaged,
 - Defects array MUST match narrative descriptions (count and content)
 
 **MANDATORY VERIFICATION BEFORE SUBMISSION:**
-□ All three passes completed with grading_passes populated
+□ All three passes completed with grading_passes populated BEFORE narratives
 □ Every defect in narrative appears in defects array
 □ Every defect array entry mentioned in narrative
 □ Scores match descriptions logically

@@ -10,6 +10,7 @@ export type GradingStage =
   | 'grading'      // 35-80%: DCM Optic™ analyzing
   | 'calculating'  // 80-95%: Computing final grade
   | 'saving'       // 95-99%: Saving to database
+  | 'slow'         // Processing taking longer than expected (2-10 min)
   | 'completed'    // 100%: Done
   | 'error'        // Error state
 
@@ -54,7 +55,7 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
       try {
         const parsed: GradingCard[] = JSON.parse(saved)
         const now = Date.now()
-        const STALE_THRESHOLD = 10 * 60 * 1000 // 10 minutes
+        const STALE_THRESHOLD = 15 * 60 * 1000 // 15 minutes
 
         // Mark stale processing/uploading cards as errors
         const cleanedQueue = parsed.map(card => {

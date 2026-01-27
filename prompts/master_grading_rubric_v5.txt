@@ -64,9 +64,12 @@ PHASE 3: TIER IDENTIFICATION (Determine Grade Ceiling)
 │   └→ This cap CANNOT be exceeded regardless of scoring                      │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
-PHASE 4: THREE-PASS GRADING (Main Evaluation)
+PHASE 4: THREE-PASS GRADING — SCORES FIRST (Main Evaluation)
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │ Section 1.5: THREE-PASS CONSENSUS PROTOCOL                                  │
+│   🚨 CRITICAL: Complete ALL three passes BEFORE writing any detailed         │
+│   centering, corner, edge, or surface narratives.                           │
+│                                                                             │
 │   FOR each pass (1, 2, 3):                                                  │
 │     └→ Evaluate Centering (front & back) → Score 1-10                       │
 │     └→ Evaluate Corners (all 8) → Score 1-10                                │
@@ -74,6 +77,12 @@ PHASE 4: THREE-PASS GRADING (Main Evaluation)
 │     └→ Evaluate Surface (front & back) → Score 1-10                         │
 │   └→ Average the three passes for each category                             │
 │   └→ Round to whole integer (1-10)                                          │
+│   └→ OUTPUT grading_passes object NOW (before detailed narratives)          │
+│                                                                             │
+│ PHASE 4b: DETAILED NARRATIVE (Derives from pass consensus)                  │
+│   └→ Write centering analysis based on pass consensus                       │
+│   └→ Write corner/edge/surface narratives based on pass consensus           │
+│   └→ These sections EXPLAIN the pass scores — they do NOT drive them        │
 └─────────────────────────────────────────────────────────────────────────────┘
                                     ↓
 PHASE 5: FINAL GRADE CALCULATION
@@ -93,9 +102,11 @@ PHASE 5: FINAL GRADE CALCULATION
                                     ↓
 PHASE 6: OUTPUT GENERATION
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│ Generate JSON output with:                                                  │
+│ Generate JSON output in this order:                                         │
 │   └→ defect_hunting results                                                 │
-│   └→ grading_passes (all 3 passes + averaged + averaged_rounded)            │
+│   └→ grading_passes (all 3 passes + averaged + averaged_rounded) ← FIRST   │
+│   └→ centering (detailed narrative derived from passes)                     │
+│   └→ defects (corner/edge/surface narratives derived from passes)           │
 │   └→ raw_sub_scores (8 values, all whole integers 1-10)                     │
 │   └→ weighted_scores (4 combined category scores)                           │
 │   └→ final_grade (decimal_grade and whole_grade - must match)               │
@@ -265,9 +276,12 @@ Complete card information extraction BEFORE condition evaluation to ensure corre
 ---
 SECTION 1.5: THREE-PASS CONSENSUS GRADING PROTOCOL (v5.5)
 ---
-🆕 **THREE-PASS GRADING SYSTEM**
+🆕 **THREE-PASS GRADING SYSTEM — PASSES FIRST, NARRATIVE AFTER**
 
 PURPOSE: Improve grading accuracy and reduce hallucination/variance by performing THREE independent evaluations of the card, then averaging results for the final grade.
+
+🚨 **GENERATION ORDER REQUIREMENT:**
+Complete ALL three grading passes and output the grading_passes object BEFORE writing any detailed centering, corner, edge, or surface narrative. The detailed analysis sections must reflect the consensus from your three passes, not the other way around. This ensures genuine independent variation between passes.
 
 **WHY THREE PASSES?**
 • Reduces single-pass bias and random variance
@@ -279,6 +293,7 @@ PURPOSE: Improve grading accuracy and reduce hallucination/variance by performin
 THREE-PASS EXECUTION PROTOCOL
 ---
 **CRITICAL: You MUST perform THREE complete, independent evaluations.**
+**CRITICAL: You MUST commit to all three pass scores BEFORE writing detailed narratives.**
 
 For EACH pass, you will:
 1. Evaluate centering (front and back) → assign front_centering_score and back_centering_score
@@ -337,6 +352,12 @@ If you re-examined → Proceed, even if scores are similar.
 Identical word-for-word defects_noted arrays across ALL three passes ARE suspicious.
 A pristine card graded 10/10/10/10 with empty defects arrays is perfectly valid.
 A damaged card with the exact same 5-sentence defect description copied three times is not.
+
+🚨 **GENERATION ORDER RULE (v5.13):**
+You MUST commit to all three pass scores before writing detailed narratives.
+The narrative sections (centering analysis, corner conditions, edge conditions, surface conditions)
+explain your pass consensus — they do NOT drive it. If you write narratives first and then
+backfill passes to match, you defeat the purpose of multi-pass evaluation.
 ---
 PASS OUTPUT STRUCTURE (v7.2 - MIN SCORING, WHOLE NUMBERS ONLY)
 ---
@@ -507,12 +528,14 @@ GRADING_PASSES OUTPUT FORMAT (v7.0 - WHOLE NUMBERS)
   }
 }
 ---
-FINAL ANALYSIS SYNTHESIS
+FINAL ANALYSIS SYNTHESIS — WRITTEN AFTER PASSES
 ---
-After the three passes, synthesize findings into the FINAL analysis sections:
+After completing and outputting all three passes in grading_passes, synthesize findings into the detailed analysis sections:
+
+**GENERATION ORDER:** The grading_passes object has already been committed. The sections below are a SYNTHESIS of those passes, written AFTER the passes are complete. Do NOT alter pass scores retroactively.
 
 **For Centering, Corners, Edges, Surface sections:**
-• Use the AVERAGED ROUNDED scores
+• Use the AVERAGED ROUNDED scores from grading_passes
 • Write a SINGLE synthesized narrative that reflects consensus findings
 • Only include defects that appeared in 2+ passes
 • Reference specific observations that were consistent across passes
@@ -522,7 +545,7 @@ After the three passes, synthesize findings into the FINAL analysis sections:
 • Apply whole grade rounding for whole_grade
 • Summary should explain the consensus grade determination
 
-**CRITICAL:** The detailed analysis sections (centering analysis, corner conditions, edge conditions, surface conditions) should reflect the FINAL CONSENSUS view, not individual pass details. Individual pass scores are shown in grading_passes for transparency.
+**CRITICAL:** The detailed analysis sections (centering analysis, corner conditions, edge conditions, surface conditions) should reflect the FINAL CONSENSUS view from your three passes, not individual pass details. Individual pass scores are shown in grading_passes for transparency. The narrative explains the pass consensus — it does not drive it.
 ---
 SECTION 1.6: CARD PRESENCE VALIDATION (v5.12 NEW)
 ---
@@ -5341,7 +5364,17 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
 **🚨 v7.0 REMINDER: ALL scores MUST be whole integers (1-10). NO decimals anywhere 🚨**
 
 {
-  "raw_sub_scores": {
+  "grading_passes": {             // 🚨 GENERATED FIRST — Three-Pass Consensus Data
+    "pass_1": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Left-right centering 58/42"] },
+    "pass_2": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Left-right centering shift noted"] },
+    "pass_3": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Centering off-center to left"] },
+    "averaged": { "centering": 8.0, "corners": 9.0, "edges": 9.0, "surface": 9.0, "final": 8.0 },
+    "averaged_rounded": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8 },
+    "variance": 0,
+    "consistency": "high",
+    "consensus_notes": ["Centering shift confirmed in 3/3 passes"]
+  },
+  "raw_sub_scores": {             // Derived from pass consensus above
     "centering_front": 9,     // ✅ Valid: whole integer
     "corners_front": 9,       // ✅ Valid: whole integer
     "edges_front": 10,        // ✅ Valid: whole integer
@@ -5361,16 +5394,6 @@ OUTPUT FORMAT: SCORING BREAKDOWN (v6.0 UPDATED - WHOLE NUMBERS)
     "preliminary_grade": 8,       // v7.2: MIN of all subgrades = 8
     "condition_tier": "E",        // v6.0: Tier from Section 1.13
     "tier_cap": 8                 // v6.0: Maximum grade from tier
-  },
-  "grading_passes": {             // 🚨 MANDATORY - Three-Pass Consensus Data
-    "pass_1": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Left-right centering 58/42"] },
-    "pass_2": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Left-right centering shift noted"] },
-    "pass_3": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8, "defects_noted": ["Centering off-center to left"] },
-    "averaged": { "centering": 8.0, "corners": 9.0, "edges": 9.0, "surface": 9.0, "final": 8.0 },
-    "averaged_rounded": { "centering": 8, "corners": 9, "edges": 9, "surface": 9, "final": 8 },
-    "variance": 0,
-    "consistency": "high",
-    "consensus_notes": ["Centering shift confirmed in 3/3 passes"]
   },
   "final_grade": {
     "decimal_grade": 8,           // 🚨 v6.0: MUST be whole integer (was 8.0)
@@ -5417,18 +5440,18 @@ JSON STRUCTURE REFERENCE
 **IMPORTANT:** The actual JSON schema is enforced by the API's response_format parameter.
 This section provides guidelines for content quality, not structure definition.
 
-**Required Top-Level Objects:**
+**Required Top-Level Objects (generation order):**
 • card_info (from Section 4 + delta file)
 • slab_detection (from Section 3)
 • alteration_detection (from Section 2)
 • image_quality (from Section 5)
-• centering (from Section 7)
-• corners (from Section 8)
-• edges (from Section 9)
-• surface (from Section 10)
+• grading_passes (THREE-PASS DATA — GENERATED FIRST, MANDATORY from Section 1.5)
+• centering (from Section 7 — derived from pass consensus)
+• corners (from Section 8 — derived from pass consensus)
+• edges (from Section 9 — derived from pass consensus)
+• surface (from Section 10 — derived from pass consensus)
 • raw_sub_scores (8 component scores - v4.2 format)
 • weighted_scores (4 weighted scores - v4.2 format)
-• grading_passes (THREE-PASS DATA - MANDATORY from Section 1.5)
 • final_grade (decimal_grade, whole_grade, etc.)
 • structural_damage (creases, bent corners detection)
 • handwriting (if detected)
