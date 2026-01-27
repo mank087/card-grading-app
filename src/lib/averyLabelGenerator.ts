@@ -463,6 +463,7 @@ export function getAveryConfig() {
 
 /**
  * Generate an Avery 6871 label sheet with multiple labels
+ * Supports single page with custom positions
  * @param labelDataArray Array of label data to render
  * @param positionIndices Array of positions (0-17) corresponding to each label
  * @param offsets Optional calibration offsets for printer alignment
@@ -511,6 +512,80 @@ export async function generateAveryLabelSheet(
     const position = indexToPosition(positionIndices[index]);
     drawLabel(doc, data, position, offsets);
   });
+
+  return doc.output('blob');
+}
+
+/**
+ * Generate a multi-page Avery 6871 label PDF with auto-pagination
+ * Labels are automatically distributed across pages (18 per page)
+ * @param labelDataArray Array of label data to render (unlimited)
+ * @param offsets Optional calibration offsets for printer alignment
+ * @param globalPositions Optional array of global positions (page * 18 + positionOnPage) for specific placement
+ * @returns Promise<Blob> - PDF blob with all labels rendered across multiple pages
+ */
+export async function generateAveryLabelSheetMultiPage(
+  labelDataArray: FoldableLabelData[],
+  offsets?: CalibrationOffsets,
+  globalPositions?: number[]
+): Promise<Blob> {
+  if (labelDataArray.length === 0) {
+    throw new Error('No labels to generate');
+  }
+
+  // Create PDF document
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'pt',
+    format: 'letter',
+  });
+
+  const labelsPerPage = TOTAL_LABELS;
+
+  if (globalPositions && globalPositions.length === labelDataArray.length) {
+    // Use specific positions - group by page first
+    const labelsByPage = new Map<number, { data: FoldableLabelData; positionOnPage: number }[]>();
+
+    labelDataArray.forEach((data, index) => {
+      const globalPos = globalPositions[index];
+      const pageIndex = Math.floor(globalPos / labelsPerPage);
+      const positionOnPage = globalPos % labelsPerPage;
+
+      if (!labelsByPage.has(pageIndex)) {
+        labelsByPage.set(pageIndex, []);
+      }
+      labelsByPage.get(pageIndex)!.push({ data, positionOnPage });
+    });
+
+    // Sort pages and render
+    const sortedPages = Array.from(labelsByPage.keys()).sort((a, b) => a - b);
+
+    sortedPages.forEach((pageIndex, idx) => {
+      if (idx > 0) {
+        doc.addPage();
+      }
+
+      const labelsOnPage = labelsByPage.get(pageIndex)!;
+      labelsOnPage.forEach(({ data, positionOnPage }) => {
+        const position = indexToPosition(positionOnPage);
+        drawLabel(doc, data, position, offsets);
+      });
+    });
+  } else {
+    // Auto-distribute labels sequentially
+    labelDataArray.forEach((data, index) => {
+      const pageIndex = Math.floor(index / labelsPerPage);
+      const positionOnPage = index % labelsPerPage;
+
+      // Add new page if needed (not for first page)
+      if (positionOnPage === 0 && pageIndex > 0) {
+        doc.addPage();
+      }
+
+      const position = indexToPosition(positionOnPage);
+      drawLabel(doc, data, position, offsets);
+    });
+  }
 
   return doc.output('blob');
 }

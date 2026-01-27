@@ -15,8 +15,10 @@ import {
 } from '../../lib/foldableLabelGenerator';
 import { generateMiniReportJpg } from '../../lib/miniReportJpgGenerator';
 import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
+import { generateToploaderLabelPair, CalibrationOffsets as CalibrationOffsets8167 } from '../../lib/avery8167LabelGenerator';
 import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
+import { Avery8167LabelModal } from './Avery8167LabelModal';
 import { getCardLabelData } from '../../lib/useLabelData';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 
@@ -42,9 +44,10 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   labelStyle = 'modern'
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'mini-jpg' | 'card-images' | null>(null);
+  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'mini-jpg' | 'card-images' | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
   const [isAveryModalOpen, setIsAveryModalOpen] = React.useState(false);
+  const [isAvery8167ModalOpen, setIsAvery8167ModalOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
@@ -945,6 +948,71 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     }
   };
 
+  /**
+   * Handle opening the Avery 8167 position selector modal
+   */
+  const handleOpenAvery8167Modal = () => {
+    setIsDropdownOpen(false);
+    setIsAvery8167ModalOpen(true);
+  };
+
+  /**
+   * Handle Avery 8167 Toploader Label generation (front + back on same sheet)
+   */
+  const handleDownloadAvery8167Label = async (frontPositionIndex: number, backPositionIndex: number, offsets: CalibrationOffsets8167) => {
+    try {
+      setIsGenerating(true);
+      setGeneratingType('avery8167');
+
+      console.log('[AVERY 8167] Starting generation - Front:', frontPositionIndex, 'Back:', backPositionIndex);
+
+      // Use unified label data generator
+      const cleanLabelData = getCardLabelData(card);
+
+      // Generate QR code URL for the card
+      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      console.log('[AVERY 8167] Card URL for QR:', cardUrl);
+
+      // Generate combined PDF with both front and back labels
+      const blob = await generateToploaderLabelPair(
+        {
+          grade: cleanLabelData.grade ?? 0,
+          conditionLabel: cleanLabelData.condition,
+          qrCodeUrl: cardUrl,
+          cardName: cleanLabelData.primaryName, // Card name for front label display
+        },
+        frontPositionIndex,
+        backPositionIndex,
+        offsets
+      );
+
+      // Download the PDF
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const cardNameClean = sanitize(cleanLabelData.primaryName);
+      const serialClean = sanitize(cleanLabelData.serial);
+
+      link.download = `DCM-Toploader-Labels-${cardNameClean}-${serialClean}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      console.log('[AVERY 8167] ✅ Labels generated successfully');
+      setIsAvery8167ModalOpen(false);
+
+    } catch (error) {
+      console.error('[AVERY 8167] ❌ Error generating labels:', error);
+      alert('Failed to generate toploader labels. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+      setGeneratingType(null);
+    }
+  };
+
   // Dropdown menu items
   const menuItems = [
     {
@@ -976,6 +1044,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       label: 'Label for Magnetic One-Touch Slab',
       description: 'Avery 6871 (1-1/4" × 2-3/8")',
       onClick: handleOpenAveryModal,
+    },
+    {
+      id: 'avery8167',
+      label: 'Label for Toploader',
+      description: 'Avery 8167 (1.75" × 0.5")',
+      onClick: handleOpenAvery8167Modal,
     },
   ];
 
@@ -1026,6 +1100,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           onConfirm={handleDownloadAveryLabel}
           isGenerating={isGenerating && generatingType === 'avery'}
         />
+
+        {/* Avery 8167 Toploader Label Modal */}
+        <Avery8167LabelModal
+          isOpen={isAvery8167ModalOpen}
+          onClose={() => setIsAvery8167ModalOpen(false)}
+          onConfirm={handleDownloadAvery8167Label}
+          isGenerating={isGenerating && generatingType === 'avery8167'}
+        />
       </div>
     );
   }
@@ -1040,7 +1122,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         title="Download Options"
       >
         {isGenerating ? (
-          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : generatingType === 'mini-jpg' ? 'Generating Image...' : generatingType === 'card-images' ? 'Generating Images...' : 'Generating Report...'}</span>
+          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : generatingType === 'avery8167' ? 'Generating Labels...' : generatingType === 'mini-jpg' ? 'Generating Image...' : generatingType === 'card-images' ? 'Generating Images...' : 'Generating Report...'}</span>
         ) : (
           <>
             <span>Download Label or Report</span>
@@ -1075,6 +1157,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         onClose={() => setIsAveryModalOpen(false)}
         onConfirm={handleDownloadAveryLabel}
         isGenerating={isGenerating && generatingType === 'avery'}
+      />
+
+      {/* Avery 8167 Toploader Label Modal */}
+      <Avery8167LabelModal
+        isOpen={isAvery8167ModalOpen}
+        onClose={() => setIsAvery8167ModalOpen(false)}
+        onConfirm={handleDownloadAvery8167Label}
+        isGenerating={isGenerating && generatingType === 'avery8167'}
       />
     </div>
   );

@@ -19,6 +19,7 @@ interface LabelPositionGridProps {
   onCardDrop: (cardId: string, position: number) => void;
   onCardRemove: (cardId: string) => void;
   onSwap: (fromPosition: number, toPosition: number) => void;
+  pageNumber?: number; // Optional page number for multi-page display
 }
 
 const ROWS = 6;
@@ -31,6 +32,7 @@ export default function LabelPositionGrid({
   onCardDrop,
   onCardRemove,
   onSwap,
+  pageNumber,
 }: LabelPositionGridProps) {
   const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
   const [draggingFromPosition, setDraggingFromPosition] = useState<number | null>(null);
@@ -105,7 +107,9 @@ export default function LabelPositionGrid({
   return (
     <div className="bg-gray-100 rounded-lg p-4">
       <div className="text-center mb-3">
-        <h4 className="font-semibold text-gray-700 text-sm">Avery 6871 Sheet</h4>
+        <h4 className="font-semibold text-gray-700 text-sm">
+          Avery 6871 Sheet{pageNumber ? ` - Page ${pageNumber}` : ''}
+        </h4>
         <p className="text-xs text-gray-500">3 x 6 grid (18 labels)</p>
       </div>
 

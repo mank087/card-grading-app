@@ -1,11 +1,16 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { getAveryConfig, CalibrationOffsets, generateAveryLabelSheet, generateAveryLabelSheetMultiPage } from '../../lib/averyLabelGenerator';
-import { generateQRCodePlain, loadLogoAsBase64 } from '../../lib/foldableLabelGenerator';
+import {
+  getAvery8167Config,
+  CalibrationOffsets,
+  ToploaderLabelData,
+  generateToploaderLabelSheet,
+  generateToploaderLabelSheetMultiPage,
+  getAvery8167CardsPerPage
+} from '../../lib/avery8167LabelGenerator';
 import { getLabelData } from '../../lib/labelDataGenerator';
-import { FoldableLabelData } from '../../lib/foldableLabelGenerator';
-import LabelPositionGrid from './LabelPositionGrid';
+import LabelPositionGrid8167 from './LabelPositionGrid8167';
 import UnassignedCardsList from './UnassignedCardsList';
 
 interface CardData {
@@ -31,25 +36,25 @@ interface CardData {
   pokemon_api_data?: Record<string, unknown>;
 }
 
-interface BatchAveryLabelModalProps {
+interface BatchAvery8167LabelModalProps {
   isOpen: boolean;
   onClose: () => void;
   selectedCards: CardData[];
   cardType?: string;
 }
 
-const CALIBRATION_STORAGE_KEY = 'dcm_avery_calibration';
-const LABELS_PER_PAGE = 18;
+const CALIBRATION_STORAGE_KEY = 'dcm_avery8167_calibration';
+const CARDS_PER_PAGE = 40; // 40 card pairs per page (80 labels)
 
-export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
+export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> = ({
   isOpen,
   onClose,
   selectedCards,
   cardType = 'card'
 }) => {
-  const config = getAveryConfig();
+  const config = getAvery8167Config();
 
-  // Card-to-position mapping (cardId -> global position: page * LABELS_PER_PAGE + positionOnPage)
+  // Card-to-position mapping (cardId -> global position: page * CARDS_PER_PAGE + positionOnPage)
   const [positionMap, setPositionMap] = useState<Map<string, number>>(new Map());
 
   // Current page being viewed (0-indexed)
@@ -67,18 +72,18 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Multi-page calculations
-  const totalPages = Math.ceil(selectedCards.length / LABELS_PER_PAGE);
-  const isMultiPageMode = selectedCards.length > LABELS_PER_PAGE;
+  const totalPages = Math.ceil(selectedCards.length / CARDS_PER_PAGE);
+  const isMultiPageMode = selectedCards.length > CARDS_PER_PAGE;
 
   // Calculate assigned card IDs
   const assignedCardIds = new Set(positionMap.keys());
   const assignedCount = assignedCardIds.size;
 
-  // Get position map for current page only (convert global positions to page positions 0-17)
+  // Get position map for current page only (convert global positions to page positions 0-39)
   const currentPagePositionMap = useMemo(() => {
     const pageMap = new Map<string, number>();
-    const pageStart = currentPage * LABELS_PER_PAGE;
-    const pageEnd = pageStart + LABELS_PER_PAGE;
+    const pageStart = currentPage * CARDS_PER_PAGE;
+    const pageEnd = pageStart + CARDS_PER_PAGE;
 
     positionMap.forEach((globalPos, cardId) => {
       if (globalPos >= pageStart && globalPos < pageEnd) {
@@ -91,13 +96,13 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
 
   // Count cards assigned to current page
   const cardsOnCurrentPage = currentPagePositionMap.size;
-  const availableOnCurrentPage = LABELS_PER_PAGE - cardsOnCurrentPage;
+  const availableOnCurrentPage = CARDS_PER_PAGE - cardsOnCurrentPage;
 
   // Get cards assigned to each page for the page indicators
   const cardsPerPage = useMemo(() => {
     const counts: number[] = Array(totalPages).fill(0);
     positionMap.forEach((globalPos) => {
-      const page = Math.floor(globalPos / LABELS_PER_PAGE);
+      const page = Math.floor(globalPos / CARDS_PER_PAGE);
       if (page < totalPages) {
         counts[page]++;
       }
@@ -142,9 +147,9 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     };
   }, [previewUrl]);
 
-  // Handle card drop onto grid (position is 0-17 on current page)
+  // Handle card drop onto grid (position is 0-39 on current page)
   const handleCardDrop = useCallback((cardId: string, positionOnPage: number) => {
-    const globalPosition = currentPage * LABELS_PER_PAGE + positionOnPage;
+    const globalPosition = currentPage * CARDS_PER_PAGE + positionOnPage;
 
     setPositionMap(prev => {
       const next = new Map(prev);
@@ -169,10 +174,10 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     });
   }, []);
 
-  // Handle swapping two cards (positions are 0-17 on current page)
+  // Handle swapping two cards (positions are 0-39 on current page)
   const handleSwap = useCallback((fromPositionOnPage: number, toPositionOnPage: number) => {
-    const fromGlobal = currentPage * LABELS_PER_PAGE + fromPositionOnPage;
-    const toGlobal = currentPage * LABELS_PER_PAGE + toPositionOnPage;
+    const fromGlobal = currentPage * CARDS_PER_PAGE + fromPositionOnPage;
+    const toGlobal = currentPage * CARDS_PER_PAGE + toPositionOnPage;
 
     setPositionMap(prev => {
       const next = new Map(prev);
@@ -195,12 +200,12 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
   const handleAutoFillPage = useCallback(() => {
     setPositionMap(prev => {
       const next = new Map(prev);
-      const pageStart = currentPage * LABELS_PER_PAGE;
+      const pageStart = currentPage * CARDS_PER_PAGE;
 
       // Get occupied positions on current page
       const occupiedOnPage = new Set<number>();
       prev.forEach((globalPos) => {
-        if (globalPos >= pageStart && globalPos < pageStart + LABELS_PER_PAGE) {
+        if (globalPos >= pageStart && globalPos < pageStart + CARDS_PER_PAGE) {
           occupiedOnPage.add(globalPos - pageStart);
         }
       });
@@ -211,10 +216,10 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
       let nextPosition = 0;
       for (const card of unassignedCards) {
         // Find next available position on this page
-        while (occupiedOnPage.has(nextPosition) && nextPosition < LABELS_PER_PAGE) {
+        while (occupiedOnPage.has(nextPosition) && nextPosition < CARDS_PER_PAGE) {
           nextPosition++;
         }
-        if (nextPosition >= LABELS_PER_PAGE) break;
+        if (nextPosition >= CARDS_PER_PAGE) break;
 
         const globalPos = pageStart + nextPosition;
         next.set(card.id, globalPos);
@@ -246,8 +251,8 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
 
   // Clear current page only
   const handleClearPage = useCallback(() => {
-    const pageStart = currentPage * LABELS_PER_PAGE;
-    const pageEnd = pageStart + LABELS_PER_PAGE;
+    const pageStart = currentPage * CARDS_PER_PAGE;
+    const pageEnd = pageStart + CARDS_PER_PAGE;
 
     setPositionMap(prev => {
       const next = new Map(prev);
@@ -260,88 +265,18 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     });
   }, [currentPage]);
 
-  // Helper function to rotate an image 180 degrees
-  const rotateImage180 = async (dataUrl: string): Promise<string> => {
-    const img = new Image();
-    img.src = dataUrl;
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load image for rotation'));
-    });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.translate(canvas.width / 2, canvas.height / 2);
-      ctx.rotate(Math.PI);
-      ctx.translate(-canvas.width / 2, -canvas.height / 2);
-      ctx.drawImage(img, 0, 0);
-      return canvas.toDataURL('image/png');
-    }
-    return dataUrl;
-  };
-
   // Build label data for a card
-  const buildLabelData = async (card: CardData): Promise<FoldableLabelData> => {
+  const buildLabelData = (card: CardData): ToploaderLabelData => {
     const cleanLabelData = getLabelData(card as Parameters<typeof getLabelData>[0]);
-
-    // Get subgrades
-    const weightedScores = card.conversational_weighted_sub_scores || {};
-    const subScores = card.conversational_sub_scores || {};
-
-    // Generate QR code and load logo
     const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
 
-    const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
-      generateQRCodePlain(cardUrl),
-      loadLogoAsBase64().catch(() => undefined)
-    ]);
-
-    // Rotate QR code and logo 180 degrees for folding
-    let rotatedQrCodeDataUrl = qrCodeDataUrl;
-    let rotatedLogoDataUrl: string | undefined = undefined;
-
-    if (qrCodeDataUrl) {
-      try {
-        rotatedQrCodeDataUrl = await rotateImage180(qrCodeDataUrl);
-      } catch (e) {
-        // Use original if rotation fails
-      }
-    }
-
-    if (logoDataUrl) {
-      try {
-        rotatedLogoDataUrl = await rotateImage180(logoDataUrl);
-      } catch (e) {
-        // Skip if rotation fails
-      }
-    }
-
-    const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
-
+    // Use primaryName from getLabelData - this uses intelligent category-specific logic
+    // (e.g., player_or_character for Sports, pokemon name with variant for Pokemon, etc.)
     return {
-      cardName: cleanLabelData.primaryName,
-      setName: cleanLabelData.setName || '',
-      cardNumber: cleanLabelData.cardNumber || undefined,
-      year: cleanLabelData.year || undefined,
-      specialFeatures: cleanLabelData.featuresLine || undefined,
-      serial: cleanLabelData.serial,
-      englishName,
       grade: cleanLabelData.grade ?? 0,
-      conditionLabel: cleanLabelData.condition,
-      subgrades: {
-        centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
-        corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
-        edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
-        surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
-      },
-      overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
-      qrCodeDataUrl: rotatedQrCodeDataUrl,
-      cardUrl,
-      logoDataUrl,
-      rotatedLogoDataUrl,
+      conditionLabel: cleanLabelData.condition || 'N/A',
+      qrCodeUrl: cardUrl,
+      cardName: cleanLabelData.primaryName,
     };
   };
 
@@ -350,14 +285,12 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     // Get all assigned cards sorted by global position
     const entries = Array.from(positionMap.entries()).sort((a, b) => a[1] - b[1]);
 
-    // Build label data for each card
-    const labelDataPromises = entries.map(async ([cardId]) => {
+    // Build label data for each card in position order
+    const labelDataArray: ToploaderLabelData[] = entries.map(([cardId]) => {
       const card = selectedCards.find(c => c.id === cardId);
       if (!card) throw new Error(`Card not found: ${cardId}`);
       return buildLabelData(card);
     });
-
-    const labelDataArray = await Promise.all(labelDataPromises);
 
     // Save calibration
     localStorage.setItem(CALIBRATION_STORAGE_KEY, JSON.stringify({ x: offsetX, y: offsetY }));
@@ -365,95 +298,57 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     const offsets: CalibrationOffsets = { x: offsetX, y: offsetY };
 
     // Check if we need multi-page
-    const maxPosition = Math.max(...entries.map(([_, pos]) => pos));
-    const pagesNeeded = Math.floor(maxPosition / LABELS_PER_PAGE) + 1;
+    const maxPosition = entries.length > 0 ? Math.max(...entries.map(([_, pos]) => pos)) : 0;
+    const pagesNeeded = Math.floor(maxPosition / CARDS_PER_PAGE) + 1;
 
     if (pagesNeeded > 1) {
       // Multi-page: need to generate with specific positions across pages
-      return generateAveryLabelSheetMultiPageWithPositions(labelDataArray, entries.map(([_, pos]) => pos), offsets);
+      const globalPositions = entries.map(([_, pos]) => pos);
+      return generateToploaderLabelSheetMultiPageWithPositions(labelDataArray, globalPositions, offsets);
     } else {
       // Single page: use specific position indices
       const positionIndices = entries.map(([_, position]) => position);
-      return generateAveryLabelSheet(labelDataArray, positionIndices, offsets);
+      return generateToploaderLabelSheet(labelDataArray, positionIndices, offsets);
     }
   };
 
   // Generate multi-page PDF with specific positions
-  const generateAveryLabelSheetMultiPageWithPositions = async (
-    labelDataArray: FoldableLabelData[],
+  const generateToploaderLabelSheetMultiPageWithPositions = async (
+    labelDataArray: ToploaderLabelData[],
     globalPositions: number[],
     offsets: CalibrationOffsets
   ): Promise<Blob> => {
-    // Import jsPDF dynamically
-    const { jsPDF } = await import('jspdf');
-
-    const doc = new jsPDF({
-      orientation: 'portrait',
-      unit: 'pt',
-      format: 'letter',
-    });
-
     // Group labels by page
-    const labelsByPage = new Map<number, { data: FoldableLabelData; positionOnPage: number }[]>();
+    const labelsByPage = new Map<number, { data: ToploaderLabelData; positionOnPage: number }[]>();
 
     labelDataArray.forEach((data, index) => {
       const globalPos = globalPositions[index];
-      const page = Math.floor(globalPos / LABELS_PER_PAGE);
-      const positionOnPage = globalPos % LABELS_PER_PAGE;
+      const pageIndex = Math.floor(globalPos / CARDS_PER_PAGE);
+      const positionOnPage = globalPos % CARDS_PER_PAGE;
 
-      if (!labelsByPage.has(page)) {
-        labelsByPage.set(page, []);
+      if (!labelsByPage.has(pageIndex)) {
+        labelsByPage.set(pageIndex, []);
       }
-      labelsByPage.get(page)!.push({ data, positionOnPage });
+      labelsByPage.get(pageIndex)!.push({ data, positionOnPage });
     });
 
     // Sort pages
     const sortedPages = Array.from(labelsByPage.keys()).sort((a, b) => a - b);
 
-    // For each page, generate labels
-    for (let i = 0; i < sortedPages.length; i++) {
-      const page = sortedPages[i];
-      const labelsOnPage = labelsByPage.get(page)!;
+    // Reorder labels for sequential generation with positions
+    const reorderedLabels: ToploaderLabelData[] = [];
+    const reorderedPositions: number[] = [];
 
-      if (i > 0) {
-        doc.addPage();
-      }
-
-      // Generate single page with these labels
-      const pageLabels = labelsOnPage.map(l => l.data);
-      const pagePositions = labelsOnPage.map(l => l.positionOnPage);
-
-      // Use the single-page generator logic but draw to our doc
-      const singlePageBlob = await generateAveryLabelSheet(pageLabels, pagePositions, offsets);
-
-      // Since we can't easily merge PDFs, let's use a different approach
-      // We'll rely on generateAveryLabelSheetMultiPage but reorder the data
-    }
-
-    // Actually, let's use a simpler approach: create label data in position order
-    // with gaps filled by generating the right order
-
-    // Create array with all positions filled
-    const maxPage = Math.max(...sortedPages);
-    const allLabels: (FoldableLabelData | null)[] = Array((maxPage + 1) * LABELS_PER_PAGE).fill(null);
-
-    labelDataArray.forEach((data, index) => {
-      allLabels[globalPositions[index]] = data;
+    sortedPages.forEach(pageIndex => {
+      const labelsOnPage = labelsByPage.get(pageIndex)!;
+      labelsOnPage.forEach(({ data, positionOnPage }) => {
+        reorderedLabels.push(data);
+        reorderedPositions.push(pageIndex * CARDS_PER_PAGE + positionOnPage);
+      });
     });
 
-    // Filter out nulls but keep track of actual positions
-    const finalLabels: FoldableLabelData[] = [];
-    const finalPositions: number[] = [];
-
-    allLabels.forEach((label, index) => {
-      if (label) {
-        finalLabels.push(label);
-        finalPositions.push(index);
-      }
-    });
-
-    // Use the multi-page generator
-    return generateAveryLabelSheetMultiPage(finalLabels, offsets, finalPositions);
+    // Use multi-page generator with positions
+    return generateToploaderLabelSheetMultiPage(reorderedLabels, offsets, reorderedPositions);
   };
 
   // Handle preview
@@ -497,9 +392,11 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
       const link = document.createElement('a');
       link.href = url;
       const timestamp = new Date().toISOString().slice(0, 10);
-      const pagesUsed = Math.max(...Array.from(positionMap.values()).map(p => Math.floor(p / LABELS_PER_PAGE))) + 1;
+      const pagesUsed = positionMap.size > 0
+        ? Math.max(...Array.from(positionMap.values()).map(p => Math.floor(p / CARDS_PER_PAGE))) + 1
+        : 1;
       const pageInfo = pagesUsed > 1 ? `-${pagesUsed}pages` : '';
-      link.download = `DCM-AveryLabels-${assignedCount}cards${pageInfo}-${timestamp}.pdf`;
+      link.download = `DCM-ToploaderLabels-${assignedCount}cards${pageInfo}-${timestamp}.pdf`;
 
       document.body.appendChild(link);
       link.click();
@@ -554,7 +451,7 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
         <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-white">Print Avery Labels</h2>
+              <h2 className="text-xl font-bold text-white">Print Toploader Labels</h2>
               <p className="text-purple-100 text-sm mt-1">
                 {selectedCards.length} cards selected • {assignedCount} assigned
                 {isMultiPageMode && <> • {totalPages} pages</>}
@@ -648,7 +545,7 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
                               : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
                         }`}
                       >
-                        P{idx + 1} ({cardsPerPage[idx]}/{LABELS_PER_PAGE})
+                        P{idx + 1} ({cardsPerPage[idx]}/{CARDS_PER_PAGE})
                       </button>
                     ))}
                   </div>
@@ -743,7 +640,7 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
                 </div>
 
                 {/* Label Position Grid - shows current page */}
-                <LabelPositionGrid
+                <LabelPositionGrid8167
                   positionMap={currentPagePositionMap}
                   cards={selectedCards}
                   onCardDrop={handleCardDrop}
@@ -849,6 +746,7 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
                   <strong>Tip:</strong> Print at 100% scale (no scaling) for proper alignment.
                   Drag cards to positions, or click a card in the grid to remove it.
                   {isMultiPageMode && ' Use page navigation to assign cards across multiple pages.'}
+                  {' '}Apply front labels to toploader front, back labels to toploader back.
                 </p>
               </div>
             </div>
@@ -905,4 +803,4 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
   );
 };
 
-export default BatchAveryLabelModal;
+export default BatchAvery8167LabelModal;

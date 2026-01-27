@@ -10,6 +10,7 @@ import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
 import { useToast } from '@/hooks/useToast'
 import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
+import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
 
 type Card = {
@@ -275,6 +276,8 @@ function CollectionPageContent() {
   const [isDeleting, setIsDeleting] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
   const [isBatchLabelModalOpen, setIsBatchLabelModalOpen] = useState(false)
+  const [isBatch8167ModalOpen, setIsBatch8167ModalOpen] = useState(false)
+  const [showLabelTypeSelector, setShowLabelTypeSelector] = useState(false)
   const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
@@ -1041,24 +1044,58 @@ function CollectionPageContent() {
                       </div>
                       {/* Action buttons - wrap on mobile */}
                       <div className="flex items-center gap-2 flex-wrap">
-                        {/* Print Labels Button */}
-                        {selectedCardIds.size > 0 && selectedCardIds.size <= 18 && (
-                          <button
-                            onClick={() => setIsBatchLabelModalOpen(true)}
-                            disabled={isDeleting}
-                            className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-                            title="Print Labels"
-                          >
-                            <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                            </svg>
-                            <span className="hidden md:inline">Print ({selectedCardIds.size})</span>
-                          </button>
-                        )}
-                        {selectedCardIds.size > 18 && (
-                          <span className="text-amber-600 text-xs md:text-sm font-medium">
-                            Max 18 for labels
-                          </span>
+                        {/* Print Labels Button with Label Type Selector */}
+                        {selectedCardIds.size > 0 && (
+                          <div className="relative">
+                            <button
+                              onClick={() => setShowLabelTypeSelector(!showLabelTypeSelector)}
+                              disabled={isDeleting}
+                              className="flex-1 md:flex-none min-w-[44px] h-[44px] md:h-auto md:px-4 md:py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-lg shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                              title="Print Labels"
+                            >
+                              <svg className="w-5 h-5 md:w-4 md:h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                              </svg>
+                              <span className="hidden md:inline">Print ({selectedCardIds.size})</span>
+                              <svg className="w-3 h-3 hidden md:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {/* Label Type Selector Dropdown */}
+                            {showLabelTypeSelector && (
+                              <>
+                                <div
+                                  className="fixed inset-0 z-40"
+                                  onClick={() => setShowLabelTypeSelector(false)}
+                                />
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                  <div className="p-2">
+                                    <p className="text-xs text-gray-500 px-2 py-1 mb-1">Select label type:</p>
+                                    <button
+                                      onClick={() => {
+                                        setShowLabelTypeSelector(false);
+                                        setIsBatchLabelModalOpen(true);
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
+                                    >
+                                      <div className="font-medium text-gray-800 text-sm">Foldable Labels</div>
+                                      <div className="text-xs text-gray-500">Avery 6871 - 2.5" × 1.75"</div>
+                                    </button>
+                                    <button
+                                      onClick={() => {
+                                        setShowLabelTypeSelector(false);
+                                        setIsBatch8167ModalOpen(true);
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
+                                    >
+                                      <div className="font-medium text-gray-800 text-sm">Toploader Labels</div>
+                                      <div className="text-xs text-gray-500">Avery 8167 - 1.75" × 0.5"</div>
+                                    </button>
+                                  </div>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
                         {/* Download Reports Button */}
                         {selectedCardIds.size > 0 && (
@@ -1497,10 +1534,21 @@ function CollectionPageContent() {
         )}
       </div>
 
-      {/* Batch Label Modal */}
+      {/* Batch Foldable Label Modal (Avery 6871) */}
       <BatchAveryLabelModal
         isOpen={isBatchLabelModalOpen}
         onClose={() => setIsBatchLabelModalOpen(false)}
+        selectedCards={cards.filter(c => selectedCardIds.has(c.id)).map(c => ({
+          ...c,
+          front_image_url: c.front_url || undefined
+        }))}
+        cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
+      />
+
+      {/* Batch Toploader Label Modal (Avery 8167) */}
+      <BatchAvery8167LabelModal
+        isOpen={isBatch8167ModalOpen}
+        onClose={() => setIsBatch8167ModalOpen(false)}
         selectedCards={cards.filter(c => selectedCardIds.has(c.id)).map(c => ({
           ...c,
           front_image_url: c.front_url || undefined
