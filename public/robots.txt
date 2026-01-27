@@ -1,5 +1,5 @@
 # DCM Grading - Robots.txt
-# https://dcmgrading.com
+# https://www.dcmgrading.com
 
 User-agent: *
 Allow: /
@@ -15,9 +15,10 @@ Disallow: /login
 
 # Block utility pages
 Disallow: /data-deletion-status
+Disallow: /test-8167
 
 # Allow search engines to find our sitemap
-Sitemap: https://dcmgrading.com/sitemap.xml
+Sitemap: https://www.dcmgrading.com/sitemap.xml
 
 # Crawl-delay for polite crawling (optional, respected by some bots)
 Crawl-delay: 1

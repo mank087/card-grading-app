@@ -2,7 +2,7 @@ import { MetadataRoute } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://dcmgrading.com';
+  const baseUrl = 'https://www.dcmgrading.com';
   const supabase = supabaseServer();
 
   // Static pages with their priorities and change frequencies
@@ -21,6 +21,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     {
       url: `${baseUrl}/about`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    // Grading info & educational pages
+    {
+      url: `${baseUrl}/card-grading`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/pokemon-grading`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/sports-grading`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/get-started`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.8,
+    },
+    {
+      url: `${baseUrl}/grade-your-first-card`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.8,
@@ -49,6 +80,51 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'monthly',
       priority: 0.6,
     },
+    // Card database pages
+    {
+      url: `${baseUrl}/pokemon-database`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/mtg-database`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/lorcana-database`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    {
+      url: `${baseUrl}/onepiece-database`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.7,
+    },
+    // Card shows
+    {
+      url: `${baseUrl}/card-shows`,
+      lastModified: new Date(),
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    },
+    // Other pages
+    {
+      url: `${baseUrl}/founders`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
+    {
+      url: `${baseUrl}/credits`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.5,
+    },
     {
       url: `${baseUrl}/contact`,
       lastModified: new Date(),
@@ -71,15 +147,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Fetch all public cards from the database
   // Only include cards that are public and have been graded
-  const { data: cards, error } = await supabase
+  const { data: cards, error: cardsError } = await supabase
     .from('cards')
     .select('id, category, created_at')
     .eq('visibility', 'public')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Error fetching cards for sitemap:', error);
-    return staticPages;
+  if (cardsError) {
+    console.error('Error fetching cards for sitemap:', cardsError);
   }
 
   // Map category to URL path
@@ -88,6 +163,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     pokemon: 'pokemon',
     mtg: 'mtg',
     lorcana: 'lorcana',
+    onepiece: 'onepiece',
     other: 'other',
   };
 
@@ -103,5 +179,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     };
   });
 
-  return [...staticPages, ...cardPages];
+  // Fetch active card shows
+  const { data: shows, error: showsError } = await supabase
+    .from('card_shows')
+    .select('slug, updated_at')
+    .eq('is_active', true);
+
+  if (showsError) {
+    console.error('Error fetching card shows for sitemap:', showsError);
+  }
+
+  const showPages: MetadataRoute.Sitemap = (shows || []).map((show) => ({
+    url: `${baseUrl}/card-shows/${show.slug}`,
+    lastModified: show.updated_at ? new Date(show.updated_at) : new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.5,
+  }));
+
+  return [...staticPages, ...cardPages, ...showPages];
 }
