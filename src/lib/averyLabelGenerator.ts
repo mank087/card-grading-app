@@ -22,19 +22,18 @@ const INCH = 72;
 const PAGE_WIDTH = 8.5 * INCH;   // Portrait width
 const PAGE_HEIGHT = 11 * INCH;  // Portrait height
 
-// Avery 6871 label specifications (extracted directly from official Avery PDF template)
+// Avery 6871 label specifications (verified against official Avery PDF template)
 // Label size: 2-3/8" x 1-1/4" (2.375" x 1.25")
 const LABEL_WIDTH = 2.375 * INCH;
 const LABEL_HEIGHT = 1.25 * INCH;
-const CORNER_RADIUS = 6; // Rounded corners in points
+const CORNER_RADIUS = 8.5; // Rounded corners in points (official template: 8.496pt)
 
-// Avery 6871 margins and spacing
-// Adjusted based on Avery's own design tool output which places content at x=0.326"
-// This provides better centering and accounts for printer variations
-const TOP_MARGIN = 1.125 * INCH;      // 1.125 inches = 1-1/8" = 81 points
-const LEFT_MARGIN = 0.326 * INCH;     // 0.326 inches (from Avery's design tool, was 0.375")
-const HORIZONTAL_GAP = 0.3125 * INCH; // 0.3125 inches = 5/16" = 22.5 points
-const VERTICAL_GAP = 0.25 * INCH;     // 0.25 inches = 1/4" = 18 points
+// Avery 6871 margins and spacing (verified from official Avery template PDF coordinates)
+// Template is symmetric: left=right=0.375", top=bottom=1.125"
+const TOP_MARGIN = 1.125 * INCH;      // 1.125 inches = 81 points
+const LEFT_MARGIN = 0.375 * INCH;     // 0.375 inches = 27 points (3/8")
+const HORIZONTAL_GAP = 0.3125 * INCH; // 0.3125 inches = 22.5 points (5/16")
+const VERTICAL_GAP = 0.25 * INCH;     // 0.25 inches = 18 points (1/4")
 
 // Border bleed - extends border beyond label edge to account for printer variations
 const BORDER_BLEED = 0.0625 * INCH;   // 1/16" = 4.5 points
