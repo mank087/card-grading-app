@@ -70,7 +70,9 @@ const getCardLink = (card: any) => {
 
 export default function Home() {
   const [user, setUser] = useState<any>(null)
+  const [authChecked, setAuthChecked] = useState(false)
   const [featuredCards, setFeaturedCards] = useState<any[]>([])
+  const [featuredCardsLoading, setFeaturedCardsLoading] = useState(true)
 
   useEffect(() => {
     const getUser = async () => {
@@ -78,6 +80,7 @@ export default function Home() {
       const session = getStoredSession()
       const sessionUser = session?.user
       setUser(sessionUser)
+      setAuthChecked(true)
     }
 
     getUser()
@@ -92,6 +95,8 @@ export default function Home() {
         setFeaturedCards(data.cards || [])
       } catch (err) {
         console.error('Error fetching featured cards:', err)
+      } finally {
+        setFeaturedCardsLoading(false)
       }
     }
 
@@ -126,29 +131,33 @@ export default function Home() {
             Magic: The Gathering®, Disney Lorcana®, and more.
           </p>
 
-          {user ? (
-            <div className="space-x-4">
+          <div className="min-h-[48px] flex items-center justify-center">
+            {!authChecked ? (
+              <div className="h-12 w-40 bg-white/20 rounded-lg animate-pulse"></div>
+            ) : user ? (
+              <div className="space-x-4">
+                <Link
+                  href="/upload"
+                  className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
+                >
+                  Grade a Card
+                </Link>
+                <Link
+                  href="/collection"
+                  className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors inline-block"
+                >
+                  View Collection
+                </Link>
+              </div>
+            ) : (
               <Link
-                href="/upload"
+                href="/login?mode=signup"
                 className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
               >
-                Grade a Card
+                Get Started
               </Link>
-              <Link
-                href="/collection"
-                className="border-2 border-white text-white px-8 py-3 rounded-lg font-semibold hover:bg-white hover:text-blue-600 transition-colors inline-block"
-              >
-                View Collection
-              </Link>
-            </div>
-          ) : (
-            <Link
-              href="/login?mode=signup"
-              className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
-            >
-              Get Started
-            </Link>
-          )}
+            )}
+          </div>
         </div>
       </section>
 
@@ -272,7 +281,21 @@ export default function Home() {
       </section>
 
       {/* Featured Cards Section - Auto-Scrolling Carousel */}
-      {featuredCards.length > 0 && (
+      {featuredCardsLoading ? (
+        <section className="py-16 bg-gradient-to-br from-purple-50 to-blue-50">
+          <div className="container mx-auto px-4">
+            <div className="mb-8">
+              <div className="h-8 w-64 bg-gray-300/50 rounded animate-pulse mb-2"></div>
+              <div className="h-5 w-96 bg-gray-300/50 rounded animate-pulse"></div>
+            </div>
+            <div className="flex gap-6 overflow-hidden">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="flex-shrink-0 w-[280px] h-[400px] bg-gray-300/30 rounded-lg animate-pulse"></div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ) : featuredCards.length > 0 ? (
         <FeaturedCardsCarousel
           featuredCards={featuredCards}
           getCardInfo={getCardInfo}
@@ -280,7 +303,7 @@ export default function Home() {
           formatGrade={formatGrade}
           getCardLink={getCardLink}
         />
-      )}
+      ) : null}
 
     </main>
   )

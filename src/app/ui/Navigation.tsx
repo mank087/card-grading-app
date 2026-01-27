@@ -168,11 +168,12 @@ export default function Navigation() {
             {/* Left Section - Navigation Links */}
             <div className="flex items-center space-x-1 min-h-[40px]">
               {!authChecked ? (
-                /* Skeleton placeholders to prevent CLS */
+                /* Skeleton placeholders to prevent CLS — match logged-out link count/widths */
                 <>
-                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-14 bg-gray-200 rounded animate-pulse mx-3"></div>
                   <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mx-3"></div>
-                  <div className="h-5 w-16 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mx-3"></div>
+                  <div className="h-5 w-10 bg-gray-200 rounded animate-pulse mx-3"></div>
                 </>
               ) : user ? (
                 <>
@@ -270,10 +271,10 @@ export default function Navigation() {
               </div>
 
               {!authChecked ? (
-                /* Skeleton placeholders for auth buttons */
+                /* Skeleton placeholders for auth buttons — match logged-out widths */
                 <>
-                  <div className="h-8 w-20 bg-gray-200 rounded-full animate-pulse"></div>
-                  <div className="h-9 w-28 bg-purple-200 rounded-md animate-pulse"></div>
+                  <div className="h-9 w-14 bg-gray-200 rounded-md animate-pulse"></div>
+                  <div className="h-9 w-36 bg-purple-200 rounded-md animate-pulse"></div>
                 </>
               ) : user ? (
                 <>
