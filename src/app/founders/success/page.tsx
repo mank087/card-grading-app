@@ -37,7 +37,9 @@ function FounderSuccessContent() {
       // Track Google Ads Purchase conversion
       if (window.gtag) {
         window.gtag('event', 'ads_conversion_PURCHASE_1', {
-          transaction_id: `founders_${sessionId}`
+          transaction_id: `founders_${sessionId}`,
+          value: 99,
+          currency: 'USD'
         })
         console.log('[Google Ads] Founders Purchase conversion tracked')
       }

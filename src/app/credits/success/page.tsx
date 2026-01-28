@@ -39,7 +39,9 @@ function PurchaseSuccessContent() {
       // Track Google Ads Purchase conversion
       if (window.gtag) {
         window.gtag('event', 'ads_conversion_PURCHASE_1', {
-          transaction_id: sessionId // Stripe session ID for deduplication
+          transaction_id: sessionId, // Stripe session ID for deduplication
+          value: value,
+          currency: 'USD'
         })
         console.log('[Google Ads] Purchase conversion tracked with transaction_id:', sessionId)
       }
