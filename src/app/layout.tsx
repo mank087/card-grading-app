@@ -44,12 +44,12 @@ export default function RootLayout({
         {/* Facebook Domain Verification */}
         <meta name="facebook-domain-verification" content="gqf9ydy92vx2nn9eq1bmw3yyf0wu8z" />
 
-        {/* Google Analytics + Google Ads */}
+        {/* Google Analytics + Google Ads - lazyOnload to avoid blocking LCP */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-YLC2FKKBGC"
-          strategy="afterInteractive"
+          strategy="lazyOnload"
         />
-        <Script id="google-analytics" strategy="afterInteractive">
+        <Script id="google-analytics" strategy="lazyOnload">
           {`
             window.dataLayer = window.dataLayer || [];
             function gtag(){dataLayer.push(arguments);}
@@ -60,7 +60,7 @@ export default function RootLayout({
         </Script>
 
         {/* Reddit Pixel */}
-        <Script id="reddit-pixel" strategy="afterInteractive">
+        <Script id="reddit-pixel" strategy="lazyOnload">
           {`
             !function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);
             rdt('init','a2_i6zsi175k40r');
@@ -69,7 +69,7 @@ export default function RootLayout({
         </Script>
 
         {/* Meta/Facebook Pixel */}
-        <Script id="meta-pixel" strategy="afterInteractive">
+        <Script id="meta-pixel" strategy="lazyOnload">
           {`
             !function(f,b,e,v,n,t,s)
             {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
