@@ -3,13 +3,16 @@
  */
 
 /**
- * Format card number for eBay search with # prefix
- * Examples: "9/111" -> "#9/111", "23" -> "#23", "SWSH039" -> "#SWSH039"
+ * Format card number for eBay search — only add # prefix for numeric card numbers.
+ * Letter-based card numbers (e.g., "ttp-hgn", "SWSH039") are used as-is since
+ * eBay listings don't typically prefix those with #.
+ * Examples: "9" -> "#9", "23" -> "#23", "9/111" -> "#9/111", "ttp-hgn" -> "ttp-hgn"
  */
 function formatCardNumber(cardNumber: string): string {
   if (!cardNumber) return '';
-  // Add # prefix for better eBay search matching
-  return `#${cardNumber}`;
+  // Only add # for purely numeric card numbers (may contain / for set numbering)
+  const isNumeric = /^[\d/]+$/.test(cardNumber);
+  return isNumeric ? `#${cardNumber}` : cardNumber;
 }
 
 export interface CardData {

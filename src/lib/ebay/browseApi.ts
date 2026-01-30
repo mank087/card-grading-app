@@ -543,6 +543,9 @@ export async function searchEbayPricesWithFallback(
 
   let lastResult: EbayPriceSearchResult | null = null;
   let lastQuery: QueryStrategy | null = null;
+  // Track the best result from a more specific strategy (not the broadest fallback)
+  let bestSpecificResult: EbayPriceSearchResult | null = null;
+  let bestSpecificQuery: QueryStrategy | null = null;
 
   for (const queryInfo of queries) {
     try {
@@ -560,7 +563,16 @@ export async function searchEbayPricesWithFallback(
         };
       }
 
-      // Track this result in case all queries fail to meet threshold
+      // Track best result from specific/moderate/broad strategies (which include card number)
+      // Prefer these over minimal fallback to keep card number in results
+      if (result.total > 0 && queryInfo.strategy !== 'minimal') {
+        if (!bestSpecificResult || result.total > bestSpecificResult.total) {
+          bestSpecificResult = result;
+          bestSpecificQuery = queryInfo;
+        }
+      }
+
+      // Track overall best result in case all queries fail to meet threshold
       if (!lastResult || result.total > lastResult.total) {
         lastResult = result;
         lastQuery = queryInfo;
@@ -571,7 +583,16 @@ export async function searchEbayPricesWithFallback(
     }
   }
 
-  // Return best result we found, even if below threshold
+  // Prefer a more specific result (with card number) if it found at least 1 listing
+  if (bestSpecificResult && bestSpecificQuery) {
+    return {
+      ...bestSpecificResult,
+      queryUsed: bestSpecificQuery.query,
+      queryStrategy: bestSpecificQuery.strategy,
+    };
+  }
+
+  // Fall back to broadest result
   if (lastResult && lastQuery) {
     return {
       ...lastResult,
