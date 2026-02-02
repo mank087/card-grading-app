@@ -179,12 +179,31 @@ export async function POST(request: NextRequest) {
             manufacturer: card.manufacturer,
             serial_numbering: card.serial_numbering,
             rookie_card: card.rookie_card,
+            sport: card.category,
           };
+
+          // Derive effective minResults: vintage cards need fewer results
+          const releaseYear = card.release_date ? parseInt(card.release_date.substring(0, 4)) : null;
+          const isVintage = releaseYear !== null && !isNaN(releaseYear) && releaseYear < 1980;
+          const effectiveMinResults = isVintage ? 1 : (minResults || 3);
+
+          // Build relevance filter from card data
+          const playerLastName = card.featured
+            ? card.featured.trim().split(/\s+/).pop()?.toLowerCase()
+            : undefined;
+          const relevanceFilter = (playerLastName || card.card_number || card.release_date)
+            ? {
+                playerLastName,
+                cardNumber: card.card_number || undefined,
+                year: card.release_date?.substring(0, 4) || undefined,
+              }
+            : undefined;
 
           result = await searchEbayPricesWithFallback(cardOptions, {
             categoryId,
             limit,
-            minResults,
+            minResults: effectiveMinResults,
+            relevanceFilter,
           });
         }
 

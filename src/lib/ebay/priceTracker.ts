@@ -105,6 +105,15 @@ function getEbayCategoryId(cardType: 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 
 }
 
 /**
+ * Check if a card is vintage (pre-1980) based on year string
+ */
+function isVintageCard(year?: string | null): boolean {
+  if (!year) return false;
+  const yearNum = parseInt(year.substring(0, 4));
+  return !isNaN(yearNum) && yearNum < 1980;
+}
+
+/**
  * Fetch price data for a single card
  */
 export async function fetchCardPrice(card: CardForPricing): Promise<PriceSnapshot | null> {
@@ -160,12 +169,26 @@ export async function fetchCardPrice(card: CardForPricing): Promise<PriceSnapsho
         manufacturer: cardInfo?.manufacturer,
         serial_numbering: cardInfo?.serial_numbering,
         rookie_card: isRookie,
+        sport: card.category,
       };
+
+      // Build relevance filter from card data
+      const playerLastName = playerOrCharacter
+        ? playerOrCharacter.trim().split(/\s+/).pop()?.toLowerCase()
+        : undefined;
+      const relevanceFilter = (playerLastName || cardNumber || year)
+        ? {
+            playerLastName,
+            cardNumber: cardNumber || undefined,
+            year: year?.substring(0, 4) || undefined,
+          }
+        : undefined;
 
       result = await searchEbayPricesWithFallback(queryOptions, {
         categoryId,
         limit: 25,
-        minResults: 3,
+        minResults: isVintageCard(year) ? 1 : 3,
+        relevanceFilter,
       });
     }
 
@@ -643,12 +666,26 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
         manufacturer: cardInfo?.manufacturer,
         serial_numbering: serialNumbering,
         rookie_card: isRookie,
+        sport: card.category,
       };
+
+      // Build relevance filter from card data
+      const playerLastName = playerOrCharacter
+        ? playerOrCharacter.trim().split(/\s+/).pop()?.toLowerCase()
+        : undefined;
+      const relevanceFilter = (playerLastName || cardNumber || year)
+        ? {
+            playerLastName,
+            cardNumber: cardNumber || undefined,
+            year: year?.substring(0, 4) || undefined,
+          }
+        : undefined;
 
       result = await searchEbayPricesWithFallback(queryOptions, {
         categoryId,
         limit: 25,
-        minResults: 3,
+        minResults: isVintageCard(year) ? 1 : 3,
+        relevanceFilter,
       });
     }
 

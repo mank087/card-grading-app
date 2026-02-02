@@ -143,6 +143,7 @@ export async function searchEbayPrices(
     minPrice?: number;
     maxPrice?: number;
     condition?: 'NEW' | 'USED' | 'GRADED';
+    relevanceFilter?: { playerLastName?: string; cardNumber?: string; year?: string; };
   } = {}
 ): Promise<EbayPriceSearchResult> {
   const token = await getApplicationToken();
@@ -206,7 +207,7 @@ export async function searchEbayPrices(
   }
 
   // Parse results
-  const items: EbayPriceResult[] = (data.itemSummaries || []).map((item: any) => ({
+  let items: EbayPriceResult[] = (data.itemSummaries || []).map((item: any) => ({
     itemId: item.itemId,
     title: item.title,
     price: parseFloat(item.price?.value || '0'),
@@ -232,6 +233,11 @@ export async function searchEbayPrices(
     bidCount: item.bidCount,
   }));
 
+  // Apply relevance filter if provided (removes non-card items like magazines, books)
+  if (options.relevanceFilter) {
+    items = filterRelevantItems(items, options.relevanceFilter);
+  }
+
   // Calculate price statistics
   const prices = items.map(i => i.price).filter(p => p > 0);
   const lowestPrice = prices.length > 0 ? Math.min(...prices) : undefined;
@@ -251,13 +257,50 @@ export async function searchEbayPrices(
   }
 
   return {
-    total: data.total || 0,
+    total: options.relevanceFilter ? items.length : (data.total || 0),
     items,
     lowestPrice,
     highestPrice,
     averagePrice,
     medianPrice,
   };
+}
+
+// =============================================================================
+// Relevance Filtering
+// =============================================================================
+
+/**
+ * Filter eBay results to only items that are actually relevant trading cards.
+ * Prevents irrelevant items (magazines, books, etc.) from polluting price data.
+ */
+function filterRelevantItems(
+  items: EbayPriceResult[],
+  filter: { playerLastName?: string; cardNumber?: string; year?: string; }
+): EbayPriceResult[] {
+  // If no filter criteria, return all
+  if (!filter.playerLastName && !filter.cardNumber && !filter.year) return items;
+
+  return items.filter(item => {
+    const titleLower = item.title.toLowerCase();
+
+    // Match player last name in title → relevant
+    if (filter.playerLastName && titleLower.includes(filter.playerLastName.toLowerCase())) return true;
+
+    // Match card number in title → relevant
+    if (filter.cardNumber && titleLower.includes(filter.cardNumber.toLowerCase())) return true;
+
+    // Match year + card keyword → relevant
+    if (filter.year && titleLower.includes(filter.year)) {
+      const cardKeywords = [
+        'card', 'trading', '#', 'rookie', 'rc', 'psa', 'bgs', 'sgc', 'cgc', 'graded',
+        'topps', 'panini', 'upper deck', 'bowman', 'fleer', 'o-pee-chee', 'opc', 'parkhurst',
+      ];
+      if (cardKeywords.some(kw => titleLower.includes(kw))) return true;
+    }
+
+    return false;
+  });
 }
 
 // =============================================================================
@@ -310,7 +353,16 @@ function extractBrandOnly(cardSet: string): string {
   const words = mainSet.split(' ');
   if (words.length >= 2) {
     // Skip manufacturer names (but keep product line names like "Select", "Prizm", etc.)
-    const skipWords = ['panini', 'topps', 'upper', 'deck', 'bowman', 'donruss', 'fleer', 'score'];
+    const skipWords = [
+      // Modern
+      'panini', 'topps', 'upper', 'deck', 'bowman', 'donruss', 'fleer', 'score',
+      'leaf', 'sage', 'press', 'pass', 'playoff', 'pinnacle', 'skybox', 'hoops',
+      // Vintage
+      'imperial', 'tobacco', 'parkhurst', 'o-pee-chee', 'goudey', 'national', 'chicle',
+      'american', 'caramel', 'colgate', 'hamilton',
+      // Suffixes
+      'gum', 'company', 'co', 'inc', 'ltd',
+    ];
     const filtered = words.filter(w => !skipWords.includes(w.toLowerCase()));
     if (filtered.length > 0) {
       return filtered.join(' ');
@@ -351,6 +403,7 @@ export interface SportsCardQueryOptions {
   manufacturer?: string;
   serial_numbering?: string;
   rookie_card?: boolean;
+  sport?: string;  // "Hockey", "Baseball", "Football", etc.
 }
 
 export interface QueryStrategy {
@@ -403,6 +456,12 @@ export function buildSportsCardQueries(card: SportsCardQueryOptions): QueryStrat
   const cardNumber = cleanCardNumber(card.card_number);
   const parallel = formatParallelForSearch(card.subset, card.rarity_or_variant);
 
+  // Sport context for fallback queries (mirrors Pokemon's "Pokemon card" pattern)
+  const sport = card.sport?.toLowerCase() || null;
+  const yearNum = validYear ? parseInt(validYear) : null;
+  const isVintage = yearNum !== null && yearNum < 1980;
+  // e.g. "hockey card" or just "card" if no sport specified
+  const sportCardSuffix = sport ? `${sport} card` : 'card';
 
   // Check if it's a numbered card (serial like /99)
   const isNumbered = card.serial_numbering && /\/\d+/.test(card.serial_numbering);
@@ -454,13 +513,16 @@ export function buildSportsCardQueries(card: SportsCardQueryOptions): QueryStrat
   }
 
   // Strategy 3: BROAD - Player + Year + Set + CardNumber (no parallel)
+  // For vintage cards without a recognized brand, append sport keyword
   // Example: "Patrick Mahomes 2024 Prizm #1"
-  // Example: "Matthew Stafford 2021 Impeccable SS-MS"
+  // Example: "Don Smith 1911 C55 hockey"
   if (playerName) {
     const parts: string[] = [playerName];
     if (validYear) parts.push(validYear);
     if (brandOnly) parts.push(brandOnly);
     if (cardNumber) parts.push(formatCardNum(cardNumber));
+    // For vintage cards, add sport keyword to prevent irrelevant results
+    if (isVintage && sport && !brandOnly) parts.push(sport);
 
     if (parts.length >= 2) {
       queries.push({
@@ -471,8 +533,8 @@ export function buildSportsCardQueries(card: SportsCardQueryOptions): QueryStrat
     }
   }
 
-  // Strategy 4: MINIMAL - Player + Brand + Year + Card Number (no parallel)
-  // Example: "Patrick Mahomes Prizm 2024 #1" or "Matthew Stafford Impeccable 2021 SS-MS"
+  // Strategy 4: MINIMAL - Player + Brand + Year + Card Number + sport card context
+  // Example: "Patrick Mahomes Prizm 2024 #1" or "Don Smith C55 1911 hockey card"
   if (playerName) {
     const parts: string[] = [playerName];
     if (brandOnly) parts.push(brandOnly);
@@ -484,6 +546,8 @@ export function buildSportsCardQueries(card: SportsCardQueryOptions): QueryStrat
       parts.push(isNumeric ? `#${cardNumber}` : cardNumber);
     }
     if (card.rookie_card) parts.push('Rookie');
+    // Add sport card context to prevent irrelevant results in fallback
+    parts.push(sportCardSuffix);
 
     queries.push({
       query: parts.join(' '),
@@ -492,20 +556,22 @@ export function buildSportsCardQueries(card: SportsCardQueryOptions): QueryStrat
     });
   }
 
-  // Strategy 5: FALLBACK - Player + Brand only (no card number, no year)
+  // Strategy 5: FALLBACK - Player + Brand + sport card
   // For when card number might be causing zero results
+  // Example: "Don Smith C55 hockey card"
   if (playerName && brandOnly) {
     queries.push({
-      query: `${playerName} ${brandOnly}`,
+      query: `${playerName} ${brandOnly} ${sportCardSuffix}`,
       strategy: 'minimal',
       description: 'Player and brand only',
     });
   }
 
-  // Fallback: Just player name if nothing else works
+  // Fallback: Just player name + sport card if nothing else works
+  // Example: "Don Smith hockey card" instead of just "Don Smith"
   if (queries.length === 0 && playerName) {
     queries.push({
-      query: playerName,
+      query: `${playerName} ${sportCardSuffix}`,
       strategy: 'minimal',
       description: 'Player name only',
     });
@@ -535,6 +601,7 @@ export async function searchEbayPricesWithFallback(
     categoryId?: string;
     limit?: number;
     minResults?: number;
+    relevanceFilter?: { playerLastName?: string; cardNumber?: string; year?: string; };
   } = {}
 ): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
   const queries = buildSportsCardQueries(card);
@@ -552,6 +619,7 @@ export async function searchEbayPricesWithFallback(
       const result = await searchEbayPrices(queryInfo.query, {
         categoryId: options.categoryId,
         limit,
+        relevanceFilter: options.relevanceFilter,
       });
 
       // If we found enough results, return immediately
