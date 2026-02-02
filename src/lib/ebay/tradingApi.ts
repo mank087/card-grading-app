@@ -101,6 +101,7 @@ export interface ListingDetails {
   description: string;
   categoryId: string;
   price: number;
+  listingFormat?: 'FIXED_PRICE' | 'AUCTION';
   quantity: number;
   conditionId: string;
   conditionDescription?: string;
@@ -515,6 +516,201 @@ export async function addFixedPriceItem(
   const xmlResponse = await callTradingApi(config, 'AddFixedPriceItem', xmlRequest);
 
   console.log('[Trading API] AddFixedPriceItem response:', xmlResponse.substring(0, 1000) + '...');
+
+  return parseAddItemResponse(xmlResponse);
+}
+
+/**
+ * Build XML for AddItem call (used for auction-style listings)
+ */
+function buildAddItemXml(
+  listing: ListingDetails,
+  shipping: ShippingDetails,
+  returns: ReturnDetails
+): string {
+  // Build item specifics XML
+  const itemSpecificsXml = listing.itemSpecifics
+    .filter(spec => spec.value && (Array.isArray(spec.value) ? spec.value.length > 0 : spec.value.trim()))
+    .map(spec => {
+      const values = Array.isArray(spec.value) ? spec.value : [spec.value];
+      return values.map(v => `
+        <NameValueList>
+          <Name>${escapeXml(spec.name)}</Name>
+          <Value>${escapeXml(v)}</Value>
+        </NameValueList>
+      `).join('');
+    })
+    .join('');
+
+  // Build picture URLs XML
+  const pictureUrlsXml = listing.imageUrls
+    .map(url => `<PictureURL>${escapeXml(url)}</PictureURL>`)
+    .join('\n          ');
+
+  // Convert weight from oz to lbs + oz
+  const weightLbs = Math.floor(shipping.packageDimensions.weightOz / 16);
+  const weightOz = shipping.packageDimensions.weightOz % 16;
+
+  // Build shipping details XML based on type
+  let shippingXml = '';
+  let shippingPackageXml = '';
+
+  if (shipping.shippingType === 'FREE') {
+    shippingXml = `
+      <ShippingDetails>
+        <ShippingType>Flat</ShippingType>
+        <ShippingServiceOptions>
+          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingServiceCost currencyID="USD">0.00</ShippingServiceCost>
+          <FreeShipping>true</FreeShipping>
+          <ShippingServicePriority>1</ShippingServicePriority>
+        </ShippingServiceOptions>
+        ${buildInternationalShippingXml(shipping)}
+      </ShippingDetails>`;
+  } else if (shipping.shippingType === 'FLAT_RATE') {
+    shippingXml = `
+      <ShippingDetails>
+        <ShippingType>Flat</ShippingType>
+        <ShippingServiceOptions>
+          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingServiceCost currencyID="USD">${(shipping.flatRateCost || 0).toFixed(2)}</ShippingServiceCost>
+          <ShippingServicePriority>1</ShippingServicePriority>
+        </ShippingServiceOptions>
+        ${buildInternationalShippingXml(shipping)}
+      </ShippingDetails>`;
+  } else {
+    // Calculated shipping
+    shippingXml = `
+      <ShippingDetails>
+        <ShippingType>Calculated</ShippingType>
+        <ShippingServiceOptions>
+          <ShippingService>${shipping.domesticShippingService}</ShippingService>
+          <ShippingServicePriority>1</ShippingServicePriority>
+        </ShippingServiceOptions>
+        ${buildInternationalShippingXml(shipping)}
+        <CalculatedShippingRate>
+          <OriginatingPostalCode>${escapeXml(shipping.postalCode)}</OriginatingPostalCode>
+          <PackagingHandlingCosts currencyID="USD">0.00</PackagingHandlingCosts>
+        </CalculatedShippingRate>
+      </ShippingDetails>`;
+
+    // Package details needed for calculated shipping
+    shippingPackageXml = `
+      <ShippingPackageDetails>
+        <WeightMajor unit="lbs">${weightLbs}</WeightMajor>
+        <WeightMinor unit="oz">${weightOz}</WeightMinor>
+        <PackageLength unit="in">${shipping.packageDimensions.lengthIn}</PackageLength>
+        <PackageWidth unit="in">${shipping.packageDimensions.widthIn}</PackageWidth>
+        <PackageDepth unit="in">${shipping.packageDimensions.depthIn}</PackageDepth>
+      </ShippingPackageDetails>`;
+  }
+
+  // Build return policy XML
+  const returnPolicyXml = buildReturnPolicyXml(returns);
+
+  // Build condition descriptors for graded cards
+  let conditionDescriptorsXml = '';
+  if (listing.conditionId === '2750' && listing.professionalGrader && listing.grade) {
+    const isOtherGrader = listing.professionalGrader === '2750123';
+
+    conditionDescriptorsXml = `
+      <ConditionDescriptors>
+        <ConditionDescriptor>
+          <Name>27501</Name>
+          <Value>${escapeXml(listing.professionalGrader)}</Value>
+        </ConditionDescriptor>
+        <ConditionDescriptor>
+          <Name>27502</Name>
+          <Value>${escapeXml(listing.grade)}</Value>
+        </ConditionDescriptor>
+      </ConditionDescriptors>`;
+
+    if (isOtherGrader) {
+      console.log('[Trading API] Auction: Skipping 27503 for "Other" grader');
+    }
+  }
+
+  // Build ship to locations for international shipping
+  let shipToLocationsXml = '';
+  if (shipping.offerInternational && shipping.internationalShipToLocations?.length) {
+    shipToLocationsXml = shipping.internationalShipToLocations
+      .map(loc => `<ShipToLocation>${escapeXml(loc)}</ShipToLocation>`)
+      .join('\n    ');
+  }
+
+  // Build regulatory documents XML
+  let regulatoryXml = '';
+  if (listing.regulatoryDocumentIds?.length) {
+    const documentsXml = listing.regulatoryDocumentIds
+      .map(docId => `
+          <Document>
+            <DocumentID>${escapeXml(docId)}</DocumentID>
+          </Document>`)
+      .join('');
+    regulatoryXml = `
+      <Regulatory>
+        <Documents>${documentsXml}
+        </Documents>
+      </Regulatory>`;
+  }
+
+  return `<?xml version="1.0" encoding="utf-8"?>
+<AddItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials>
+    <eBayAuthToken>TOKEN_PLACEHOLDER</eBayAuthToken>
+  </RequesterCredentials>
+  <ErrorLanguage>en_US</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+  <Item>
+    <Title>${escapeXml(listing.title)}</Title>
+    <Description><![CDATA[${listing.description}]]></Description>
+    <PrimaryCategory>
+      <CategoryID>${listing.categoryId}</CategoryID>
+    </PrimaryCategory>
+    <StartPrice currencyID="USD">${listing.price.toFixed(2)}</StartPrice>
+    <Quantity>1</Quantity>
+    <ConditionID>${listing.conditionId}</ConditionID>
+    ${listing.conditionDescription ? `<ConditionDescription>${escapeXml(listing.conditionDescription)}</ConditionDescription>` : ''}
+    ${conditionDescriptorsXml}
+    <Country>US</Country>
+    <Currency>USD</Currency>
+    <DispatchTimeMax>${shipping.handlingDays}</DispatchTimeMax>
+    <ListingDuration>${listing.listingDuration}</ListingDuration>
+    <ListingType>Chinese</ListingType>
+    <PaymentMethods>PayPal</PaymentMethods>
+    <PictureDetails>
+      ${pictureUrlsXml}
+    </PictureDetails>
+    <PostalCode>${escapeXml(shipping.postalCode)}</PostalCode>
+    <ItemSpecifics>
+      ${itemSpecificsXml}
+    </ItemSpecifics>
+    <SKU>${escapeXml(listing.sku)}</SKU>
+    ${shippingXml}
+    ${shippingPackageXml}
+    ${returnPolicyXml}
+    ${regulatoryXml}
+    ${shipToLocationsXml ? `<ShipToLocations>${shipToLocationsXml}</ShipToLocations>` : ''}
+  </Item>
+</AddItemRequest>`;
+}
+
+/**
+ * Create an auction-style listing using Trading API
+ */
+export async function addAuctionItem(
+  config: TradingApiConfig,
+  listing: ListingDetails,
+  shipping: ShippingDetails,
+  returns: ReturnDetails
+): Promise<AddItemResponse> {
+  const xmlRequest = buildAddItemXml(listing, shipping, returns);
+
+  console.log('[Trading API] AddItem (Auction) request:', xmlRequest.substring(0, 500) + '...');
+
+  const xmlResponse = await callTradingApi(config, 'AddItem', xmlRequest);
+
+  console.log('[Trading API] AddItem (Auction) response:', xmlResponse.substring(0, 1000) + '...');
 
   return parseAddItemResponse(xmlResponse);
 }

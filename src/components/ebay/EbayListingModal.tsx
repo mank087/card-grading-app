@@ -1066,6 +1066,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           title,
           description,
           price: parseFloat(price),
+          listingFormat,
           bestOfferEnabled: listingFormat === 'FIXED_PRICE' ? bestOfferEnabled : false,
           duration,
           imageUrls: uploadedUrls,

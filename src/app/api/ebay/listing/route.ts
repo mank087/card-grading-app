@@ -20,6 +20,7 @@ import {
 } from '@/lib/ebay/constants';
 import {
   addFixedPriceItem,
+  addAuctionItem,
   type TradingApiConfig,
   type ListingDetails,
   type ShippingDetails,
@@ -38,6 +39,7 @@ interface CreateListingRequest {
   title: string;
   description?: string;
   price: number;
+  listingFormat?: 'FIXED_PRICE' | 'AUCTION';
   quantity?: number;
   bestOfferEnabled?: boolean;
   duration?: string;
@@ -170,6 +172,7 @@ function getEbayCategoryId(category: string): string {
  */
 function mapListingDuration(duration?: string): string {
   switch (duration) {
+    case 'DAYS_1': return 'Days_1';
     case 'DAYS_3': return 'Days_3';
     case 'DAYS_5': return 'Days_5';
     case 'DAYS_7': return 'Days_7';
@@ -229,6 +232,7 @@ export async function POST(request: NextRequest) {
       title,
       description,
       price,
+      listingFormat = 'FIXED_PRICE',
       quantity = 1,
       bestOfferEnabled = false,
       duration,
@@ -370,7 +374,8 @@ export async function POST(request: NextRequest) {
       description: description || `DCM Graded ${card.card_name || 'Trading Card'} - Grade ${grade}`,
       categoryId,
       price,
-      quantity,
+      listingFormat,
+      quantity: listingFormat === 'AUCTION' ? 1 : quantity,
       conditionId: EBAY_CONDITIONS.GRADED,
       imageUrls,
       itemSpecifics: itemSpecifics.map(spec => ({
@@ -428,12 +433,9 @@ export async function POST(request: NextRequest) {
     };
 
     // Create listing via Trading API
-    const result = await addFixedPriceItem(
-      tradingConfig,
-      listingDetails,
-      shippingDetails,
-      returnDetails
-    );
+    const result = listingFormat === 'AUCTION'
+      ? await addAuctionItem(tradingConfig, listingDetails, shippingDetails, returnDetails)
+      : await addFixedPriceItem(tradingConfig, listingDetails, shippingDetails, returnDetails);
 
     if (!result.success) {
       console.error('[eBay Listing] Trading API error:', result.errors);
@@ -464,7 +466,7 @@ export async function POST(request: NextRequest) {
       price: price,
       currency: 'USD',
       quantity: quantity,
-      listing_format: 'FIXED_PRICE',
+      listing_format: listingFormat,
       duration: duration || 'GTC',
       category_id: categoryId,
       ebay_image_urls: imageUrls,
