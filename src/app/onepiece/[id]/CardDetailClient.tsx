@@ -2568,9 +2568,22 @@ export function OnePieceCardDetails() {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <Link href="/upload/onepiece" className="text-purple-600 hover:text-purple-800">
-          ← Back to One Piece Upload
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/upload/onepiece" className="text-purple-600 hover:text-purple-800">
+            ← Back to One Piece Upload
+          </Link>
+          <button
+            onClick={() => {
+              localStorage.removeItem('dcm_onboarding_tour_completed');
+              localStorage.removeItem('dcm_onboarding_tour_started');
+              setShowOnboardingTour(true);
+            }}
+            className="text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 px-3 py-1.5 rounded-full cursor-pointer transition-colors shadow-sm"
+            title="Take a guided tour of this page"
+          >
+            Page Tour
+          </button>
+        </div>
         <div id="tour-visibility-toggle" className="flex items-center space-x-4">
           <div className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
             🏴‍☠️ One Piece TCG Card

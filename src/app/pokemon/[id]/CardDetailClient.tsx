@@ -2505,9 +2505,22 @@ export function PokemonCardDetails() {
 
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <Link href="/upload/pokemon" className="text-blue-600 hover:text-blue-800">
-          ← Back to Pokemon Upload
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/upload/pokemon" className="text-blue-600 hover:text-blue-800">
+            ← Back to Pokemon Upload
+          </Link>
+          <button
+            onClick={() => {
+              localStorage.removeItem('dcm_onboarding_tour_completed');
+              localStorage.removeItem('dcm_onboarding_tour_started');
+              setShowOnboardingTour(true);
+            }}
+            className="text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 active:bg-purple-800 px-3 py-1.5 rounded-full cursor-pointer transition-colors shadow-sm"
+            title="Take a guided tour of this page"
+          >
+            Page Tour
+          </button>
+        </div>
         <div className="flex items-center space-x-4" id="tour-visibility-toggle">
           <div className="inline-flex items-center px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
             ⚡ Pokemon Card

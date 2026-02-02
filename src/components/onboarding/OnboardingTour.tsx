@@ -230,6 +230,33 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
     setArrowPosition(arrow)
   }, [step, currentStep])
 
+  // After positioning, verify the tooltip + target highlight are both visible and do a corrective scroll if needed
+  const ensureTooltipVisible = useCallback(() => {
+    if (!tooltipRef.current || !step) return
+
+    const targetEl = document.getElementById(step.targetId)
+    if (!targetEl) return
+
+    const tooltipRect = tooltipRef.current.getBoundingClientRect()
+    const targetRect = targetEl.getBoundingClientRect()
+    const viewportHeight = window.innerHeight
+    const padding = 20
+
+    // Combined bounding box of target highlight + tooltip
+    const combinedTop = Math.min(tooltipRect.top, targetRect.top)
+    const combinedBottom = Math.max(tooltipRect.bottom, targetRect.bottom)
+
+    if (combinedTop < padding) {
+      // Combined area extends above viewport — scroll up
+      window.scrollBy({ top: combinedTop - padding, behavior: 'smooth' })
+      setTimeout(updatePosition, 500)
+    } else if (combinedBottom > viewportHeight - padding) {
+      // Combined area extends below viewport — scroll down
+      window.scrollBy({ top: combinedBottom - viewportHeight + padding, behavior: 'smooth' })
+      setTimeout(updatePosition, 500)
+    }
+  }, [step, updatePosition])
+
   // Scroll to element and update position
   const scrollToElement = useCallback(() => {
     if (!step) return
@@ -247,26 +274,54 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
         top: 0,
         behavior: 'smooth'
       })
-      setTimeout(updatePosition, 1000)
+      setTimeout(() => {
+        updatePosition()
+        setTimeout(ensureTooltipVisible, 150)
+      }, 1000)
       return
     }
 
-    // Scroll element into view with some padding
     const rect = targetEl.getBoundingClientRect()
     const elementTop = window.scrollY + rect.top
+    const elementBottom = window.scrollY + rect.bottom
     const viewportHeight = window.innerHeight
+    const tooltipSpace = 228 // tooltipHeight(200) + arrowSize(12) + padding(16)
 
-    // Calculate scroll position to put element in upper third of viewport
-    const scrollTo = elementTop - (viewportHeight / 4)
+    let scrollTo: number
+
+    if (step.position === 'top') {
+      // Tooltip appears above target — leave room above the element
+      scrollTo = elementTop - tooltipSpace - 20
+    } else if (step.position === 'bottom') {
+      // Tooltip appears below target — put element near top so tooltip fits below
+      scrollTo = elementTop - 60
+    } else {
+      // Left/right — center the element vertically
+      const elementHeight = elementBottom - elementTop
+      scrollTo = elementTop - (viewportHeight - elementHeight) / 2
+    }
 
     window.scrollTo({
       top: Math.max(0, scrollTo),
       behavior: 'smooth'
     })
 
-    // Update position after scroll completes (increased delay for reliability)
-    setTimeout(updatePosition, 1000)
-  }, [step, currentStep, updatePosition])
+    // Update position after scroll completes, then verify both target + tooltip are visible
+    setTimeout(() => {
+      updatePosition()
+      setTimeout(ensureTooltipVisible, 150)
+    }, 1000)
+  }, [step, currentStep, updatePosition, ensureTooltipVisible])
+
+  // Reset tour state when re-activated (e.g. via Page Tour button)
+  useEffect(() => {
+    if (isActive) {
+      setCurrentStep(0)
+      setShowFinalModal(false)
+      setIsVisible(false)
+      retryCountRef.current = 0
+    }
+  }, [isActive])
 
   // Initialize tour
   useEffect(() => {
