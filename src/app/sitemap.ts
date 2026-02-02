@@ -196,5 +196,43 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.5,
   }));
 
-  return [...staticPages, ...cardPages, ...showPages];
+  // Fetch published blog posts
+  const { data: blogPosts, error: blogError } = await supabase
+    .from('blog_posts')
+    .select('slug, updated_at')
+    .eq('status', 'published')
+    .lte('published_at', new Date().toISOString());
+
+  if (blogError) {
+    console.error('Error fetching blog posts for sitemap:', blogError);
+  }
+
+  const blogPages: MetadataRoute.Sitemap = (blogPosts || []).map((post) => ({
+    url: `${baseUrl}/blog/${post.slug}`,
+    lastModified: post.updated_at ? new Date(post.updated_at) : new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.7,
+  }));
+
+  // Fetch blog categories
+  const { data: blogCategories } = await supabase
+    .from('blog_categories')
+    .select('slug, updated_at');
+
+  const blogCategoryPages: MetadataRoute.Sitemap = (blogCategories || []).map((cat) => ({
+    url: `${baseUrl}/blog/category/${cat.slug}`,
+    lastModified: cat.updated_at ? new Date(cat.updated_at) : new Date(),
+    changeFrequency: 'weekly' as const,
+    priority: 0.6,
+  }));
+
+  // Add blog index page
+  const blogIndexPage: MetadataRoute.Sitemap = [{
+    url: `${baseUrl}/blog`,
+    lastModified: new Date(),
+    changeFrequency: 'daily' as const,
+    priority: 0.8,
+  }];
+
+  return [...staticPages, ...cardPages, ...showPages, ...blogIndexPage, ...blogPages, ...blogCategoryPages];
 }
