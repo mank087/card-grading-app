@@ -267,6 +267,8 @@ export async function POST(request: NextRequest) {
       regulatoryDocumentIds = [],
     } = body;
 
+    console.log('[eBay Listing] listingFormat received:', listingFormat, '| raw body listingFormat:', body.listingFormat);
+
     // Validate required fields
     if (!cardId || !title || !price || !imageUrls?.length) {
       return NextResponse.json(
