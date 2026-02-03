@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: January 23, 2026 (v7.8 - One Piece TCG Support)
+> Last Updated: February 2, 2026 (v8.0 - Blog CMS, eBay Auction Listings, Scroll-to-Top)
 
 ---
 
@@ -33,6 +33,8 @@
 
 **Core Features:**
 - AI-powered card grading with three-pass consensus system
+- **v8.0: Blog CMS, eBay auction listings (AddItem/Chinese), global scroll-to-top**
+- **v7.9: Three-pass reorder (passes-first), SEO & CLS fixes, Google Ads conversion tracking**
 - **v7.8: One Piece TCG support with variant-aware eBay search (parallel, manga, alt art, SP)**
 - **v7.7: eBay price caching with auto-refresh, collection value tracking, price charts**
 - **v7.6: Founders Package with lifetime benefits (150 credits, 20% discount, founder emblem)**
@@ -146,8 +148,21 @@ src/
 | `/pokemon-database` | `app/pokemon-database/page.tsx` | Pokemon card database search (EN/JA) |
 | `/pokemon-grading` | `app/pokemon-grading/page.tsx` | Pokemon-focused landing page |
 | `/sports-grading` | `app/sports-grading/page.tsx` | Sports-focused landing page (v7.5) |
+| `/card-grading` | `app/card-grading/page.tsx` | General card grading landing page |
+| `/get-started` | `app/get-started/page.tsx` | Getting started guide |
+| `/grade-your-first-card` | `app/grade-your-first-card/page.tsx` | First card grading walkthrough |
+| `/grading-limitations` | `app/grading-limitations/page.tsx` | Known grading limitations |
+| `/reports-and-labels` | `app/reports-and-labels/page.tsx` | Reports and labels info |
+| `/card-shows` | `app/card-shows/page.tsx` | Card shows directory |
+| `/card-shows/[slug]` | `app/card-shows/[slug]/page.tsx` | Individual card show page |
 | `/founders` | `app/founders/page.tsx` | Founders Package landing page (v7.6) |
 | `/founders/success` | `app/founders/success/page.tsx` | Founders purchase success page |
+| `/mtg-database` | `app/mtg-database/page.tsx` | MTG card database search |
+| `/lorcana-database` | `app/lorcana-database/page.tsx` | Lorcana card database search |
+| `/onepiece-database` | `app/onepiece-database/page.tsx` | One Piece card database search |
+| `/blog` | `app/blog/page.tsx` | Blog listing page with categories (v8.0) |
+| `/blog/[slug]` | `app/blog/[slug]/page.tsx` | Individual blog post page (v8.0) |
+| `/blog/category/[category]` | `app/blog/category/[category]/page.tsx` | Blog posts filtered by category (v8.0) |
 
 ### Protected Pages (Require Login)
 
@@ -180,6 +195,9 @@ src/
 | `/admin/cards` | `app/admin/(dashboard)/cards/page.tsx` | Card management |
 | `/admin/analytics` | `app/admin/(dashboard)/analytics/page.tsx` | Analytics |
 | `/admin/monitoring` | `app/admin/(dashboard)/monitoring/page.tsx` | API monitoring |
+| `/admin/blog` | `app/admin/(dashboard)/blog/page.tsx` | Blog post management (v8.0) |
+| `/admin/blog/new` | `app/admin/(dashboard)/blog/new/page.tsx` | Create new blog post (v8.0) |
+| `/admin/blog/[id]/edit` | `app/admin/(dashboard)/blog/[id]/edit/page.tsx` | Edit blog post (v8.0) |
 
 ---
 
@@ -240,6 +258,35 @@ src/
 | `/api/ebay/batch-refresh-prices` | POST | Batch refresh prices for multiple cards |
 | `/api/ebay/price-history` | GET | Get historical price data for charts |
 | `/api/cron/update-card-prices` | GET | Weekly cron job for price history tracking |
+
+### Blog System (v8.0)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/blog/posts` | GET | List published blog posts (with pagination, category filter) |
+| `/api/blog/posts/[slug]` | GET | Get single blog post by slug |
+| `/api/blog/categories` | GET | List blog categories |
+| `/api/admin/blog/posts` | GET/POST | Admin: list all posts / create new post |
+| `/api/admin/blog/posts/[id]` | GET/PUT/DELETE | Admin: get/update/delete blog post |
+| `/api/admin/blog/categories` | GET/POST | Admin: manage blog categories |
+| `/api/admin/blog/upload-image` | POST | Admin: upload blog post images |
+
+### eBay Listing & Connection
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/ebay/auth` | GET | Initiate eBay OAuth connection |
+| `/api/ebay/callback` | GET | eBay OAuth callback handler |
+| `/api/ebay/status` | GET | Check eBay connection status |
+| `/api/ebay/disconnect` | POST | Disconnect eBay account |
+| `/api/ebay/listing` | POST | Create eBay listing (Fixed Price or Auction) |
+| `/api/ebay/listing/check` | GET | Check if card has existing active listing |
+| `/api/ebay/images` | POST | Upload images to eBay hosting |
+| `/api/ebay/document` | POST | Upload regulatory documents (Certificate of Analysis) |
+| `/api/ebay/aspects` | GET | Get eBay category item aspects |
+| `/api/ebay/policies` | GET | Get seller's eBay business policies |
+| `/api/ebay/opt-in` | POST | eBay seller opt-in |
+| `/api/ebay/disclaimer` | GET/POST | eBay listing disclaimer status |
 
 ### Payments & Credits
 
@@ -306,7 +353,7 @@ src/
 | `lib/conversationalParserV3_5.ts` | Parse grading markdown reports |
 | `lib/professionalGradeMapper.ts` | Map to PSA/BGS/SGC/CGC grades |
 | `lib/conditionAssessment.ts` | Numeric grade to condition label |
-| `lib/cardGradingSchema_v5.ts` | Zod validation for grading responses |
+| `lib/cardGradingSchema_v5.ts` | Zod validation for grading responses (v7.9: passes-first field ordering) |
 
 ### v6.0 Grading System Updates (December 2025)
 
@@ -388,7 +435,7 @@ src/
    - 20% lifetime discount on future purchases
    - Founder badge on collection page
    - Founder emblem on card labels (toggleable)
-   - Available until January 1, 2026
+   - Available until February 1, 2026
 
 2. **Founders Landing Page** (`/founders`)
    - Countdown timer to offer expiration
@@ -444,6 +491,142 @@ ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT fal
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS founder_since TIMESTAMPTZ;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_founder_badge BOOLEAN DEFAULT true;
 ```
+
+### v8.0 Blog CMS, eBay Auction Listings, Scroll-to-Top (February 2, 2026)
+
+**Key Changes:**
+
+1. **Blog System with Admin CMS**
+   - Full blog with public listing, individual post, and category pages
+   - Admin CMS for creating/editing/deleting posts with rich text editor
+   - Image upload support for blog post content
+   - SEO-optimized blog pages with meta tags and structured data
+   - Blog link added to all navigation contexts (desktop, mobile, logged in/out)
+   - Routes: `/blog`, `/blog/[slug]`, `/blog/category/[category]`
+   - Admin routes: `/admin/blog`, `/admin/blog/new`, `/admin/blog/[id]/edit`
+
+2. **eBay Auction Listing Support**
+   - Previously, selecting "Auction" in the UI still posted as Buy It Now
+   - Root cause: `listingFormat` was never sent in the API request body, API route hardcoded `'FIXED_PRICE'`, Trading API only had `addFixedPriceItem()`
+   - Fix: Three files changed:
+     - `EbayListingModal.tsx`: Added `listingFormat` to fetch body
+     - `route.ts`: Added `listingFormat` to request interface, conditionally calls `addAuctionItem()` or `addFixedPriceItem()`, stores dynamic `listing_format` in DB
+     - `tradingApi.ts`: Added `buildAddItemXml()` and `addAuctionItem()` export
+   - Auctions use eBay Trading API `AddItem` call with `<ListingType>Chinese</ListingType>`
+   - Auctions force `Quantity=1` (eBay requirement)
+   - Best Offer not supported on auctions (UI already handles this)
+   - Added `DAYS_1` to `mapListingDuration()` for 1-day auctions
+   - Valid auction durations: Days_1, Days_3, Days_5, Days_7, Days_10
+
+3. **Global Scroll-to-Top on Navigation**
+   - Added `ScrollToTop` component to `ClientLayout.tsx`
+   - Uses `usePathname()` from `next/navigation` to detect route changes
+   - Calls `window.scrollTo(0, 0)` on every pathname change
+   - Fixes issue where navigating to card detail pages (or other pages) loaded the user mid-scroll
+
+4. **Page Tour Restart Button**
+   - Added restart button to all card detail pages for the onboarding tour
+   - Users can re-trigger the guided tour from any card detail page
+
+5. **eBay Valuation Fixes**
+   - Fixed eBay valuation for vintage sports cards
+   - Fixed eBay search for letter-based card numbers (e.g., ttp-hgn)
+
+**Files Changed:**
+| File | Changes |
+|------|---------|
+| `src/components/ebay/EbayListingModal.tsx` | Added `listingFormat` to fetch body |
+| `src/app/api/ebay/listing/route.ts` | Auction support: `listingFormat` field, conditional API call, dynamic DB record |
+| `src/lib/ebay/tradingApi.ts` | Added `buildAddItemXml()`, `addAuctionItem()` export, `listingFormat` to `ListingDetails` |
+| `src/components/ClientLayout.tsx` | Added `ScrollToTop` component with `usePathname()` |
+| `src/app/blog/page.tsx` | Blog listing page |
+| `src/app/blog/[slug]/page.tsx` | Blog post page |
+| `src/app/blog/category/[category]/page.tsx` | Blog category page |
+| `src/app/admin/(dashboard)/blog/page.tsx` | Admin blog management |
+| `src/app/admin/(dashboard)/blog/new/page.tsx` | Admin new blog post |
+| `src/app/admin/(dashboard)/blog/[id]/edit/page.tsx` | Admin edit blog post |
+| `src/app/api/blog/posts/route.ts` | Public blog posts API |
+| `src/app/api/blog/posts/[slug]/route.ts` | Single blog post API |
+| `src/app/api/blog/categories/route.ts` | Blog categories API |
+| `src/app/api/admin/blog/posts/route.ts` | Admin blog posts CRUD API |
+| `src/app/api/admin/blog/posts/[id]/route.ts` | Admin single post API |
+| `src/app/api/admin/blog/categories/route.ts` | Admin categories API |
+| `src/app/api/admin/blog/upload-image/route.ts` | Blog image upload API |
+| `src/app/ui/Navigation.tsx` | Added Blog link to all nav contexts |
+
+**eBay Auction vs Fixed Price - Key Differences:**
+| | Fixed Price (Buy It Now) | Auction |
+|---|---|---|
+| Trading API Call | `AddFixedPriceItem` | `AddItem` |
+| XML ListingType | `FixedPriceItem` | `Chinese` |
+| Quantity | Any (default 1) | Must be 1 |
+| Price field | Buy It Now price | Starting bid |
+| Best Offer | Supported | Not supported |
+| Default duration | GTC | 7 days |
+| Valid durations | GTC, 3/5/7/10/30 days | 1/3/5/7/10 days |
+
+### v7.9 Three-Pass Reorder, SEO & CLS Fixes, Conversion Tracking (January 27, 2026)
+
+**Key Changes:**
+
+1. **Three-Pass Grading Reorder (Passes-First)**
+   - Moved `grading_passes` field in `cardGradingSchema_v5.ts` to generate BEFORE detailed narrative sections
+   - Previously, grading passes were the last field in the schema, causing the AI to write detailed narratives first and then backfill "independent" passes that were just copies
+   - New order: `grading_passes` → `centering` → `defects` → `raw_sub_scores` → `weighted_scores` → `final_grade`
+   - Updated `prompts/master_grading_rubric_v5.txt` and `prompts/master_grading_rubric_v5_optimized.txt` with passes-first instructions
+   - Updated `src/lib/visionGrader_v5.ts` user message to reinforce generation order
+   - No downstream changes needed — all consumers access `grading_passes` by field name, not position
+
+2. **SEO & Sitemap Fixes**
+   - Added `sitemap.ts` with dynamic card and card show pages
+   - Added `robots.txt` with crawl rules (block `/api/`, `/admin/`, auth pages)
+   - Added missing public pages to sitemap: `/card-grading`, `/get-started`, `/grade-your-first-card`, `/grading-limitations`, `/reports-and-labels`, `/card-shows`
+   - Added card database pages to sitemap: `/pokemon-database`, `/mtg-database`, `/lorcana-database`, `/onepiece-database`
+
+3. **CLS (Cumulative Layout Shift) Fixes**
+   - **Homepage hero buttons**: Added `authChecked` state with skeleton placeholder during auth fetch, preventing content swap
+   - **Featured cards section**: Added `featuredCardsLoading` state with skeleton grid (5 placeholder cards) during async fetch
+   - **Navigation**: Updated desktop skeleton widths to match logged-out link count (4 items) and auth button dimensions
+   - Files: `src/app/page.tsx`, `src/app/ui/Navigation.tsx`
+
+4. **Google Ads Conversion Value Fix**
+   - `ads_conversion_PURCHASE_1` event was missing `value` and `currency` parameters
+   - Google Ads defaulted all conversions to $1 regardless of actual purchase amount
+   - Fixed in both `/credits/success/page.tsx` (dynamic value from Stripe session) and `/founders/success/page.tsx` (hardcoded $99)
+   - Added `currency: 'USD'` to all conversion events
+
+5. **Version String Fix**
+   - Updated all 6 card-type API routes to use `V7.1` version string instead of legacy `V6.0`
+   - Affected: `sports/[id]`, `pokemon/[id]`, `mtg/[id]`, `lorcana/[id]`, `onepiece/[id]`, `other/[id]`
+
+6. **Founders Deadline Extension**
+   - Extended from January 1, 2026 to February 1, 2026 in checkout route
+
+7. **Avery Label Improvements**
+   - Fixed Avery 6871 left margin to match official template
+   - Removed purple border from 8167 front and back labels
+   - Added Avery 8167 toploader label support with multi-page printing
+
+**Files Changed:**
+| File | Changes |
+|------|---------|
+| `src/lib/cardGradingSchema_v5.ts` | Moved `grading_passes` field before narrative sections |
+| `prompts/master_grading_rubric_v5.txt` | Passes-first instructions, updated flowchart and JSON examples |
+| `prompts/master_grading_rubric_v5_optimized.txt` | Passes-first instructions, updated JSON example |
+| `src/lib/visionGrader_v5.ts` | Updated user message with generation order instructions |
+| `src/app/page.tsx` | CLS fixes: auth skeleton, featured cards skeleton |
+| `src/app/ui/Navigation.tsx` | CLS fix: updated skeleton widths |
+| `src/app/credits/success/page.tsx` | Google Ads conversion value + currency |
+| `src/app/founders/success/page.tsx` | Google Ads conversion value ($99) + currency |
+| `src/app/api/sports/[id]/route.ts` | Version string V7.1 |
+| `src/app/api/pokemon/[id]/route.ts` | Version string V7.1 |
+| `src/app/api/mtg/[id]/route.ts` | Version string V7.1 |
+| `src/app/api/lorcana/[id]/route.ts` | Version string V7.1 |
+| `src/app/api/onepiece/[id]/route.ts` | Version string V7.1 |
+| `src/app/api/other/[id]/route.ts` | Version string V7.1 |
+| `src/app/sitemap.ts` | Dynamic sitemap with public cards and card shows |
+| `public/robots.txt` | Crawl rules for search engines |
+| `src/app/api/stripe/checkout/route.ts` | Founders deadline extended to Feb 1, 2026 |
 
 ### v7.8 One Piece TCG Support (January 23, 2026)
 
@@ -915,13 +1098,18 @@ interface LabelData {
 }
 ```
 
-### eBay Integration (v7.7)
+### eBay Integration (v7.7 pricing, v8.0 auction listings)
 
 | File | Purpose |
 |------|---------|
 | `lib/ebay/browseApi.ts` | eBay Browse API client with fallback search strategies |
+| `lib/ebay/tradingApi.ts` | eBay Trading API: `addFixedPriceItem()`, `addAuctionItem()`, `getItemStatus()` |
+| `lib/ebay/auth.ts` | eBay OAuth connection management and token refresh |
+| `lib/ebay/constants.ts` | eBay category IDs, condition IDs, grader IDs |
+| `lib/ebay/types.ts` | TypeScript types for `EbayListing` (supports `listing_format: 'FIXED_PRICE' | 'AUCTION'`) |
 | `lib/ebay/priceTracker.ts` | Price caching and batch job logic |
-| `lib/ebay/constants.ts` | eBay category IDs and constants |
+| `components/ebay/EbayListingModal.tsx` | Full eBay listing creation modal (images, details, shipping, returns) |
+| `components/ebay/EbayListingButton.tsx` | "List on eBay" button on card detail pages |
 | `components/ebay/EbayPriceLookup.tsx` | Card detail page price display component |
 | `components/ebay/charts/PriceDistributionChart.tsx` | Histogram showing listing price distribution |
 | `components/ebay/charts/PriceHistoryChart.tsx` | Line chart showing price trends over time |
@@ -943,7 +1131,7 @@ interface LabelData {
 
 | Component | Purpose |
 |-----------|---------|
-| `components/ClientLayout.tsx` | Root layout with Auth, Credits, GradingQueue providers |
+| `components/ClientLayout.tsx` | Root layout with providers, ScrollToTop, session refresh |
 | `components/CardSlab.tsx` | Card slab display (front/back + grade) |
 | `components/CardLabel.tsx` | Card label display |
 | `components/PersistentStatusBar.tsx` | Status notifications |
@@ -1630,6 +1818,37 @@ File: lib/emailTemplates.ts
 
 ---
 
+## Conversion & Analytics Tracking
+
+### Tracking Pixels & Tags
+
+| Platform | ID | Implementation |
+|----------|-----|----------------|
+| Google Analytics 4 | `G-YLC2FKKBGC` | `gtag.js` in `layout.tsx` |
+| Google Ads | `AW-17817758517` | `gtag.js` in `layout.tsx` |
+| Reddit Pixel | `a2_i6zsi175k40r` | `rdt('init', ...)` in `layout.tsx` |
+| Meta/Facebook Pixel | `2308558869571917` | `fbq('init', ...)` in `layout.tsx` |
+
+### Conversion Events
+
+| Event | Where Fired | Parameters |
+|-------|-------------|------------|
+| `ads_conversion_PURCHASE_1` | `/credits/success`, `/founders/success` | `transaction_id`, `value`, `currency: 'USD'` |
+| `purchase` (GA4) | `/credits/success`, `/founders/success` | `transaction_id`, `value`, `currency`, `items` |
+| Reddit `Purchase` | `/credits/success` | `transactionId`, `value`, `currency` |
+| Reddit `Lead` | Landing page CTAs | `conversionId` with page/location/timestamp |
+| Reddit `SignUp` | `/login` (on account creation) | `conversionId` with timestamp/email |
+| Meta `Purchase` | `/credits/success` | `value`, `currency` |
+
+### Google Ads Conversion Notes (v7.9)
+- The `ads_conversion_PURCHASE_1` event **must** include `value` and `currency` parameters
+- Without these, Google Ads defaults all conversions to $1 regardless of actual purchase amount
+- Credits success page uses dynamic value from Stripe session metadata
+- Founders success page uses hardcoded `value: 99`
+- `transaction_id` is used for deduplication (Stripe session ID or `founders_{sessionId}`)
+
+---
+
 ## 14. Admin Dashboard
 
 ### Routes
@@ -1794,6 +2013,51 @@ node scripts/import-pokemon-tcgdex.js
 # Backfill missing image URLs for Japanese cards
 node scripts/backfill-japanese-images.js
 ```
+
+### Analytics Scripts
+
+```bash
+# Free credit conversion funnel analysis (v7.9)
+# Analyzes signup → free grade → purchase pipeline
+npx tsx scripts/free-credit-analysis.ts
+```
+
+### Email Advertising Audience Export
+
+```bash
+# Export full user list as CSV for email advertising (EmailOctopus, etc.)
+npx tsx scripts/export-users-email-list.ts
+```
+
+**Output:** Creates `user-export-YYYY-MM-DD.csv` in the project root with these columns:
+
+| Column | Description |
+|--------|-------------|
+| Email | User's email address |
+| Credits Purchased | Total credits purchased (`user_credits.total_purchased`) |
+| Credit Balance | Current credit balance (`user_credits.balance`) |
+| Paying Customer | "Yes" if `total_purchased > 0`, otherwise "No" |
+| User Status | Segment classification (see below) |
+| Signup Date | Account creation date |
+
+**User Status Segments:**
+
+| Status | Definition |
+|--------|------------|
+| Paying Customer | `total_purchased > 0` — has made at least one credit purchase |
+| Free Grader | `total_purchased = 0` AND has `grade`/`regrade` transactions — used free signup credit but never paid |
+| Signed Up Only | `total_purchased = 0` AND no grade transactions — created account but never graded a card |
+
+**Data Sources:**
+- `users` table — email addresses and signup dates
+- `user_credits` table — balance, total_purchased, total_used
+- `credit_transactions` table — transaction types (`grade`, `regrade`) to identify who has graded
+
+**Email Platform:** EmailOctopus (https://emailoctopus.com)
+- Import the CSV as an audience list
+- Email templates are stored in `emails/` directory
+- Templates use EmailOctopus merge tags: `{{PreviewText}}`, `{{SenderInfo}}`, `{{UnsubscribeURL}}`, `{{RewardsURL}}`
+- UTM parameters follow pattern: `utm_source=emailoctopus&utm_medium=email&utm_campaign={campaign-name}&utm_content={element}`
 
 ---
 
@@ -1969,6 +2233,21 @@ node scripts/backfill-japanese-images.js
 - Check server logs for `[PriceTracker]` or `[Batch Refresh]` messages
 - Refresh only triggers for cards where `ebay_price_updated_at` is null or >7 days old
 
+### eBay Auction Listing Posts as Buy It Now
+- v8.0 fix: Ensure `listingFormat` is sent in the request body from the modal
+- If browser serves cached JS, `listingFormat` won't be in the body → server defaults to `'FIXED_PRICE'`
+- Fix: Hard-refresh the browser (Ctrl+Shift+R) to load updated JavaScript bundle
+- Debug: Server logs show `[eBay Listing] listingFormat received: AUCTION | raw body listingFormat: AUCTION`
+- If raw body shows `undefined`, the old client JS is cached
+- Verify: Auction listings should use `AddItem` call with `<ListingType>Chinese</ListingType>`
+- Verify: Fixed price listings should use `AddFixedPriceItem` with `<ListingType>FixedPriceItem</ListingType>`
+
+### Pages Load Mid-Scroll
+- v8.0 fix: `ScrollToTop` component in `ClientLayout.tsx` scrolls to top on every route change
+- Uses `usePathname()` hook to detect navigation
+- If still happening: verify `ClientLayout.tsx` includes `<ScrollToTop />` before other children
+- The component calls `window.scrollTo(0, 0)` in a `useEffect` keyed on `pathname`
+
 ### eBay API Rate Limits
 - Default eBay API limit: 5,000 calls/day
 - Batch refresh uses 500ms delay between calls
@@ -1988,7 +2267,7 @@ node scripts/backfill-japanese-images.js
 
 ---
 
-*This guide covers active, working code as of January 2026 (v7.8). Deprecated files are not included.*
+*This guide covers active, working code as of February 2026 (v8.0). Deprecated files are not included.*
 
 ---
 
@@ -1996,6 +2275,8 @@ node scripts/backfill-japanese-images.js
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v8.0 | Feb 2, 2026 | Blog CMS with admin, eBay auction listings (AddItem/Chinese), global scroll-to-top, page tour restart, eBay vintage sports & letter-based card number fixes |
+| v7.9 | Jan 27, 2026 | Three-pass reorder (passes-first), SEO sitemap/robots.txt, CLS fixes (homepage skeletons), Google Ads conversion value fix, version string fix, Avery label improvements |
 | v7.8 | Jan 23, 2026 | One Piece TCG support, variant-aware eBay search, onboarding tour Live Market Pricing step |
 | v7.7 | Jan 20, 2026 | eBay price caching system, collection page pricing, batch refresh, price charts |
 | v7.6 | Dec 22, 2025 | Founders Package ($99, 150 credits, 20% lifetime discount, founder emblem on labels) |
