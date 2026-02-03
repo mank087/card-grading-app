@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { Toaster } from 'react-hot-toast'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
@@ -10,6 +11,15 @@ import { initSessionRefresh, cleanupSessionRefresh } from '@/lib/directAuth'
 
 function BackgroundGradingMonitor() {
   useBackgroundGrading()
+  return null
+}
+
+// Scroll to top on route changes
+function ScrollToTop() {
+  const pathname = usePathname()
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
   return null
 }
 
@@ -26,6 +36,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
   return (
     <CreditsProvider>
       <GradingQueueProvider>
+        <ScrollToTop />
         <BackgroundGradingMonitor />
         <SessionRefreshMonitor />
         <Toaster
