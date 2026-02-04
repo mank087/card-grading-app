@@ -281,6 +281,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
     let ownerShowFounderBadge = false;
     let ownerIsCardLover = false;
     let ownerShowCardLoverBadge = false;
+    let ownerPreferredLabelEmblem: string = 'both';
     if (card.user_id) {
       try {
         const ownerCredits = await getUserCredits(card.user_id);
@@ -289,6 +290,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
           ownerShowFounderBadge = ownerCredits.show_founder_badge;
           ownerIsCardLover = ownerCredits.is_card_lover;
           ownerShowCardLoverBadge = ownerCredits.show_card_lover_badge;
+          ownerPreferredLabelEmblem = ownerCredits.preferred_label_emblem || 'both';
         }
       } catch (err) {
         console.error(`[GET /api/lorcana/${cardId}] Error fetching owner status:`, err);
@@ -526,7 +528,8 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
         owner_is_founder: ownerIsFounder,
         owner_show_founder_badge: ownerShowFounderBadge,
         owner_is_card_lover: ownerIsCardLover,
-        owner_show_card_lover_badge: ownerShowCardLoverBadge
+        owner_show_card_lover_badge: ownerShowCardLoverBadge,
+        owner_preferred_label_emblem: ownerPreferredLabelEmblem
       });
     }
 
@@ -1120,7 +1123,8 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       owner_is_founder: ownerIsFounder,
       owner_show_founder_badge: ownerShowFounderBadge,
       owner_is_card_lover: ownerIsCardLover,
-      owner_show_card_lover_badge: ownerShowCardLoverBadge
+      owner_show_card_lover_badge: ownerShowCardLoverBadge,
+      owner_preferred_label_emblem: ownerPreferredLabelEmblem
     });
 
   } catch (error: any) {

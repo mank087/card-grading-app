@@ -141,7 +141,7 @@ export function ModernBackLabel({
           )}
 
           {/* Card Lovers badge - heart at top, LOVER sideways below */}
-          {showCardLoversEmblem && !showFounderEmblem && (
+          {showCardLoversEmblem && (
             <div className="flex flex-col items-center justify-start h-full py-1">
               <span className={`${config.founderStarSize} leading-none`} style={{ color: '#f43f5e' }}>
                 ♥

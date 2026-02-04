@@ -195,8 +195,8 @@ export function CardLabel({
             </div>
           )}
 
-          {/* Card Lovers Emblem - shown to the right of QR code (only if not a Founder) */}
-          {showCardLoversEmblem && !showFounderEmblem && (
+          {/* Card Lovers Emblem - shown to the right of QR code */}
+          {showCardLoversEmblem && (
             <div className="flex flex-col items-center justify-center">
               <div
                 className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-full flex items-center justify-center shadow-md"

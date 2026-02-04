@@ -53,6 +53,10 @@ export default function AccountPage() {
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
   const [isTogglingLabelStyle, setIsTogglingLabelStyle] = useState(false)
 
+  // Label emblem preference (for users with both Founder and Card Lover)
+  const [preferredLabelEmblem, setPreferredLabelEmblem] = useState<'founder' | 'card_lover' | 'both' | 'none'>('both')
+  const [isUpdatingEmblemPref, setIsUpdatingEmblemPref] = useState(false)
+
   // Card Lovers subscription state
   const [isCardLover, setIsCardLover] = useState(false)
   const [cardLoverPlan, setCardLoverPlan] = useState<'monthly' | 'annual' | null>(null)
@@ -241,6 +245,21 @@ export default function AccountPage() {
           console.error('Error fetching subscription status:', err)
         }
 
+        // Fetch label emblem preference
+        try {
+          const emblemRes = await fetch('/api/user/label-emblem-preference', {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
+          if (emblemRes.ok) {
+            const emblemData = await emblemRes.json()
+            setPreferredLabelEmblem(emblemData.preferredLabelEmblem || 'both')
+          }
+        } catch (err) {
+          console.error('Error fetching label emblem preference:', err)
+        }
+
         setLoading(false)
       } catch (err) {
         console.error('Error fetching account data:', err)
@@ -394,6 +413,34 @@ export default function AccountPage() {
       console.error('Error toggling label style:', err)
     } finally {
       setIsTogglingLabelStyle(false)
+    }
+  }
+
+  // Handle label emblem preference change
+  const handleEmblemPreferenceChange = async (newPreference: 'founder' | 'card_lover' | 'both' | 'none') => {
+    setIsUpdatingEmblemPref(true)
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        return
+      }
+
+      const response = await fetch('/api/user/label-emblem-preference', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ preferredLabelEmblem: newPreference }),
+      })
+
+      if (response.ok) {
+        setPreferredLabelEmblem(newPreference)
+      }
+    } catch (err) {
+      console.error('Error updating emblem preference:', err)
+    } finally {
+      setIsUpdatingEmblemPref(false)
     }
   }
 
@@ -846,6 +893,90 @@ export default function AccountPage() {
               </button>
             </div>
 
+          </div>
+        )}
+
+        {/* Label Emblem Preference - Only show when user has BOTH Founder AND Card Lover */}
+        {isFounder && isCardLover && (
+          <div className="bg-gradient-to-r from-amber-50 via-rose-50 to-purple-50 rounded-lg shadow-md p-6 border border-amber-200 mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+              <span className="mr-2">🏷️</span>
+              Label Emblem Preference
+            </h2>
+            <p className="text-sm text-gray-600 mb-4">
+              You have both Founder and Card Lover status! Choose which emblem(s) to display on your graded card labels.
+            </p>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* Both Option */}
+              <button
+                onClick={() => handleEmblemPreferenceChange('both')}
+                disabled={isUpdatingEmblemPref}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  preferredLabelEmblem === 'both'
+                    ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
+                    : 'border-gray-200 bg-white hover:border-purple-300'
+                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex justify-center gap-1 mb-2">
+                  <span className="text-yellow-500 text-lg">★</span>
+                  <span className="text-rose-500 text-lg">♥</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">Both</p>
+                <p className="text-xs text-gray-500">Show both emblems</p>
+              </button>
+
+              {/* Founder Only */}
+              <button
+                onClick={() => handleEmblemPreferenceChange('founder')}
+                disabled={isUpdatingEmblemPref}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  preferredLabelEmblem === 'founder'
+                    ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-200'
+                    : 'border-gray-200 bg-white hover:border-yellow-300'
+                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex justify-center mb-2">
+                  <span className="text-yellow-500 text-2xl">★</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">Founder</p>
+                <p className="text-xs text-gray-500">Founder only</p>
+              </button>
+
+              {/* Card Lover Only */}
+              <button
+                onClick={() => handleEmblemPreferenceChange('card_lover')}
+                disabled={isUpdatingEmblemPref}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  preferredLabelEmblem === 'card_lover'
+                    ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-200'
+                    : 'border-gray-200 bg-white hover:border-rose-300'
+                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex justify-center mb-2">
+                  <span className="text-rose-500 text-2xl">♥</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">Card Lover</p>
+                <p className="text-xs text-gray-500">Heart only</p>
+              </button>
+
+              {/* None */}
+              <button
+                onClick={() => handleEmblemPreferenceChange('none')}
+                disabled={isUpdatingEmblemPref}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  preferredLabelEmblem === 'none'
+                    ? 'border-gray-500 bg-gray-100 ring-2 ring-gray-200'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
+                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <div className="flex justify-center mb-2">
+                  <span className="text-gray-400 text-2xl">○</span>
+                </div>
+                <p className="text-sm font-semibold text-gray-900">None</p>
+                <p className="text-xs text-gray-500">No emblem</p>
+              </button>
+            </div>
           </div>
         )}
 
