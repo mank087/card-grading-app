@@ -2866,14 +2866,14 @@ export function MTGCardDetails() {
                         </div>
                       )}
 
-                      {/* Card Lovers badge - heart at top, LOVER sideways below */}
+                      {/* Card Lovers badge - heart at top, Card Lover sideways below */}
                       {showCardLoversEmblem && (
                         <div className="flex flex-col items-center justify-start h-full py-1">
                           <span className="text-[14px] leading-none" style={{ color: '#f43f5e' }}>
                             ♥
                           </span>
                           <span
-                            className="text-[8px] font-bold"
+                            className="text-[7px] font-bold"
                             style={{
                               color: '#ec4899',
                               writingMode: 'vertical-rl',
@@ -2881,7 +2881,7 @@ export function MTGCardDetails() {
                               marginTop: '2px',
                             }}
                           >
-                            LOVER
+                            Card Lover
                           </span>
                         </div>
                       )}

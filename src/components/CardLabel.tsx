@@ -219,9 +219,9 @@ export function CardLabel({
               </div>
               <span
                 className="text-rose-600 font-bold mt-0.5"
-                style={{ fontSize: size === 'sm' ? '7px' : size === 'md' ? '8px' : '9px' }}
+                style={{ fontSize: size === 'sm' ? '6px' : size === 'md' ? '7px' : '8px' }}
               >
-                LOVER
+                Card Lover
               </span>
             </div>
           )}
