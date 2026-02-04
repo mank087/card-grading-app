@@ -81,6 +81,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Determine URLs with origin validation (same pattern as checkout route)
+    const allowedOrigins = [
+      'https://dcmgrading.com',
+      'https://www.dcmgrading.com',
+      ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000'] : [])
+    ];
+    const requestOrigin = request.headers.get('origin');
+    const origin = requestOrigin && allowedOrigins.includes(requestOrigin)
+      ? requestOrigin
+      : 'https://www.dcmgrading.com';
+
     // Build checkout session params
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
@@ -91,8 +102,8 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NEXT_PUBLIC_SITE_URL}/card-lovers/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL}/card-lovers`,
+      success_url: `${origin}/card-lovers/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/card-lovers`,
       metadata: {
         userId: user.id,
         plan,
@@ -119,10 +130,13 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       url: session.url,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error creating subscription checkout:', error);
+
+    // Return more specific error for debugging
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      { error: 'Failed to create checkout session' },
+      { error: 'Failed to create checkout session', details: errorMessage },
       { status: 500 }
     );
   }
