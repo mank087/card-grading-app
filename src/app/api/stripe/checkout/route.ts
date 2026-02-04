@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, STRIPE_PRICES, StripePriceTier } from '@/lib/stripe';
-import { getUserCredits, isFirstPurchase, isFounder, getFounderDiscountMultiplier } from '@/lib/credits';
+import { getUserCredits, isFirstPurchase, isFounder } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
 import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
 
@@ -64,14 +64,6 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if founders program has expired (Feb 1, 2026)
-      const expirationDate = new Date('2026-02-01T23:59:59-05:00');
-      if (new Date() > expirationDate) {
-        return NextResponse.json(
-          { error: 'The Founders Package program has ended.' },
-          { status: 400 }
-        );
-      }
     }
 
     const priceConfig = STRIPE_PRICES[tier];
@@ -87,9 +79,6 @@ export async function POST(request: NextRequest) {
 
     // Check if this is first purchase (for bonus credit) - not applicable to founders
     const firstPurchase = isFoundersPackage ? false : await isFirstPurchase(userId);
-
-    // Check if user is a founder (for discount on regular packages)
-    const userIsFounder = isFoundersPackage ? false : await isFounder(userId);
 
     // Get or create user credits record to get Stripe customer ID
     const userCredits = await getUserCredits(userId);
@@ -156,32 +145,13 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Handle line items based on tier and founder status
-    if (userIsFounder && !isFoundersPackage) {
-      // Founders get 20% off regular packages - use dynamic pricing
-      const discountedPrice = Math.round(priceConfig.price * getFounderDiscountMultiplier() * 100); // in cents
-      checkoutOptions.line_items = [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `${priceConfig.name} (Founder Discount)`,
-              description: `${priceConfig.description} - 20% Founder Discount Applied`,
-            },
-            unit_amount: discountedPrice,
-          },
-          quantity: 1,
-        },
-      ];
-    } else {
-      // Standard pricing
-      checkoutOptions.line_items = [
-        {
-          price: priceConfig.priceId,
-          quantity: 1,
-        },
-      ];
-    }
+    // Standard pricing
+    checkoutOptions.line_items = [
+      {
+        price: priceConfig.priceId,
+        quantity: 1,
+      },
+    ];
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create(checkoutOptions);
@@ -191,11 +161,6 @@ export async function POST(request: NextRequest) {
       ? priceConfig.credits + bonusCredits
       : priceConfig.credits;
 
-    // Calculate actual price paid (with founder discount if applicable)
-    const actualPrice = userIsFounder && !isFoundersPackage
-      ? priceConfig.price * getFounderDiscountMultiplier()
-      : priceConfig.price;
-
     return NextResponse.json({
       sessionId: session.id,
       url: session.url,
@@ -203,9 +168,7 @@ export async function POST(request: NextRequest) {
       credits: priceConfig.credits,
       bonusCredits: firstPurchase ? bonusCredits : 0,
       totalCredits: creditsToReceive,
-      price: actualPrice,
-      originalPrice: priceConfig.price,
-      founderDiscount: userIsFounder && !isFoundersPackage,
+      price: priceConfig.price,
       isFoundersPackage: isFoundersPackage,
     });
   } catch (error: any) {

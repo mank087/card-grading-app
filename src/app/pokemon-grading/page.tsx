@@ -67,10 +67,6 @@ export default function PokemonGradingLanding() {
   const [emailLoading, setEmailLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
-  const [countdown, setCountdown] = useState<{ days: number; hours: number; mins: number; secs: number } | null>(null)
-
-  // Countdown end date: February 1, 2026 at 12:00 AM EST (midnight)
-  const COUNTDOWN_END = new Date('2026-02-01T00:00:00-05:00').getTime()
 
   useEffect(() => {
     const session = getStoredSession()
@@ -87,33 +83,6 @@ export default function PokemonGradingLanding() {
       })
     }
   }, [])
-
-  // Countdown timer for Founders offer
-  useEffect(() => {
-    const calculateCountdown = () => {
-      const now = Date.now()
-      const difference = COUNTDOWN_END - now
-
-      if (difference <= 0) {
-        return { days: 0, hours: 0, mins: 0, secs: 0 }
-      }
-
-      return {
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-        mins: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-        secs: Math.floor((difference % (1000 * 60)) / 1000),
-      }
-    }
-
-    setCountdown(calculateCountdown())
-
-    const timer = setInterval(() => {
-      setCountdown(calculateCountdown())
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [COUNTDOWN_END])
 
   const handleOAuthSignup = async (provider: 'google' | 'facebook') => {
     setIsSigningUp(true)
@@ -852,15 +821,8 @@ export default function PokemonGradingLanding() {
                     <span className="text-2xl">⭐</span>
                     <h3 className="text-xl font-bold text-gray-900">Founders</h3>
                   </div>
-                  <div className="text-right">
-                    <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      LIMITED TIME
-                    </div>
-                    {countdown && (
-                      <div className="bg-gray-900/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded mt-1">
-                        {countdown.days}d {countdown.hours.toString().padStart(2, '0')}:{countdown.mins.toString().padStart(2, '0')}:{countdown.secs.toString().padStart(2, '0')}
-                      </div>
-                    )}
+                  <div className="bg-yellow-900/80 text-yellow-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    EXCLUSIVE
                   </div>
                 </div>
                 <div className="mt-1.5 inline-block bg-white/30 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -893,12 +855,6 @@ export default function PokemonGradingLanding() {
                 <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl">
                   <div className="text-yellow-400 font-bold text-xs mb-1.5">Lifetime Benefits:</div>
                   <ul className="text-yellow-300/80 text-xs space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      20% off future purchases
-                    </li>
                     <li className="flex items-center gap-1.5">
                       <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

@@ -408,9 +408,3 @@ export async function toggleFounderBadge(
   return { success: true };
 }
 
-/**
- * Get founder discount multiplier (20% off = 0.8)
- */
-export function getFounderDiscountMultiplier(): number {
-  return 0.8; // 20% off
-}

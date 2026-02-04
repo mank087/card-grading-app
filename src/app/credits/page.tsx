@@ -17,9 +17,6 @@ import { loadStripe } from '@stripe/stripe-js'
 import Image from 'next/image'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
 
-// Founder discount constant
-const FOUNDER_DISCOUNT = 0.2 // 20% off
-
 // Initialize Stripe
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!)
 
@@ -83,8 +80,6 @@ const pricingTiers: PricingTier[] = [
   },
 ]
 
-// Countdown end date: February 1, 2026 at 12:00 AM EST (midnight)
-const COUNTDOWN_END = new Date('2026-02-01T00:00:00-05:00').getTime()
 
 function CreditsPageContent() {
   const router = useRouter()
@@ -95,7 +90,6 @@ function CreditsPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
-  const [countdown, setCountdown] = useState<{ days: number; hours: number; mins: number; secs: number } | null>(null)
 
   // Check for canceled payment and welcome parameter
   const canceled = searchParams.get('canceled')
@@ -140,33 +134,6 @@ function CreditsPageContent() {
     }
   }, [welcome, router])
 
-  // Countdown timer for Founders offer
-  useEffect(() => {
-    const calculateCountdown = () => {
-      const now = Date.now()
-      const difference = COUNTDOWN_END - now
-
-      if (difference <= 0) {
-        return { days: 0, hours: 0, mins: 0, secs: 0 }
-      }
-
-      return {
-        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-        hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-        mins: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-        secs: Math.floor((difference % (1000 * 60)) / 1000),
-      }
-    }
-
-    // Set initial value
-    setCountdown(calculateCountdown())
-
-    const timer = setInterval(() => {
-      setCountdown(calculateCountdown())
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [])
 
   const handlePurchase = async (tier: PricingTier) => {
     // If not authenticated, redirect to signup
@@ -447,15 +414,6 @@ function CreditsPageContent() {
               </div>
             )}
 
-            {/* Founder Discount Banner */}
-            {isAuthenticated && isFounder && (
-              <div className="mt-6 inline-flex items-center gap-2 bg-gradient-to-r from-yellow-500 to-orange-500 text-gray-900 rounded-full px-6 py-2 shadow-lg">
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                </svg>
-                <span className="font-semibold">Founder Discount: 20% off all credit packages!</span>
-              </div>
-            )}
 
             {/* First Purchase Bonus Banner - Only for logged-in first-time buyers (not founders) */}
             {isAuthenticated && isFirstPurchase && !isFounder && (
@@ -488,14 +446,9 @@ function CreditsPageContent() {
                     <h3 className="text-xl font-bold text-gray-900">Founders</h3>
                   </div>
                   <div className="text-right">
-                    <div className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      LIMITED TIME
+                    <div className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      EXCLUSIVE
                     </div>
-                    {countdown && (
-                      <div className="bg-gray-900/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded mt-1">
-                        {countdown.days}d {countdown.hours.toString().padStart(2, '0')}:{countdown.mins.toString().padStart(2, '0')}:{countdown.secs.toString().padStart(2, '0')}
-                      </div>
-                    )}
                   </div>
                 </div>
                 <div className="mt-1.5 inline-block bg-white/30 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
@@ -531,14 +484,8 @@ function CreditsPageContent() {
 
                 {/* Benefits Section - Flex grow to push button down */}
                 <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl">
-                  <div className="text-yellow-800 font-bold text-xs mb-1.5">Lifetime Benefits:</div>
+                  <div className="text-yellow-800 font-bold text-xs mb-1.5">Founder Benefits:</div>
                   <ul className="text-yellow-700 text-xs space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      20% off future purchases
-                    </li>
                     <li className="flex items-center gap-1.5">
                       <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -620,16 +567,7 @@ function CreditsPageContent() {
               <div className="p-5 flex flex-col flex-grow">
                 {/* Price Section - Fixed Height */}
                 <div className="text-center mb-3 h-[60px] flex flex-col justify-center">
-                  {isFounder ? (
-                    <div className="flex items-center justify-center gap-2">
-                      <span className="text-xl text-gray-400 line-through">${tier.price.toFixed(2)}</span>
-                      <span className="text-3xl font-bold text-gray-900">
-                        ${(tier.price * (1 - FOUNDER_DISCOUNT)).toFixed(2)}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-3xl font-bold text-gray-900">${tier.price}</span>
-                  )}
+                  <span className="text-3xl font-bold text-gray-900">${tier.price}</span>
                   <p className="text-gray-500 text-xs mt-1">{tier.description}</p>
                 </div>
 
@@ -645,7 +583,6 @@ function CreditsPageContent() {
 
                 {/* Per Grade Cost - Fixed Height */}
                 <div className={`mb-3 p-2.5 rounded-lg h-[56px] flex flex-col justify-center ${
-                  isFounder ? 'bg-yellow-50 border border-yellow-300' :
                   tier.color === 'blue' ? 'bg-blue-50 border border-blue-200' :
                   tier.color === 'purple' ? 'bg-purple-50 border border-purple-200' :
                   'bg-amber-50 border border-amber-200'
@@ -653,24 +590,14 @@ function CreditsPageContent() {
                   <div className="flex items-center justify-between">
                     <span className="text-gray-600 text-xs font-medium">Cost per grade:</span>
                     <span className={`text-lg font-bold ${
-                      isFounder ? 'text-yellow-600' :
                       tier.color === 'blue' ? 'text-blue-600' :
                       tier.color === 'purple' ? 'text-purple-600' :
                       'text-amber-600'
                     }`}>
-                      ${isFounder
-                        ? (tier.perGradeCost * (1 - FOUNDER_DISCOUNT)).toFixed(2)
-                        : tier.perGradeCost.toFixed(2)}
+                      ${tier.perGradeCost.toFixed(2)}
                     </span>
                   </div>
-                  {isFounder ? (
-                    <div className="text-yellow-700 text-[10px] font-semibold flex items-center gap-1">
-                      <svg className="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                      </svg>
-                      Founder discount applied!
-                    </div>
-                  ) : tier.savingsPercent ? (
+                  {tier.savingsPercent ? (
                     <div className="text-green-600 text-[10px] font-semibold">
                       Save ${((BASE_PRICE_PER_CREDIT - tier.perGradeCost) * tier.credits).toFixed(2)} vs Basic
                     </div>

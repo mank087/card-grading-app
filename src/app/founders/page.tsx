@@ -16,68 +16,14 @@ declare global {
   }
 }
 
-// Countdown end date: February 1, 2026 at 12:00 AM EST (midnight)
-const COUNTDOWN_END = new Date('2026-02-01T00:00:00-05:00').getTime()
-
-interface TimeLeft {
-  days: number
-  hours: number
-  minutes: number
-  seconds: number
-}
-
-function calculateTimeLeft(): TimeLeft {
-  const now = new Date().getTime()
-  const difference = COUNTDOWN_END - now
-
-  if (difference <= 0) {
-    return { days: 0, hours: 0, minutes: 0, seconds: 0 }
-  }
-
-  return {
-    days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-    hours: Math.floor((difference % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-    minutes: Math.floor((difference % (1000 * 60 * 60)) / (1000 * 60)),
-    seconds: Math.floor((difference % (1000 * 60)) / 1000),
-  }
-}
 
 export default function FoundersPage() {
   const router = useRouter()
   const { refreshCredits } = useCredits()
-  // Initialize to null to avoid hydration mismatch - only calculate on client
-  const [timeLeft, setTimeLeft] = useState<TimeLeft | null>(null)
-  const [isExpired, setIsExpired] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
   const [checkingFounder, setCheckingFounder] = useState(true)
   const [purchasing, setPurchasing] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
-
-  // Update countdown every second - only runs on client
-  useEffect(() => {
-    // Set initial value on mount
-    const initialTimeLeft = calculateTimeLeft()
-    setTimeLeft(initialTimeLeft)
-
-    if (initialTimeLeft.days === 0 && initialTimeLeft.hours === 0 &&
-        initialTimeLeft.minutes === 0 && initialTimeLeft.seconds === 0) {
-      setIsExpired(true)
-      return
-    }
-
-    const timer = setInterval(() => {
-      const newTimeLeft = calculateTimeLeft()
-      setTimeLeft(newTimeLeft)
-
-      if (newTimeLeft.days === 0 && newTimeLeft.hours === 0 &&
-          newTimeLeft.minutes === 0 && newTimeLeft.seconds === 0) {
-        setIsExpired(true)
-        clearInterval(timer)
-      }
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [])
 
   // Check authentication and founder status
   useEffect(() => {
@@ -171,15 +117,6 @@ export default function FoundersPage() {
     }
   }
 
-  const TimeBlock = ({ value, label }: { value: number; label: string }) => (
-    <div className="flex flex-col items-center">
-      <div className="bg-gray-900 text-white text-3xl md:text-5xl font-bold rounded-xl w-16 md:w-24 h-16 md:h-24 flex items-center justify-center shadow-lg">
-        {value.toString().padStart(2, '0')}
-      </div>
-      <span className="text-gray-600 text-sm mt-2 uppercase tracking-wide">{label}</span>
-    </div>
-  )
-
   return (
     <main className="min-h-screen bg-gradient-to-br from-amber-50 via-yellow-50 to-orange-50">
       {/* Hero Section */}
@@ -198,7 +135,7 @@ export default function FoundersPage() {
               <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
-              Limited Time Offer
+              Exclusive Offer
             </div>
 
             {/* Logo */}
@@ -211,35 +148,8 @@ export default function FoundersPage() {
             </h1>
 
             <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-2xl mx-auto">
-              Join our exclusive group of early supporters and unlock lifetime benefits to celebrate the launch of DCM and begin your Card Grading Journey with Us!
+              Join our exclusive group of supporters and unlock lifetime benefits as you begin your Card Grading Journey with Us!
             </p>
-
-            {/* Countdown Timer */}
-            {!isExpired && timeLeft ? (
-              <div className="mb-10">
-                <p className="text-gray-500 mb-4 text-sm uppercase tracking-wide">Offer ends in</p>
-                <div className="flex justify-center gap-3 md:gap-6">
-                  <TimeBlock value={timeLeft.days} label="Days" />
-                  <TimeBlock value={timeLeft.hours} label="Hours" />
-                  <TimeBlock value={timeLeft.minutes} label="Mins" />
-                  <TimeBlock value={timeLeft.seconds} label="Secs" />
-                </div>
-              </div>
-            ) : !isExpired && !timeLeft ? (
-              <div className="mb-10">
-                <p className="text-gray-500 mb-4 text-sm uppercase tracking-wide">Offer ends in</p>
-                <div className="flex justify-center gap-3 md:gap-6">
-                  <TimeBlock value={0} label="Days" />
-                  <TimeBlock value={0} label="Hours" />
-                  <TimeBlock value={0} label="Mins" />
-                  <TimeBlock value={0} label="Secs" />
-                </div>
-              </div>
-            ) : (
-              <div className="mb-10 bg-red-100 text-red-700 px-6 py-4 rounded-xl inline-block">
-                <p className="font-semibold">This offer has expired</p>
-              </div>
-            )}
           </div>
         </div>
       </section>
@@ -283,15 +193,6 @@ export default function FoundersPage() {
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     </div>
-                    <span className="text-lg"><strong>20% off</strong> all future purchases</span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="w-6 h-6 bg-yellow-400 rounded-full flex items-center justify-center flex-shrink-0">
-                      <svg className="w-4 h-4 text-gray-900" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
                     <span className="text-lg"><strong>Founder badge</strong> on your collection</span>
                   </div>
 
@@ -321,10 +222,6 @@ export default function FoundersPage() {
                     </svg>
                     You&apos;re a Founder!
                   </div>
-                ) : isExpired ? (
-                  <div className="w-full bg-gray-600 text-gray-300 font-bold py-4 px-6 rounded-xl text-center cursor-not-allowed">
-                    Offer Expired
-                  </div>
                 ) : (
                   <button
                     onClick={handlePurchase}
@@ -350,21 +247,6 @@ export default function FoundersPage() {
                       <p className="text-gray-600 text-sm">
                         Grade up to 150 cards — Pokemon, Sports, MTG, or any trading card.
                         At $0.66 per grade, this is our best value ever.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-6 border border-green-100">
-                  <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-green-600 rounded-xl flex items-center justify-center flex-shrink-0">
-                      <span className="text-white font-bold text-lg">20%</span>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900 mb-1">Lifetime 20% Discount</h3>
-                      <p className="text-gray-600 text-sm">
-                        Every future credit purchase is automatically discounted.
-                        This benefit never expires — it&apos;s yours forever.
                       </p>
                     </div>
                   </div>
@@ -447,7 +329,7 @@ export default function FoundersPage() {
             </div>
 
             <p className="mt-6 text-gray-500 text-sm">
-              Plus founders get 20% off all future purchases — the savings continue forever.
+              The best value for serious collectors — plus exclusive founder status!
             </p>
           </div>
         </div>
@@ -464,12 +346,8 @@ export default function FoundersPage() {
             <div className="space-y-4">
               {[
                 {
-                  q: "What happens after January 31, 2026?",
-                  a: "The Founders Package will no longer be available for purchase. If you've already purchased it, you keep all benefits forever — the credits, the 20% discount, and the founder badge."
-                },
-                {
                   q: "Can I buy multiple Founders Packages?",
-                  a: "No, the Founders Package is limited to one per account. It's designed to be an exclusive benefit for early supporters."
+                  a: "No, the Founders Package is limited to one per account. It's designed to be an exclusive benefit for our supporters."
                 },
                 {
                   q: "Do the 150 credits expire?",
@@ -480,12 +358,8 @@ export default function FoundersPage() {
                   a: "Yes! You can toggle the founder emblem on or off in your account settings. The badge on your collection page will always show, but label display is up to you."
                 },
                 {
-                  q: "Does the 20% discount stack with other promotions?",
-                  a: "The founder discount applies to all regular credit packages. If we run special promotions in the future, we'll clarify how they interact with founder benefits."
-                },
-                {
                   q: "I'm already a DCM user. Can I still become a founder?",
-                  a: "Absolutely! Any user can purchase the Founders Package before the deadline. Your existing credits will remain, and the 150 founder credits will be added to your balance."
+                  a: "Absolutely! Any user can purchase the Founders Package. Your existing credits will remain, and the 150 founder credits will be added to your balance."
                 }
               ].map((faq, index) => (
                 <div key={index} className="bg-gray-50 rounded-xl p-6">
@@ -508,7 +382,7 @@ export default function FoundersPage() {
             Join us at the beginning and enjoy exclusive benefits for the lifetime of your account.
           </p>
 
-          {!isExpired && !isFounder && (
+          {!isFounder && (
             <button
               onClick={handlePurchase}
               disabled={purchasing || checkingFounder}
