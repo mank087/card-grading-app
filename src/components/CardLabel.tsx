@@ -235,7 +235,7 @@ export function CardLabel({
                   textRendering: 'optimizeLegibility',
                 } as React.CSSProperties}
               >
-                LOVER
+                CARD LOVER
               </span>
             </div>
           )}

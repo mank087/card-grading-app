@@ -304,7 +304,7 @@ export function CardSlab({
               </div>
             )}
 
-            {/* Card Lovers badge - heart at top, LOVER sideways below */}
+            {/* Card Lovers badge - heart at top, CARD LOVER sideways below */}
             {showCardLoversEmblem && (
               <div className="flex flex-col items-center justify-start h-full py-1">
                 <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#f43f5e' }}>
@@ -326,7 +326,7 @@ export function CardSlab({
                     textRendering: 'optimizeLegibility',
                   } as React.CSSProperties}
                 >
-                  Lover
+                  Card Lover
                 </span>
               </div>
             )}

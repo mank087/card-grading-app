@@ -169,7 +169,7 @@ export function ModernBackLabel({
                   textRendering: 'optimizeLegibility',
                 } as React.CSSProperties}
               >
-                Lover
+                Card Lover
               </span>
             </div>
           )}

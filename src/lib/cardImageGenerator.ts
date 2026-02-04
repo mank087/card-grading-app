@@ -436,7 +436,7 @@ async function drawBackLabel(
     ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('LOVER', 0, 0);
+    ctx.fillText('CARD LOVER', 0, 0);
 
     ctx.restore();
   }
@@ -847,7 +847,7 @@ async function drawModernBackLabel(
     ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('LOVER', 0, 0);
+    ctx.fillText('CARD LOVER', 0, 0);
 
     ctx.restore();
   }
