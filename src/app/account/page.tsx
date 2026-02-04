@@ -53,6 +53,16 @@ export default function AccountPage() {
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
   const [isTogglingLabelStyle, setIsTogglingLabelStyle] = useState(false)
 
+  // Card Lovers subscription state
+  const [isCardLover, setIsCardLover] = useState(false)
+  const [cardLoverPlan, setCardLoverPlan] = useState<'monthly' | 'annual' | null>(null)
+  const [cardLoverPeriodEnd, setCardLoverPeriodEnd] = useState<string | null>(null)
+  const [cardLoverMonthsActive, setCardLoverMonthsActive] = useState(0)
+  const [nextLoyaltyBonus, setNextLoyaltyBonus] = useState<{ atMonth: number; credits: number; monthsUntil: number } | null>(null)
+  const [isCancellingSubscription, setIsCancellingSubscription] = useState(false)
+  const [isUpgradingSubscription, setIsUpgradingSubscription] = useState(false)
+  const [showCancelModal, setShowCancelModal] = useState(false)
+
   useEffect(() => {
     const fetchAccountData = async () => {
       try {
@@ -212,6 +222,25 @@ export default function AccountPage() {
           console.error('Error fetching label style:', err)
         }
 
+        // Fetch Card Lovers subscription status
+        try {
+          const subscriptionRes = await fetch('/api/subscription/status', {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
+          if (subscriptionRes.ok) {
+            const subData = await subscriptionRes.json()
+            setIsCardLover(subData.isActive)
+            setCardLoverPlan(subData.plan)
+            setCardLoverPeriodEnd(subData.currentPeriodEnd)
+            setCardLoverMonthsActive(subData.monthsActive || 0)
+            setNextLoyaltyBonus(subData.nextLoyaltyBonus)
+          }
+        } catch (err) {
+          console.error('Error fetching subscription status:', err)
+        }
+
         setLoading(false)
       } catch (err) {
         console.error('Error fetching account data:', err)
@@ -365,6 +394,74 @@ export default function AccountPage() {
       console.error('Error toggling label style:', err)
     } finally {
       setIsTogglingLabelStyle(false)
+    }
+  }
+
+  // Handle subscription cancellation
+  const handleCancelSubscription = async () => {
+    setIsCancellingSubscription(true)
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        return
+      }
+
+      const response = await fetch('/api/stripe/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update UI to show cancellation pending
+        setShowCancelModal(false)
+        alert(`Your subscription will remain active until ${new Date(data.cancelAt).toLocaleDateString()}. You won't be charged again.`)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to cancel subscription')
+      }
+    } catch (err) {
+      console.error('Error cancelling subscription:', err)
+      alert('Failed to cancel subscription. Please try again.')
+    } finally {
+      setIsCancellingSubscription(false)
+    }
+  }
+
+  // Handle subscription upgrade to annual
+  const handleUpgradeSubscription = async () => {
+    setIsUpgradingSubscription(true)
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        return
+      }
+
+      const response = await fetch('/api/stripe/upgrade-subscription', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        // Update UI
+        setCardLoverPlan('annual')
+        setCardLoverMonthsActive(12)
+        setNextLoyaltyBonus(null)
+        alert(`Upgraded to annual! ${data.creditsAdded} credits have been added to your account.`)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to upgrade subscription')
+      }
+    } catch (err) {
+      console.error('Error upgrading subscription:', err)
+      alert('Failed to upgrade subscription. Please try again.')
+    } finally {
+      setIsUpgradingSubscription(false)
     }
   }
 
@@ -752,6 +849,141 @@ export default function AccountPage() {
           </div>
         )}
 
+        {/* Card Lovers Subscription Section */}
+        {isCardLover ? (
+          <div className="bg-gradient-to-r from-purple-50 to-rose-50 rounded-lg shadow-md p-6 border border-purple-200 mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
+              <svg className="w-6 h-6 mr-2 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+              </svg>
+              Card Lovers Subscription
+            </h2>
+
+            {/* Subscription Status */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white rounded-lg p-4 border border-purple-200">
+                <p className="text-sm text-gray-600 font-medium">Current Plan</p>
+                <p className="text-xl font-bold text-purple-700">
+                  {cardLoverPlan === 'monthly' ? 'Monthly' : 'Annual'}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {cardLoverPlan === 'monthly' ? '$49.99/month' : '$449/year'}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-purple-200">
+                <p className="text-sm text-gray-600 font-medium">Next Billing Date</p>
+                <p className="text-xl font-bold text-purple-700">
+                  {cardLoverPeriodEnd ? new Date(cardLoverPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                </p>
+                <p className="text-sm text-gray-500">
+                  {cardLoverPlan === 'monthly' ? '70 credits' : '900 credits'}
+                </p>
+              </div>
+              <div className="bg-white rounded-lg p-4 border border-purple-200">
+                <p className="text-sm text-gray-600 font-medium">Months Active</p>
+                <p className="text-xl font-bold text-purple-700">{cardLoverMonthsActive}</p>
+                <p className="text-sm text-gray-500">consecutive months</p>
+              </div>
+            </div>
+
+            {/* Loyalty Progress (Monthly only) */}
+            {cardLoverPlan === 'monthly' && nextLoyaltyBonus && (
+              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 border border-yellow-200 mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  <span className="font-semibold text-yellow-800">Loyalty Progress</span>
+                </div>
+                <p className="text-sm text-yellow-700">
+                  <strong>+{nextLoyaltyBonus.credits} bonus credits</strong> coming at month {nextLoyaltyBonus.atMonth}!
+                  {nextLoyaltyBonus.monthsUntil === 1
+                    ? ' Just 1 more month to go!'
+                    : ` Only ${nextLoyaltyBonus.monthsUntil} months away.`}
+                </p>
+                <div className="mt-2 bg-yellow-200 rounded-full h-2">
+                  <div
+                    className="bg-yellow-500 h-2 rounded-full transition-all"
+                    style={{ width: `${((cardLoverMonthsActive % 3) / 3) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Perks Reminder */}
+            <div className="bg-white rounded-lg p-4 border border-purple-200 mb-6">
+              <p className="font-semibold text-gray-900 mb-2">Your Active Perks:</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                <div className="flex items-center gap-2 text-gray-600">
+                  <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Card Lovers emblem on labels
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  20% off credit purchases
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Badge on collection page
+                </div>
+                <div className="flex items-center gap-2 text-gray-600">
+                  <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Credits roll over forever
+                </div>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex flex-wrap gap-3">
+              {cardLoverPlan === 'monthly' && (
+                <button
+                  onClick={handleUpgradeSubscription}
+                  disabled={isUpgradingSubscription}
+                  className="bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-700 hover:to-rose-700 text-white font-semibold px-6 py-2 rounded-lg transition-all disabled:opacity-50"
+                >
+                  {isUpgradingSubscription ? 'Upgrading...' : 'Upgrade to Annual (Save $150/yr)'}
+                </button>
+              )}
+              <button
+                onClick={() => setShowCancelModal(true)}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-2 rounded-lg transition-all"
+              >
+                Cancel Subscription
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Card Lovers Promo for non-subscribers */
+          <div className="bg-gradient-to-r from-purple-50 to-rose-50 rounded-lg shadow-md p-6 border border-purple-200 mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center">
+              <svg className="w-6 h-6 mr-2 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+              </svg>
+              Become a Card Lover
+            </h2>
+            <p className="text-gray-600 mb-4">
+              Get 70 credits/month, 20% off purchases, exclusive badge & label emblem, and loyalty bonuses!
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <Link
+                href="/card-lovers"
+                className="inline-block bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-700 hover:to-rose-700 text-white font-semibold px-6 py-2 rounded-lg transition-all"
+              >
+                Learn More
+              </Link>
+              <p className="text-sm text-gray-500 self-center">Starting at $49.99/month</p>
+            </div>
+          </div>
+        )}
+
         {/* Account Actions */}
         <div className="bg-white rounded-lg shadow-md p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
@@ -874,6 +1106,76 @@ export default function AccountPage() {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Subscription Modal */}
+      {showCancelModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+            <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-purple-100 rounded-full">
+              <svg className="w-8 h-8 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+              </svg>
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-900 text-center mb-2">Cancel Subscription?</h3>
+            <p className="text-gray-600 text-center mb-4">
+              Are you sure you want to cancel your Card Lovers subscription?
+            </p>
+
+            <div className="bg-gray-50 rounded-lg p-4 mb-4">
+              <p className="text-sm text-gray-700 font-medium mb-2">What happens when you cancel:</p>
+              <ul className="text-sm text-gray-600 space-y-1">
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Your credits are kept forever
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                  Access until current period ends
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  No more monthly credits
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Lose 20% discount & badge
+                </li>
+                <li className="flex items-start gap-2">
+                  <svg className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                  Loyalty progress resets
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowCancelModal(false)}
+                className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+              >
+                Keep Subscription
+              </button>
+              <button
+                onClick={handleCancelSubscription}
+                disabled={isCancellingSubscription}
+                className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancellingSubscription ? 'Cancelling...' : 'Cancel Subscription'}
+              </button>
+            </div>
           </div>
         </div>
       )}
