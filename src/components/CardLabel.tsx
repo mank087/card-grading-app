@@ -229,13 +229,13 @@ export function CardLabel({
                 style={{
                   fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                   fontWeight: 700,
-                  fontSize: size === 'sm' ? '6px' : size === 'md' ? '7px' : '8px',
+                  fontSize: size === 'sm' ? '7px' : size === 'md' ? '8px' : '9px',
                   WebkitFontSmoothing: 'antialiased',
                   MozOsxFontSmoothing: 'grayscale',
                   textRendering: 'optimizeLegibility',
                 } as React.CSSProperties}
               >
-                Card Lover
+                LOVER
               </span>
             </div>
           )}

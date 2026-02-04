@@ -43,7 +43,6 @@ const sizeConfig = {
     subScoreSize: 'text-[8px]',
     founderStarSize: 'text-[12px]',
     founderTextSize: '7px',
-    cardLoverTextSize: '6px',
   },
   md: {
     height: 'h-[80px]',
@@ -54,7 +53,6 @@ const sizeConfig = {
     subScoreSize: 'text-[9px]',
     founderStarSize: 'text-[14px]',
     founderTextSize: '8px',
-    cardLoverTextSize: '7px',
   },
   lg: {
     height: 'h-[90px]',
@@ -65,7 +63,6 @@ const sizeConfig = {
     subScoreSize: 'text-[10px]',
     founderStarSize: 'text-[16px]',
     founderTextSize: '9px',
-    cardLoverTextSize: '8px',
   },
 }
 
@@ -150,28 +147,29 @@ export function ModernBackLabel({
             </div>
           )}
 
-          {/* Card Lovers badge - heart at top, Card Lover sideways below */}
+          {/* Card Lovers badge - heart at top, CARD LOVER sideways below */}
           {showCardLoversEmblem && (
             <div className="flex flex-col items-center justify-start h-full py-1">
               <span className={`${config.founderStarSize} leading-none`} style={{ color: '#f43f5e' }}>
                 ♥
               </span>
               <span
+                className="uppercase"
                 style={{
                   fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                   fontWeight: 600,
-                  fontSize: config.cardLoverTextSize,
+                  fontSize: config.founderTextSize,
                   color: '#FFFFFF',
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
                   marginTop: '3px',
-                  letterSpacing: '0.3px',
+                  letterSpacing: '0.5px',
                   WebkitFontSmoothing: 'antialiased',
                   MozOsxFontSmoothing: 'grayscale',
                   textRendering: 'optimizeLegibility',
                 } as React.CSSProperties}
               >
-                Card Lover
+                Lover
               </span>
             </div>
           )}

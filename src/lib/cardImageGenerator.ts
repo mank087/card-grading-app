@@ -415,7 +415,7 @@ async function drawBackLabel(
     badgeXOffset += 30; // Move next badge to the right
   }
 
-  // Card Lovers badge - heart at top, "Card Lover" text rotated below
+  // Card Lovers badge - heart at top, "LOVER" text rotated below
   if (data.showCardLoversEmblem) {
     const cardLoverX = badgeXOffset;
     const cardLoverStartY = qrY + 8;
@@ -427,16 +427,16 @@ async function drawBackLabel(
     ctx.textBaseline = 'top';
     ctx.fillText('\u2665', cardLoverX, cardLoverStartY);
 
-    // "Card Lover" text rotated -90 degrees below heart
+    // "LOVER" text rotated -90 degrees below heart
     ctx.save();
     ctx.translate(cardLoverX, cardLoverStartY + 32);
     ctx.rotate(-Math.PI / 2);
 
     ctx.fillStyle = '#f43f5e'; // rose-500
-    ctx.font = 'bold 12px "Helvetica Neue", Arial, sans-serif';
+    ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Card Lover', 0, 0);
+    ctx.fillText('LOVER', 0, 0);
 
     ctx.restore();
   }
@@ -826,7 +826,7 @@ async function drawModernBackLabel(
     badgeXOffset += 30; // Move next badge to the right
   }
 
-  // Card Lovers badge - heart at top, "Card Lover" sideways below it
+  // Card Lovers badge - heart at top, "LOVER" sideways below it
   if (data.showCardLoversEmblem) {
     const cardLoverX = badgeXOffset;
     const cardLoverStartY = qrY + 8; // Align near top of QR
@@ -838,16 +838,16 @@ async function drawModernBackLabel(
     ctx.textBaseline = 'top';
     ctx.fillText('\u2665', cardLoverX, cardLoverStartY);
 
-    // "Card Lover" text rotated -90 degrees below heart
+    // "LOVER" text rotated -90 degrees below heart
     ctx.save();
     ctx.translate(cardLoverX, cardLoverStartY + 32);
     ctx.rotate(-Math.PI / 2); // Rotate -90 degrees (counterclockwise)
 
     ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 12px "Helvetica Neue", Arial, sans-serif';
+    ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
-    ctx.fillText('Card Lover', 0, 0);
+    ctx.fillText('LOVER', 0, 0);
 
     ctx.restore();
   }

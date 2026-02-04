@@ -251,9 +251,9 @@ export function CardSlab({
   const BackLabel = () => {
     // Size-specific configurations for back label elements
     const backLabelConfig = {
-      sm: { gradeSize: 'text-2xl', conditionSize: 'text-[8px]', subScoreSize: 'text-[8px]', founderStarSize: 'text-[12px]', founderTextSize: '7px', cardLoverTextSize: '6px' },
-      md: { gradeSize: 'text-3xl', conditionSize: 'text-[9px]', subScoreSize: 'text-[9px]', founderStarSize: 'text-[14px]', founderTextSize: '8px', cardLoverTextSize: '7px' },
-      lg: { gradeSize: 'text-4xl', conditionSize: 'text-[10px]', subScoreSize: 'text-[10px]', founderStarSize: 'text-[16px]', founderTextSize: '9px', cardLoverTextSize: '8px' },
+      sm: { gradeSize: 'text-2xl', conditionSize: 'text-[8px]', subScoreSize: 'text-[8px]', founderStarSize: 'text-[12px]', founderTextSize: '7px' },
+      md: { gradeSize: 'text-3xl', conditionSize: 'text-[9px]', subScoreSize: 'text-[9px]', founderStarSize: 'text-[14px]', founderTextSize: '8px' },
+      lg: { gradeSize: 'text-4xl', conditionSize: 'text-[10px]', subScoreSize: 'text-[10px]', founderStarSize: 'text-[16px]', founderTextSize: '9px' },
     }
     const backConfig = backLabelConfig[size]
 
@@ -304,28 +304,29 @@ export function CardSlab({
               </div>
             )}
 
-            {/* Card Lovers badge - heart at top, Card Lover sideways below */}
+            {/* Card Lovers badge - heart at top, LOVER sideways below */}
             {showCardLoversEmblem && (
               <div className="flex flex-col items-center justify-start h-full py-1">
                 <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#f43f5e' }}>
                   ♥
                 </span>
                 <span
+                  className="uppercase"
                   style={{
                     fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                     fontWeight: 600,
-                    fontSize: backConfig.cardLoverTextSize,
+                    fontSize: backConfig.founderTextSize,
                     color: '#ec4899',
                     writingMode: 'vertical-rl',
                     transform: 'rotate(180deg)',
                     marginTop: '3px',
-                    letterSpacing: '0.3px',
+                    letterSpacing: '0.5px',
                     WebkitFontSmoothing: 'antialiased',
                     MozOsxFontSmoothing: 'grayscale',
                     textRendering: 'optimizeLegibility',
                   } as React.CSSProperties}
                 >
-                  Card Lover
+                  Lover
                 </span>
               </div>
             )}
