@@ -215,21 +215,22 @@ export default function FoundersPage() {
                   <div className="w-full bg-gray-700 text-gray-400 font-bold py-4 px-6 rounded-xl text-center">
                     Checking status...
                   </div>
-                ) : isFounder ? (
-                  <div className="w-full bg-green-600 text-white font-bold py-4 px-6 rounded-xl text-center flex items-center justify-center gap-2">
-                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    You&apos;re a Founder!
-                  </div>
                 ) : (
                   <button
                     onClick={handlePurchase}
                     disabled={purchasing}
                     className="w-full bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-300 hover:to-orange-300 text-gray-900 font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {purchasing ? 'Processing...' : isAuthenticated ? 'Become a Founder' : 'Sign Up & Become a Founder'}
+                    {purchasing ? 'Processing...' : isFounder ? 'Buy Another 150 Credits' : isAuthenticated ? 'Become a Founder' : 'Sign Up & Become a Founder'}
                   </button>
+                )}
+                {isFounder && (
+                  <p className="text-center text-green-400 text-xs mt-2 flex items-center justify-center gap-1">
+                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    You&apos;re already a Founder!
+                  </p>
                 )}
               </div>
 
@@ -347,7 +348,7 @@ export default function FoundersPage() {
               {[
                 {
                   q: "Can I buy multiple Founders Packages?",
-                  a: "No, the Founders Package is limited to one per account. It's designed to be an exclusive benefit for our supporters."
+                  a: "Yes! You can purchase the Founders Package multiple times to stock up on credits at just $0.66 per grade — our best rate. Each purchase adds 150 credits to your account."
                 },
                 {
                   q: "Do the 150 credits expire?",
@@ -382,23 +383,21 @@ export default function FoundersPage() {
             Join us at the beginning and enjoy exclusive benefits for the lifetime of your account.
           </p>
 
-          {!isFounder && (
-            <button
-              onClick={handlePurchase}
-              disabled={purchasing || checkingFounder}
-              className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-300 hover:to-orange-300 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
-            >
-              {purchasing ? 'Processing...' : 'Get the Founders Package — $99'}
-            </button>
-          )}
+          <button
+            onClick={handlePurchase}
+            disabled={purchasing || checkingFounder}
+            className="inline-block bg-gradient-to-r from-yellow-400 to-orange-400 hover:from-yellow-300 hover:to-orange-300 text-gray-900 font-bold text-lg px-10 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50"
+          >
+            {purchasing ? 'Processing...' : isFounder ? 'Buy Another 150 Credits — $99' : 'Get the Founders Package — $99'}
+          </button>
 
           {isFounder && (
-            <div className="inline-flex items-center gap-2 bg-green-600 text-white font-bold text-lg px-10 py-4 rounded-xl">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20">
+            <p className="mt-4 text-green-400 text-sm flex items-center justify-center gap-2">
+              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
               </svg>
-              You&apos;re Already a Founder!
-            </div>
+              You&apos;re already a Founder! Purchase again to add more credits.
+            </p>
           )}
 
           <p className="mt-6 text-gray-500 text-sm">
