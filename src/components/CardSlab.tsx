@@ -54,6 +54,10 @@ export interface CardSlabProps {
 
   // Sub-scores for modern back label
   subScores?: SubScores
+
+  // Badge/emblem options (for back labels)
+  showFounderEmblem?: boolean
+  showCardLoversEmblem?: boolean
 }
 
 // Helper: Format grade for display - v6.0: Always whole numbers
@@ -86,6 +90,8 @@ export function CardSlab({
   isAlteredAuthentic = false,
   labelStyle = 'modern',
   subScores,
+  showFounderEmblem = false,
+  showCardLoversEmblem = false,
 }: CardSlabProps) {
   const isModern = labelStyle === 'modern'
   // Size configurations
@@ -272,22 +278,44 @@ export function CardSlab({
             )}
 
             {/* Founder badge - star at top, FOUNDER sideways below */}
-            <div className="flex flex-col items-center justify-start h-full py-1">
-              <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#d97706' }}>
-                ★
-              </span>
-              <span
-                className={`${backConfig.founderTextSize} font-bold`}
-                style={{
-                  color: '#7c3aed',
-                  writingMode: 'vertical-rl',
-                  transform: 'rotate(180deg)',
-                  marginTop: '2px',
-                }}
-              >
-                FOUNDER
-              </span>
-            </div>
+            {showFounderEmblem && (
+              <div className="flex flex-col items-center justify-start h-full py-1">
+                <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#d97706' }}>
+                  ★
+                </span>
+                <span
+                  className={`${backConfig.founderTextSize} font-bold`}
+                  style={{
+                    color: '#7c3aed',
+                    writingMode: 'vertical-rl',
+                    transform: 'rotate(180deg)',
+                    marginTop: '2px',
+                  }}
+                >
+                  FOUNDER
+                </span>
+              </div>
+            )}
+
+            {/* Card Lovers badge - heart at top, LOVER sideways below */}
+            {showCardLoversEmblem && !showFounderEmblem && (
+              <div className="flex flex-col items-center justify-start h-full py-1">
+                <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#f43f5e' }}>
+                  ♥
+                </span>
+                <span
+                  className={`${backConfig.founderTextSize} font-bold`}
+                  style={{
+                    color: '#ec4899',
+                    writingMode: 'vertical-rl',
+                    transform: 'rotate(180deg)',
+                    marginTop: '2px',
+                  }}
+                >
+                  LOVER
+                </span>
+              </div>
+            )}
           </div>
 
           {/* CENTER: Large Grade + Condition */}
@@ -417,6 +445,8 @@ export function CardSlab({
                   subScores={subScores}
                   isAlteredAuthentic={isAlteredAuthentic}
                   size={size}
+                  showFounderEmblem={showFounderEmblem}
+                  showCardLoversEmblem={showCardLoversEmblem}
                 />
               ) : (
                 <BackLabel />

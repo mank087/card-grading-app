@@ -276,18 +276,22 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       console.log(`[GET /api/lorcana/${cardId}] 🌐 Public card - access granted`);
     }
 
-    // ⭐ Fetch card owner's founder status (for founder emblem on card labels)
+    // ⭐ Fetch card owner's founder status and Card Lovers status (for emblems on card labels)
     let ownerIsFounder = false;
     let ownerShowFounderBadge = false;
+    let ownerIsCardLover = false;
+    let ownerShowCardLoverBadge = false;
     if (card.user_id) {
       try {
         const ownerCredits = await getUserCredits(card.user_id);
         if (ownerCredits) {
           ownerIsFounder = ownerCredits.is_founder;
           ownerShowFounderBadge = ownerCredits.show_founder_badge;
+          ownerIsCardLover = ownerCredits.is_card_lover;
+          ownerShowCardLoverBadge = ownerCredits.show_card_lover_badge;
         }
       } catch (err) {
-        console.error(`[GET /api/lorcana/${cardId}] Error fetching owner founder status:`, err);
+        console.error(`[GET /api/lorcana/${cardId}] Error fetching owner status:`, err);
       }
     }
 
@@ -520,7 +524,9 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
         back_url: backUrl,
         processing_time: card.processing_time,  // ✅ CRITICAL: Use stored value, NOT recalculated
         owner_is_founder: ownerIsFounder,
-        owner_show_founder_badge: ownerShowFounderBadge
+        owner_show_founder_badge: ownerShowFounderBadge,
+        owner_is_card_lover: ownerIsCardLover,
+        owner_show_card_lover_badge: ownerShowCardLoverBadge
       });
     }
 
@@ -1110,9 +1116,11 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       lorcana_card_id: matchedDatabaseCard?.id || null,
       lorcana_reference_image: matchedDatabaseCard?.image_normal || matchedDatabaseCard?.image_large || null,
       database_match_confidence: databaseMatchConfidence,
-      // ⭐ Card owner's founder status (for founder emblem on public card labels)
+      // ⭐ Card owner's founder/Card Lovers status (for emblems on public card labels)
       owner_is_founder: ownerIsFounder,
-      owner_show_founder_badge: ownerShowFounderBadge
+      owner_show_founder_badge: ownerShowFounderBadge,
+      owner_is_card_lover: ownerIsCardLover,
+      owner_show_card_lover_badge: ownerShowCardLoverBadge
     });
 
   } catch (error: any) {

@@ -33,6 +33,8 @@ export interface CardLabelProps {
 
   // Founder emblem (only shown on back labels when enabled)
   showFounderEmblem?: boolean
+  // Card Lovers emblem (only shown on back labels when enabled, Founder takes priority)
+  showCardLoversEmblem?: boolean
 }
 
 // Size configurations
@@ -116,6 +118,7 @@ export function CardLabel({
   variant = 'front',
   qrCodeUrl,
   showFounderEmblem = false,
+  showCardLoversEmblem = false,
 }: CardLabelProps) {
   // Get label data from props or extract from card
   const labelData = providedLabelData || (card ? getCardLabelData(card) : null)
@@ -188,6 +191,37 @@ export function CardLabel({
                 style={{ fontSize: size === 'sm' ? '7px' : size === 'md' ? '8px' : '9px' }}
               >
                 FOUNDER
+              </span>
+            </div>
+          )}
+
+          {/* Card Lovers Emblem - shown to the right of QR code (only if not a Founder) */}
+          {showCardLoversEmblem && !showFounderEmblem && (
+            <div className="flex flex-col items-center justify-center">
+              <div
+                className="bg-gradient-to-br from-rose-500 to-pink-600 rounded-full flex items-center justify-center shadow-md"
+                style={{
+                  width: size === 'sm' ? '28px' : size === 'md' ? '34px' : '40px',
+                  height: size === 'sm' ? '28px' : size === 'md' ? '34px' : '40px',
+                }}
+              >
+                <svg
+                  className="text-white"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                  style={{
+                    width: size === 'sm' ? '16px' : size === 'md' ? '20px' : '24px',
+                    height: size === 'sm' ? '16px' : size === 'md' ? '20px' : '24px',
+                  }}
+                >
+                  <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <span
+                className="text-rose-600 font-bold mt-0.5"
+                style={{ fontSize: size === 'sm' ? '7px' : size === 'md' ? '8px' : '9px' }}
+              >
+                LOVER
               </span>
             </div>
           )}

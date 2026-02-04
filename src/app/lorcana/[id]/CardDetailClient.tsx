@@ -1417,6 +1417,8 @@ export function MTGCardDetails() {
   const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
   // ⭐ Founder emblem state (for back label)
   const [showFounderEmblem, setShowFounderEmblem] = useState(false);
+  // ❤️ Card Lovers emblem state (for back label)
+  const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern');
   // 🐛 Parsing error state
@@ -1565,6 +1567,15 @@ export function MTGCardDetails() {
       setShowFounderEmblem(false);
     }
   }, [card?.owner_is_founder, card?.owner_show_founder_badge]);
+
+  // ❤️ Show Card Lovers emblem based on card OWNER's subscription status
+  useEffect(() => {
+    if (card?.owner_is_card_lover && card?.owner_show_card_lover_badge) {
+      setShowCardLoversEmblem(true);
+    } else {
+      setShowCardLoversEmblem(false);
+    }
+  }, [card?.owner_is_card_lover, card?.owner_show_card_lover_badge]);
 
   // 🎨 Fetch label style preference for the logged-in user
   useEffect(() => {
@@ -2806,6 +2817,8 @@ export function MTGCardDetails() {
                   } : undefined}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
                   size="lg"
+                  showFounderEmblem={showFounderEmblem}
+                  showCardLoversEmblem={showCardLoversEmblem}
                 />
               ) : (
                 <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] p-4">
@@ -2839,6 +2852,26 @@ export function MTGCardDetails() {
                             }}
                           >
                             FOUNDER
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Card Lovers badge - heart at top, LOVER sideways below */}
+                      {showCardLoversEmblem && !showFounderEmblem && (
+                        <div className="flex flex-col items-center justify-start h-full py-1">
+                          <span className="text-[14px] leading-none" style={{ color: '#f43f5e' }}>
+                            ♥
+                          </span>
+                          <span
+                            className="text-[8px] font-bold"
+                            style={{
+                              color: '#ec4899',
+                              writingMode: 'vertical-rl',
+                              transform: 'rotate(180deg)',
+                              marginTop: '2px',
+                            }}
+                          >
+                            LOVER
                           </span>
                         </div>
                       )}

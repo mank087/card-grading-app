@@ -17,6 +17,9 @@ interface ModernBackLabelProps {
   subScores?: SubScores
   isAlteredAuthentic?: boolean
   size?: 'sm' | 'md' | 'lg'
+  // Badge options - only show one (Founder takes priority)
+  showFounderEmblem?: boolean
+  showCardLoversEmblem?: boolean
 }
 
 // Helper: Format grade for display
@@ -71,6 +74,8 @@ export function ModernBackLabel({
   subScores,
   isAlteredAuthentic = false,
   size = 'md',
+  showFounderEmblem = false,
+  showCardLoversEmblem = false,
 }: ModernBackLabelProps) {
   const config = sizeConfig[size]
 
@@ -116,22 +121,44 @@ export function ModernBackLabel({
           )}
 
           {/* Founder badge - star at top, FOUNDER sideways below */}
-          <div className="flex flex-col items-center justify-start h-full py-1">
-            <span className={`${config.founderStarSize} leading-none`} style={{ color: '#FFD700' }}>
-              ★
-            </span>
-            <span
-              className={`${config.founderTextSize} font-bold`}
-              style={{
-                color: '#FFFFFF',
-                writingMode: 'vertical-rl',
-                transform: 'rotate(180deg)',
-                marginTop: '2px',
-              }}
-            >
-              FOUNDER
-            </span>
-          </div>
+          {showFounderEmblem && (
+            <div className="flex flex-col items-center justify-start h-full py-1">
+              <span className={`${config.founderStarSize} leading-none`} style={{ color: '#FFD700' }}>
+                ★
+              </span>
+              <span
+                className={`${config.founderTextSize} font-bold`}
+                style={{
+                  color: '#FFFFFF',
+                  writingMode: 'vertical-rl',
+                  transform: 'rotate(180deg)',
+                  marginTop: '2px',
+                }}
+              >
+                FOUNDER
+              </span>
+            </div>
+          )}
+
+          {/* Card Lovers badge - heart at top, LOVER sideways below */}
+          {showCardLoversEmblem && !showFounderEmblem && (
+            <div className="flex flex-col items-center justify-start h-full py-1">
+              <span className={`${config.founderStarSize} leading-none`} style={{ color: '#f43f5e' }}>
+                ♥
+              </span>
+              <span
+                className={`${config.founderTextSize} font-bold`}
+                style={{
+                  color: '#FFFFFF',
+                  writingMode: 'vertical-rl',
+                  transform: 'rotate(180deg)',
+                  marginTop: '2px',
+                }}
+              >
+                LOVER
+              </span>
+            </div>
+          )}
         </div>
 
         {/* CENTER: Large Grade + Condition (centered, no founding member text) */}
