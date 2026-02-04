@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { BlogPost, BlogPostsResponse } from '@/types/blog';
 
-export const revalidate = 60; // ISR: revalidate every 60 seconds
+export const dynamic = 'force-dynamic'; // Required because we use searchParams
 
 export async function GET(request: NextRequest) {
   try {
