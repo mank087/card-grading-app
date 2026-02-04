@@ -104,13 +104,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Update user's preference
+    // Update user's preference and also set the individual badge flags for backward compatibility
+    // This ensures the preference controls both the legacy toggle fields and the new unified preference
+    const showFounderBadge = preferredLabelEmblem === 'founder' || preferredLabelEmblem === 'both';
+    const showCardLoverBadge = preferredLabelEmblem === 'card_lover' || preferredLabelEmblem === 'both';
+
     const serviceClient = getServiceClient();
     const { data, error } = await serviceClient
       .from('user_credits')
-      .update({ preferred_label_emblem: preferredLabelEmblem })
+      .update({
+        preferred_label_emblem: preferredLabelEmblem,
+        show_founder_badge: showFounderBadge,
+        show_card_lover_badge: showCardLoverBadge,
+      })
       .eq('user_id', user.id)
-      .select('preferred_label_emblem')
+      .select('preferred_label_emblem, show_founder_badge, show_card_lover_badge')
       .single();
 
     if (error) {

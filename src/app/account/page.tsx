@@ -47,7 +47,6 @@ export default function AccountPage() {
   // Founder state
   const [isFounder, setIsFounder] = useState(false)
   const [showFounderBadge, setShowFounderBadge] = useState(true)
-  const [isTogglingBadge, setIsTogglingBadge] = useState(false)
 
   // Label style preference
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
@@ -359,34 +358,6 @@ export default function AccountPage() {
     }
   }
 
-  // Handle founder badge toggle
-  const handleFounderBadgeToggle = async () => {
-    setIsTogglingBadge(true)
-    try {
-      const session = getStoredSession()
-      if (!session?.access_token) {
-        return
-      }
-
-      const response = await fetch('/api/founders/toggle-badge', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ showBadge: !showFounderBadge }),
-      })
-
-      if (response.ok) {
-        setShowFounderBadge(!showFounderBadge)
-      }
-    } catch (err) {
-      console.error('Error toggling founder badge:', err)
-    } finally {
-      setIsTogglingBadge(false)
-    }
-  }
-
   // Handle label style toggle
   const handleLabelStyleToggle = async () => {
     setIsTogglingLabelStyle(true)
@@ -436,6 +407,8 @@ export default function AccountPage() {
 
       if (response.ok) {
         setPreferredLabelEmblem(newPreference)
+        // Also update the local badge states to match the preference
+        setShowFounderBadge(newPreference === 'founder' || newPreference === 'both')
       }
     } catch (err) {
       console.error('Error updating emblem preference:', err)
@@ -861,104 +834,103 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Founder Settings - Only show for founders */}
-        {isFounder && (
-          <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg shadow-md p-6 border border-yellow-200 mb-6">
+        {/* Label Emblem Preference - Show when user is a Founder OR Card Lover */}
+        {(isFounder || isCardLover) && (
+          <div className={`rounded-lg shadow-md p-6 border mb-6 ${
+            isFounder && isCardLover
+              ? 'bg-gradient-to-r from-amber-50 via-rose-50 to-purple-50 border-amber-200'
+              : isFounder
+                ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200'
+                : 'bg-gradient-to-r from-purple-50 to-rose-50 border-purple-200'
+          }`}>
             <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-              <svg className="w-6 h-6 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-              </svg>
-              Founder Settings
-            </h2>
-
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="font-medium text-gray-900">Show Founder Badge on Labels</h3>
-                <p className="text-sm text-gray-600">
-                  Display the founder emblem on your graded card labels
-                </p>
-              </div>
-              <button
-                onClick={handleFounderBadgeToggle}
-                disabled={isTogglingBadge}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 ${
-                  showFounderBadge ? 'bg-yellow-500' : 'bg-gray-300'
-                } ${isTogglingBadge ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    showFounderBadge ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-            </div>
-
-          </div>
-        )}
-
-        {/* Label Emblem Preference - Only show when user has BOTH Founder AND Card Lover */}
-        {isFounder && isCardLover && (
-          <div className="bg-gradient-to-r from-amber-50 via-rose-50 to-purple-50 rounded-lg shadow-md p-6 border border-amber-200 mb-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-              <span className="mr-2">🏷️</span>
-              Label Emblem Preference
+              {isFounder && isCardLover ? (
+                <>
+                  <span className="mr-2">🏷️</span>
+                  Label Emblem Preference
+                </>
+              ) : isFounder ? (
+                <>
+                  <svg className="w-6 h-6 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                  </svg>
+                  Founder Badge
+                </>
+              ) : (
+                <>
+                  <svg className="w-6 h-6 mr-2 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                  </svg>
+                  Card Lover Badge
+                </>
+              )}
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              You have both Founder and Card Lover status! Choose which emblem(s) to display on your graded card labels.
+              {isFounder && isCardLover
+                ? 'You have both Founder and Card Lover status! Choose which emblem(s) to display on your graded card labels.'
+                : isFounder
+                  ? 'As a Founder, you can display a special emblem on your graded card labels.'
+                  : 'As a Card Lover subscriber, you can display a special emblem on your graded card labels.'}
             </p>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {/* Both Option */}
-              <button
-                onClick={() => handleEmblemPreferenceChange('both')}
-                disabled={isUpdatingEmblemPref}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  preferredLabelEmblem === 'both'
-                    ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
-                    : 'border-gray-200 bg-white hover:border-purple-300'
-                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <div className="flex justify-center gap-1 mb-2">
-                  <span className="text-yellow-500 text-lg">★</span>
-                  <span className="text-rose-500 text-lg">♥</span>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">Both</p>
-                <p className="text-xs text-gray-500">Show both emblems</p>
-              </button>
+            <div className={`grid gap-3 ${isFounder && isCardLover ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'}`}>
+              {/* Both Option - Only show when user has both */}
+              {isFounder && isCardLover && (
+                <button
+                  onClick={() => handleEmblemPreferenceChange('both')}
+                  disabled={isUpdatingEmblemPref}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    preferredLabelEmblem === 'both'
+                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
+                      : 'border-gray-200 bg-white hover:border-purple-300'
+                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex justify-center gap-1 mb-2">
+                    <span className="text-yellow-500 text-lg">★</span>
+                    <span className="text-rose-500 text-lg">♥</span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">Both</p>
+                  <p className="text-xs text-gray-500">Show both emblems</p>
+                </button>
+              )}
 
-              {/* Founder Only */}
-              <button
-                onClick={() => handleEmblemPreferenceChange('founder')}
-                disabled={isUpdatingEmblemPref}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  preferredLabelEmblem === 'founder'
-                    ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-200'
-                    : 'border-gray-200 bg-white hover:border-yellow-300'
-                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <div className="flex justify-center mb-2">
-                  <span className="text-yellow-500 text-2xl">★</span>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">Founder</p>
-                <p className="text-xs text-gray-500">Founder only</p>
-              </button>
+              {/* Founder Only - Show when user is a founder */}
+              {isFounder && (
+                <button
+                  onClick={() => handleEmblemPreferenceChange('founder')}
+                  disabled={isUpdatingEmblemPref}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    preferredLabelEmblem === 'founder'
+                      ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-200'
+                      : 'border-gray-200 bg-white hover:border-yellow-300'
+                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex justify-center mb-2">
+                    <span className="text-yellow-500 text-2xl">★</span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">Founder</p>
+                  <p className="text-xs text-gray-500">{isCardLover ? 'Founder only' : 'Show emblem'}</p>
+                </button>
+              )}
 
-              {/* Card Lover Only */}
-              <button
-                onClick={() => handleEmblemPreferenceChange('card_lover')}
-                disabled={isUpdatingEmblemPref}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  preferredLabelEmblem === 'card_lover'
-                    ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-200'
-                    : 'border-gray-200 bg-white hover:border-rose-300'
-                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <div className="flex justify-center mb-2">
-                  <span className="text-rose-500 text-2xl">♥</span>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">Card Lover</p>
-                <p className="text-xs text-gray-500">Heart only</p>
-              </button>
+              {/* Card Lover Only - Show when user is a card lover */}
+              {isCardLover && (
+                <button
+                  onClick={() => handleEmblemPreferenceChange('card_lover')}
+                  disabled={isUpdatingEmblemPref}
+                  className={`p-4 rounded-lg border-2 transition-all ${
+                    preferredLabelEmblem === 'card_lover'
+                      ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-200'
+                      : 'border-gray-200 bg-white hover:border-rose-300'
+                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  <div className="flex justify-center mb-2">
+                    <span className="text-rose-500 text-2xl">♥</span>
+                  </div>
+                  <p className="text-sm font-semibold text-gray-900">Card Lover</p>
+                  <p className="text-xs text-gray-500">{isFounder ? 'Heart only' : 'Show emblem'}</p>
+                </button>
+              )}
 
               {/* None */}
               <button
