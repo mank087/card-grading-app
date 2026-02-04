@@ -1447,6 +1447,8 @@ export function OnePieceCardDetails() {
   const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
   // ⭐ Founder emblem state (for back label)
   const [showFounderEmblem, setShowFounderEmblem] = useState(false);
+  // ♥ Card Lovers emblem state (for back label)
+  const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern');
   // 🐛 Parsing error state
@@ -1586,15 +1588,29 @@ export function OnePieceCardDetails() {
     }
   }, []);
 
-  // ⭐ Show founder emblem based on card OWNER's founder status (not logged-in user)
-  // This allows the founder emblem to appear on public shared cards
+  // ⭐ Show founder and Card Lovers emblems based on card OWNER's status and preferences
+  // This allows emblems to appear on public shared cards
   useEffect(() => {
-    if (card?.owner_is_founder && card?.owner_show_founder_badge) {
-      setShowFounderEmblem(true);
-    } else {
+    const isFounder = card?.owner_is_founder && card?.owner_show_founder_badge;
+    const isCardLover = card?.owner_is_card_lover && card?.owner_show_card_lover_badge;
+    const preference = card?.owner_preferred_label_emblem || 'both';
+
+    // Apply emblem visibility based on owner's preference
+    if (preference === 'founder') {
+      setShowFounderEmblem(isFounder);
+      setShowCardLoversEmblem(false);
+    } else if (preference === 'card_lover') {
       setShowFounderEmblem(false);
+      setShowCardLoversEmblem(isCardLover);
+    } else if (preference === 'both') {
+      setShowFounderEmblem(isFounder);
+      setShowCardLoversEmblem(isCardLover);
+    } else {
+      // 'none'
+      setShowFounderEmblem(false);
+      setShowCardLoversEmblem(false);
     }
-  }, [card?.owner_is_founder, card?.owner_show_founder_badge]);
+  }, [card?.owner_is_founder, card?.owner_show_founder_badge, card?.owner_is_card_lover, card?.owner_show_card_lover_badge, card?.owner_preferred_label_emblem]);
 
   // 🎨 Fetch label style preference for the logged-in user
   useEffect(() => {
@@ -2870,6 +2886,30 @@ export function OnePieceCardDetails() {
                           </span>
                         </div>
                       )}
+
+                      {/* Card Lovers badge - heart at top, Card Lover sideways below */}
+                      {showCardLoversEmblem && (
+                        <div className="flex flex-col items-center justify-start h-full py-1">
+                          <span className="text-[14px] leading-none" style={{ color: '#f43f5e' }}>♥</span>
+                          <span
+                            style={{
+                              fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                              fontWeight: 600,
+                              fontSize: '8px',
+                              color: '#FFFFFF',
+                              writingMode: 'vertical-rl',
+                              transform: 'rotate(180deg)',
+                              marginTop: '3px',
+                              letterSpacing: '0.5px',
+                              WebkitFontSmoothing: 'antialiased',
+                              MozOsxFontSmoothing: 'grayscale',
+                              textRendering: 'optimizeLegibility',
+                            } as React.CSSProperties}
+                          >
+                            Card Lover
+                          </span>
+                        </div>
+                      )}
                     </div>
 
                     {/* CENTER: Large Grade + Condition */}
@@ -3163,7 +3203,7 @@ export function OnePieceCardDetails() {
                     </div>
 
                     {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="mtg" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />}
+                    {isOwner && <DownloadReportButton card={card} cardType="onepiece" showFounderEmblem={showFounderEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">

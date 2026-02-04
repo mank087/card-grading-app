@@ -278,15 +278,21 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       console.log(`[GET /api/mtg/${cardId}] 🌐 Public card - access granted`);
     }
 
-    // ⭐ Fetch card owner's founder status (for founder emblem on card labels)
+    // ⭐ Fetch card owner's founder status and Card Lovers status (for emblems on card labels)
     let ownerIsFounder = false;
     let ownerShowFounderBadge = false;
+    let ownerIsCardLover = false;
+    let ownerShowCardLoverBadge = false;
+    let ownerPreferredLabelEmblem: string = 'both';
     if (card.user_id) {
       try {
         const ownerCredits = await getUserCredits(card.user_id);
         if (ownerCredits) {
           ownerIsFounder = ownerCredits.is_founder;
           ownerShowFounderBadge = ownerCredits.show_founder_badge;
+          ownerIsCardLover = ownerCredits.is_card_lover;
+          ownerShowCardLoverBadge = ownerCredits.show_card_lover_badge;
+          ownerPreferredLabelEmblem = ownerCredits.preferred_label_emblem || 'both';
         }
       } catch (err) {
         console.error(`[GET /api/mtg/${cardId}] Error fetching owner founder status:`, err);
@@ -536,9 +542,12 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         front_url: frontUrl,
         back_url: backUrl,
         processing_time: card.processing_time,  // Use stored value, not recalculated
-        // ⭐ Card owner's founder status (for founder emblem on public card labels)
+        // ⭐ Card owner's founder/Card Lovers status (for emblems on public card labels)
         owner_is_founder: ownerIsFounder,
-        owner_show_founder_badge: ownerShowFounderBadge
+        owner_show_founder_badge: ownerShowFounderBadge,
+        owner_is_card_lover: ownerIsCardLover,
+        owner_show_card_lover_badge: ownerShowCardLoverBadge,
+        owner_preferred_label_emblem: ownerPreferredLabelEmblem
       });
     }
 
@@ -1263,9 +1272,12 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       // 🃏 Scryfall API verification results
       mtg_api_verification: mtgApiVerification || null,
       mtg_api_verified: mtgApiVerification?.verified === true,
-      // ⭐ Card owner's founder status (for founder emblem on public card labels)
+      // ⭐ Card owner's founder/Card Lovers status (for emblems on public card labels)
       owner_is_founder: ownerIsFounder,
-      owner_show_founder_badge: ownerShowFounderBadge
+      owner_show_founder_badge: ownerShowFounderBadge,
+      owner_is_card_lover: ownerIsCardLover,
+      owner_show_card_lover_badge: ownerShowCardLoverBadge,
+      owner_preferred_label_emblem: ownerPreferredLabelEmblem
     });
 
   } catch (error: any) {
