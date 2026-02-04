@@ -41,8 +41,9 @@ const sizeConfig = {
     gradeSize: 'text-2xl',
     conditionSize: 'text-[8px]',
     subScoreSize: 'text-[8px]',
-    founderStarSize: 'text-[10px]',
-    founderTextSize: 'text-[6px]',
+    founderStarSize: 'text-[12px]',
+    founderTextSize: '7px',
+    cardLoverTextSize: '6px',
   },
   md: {
     height: 'h-[80px]',
@@ -51,8 +52,9 @@ const sizeConfig = {
     gradeSize: 'text-3xl',
     conditionSize: 'text-[9px]',
     subScoreSize: 'text-[9px]',
-    founderStarSize: 'text-[12px]',
-    founderTextSize: 'text-[7px]',
+    founderStarSize: 'text-[14px]',
+    founderTextSize: '8px',
+    cardLoverTextSize: '7px',
   },
   lg: {
     height: 'h-[90px]',
@@ -61,8 +63,9 @@ const sizeConfig = {
     gradeSize: 'text-4xl',
     conditionSize: 'text-[10px]',
     subScoreSize: 'text-[10px]',
-    founderStarSize: 'text-[14px]',
-    founderTextSize: 'text-[8px]',
+    founderStarSize: 'text-[16px]',
+    founderTextSize: '9px',
+    cardLoverTextSize: '8px',
   },
 }
 
@@ -120,22 +123,24 @@ export function ModernBackLabel({
             </div>
           )}
 
-          {/* Founder badge - star at top, FOUNDER sideways below */}
+          {/* Founder badge - star at top, Founder sideways below */}
           {showFounderEmblem && (
             <div className="flex flex-col items-center justify-start h-full py-1">
               <span className={`${config.founderStarSize} leading-none`} style={{ color: '#FFD700' }}>
                 ★
               </span>
               <span
-                className={`${config.founderTextSize} font-bold`}
+                className="font-semibold uppercase"
                 style={{
+                  fontSize: config.founderTextSize,
                   color: '#FFFFFF',
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
-                  marginTop: '2px',
+                  marginTop: '3px',
+                  letterSpacing: '0.5px',
                 }}
               >
-                FOUNDER
+                Founder
               </span>
             </div>
           )}
@@ -147,12 +152,14 @@ export function ModernBackLabel({
                 ♥
               </span>
               <span
-                className={`${config.founderTextSize} font-bold`}
+                className="font-semibold"
                 style={{
+                  fontSize: config.cardLoverTextSize,
                   color: '#FFFFFF',
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
-                  marginTop: '2px',
+                  marginTop: '3px',
+                  letterSpacing: '0.3px',
                 }}
               >
                 Card Lover

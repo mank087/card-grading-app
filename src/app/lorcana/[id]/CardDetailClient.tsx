@@ -2849,19 +2849,21 @@ export function MTGCardDetails() {
                       {/* Founder badge - star at top, FOUNDER sideways below */}
                       {showFounderEmblem && (
                         <div className="flex flex-col items-center justify-start h-full py-1">
-                          <span className="text-[14px] leading-none" style={{ color: '#d97706' }}>
+                          <span className="text-[16px] leading-none" style={{ color: '#d97706' }}>
                             ★
                           </span>
                           <span
-                            className="text-[8px] font-bold"
+                            className="font-semibold uppercase tracking-wider"
                             style={{
+                              fontSize: '9px',
                               color: '#7c3aed',
                               writingMode: 'vertical-rl',
                               transform: 'rotate(180deg)',
-                              marginTop: '2px',
+                              marginTop: '3px',
+                              letterSpacing: '0.5px',
                             }}
                           >
-                            FOUNDER
+                            Founder
                           </span>
                         </div>
                       )}
@@ -2869,16 +2871,18 @@ export function MTGCardDetails() {
                       {/* Card Lovers badge - heart at top, Card Lover sideways below */}
                       {showCardLoversEmblem && (
                         <div className="flex flex-col items-center justify-start h-full py-1">
-                          <span className="text-[14px] leading-none" style={{ color: '#f43f5e' }}>
+                          <span className="text-[16px] leading-none" style={{ color: '#f43f5e' }}>
                             ♥
                           </span>
                           <span
-                            className="text-[7px] font-bold"
+                            className="font-semibold tracking-wide"
                             style={{
+                              fontSize: '8px',
                               color: '#ec4899',
                               writingMode: 'vertical-rl',
                               transform: 'rotate(180deg)',
-                              marginTop: '2px',
+                              marginTop: '3px',
+                              letterSpacing: '0.3px',
                             }}
                           >
                             Card Lover

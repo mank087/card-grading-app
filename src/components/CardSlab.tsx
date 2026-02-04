@@ -251,9 +251,9 @@ export function CardSlab({
   const BackLabel = () => {
     // Size-specific configurations for back label elements
     const backLabelConfig = {
-      sm: { gradeSize: 'text-2xl', conditionSize: 'text-[8px]', subScoreSize: 'text-[8px]', founderStarSize: 'text-[10px]', founderTextSize: 'text-[6px]' },
-      md: { gradeSize: 'text-3xl', conditionSize: 'text-[9px]', subScoreSize: 'text-[9px]', founderStarSize: 'text-[12px]', founderTextSize: 'text-[7px]' },
-      lg: { gradeSize: 'text-4xl', conditionSize: 'text-[10px]', subScoreSize: 'text-[10px]', founderStarSize: 'text-[14px]', founderTextSize: 'text-[8px]' },
+      sm: { gradeSize: 'text-2xl', conditionSize: 'text-[8px]', subScoreSize: 'text-[8px]', founderStarSize: 'text-[12px]', founderTextSize: '7px', cardLoverTextSize: '6px' },
+      md: { gradeSize: 'text-3xl', conditionSize: 'text-[9px]', subScoreSize: 'text-[9px]', founderStarSize: 'text-[14px]', founderTextSize: '8px', cardLoverTextSize: '7px' },
+      lg: { gradeSize: 'text-4xl', conditionSize: 'text-[10px]', subScoreSize: 'text-[10px]', founderStarSize: 'text-[16px]', founderTextSize: '9px', cardLoverTextSize: '8px' },
     }
     const backConfig = backLabelConfig[size]
 
@@ -277,22 +277,24 @@ export function CardSlab({
               <div className="text-gray-400 text-sm">Back</div>
             )}
 
-            {/* Founder badge - star at top, FOUNDER sideways below */}
+            {/* Founder badge - star at top, Founder sideways below */}
             {showFounderEmblem && (
               <div className="flex flex-col items-center justify-start h-full py-1">
                 <span className={`${backConfig.founderStarSize} leading-none`} style={{ color: '#d97706' }}>
                   ★
                 </span>
                 <span
-                  className={`${backConfig.founderTextSize} font-bold`}
+                  className="font-semibold uppercase"
                   style={{
+                    fontSize: backConfig.founderTextSize,
                     color: '#7c3aed',
                     writingMode: 'vertical-rl',
                     transform: 'rotate(180deg)',
-                    marginTop: '2px',
+                    marginTop: '3px',
+                    letterSpacing: '0.5px',
                   }}
                 >
-                  FOUNDER
+                  Founder
                 </span>
               </div>
             )}
@@ -304,12 +306,14 @@ export function CardSlab({
                   ♥
                 </span>
                 <span
-                  className={`${backConfig.founderTextSize} font-bold`}
+                  className="font-semibold"
                   style={{
+                    fontSize: backConfig.cardLoverTextSize,
                     color: '#ec4899',
                     writingMode: 'vertical-rl',
                     transform: 'rotate(180deg)',
-                    marginTop: '2px',
+                    marginTop: '3px',
+                    letterSpacing: '0.3px',
                   }}
                 >
                   Card Lover
