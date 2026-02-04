@@ -3182,7 +3182,7 @@ export function MTGCardDetails() {
                     </div>
 
                     {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="lorcana" showFounderEmblem={showFounderEmblem} labelStyle={labelStyle} />}
+                    {isOwner && <DownloadReportButton card={card} cardType="lorcana" showFounderEmblem={showFounderEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">

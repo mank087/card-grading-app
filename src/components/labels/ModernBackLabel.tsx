@@ -130,15 +130,20 @@ export function ModernBackLabel({
                 ★
               </span>
               <span
-                className="font-semibold uppercase"
+                className="uppercase"
                 style={{
+                  fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                  fontWeight: 600,
                   fontSize: config.founderTextSize,
                   color: '#FFFFFF',
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
                   marginTop: '3px',
                   letterSpacing: '0.5px',
-                }}
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  textRendering: 'optimizeLegibility',
+                } as React.CSSProperties}
               >
                 Founder
               </span>
@@ -152,15 +157,19 @@ export function ModernBackLabel({
                 ♥
               </span>
               <span
-                className="font-semibold"
                 style={{
+                  fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                  fontWeight: 600,
                   fontSize: config.cardLoverTextSize,
                   color: '#FFFFFF',
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
                   marginTop: '3px',
                   letterSpacing: '0.3px',
-                }}
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  textRendering: 'optimizeLegibility',
+                } as React.CSSProperties}
               >
                 Card Lover
               </span>

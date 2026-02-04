@@ -187,8 +187,15 @@ export function CardLabel({
                 </svg>
               </div>
               <span
-                className="text-yellow-600 font-bold mt-0.5"
-                style={{ fontSize: size === 'sm' ? '7px' : size === 'md' ? '8px' : '9px' }}
+                className="text-yellow-600 mt-0.5"
+                style={{
+                  fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                  fontWeight: 700,
+                  fontSize: size === 'sm' ? '7px' : size === 'md' ? '8px' : '9px',
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  textRendering: 'optimizeLegibility',
+                } as React.CSSProperties}
               >
                 FOUNDER
               </span>
@@ -218,8 +225,15 @@ export function CardLabel({
                 </svg>
               </div>
               <span
-                className="text-rose-600 font-bold mt-0.5"
-                style={{ fontSize: size === 'sm' ? '6px' : size === 'md' ? '7px' : '8px' }}
+                className="text-rose-600 mt-0.5"
+                style={{
+                  fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                  fontWeight: 700,
+                  fontSize: size === 'sm' ? '6px' : size === 'md' ? '7px' : '8px',
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  textRendering: 'optimizeLegibility',
+                } as React.CSSProperties}
               >
                 Card Lover
               </span>

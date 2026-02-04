@@ -91,6 +91,8 @@ export interface CardImageData {
   englishName?: string;
   // Founder emblem - shown on back label when user is a founder with badge enabled
   showFounderEmblem?: boolean;
+  // Card Lovers emblem - shown on back label when user is a Card Lover with badge enabled
+  showCardLoversEmblem?: boolean;
   // Label style preference
   labelStyle?: 'modern' | 'traditional';
   // Sub-scores for modern back label
@@ -382,9 +384,12 @@ async function drawBackLabel(
     ctx.strokeRect(qrX, qrY, qrSize, qrSize);
   }
 
+  // Calculate badge position (both badges shown side by side if both enabled)
+  let badgeXOffset = qrX + qrSize + 20;
+
   // Founder badge - star at top, FOUNDER text rotated below (compact style)
   if (data.showFounderEmblem) {
-    const founderX = qrX + qrSize + 20;
+    const founderX = badgeXOffset;
     const founderStartY = qrY + 8;
 
     // Gold/amber star at top
@@ -404,6 +409,34 @@ async function drawBackLabel(
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText('FOUNDER', 0, 0);
+
+    ctx.restore();
+
+    badgeXOffset += 30; // Move next badge to the right
+  }
+
+  // Card Lovers badge - heart at top, "Card Lover" text rotated below
+  if (data.showCardLoversEmblem) {
+    const cardLoverX = badgeXOffset;
+    const cardLoverStartY = qrY + 8;
+
+    // Rose/pink heart at top
+    ctx.fillStyle = '#f43f5e'; // rose-500
+    ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('\u2665', cardLoverX, cardLoverStartY);
+
+    // "Card Lover" text rotated -90 degrees below heart
+    ctx.save();
+    ctx.translate(cardLoverX, cardLoverStartY + 32);
+    ctx.rotate(-Math.PI / 2);
+
+    ctx.fillStyle = '#f43f5e'; // rose-500
+    ctx.font = 'bold 12px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Card Lover', 0, 0);
 
     ctx.restore();
   }
@@ -762,29 +795,62 @@ async function drawModernBackLabel(
     ctx.strokeRect(qrX, qrY, qrSize, qrSize);
   }
 
-  // "Founder" badge - star at top, FOUNDER sideways below it
-  const founderX = qrX + qrSize + qrPadding + 18;
-  const founderStartY = qrY + 8; // Align near top of QR
+  // Calculate badge position (both badges shown side by side if both enabled)
+  let badgeXOffset = qrX + qrSize + qrPadding + 18;
 
-  // Gold star at top (not rotated)
-  ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText('\u2605', founderX, founderStartY);
+  // Founder badge - star at top, FOUNDER sideways below it
+  if (data.showFounderEmblem) {
+    const founderX = badgeXOffset;
+    const founderStartY = qrY + 8; // Align near top of QR
 
-  // "FOUNDER" text rotated -90 degrees below star (matches card details page)
-  ctx.save();
-  ctx.translate(founderX, founderStartY + 32);
-  ctx.rotate(-Math.PI / 2); // Rotate -90 degrees (counterclockwise)
+    // Gold star at top (not rotated)
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('\u2605', founderX, founderStartY);
 
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('FOUNDER', 0, 0);
+    // "FOUNDER" text rotated -90 degrees below star (matches card details page)
+    ctx.save();
+    ctx.translate(founderX, founderStartY + 32);
+    ctx.rotate(-Math.PI / 2); // Rotate -90 degrees (counterclockwise)
 
-  ctx.restore();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('FOUNDER', 0, 0);
+
+    ctx.restore();
+
+    badgeXOffset += 30; // Move next badge to the right
+  }
+
+  // Card Lovers badge - heart at top, "Card Lover" sideways below it
+  if (data.showCardLoversEmblem) {
+    const cardLoverX = badgeXOffset;
+    const cardLoverStartY = qrY + 8; // Align near top of QR
+
+    // Rose/pink heart at top (not rotated)
+    ctx.fillStyle = '#f43f5e'; // rose-500
+    ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('\u2665', cardLoverX, cardLoverStartY);
+
+    // "Card Lover" text rotated -90 degrees below heart
+    ctx.save();
+    ctx.translate(cardLoverX, cardLoverStartY + 32);
+    ctx.rotate(-Math.PI / 2); // Rotate -90 degrees (counterclockwise)
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 12px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Card Lover', 0, 0);
+
+    ctx.restore();
+  }
 
   // CENTER: Large Grade + Condition (re-centered, no founding member text)
   const centerX = labelX + labelWidth / 2;

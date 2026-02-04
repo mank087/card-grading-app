@@ -284,15 +284,20 @@ export function CardSlab({
                   ★
                 </span>
                 <span
-                  className="font-semibold uppercase"
+                  className="uppercase"
                   style={{
+                    fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                    fontWeight: 600,
                     fontSize: backConfig.founderTextSize,
                     color: '#7c3aed',
                     writingMode: 'vertical-rl',
                     transform: 'rotate(180deg)',
                     marginTop: '3px',
                     letterSpacing: '0.5px',
-                  }}
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale',
+                    textRendering: 'optimizeLegibility',
+                  } as React.CSSProperties}
                 >
                   Founder
                 </span>
@@ -306,15 +311,19 @@ export function CardSlab({
                   ♥
                 </span>
                 <span
-                  className="font-semibold"
                   style={{
+                    fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                    fontWeight: 600,
                     fontSize: backConfig.cardLoverTextSize,
                     color: '#ec4899',
                     writingMode: 'vertical-rl',
                     transform: 'rotate(180deg)',
                     marginTop: '3px',
                     letterSpacing: '0.3px',
-                  }}
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale',
+                    textRendering: 'optimizeLegibility',
+                  } as React.CSSProperties}
                 >
                   Card Lover
                 </span>
