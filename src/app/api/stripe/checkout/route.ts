@@ -4,8 +4,9 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, STRIPE_PRICES, StripePriceTier } from '@/lib/stripe';
-import { getUserCredits, isFirstPurchase } from '@/lib/credits';
+import Stripe from 'stripe';
+import { stripe, STRIPE_PRICES, StripePriceTier, CARD_LOVERS_DISCOUNT } from '@/lib/stripe';
+import { getUserCredits, isFirstPurchase, isActiveCardLover } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
 import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
 
@@ -68,6 +69,9 @@ export async function POST(request: NextRequest) {
     // Check if this is first purchase (for bonus credit) - not applicable to founders
     const firstPurchase = isFoundersPackage ? false : await isFirstPurchase(userId);
 
+    // Check if user is an active Card Lover (for 20% discount on non-founders packages)
+    const hasCardLoverDiscount = !isFoundersPackage && await isActiveCardLover(userId);
+
     // Get or create user credits record to get Stripe customer ID
     const userCredits = await getUserCredits(userId);
     let stripeCustomerId = userCredits?.stripe_customer_id;
@@ -106,7 +110,7 @@ export async function POST(request: NextRequest) {
       : `${origin}/credits?canceled=true`;
 
     // Build checkout session options
-    const checkoutOptions: Parameters<typeof stripe.checkout.sessions.create>[0] = {
+    const checkoutOptions: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       mode: 'payment',
@@ -133,13 +137,33 @@ export async function POST(request: NextRequest) {
       },
     };
 
-    // Standard pricing
-    checkoutOptions.line_items = [
-      {
-        price: priceConfig.priceId,
-        quantity: 1,
-      },
-    ];
+    // Apply Card Lovers 20% discount using custom pricing, or use standard price
+    if (hasCardLoverDiscount) {
+      // Calculate discounted price in cents (Stripe uses smallest currency unit)
+      const discountedPriceCents = Math.round(priceConfig.price * (1 - CARD_LOVERS_DISCOUNT) * 100);
+
+      checkoutOptions.line_items = [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: {
+              name: `${priceConfig.name} (Card Lovers 20% Off)`,
+              description: priceConfig.description,
+            },
+            unit_amount: discountedPriceCents,
+          },
+          quantity: 1,
+        },
+      ];
+    } else {
+      // Standard pricing
+      checkoutOptions.line_items = [
+        {
+          price: priceConfig.priceId,
+          quantity: 1,
+        },
+      ];
+    }
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create(checkoutOptions);
@@ -149,6 +173,11 @@ export async function POST(request: NextRequest) {
       ? priceConfig.credits + bonusCredits
       : priceConfig.credits;
 
+    // Calculate discounted price if applicable
+    const discountedPrice = hasCardLoverDiscount
+      ? priceConfig.price * (1 - CARD_LOVERS_DISCOUNT)
+      : priceConfig.price;
+
     return NextResponse.json({
       sessionId: session.id,
       url: session.url,
@@ -157,6 +186,8 @@ export async function POST(request: NextRequest) {
       bonusCredits: firstPurchase ? bonusCredits : 0,
       totalCredits: creditsToReceive,
       price: priceConfig.price,
+      discountedPrice: hasCardLoverDiscount ? discountedPrice : undefined,
+      hasCardLoverDiscount,
       isFoundersPackage: isFoundersPackage,
     });
   } catch (error: any) {

@@ -8,7 +8,7 @@ import Stripe from 'stripe';
 // Using SDK default API version (v20 uses 2025-09-30.clover)
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
-// Price configuration
+// One-time purchase price configuration
 export const STRIPE_PRICES = {
   basic: {
     priceId: process.env.STRIPE_PRICE_BASIC!,
@@ -41,6 +41,41 @@ export const STRIPE_PRICES = {
 } as const;
 
 export type StripePriceTier = keyof typeof STRIPE_PRICES;
+
+// Card Lovers subscription configuration
+export const CARD_LOVERS_SUBSCRIPTION = {
+  monthly: {
+    priceId: process.env.STRIPE_PRICE_CARD_LOVERS_MONTHLY!,
+    credits: 70,
+    price: 49.99,
+    interval: 'month' as const,
+    name: 'Card Lovers Monthly',
+    description: '70 credits/month + exclusive perks',
+  },
+  annual: {
+    priceId: process.env.STRIPE_PRICE_CARD_LOVERS_ANNUAL!,
+    credits: 840, // Base credits (70 x 12)
+    bonusCredits: 60, // Annual bonus
+    totalCredits: 900, // 840 + 60
+    price: 449,
+    interval: 'year' as const,
+    name: 'Card Lovers Annual',
+    description: '900 credits/year + exclusive perks (save $150)',
+  },
+} as const;
+
+export type CardLoversPlan = keyof typeof CARD_LOVERS_SUBSCRIPTION;
+
+// Loyalty bonus milestones for monthly subscribers
+export const CARD_LOVERS_LOYALTY_BONUSES: Record<number, number> = {
+  3: 5,   // Month 3: +5 credits
+  6: 10,  // Month 6: +10 credits
+  9: 15,  // Month 9: +15 credits
+  12: 20, // Month 12: +20 credits
+};
+
+// Card Lovers discount on credit purchases (20%)
+export const CARD_LOVERS_DISCOUNT = 0.20;
 
 // Get credits for a price ID
 export function getCreditsForPrice(priceId: string): number {

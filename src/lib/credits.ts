@@ -24,6 +24,15 @@ export interface UserCredits {
   is_founder: boolean;
   founder_purchased_at: string | null;
   show_founder_badge: boolean;
+  // Card Lovers subscription fields
+  is_card_lover: boolean;
+  card_lover_subscribed_at: string | null;
+  card_lover_current_period_end: string | null;
+  card_lover_subscription_id: string | null;
+  card_lover_plan: 'monthly' | 'annual' | null;
+  card_lover_months_active: number;
+  show_card_lover_badge: boolean;
+  preferred_label_emblem: 'founder' | 'card_lover' | 'none' | 'auto';
   created_at: string;
   updated_at: string;
 }
@@ -413,5 +422,445 @@ export async function toggleFounderBadge(
   }
 
   return { success: true };
+}
+
+// ============================================
+// CARD LOVERS SUBSCRIPTION FUNCTIONS
+// ============================================
+
+/**
+ * Check if user has an active Card Lovers subscription
+ */
+export async function isActiveCardLover(userId: string): Promise<boolean> {
+  const credits = await getUserCredits(userId);
+  if (!credits || !credits.is_card_lover) return false;
+
+  // Check if subscription is still active (period end is in the future)
+  if (!credits.card_lover_current_period_end) return false;
+  return new Date(credits.card_lover_current_period_end) > new Date();
+}
+
+/**
+ * Get Card Lovers subscription status
+ */
+export async function getCardLoverStatus(userId: string): Promise<{
+  isActive: boolean;
+  plan: 'monthly' | 'annual' | null;
+  monthsActive: number;
+  currentPeriodEnd: Date | null;
+  subscriptionId: string | null;
+}> {
+  const credits = await getUserCredits(userId);
+
+  if (!credits) {
+    return {
+      isActive: false,
+      plan: null,
+      monthsActive: 0,
+      currentPeriodEnd: null,
+      subscriptionId: null,
+    };
+  }
+
+  const isActive = credits.is_card_lover &&
+    credits.card_lover_current_period_end &&
+    new Date(credits.card_lover_current_period_end) > new Date();
+
+  return {
+    isActive,
+    plan: credits.card_lover_plan,
+    monthsActive: credits.card_lover_months_active,
+    currentPeriodEnd: credits.card_lover_current_period_end
+      ? new Date(credits.card_lover_current_period_end)
+      : null,
+    subscriptionId: credits.card_lover_subscription_id,
+  };
+}
+
+/**
+ * Activate Card Lovers subscription (called after initial subscription checkout)
+ */
+export async function activateCardLoverSubscription(
+  userId: string,
+  options: {
+    plan: 'monthly' | 'annual';
+    subscriptionId: string;
+    currentPeriodEnd: Date;
+    stripeInvoiceId?: string;
+  }
+): Promise<{ success: boolean; creditsAdded: number; error?: string }> {
+  const supabase = getServiceClient();
+
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { success: false, creditsAdded: 0, error: 'User credits not found' };
+  }
+
+  // Calculate credits to add
+  let creditsToAdd = 70; // Monthly base
+  let bonusCredits = 0;
+
+  if (options.plan === 'annual') {
+    creditsToAdd = 840; // 70 x 12
+    bonusCredits = 60; // Annual bonus
+  }
+
+  const totalCredits = creditsToAdd + bonusCredits;
+  const newBalance = credits.balance + totalCredits;
+
+  // Update user_credits
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update({
+      is_card_lover: true,
+      card_lover_subscribed_at: new Date().toISOString(),
+      card_lover_current_period_end: options.currentPeriodEnd.toISOString(),
+      card_lover_subscription_id: options.subscriptionId,
+      card_lover_plan: options.plan,
+      card_lover_months_active: options.plan === 'annual' ? 12 : 1,
+      show_card_lover_badge: true,
+      balance: newBalance,
+      total_purchased: credits.total_purchased + totalCredits,
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('Error activating Card Lovers subscription:', updateError);
+    return { success: false, creditsAdded: 0, error: 'Database error' };
+  }
+
+  // Record subscription event
+  await supabase.from('subscription_events').insert({
+    user_id: userId,
+    event_type: 'subscribed',
+    plan: options.plan,
+    credits_added: creditsToAdd,
+    bonus_credits: bonusCredits,
+    stripe_subscription_id: options.subscriptionId,
+    stripe_invoice_id: options.stripeInvoiceId,
+    metadata: { initial_subscription: true },
+  });
+
+  // Record credit transaction
+  await supabase.from('credit_transactions').insert({
+    user_id: userId,
+    type: 'purchase',
+    amount: totalCredits,
+    balance_after: newBalance,
+    description: options.plan === 'annual'
+      ? 'Card Lovers Annual - 900 credits (840 + 60 bonus)'
+      : 'Card Lovers Monthly - 70 credits',
+    metadata: {
+      subscription: 'card_lovers',
+      plan: options.plan,
+      base_credits: creditsToAdd,
+      bonus_credits: bonusCredits,
+    },
+  });
+
+  return { success: true, creditsAdded: totalCredits };
+}
+
+/**
+ * Process Card Lovers subscription renewal (called by webhook on invoice.paid)
+ */
+export async function processCardLoverRenewal(
+  userId: string,
+  options: {
+    stripeInvoiceId: string;
+    subscriptionId: string;
+    currentPeriodEnd: Date;
+  }
+): Promise<{ success: boolean; creditsAdded: number; bonusCredits: number; error?: string }> {
+  const supabase = getServiceClient();
+
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { success: false, creditsAdded: 0, bonusCredits: 0, error: 'User credits not found' };
+  }
+
+  // Only process for monthly subscriptions - annual doesn't renew monthly
+  if (credits.card_lover_plan !== 'monthly') {
+    // For annual, just update the period end
+    await supabase
+      .from('user_credits')
+      .update({
+        card_lover_current_period_end: options.currentPeriodEnd.toISOString(),
+        card_lover_months_active: 12, // Reset to 12 for annual renewal
+      })
+      .eq('user_id', userId);
+
+    return { success: true, creditsAdded: 0, bonusCredits: 0 };
+  }
+
+  const creditsToAdd = 70;
+  const newMonthsActive = credits.card_lover_months_active + 1;
+
+  // Check for loyalty bonus
+  const loyaltyBonuses: Record<number, number> = { 3: 5, 6: 10, 9: 15, 12: 20 };
+  const bonusCredits = loyaltyBonuses[newMonthsActive] || 0;
+
+  const totalCredits = creditsToAdd + bonusCredits;
+  const newBalance = credits.balance + totalCredits;
+
+  // Update user_credits
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update({
+      card_lover_current_period_end: options.currentPeriodEnd.toISOString(),
+      card_lover_months_active: newMonthsActive,
+      balance: newBalance,
+      total_purchased: credits.total_purchased + totalCredits,
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('Error processing Card Lovers renewal:', updateError);
+    return { success: false, creditsAdded: 0, bonusCredits: 0, error: 'Database error' };
+  }
+
+  // Record subscription event
+  await supabase.from('subscription_events').insert({
+    user_id: userId,
+    event_type: 'renewed',
+    plan: 'monthly',
+    credits_added: creditsToAdd,
+    bonus_credits: bonusCredits,
+    stripe_subscription_id: options.subscriptionId,
+    stripe_invoice_id: options.stripeInvoiceId,
+    metadata: { months_active: newMonthsActive },
+  });
+
+  // Record credit transaction
+  await supabase.from('credit_transactions').insert({
+    user_id: userId,
+    type: 'purchase',
+    amount: totalCredits,
+    balance_after: newBalance,
+    description: bonusCredits > 0
+      ? `Card Lovers Monthly - 70 credits + ${bonusCredits} loyalty bonus (Month ${newMonthsActive})`
+      : `Card Lovers Monthly - 70 credits (Month ${newMonthsActive})`,
+    metadata: {
+      subscription: 'card_lovers',
+      plan: 'monthly',
+      months_active: newMonthsActive,
+      loyalty_bonus: bonusCredits,
+    },
+  });
+
+  // Record loyalty bonus separately if applicable
+  if (bonusCredits > 0) {
+    await supabase.from('subscription_events').insert({
+      user_id: userId,
+      event_type: 'loyalty_bonus',
+      plan: 'monthly',
+      credits_added: 0,
+      bonus_credits: bonusCredits,
+      stripe_subscription_id: options.subscriptionId,
+      metadata: { milestone_month: newMonthsActive },
+    });
+  }
+
+  return { success: true, creditsAdded: creditsToAdd, bonusCredits };
+}
+
+/**
+ * Cancel Card Lovers subscription (called by webhook on subscription.deleted)
+ */
+export async function cancelCardLoverSubscription(
+  userId: string,
+  options: {
+    subscriptionId: string;
+  } = { subscriptionId: '' }
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { success: false, error: 'User credits not found' };
+  }
+
+  // Update user_credits - set is_card_lover to false but keep credits
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update({
+      is_card_lover: false,
+      card_lover_months_active: 0, // Reset loyalty progress
+      // Keep other fields for historical reference
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('Error cancelling Card Lovers subscription:', updateError);
+    return { success: false, error: 'Database error' };
+  }
+
+  // Record subscription event
+  await supabase.from('subscription_events').insert({
+    user_id: userId,
+    event_type: 'cancelled',
+    plan: credits.card_lover_plan,
+    credits_added: 0,
+    bonus_credits: 0,
+    stripe_subscription_id: options.subscriptionId,
+    metadata: {
+      months_active_at_cancel: credits.card_lover_months_active,
+      credits_retained: credits.balance,
+    },
+  });
+
+  return { success: true };
+}
+
+/**
+ * Upgrade Card Lovers subscription from monthly to annual
+ */
+export async function upgradeCardLoverToAnnual(
+  userId: string,
+  options: {
+    subscriptionId: string;
+    currentPeriodEnd: Date;
+    creditsAlreadyGivenThisCycle: number;
+    stripeInvoiceId?: string;
+  }
+): Promise<{ success: boolean; creditsAdded: number; error?: string }> {
+  const supabase = getServiceClient();
+
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { success: false, creditsAdded: 0, error: 'User credits not found' };
+  }
+
+  // Calculate credits to add: annual total minus what they already received
+  const annualTotal = 840 + 60; // 900 total
+  const creditsToAdd = annualTotal - options.creditsAlreadyGivenThisCycle;
+  const newBalance = credits.balance + creditsToAdd;
+
+  // Update user_credits
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update({
+      card_lover_plan: 'annual',
+      card_lover_current_period_end: options.currentPeriodEnd.toISOString(),
+      card_lover_subscription_id: options.subscriptionId,
+      card_lover_months_active: 12, // Set to 12 for annual
+      balance: newBalance,
+      total_purchased: credits.total_purchased + creditsToAdd,
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('Error upgrading Card Lovers subscription:', updateError);
+    return { success: false, creditsAdded: 0, error: 'Database error' };
+  }
+
+  // Record subscription event
+  await supabase.from('subscription_events').insert({
+    user_id: userId,
+    event_type: 'upgraded',
+    plan: 'annual',
+    credits_added: creditsToAdd,
+    bonus_credits: 60,
+    stripe_subscription_id: options.subscriptionId,
+    stripe_invoice_id: options.stripeInvoiceId,
+    metadata: {
+      upgraded_from: 'monthly',
+      credits_already_received: options.creditsAlreadyGivenThisCycle,
+    },
+  });
+
+  // Record credit transaction
+  await supabase.from('credit_transactions').insert({
+    user_id: userId,
+    type: 'purchase',
+    amount: creditsToAdd,
+    balance_after: newBalance,
+    description: `Card Lovers Upgrade to Annual - ${creditsToAdd} credits (prorated)`,
+    metadata: {
+      subscription: 'card_lovers',
+      plan: 'annual',
+      upgrade: true,
+      prorated_credits: creditsToAdd,
+    },
+  });
+
+  return { success: true, creditsAdded };
+}
+
+/**
+ * Toggle Card Lovers badge visibility
+ */
+export async function toggleCardLoverBadge(
+  userId: string,
+  showBadge: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  const { error } = await supabase
+    .from('user_credits')
+    .update({ show_card_lover_badge: showBadge })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error toggling Card Lover badge:', error);
+    return { success: false, error: 'Database error' };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Update preferred label emblem
+ */
+export async function updateLabelEmblemPreference(
+  userId: string,
+  preference: 'founder' | 'card_lover' | 'none' | 'auto'
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  const { error } = await supabase
+    .from('user_credits')
+    .update({ preferred_label_emblem: preference })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error updating label emblem preference:', error);
+    return { success: false, error: 'Database error' };
+  }
+
+  return { success: true };
+}
+
+/**
+ * Get the emblem to display on labels based on user preferences
+ */
+export async function getLabelEmblem(userId: string): Promise<'founder' | 'card_lover' | null> {
+  const credits = await getUserCredits(userId);
+  if (!credits) return null;
+
+  const preference = credits.preferred_label_emblem || 'auto';
+  const isActiveSubscriber = credits.is_card_lover &&
+    credits.card_lover_current_period_end &&
+    new Date(credits.card_lover_current_period_end) > new Date();
+
+  if (preference === 'none') return null;
+  if (preference === 'founder' && credits.is_founder) return 'founder';
+  if (preference === 'card_lover' && isActiveSubscriber) return 'card_lover';
+
+  // Auto: prefer founder, then card_lover
+  if (preference === 'auto') {
+    if (credits.is_founder) return 'founder';
+    if (isActiveSubscriber) return 'card_lover';
+  }
+
+  return null;
+}
+
+/**
+ * Get Card Lovers discount amount (20% for active subscribers)
+ */
+export async function getCardLoverDiscount(userId: string): Promise<number> {
+  const isActive = await isActiveCardLover(userId);
+  return isActive ? 0.20 : 0;
 }
 
