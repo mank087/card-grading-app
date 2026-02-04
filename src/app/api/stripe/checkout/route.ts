@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe, STRIPE_PRICES, StripePriceTier } from '@/lib/stripe';
-import { getUserCredits, isFirstPurchase, isFounder } from '@/lib/credits';
+import { getUserCredits, isFirstPurchase } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
 import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
 
@@ -53,18 +53,6 @@ export async function POST(request: NextRequest) {
 
     // Special handling for founders package
     const isFoundersPackage = tier === 'founders';
-
-    if (isFoundersPackage) {
-      // Check if user is already a founder
-      const alreadyFounder = await isFounder(userId);
-      if (alreadyFounder) {
-        return NextResponse.json(
-          { error: 'You are already a DCM Founder!' },
-          { status: 400 }
-        );
-      }
-
-    }
 
     const priceConfig = STRIPE_PRICES[tier];
 

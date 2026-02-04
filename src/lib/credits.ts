@@ -324,7 +324,8 @@ export async function isFounder(userId: string): Promise<boolean> {
 }
 
 /**
- * Set user as founder (called after Founders Package purchase)
+ * Set user as founder and add credits (called after Founders Package purchase)
+ * Can be purchased multiple times - adds 150 credits each time
  */
 export async function setFounderStatus(
   userId: string,
@@ -341,24 +342,26 @@ export async function setFounderStatus(
     return { success: false, error: 'User credits not found' };
   }
 
-  // Check if already a founder
-  if (credits.is_founder) {
-    return { success: false, error: 'User is already a founder' };
-  }
-
   const founderCredits = 150;
   const newBalance = credits.balance + founderCredits;
+  const isFirstFounderPurchase = !credits.is_founder;
 
   // Update user as founder and add credits
+  const updateData: Record<string, unknown> = {
+    balance: newBalance,
+    total_purchased: credits.total_purchased + founderCredits,
+  };
+
+  // Only set founder status fields on first purchase
+  if (isFirstFounderPurchase) {
+    updateData.is_founder = true;
+    updateData.founder_purchased_at = new Date().toISOString();
+    updateData.show_founder_badge = true;
+  }
+
   const { error: updateError } = await supabase
     .from('user_credits')
-    .update({
-      is_founder: true,
-      founder_purchased_at: new Date().toISOString(),
-      show_founder_badge: true,
-      balance: newBalance,
-      total_purchased: credits.total_purchased + founderCredits,
-    })
+    .update(updateData)
     .eq('user_id', userId);
 
   if (updateError) {
@@ -367,20 +370,24 @@ export async function setFounderStatus(
   }
 
   // Record the transaction
+  const description = isFirstFounderPurchase
+    ? 'Founders Package - 150 credits'
+    : 'Founders Package (additional) - 150 credits';
+
   const { error: transactionError } = await supabase.from('credit_transactions').insert({
     user_id: userId,
     type: 'purchase',
     amount: founderCredits,
     balance_after: newBalance,
-    description: 'Founders Package - 150 credits',
+    description,
     stripe_session_id: options.stripeSessionId,
     stripe_payment_intent_id: options.stripePaymentIntentId,
-    metadata: { package: 'founders' },
+    metadata: { package: 'founders', isRepeatPurchase: !isFirstFounderPurchase },
   });
 
   if (transactionError) {
     console.error('Failed to record founder transaction:', transactionError);
-    // Don't fail - founder status was set, just audit log is incomplete
+    // Don't fail - credits were added, just audit log is incomplete
   }
 
   return { success: true };
