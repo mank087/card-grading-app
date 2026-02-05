@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: February 2, 2026 (v8.0 - Blog CMS, eBay Auction Listings, Scroll-to-Top)
+> Last Updated: February 5, 2026 (v8.1 - VIP Package, Card Lovers Subscription, SEO Metadata, Database Optimizations)
 
 ---
 
@@ -33,6 +33,7 @@
 
 **Core Features:**
 - AI-powered card grading with three-pass consensus system
+- **v8.1: VIP Package ($99/150 credits), Card Lovers subscription, SEO metadata, database optimizations**
 - **v8.0: Blog CMS, eBay auction listings (AddItem/Chinese), global scroll-to-top**
 - **v7.9: Three-pass reorder (passes-first), SEO & CLS fixes, Google Ads conversion tracking**
 - **v7.8: One Piece TCG support with variant-aware eBay search (parallel, manga, alt art, SP)**
@@ -78,19 +79,47 @@
 src/
 ├── app/                          # Next.js App Router pages
 │   ├── page.tsx                  # Homepage
-│   ├── layout.tsx                # Root layout
+│   ├── layout.tsx                # Root layout (tracking pixels)
 │   ├── login/                    # Login/signup page
+│   │   └── layout.tsx            # SEO metadata
 │   ├── upload/                   # Card upload flow
+│   │   └── layout.tsx            # SEO metadata
 │   ├── collection/               # User's card collection
+│   │   └── layout.tsx            # SEO metadata
 │   ├── account/                  # Account settings
+│   │   └── layout.tsx            # SEO metadata
 │   ├── search/                   # Public card search
 │   ├── credits/                  # Credit purchase
+│   │   └── layout.tsx            # SEO metadata
+│   ├── vip/                      # VIP package (v8.1)
+│   │   ├── page.tsx
+│   │   └── layout.tsx            # SEO metadata
+│   ├── card-lovers/              # Card Lovers subscription (v8.1)
+│   │   ├── page.tsx
+│   │   ├── success/page.tsx
+│   │   └── layout.tsx            # SEO metadata
+│   ├── founders/                 # Founders package
+│   │   └── layout.tsx            # SEO metadata
 │   ├── pokemon/[id]/             # Pokemon card detail
 │   ├── mtg/[id]/                 # MTG card detail
 │   ├── sports/[id]/              # Sports card detail
 │   ├── lorcana/[id]/             # Lorcana card detail
 │   ├── onepiece/[id]/            # One Piece card detail
 │   ├── other/[id]/               # Other card detail
+│   ├── pokemon-database/         # Pokemon database
+│   │   └── layout.tsx            # SEO metadata
+│   ├── mtg-database/             # MTG database
+│   │   └── layout.tsx            # SEO metadata
+│   ├── lorcana-database/         # Lorcana database
+│   │   └── layout.tsx            # SEO metadata
+│   ├── onepiece-database/        # One Piece database
+│   │   └── layout.tsx            # SEO metadata
+│   ├── pokemon-grading/          # Pokemon landing page
+│   │   └── layout.tsx            # SEO metadata
+│   ├── sports-grading/           # Sports landing page
+│   │   └── layout.tsx            # SEO metadata
+│   ├── card-grading/             # General landing page
+│   │   └── layout.tsx            # SEO metadata
 │   ├── unsubscribe/              # Email unsubscribe
 │   ├── admin/                    # Admin dashboard
 │   └── api/                      # API routes
@@ -157,6 +186,9 @@ src/
 | `/card-shows/[slug]` | `app/card-shows/[slug]/page.tsx` | Individual card show page |
 | `/founders` | `app/founders/page.tsx` | Founders Package landing page (v7.6) |
 | `/founders/success` | `app/founders/success/page.tsx` | Founders purchase success page |
+| `/vip` | `app/vip/page.tsx` | VIP Package landing page (v8.1) |
+| `/card-lovers` | `app/card-lovers/page.tsx` | Card Lovers subscription page (v8.1) |
+| `/card-lovers/success` | `app/card-lovers/success/page.tsx` | Card Lovers subscription success page |
 | `/mtg-database` | `app/mtg-database/page.tsx` | MTG card database search |
 | `/lorcana-database` | `app/lorcana-database/page.tsx` | Lorcana card database search |
 | `/onepiece-database` | `app/onepiece-database/page.tsx` | One Piece card database search |
@@ -303,6 +335,17 @@ src/
 |----------|--------|---------|
 | `/api/founders/status` | GET | Check if user is a founder, get badge preference |
 | `/api/founders/toggle-badge` | POST | Toggle founder emblem display on card labels |
+
+### VIP & Card Lovers Programs (v8.1)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/stripe/checkout` | POST | Create checkout session (supports `vip` tier) |
+| `/api/stripe/subscribe` | POST | Create Card Lovers subscription checkout |
+| `/api/subscription/status` | GET | Check Card Lovers subscription status |
+| `/api/user/label-emblem-preference` | GET/POST | Get/set emblem preference (founder/card_lover/vip/none/auto) |
+| `/api/stripe/cancel-subscription` | POST | Cancel Card Lovers subscription |
+| `/api/stripe/upgrade-subscription` | POST | Upgrade from monthly to annual |
 
 ### Email System
 
@@ -490,6 +533,95 @@ src/
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT false;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS founder_since TIMESTAMPTZ;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_founder_badge BOOLEAN DEFAULT true;
+```
+
+### v8.1 VIP Package, Card Lovers Subscription, SEO & Database Optimizations (February 5, 2026)
+
+**Key Changes:**
+
+1. **VIP Package** ($99 one-time, purchasable multiple times)
+   - 150 grading credits
+   - VIP diamond emblem (◆) on card labels
+   - Best cost per grade for one-time purchases ($0.66/grade)
+   - Landing page: `/vip`
+
+2. **Card Lovers Subscription**
+   - Monthly plan: $49.99/month (70 credits)
+   - Annual plan: $449/year (900 credits upfront, includes 60 bonus)
+   - 20% discount on additional credit purchases
+   - Card Lover heart emblem (♥) on labels
+   - Loyalty bonuses: +5 at month 3, +10 at month 6, +15 at month 9, +20 at month 12
+   - Credits roll over indefinitely
+   - Landing page: `/card-lovers`
+
+3. **Unified Emblem System**
+   - Users can choose which emblem to display: Founder (★), Card Lover (♥), VIP (◆), or auto
+   - Account settings page allows emblem preference selection
+   - Labels show up to 2 emblems (order: Founder → Card Lover → VIP)
+
+4. **SEO Metadata Improvements**
+   - Added `layout.tsx` files with metadata for all main pages
+   - Pages: credits, vip, card-lovers, founders, collection, account, login, upload
+   - Grading pages: pokemon-grading, sports-grading, card-grading
+   - Database pages: pokemon-database, mtg-database, lorcana-database, onepiece-database
+
+5. **Database Performance Optimizations**
+   - Fixed RLS policies for `subscription_events` (auth_rls_initplan warning)
+   - Added composite indexes for query optimization:
+     - `idx_cards_user_id_created_at` - User collection queries
+     - `idx_cards_visibility_created_at` - Public card queries
+     - `idx_cards_featured_lookup` - Featured cards partial index
+     - `idx_cards_serial` - Serial lookup
+     - `idx_cards_category_created_at` - Category filtered lists
+
+6. **Conversion Tracking**
+   - Added Google Ads conversion tracking to Card Lovers success page
+   - All success pages now have: Meta, GA4, Google Ads, Reddit tracking
+
+7. **UI Label Improvements**
+   - Front/back labels now have consistent fixed heights
+   - Dynamic font sizing for long card names
+   - Text wraps instead of truncating (matches downloadable labels)
+
+**Files Changed:**
+| File | Changes |
+|------|---------|
+| `app/vip/page.tsx` | New VIP package landing page |
+| `app/vip/layout.tsx` | VIP page SEO metadata |
+| `app/card-lovers/page.tsx` | Updated Card Lovers subscription page |
+| `app/card-lovers/success/page.tsx` | Added Google Ads tracking |
+| `app/card-lovers/layout.tsx` | Card Lovers page SEO metadata |
+| `app/api/stripe/checkout/route.ts` | VIP tier, founder discount logic |
+| `app/api/stripe/webhook/route.ts` | VIP purchase handling |
+| `app/api/user/label-emblem-preference/route.ts` | Unified emblem preference API |
+| `app/ui/Navigation.tsx` | VIP and Card Lovers nav links |
+| `app/account/page.tsx` | Emblem preference selector |
+| `lib/credits.ts` | VIP status functions, hasFounderDiscount() |
+| `lib/stripe.ts` | VIP price configuration |
+| `components/labels/ModernFrontLabel.tsx` | Fixed heights, dynamic font sizing |
+| `components/labels/ModernBackLabel.tsx` | VIP emblem rendering |
+| `lib/cardImageGenerator.ts` | VIP emblem in downloadable images |
+| Multiple `layout.tsx` files | SEO metadata for all main pages |
+
+**Database Migrations:**
+```sql
+-- Card Lovers fields (already exists)
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_card_lover BOOLEAN DEFAULT FALSE;
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS card_lover_plan TEXT;
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_card_lover_badge BOOLEAN DEFAULT TRUE;
+
+-- VIP fields
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_vip BOOLEAN DEFAULT FALSE;
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_vip_badge BOOLEAN DEFAULT TRUE;
+
+-- Unified emblem preference
+ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS preferred_label_emblem TEXT DEFAULT 'auto';
+
+-- Performance indexes
+CREATE INDEX idx_cards_user_id_created_at ON cards (user_id, created_at DESC);
+CREATE INDEX idx_cards_visibility_created_at ON cards (visibility, created_at DESC);
+CREATE INDEX idx_cards_featured_lookup ON cards (visibility, is_featured, created_at DESC)
+  WHERE conversational_decimal_grade IS NOT NULL;
 ```
 
 ### v8.0 Blog CMS, eBay Auction Listings, Scroll-to-Top (February 2, 2026)
@@ -1556,34 +1688,77 @@ const isJapaneseCard = hasJapaneseText(cardInfo?.card_name) ||
 
 ## 11. Credit & Payment System
 
-### Credit Tiers
+### Credit Tiers (One-Time Purchases)
 
-| Tier | Price | Credits | First Purchase Bonus |
-|------|-------|---------|---------------------|
-| Basic | $2.99 | 1 | +1 |
-| Pro | $9.99 | 5 | +3 |
-| Elite | $19.99 | 20 | +5 |
-| **Founders** | $99 | 150 | N/A (lifetime benefits) |
+| Tier | Price | Credits | Per Grade | First Purchase Bonus |
+|------|-------|---------|-----------|---------------------|
+| Basic | $2.99 | 1 | $2.99 | +1 |
+| Pro | $9.99 | 5 | $2.00 | +3 |
+| Elite | $19.99 | 20 | $1.00 | +5 |
+| **VIP** | $99 | 150 | $0.66 | N/A (purchasable multiple times) |
+| **Founders** | $99 | 150 | $0.66 | N/A (one-time, legacy) |
 
-### Founders Program (v7.6)
+### Card Lovers Subscription (v8.1)
 
-Limited-time package available until January 1, 2026:
-- **150 grading credits** ($0.66 per grade - best value)
-- **20% lifetime discount** on all future credit purchases
-- **Founder badge** displayed on collection page
-- **Founder emblem** on card labels (toggleable in account settings)
+| Plan | Price | Credits | Per Grade | Notes |
+|------|-------|---------|-----------|-------|
+| Monthly | $49.99/mo | 70/mo | $0.71 | +loyalty bonuses at 3,6,9,12 months |
+| Annual | $449/yr | 900 upfront | $0.50 | Includes 60 bonus credits |
+
+**Subscription Benefits:**
+- 20% discount on additional credit purchases
+- Card Lover heart emblem (♥) on labels
+- Credits roll over indefinitely (never expire)
+- Loyalty bonuses (monthly only): +5 at 3mo, +10 at 6mo, +15 at 9mo, +20 at 12mo
+
+### VIP Package (v8.1)
+
+- **150 credits** at $0.66/grade (best one-time value)
+- **VIP diamond emblem (◆)** on labels
+- **Purchasable multiple times** (unlike Founders)
+- Landing page: `/vip`
+
+### Founders Program (v7.6 - Legacy)
+
+Limited-time package (no longer sold, existing founders keep benefits):
+- **150 grading credits** ($0.66 per grade)
+- **20% lifetime discount** on future credit purchases
+- **Founder star emblem (★)** on labels
+
+### Unified Emblem System (v8.1)
+
+Users can have multiple statuses and choose which emblem to display:
+- **preferred_label_emblem**: `'auto'` | `'founder'` | `'card_lover'` | `'vip'` | `'none'`
+- Auto mode displays based on priority: Founder → Card Lover → VIP
+- Up to 2 emblems can show on card labels
 
 **Database Fields (user_credits table):**
 ```sql
+-- Founder fields
 is_founder BOOLEAN DEFAULT false
 founder_since TIMESTAMPTZ
 show_founder_badge BOOLEAN DEFAULT true
+
+-- Card Lovers fields
+is_card_lover BOOLEAN DEFAULT false
+card_lover_plan TEXT  -- 'monthly' or 'annual'
+card_lover_months_active INTEGER DEFAULT 0
+show_card_lover_badge BOOLEAN DEFAULT true
+
+-- VIP fields
+is_vip BOOLEAN DEFAULT false
+show_vip_badge BOOLEAN DEFAULT true
+
+-- Unified preference
+preferred_label_emblem TEXT DEFAULT 'auto'
 ```
 
-**Founder Discount Implementation:**
-- Checkout API applies 20% discount automatically for founders
-- Uses dynamic `price_data` instead of fixed Stripe price IDs
-- `lib/credits.ts`: `isFounder()`, `getFounderDiscountMultiplier()` helpers
+### Discount Logic
+
+- **Card Lovers (active)**: 20% off credit purchases
+- **Founders**: 20% off credit purchases
+- **Note**: Discounts do NOT stack. Card Lover takes precedence if user has both.
+- Implemented in `lib/credits.ts`: `hasFounderDiscount()`, `isActiveCardLover()`
 
 ### Payment Flow
 
@@ -1833,12 +2008,15 @@ File: lib/emailTemplates.ts
 
 | Event | Where Fired | Parameters |
 |-------|-------------|------------|
-| `ads_conversion_PURCHASE_1` | `/credits/success`, `/founders/success` | `transaction_id`, `value`, `currency: 'USD'` |
-| `purchase` (GA4) | `/credits/success`, `/founders/success` | `transaction_id`, `value`, `currency`, `items` |
-| Reddit `Purchase` | `/credits/success` | `transactionId`, `value`, `currency` |
+| `ads_conversion_PURCHASE_1` | `/credits/success`, `/founders/success`, `/card-lovers/success` | `transaction_id`, `value`, `currency: 'USD'` |
+| `purchase` (GA4) | `/credits/success`, `/founders/success`, `/card-lovers/success` | `transaction_id`, `value`, `currency`, `items` |
+| Reddit `Purchase` | `/credits/success`, `/card-lovers/success` | `transactionId`, `value`, `currency` |
 | Reddit `Lead` | Landing page CTAs | `conversionId` with page/location/timestamp |
 | Reddit `SignUp` | `/login` (on account creation) | `conversionId` with timestamp/email |
-| Meta `Purchase` | `/credits/success` | `value`, `currency` |
+| Meta `Purchase` | `/credits/success`, `/card-lovers/success` | `value`, `currency` |
+| Meta `Subscribe` | `/card-lovers/success` | `value`, `currency`, `content_ids` |
+| `begin_checkout` (GA4) | `/vip`, `/card-lovers`, `/credits` | `value`, `currency`, `items` |
+| Meta `InitiateCheckout` | `/vip`, `/card-lovers`, `/credits` | `value`, `currency`, `content_ids` |
 
 ### Google Ads Conversion Notes (v7.9)
 - The `ads_conversion_PURCHASE_1` event **must** include `value` and `currency` parameters
@@ -1894,6 +2072,9 @@ STRIPE_PRICE_BASIC=price_xxx
 STRIPE_PRICE_PRO=price_xxx
 STRIPE_PRICE_ELITE=price_xxx
 STRIPE_PRICE_FOUNDERS=price_xxx
+STRIPE_PRICE_VIP=price_xxx
+STRIPE_PRICE_CARD_LOVERS_MONTHLY=price_xxx
+STRIPE_PRICE_CARD_LOVERS_ANNUAL=price_xxx
 
 # Resend
 RESEND_API_KEY=
@@ -2267,7 +2448,7 @@ npx tsx scripts/export-users-email-list.ts
 
 ---
 
-*This guide covers active, working code as of February 2026 (v8.0). Deprecated files are not included.*
+*This guide covers active, working code as of February 2026 (v8.1). Deprecated files are not included.*
 
 ---
 
@@ -2275,6 +2456,7 @@ npx tsx scripts/export-users-email-list.ts
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v8.1 | Feb 5, 2026 | VIP Package ($99/150 credits), Card Lovers subscription (monthly/annual), unified emblem system, SEO metadata for all pages, database performance indexes, conversion tracking fixes |
 | v8.0 | Feb 2, 2026 | Blog CMS with admin, eBay auction listings (AddItem/Chinese), global scroll-to-top, page tour restart, eBay vintage sports & letter-based card number fixes |
 | v7.9 | Jan 27, 2026 | Three-pass reorder (passes-first), SEO sitemap/robots.txt, CLS fixes (homepage skeletons), Google Ads conversion value fix, version string fix, Avery label improvements |
 | v7.8 | Jan 23, 2026 | One Piece TCG support, variant-aware eBay search, onboarding tour Live Market Pricing step |
