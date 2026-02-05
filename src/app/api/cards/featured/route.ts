@@ -59,7 +59,7 @@ export async function GET() {
 
     // Map URLs back to cards + parse conversational_grading for missing fields
     const cardsWithUrls = cards.map(card => {
-      let enrichedCard = {
+      const enrichedCard = {
         ...card,
         front_url: urlMap.get(card.front_path) || null,
         back_url: urlMap.get(card.back_path) || null

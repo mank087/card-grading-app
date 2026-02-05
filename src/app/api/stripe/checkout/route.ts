@@ -5,8 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
-import { stripe, STRIPE_PRICES, StripePriceTier, CARD_LOVERS_DISCOUNT } from '@/lib/stripe';
-import { getUserCredits, isFirstPurchase, isActiveCardLover } from '@/lib/credits';
+import { stripe, STRIPE_PRICES, StripePriceTier, CARD_LOVERS_DISCOUNT, FOUNDER_DISCOUNT } from '@/lib/stripe';
+import { getUserCredits, isFirstPurchase, isActiveCardLover, hasFounderDiscount } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
 import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
 
@@ -47,30 +47,42 @@ export async function POST(request: NextRequest) {
 
     if (!tier || !STRIPE_PRICES[tier]) {
       return NextResponse.json(
-        { error: 'Invalid tier. Must be one of: basic, pro, elite, founders' },
+        { error: 'Invalid tier. Must be one of: basic, pro, elite, founders, vip' },
         { status: 400 }
       );
     }
 
-    // Special handling for founders package
+    // Special handling for founders and VIP packages
     const isFoundersPackage = tier === 'founders';
+    const isVipPackage = tier === 'vip';
 
     const priceConfig = STRIPE_PRICES[tier];
 
-    // Tier-specific bonus credits for DCM Launch Special (not applicable to founders)
+    // Tier-specific bonus credits for DCM Launch Special (not applicable to founders/vip)
     const bonusCreditsMap: Record<string, number> = {
       basic: 1,
       pro: 3,
       elite: 5,
       founders: 0, // Founders don't get additional bonus - it's already a great deal
+      vip: 0, // VIP doesn't get additional bonus - it's already a great deal
     };
     const bonusCredits = bonusCreditsMap[tier] || 0;
 
-    // Check if this is first purchase (for bonus credit) - not applicable to founders
-    const firstPurchase = isFoundersPackage ? false : await isFirstPurchase(userId);
+    // Check if this is first purchase (for bonus credit) - not applicable to founders/vip
+    const firstPurchase = (isFoundersPackage || isVipPackage) ? false : await isFirstPurchase(userId);
 
-    // Check if user is an active Card Lover (for 20% discount on non-founders packages)
-    const hasCardLoverDiscount = !isFoundersPackage && await isActiveCardLover(userId);
+    // Check if user is eligible for discount (20% for Card Lovers or Founders)
+    // Card Lover discount takes precedence, but they're the same rate
+    // Discounts don't apply to founders or vip packages
+    const isDiscountEligibleTier = !isFoundersPackage && !isVipPackage;
+    const hasCardLoverDiscount = isDiscountEligibleTier && await isActiveCardLover(userId);
+    const hasFounderDiscountEligible = isDiscountEligibleTier && !hasCardLoverDiscount && await hasFounderDiscount(userId);
+
+    // Determine discount rate and label
+    const discountRate = hasCardLoverDiscount ? CARD_LOVERS_DISCOUNT :
+                         hasFounderDiscountEligible ? FOUNDER_DISCOUNT : 0;
+    const discountLabel = hasCardLoverDiscount ? 'Card Lovers 20% Off' :
+                          hasFounderDiscountEligible ? 'Founder 20% Off' : null;
 
     // Get or create user credits record to get Stripe customer ID
     const userCredits = await getUserCredits(userId);
@@ -102,6 +114,7 @@ export async function POST(request: NextRequest) {
       : 'https://www.dcmgrading.com';
 
     // Set success and cancel URLs based on package type
+    // VIP uses credits success page (not founders success page)
     const successUrl = isFoundersPackage
       ? `${origin}/founders/success?session_id={CHECKOUT_SESSION_ID}`
       : `${origin}/credits/success?session_id={CHECKOUT_SESSION_ID}&tier=${tier}&value=${priceConfig.price}&credits=${priceConfig.credits}`;
@@ -124,6 +137,7 @@ export async function POST(request: NextRequest) {
         bonusCredits: bonusCredits.toString(),
         isFirstPurchase: firstPurchase.toString(),
         isFoundersPackage: isFoundersPackage.toString(),
+        isVipPackage: isVipPackage.toString(),
       },
       payment_intent_data: {
         metadata: {
@@ -133,21 +147,22 @@ export async function POST(request: NextRequest) {
           bonusCredits: bonusCredits.toString(),
           isFirstPurchase: firstPurchase.toString(),
           isFoundersPackage: isFoundersPackage.toString(),
+          isVipPackage: isVipPackage.toString(),
         },
       },
     };
 
-    // Apply Card Lovers 20% discount using custom pricing, or use standard price
-    if (hasCardLoverDiscount) {
+    // Apply 20% discount using custom pricing (for Card Lovers or Founders), or use standard price
+    if (discountRate > 0 && discountLabel) {
       // Calculate discounted price in cents (Stripe uses smallest currency unit)
-      const discountedPriceCents = Math.round(priceConfig.price * (1 - CARD_LOVERS_DISCOUNT) * 100);
+      const discountedPriceCents = Math.round(priceConfig.price * (1 - discountRate) * 100);
 
       checkoutOptions.line_items = [
         {
           price_data: {
             currency: 'usd',
             product_data: {
-              name: `${priceConfig.name} (Card Lovers 20% Off)`,
+              name: `${priceConfig.name} (${discountLabel})`,
               description: priceConfig.description,
             },
             unit_amount: discountedPriceCents,
@@ -174,8 +189,8 @@ export async function POST(request: NextRequest) {
       : priceConfig.credits;
 
     // Calculate discounted price if applicable
-    const discountedPrice = hasCardLoverDiscount
-      ? priceConfig.price * (1 - CARD_LOVERS_DISCOUNT)
+    const discountedPrice = discountRate > 0
+      ? priceConfig.price * (1 - discountRate)
       : priceConfig.price;
 
     return NextResponse.json({
@@ -186,9 +201,12 @@ export async function POST(request: NextRequest) {
       bonusCredits: firstPurchase ? bonusCredits : 0,
       totalCredits: creditsToReceive,
       price: priceConfig.price,
-      discountedPrice: hasCardLoverDiscount ? discountedPrice : undefined,
+      discountedPrice: discountRate > 0 ? discountedPrice : undefined,
       hasCardLoverDiscount,
+      hasFounderDiscount: hasFounderDiscountEligible,
+      discountLabel,
       isFoundersPackage: isFoundersPackage,
+      isVipPackage: isVipPackage,
     });
   } catch (error: any) {
     console.error('Checkout session error:', error);

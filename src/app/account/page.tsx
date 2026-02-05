@@ -48,12 +48,18 @@ export default function AccountPage() {
   const [isFounder, setIsFounder] = useState(false)
   const [showFounderBadge, setShowFounderBadge] = useState(true)
 
+  // VIP state
+  const [isVip, setIsVip] = useState(false)
+  const [showVipBadge, setShowVipBadge] = useState(true)
+
   // Label style preference
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
   const [isTogglingLabelStyle, setIsTogglingLabelStyle] = useState(false)
 
-  // Label emblem preference (for users with both Founder and Card Lover)
-  const [preferredLabelEmblem, setPreferredLabelEmblem] = useState<'founder' | 'card_lover' | 'both' | 'none'>('both')
+  // Label emblem preference (for users with Founder, VIP, and/or Card Lover)
+  // Users can select 0, 1, or max 2 emblems to display
+  type EmblemType = 'founder' | 'vip' | 'card_lover'
+  const [selectedEmblems, setSelectedEmblems] = useState<EmblemType[]>([])
   const [isUpdatingEmblemPref, setIsUpdatingEmblemPref] = useState(false)
 
   // Card Lovers subscription state
@@ -244,7 +250,7 @@ export default function AccountPage() {
           console.error('Error fetching subscription status:', err)
         }
 
-        // Fetch label emblem preference
+        // Fetch label emblem preference (also includes VIP status)
         try {
           const emblemRes = await fetch('/api/user/label-emblem-preference', {
             headers: {
@@ -253,7 +259,10 @@ export default function AccountPage() {
           })
           if (emblemRes.ok) {
             const emblemData = await emblemRes.json()
-            setPreferredLabelEmblem(emblemData.preferredLabelEmblem || 'both')
+            // Use the new array format from API
+            setSelectedEmblems(emblemData.selectedEmblems || [])
+            setIsVip(emblemData.isVip || false)
+            setShowVipBadge(emblemData.showVipBadge ?? true)
           }
         } catch (err) {
           console.error('Error fetching label emblem preference:', err)
@@ -387,13 +396,28 @@ export default function AccountPage() {
     }
   }
 
-  // Handle label emblem preference change
-  const handleEmblemPreferenceChange = async (newPreference: 'founder' | 'card_lover' | 'both' | 'none') => {
+  // Handle label emblem toggle (checkbox style, max 2 selections)
+  const handleEmblemToggle = async (emblem: EmblemType) => {
     setIsUpdatingEmblemPref(true)
     try {
       const session = getStoredSession()
       if (!session?.access_token) {
         return
+      }
+
+      // Calculate new selection
+      let newSelection: EmblemType[]
+      if (selectedEmblems.includes(emblem)) {
+        // Remove if already selected
+        newSelection = selectedEmblems.filter(e => e !== emblem)
+      } else {
+        // Add if not at max (2)
+        if (selectedEmblems.length >= 2) {
+          // Already at max, don't add
+          setIsUpdatingEmblemPref(false)
+          return
+        }
+        newSelection = [...selectedEmblems, emblem]
       }
 
       const response = await fetch('/api/user/label-emblem-preference', {
@@ -402,13 +426,14 @@ export default function AccountPage() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ preferredLabelEmblem: newPreference }),
+        body: JSON.stringify({ selectedEmblems: newSelection }),
       })
 
       if (response.ok) {
-        setPreferredLabelEmblem(newPreference)
-        // Also update the local badge states to match the preference
-        setShowFounderBadge(newPreference === 'founder' || newPreference === 'both')
+        setSelectedEmblems(newSelection)
+        // Also update the local badge states to match the selection
+        setShowFounderBadge(newSelection.includes('founder'))
+        setShowVipBadge(newSelection.includes('vip'))
       }
     } catch (err) {
       console.error('Error updating emblem preference:', err)
@@ -834,120 +859,148 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Label Emblem Preference - Show when user is a Founder OR Card Lover */}
-        {(isFounder || isCardLover) && (
-          <div className={`rounded-lg shadow-md p-6 border mb-6 ${
-            isFounder && isCardLover
-              ? 'bg-gradient-to-r from-amber-50 via-rose-50 to-purple-50 border-amber-200'
-              : isFounder
-                ? 'bg-gradient-to-r from-yellow-50 to-orange-50 border-yellow-200'
-                : 'bg-gradient-to-r from-purple-50 to-rose-50 border-purple-200'
-          }`}>
+        {/* Label Emblem Preference - Show when user is a Founder, VIP, or Card Lover */}
+        {(isFounder || isVip || isCardLover) && (
+          <div className="rounded-lg shadow-md p-6 border mb-6 bg-gradient-to-r from-gray-50 to-purple-50 border-purple-200">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
-              {isFounder && isCardLover ? (
-                <>
-                  <span className="mr-2">🏷️</span>
-                  Label Emblem Preference
-                </>
-              ) : isFounder ? (
-                <>
-                  <svg className="w-6 h-6 mr-2 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                  </svg>
-                  Founder Badge
-                </>
-              ) : (
-                <>
-                  <svg className="w-6 h-6 mr-2 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-                  </svg>
-                  Card Lover Badge
-                </>
-              )}
+              <span className="mr-2">🏷️</span>
+              Label Emblem Preference
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              {isFounder && isCardLover
-                ? 'You have both Founder and Card Lover status! Choose which emblem(s) to display on your graded card labels.'
-                : isFounder
-                  ? 'As a Founder, you can display a special emblem on your graded card labels.'
-                  : 'As a Card Lover subscriber, you can display a special emblem on your graded card labels.'}
+              Select up to 2 emblems to display on your graded card labels.
+              {selectedEmblems.length >= 2 && (
+                <span className="text-purple-600 font-medium ml-1">(Maximum reached)</span>
+              )}
             </p>
 
-            <div className={`grid gap-3 ${isFounder && isCardLover ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'}`}>
-              {/* Both Option - Only show when user has both */}
-              {isFounder && isCardLover && (
-                <button
-                  onClick={() => handleEmblemPreferenceChange('both')}
-                  disabled={isUpdatingEmblemPref}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    preferredLabelEmblem === 'both'
-                      ? 'border-purple-500 bg-purple-50 ring-2 ring-purple-200'
-                      : 'border-gray-200 bg-white hover:border-purple-300'
-                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <div className="flex justify-center gap-1 mb-2">
-                    <span className="text-yellow-500 text-lg">★</span>
-                    <span className="text-rose-500 text-lg">♥</span>
-                  </div>
-                  <p className="text-sm font-semibold text-gray-900">Both</p>
-                  <p className="text-xs text-gray-500">Show both emblems</p>
-                </button>
-              )}
-
-              {/* Founder Only - Show when user is a founder */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+              {/* Founder Checkbox - Show when user is a founder */}
               {isFounder && (
-                <button
-                  onClick={() => handleEmblemPreferenceChange('founder')}
-                  disabled={isUpdatingEmblemPref}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    preferredLabelEmblem === 'founder'
+                <label
+                  className={`relative flex items-center p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                    selectedEmblems.includes('founder')
                       ? 'border-yellow-500 bg-yellow-50 ring-2 ring-yellow-200'
                       : 'border-gray-200 bg-white hover:border-yellow-300'
-                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''} ${
+                    !selectedEmblems.includes('founder') && selectedEmblems.length >= 2
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                  }`}
                 >
-                  <div className="flex justify-center mb-2">
-                    <span className="text-yellow-500 text-2xl">★</span>
+                  <input
+                    type="checkbox"
+                    checked={selectedEmblems.includes('founder')}
+                    onChange={() => handleEmblemToggle('founder')}
+                    disabled={isUpdatingEmblemPref || (!selectedEmblems.includes('founder') && selectedEmblems.length >= 2)}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-3 flex-shrink-0 ${
+                    selectedEmblems.includes('founder')
+                      ? 'border-yellow-500 bg-yellow-500'
+                      : 'border-gray-300'
+                  }`}>
+                    {selectedEmblems.includes('founder') && (
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  <p className="text-sm font-semibold text-gray-900">Founder</p>
-                  <p className="text-xs text-gray-500">{isCardLover ? 'Founder only' : 'Show emblem'}</p>
-                </button>
+                  <span className="text-yellow-500 text-2xl mr-3">★</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Founder</p>
+                    <p className="text-xs text-gray-500">Star emblem</p>
+                  </div>
+                </label>
               )}
 
-              {/* Card Lover Only - Show when user is a card lover */}
+              {/* Card Lover Checkbox - Show when user is a card lover */}
               {isCardLover && (
-                <button
-                  onClick={() => handleEmblemPreferenceChange('card_lover')}
-                  disabled={isUpdatingEmblemPref}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    preferredLabelEmblem === 'card_lover'
+                <label
+                  className={`relative flex items-center p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                    selectedEmblems.includes('card_lover')
                       ? 'border-rose-500 bg-rose-50 ring-2 ring-rose-200'
                       : 'border-gray-200 bg-white hover:border-rose-300'
-                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''} ${
+                    !selectedEmblems.includes('card_lover') && selectedEmblems.length >= 2
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                  }`}
                 >
-                  <div className="flex justify-center mb-2">
-                    <span className="text-rose-500 text-2xl">♥</span>
+                  <input
+                    type="checkbox"
+                    checked={selectedEmblems.includes('card_lover')}
+                    onChange={() => handleEmblemToggle('card_lover')}
+                    disabled={isUpdatingEmblemPref || (!selectedEmblems.includes('card_lover') && selectedEmblems.length >= 2)}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-3 flex-shrink-0 ${
+                    selectedEmblems.includes('card_lover')
+                      ? 'border-rose-500 bg-rose-500'
+                      : 'border-gray-300'
+                  }`}>
+                    {selectedEmblems.includes('card_lover') && (
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
                   </div>
-                  <p className="text-sm font-semibold text-gray-900">Card Lover</p>
-                  <p className="text-xs text-gray-500">{isFounder ? 'Heart only' : 'Show emblem'}</p>
-                </button>
+                  <span className="text-rose-500 text-2xl mr-3">♥</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">Card Lover</p>
+                    <p className="text-xs text-gray-500">Heart emblem</p>
+                  </div>
+                </label>
               )}
 
-              {/* None */}
-              <button
-                onClick={() => handleEmblemPreferenceChange('none')}
-                disabled={isUpdatingEmblemPref}
-                className={`p-4 rounded-lg border-2 transition-all ${
-                  preferredLabelEmblem === 'none'
-                    ? 'border-gray-500 bg-gray-100 ring-2 ring-gray-200'
-                    : 'border-gray-200 bg-white hover:border-gray-300'
-                } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <div className="flex justify-center mb-2">
-                  <span className="text-gray-400 text-2xl">○</span>
-                </div>
-                <p className="text-sm font-semibold text-gray-900">None</p>
-                <p className="text-xs text-gray-500">No emblem</p>
-              </button>
+              {/* VIP Checkbox - Show when user is VIP */}
+              {isVip && (
+                <label
+                  className={`relative flex items-center p-4 rounded-lg border-2 transition-all cursor-pointer ${
+                    selectedEmblems.includes('vip')
+                      ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-200'
+                      : 'border-gray-200 bg-white hover:border-indigo-300'
+                  } ${isUpdatingEmblemPref ? 'opacity-50 cursor-not-allowed' : ''} ${
+                    !selectedEmblems.includes('vip') && selectedEmblems.length >= 2
+                      ? 'opacity-50 cursor-not-allowed'
+                      : ''
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedEmblems.includes('vip')}
+                    onChange={() => handleEmblemToggle('vip')}
+                    disabled={isUpdatingEmblemPref || (!selectedEmblems.includes('vip') && selectedEmblems.length >= 2)}
+                    className="sr-only"
+                  />
+                  <div className={`w-5 h-5 rounded border-2 flex items-center justify-center mr-3 flex-shrink-0 ${
+                    selectedEmblems.includes('vip')
+                      ? 'border-indigo-500 bg-indigo-500'
+                      : 'border-gray-300'
+                  }`}>
+                    {selectedEmblems.includes('vip') && (
+                      <svg className="w-3 h-3 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                  </div>
+                  <span className="text-indigo-500 text-2xl mr-3">◆</span>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-900">VIP</p>
+                    <p className="text-xs text-gray-500">Diamond emblem</p>
+                  </div>
+                </label>
+              )}
+            </div>
+
+            {/* Selection summary */}
+            <div className="mt-4 text-sm text-gray-600">
+              {selectedEmblems.length === 0 ? (
+                <p>No emblems selected. Your labels will not display any emblems.</p>
+              ) : selectedEmblems.length === 1 ? (
+                <p>1 emblem selected. You can add one more.</p>
+              ) : (
+                <p>2 emblems selected (maximum). Uncheck one to select a different emblem.</p>
+              )}
             </div>
           </div>
         )}

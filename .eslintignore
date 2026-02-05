@@ -1,0 +1,27 @@
+# Backup folders
+**/backup_*/**
+**/backups/**
+backup_before_ai_optimized_grading_20251002/
+
+# Node modules
+node_modules/
+
+# Build output
+.next/
+out/
+dist/
+
+# Utility scripts (not part of the app)
+update_assistant.js
+update_assistants_v3_1.js
+update_stage1_assistant.js
+update_stage2_assistant.js
+update_stage2_for_parallel.js
+verify_assistants_v3_1.js
+
+# Scripts folder
+scripts/
+
+# Test files
+**/*.test.ts
+**/*.test.tsx

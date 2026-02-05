@@ -91,6 +91,8 @@ export interface CardImageData {
   englishName?: string;
   // Founder emblem - shown on back label when user is a founder with badge enabled
   showFounderEmblem?: boolean;
+  // VIP emblem - shown on back label when user is a VIP with badge enabled
+  showVipEmblem?: boolean;
   // Card Lovers emblem - shown on back label when user is a Card Lover with badge enabled
   showCardLoversEmblem?: boolean;
   // Label style preference
@@ -415,7 +417,7 @@ async function drawBackLabel(
     badgeXOffset += 30; // Move next badge to the right
   }
 
-  // Card Lovers badge - heart at top, "LOVER" text rotated below
+  // Card Lovers badge - heart at top, "Card Lover" text rotated below
   if (data.showCardLoversEmblem) {
     const cardLoverX = badgeXOffset;
     const cardLoverStartY = qrY + 8;
@@ -427,7 +429,7 @@ async function drawBackLabel(
     ctx.textBaseline = 'top';
     ctx.fillText('\u2665', cardLoverX, cardLoverStartY);
 
-    // "LOVER" text rotated -90 degrees below heart
+    // "Card Lover" text rotated -90 degrees below heart
     ctx.save();
     ctx.translate(cardLoverX, cardLoverStartY + 32);
     ctx.rotate(-Math.PI / 2);
@@ -437,6 +439,34 @@ async function drawBackLabel(
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText('Card Lover', 0, 0);
+
+    ctx.restore();
+
+    badgeXOffset += 30; // Move next badge to the right
+  }
+
+  // VIP badge - diamond at top, "VIP" text rotated below
+  if (data.showVipEmblem) {
+    const vipX = badgeXOffset;
+    const vipStartY = qrY + 8;
+
+    // Indigo diamond at top
+    ctx.fillStyle = '#6366f1'; // indigo-500
+    ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('\u25C6', vipX, vipStartY); // ◆ diamond
+
+    // "VIP" text rotated -90 degrees below diamond
+    ctx.save();
+    ctx.translate(vipX, vipStartY + 32);
+    ctx.rotate(-Math.PI / 2);
+
+    ctx.fillStyle = '#6366f1'; // indigo-500
+    ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('VIP', 0, 0);
 
     ctx.restore();
   }
@@ -826,7 +856,7 @@ async function drawModernBackLabel(
     badgeXOffset += 30; // Move next badge to the right
   }
 
-  // Card Lovers badge - heart at top, "LOVER" sideways below it
+  // Card Lovers badge - heart at top, "Card Lover" sideways below it
   if (data.showCardLoversEmblem) {
     const cardLoverX = badgeXOffset;
     const cardLoverStartY = qrY + 8; // Align near top of QR
@@ -838,7 +868,7 @@ async function drawModernBackLabel(
     ctx.textBaseline = 'top';
     ctx.fillText('\u2665', cardLoverX, cardLoverStartY);
 
-    // "LOVER" text rotated -90 degrees below heart
+    // "Card Lover" text rotated -90 degrees below heart
     ctx.save();
     ctx.translate(cardLoverX, cardLoverStartY + 32);
     ctx.rotate(-Math.PI / 2); // Rotate -90 degrees (counterclockwise)
@@ -848,6 +878,34 @@ async function drawModernBackLabel(
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     ctx.fillText('Card Lover', 0, 0);
+
+    ctx.restore();
+
+    badgeXOffset += 30; // Move next badge to the right
+  }
+
+  // VIP badge - diamond at top, "VIP" sideways below it
+  if (data.showVipEmblem) {
+    const vipX = badgeXOffset;
+    const vipStartY = qrY + 8; // Align near top of QR
+
+    // Indigo diamond at top (not rotated)
+    ctx.fillStyle = '#6366f1'; // indigo-500
+    ctx.font = 'bold 22px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('\u25C6', vipX, vipStartY); // ◆ diamond
+
+    // "VIP" text rotated -90 degrees below diamond
+    ctx.save();
+    ctx.translate(vipX, vipStartY + 32);
+    ctx.rotate(-Math.PI / 2); // Rotate -90 degrees (counterclockwise)
+
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 14px "Helvetica Neue", Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('VIP', 0, 0);
 
     ctx.restore();
   }

@@ -74,7 +74,7 @@ export default function FeaturedCardsShowcase() {
     const positions = [-2, -1, 0, 1, 2] // far-left, left, center, right, far-right
 
     positions.forEach(pos => {
-      let idx = (currentIndex + pos + cards.length) % cards.length
+      const idx = (currentIndex + pos + cards.length) % cards.length
       visible.push({ card: cards[idx], position: pos, index: idx })
     })
 
@@ -137,9 +137,9 @@ export default function FeaturedCardsShowcase() {
 
             // Calculate transform based on position
             let translateX = position * (isCenter ? 0 : position > 0 ? 130 : 130)
-            let scale = isCenter ? 1 : isAdjacent ? 0.75 : 0.55
-            let opacity = isCenter ? 1 : isAdjacent ? 0.7 : 0.4
-            let zIndex = isCenter ? 20 : isAdjacent ? 15 : 10
+            const scale = isCenter ? 1 : isAdjacent ? 0.75 : 0.55
+            const opacity = isCenter ? 1 : isAdjacent ? 0.7 : 0.4
+            const zIndex = isCenter ? 20 : isAdjacent ? 15 : 10
 
             // Adjust translateX for smooth spacing with wider cards
             if (isAdjacent) translateX = position * 165

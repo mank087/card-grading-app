@@ -116,7 +116,7 @@ export function normalizeCardId(cardId: string): string {
   if (!cardId) return '';
 
   // Remove spaces and convert to uppercase
-  let normalized = cardId.toUpperCase().replace(/\s+/g, '');
+  const normalized = cardId.toUpperCase().replace(/\s+/g, '');
 
   // Handle format like "OP01-001" or "OP-01-001"
   const match = normalized.match(/^([A-Z]+)-?(\d+)-(\d+[A-Za-z]?)$/);

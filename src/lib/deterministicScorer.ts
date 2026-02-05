@@ -510,8 +510,8 @@ function checkSevereDamage(defects: any): SevereDamageResult {
 
   // TIER 4: Cumulative Heavy Damage (Cap at 6.0)
   let heavyDefectCount = 0;
-  let categoriesWithHeavy = new Set<string>();
-  let sidesWithHeavy = new Set<string>();
+  const categoriesWithHeavy = new Set<string>();
+  const sidesWithHeavy = new Set<string>();
 
   for (const side of ['front', 'back']) {
     // Check corners

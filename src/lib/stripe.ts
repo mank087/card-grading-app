@@ -38,6 +38,13 @@ export const STRIPE_PRICES = {
     name: 'Founders Package',
     description: '150 Card Grades + Lifetime Benefits',
   },
+  vip: {
+    priceId: process.env.STRIPE_PRICE_VIP!,
+    credits: 150,
+    price: 99,
+    name: 'VIP',
+    description: '150 Card Grades + VIP Emblem',
+  },
 } as const;
 
 export type StripePriceTier = keyof typeof STRIPE_PRICES;
@@ -76,6 +83,9 @@ export const CARD_LOVERS_LOYALTY_BONUSES: Record<number, number> = {
 
 // Card Lovers discount on credit purchases (20%)
 export const CARD_LOVERS_DISCOUNT = 0.20;
+
+// Founder discount on credit purchases (20%) - same rate as Card Lovers
+export const FOUNDER_DISCOUNT = 0.20;
 
 // Get credits for a price ID
 export function getCreditsForPrice(priceId: string): number {

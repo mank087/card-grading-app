@@ -27,7 +27,7 @@ export default function CardLoversPage() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
   const [checkingStatus, setCheckingStatus] = useState(true)
   const [purchasing, setPurchasing] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('monthly')
+  const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual')
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
   // Check authentication and subscription status
@@ -168,193 +168,222 @@ export default function CardLoversPage() {
         </div>
       </section>
 
-      {/* Pricing Cards */}
+      {/* Pricing Card - Single box with toggle */}
       <section className="py-12 bg-white">
         <div className="container mx-auto px-4">
-          <div className="max-w-5xl mx-auto">
-            <div className="grid md:grid-cols-2 gap-8">
-              {/* Monthly Plan */}
-              <div className={`relative rounded-3xl p-8 shadow-2xl overflow-hidden transition-all ${selectedPlan === 'monthly' ? 'ring-4 ring-purple-500' : ''} ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300' : 'bg-gradient-to-br from-gray-900 to-gray-800 text-white'}`}>
-                {/* Heart decoration */}
-                <div className={`absolute top-4 right-4 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-green-500' : 'text-rose-500'}`}>
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-                  </svg>
-                </div>
-
-                <div className={`font-semibold text-sm uppercase tracking-wide mb-2 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-green-600' : 'text-purple-400'}`}>
-                  {subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'Current Plan' : 'Monthly'}
-                </div>
-
-                <div className="flex items-baseline gap-2 mb-6">
-                  <span className={`text-5xl font-bold ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-gray-900' : ''}`}>$49.99</span>
-                  <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-gray-500' : 'text-gray-400'}`}>/month</span>
-                </div>
-
-                <div className="space-y-4 mb-8">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'bg-green-500' : 'bg-purple-500'}`}>
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+          <div className="max-w-lg mx-auto">
+            <div className={`relative rounded-3xl shadow-2xl overflow-hidden ${
+              subscriptionStatus?.isActive
+                ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300'
+                : 'bg-white ring-4 ring-rose-300'
+            }`}>
+              {/* Header with Toggle */}
+              <div className="bg-gradient-to-r from-purple-600 to-rose-500 px-6 py-5">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl">♥</span>
+                    <h3 className="text-2xl font-bold text-white">Card Lovers</h3>
+                  </div>
+                  {subscriptionStatus?.isActive && (
+                    <div className="bg-green-400 text-green-900 text-xs font-bold px-3 py-1 rounded-full">
+                      ACTIVE
                     </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-gray-700' : ''}`}><strong>70 credits</strong> every month</span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'bg-green-500' : 'bg-purple-500'}`}>
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-gray-700' : ''}`}><strong>20% discount</strong> on credit purchases</span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'bg-green-500' : 'bg-purple-500'}`}>
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-gray-700' : ''}`}><strong>Loyalty bonuses</strong> at milestones</span>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'bg-green-500' : 'bg-purple-500'}`}>
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-gray-700' : ''}`}><strong>Exclusive badge</strong> & label emblem</span>
-                  </div>
+                  )}
                 </div>
 
-                <div className={`text-center text-sm mb-4 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? 'text-gray-500' : 'text-gray-400'}`}>
-                  $0.71 per grade • 840 credits/year + bonuses
-                </div>
+                {/* Plan Toggle - Only show if not subscribed */}
+                {!subscriptionStatus?.isActive && (
+                  <div className="flex items-center justify-center gap-2 bg-white/20 rounded-full p-1">
+                    <button
+                      onClick={() => setSelectedPlan('annual')}
+                      className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
+                        selectedPlan === 'annual'
+                          ? 'bg-white text-purple-700'
+                          : 'text-white/80 hover:text-white'
+                      }`}
+                    >
+                      Annual (Save $150)
+                    </button>
+                    <button
+                      onClick={() => setSelectedPlan('monthly')}
+                      className={`px-5 py-2 rounded-full text-sm font-semibold transition-all ${
+                        selectedPlan === 'monthly'
+                          ? 'bg-white text-purple-700'
+                          : 'text-white/80 hover:text-white'
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                  </div>
+                )}
 
-                {/* CTA Button */}
-                {checkingStatus ? (
-                  <div className="w-full bg-gray-700 text-gray-400 font-bold py-4 px-6 rounded-xl text-center">
-                    Checking status...
+                {/* Show current plan info if subscribed */}
+                {subscriptionStatus?.isActive && (
+                  <div className="text-white/90 text-sm">
+                    Current plan: <strong>{subscriptionStatus.plan === 'annual' ? 'Annual' : 'Monthly'}</strong>
                   </div>
-                ) : subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly' ? (
-                  <div className="w-full bg-green-500 text-white font-bold py-4 px-6 rounded-xl text-center">
-                    Current Plan
-                  </div>
-                ) : subscriptionStatus?.isActive ? (
-                  <div className="w-full bg-gray-500 text-white font-bold py-4 px-6 rounded-xl text-center">
-                    Already Subscribed
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleSubscribe('monthly')}
-                    disabled={purchasing}
-                    className="w-full bg-gradient-to-r from-purple-500 to-rose-500 hover:from-purple-400 hover:to-rose-400 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {purchasing ? 'Processing...' : isAuthenticated ? 'Subscribe Monthly' : 'Sign Up & Subscribe'}
-                  </button>
                 )}
               </div>
 
-              {/* Annual Plan */}
-              <div className={`relative rounded-3xl p-8 shadow-2xl overflow-hidden transition-all ${selectedPlan === 'annual' ? 'ring-4 ring-purple-500' : ''} ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300' : 'bg-gradient-to-br from-purple-900 to-purple-800 text-white'}`}>
-                {/* Best Value Badge */}
-                {!(subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual') && (
-                  <div className="absolute top-0 right-0 bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 px-4 py-1 text-sm font-bold rounded-bl-xl">
-                    BEST VALUE
-                  </div>
-                )}
-
-                {/* Heart decoration */}
-                <div className={`absolute top-4 left-4 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-green-500' : 'text-rose-400'}`}>
-                  <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-                  </svg>
+              {/* Card Body */}
+              <div className="p-6">
+                {/* Price Section */}
+                <div className="text-center mb-5">
+                  {subscriptionStatus?.isActive ? (
+                    // Show current subscription info
+                    <>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-4xl font-bold text-gray-900">
+                          {subscriptionStatus.plan === 'annual' ? '$37.42' : '$49.99'}
+                        </span>
+                        <span className="text-gray-500 text-lg">/month</span>
+                      </div>
+                      <p className="text-gray-500 text-sm mt-1">
+                        {subscriptionStatus.plan === 'annual'
+                          ? 'Billed annually at $449/year'
+                          : 'Billed monthly'}
+                      </p>
+                    </>
+                  ) : selectedPlan === 'annual' ? (
+                    <>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-4xl font-bold text-gray-900">$37.42</span>
+                        <span className="text-gray-500 text-lg">/month</span>
+                      </div>
+                      <p className="text-gray-500 text-sm mt-1">Billed annually at $449/year</p>
+                      <div className="inline-block mt-2 bg-green-100 text-green-700 text-sm font-bold px-3 py-1 rounded-full">
+                        Save $150/year vs monthly
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-4xl font-bold text-gray-900">$49.99</span>
+                        <span className="text-gray-500 text-lg">/month</span>
+                      </div>
+                      <p className="text-gray-500 text-sm mt-1">Billed monthly, cancel anytime</p>
+                    </>
+                  )}
                 </div>
 
-                <div className={`font-semibold text-sm uppercase tracking-wide mb-2 mt-4 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-green-600' : 'text-purple-300'}`}>
-                  {subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'Current Plan' : 'Annual • Save $150'}
+                {/* Credits Display */}
+                <div className="mb-5 p-4 bg-gradient-to-r from-purple-50 to-rose-50 rounded-xl text-center">
+                  <span className="text-3xl font-bold text-purple-600">
+                    {subscriptionStatus?.isActive
+                      ? (subscriptionStatus.plan === 'annual' ? '900' : '70')
+                      : (selectedPlan === 'annual' ? '900' : '70')
+                    }
+                  </span>
+                  <span className="text-gray-600 ml-2 text-lg">
+                    {subscriptionStatus?.isActive
+                      ? (subscriptionStatus.plan === 'annual' ? 'credits upfront' : 'credits/month')
+                      : (selectedPlan === 'annual' ? 'credits upfront' : 'credits/month')
+                    }
+                  </span>
+                  {((subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual') ||
+                    (!subscriptionStatus?.isActive && selectedPlan === 'annual')) && (
+                    <p className="text-sm text-purple-600 mt-1">Includes 60 bonus credits!</p>
+                  )}
                 </div>
 
-                <div className="flex items-baseline gap-2 mb-2">
-                  <span className={`text-5xl font-bold ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-900' : ''}`}>$449</span>
-                  <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-500' : 'text-purple-300'}`}>/year</span>
-                </div>
-
-                <div className={`text-sm mb-6 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-500' : 'text-purple-300'}`}>
-                  <span className="line-through">$599.88</span> — Save $150!
-                </div>
-
-                <div className="space-y-4 mb-8">
+                {/* Benefits */}
+                <div className="mb-5 space-y-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'bg-green-500' : 'bg-rose-500'}`}>
+                    <div className="w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-700' : ''}`}><strong>900 credits</strong> upfront (840 + 60 bonus)</span>
+                    <span className="text-gray-700"><strong>20% off</strong> all future additional credit purchases</span>
                   </div>
-
                   <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'bg-green-500' : 'bg-rose-500'}`}>
+                    <div className="w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-700' : ''}`}><strong>20% discount</strong> on credit purchases</span>
+                    <span className="text-gray-700"><strong>Card Lover</strong> heart emblem on labels</span>
                   </div>
-
                   <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'bg-green-500' : 'bg-rose-500'}`}>
+                    <div className="w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center flex-shrink-0">
                       <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-700' : ''}`}><strong>Exclusive badge</strong> & label emblem</span>
+                    <span className="text-gray-700"><strong>Credits roll over</strong> forever</span>
                   </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'bg-green-500' : 'bg-rose-500'}`}>
-                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
+                  {((subscriptionStatus?.isActive && subscriptionStatus.plan === 'monthly') ||
+                    (!subscriptionStatus?.isActive && selectedPlan === 'monthly')) && (
+                    <div className="flex items-center gap-3">
+                      <div className="w-6 h-6 rounded-full bg-rose-500 flex items-center justify-center flex-shrink-0">
+                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <span className="text-gray-700"><strong>Loyalty bonuses</strong> at milestones</span>
                     </div>
-                    <span className={`text-lg ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-700' : ''}`}><strong>All perks</strong> for 12 months</span>
-                  </div>
+                  )}
                 </div>
 
-                <div className={`text-center text-sm mb-4 ${subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? 'text-gray-500' : 'text-purple-300'}`}>
-                  Only $0.50 per grade — Our lowest price!
+                {/* Cost per grade info */}
+                <div className="text-center text-sm text-gray-500 mb-5">
+                  {subscriptionStatus?.isActive
+                    ? (subscriptionStatus.plan === 'annual'
+                        ? 'Only $0.50 per grade — Our lowest price!'
+                        : '$0.71 per grade • Loyalty bonuses every 3 months')
+                    : (selectedPlan === 'annual'
+                        ? 'Only $0.50 per grade — Our lowest price!'
+                        : '$0.71 per grade • Loyalty bonuses every 3 months')
+                  }
                 </div>
 
                 {/* CTA Button */}
                 {checkingStatus ? (
-                  <div className="w-full bg-gray-700 text-gray-400 font-bold py-4 px-6 rounded-xl text-center">
+                  <div className="w-full bg-gray-200 text-gray-500 font-bold py-4 px-6 rounded-xl text-center">
                     Checking status...
                   </div>
-                ) : subscriptionStatus?.isActive && subscriptionStatus.plan === 'annual' ? (
-                  <div className="w-full bg-green-500 text-white font-bold py-4 px-6 rounded-xl text-center">
-                    Current Plan
-                  </div>
                 ) : subscriptionStatus?.isActive ? (
-                  <Link
-                    href="/account"
-                    className="w-full block bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 font-bold py-4 px-6 rounded-xl text-center transition-all shadow-lg hover:shadow-xl"
-                  >
-                    Upgrade to Annual
-                  </Link>
+                  <div className="space-y-3">
+                    <div className="w-full bg-green-500 text-white font-bold py-4 px-6 rounded-xl text-center">
+                      You&apos;re a Card Lover!
+                    </div>
+                    {subscriptionStatus.plan === 'monthly' && (
+                      <Link
+                        href="/account"
+                        className="w-full block bg-gradient-to-r from-yellow-400 to-orange-400 text-gray-900 font-bold py-3 px-6 rounded-xl text-center transition-all shadow-md hover:shadow-lg text-sm"
+                      >
+                        Upgrade to Annual & Save $150/year
+                      </Link>
+                    )}
+                  </div>
                 ) : (
                   <button
-                    onClick={() => handleSubscribe('annual')}
+                    onClick={() => handleSubscribe(selectedPlan)}
                     disabled={purchasing}
-                    className="w-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-400 hover:to-pink-400 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white font-bold py-4 px-6 rounded-xl transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {purchasing ? 'Processing...' : isAuthenticated ? 'Subscribe Annually' : 'Sign Up & Subscribe'}
+                    {purchasing ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Processing...
+                      </span>
+                    ) : isAuthenticated ? (
+                      `Subscribe ${selectedPlan === 'annual' ? 'Annually' : 'Monthly'}`
+                    ) : (
+                      'Sign Up & Subscribe'
+                    )}
                   </button>
                 )}
               </div>
             </div>
+
+            {/* Discount stacking note */}
+            <p className="text-gray-500 text-xs mt-4 text-center italic">
+              Note: Founder and Card Lover discounts do not stack. If you have both statuses, you&apos;ll receive one 20% discount on credit purchases.
+            </p>
           </div>
         </div>
       </section>
@@ -394,6 +423,15 @@ export default function CardLoversPage() {
                     </p>
                   </div>
                 </div>
+                <div className="mt-4">
+                  <Image
+                    src="/Card-Lovers-Label-Emblem-DCM.png"
+                    alt="Card Lovers emblem on card label"
+                    width={300}
+                    height={200}
+                    className="rounded-lg shadow-md mx-auto"
+                  />
+                </div>
               </div>
 
               <div className="bg-white rounded-xl p-6 shadow-md border border-purple-100">
@@ -405,6 +443,9 @@ export default function CardLoversPage() {
                     <h3 className="font-bold text-gray-900 mb-1">Discount on Extra Credits</h3>
                     <p className="text-gray-600 text-sm">
                       Need more credits? Get 20% off all credit package purchases while subscribed.
+                    </p>
+                    <p className="text-gray-500 text-xs mt-2 italic">
+                      Note: Founder and Card Lover discounts do not stack. If you have both statuses, you&apos;ll receive one 20% discount on credit purchases.
                     </p>
                   </div>
                 </div>

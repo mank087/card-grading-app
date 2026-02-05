@@ -1038,7 +1038,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       }
 
       // Upload grading report as Certificate of Analysis if enabled
-      let regulatoryDocumentIds: string[] = [];
+      const regulatoryDocumentIds: string[] = [];
       if (includeGradingReport) {
         const docId = await uploadGradingReport();
         if (docId) {

@@ -18,6 +18,14 @@ const eslintConfig = [
       "out/**",
       "build/**",
       "next-env.d.ts",
+      // Backup folders
+      "backup_*/**",
+      "backups/**",
+      // Utility scripts (not part of the app)
+      "update_*.js",
+      "verify_*.js",
+      // Scripts folder
+      "scripts/**",
     ],
   },
 ];

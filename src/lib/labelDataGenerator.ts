@@ -1013,7 +1013,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
                     null;
   }
   // Clean card number - remove explanatory text like "(printed as 125/094★...)"
-  let cardNumber = getCleanValue(rawCardNumber);
+  const cardNumber = getCleanValue(rawCardNumber);
 
   // For Pokemon cards, format the card number properly
   // - Promo formats (SM226, SWSH039, SVP085) - show as-is, no "#" prefix

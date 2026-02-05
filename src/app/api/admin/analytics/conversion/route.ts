@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all grade transactions (users who used credits)
-    let gradesQuery = supabaseAdmin
+    const gradesQuery = supabaseAdmin
       .from('credit_transactions')
       .select('user_id, created_at')
       .eq('type', 'grade')
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all purchase transactions
-    let purchasesQuery = supabaseAdmin
+    const purchasesQuery = supabaseAdmin
       .from('credit_transactions')
       .select('user_id, created_at, amount, description, metadata')
       .eq('type', 'purchase')

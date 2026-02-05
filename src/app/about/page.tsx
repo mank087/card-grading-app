@@ -2,13 +2,19 @@ import { Metadata } from 'next';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
 export const metadata: Metadata = {
-  title: 'About DCM',
+  title: 'About Us - Our Story & Mission',
   description: 'DCM Grading is built by collectors, for collectors. Learn about our AI-powered card grading service using DCM Optic™ technology for fast, accurate, and affordable trading card assessments.',
-  keywords: 'about DCM, card grading company, AI grading, DCM Optic, card collectors, trading card grading service',
+  keywords: 'about DCM, card grading company, AI grading, DCM Optic, card collectors, trading card grading service, who is DCM',
   openGraph: {
-    title: 'About DCM Grading',
+    title: 'About DCM Grading - Our Story & Mission',
     description: 'Built by collectors, for collectors. Fast, accurate AI card grading with DCM Optic™ technology.',
     type: 'website',
+    siteName: 'DCM Grading',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'About DCM Grading',
+    description: 'Built by collectors, for collectors. AI-powered card grading with DCM Optic™.',
   },
 };
 

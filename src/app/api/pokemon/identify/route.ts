@@ -77,7 +77,7 @@ Output format:
     // Parse card number: "125/094" → cardNumber="125", fullNumberText="125/094"
     const rawCardNumber = cardNumberMatch ? cardNumberMatch[1].trim() : null;
     let cardNumber = null;
-    let fullNumberText = rawCardNumber;
+    const fullNumberText = rawCardNumber;
 
     if (rawCardNumber && rawCardNumber.includes('/')) {
       // Extract numerator from "125/094" → "125"

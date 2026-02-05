@@ -99,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     // Generate signed URLs for card images
     const frontPaths = cards?.map(card => card.front_path).filter(Boolean) || [];
-    let urlMap = new Map<string, string>();
+    const urlMap = new Map<string, string>();
 
     if (frontPaths.length > 0) {
       const { data: signedUrls } = await supabase.storage
@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
     // Map database fields to frontend - include all raw fields for label generation
     const sanitizedCards = cards?.map(card => {
       // Parse conversational_grading JSON if conversational_card_info is missing
-      let enrichedCard = { ...card };
+      const enrichedCard = { ...card };
       if (!card.conversational_card_info && card.conversational_grading) {
         try {
           const parsed = typeof card.conversational_grading === 'string'

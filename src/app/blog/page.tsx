@@ -8,13 +8,19 @@ import { BlogPostCard, BlogPagination, CategoryBadge } from '@/components/blog';
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'Blog | DCM Grading',
-  description: 'Expert insights on card grading, market trends, collecting tips, and more from the DCM Grading team.',
-  keywords: 'card grading blog, trading cards, collecting tips, market insights, pokemon cards, sports cards, MTG',
+  title: 'Blog - Card Collecting News & Tips',
+  description: 'Expert insights on card grading, market trends, collecting tips, and more from the DCM Grading team. Stay informed about Pokemon, Sports, MTG card news.',
+  keywords: 'card grading blog, trading cards, collecting tips, market insights, pokemon cards, sports cards, MTG, card collecting news, grading tips',
   openGraph: {
-    title: 'Blog | DCM Grading',
-    description: 'Expert insights on card grading, market trends, collecting tips, and more.',
+    title: 'Blog - Card Collecting News & Tips | DCM Grading',
+    description: 'Expert insights on card grading, market trends, and collecting tips.',
     type: 'website',
+    siteName: 'DCM Grading',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'DCM Grading Blog',
+    description: 'Card collecting news, grading tips, and market insights.',
   },
 };
 

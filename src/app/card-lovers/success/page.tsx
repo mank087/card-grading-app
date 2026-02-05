@@ -6,7 +6,14 @@ import Link from 'next/link'
 import { useCredits } from '@/contexts/CreditsContext'
 import { getStoredSession } from '@/lib/directAuth'
 
-// Global types for tracking pixels are declared elsewhere
+// Declare tracking pixels for TypeScript
+declare global {
+  interface Window {
+    rdt: (...args: unknown[]) => void
+    gtag: (...args: unknown[]) => void
+    fbq: (...args: unknown[]) => void
+  }
+}
 
 interface SubscriptionStatus {
   isActive: boolean
@@ -72,9 +79,20 @@ function CardLoversSuccessContent() {
           content_ids: [`card_lovers_${subscriptionStatus.plan}`],
           num_items: credits
         })
+        console.log('[Meta Pixel] Card Lovers Subscribe event tracked')
       }
 
-      // Google Analytics
+      // Google Ads Purchase conversion
+      if (window.gtag) {
+        window.gtag('event', 'ads_conversion_PURCHASE_1', {
+          transaction_id: `card_lovers_${sessionId}`,
+          value,
+          currency: 'USD'
+        })
+        console.log('[Google Ads] Card Lovers Purchase conversion tracked')
+      }
+
+      // GA4 purchase event
       if (window.gtag) {
         window.gtag('event', 'purchase', {
           transaction_id: sessionId,
@@ -87,6 +105,7 @@ function CardLoversSuccessContent() {
             quantity: 1
           }]
         })
+        console.log('[GA4] Card Lovers purchase event tracked')
       }
 
       // Reddit Pixel
@@ -97,6 +116,7 @@ function CardLoversSuccessContent() {
           itemCount: credits,
           transactionId: sessionId
         })
+        console.log('[Reddit Pixel] Card Lovers Purchase event tracked')
       }
     }
 

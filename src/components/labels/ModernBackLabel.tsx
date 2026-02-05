@@ -17,8 +17,9 @@ interface ModernBackLabelProps {
   subScores?: SubScores
   isAlteredAuthentic?: boolean
   size?: 'sm' | 'md' | 'lg'
-  // Badge options - only show one (Founder takes priority)
+  // Badge options - display order: Founder first, then Card Lover, then VIP
   showFounderEmblem?: boolean
+  showVipEmblem?: boolean
   showCardLoversEmblem?: boolean
 }
 
@@ -32,10 +33,10 @@ const formatSubScore = (score: number): string => {
   return Math.round(score).toString()
 }
 
-// Size configurations for modern back label
+// Size configurations for modern back label - heights match ModernFrontLabel for consistency
 const sizeConfig = {
   sm: {
-    height: 'h-[70px]',
+    height: 'h-[85px]',
     padding: 'px-2 py-1.5',
     qrSize: 50,
     gradeSize: 'text-2xl',
@@ -45,7 +46,7 @@ const sizeConfig = {
     founderTextSize: '7px',
   },
   md: {
-    height: 'h-[80px]',
+    height: 'h-[95px]',
     padding: 'px-3 py-2',
     qrSize: 58,
     gradeSize: 'text-3xl',
@@ -55,7 +56,7 @@ const sizeConfig = {
     founderTextSize: '8px',
   },
   lg: {
-    height: 'h-[90px]',
+    height: 'h-[110px]',
     padding: 'px-4 py-2.5',
     qrSize: 66,
     gradeSize: 'text-4xl',
@@ -75,6 +76,7 @@ export function ModernBackLabel({
   isAlteredAuthentic = false,
   size = 'md',
   showFounderEmblem = false,
+  showVipEmblem = false,
   showCardLoversEmblem = false,
 }: ModernBackLabelProps) {
   const config = sizeConfig[size]
@@ -169,6 +171,32 @@ export function ModernBackLabel({
                 } as React.CSSProperties}
               >
                 Card Lover
+              </span>
+            </div>
+          )}
+
+          {/* VIP badge - diamond at top, VIP sideways below */}
+          {showVipEmblem && (
+            <div className="flex flex-col items-center justify-start h-full py-1">
+              <span className={`${config.founderStarSize} leading-none`} style={{ color: '#6366f1' }}>
+                ◆
+              </span>
+              <span
+                style={{
+                  fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
+                  fontWeight: 600,
+                  fontSize: config.founderTextSize,
+                  color: '#FFFFFF',
+                  writingMode: 'vertical-rl',
+                  transform: 'rotate(180deg)',
+                  marginTop: '3px',
+                  letterSpacing: '0.5px',
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale',
+                  textRendering: 'optimizeLegibility',
+                } as React.CSSProperties}
+              >
+                VIP
               </span>
             </div>
           )}

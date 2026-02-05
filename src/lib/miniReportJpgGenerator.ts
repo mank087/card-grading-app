@@ -339,7 +339,7 @@ export async function generateMiniReportJpg(data: FoldableLabelData): Promise<Bl
   const safeYear = data.year ? extractAsciiSafe(data.year, '') : '';
   const setInfo = [safeSetName, safeCardNumber, safeYear].filter(Boolean).join(' • ');
 
-  let setFontSize = 20;
+  const setFontSize = 20;
   ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
 
   // Always wrap if text is too wide - don't just shrink font

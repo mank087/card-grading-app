@@ -1333,8 +1333,8 @@ export interface ConversationalGradeResult {
 export type { ConversationalGradeResultV3_3, RarityClassification, DefectCoordinate, GradingMetadataV3_3 } from './conversationalGradingV3_3';
 
 // Load conversational grading prompt
-let conversationalPrompt: string | null = null;
-let conversationalPromptJSON: string | null = null;
+const conversationalPrompt: string | null = null;
+const conversationalPromptJSON: string | null = null;
 
 function loadConversationalPrompt(cardType: 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other' = 'sports'): { text: string; format: 'markdown' | 'json' } {
   const isDevelopment = process.env.NODE_ENV === 'development';

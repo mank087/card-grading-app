@@ -188,7 +188,7 @@ function drawFrontLabel(
 
     // Try to fit on one line first, starting with larger font
     doc.setFontSize(6);
-    let textWidth = doc.getTextWidth(fullName);
+    const textWidth = doc.getTextWidth(fullName);
 
     if (textWidth <= cardNameMaxWidth) {
       // Fits on one line - center vertically

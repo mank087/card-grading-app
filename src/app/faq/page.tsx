@@ -3,14 +3,19 @@ import Link from 'next/link';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
 export const metadata: Metadata = {
-  title: 'Frequently Asked Questions | DCM Grading',
+  title: 'FAQ - Frequently Asked Questions',
   description: 'Find answers to common questions about DCM card grading services, our three-pass consensus technology, pricing, supported card types, and more.',
-  keywords: 'DCM grading FAQ, card grading questions, AI card grading, three-pass grading, card authentication, grading accuracy',
+  keywords: 'DCM grading FAQ, card grading questions, AI card grading, three-pass grading, card authentication, grading accuracy, how does card grading work',
   openGraph: {
-    title: 'Frequently Asked Questions | DCM Grading',
-    description: 'Find answers to common questions about DCM card grading services, our three-pass consensus technology, pricing, supported card types, and more.',
+    title: 'FAQ - Frequently Asked Questions | DCM Grading',
+    description: 'Find answers to common questions about DCM card grading services, pricing, and supported card types.',
     type: 'website',
-    siteName: 'DCM Card Grading',
+    siteName: 'DCM Grading',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'FAQ - DCM Grading',
+    description: 'Answers to common questions about AI-powered card grading.',
   },
 };
 

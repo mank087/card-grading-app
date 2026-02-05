@@ -18,7 +18,7 @@ export default function RelatedPosts({ currentPostId, categoryId, tags }: Relate
     const fetchRelatedPosts = async () => {
       try {
         // Try to fetch posts from the same category first
-        let url = '/api/blog/posts?limit=3';
+        const url = '/api/blog/posts?limit=3';
         if (categoryId) {
           // Need to get category slug first - for now just fetch recent posts
           // This could be optimized with a dedicated related posts API endpoint

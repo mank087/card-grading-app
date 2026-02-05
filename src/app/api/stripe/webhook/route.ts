@@ -9,6 +9,7 @@ import {
   addCredits,
   updateStripeCustomerId,
   setFounderStatus,
+  setVipStatus,
   activateCardLoverSubscription,
   processCardLoverRenewal,
   cancelCardLoverSubscription,
@@ -147,6 +148,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   const bonusCredits = parseInt(session.metadata?.bonusCredits || '1', 10); // Default to 1 for backwards compatibility
   const isFirstPurchase = session.metadata?.isFirstPurchase === 'true';
   const isFoundersPackage = session.metadata?.isFoundersPackage === 'true';
+  const isVipPackage = session.metadata?.isVipPackage === 'true';
 
   if (!userId || !credits) {
     console.error('Missing required metadata:', { userId, credits });
@@ -186,6 +188,28 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
       console.log('Founder status set successfully:', { userId });
     } else {
       console.error('Failed to set founder status:', { userId, error: founderResult.error });
+    }
+    return;
+  }
+
+  // Handle VIP Package separately
+  if (isVipPackage) {
+    console.log('Processing VIP Package purchase:', {
+      userId,
+      sessionId: session.id,
+    });
+
+    const vipResult = await setVipStatus(userId, {
+      stripeSessionId: session.id,
+      stripePaymentIntentId: typeof session.payment_intent === 'string'
+        ? session.payment_intent
+        : undefined,
+    });
+
+    if (vipResult.success) {
+      console.log('VIP status set successfully:', { userId });
+    } else {
+      console.error('Failed to set VIP status:', { userId, error: vipResult.error });
     }
     return;
   }

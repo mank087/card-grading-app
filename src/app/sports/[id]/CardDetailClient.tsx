@@ -694,7 +694,7 @@ const formatConversationalGrading = (markdown: string): string => {
   console.log('[FRONTEND] First 500 chars of markdown:', markdown.substring(0, 500));
 
   // Strip out parser-only blocks
-  let cleaned = markdown
+  const cleaned = markdown
     .replace(/:::SUBSCORES[\s\S]*?:::END/g, '')
     .replace(/:::CHECKLIST[\s\S]*?:::END/g, '')
     .replace(/:::META[\s\S]*?:::END/g, '');
@@ -1415,6 +1415,8 @@ export function SportsCardDetails() {
   const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
   // ⭐ Founder emblem state (for back label)
   const [showFounderEmblem, setShowFounderEmblem] = useState(false);
+  // ◆ VIP emblem state (for back label)
+  const [showVipEmblem, setShowVipEmblem] = useState(false);
   // ❤️ Card Lovers emblem state (for back label)
   const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
@@ -1706,34 +1708,36 @@ export function SportsCardDetails() {
   }, []);
 
   // ⭐ Show emblems based on card OWNER's settings and preference
-  // This allows the emblems to appear on public shared cards
+  // New format: comma-separated list of selected emblems (e.g., "founder,vip" or "card_lover")
   useEffect(() => {
-    const preference = card?.owner_preferred_label_emblem || 'both';
+    const preference = card?.owner_preferred_label_emblem || '';
     const isFounder = card?.owner_is_founder && card?.owner_show_founder_badge;
+    const isVip = card?.owner_is_vip && card?.owner_show_vip_badge;
     const isCardLover = card?.owner_is_card_lover && card?.owner_show_card_lover_badge;
 
-    switch (preference) {
-      case 'founder':
-        setShowFounderEmblem(isFounder);
-        setShowCardLoversEmblem(false);
-        break;
-      case 'card_lover':
-        setShowFounderEmblem(false);
-        setShowCardLoversEmblem(isCardLover);
-        break;
-      case 'both':
-        setShowFounderEmblem(isFounder);
-        setShowCardLoversEmblem(isCardLover);
-        break;
-      case 'none':
-        setShowFounderEmblem(false);
-        setShowCardLoversEmblem(false);
-        break;
-      default:
-        setShowFounderEmblem(isFounder);
-        setShowCardLoversEmblem(isCardLover);
+    // Handle legacy 'none' value
+    if (preference === 'none') {
+      setShowFounderEmblem(false);
+      setShowVipEmblem(false);
+      setShowCardLoversEmblem(false);
+      return;
     }
-  }, [card?.owner_is_founder, card?.owner_show_founder_badge, card?.owner_is_card_lover, card?.owner_show_card_lover_badge, card?.owner_preferred_label_emblem]);
+
+    // Parse comma-separated preference (new format) or handle legacy single values
+    const selectedEmblems = preference ? preference.split(',') : [];
+
+    // If no preference set, show all available emblems (legacy 'both'/'auto' behavior)
+    if (selectedEmblems.length === 0 || preference === 'both' || preference === 'auto') {
+      setShowFounderEmblem(!!isFounder);
+      setShowVipEmblem(!!isVip);
+      setShowCardLoversEmblem(!!isCardLover);
+    } else {
+      // New array-based format: only show emblems that are in the selected list AND user has the status
+      setShowFounderEmblem(selectedEmblems.includes('founder') && !!isFounder);
+      setShowVipEmblem(selectedEmblems.includes('vip') && !!isVip);
+      setShowCardLoversEmblem(selectedEmblems.includes('card_lover') && !!isCardLover);
+    }
+  }, [card?.owner_is_founder, card?.owner_show_founder_badge, card?.owner_is_vip, card?.owner_show_vip_badge, card?.owner_is_card_lover, card?.owner_show_card_lover_badge, card?.owner_preferred_label_emblem]);
 
   // 🎨 Fetch label style preference for the logged-in user
   useEffect(() => {
@@ -2769,6 +2773,9 @@ export function SportsCardDetails() {
                   } : undefined}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
                   size="lg"
+                  showFounderEmblem={showFounderEmblem}
+                  showVipEmblem={showVipEmblem}
+                  showCardLoversEmblem={showCardLoversEmblem}
                 />
               ) : (
                 <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] p-4">
@@ -2835,6 +2842,28 @@ export function SportsCardDetails() {
                             } as React.CSSProperties}
                           >
                             Card Lover
+                          </span>
+                        </div>
+                      )}
+
+                      {/* VIP badge - diamond at top, VIP sideways below */}
+                      {showVipEmblem && (
+                        <div className="flex flex-col items-center justify-start h-full py-1">
+                          <span className="text-[16px] leading-none" style={{ color: '#6366f1' }}>
+                            ◆
+                          </span>
+                          <span
+                            className="font-semibold uppercase tracking-wider"
+                            style={{
+                              fontSize: '9px',
+                              color: '#6366f1',
+                              writingMode: 'vertical-rl',
+                              transform: 'rotate(180deg)',
+                              marginTop: '3px',
+                              letterSpacing: '0.5px',
+                            }}
+                          >
+                            VIP
                           </span>
                         </div>
                       )}
@@ -3161,7 +3190,7 @@ export function SportsCardDetails() {
                     </div>
 
                     {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} />}
+                    {isOwner && <DownloadReportButton card={card} cardType="sports" showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">

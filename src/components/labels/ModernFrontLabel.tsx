@@ -16,40 +16,46 @@ const formatGrade = (grade: number): string => {
   return Math.round(grade).toString()
 }
 
-// Size configurations for modern label
+// Size configurations for modern label - heights match ModernBackLabel for consistency
 const sizeConfig = {
   sm: {
     logoHeight: 'h-6',
-    nameFontSize: '10px',
+    nameMaxFontSize: 10,
+    nameMinFontSize: 7,
     detailFontSize: '8px',
     featureFontSize: '7px',
     serialFontSize: '7px',
     gradeSize: 'text-2xl',
     conditionSize: 'text-[8px]',
     padding: 'px-2 py-1.5',
-    height: 'h-[70px]',
+    height: 'h-[85px]',
+    maxNameChars: 18,
   },
   md: {
     logoHeight: 'h-8',
-    nameFontSize: '12px',
+    nameMaxFontSize: 12,
+    nameMinFontSize: 9,
     detailFontSize: '9px',
     featureFontSize: '8px',
     serialFontSize: '8px',
     gradeSize: 'text-3xl',
     conditionSize: 'text-[9px]',
     padding: 'px-3 py-2',
-    height: 'h-[80px]',
+    height: 'h-[95px]',
+    maxNameChars: 22,
   },
   lg: {
     logoHeight: 'h-10',
-    nameFontSize: '14px',
+    nameMaxFontSize: 14,
+    nameMinFontSize: 10,
     detailFontSize: '11px',
     featureFontSize: '10px',
     serialFontSize: '9px',
     gradeSize: 'text-4xl',
     conditionSize: 'text-[10px]',
     padding: 'px-4 py-2.5',
-    height: 'h-[90px]',
+    height: 'h-[110px]',
+    maxNameChars: 26,
   },
 }
 
@@ -65,11 +71,10 @@ export function ModernFrontLabel({
 }: ModernFrontLabelProps) {
   const config = sizeConfig[size]
 
-  // Calculate scale for name to fit on single line
-  const maxCharsAtFullSize = size === 'sm' ? 16 : size === 'md' ? 20 : 24
-  const nameScaleX = displayName.length <= maxCharsAtFullSize
-    ? 1
-    : Math.max(0.55, maxCharsAtFullSize / displayName.length)
+  // Calculate dynamic font size for name (shrink to fit instead of scaleX)
+  const nameFontSize = displayName.length <= config.maxNameChars
+    ? config.nameMaxFontSize
+    : Math.max(config.nameMinFontSize, Math.floor(config.nameMaxFontSize * (config.maxNameChars / displayName.length)))
 
   return (
     <div
@@ -86,7 +91,7 @@ export function ModernFrontLabel({
         }}
       />
 
-      <div className="relative flex items-center justify-between h-full gap-2">
+      <div className="relative flex items-center justify-between h-full w-full gap-2">
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0">
           <img
@@ -98,25 +103,26 @@ export function ModernFrontLabel({
 
         {/* Center: Card Information - Light white text */}
         <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0">
-          {/* Line 1: Player/Card Name */}
+          {/* Line 1: Player/Card Name - font shrinks to fit */}
           <div
-            className="font-semibold leading-tight whitespace-nowrap origin-left"
+            className="font-semibold leading-tight"
             style={{
-              fontSize: config.nameFontSize,
-              transform: `scaleX(${nameScaleX})`,
+              fontSize: `${nameFontSize}px`,
               color: 'rgba(255, 255, 255, 0.95)',
+              wordBreak: 'break-word',
             }}
             title={displayName}
           >
             {displayName}
           </div>
 
-          {/* Line 2: Card Number + Set Name */}
+          {/* Line 2: Card Number + Set Name - wraps to multiple lines */}
           <div
-            className="leading-tight truncate"
+            className="leading-tight"
             style={{
               fontSize: config.detailFontSize,
               color: 'rgba(255, 255, 255, 0.7)',
+              wordBreak: 'break-word',
             }}
             title={setLineText}
           >
@@ -126,10 +132,11 @@ export function ModernFrontLabel({
           {/* Line 3: Special Features */}
           {features.length > 0 && (
             <div
-              className="font-medium leading-tight truncate"
+              className="font-medium leading-tight"
               style={{
                 fontSize: config.featureFontSize,
                 color: 'rgba(34, 197, 94, 0.9)', // Green accent for features
+                wordBreak: 'break-word',
               }}
             >
               {features.join(' • ')}
@@ -138,7 +145,7 @@ export function ModernFrontLabel({
 
           {/* Line 4: Serial Number */}
           <div
-            className="font-mono leading-tight truncate"
+            className="font-mono leading-tight"
             style={{
               fontSize: config.serialFontSize,
               color: 'rgba(255, 255, 255, 0.5)',

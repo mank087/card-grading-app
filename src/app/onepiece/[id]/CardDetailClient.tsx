@@ -724,7 +724,7 @@ const formatConversationalGrading = (markdown: string): string => {
   console.log('[FRONTEND] First 500 chars of markdown:', markdown.substring(0, 500));
 
   // Strip out parser-only blocks
-  let cleaned = markdown
+  const cleaned = markdown
     .replace(/:::SUBSCORES[\s\S]*?:::END/g, '')
     .replace(/:::CHECKLIST[\s\S]*?:::END/g, '')
     .replace(/:::META[\s\S]*?:::END/g, '');
@@ -1447,6 +1447,8 @@ export function OnePieceCardDetails() {
   const [showVisibilityConfirm, setShowVisibilityConfirm] = useState(false);
   // ⭐ Founder emblem state (for back label)
   const [showFounderEmblem, setShowFounderEmblem] = useState(false);
+  // ◆ VIP emblem state (for back label)
+  const [showVipEmblem, setShowVipEmblem] = useState(false);
   // ♥ Card Lovers emblem state (for back label)
   const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
@@ -1588,29 +1590,37 @@ export function OnePieceCardDetails() {
     }
   }, []);
 
-  // ⭐ Show founder and Card Lovers emblems based on card OWNER's status and preferences
-  // This allows emblems to appear on public shared cards
+  // ⭐ Show emblems based on card OWNER's settings and preference
+  // New format: comma-separated list of selected emblems (e.g., "founder,vip" or "card_lover")
   useEffect(() => {
+    const preference = card?.owner_preferred_label_emblem || '';
     const isFounder = card?.owner_is_founder && card?.owner_show_founder_badge;
+    const isVip = card?.owner_is_vip && card?.owner_show_vip_badge;
     const isCardLover = card?.owner_is_card_lover && card?.owner_show_card_lover_badge;
-    const preference = card?.owner_preferred_label_emblem || 'both';
 
-    // Apply emblem visibility based on owner's preference
-    if (preference === 'founder') {
-      setShowFounderEmblem(isFounder);
-      setShowCardLoversEmblem(false);
-    } else if (preference === 'card_lover') {
+    // Handle legacy 'none' value
+    if (preference === 'none') {
       setShowFounderEmblem(false);
-      setShowCardLoversEmblem(isCardLover);
-    } else if (preference === 'both') {
-      setShowFounderEmblem(isFounder);
-      setShowCardLoversEmblem(isCardLover);
-    } else {
-      // 'none'
-      setShowFounderEmblem(false);
+      setShowVipEmblem(false);
       setShowCardLoversEmblem(false);
+      return;
     }
-  }, [card?.owner_is_founder, card?.owner_show_founder_badge, card?.owner_is_card_lover, card?.owner_show_card_lover_badge, card?.owner_preferred_label_emblem]);
+
+    // Parse comma-separated preference (new format) or handle legacy single values
+    const selectedEmblems = preference ? preference.split(',') : [];
+
+    // If no preference set, show all available emblems (legacy 'both'/'auto' behavior)
+    if (selectedEmblems.length === 0 || preference === 'both' || preference === 'auto') {
+      setShowFounderEmblem(!!isFounder);
+      setShowVipEmblem(!!isVip);
+      setShowCardLoversEmblem(!!isCardLover);
+    } else {
+      // New array-based format: only show emblems that are in the selected list AND user has the status
+      setShowFounderEmblem(selectedEmblems.includes('founder') && !!isFounder);
+      setShowVipEmblem(selectedEmblems.includes('vip') && !!isVip);
+      setShowCardLoversEmblem(selectedEmblems.includes('card_lover') && !!isCardLover);
+    }
+  }, [card?.owner_is_founder, card?.owner_show_founder_badge, card?.owner_is_vip, card?.owner_show_vip_badge, card?.owner_is_card_lover, card?.owner_show_card_lover_badge, card?.owner_preferred_label_emblem]);
 
   // 🎨 Fetch label style preference for the logged-in user
   useEffect(() => {
@@ -2850,6 +2860,9 @@ export function OnePieceCardDetails() {
                   } : undefined}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
                   size="lg"
+                  showFounderEmblem={showFounderEmblem}
+                  showVipEmblem={showVipEmblem}
+                  showCardLoversEmblem={showCardLoversEmblem}
                 />
               ) : (
                 <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] p-4">
@@ -2907,6 +2920,28 @@ export function OnePieceCardDetails() {
                             } as React.CSSProperties}
                           >
                             Card Lover
+                          </span>
+                        </div>
+                      )}
+
+                      {/* VIP badge - diamond at top, VIP sideways below */}
+                      {showVipEmblem && (
+                        <div className="flex flex-col items-center justify-start h-full py-1">
+                          <span className="text-[16px] leading-none" style={{ color: '#6366f1' }}>
+                            ◆
+                          </span>
+                          <span
+                            className="font-semibold uppercase tracking-wider"
+                            style={{
+                              fontSize: '9px',
+                              color: '#6366f1',
+                              writingMode: 'vertical-rl',
+                              transform: 'rotate(180deg)',
+                              marginTop: '3px',
+                              letterSpacing: '0.5px',
+                            }}
+                          >
+                            VIP
                           </span>
                         </div>
                       )}
@@ -3203,7 +3238,7 @@ export function OnePieceCardDetails() {
                     </div>
 
                     {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="onepiece" showFounderEmblem={showFounderEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} />}
+                    {isOwner && <DownloadReportButton card={card} cardType="onepiece" showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">

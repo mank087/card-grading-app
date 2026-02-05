@@ -151,7 +151,7 @@ export async function GET(request: NextRequest) {
 
     // Enrich card data with user email, signed URL, and extract grade from JSON if needed
     const enrichedCards = cards?.map(card => {
-      let enrichedCard: any = {
+      const enrichedCard: any = {
         ...card,
         user_email: userMap[card.user_id] || 'Unknown',
         front_url: card.front_path ? signedUrlMap[card.front_path] || null : null,

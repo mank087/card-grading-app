@@ -33,6 +33,7 @@ interface DownloadReportButtonProps {
   variant?: 'default' | 'compact';
   cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'other'; // For URL generation
   showFounderEmblem?: boolean; // Show founder emblem on back label of card images
+  showVipEmblem?: boolean; // Show VIP emblem on back label of card images
   showCardLoversEmblem?: boolean; // Show Card Lovers emblem on back label of card images
   labelStyle?: 'modern' | 'traditional'; // Label style preference for card images
 }
@@ -42,6 +43,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   variant = 'default',
   cardType = 'sports',
   showFounderEmblem = false,
+  showVipEmblem = false,
   showCardLoversEmblem = false,
   labelStyle = 'modern'
 }) => {
@@ -775,6 +777,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         frontImageUrl,
         backImageUrl,
         showFounderEmblem, // Show founder emblem on back label if user is founder with badge enabled
+        showVipEmblem, // Show VIP emblem on back label if user is VIP with badge enabled
         showCardLoversEmblem, // Show Card Lovers emblem on back label if user is Card Lover with badge enabled
         labelStyle, // Use modern or traditional label style
         subScores: {

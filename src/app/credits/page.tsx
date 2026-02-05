@@ -90,6 +90,8 @@ function CreditsPageContent() {
   const [error, setError] = useState<string | null>(null)
   const [showWelcome, setShowWelcome] = useState(false)
   const [isFounder, setIsFounder] = useState(false)
+  const [cardLoversSelectedPlan, setCardLoversSelectedPlan] = useState<'monthly' | 'annual'>('annual')
+  const [isCardLover, setIsCardLover] = useState(false)
 
   // Check for canceled payment and welcome parameter
   const canceled = searchParams.get('canceled')
@@ -114,6 +116,20 @@ function CreditsPageContent() {
           }
         })
         .catch(err => console.error('Error checking founder status:', err))
+
+      // Check Card Lover subscription status
+      fetch('/api/subscription/status', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.isActive) {
+            setIsCardLover(true)
+          }
+        })
+        .catch(err => console.error('Error checking subscription status:', err))
     }
   }, [])
 
@@ -209,7 +225,7 @@ function CreditsPageContent() {
     }
   }
 
-  const handleFoundersPurchase = async () => {
+  const handleVipPurchase = async () => {
     // If not authenticated, redirect to signup
     if (!isAuthenticated) {
       router.push('/login?mode=signup&redirect=/credits')
@@ -217,7 +233,7 @@ function CreditsPageContent() {
     }
 
     setError(null)
-    setPurchaseLoading('founders')
+    setPurchaseLoading('vip')
 
     // Track begin_checkout event
     if (typeof window !== 'undefined' && window.gtag) {
@@ -225,8 +241,8 @@ function CreditsPageContent() {
         currency: 'USD',
         value: 99,
         items: [{
-          item_id: 'founders',
-          item_name: 'Founders Package',
+          item_id: 'vip',
+          item_name: 'VIP Package',
           price: 99,
           quantity: 1
         }]
@@ -239,7 +255,7 @@ function CreditsPageContent() {
         value: 99,
         currency: 'USD',
         content_type: 'product',
-        content_ids: ['founders'],
+        content_ids: ['vip'],
         num_items: 150
       })
     }
@@ -258,7 +274,7 @@ function CreditsPageContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ tier: 'founders' }),
+        body: JSON.stringify({ tier: 'vip' }),
       })
 
       if (!response.ok) {
@@ -275,7 +291,65 @@ function CreditsPageContent() {
         throw new Error('No checkout URL returned')
       }
     } catch (err) {
-      console.error('Founders purchase error:', err)
+      console.error('VIP purchase error:', err)
+      setError(err instanceof Error ? err.message : 'Failed to start checkout')
+      setPurchaseLoading(null)
+    }
+  }
+
+  // Handle Card Lovers subscription
+  const handleCardLoversSubscribe = async () => {
+    if (!isAuthenticated) {
+      router.push('/login?mode=signup&redirect=/credits')
+      return
+    }
+
+    if (isCardLover) {
+      return
+    }
+
+    setPurchaseLoading('card_lovers')
+    setError(null)
+
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      // Track subscription attempt
+      if (typeof window !== 'undefined' && window.fbq) {
+        window.fbq('track', 'InitiateCheckout', {
+          content_type: 'subscription',
+          content_ids: [`card_lovers_${cardLoversSelectedPlan}`],
+          value: cardLoversSelectedPlan === 'monthly' ? 49.99 : 449,
+          currency: 'USD',
+        })
+      }
+
+      const response = await fetch('/api/stripe/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ plan: cardLoversSelectedPlan }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Failed to create checkout session')
+      }
+
+      const { url } = await response.json()
+
+      if (url) {
+        window.location.href = url
+      } else {
+        throw new Error('No checkout URL returned')
+      }
+    } catch (err) {
+      console.error('Card Lovers subscription error:', err)
       setError(err instanceof Error ? err.message : 'Failed to start checkout')
       setPurchaseLoading(null)
     }
@@ -433,104 +507,125 @@ function CreditsPageContent() {
           </div>
         )}
 
+        {/* Discount Banner - Card Lovers takes priority over Founder if both */}
+        {isAuthenticated && isCardLover && (
+          <div className="mb-6 bg-gradient-to-r from-purple-100 to-rose-100 border border-rose-300 rounded-xl p-4 flex items-center gap-3">
+            <span className="text-2xl">♥</span>
+            <div>
+              <p className="font-bold text-rose-800">Card Lovers Discount Active!</p>
+              <p className="text-sm text-rose-700">You receive 20% off all credit purchases as a Card Lover.</p>
+            </div>
+          </div>
+        )}
+        {isAuthenticated && isFounder && !isCardLover && (
+          <div className="mb-6 bg-gradient-to-r from-yellow-100 to-orange-100 border border-yellow-300 rounded-xl p-4 flex items-center gap-3">
+            <span className="text-2xl">⭐</span>
+            <div>
+              <p className="font-bold text-yellow-800">Founder Discount Active!</p>
+              <p className="text-sm text-yellow-700">You receive 20% off all credit purchases as a Founder.</p>
+            </div>
+          </div>
+        )}
+
         {/* Pricing Cards */}
-        <div className={`grid md:grid-cols-2 ${isFounder ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-6`}>
-          {/* Founders Package - Special Limited-Time Offer */}
-          {!isFounder && (
-            <div className="relative bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-yellow-400 flex flex-col">
-              {/* Colored Header Bar - Fixed Height */}
-              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 px-5 py-4 h-[88px] relative">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl">⭐</span>
-                    <h3 className="text-xl font-bold text-gray-900">Founders</h3>
-                  </div>
-                  <div className="text-right">
-                    <div className="bg-purple-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                      EXCLUSIVE
-                    </div>
-                  </div>
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* VIP Package - Best Value */}
+          <div className="relative bg-white rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-gray-300 flex flex-col">
+            {/* Shining Silver Header Bar - Fixed Height */}
+            <div className="px-5 py-4 h-[88px] relative overflow-hidden" style={{ background: 'linear-gradient(135deg, #e8e8e8 0%, #f5f5f5 25%, #d4d4d4 50%, #f0f0f0 75%, #c0c0c0 100%)' }}>
+              {/* Animated shine effect */}
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12 animate-pulse" style={{ animationDuration: '3s' }}></div>
+              <div className="relative flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl text-gray-700">◆</span>
+                  <h3 className="text-xl font-bold text-gray-800">VIP</h3>
                 </div>
-                <div className="mt-1.5 inline-block bg-white/30 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  🚀 BEST VALUE
+                <div className="text-right">
+                  <div className="bg-gray-800/20 backdrop-blur-sm text-gray-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    BEST VALUE
+                  </div>
                 </div>
               </div>
-
-              {/* Card Body - Flex grow to fill space */}
-              <div className="p-5 flex flex-col flex-grow">
-                {/* Price Section - Fixed Height */}
-                <div className="text-center mb-3 h-[60px] flex flex-col justify-center">
-                  <div>
-                    <span className="text-3xl font-bold text-gray-900">$99</span>
-                    <span className="text-gray-500 text-sm ml-1">one-time</span>
-                  </div>
-                  <p className="text-gray-500 text-xs mt-1">Lifetime benefits for early supporters</p>
-                </div>
-
-                {/* Credits Display - Fixed Height */}
-                <div className="mb-3 p-3 bg-gray-50 rounded-xl text-center h-[52px] flex items-center justify-center">
-                  <span className="text-2xl font-bold text-yellow-600">150</span>
-                  <span className="text-gray-600 ml-2">credits</span>
-                </div>
-
-                {/* Per Grade Cost - Fixed Height */}
-                <div className="mb-3 p-2.5 rounded-lg bg-yellow-50 border border-yellow-300 h-[56px] flex flex-col justify-center">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-600 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-yellow-600">$0.66</span>
-                  </div>
-                  <div className="text-yellow-700 text-[10px] font-semibold">Save 78% vs Basic!</div>
-                </div>
-
-                {/* Benefits Section - Flex grow to push button down */}
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl">
-                  <div className="text-yellow-800 font-bold text-xs mb-1.5">Founder Benefits:</div>
-                  <ul className="text-yellow-700 text-xs space-y-1">
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Exclusive Founder badge
-                    </li>
-                    <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      Founder emblem on labels
-                    </li>
-                  </ul>
-                </div>
-
-                {/* CTA Button - Always at bottom */}
-                {isAuthenticated ? (
-                  <button
-                    onClick={handleFoundersPurchase}
-                    disabled={purchaseLoading !== null}
-                    className="w-full py-3 px-4 rounded-xl font-bold text-base transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-gray-900 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {purchaseLoading === 'founders' ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : (
-                      'Become a Founder'
-                    )}
-                  </button>
-                ) : (
-                  <Link
-                    href="/login?mode=signup&redirect=/credits"
-                    className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-gray-900 shadow-lg hover:shadow-xl"
-                  >
-                    Sign Up to Purchase
-                  </Link>
-                )}
+              <div className="relative mt-1.5 inline-block bg-gray-800/20 text-gray-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                🚀 Save 78%
               </div>
             </div>
-          )}
+
+            {/* Card Body - Flex grow to fill space */}
+            <div className="p-5 flex flex-col flex-grow">
+              {/* Price Section - Fixed Height */}
+              <div className="text-center mb-3 h-[60px] flex flex-col justify-center">
+                <div>
+                  <span className="text-3xl font-bold text-gray-900">$99</span>
+                </div>
+                <p className="text-gray-500 text-xs mt-1">150 credits + VIP emblem</p>
+              </div>
+
+              {/* Credits Display - Fixed Height */}
+              <div className="mb-3 p-3 bg-gray-50 rounded-xl text-center h-[52px] flex items-center justify-center">
+                <span className="text-2xl font-bold text-gray-700">150</span>
+                <span className="text-gray-600 ml-2">credits</span>
+              </div>
+
+              {/* Per Grade Cost - Fixed Height */}
+              <div className="mb-3 p-2.5 rounded-lg bg-gray-100 border border-gray-300 h-[56px] flex flex-col justify-center">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 text-xs font-medium">Cost per grade:</span>
+                  <span className="text-lg font-bold text-gray-700">$0.66</span>
+                </div>
+                <div className="text-gray-600 text-[10px] font-semibold">Save 78% vs Basic!</div>
+              </div>
+
+              {/* Benefits Section - Flex grow to push button down */}
+              <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-300 rounded-xl">
+                <div className="text-gray-800 font-bold text-xs mb-1.5">Best Price + Added Perks:</div>
+                <ul className="text-gray-700 text-xs space-y-1">
+                  <li className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-gray-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    VIP diamond emblem on labels
+                  </li>
+                  <li className="flex items-center gap-1.5">
+                    <svg className="w-3 h-3 text-gray-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    Best cost per grade
+                  </li>
+                </ul>
+              </div>
+
+              {/* CTA Button - Always at bottom */}
+              {isAuthenticated ? (
+                <button
+                  onClick={handleVipPurchase}
+                  disabled={purchaseLoading !== null}
+                  className="w-full py-3 px-4 rounded-xl font-bold text-base transition-all duration-200 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ background: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 50%, #6b7280 100%)' }}
+                >
+                  {purchaseLoading === 'vip' ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : (
+                    'Get VIP Package'
+                  )}
+                </button>
+              ) : (
+                <Link
+                  href="/login?mode=signup&redirect=/credits"
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 text-white shadow-lg hover:shadow-xl"
+                  style={{ background: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 50%, #6b7280 100%)' }}
+                >
+                  Sign Up to Purchase
+                </Link>
+              )}
+            </div>
+          </div>
 
           {pricingTiers.map((tier) => (
             <div
@@ -653,6 +748,170 @@ function CreditsPageContent() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Card Lovers Subscription Section */}
+        <div className="mt-12">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900">Join our Card Lovers <span className="text-rose-500">♥</span> Program</h2>
+            <p className="text-gray-600 mt-2">Get credits every month plus exclusive perks</p>
+          </div>
+
+          <div className="max-w-md mx-auto">
+            <div className="relative bg-white rounded-2xl shadow-xl overflow-hidden ring-4 ring-rose-300">
+              {/* Header with Toggle */}
+              <div className="bg-gradient-to-r from-purple-600 to-rose-500 px-5 py-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">♥</span>
+                    <h3 className="text-xl font-bold text-white">Card Lovers</h3>
+                  </div>
+                  {isCardLover && (
+                    <div className="bg-green-400 text-green-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                      ACTIVE
+                    </div>
+                  )}
+                </div>
+
+                {/* Plan Toggle */}
+                <div className="flex items-center justify-center gap-2 bg-white/20 rounded-full p-1">
+                  <button
+                    onClick={() => setCardLoversSelectedPlan('annual')}
+                    className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                      cardLoversSelectedPlan === 'annual'
+                        ? 'bg-white text-purple-700'
+                        : 'text-white/80 hover:text-white'
+                    }`}
+                  >
+                    Annual
+                  </button>
+                  <button
+                    onClick={() => setCardLoversSelectedPlan('monthly')}
+                    className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-all ${
+                      cardLoversSelectedPlan === 'monthly'
+                        ? 'bg-white text-purple-700'
+                        : 'text-white/80 hover:text-white'
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              </div>
+
+              {/* Card Body */}
+              <div className="p-5">
+                {/* Price Section */}
+                <div className="text-center mb-4">
+                  {cardLoversSelectedPlan === 'annual' ? (
+                    <>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-3xl font-bold text-gray-900">$37.42</span>
+                        <span className="text-gray-500 text-sm">/month</span>
+                      </div>
+                      <p className="text-gray-500 text-xs mt-1">Billed annually at $449/year</p>
+                      <div className="inline-block mt-2 bg-green-100 text-green-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                        Save $150/year vs monthly
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-center gap-2">
+                        <span className="text-3xl font-bold text-gray-900">$49.99</span>
+                        <span className="text-gray-500 text-sm">/month</span>
+                      </div>
+                      <p className="text-gray-500 text-xs mt-1">Billed monthly, cancel anytime</p>
+                    </>
+                  )}
+                </div>
+
+                {/* Credits Display */}
+                <div className="mb-4 p-3 bg-gradient-to-r from-purple-50 to-rose-50 rounded-xl text-center">
+                  <span className="text-2xl font-bold text-purple-600">
+                    {cardLoversSelectedPlan === 'annual' ? '900' : '70'}
+                  </span>
+                  <span className="text-gray-600 ml-2">
+                    {cardLoversSelectedPlan === 'annual' ? 'credits upfront' : 'credits/month'}
+                  </span>
+                  {cardLoversSelectedPlan === 'annual' && (
+                    <p className="text-xs text-purple-600 mt-1">Includes 60 bonus credits!</p>
+                  )}
+                </div>
+
+                {/* Benefits */}
+                <div className="mb-4 p-3 bg-gray-50 rounded-xl">
+                  <ul className="text-gray-700 text-sm space-y-2">
+                    <li className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span><strong>20% off</strong> all future additional credit purchases</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span><strong>Card Lover</strong> heart emblem on labels</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <svg className="w-4 h-4 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      <span><strong>Credits roll over</strong> forever</span>
+                    </li>
+                    {cardLoversSelectedPlan === 'monthly' && (
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                        <span><strong>Loyalty bonuses</strong> at milestones</span>
+                      </li>
+                    )}
+                  </ul>
+                </div>
+
+                {/* CTA Button */}
+                {isAuthenticated ? (
+                  isCardLover ? (
+                    <div className="w-full py-3 px-4 rounded-xl font-bold text-base text-center bg-green-100 text-green-700">
+                      You&apos;re a Card Lover!
+                    </div>
+                  ) : (
+                    <button
+                      onClick={handleCardLoversSubscribe}
+                      disabled={purchaseLoading !== null}
+                      className="w-full py-3 px-4 rounded-xl font-bold text-base transition-all duration-200 bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {purchaseLoading === 'card_lovers' ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Processing...
+                        </span>
+                      ) : (
+                        `Subscribe ${cardLoversSelectedPlan === 'annual' ? 'Annually' : 'Monthly'}`
+                      )}
+                    </button>
+                  )
+                ) : (
+                  <Link
+                    href="/login?mode=signup&redirect=/credits"
+                    className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white shadow-lg hover:shadow-xl"
+                  >
+                    Sign Up to Subscribe
+                  </Link>
+                )}
+
+                {/* Learn More Link */}
+                <div className="mt-3 text-center">
+                  <Link href="/card-lovers" className="text-purple-600 hover:text-purple-700 text-sm font-medium">
+                    Learn more about Card Lovers →
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Features */}

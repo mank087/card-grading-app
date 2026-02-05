@@ -94,11 +94,13 @@ export function CardSlab({
   showCardLoversEmblem = false,
 }: CardSlabProps) {
   const isModern = labelStyle === 'modern'
-  // Size configurations
+  // Size configurations - heights match between front/back labels for consistency
   const sizeConfig = {
     sm: {
       logoHeight: 'h-7',
-      nameFontSize: '11px',
+      nameMaxFontSize: 11,
+      nameMinFontSize: 8,
+      maxNameChars: 18,
       setFontSize: '9px',
       featureFontSize: 'text-[8px]',
       serialFontSize: 'text-[8px]',
@@ -114,7 +116,9 @@ export function CardSlab({
     },
     md: {
       logoHeight: 'h-9',
-      nameFontSize: '13px',
+      nameMaxFontSize: 13,
+      nameMinFontSize: 9,
+      maxNameChars: 22,
       setFontSize: '11px',
       featureFontSize: 'text-[10px]',
       serialFontSize: 'text-[10px]',
@@ -130,7 +134,9 @@ export function CardSlab({
     },
     lg: {
       logoHeight: 'h-14',
-      nameFontSize: '14px',
+      nameMaxFontSize: 14,
+      nameMinFontSize: 10,
+      maxNameChars: 26,
       setFontSize: '12px',
       featureFontSize: 'text-[11px]',
       serialFontSize: 'text-[11px]',
@@ -148,17 +154,10 @@ export function CardSlab({
 
   const config = sizeConfig[size]
 
-  // Calculate scale for name to fit on single line
-  const maxCharsAtFullSize = 20
-  const nameScaleX = displayName.length <= maxCharsAtFullSize
-    ? 1
-    : Math.max(0.55, maxCharsAtFullSize / displayName.length)
-
-  // Dynamic set line font size
-  const dynamicSetFontSize = setLineText.length > 50 ? '8px'
-    : setLineText.length > 40 ? '9px'
-    : setLineText.length > 30 ? '10px'
-    : config.setFontSize
+  // Calculate dynamic font size for name (shrink to fit instead of scaleX)
+  const nameFontSize = displayName.length <= config.maxNameChars
+    ? config.nameMaxFontSize
+    : Math.max(config.nameMinFontSize, Math.floor(config.nameMaxFontSize * (config.maxNameChars / displayName.length)))
 
   // Slab border styles - modern has dark with glow, traditional has metallic purple
   const slabBorderStyle = isModern
@@ -187,28 +186,24 @@ export function CardSlab({
 
         {/* Center: Card Information */}
         <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-          {/* Line 1: Player/Card Name */}
+          {/* Line 1: Player/Card Name - font shrinks to fit */}
           <div
-            className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
+            className="font-bold text-gray-900 leading-tight"
             style={{
-              fontSize: config.nameFontSize,
-              transform: `scaleX(${nameScaleX})`,
-              lineHeight: '1.2'
+              fontSize: `${nameFontSize}px`,
+              lineHeight: '1.2',
+              wordBreak: 'break-word'
             }}
             title={displayName}
           >
             {displayName}
           </div>
 
-          {/* Line 2: Set Name */}
+          {/* Line 2: Set Name - wraps freely */}
           <div
             className="text-gray-700 leading-tight"
             style={{
-              fontSize: dynamicSetFontSize,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
+              fontSize: config.setFontSize,
               wordBreak: 'break-word'
             }}
             title={setLineText}
@@ -218,13 +213,16 @@ export function CardSlab({
 
           {/* Line 3: Special Features */}
           {features.length > 0 && (
-            <div className={`text-blue-600 font-semibold ${config.featureFontSize} leading-tight truncate`}>
+            <div
+              className={`text-blue-600 font-semibold ${config.featureFontSize} leading-tight`}
+              style={{ wordBreak: 'break-word' }}
+            >
               {features.join(' • ')}
             </div>
           )}
 
           {/* Line 4: DCM Serial Number */}
-          <div className={`text-gray-500 font-mono truncate ${config.serialFontSize} leading-tight`}>
+          <div className={`text-gray-500 font-mono ${config.serialFontSize} leading-tight`}>
             {serial}
           </div>
         </div>
@@ -515,17 +513,18 @@ export function CardSlabGrid({
 }: CardSlabGridProps) {
   const isModern = labelStyle === 'modern'
 
-  // Calculate scale for name to fit on single line
-  const maxCharsAtFullSize = 20
-  const nameScaleX = displayName.length <= maxCharsAtFullSize
-    ? 1
-    : Math.max(0.55, maxCharsAtFullSize / displayName.length)
+  // Grid-specific config
+  const gridConfig = {
+    nameMaxFontSize: 13,
+    nameMinFontSize: 9,
+    maxNameChars: 22,
+    setFontSize: '11px',
+  }
 
-  // Dynamic set line font size
-  const dynamicSetFontSize = setLineText.length > 50 ? '8px'
-    : setLineText.length > 40 ? '9px'
-    : setLineText.length > 30 ? '10px'
-    : '11px'
+  // Calculate dynamic font size for name (shrink to fit instead of scaleX)
+  const nameFontSize = displayName.length <= gridConfig.maxNameChars
+    ? gridConfig.nameMaxFontSize
+    : Math.max(gridConfig.nameMinFontSize, Math.floor(gridConfig.nameMaxFontSize * (gridConfig.maxNameChars / displayName.length)))
 
   // Slab border styles - modern has dark with glow, traditional has metallic purple
   const slabBorderStyle = isModern
@@ -563,28 +562,24 @@ export function CardSlabGrid({
 
         {/* Center: Card Information */}
         <div className="flex-1 min-w-0 mx-1 flex flex-col justify-center gap-0.5">
-          {/* Line 1: Player/Card Name */}
+          {/* Line 1: Player/Card Name - font shrinks to fit */}
           <div
-            className="font-bold text-gray-900 leading-tight whitespace-nowrap origin-left"
+            className="font-bold text-gray-900 leading-tight"
             style={{
-              fontSize: '13px',
-              transform: `scaleX(${nameScaleX})`,
-              lineHeight: '1.2'
+              fontSize: `${nameFontSize}px`,
+              lineHeight: '1.2',
+              wordBreak: 'break-word'
             }}
             title={displayName}
           >
             {displayName}
           </div>
 
-          {/* Line 2: Set Name */}
+          {/* Line 2: Set Name - wraps freely */}
           <div
             className="text-gray-700 leading-tight"
             style={{
-              fontSize: dynamicSetFontSize,
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
+              fontSize: gridConfig.setFontSize,
               wordBreak: 'break-word'
             }}
             title={setLineText}
@@ -594,13 +589,16 @@ export function CardSlabGrid({
 
           {/* Line 3: Special Features */}
           {features.length > 0 && (
-            <div className="text-blue-600 font-semibold text-[10px] leading-tight truncate">
+            <div
+              className="text-blue-600 font-semibold text-[10px] leading-tight"
+              style={{ wordBreak: 'break-word' }}
+            >
               {features.join(' • ')}
             </div>
           )}
 
           {/* Line 4: DCM Serial Number */}
-          <div className="text-gray-500 font-mono truncate text-[10px] leading-tight">
+          <div className="text-gray-500 font-mono text-[10px] leading-tight">
             {serial}
           </div>
         </div>

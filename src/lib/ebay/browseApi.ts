@@ -419,7 +419,7 @@ export interface QueryStrategy {
 function cleanCardNumber(cardNumber?: string): string | null {
   if (!cardNumber) return null;
 
-  let cleaned = cardNumber
+  const cleaned = cardNumber
     // Remove common label prefixes that might be included
     .replace(/^(Card\s*Number|Card\s*#|Number|No\.?)\s*:?\s*/i, '')
     // Remove # prefix (we'll add it back)
@@ -714,7 +714,7 @@ function cleanPokemonCardName(name: string): string {
  */
 function formatPokemonCardNumber(cardNumber: string): string {
   // Clean up the number
-  let cleaned = cardNumber
+  const cleaned = cardNumber
     .replace(/^(Card\s*Number|Card\s*#|Number|No\.?)\s*:?\s*/i, '')
     .replace(/^#\s*/, '')
     .trim();
@@ -1517,7 +1517,7 @@ function cleanOtherCardName(name: string): string {
  * Prioritizes keeping the number visible in search
  */
 function formatOtherCardNumber(cardNumber: string): string {
-  let cleaned = cardNumber
+  const cleaned = cardNumber
     .replace(/^(Card\s*Number|Card\s*#|Number|No\.?)\s*:?\s*/i, '')
     .replace(/^#\s*/, '')
     .trim();

@@ -2,13 +2,19 @@ import { Metadata } from 'next';
 import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
 export const metadata: Metadata = {
-  title: 'Grading Rubric',
+  title: 'Grading Rubric - How We Grade Cards',
   description: 'Understand DCM\'s professional grading standards. Our 30-point inspection with three-pass consensus technology evaluates centering, corners, edges, and surface condition for accurate card grades.',
-  keywords: 'card grading rubric, grading standards, PSA grading scale, BGS grading, card condition, centering, corners, edges, surface, DCM Optic, three-pass grading',
+  keywords: 'card grading rubric, grading standards, PSA grading scale, BGS grading, card condition, centering, corners, edges, surface, DCM Optic, three-pass grading, how cards are graded',
   openGraph: {
-    title: 'DCM Grading Rubric - Professional Grading Standards',
+    title: 'Grading Rubric - How DCM Grades Cards',
     description: 'Learn how DCM grades trading cards with our comprehensive 30-point inspection and three-pass consensus technology.',
     type: 'website',
+    siteName: 'DCM Grading',
+  },
+  twitter: {
+    card: 'summary',
+    title: 'DCM Grading Rubric',
+    description: '30-point inspection with three-pass consensus technology for accurate card grades.',
   },
 };
 

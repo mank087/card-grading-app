@@ -303,7 +303,7 @@ export function enforceWholeNumberScale(grade: number | null): number | null {
  */
 export function validateGrade(result: VisionGradeResult): VisionGradeResult {
   // Step 1: Enforce grade caps based on defects/checks
-  let validated = enforceGradeCaps(result);
+  const validated = enforceGradeCaps(result);
 
   // Step 2: Enforce whole number scale (v7.4: no more half-points)
   if (validated.recommended_grade.recommended_decimal_grade !== null) {

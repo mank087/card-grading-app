@@ -1,6 +1,6 @@
 /**
- * API to get/set user's preferred label emblem
- * Options: 'founder', 'card_lover', 'both', 'none'
+ * API to get/set user's preferred label emblems
+ * Users can select 0, 1, or 2 emblems to display on their card labels
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,7 +29,7 @@ function getServiceClient() {
   );
 }
 
-export type LabelEmblemPreference = 'founder' | 'card_lover' | 'both' | 'none';
+export type EmblemType = 'founder' | 'vip' | 'card_lover';
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     const serviceClient = getServiceClient();
     const { data: credits, error } = await serviceClient
       .from('user_credits')
-      .select('preferred_label_emblem, is_founder, is_card_lover, show_founder_badge, show_card_lover_badge')
+      .select('preferred_label_emblem, is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge')
       .eq('user_id', user.id)
       .single();
 
@@ -61,11 +61,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch preference' }, { status: 500 });
     }
 
+    // Parse the stored preference (comma-separated string) into an array
+    const storedPref = credits?.preferred_label_emblem || '';
+    let selectedEmblems: EmblemType[] = [];
+
+    if (storedPref && storedPref !== 'none' && storedPref !== 'auto') {
+      // Handle new format (comma-separated) and legacy single values
+      selectedEmblems = storedPref.split(',').filter((e: string) =>
+        ['founder', 'vip', 'card_lover'].includes(e)
+      ) as EmblemType[];
+    } else if (storedPref === 'auto') {
+      // Legacy 'auto' - convert to showing all available emblems (max 2)
+      const available: EmblemType[] = [];
+      if (credits?.is_founder) available.push('founder');
+      if (credits?.is_vip) available.push('vip');
+      if (credits?.is_card_lover) available.push('card_lover');
+      selectedEmblems = available.slice(0, 2);
+    }
+
     return NextResponse.json({
-      preferredLabelEmblem: credits?.preferred_label_emblem || 'both',
+      selectedEmblems,
+      // Legacy field for backward compatibility
+      preferredLabelEmblem: storedPref || 'none',
       isFounder: credits?.is_founder || false,
+      isVip: credits?.is_vip || false,
       isCardLover: credits?.is_card_lover || false,
       showFounderBadge: credits?.show_founder_badge ?? true,
+      showVipBadge: credits?.show_vip_badge ?? true,
       showCardLoverBadge: credits?.show_card_lover_badge ?? true,
     });
   } catch (error) {
@@ -93,32 +115,57 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { preferredLabelEmblem } = body as { preferredLabelEmblem: LabelEmblemPreference };
+    const { selectedEmblems } = body as { selectedEmblems: EmblemType[] };
 
-    // Validate preference
-    const validPreferences: LabelEmblemPreference[] = ['founder', 'card_lover', 'both', 'none'];
-    if (!preferredLabelEmblem || !validPreferences.includes(preferredLabelEmblem)) {
+    // Validate selectedEmblems
+    if (!Array.isArray(selectedEmblems)) {
       return NextResponse.json(
-        { error: 'Invalid preference. Must be one of: founder, card_lover, both, none' },
+        { error: 'selectedEmblems must be an array' },
         { status: 400 }
       );
     }
 
-    // Update user's preference and also set the individual badge flags for backward compatibility
-    // This ensures the preference controls both the legacy toggle fields and the new unified preference
-    const showFounderBadge = preferredLabelEmblem === 'founder' || preferredLabelEmblem === 'both';
-    const showCardLoverBadge = preferredLabelEmblem === 'card_lover' || preferredLabelEmblem === 'both';
+    // Validate max 2 selections
+    if (selectedEmblems.length > 2) {
+      return NextResponse.json(
+        { error: 'Maximum 2 emblems can be selected' },
+        { status: 400 }
+      );
+    }
+
+    // Validate each emblem type
+    const validTypes: EmblemType[] = ['founder', 'vip', 'card_lover'];
+    for (const emblem of selectedEmblems) {
+      if (!validTypes.includes(emblem)) {
+        return NextResponse.json(
+          { error: `Invalid emblem type: ${emblem}. Must be one of: founder, vip, card_lover` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Remove duplicates
+    const uniqueEmblems = [...new Set(selectedEmblems)];
+
+    // Store as comma-separated string, or 'none' if empty
+    const preferenceValue = uniqueEmblems.length > 0 ? uniqueEmblems.join(',') : 'none';
+
+    // Set individual badge flags based on selection
+    const showFounderBadge = uniqueEmblems.includes('founder');
+    const showVipBadge = uniqueEmblems.includes('vip');
+    const showCardLoverBadge = uniqueEmblems.includes('card_lover');
 
     const serviceClient = getServiceClient();
     const { data, error } = await serviceClient
       .from('user_credits')
       .update({
-        preferred_label_emblem: preferredLabelEmblem,
+        preferred_label_emblem: preferenceValue,
         show_founder_badge: showFounderBadge,
+        show_vip_badge: showVipBadge,
         show_card_lover_badge: showCardLoverBadge,
       })
       .eq('user_id', user.id)
-      .select('preferred_label_emblem, show_founder_badge, show_card_lover_badge')
+      .select('preferred_label_emblem, show_founder_badge, show_vip_badge, show_card_lover_badge')
       .single();
 
     if (error) {
@@ -128,6 +175,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      selectedEmblems: uniqueEmblems,
       preferredLabelEmblem: data.preferred_label_emblem,
     });
   } catch (error) {

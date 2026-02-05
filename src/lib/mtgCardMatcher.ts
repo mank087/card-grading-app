@@ -174,7 +174,7 @@ export function normalizeSetCode(code: string): string {
 export function normalizeCollectorNumber(num: string): string {
   if (!num) return '';
 
-  let normalized = num.trim();
+  const normalized = num.trim();
 
   // If purely numeric, remove leading zeros
   if (/^\d+$/.test(normalized)) {

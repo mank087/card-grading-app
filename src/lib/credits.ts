@@ -32,7 +32,10 @@ export interface UserCredits {
   card_lover_plan: 'monthly' | 'annual' | null;
   card_lover_months_active: number;
   show_card_lover_badge: boolean;
-  preferred_label_emblem: 'founder' | 'card_lover' | 'none' | 'auto';
+  // VIP fields
+  is_vip: boolean;
+  show_vip_badge: boolean;
+  preferred_label_emblem: 'founder' | 'card_lover' | 'vip' | 'none' | 'auto';
   created_at: string;
   updated_at: string;
 }
@@ -862,5 +865,120 @@ export async function getLabelEmblem(userId: string): Promise<'founder' | 'card_
 export async function getCardLoverDiscount(userId: string): Promise<number> {
   const isActive = await isActiveCardLover(userId);
   return isActive ? 0.20 : 0;
+}
+
+/**
+ * Check if user has founder discount on credit purchases
+ * Founders get 20% off, but Card Lovers discount takes precedence when user has both
+ * (they get the same 20% rate, but we label it as Card Lovers discount)
+ */
+export async function hasFounderDiscount(userId: string): Promise<boolean> {
+  const credits = await getUserCredits(userId);
+  if (!credits || !credits.is_founder) return false;
+
+  // Card Lover discount takes precedence (same rate, different label)
+  const isActiveSubscriber = await isActiveCardLover(userId);
+  if (isActiveSubscriber) return false;
+
+  return true;
+}
+
+/**
+ * Check if user is a VIP
+ */
+export async function isVip(userId: string): Promise<boolean> {
+  const credits = await getUserCredits(userId);
+  return credits !== null && credits.is_vip;
+}
+
+/**
+ * Set user as VIP and add credits (called after VIP Package purchase)
+ * Can be purchased multiple times - adds 150 credits each time
+ */
+export async function setVipStatus(
+  userId: string,
+  options: {
+    stripeSessionId?: string;
+    stripePaymentIntentId?: string;
+  } = {}
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  // Get current credits
+  const credits = await getUserCredits(userId);
+  if (!credits) {
+    return { success: false, error: 'User credits not found' };
+  }
+
+  const vipCredits = 150;
+  const newBalance = credits.balance + vipCredits;
+  const isFirstVipPurchase = !credits.is_vip;
+
+  // Update user as VIP and add credits
+  const updateData: Record<string, unknown> = {
+    balance: newBalance,
+    total_purchased: credits.total_purchased + vipCredits,
+  };
+
+  // Only set VIP status fields on first purchase
+  if (isFirstVipPurchase) {
+    updateData.is_vip = true;
+    updateData.show_vip_badge = true;
+  }
+
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update(updateData)
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('Error setting VIP status:', updateError);
+    return { success: false, error: 'Database error' };
+  }
+
+  // Record the transaction
+  const description = isFirstVipPurchase
+    ? 'VIP Package - 150 credits'
+    : 'VIP Package (additional) - 150 credits';
+
+  const { error: transactionError } = await supabase.from('credit_transactions').insert({
+    user_id: userId,
+    type: 'purchase',
+    amount: vipCredits,
+    balance_after: newBalance,
+    description,
+    stripe_session_id: options.stripeSessionId,
+    stripe_payment_intent_id: options.stripePaymentIntentId,
+    metadata: { package: 'vip', isRepeatPurchase: !isFirstVipPurchase },
+  });
+
+  if (transactionError) {
+    console.error('Failed to record VIP transaction:', transactionError);
+    // Don't fail - credits were added, just audit log is incomplete
+  }
+
+  return { success: true };
+}
+
+/**
+ * Toggle VIP badge visibility on labels
+ */
+export async function toggleVipBadge(
+  userId: string,
+  showBadge: boolean
+): Promise<{ success: boolean; error?: string }> {
+  const supabase = getServiceClient();
+
+  const { error } = await supabase
+    .from('user_credits')
+    .update({ show_vip_badge: showBadge })
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error toggling VIP badge:', error);
+    return { success: false, error: 'Database error' };
+  }
+
+  return { success: true };
 }
 
