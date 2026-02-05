@@ -49,16 +49,21 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'mini-jpg' | 'card-images' | null>(null);
-  const [isDropdownOpen, setIsDropdownOpen] = React.useState(false);
+  const [isLabelsDropdownOpen, setIsLabelsDropdownOpen] = React.useState(false);
+  const [isReportsDropdownOpen, setIsReportsDropdownOpen] = React.useState(false);
   const [isAveryModalOpen, setIsAveryModalOpen] = React.useState(false);
   const [isAvery8167ModalOpen, setIsAvery8167ModalOpen] = React.useState(false);
-  const dropdownRef = React.useRef<HTMLDivElement>(null);
+  const labelsDropdownRef = React.useRef<HTMLDivElement>(null);
+  const reportsDropdownRef = React.useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
+  // Close dropdowns when clicking outside
   React.useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
+      if (labelsDropdownRef.current && !labelsDropdownRef.current.contains(event.target as Node)) {
+        setIsLabelsDropdownOpen(false);
+      }
+      if (reportsDropdownRef.current && !reportsDropdownRef.current.contains(event.target as Node)) {
+        setIsReportsDropdownOpen(false);
       }
     };
 
@@ -505,7 +510,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     try {
       setIsGenerating(true);
       setGeneratingType('label');
-      setIsDropdownOpen(false);
+      setIsReportsDropdownOpen(false);
 
       console.log('[FOLDABLE LABEL] Starting generation...');
 
@@ -598,13 +603,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   // Wrapper for full report download
   const handleDownloadReport = () => {
     setGeneratingType('report');
-    setIsDropdownOpen(false);
+    setIsReportsDropdownOpen(false);
     handleDownload();
   };
 
   // Open Avery label modal
   const handleOpenAveryModal = () => {
-    setIsDropdownOpen(false);
+    setIsLabelsDropdownOpen(false);
     setIsAveryModalOpen(true);
   };
 
@@ -615,7 +620,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     try {
       setIsGenerating(true);
       setGeneratingType('mini-jpg');
-      setIsDropdownOpen(false);
+      setIsReportsDropdownOpen(false);
 
       console.log('[MINI-REPORT JPG] Starting generation...');
 
@@ -718,7 +723,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     try {
       setIsGenerating(true);
       setGeneratingType('card-images');
-      setIsDropdownOpen(false);
+      setIsLabelsDropdownOpen(false);
 
       console.log('[CARD IMAGES] Starting generation...');
 
@@ -958,7 +963,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
    * Handle opening the Avery 8167 position selector modal
    */
   const handleOpenAvery8167Modal = () => {
-    setIsDropdownOpen(false);
+    setIsLabelsDropdownOpen(false);
     setIsAvery8167ModalOpen(true);
   };
 
@@ -1019,31 +1024,13 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     }
   };
 
-  // Dropdown menu items
-  const menuItems = [
+  // Labels dropdown menu items (card images and printable labels for slabs/toploaders)
+  const labelsMenuItems = [
     {
       id: 'card-images',
       label: 'Card Images with Grade Label (Front & Back)',
       description: 'Images for Online Marketplaces and Social Media Sharing',
       onClick: handleDownloadCardImages,
-    },
-    {
-      id: 'mini-jpg',
-      label: 'Mini-Report Image',
-      description: 'For Online Marketplaces and Social Media Sharing',
-      onClick: handleDownloadMiniJpg,
-    },
-    {
-      id: 'report',
-      label: 'Full Grading Report',
-      description: 'Complete PDF with all details',
-      onClick: handleDownloadReport,
-    },
-    {
-      id: 'label',
-      label: 'Mini-Report (PDF)',
-      description: 'Fold or cut to 2.5" × 3.5"',
-      onClick: handleDownloadLabel,
     },
     {
       id: 'avery',
@@ -1059,45 +1046,115 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     },
   ];
 
-  // Compact variant (smaller dropdown)
+  // Reports dropdown menu items (all report formats)
+  const reportsMenuItems = [
+    {
+      id: 'report',
+      label: 'Full Grading Report',
+      description: 'Complete PDF with all details',
+      onClick: handleDownloadReport,
+    },
+    {
+      id: 'label',
+      label: 'Mini-Report (PDF)',
+      description: 'Fold or cut to 2.5" × 3.5"',
+      onClick: handleDownloadLabel,
+    },
+    {
+      id: 'mini-jpg',
+      label: 'Mini-Report Image',
+      description: 'For Online Marketplaces and Social Media Sharing',
+      onClick: handleDownloadMiniJpg,
+    },
+  ];
+
+  // Compact variant (smaller buttons)
   if (variant === 'compact') {
     return (
-      <div className="relative" ref={dropdownRef}>
-        <button
-          onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          disabled={isGenerating}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-medium"
-          title="Download Options"
-        >
-          {isGenerating ? (
-            <span>Generating...</span>
-          ) : (
-            <>
-              <span>Download Label or Report</span>
-              <svg className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </>
-          )}
-        </button>
+      <div className="flex gap-2">
+        {/* Labels Dropdown Button */}
+        <div className="relative" ref={labelsDropdownRef}>
+          <button
+            onClick={() => setIsLabelsDropdownOpen(!isLabelsDropdownOpen)}
+            disabled={isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167')}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-medium"
+            title="Download Labels"
+          >
+            {isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167') ? (
+              <span>Generating...</span>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <span>Labels</span>
+                <svg className={`w-4 h-4 transition-transform ${isLabelsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
 
-        {/* Dropdown Menu */}
-        {isDropdownOpen && !isGenerating && (
-          <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={item.onClick}
-                className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left"
-              >
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">{item.label}</div>
-                  <div className="text-xs text-gray-500">{item.description}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
+          {/* Labels Dropdown Menu */}
+          {isLabelsDropdownOpen && !isGenerating && (
+            <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+              {labelsMenuItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={item.onClick}
+                  className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left"
+                >
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">{item.label}</div>
+                    <div className="text-xs text-gray-500">{item.description}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Reports Dropdown Button */}
+        <div className="relative" ref={reportsDropdownRef}>
+          <button
+            onClick={() => setIsReportsDropdownOpen(!isReportsDropdownOpen)}
+            disabled={isGenerating && (generatingType === 'report' || generatingType === 'label' || generatingType === 'mini-jpg')}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-medium"
+            title="Download Reports"
+          >
+            {isGenerating && (generatingType === 'report' || generatingType === 'label' || generatingType === 'mini-jpg') ? (
+              <span>Generating...</span>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <span>Reports</span>
+                <svg className={`w-4 h-4 transition-transform ${isReportsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </>
+            )}
+          </button>
+
+          {/* Reports Dropdown Menu */}
+          {isReportsDropdownOpen && !isGenerating && (
+            <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+              {reportsMenuItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={item.onClick}
+                  className="w-full flex items-start px-4 py-3 hover:bg-indigo-50 transition-colors text-left"
+                >
+                  <div>
+                    <div className="font-medium text-gray-900 text-sm">{item.label}</div>
+                    <div className="text-xs text-gray-500">{item.description}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* Avery Label Position Modal */}
         <AveryLabelModal
@@ -1118,44 +1175,92 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     );
   }
 
-  // Default variant (larger dropdown button)
+  // Default variant (larger buttons)
   return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-        disabled={isGenerating}
-        className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
-        title="Download Options"
-      >
-        {isGenerating ? (
-          <span>{generatingType === 'label' ? 'Generating Label...' : generatingType === 'avery' ? 'Generating Label...' : generatingType === 'avery8167' ? 'Generating Labels...' : generatingType === 'mini-jpg' ? 'Generating Image...' : generatingType === 'card-images' ? 'Generating Images...' : 'Generating Report...'}</span>
-        ) : (
-          <>
-            <span>Download Label or Report</span>
-            <svg className={`w-5 h-5 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </>
-        )}
-      </button>
+    <div className="flex gap-3">
+      {/* Labels Dropdown Button */}
+      <div className="relative" ref={labelsDropdownRef}>
+        <button
+          onClick={() => setIsLabelsDropdownOpen(!isLabelsDropdownOpen)}
+          disabled={isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167')}
+          className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
+          title="Download Labels"
+        >
+          {isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167') ? (
+            <span>{generatingType === 'avery' ? 'Generating Label...' : generatingType === 'avery8167' ? 'Generating Labels...' : 'Generating Images...'}</span>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              <span>Labels</span>
+              <svg className={`w-5 h-5 transition-transform ${isLabelsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </>
+          )}
+        </button>
 
-      {/* Dropdown Menu */}
-      {isDropdownOpen && !isGenerating && (
-        <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
-          {menuItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={item.onClick}
-              className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
-            >
-              <div>
-                <div className="font-semibold text-gray-900">{item.label}</div>
-                <div className="text-sm text-gray-500">{item.description}</div>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
+        {/* Labels Dropdown Menu */}
+        {isLabelsDropdownOpen && !isGenerating && (
+          <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+            {labelsMenuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={item.onClick}
+                className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+              >
+                <div>
+                  <div className="font-semibold text-gray-900">{item.label}</div>
+                  <div className="text-sm text-gray-500">{item.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Reports Dropdown Button */}
+      <div className="relative" ref={reportsDropdownRef}>
+        <button
+          onClick={() => setIsReportsDropdownOpen(!isReportsDropdownOpen)}
+          disabled={isGenerating && (generatingType === 'report' || generatingType === 'label' || generatingType === 'mini-jpg')}
+          className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
+          title="Download Reports"
+        >
+          {isGenerating && (generatingType === 'report' || generatingType === 'label' || generatingType === 'mini-jpg') ? (
+            <span>{generatingType === 'report' ? 'Generating Report...' : generatingType === 'label' ? 'Generating PDF...' : 'Generating Image...'}</span>
+          ) : (
+            <>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span>Reports</span>
+              <svg className={`w-5 h-5 transition-transform ${isReportsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </>
+          )}
+        </button>
+
+        {/* Reports Dropdown Menu */}
+        {isReportsDropdownOpen && !isGenerating && (
+          <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+            {reportsMenuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={item.onClick}
+                className="w-full flex items-start px-4 py-3 hover:bg-indigo-50 transition-colors text-left border-b border-gray-100 last:border-b-0"
+              >
+                <div>
+                  <div className="font-semibold text-gray-900">{item.label}</div>
+                  <div className="text-sm text-gray-500">{item.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Avery Label Position Modal */}
       <AveryLabelModal

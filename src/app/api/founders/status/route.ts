@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
       isFounder: credits.is_founder,
       founderPurchasedAt: credits.founder_purchased_at,
       showFounderBadge: credits.show_founder_badge,
+      isVip: credits.is_vip,
+      showVipBadge: credits.show_vip_badge,
     });
   } catch (error) {
     console.error('Founder status check error:', error);
