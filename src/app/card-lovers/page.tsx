@@ -501,7 +501,7 @@ export default function CardLoversPage() {
                     <td className="px-6 py-4 text-center text-gray-700">$1.00</td>
                   </tr>
                   <tr>
-                    <td className="px-6 py-4 text-gray-700">Founders</td>
+                    <td className="px-6 py-4 text-gray-700">VIP</td>
                     <td className="px-6 py-4 text-center text-gray-700">150</td>
                     <td className="px-6 py-4 text-center text-gray-700">$99</td>
                     <td className="px-6 py-4 text-center text-gray-700">$0.66</td>

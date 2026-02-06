@@ -67,6 +67,7 @@ export default function PokemonGradingLanding() {
   const [emailLoading, setEmailLoading] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [cardLoversPlan, setCardLoversPlan] = useState<'monthly' | 'annual'>('annual')
 
   useEffect(() => {
     const session = getStoredSession()
@@ -812,21 +813,128 @@ export default function PokemonGradingLanding() {
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
-            {/* Founders Package */}
-            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-yellow-400 flex flex-col">
-              <div className="bg-gradient-to-r from-yellow-400 to-orange-500 px-5 py-4 relative">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-7xl mx-auto">
+            {/* Card Lovers Subscription */}
+            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-rose-400 flex flex-col">
+              <div className="bg-gradient-to-r from-purple-600 to-rose-500 px-5 py-4 relative">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl">⭐</span>
-                    <h3 className="text-xl font-bold text-gray-900">Founders</h3>
+                    <span className="text-2xl">♥</span>
+                    <h3 className="text-xl font-bold text-white">Card Lovers</h3>
                   </div>
-                  <div className="bg-yellow-900/80 text-yellow-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                    EXCLUSIVE
+                  <div className="bg-rose-900/80 text-rose-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    SUBSCRIPTION
                   </div>
                 </div>
-                <div className="mt-1.5 inline-block bg-white/30 text-gray-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  🚀 BEST VALUE
+                {/* Plan Toggle */}
+                <div className="mt-2 flex items-center justify-center gap-1 bg-white/20 rounded-full p-0.5">
+                  <button
+                    onClick={() => setCardLoversPlan('annual')}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                      cardLoversPlan === 'annual'
+                        ? 'bg-white text-purple-700'
+                        : 'text-white/80 hover:text-white'
+                    }`}
+                  >
+                    Annual
+                  </button>
+                  <button
+                    onClick={() => setCardLoversPlan('monthly')}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition-all ${
+                      cardLoversPlan === 'monthly'
+                        ? 'bg-white text-purple-700'
+                        : 'text-white/80 hover:text-white'
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-5 flex flex-col flex-grow">
+                <div className="text-center mb-3">
+                  {cardLoversPlan === 'annual' ? (
+                    <>
+                      <div>
+                        <span className="text-3xl font-bold text-white">$449</span>
+                        <span className="text-gray-400 text-sm ml-1">/year</span>
+                      </div>
+                      <p className="text-gray-500 text-xs mt-1">$37.42/mo • Save $150</p>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <span className="text-3xl font-bold text-white">$49.99</span>
+                        <span className="text-gray-400 text-sm ml-1">/month</span>
+                      </div>
+                      <p className="text-gray-500 text-xs mt-1">Cancel anytime</p>
+                    </>
+                  )}
+                </div>
+
+                <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
+                  <span className="text-2xl font-bold text-rose-400">
+                    {cardLoversPlan === 'annual' ? '900' : '70'}
+                  </span>
+                  <span className="text-gray-300 ml-2">
+                    {cardLoversPlan === 'annual' ? 'credits upfront' : 'credits/mo'}
+                  </span>
+                </div>
+
+                <div className="mb-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/30">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
+                    <span className="text-lg font-bold text-rose-400">
+                      {cardLoversPlan === 'annual' ? '$0.50' : '$0.71'}
+                    </span>
+                  </div>
+                  <div className="text-green-400 text-[10px] font-semibold">
+                    {cardLoversPlan === 'annual' ? 'Our lowest price!' : 'Save 76% vs Basic!'}
+                  </div>
+                </div>
+
+                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-purple-500/10 to-rose-500/10 border border-rose-500/20 rounded-xl">
+                  <div className="text-rose-400 font-bold text-xs mb-1.5">Subscriber Benefits:</div>
+                  <ul className="text-rose-300/80 text-xs space-y-1">
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      20% off all credit purchases
+                    </li>
+                    <li className="flex items-center gap-1.5">
+                      <svg className="w-3 h-3 text-rose-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                      Card Lover emblem on labels
+                    </li>
+                  </ul>
+                </div>
+
+                <Link
+                  href="/login?mode=signup&redirect=/card-lovers"
+                  onClick={() => trackSignupClick('pricing_card_lovers')}
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-700 hover:to-rose-600 text-white shadow-lg hover:shadow-xl cursor-pointer"
+                >
+                  Sign Up to Subscribe
+                </Link>
+              </div>
+            </div>
+
+            {/* VIP Package */}
+            <div className="relative bg-gray-800 rounded-2xl shadow-xl overflow-hidden transform transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl ring-4 ring-indigo-400 flex flex-col">
+              <div className="bg-gradient-to-r from-indigo-500 to-violet-600 px-5 py-4 relative">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">◆</span>
+                    <h3 className="text-xl font-bold text-white">VIP</h3>
+                  </div>
+                  <div className="bg-indigo-900/80 text-indigo-100 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    BEST VALUE
+                  </div>
+                </div>
+                <div className="mt-1.5 inline-block bg-white/30 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  ONE-TIME
                 </div>
               </div>
 
@@ -836,44 +944,44 @@ export default function PokemonGradingLanding() {
                     <span className="text-3xl font-bold text-white">$99</span>
                     <span className="text-gray-400 text-sm ml-1">one-time</span>
                   </div>
-                  <p className="text-gray-500 text-xs mt-1">Lifetime benefits for early supporters</p>
+                  <p className="text-gray-500 text-xs mt-1">No subscription required</p>
                 </div>
 
                 <div className="mb-3 p-3 bg-gray-700/50 rounded-xl text-center">
-                  <span className="text-2xl font-bold text-yellow-400">150</span>
+                  <span className="text-2xl font-bold text-indigo-400">150</span>
                   <span className="text-gray-300 ml-2">credits</span>
                 </div>
 
-                <div className="mb-3 p-2.5 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+                <div className="mb-3 p-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30">
                   <div className="flex items-center justify-between">
                     <span className="text-gray-400 text-xs font-medium">Cost per grade:</span>
-                    <span className="text-lg font-bold text-yellow-400">$0.66</span>
+                    <span className="text-lg font-bold text-indigo-400">$0.66</span>
                   </div>
-                  <div className="text-yellow-500 text-[10px] font-semibold">Save 78% vs Basic!</div>
+                  <div className="text-green-400 text-[10px] font-semibold">Save 78% vs Basic!</div>
                 </div>
 
-                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl">
-                  <div className="text-yellow-400 font-bold text-xs mb-1.5">Lifetime Benefits:</div>
-                  <ul className="text-yellow-300/80 text-xs space-y-1">
+                <div className="flex-grow mb-3 p-2.5 bg-gradient-to-r from-indigo-500/10 to-violet-500/10 border border-indigo-500/20 rounded-xl">
+                  <div className="text-indigo-400 font-bold text-xs mb-1.5">VIP Benefits:</div>
+                  <ul className="text-indigo-300/80 text-xs space-y-1">
                     <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
-                      Exclusive Founder badge
+                      VIP diamond emblem on labels
                     </li>
                     <li className="flex items-center gap-1.5">
-                      <svg className="w-3 h-3 text-yellow-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-3 h-3 text-indigo-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
-                      Founder emblem on labels
+                      Purchase multiple times
                     </li>
                   </ul>
                 </div>
 
                 <Link
                   href="/login?mode=signup&redirect=/credits"
-                  onClick={() => trackSignupClick('pricing_founders')}
-                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-gray-900 shadow-lg hover:shadow-xl cursor-pointer"
+                  onClick={() => trackSignupClick('pricing_vip')}
+                  className="block w-full py-3 px-4 rounded-xl font-bold text-base text-center transition-all duration-200 bg-gradient-to-r from-indigo-500 to-violet-600 hover:from-indigo-600 hover:to-violet-700 text-white shadow-lg hover:shadow-xl cursor-pointer"
                 >
                   Sign Up to Purchase
                 </Link>
