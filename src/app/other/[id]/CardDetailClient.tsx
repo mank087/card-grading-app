@@ -43,7 +43,7 @@ import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottom
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
-import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
+import { OtherPriceLookup } from '@/components/pricing/OtherPriceLookup';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1431,6 +1431,14 @@ export function OtherCardDetails() {
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern');
+  // 💰 DCM Pricing callout state (from PriceCharting API or eBay fallback)
+  const [dcmPriceData, setDcmPriceData] = useState<{
+    estimatedValue: number | null;
+    matchConfidence: 'high' | 'medium' | 'low' | 'none';
+    productName: string | null;
+    priceChartingUrl?: string;
+    source?: 'pricecharting' | 'ebay';
+  } | null>(null);
 
   // Fetch Other Card Details using MTG-specific API
   const fetchOtherCardDetails = useCallback(async () => {
@@ -3129,6 +3137,62 @@ export function OtherCardDetails() {
                 </div>
                 );
               })()}
+
+              {/* 💰 DCM Estimated Price Callout */}
+              {dcmPriceData?.estimatedValue && (
+                <div className={`rounded-xl shadow-lg p-5 border-2 mt-6 ${
+                  dcmPriceData.source === 'ebay'
+                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200'
+                    : 'bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-200'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className={`w-5 h-5 ${dcmPriceData.source === 'ebay' ? 'text-blue-600' : 'text-emerald-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className={`text-sm font-medium ${dcmPriceData.source === 'ebay' ? 'text-blue-700' : 'text-emerald-700'}`}>
+                          {dcmPriceData.source === 'ebay' ? 'eBay Median Price' : 'DCM Estimated Value'}
+                        </span>
+                      </div>
+                      <p className={`text-2xl font-bold ${dcmPriceData.source === 'ebay' ? 'text-blue-800' : 'text-emerald-800'}`}>
+                        ${dcmPriceData.estimatedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                        dcmPriceData.source === 'ebay'
+                          ? (dcmPriceData.matchConfidence === 'high' ? 'bg-blue-100 text-blue-700' :
+                             dcmPriceData.matchConfidence === 'medium' ? 'bg-blue-100 text-blue-600' :
+                             'bg-blue-100 text-blue-500')
+                          : (dcmPriceData.matchConfidence === 'high' ? 'bg-green-100 text-green-700' :
+                             dcmPriceData.matchConfidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                             'bg-orange-100 text-orange-700')
+                      }`}>
+                        {dcmPriceData.source === 'ebay'
+                          ? (dcmPriceData.matchConfidence === 'high' ? 'High Confidence' :
+                             dcmPriceData.matchConfidence === 'medium' ? 'Medium Confidence' : 'Low Confidence')
+                          : (dcmPriceData.matchConfidence === 'high' ? 'Best Match' :
+                             dcmPriceData.matchConfidence === 'medium' ? 'Good Match' : 'Partial Match')}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-3 leading-relaxed">
+                    Card variant may differ from the matched listing. Review and adjust in the{' '}
+                    <a
+                      href="#market-pricing-section"
+                      className="text-emerald-700 font-medium hover:text-emerald-800 underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById('market-pricing-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Market Pricing Section
+                    </a>{' '}
+                    below.
+                  </p>
+                </div>
+              )}
 
               {/* Overall Card Condition Summary */}
               {card.conversational_final_grade_summary && (
@@ -4902,12 +4966,47 @@ export function OtherCardDetails() {
                 </h2>
               </div>
 
+              {/* Market Value Section */}
+              <div id="tour-live-market-pricing">
+                {(() => {
+                  const session = getStoredSession();
+                  const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                  return (
+                    <OtherPriceLookup
+                      card={{
+                        card_name: cardInfo.card_name || card.card_name,
+                        featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                        card_set: extractEnglishForSearch(cardInfo.set_name) || card.card_set,
+                        card_number: cardInfo.card_number || card.card_number,
+                        release_date: cardInfo.year || card.release_date,
+                        subset: cardInfo.subset,
+                        rarity_or_variant: cardInfo.rarity_or_variant,
+                        manufacturer: cardInfo.manufacturer || card.manufacturer,
+                        game_type: cardInfo.game_type || 'other',
+                      }}
+                      cardId={card.id}
+                      dcmGrade={card.conversational_decimal_grade ?? undefined}
+                      isOwner={isPricingOwner}
+                      onPriceLoad={setDcmPriceData}
+                    />
+                  );
+                })()}
+              </div>
+
               {/* Find and Price This Card */}
               <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-lg font-bold mb-3 text-gray-800">Market Listings</h2>
+                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Find and Price This Card or Similar
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || cardInfo.card_name || card.featured || card.card_name} card.
+                </p>
 
-                {/* eBay Marketplace Buttons - Only eBay for Other cards */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {/* eBay Marketplace Buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {/* eBay General Search */}
                   <a
                     href={generateOtherEbaySearchUrl({
@@ -4959,27 +5058,32 @@ export function OtherCardDetails() {
                       <p className="text-xs text-green-700 truncate">Price history</p>
                     </div>
                   </a>
+
+                  {/* PriceCharting Search */}
+                  <a
+                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
+                      [
+                        extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                        extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
+                        cardInfo.card_number || card.card_number
+                      ].filter(Boolean).join(' ')
+                    )}&type=prices`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
+                  >
+                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-purple-900 text-sm">PriceCharting</h3>
+                      <p className="text-xs text-purple-700 truncate">Market data</p>
+                    </div>
+                  </a>
                 </div>
 
-              </div>
-
-              {/* eBay Price Lookup Section */}
-              <div id="tour-live-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <EbayPriceLookup
-                  card={{
-                    card_name: cardInfo.card_name || card.card_name,
-                    featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                    card_set: extractEnglishForSearch(cardInfo.set_name) || card.card_set,
-                    card_number: cardInfo.card_number || card.card_number,
-                    release_date: cardInfo.year || card.release_date,
-                    subset: cardInfo.subset,
-                    rarity_or_variant: cardInfo.rarity_or_variant,
-                    manufacturer: cardInfo.manufacturer || card.manufacturer,
-                    game_type: 'other',
-                  }}
-                  cardId={card.id}
-                  category="other"
-                />
               </div>
 
               {/* Insta-List on eBay Section */}
@@ -4991,20 +5095,20 @@ export function OtherCardDetails() {
                 return (
                   <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                       </div>
                       <div>
                         <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
-                        <p className="text-sm text-gray-500">List this card directly to eBay with one click</p>
+                        <p className="text-sm text-gray-500">List this card directly to eBay</p>
                       </div>
                     </div>
 
-                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-4">
+                    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
-                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div className="text-sm text-gray-700">

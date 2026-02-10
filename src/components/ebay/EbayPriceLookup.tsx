@@ -93,9 +93,16 @@ interface EbayPriceLookupProps {
   };
   cardId?: string;
   category?: 'sports' | 'ccg' | 'other';
+  // Callback when price data is loaded - used to report eBay median price
+  onPriceLoad?: (data: {
+    estimatedValue: number | null;
+    matchConfidence: 'high' | 'medium' | 'low' | 'none';
+    productName: string | null;
+    source: 'ebay';
+  }) => void;
 }
 
-export function EbayPriceLookup({ card, cardId, category = 'sports' }: EbayPriceLookupProps) {
+export function EbayPriceLookup({ card, cardId, category = 'sports', onPriceLoad }: EbayPriceLookupProps) {
   const [priceData, setPriceData] = useState<EbayPriceData | null>(null);
   const [cachedPrices, setCachedPrices] = useState<CachedPriceData | null>(null);
   const [priceHistory, setPriceHistory] = useState<PriceHistoryData | null>(null);
@@ -200,6 +207,17 @@ export function EbayPriceLookup({ card, cardId, category = 'sports' }: EbayPrice
           averagePrice: data.data.average_price,
           medianPrice: data.data.median_price,
         });
+
+        // Report price to parent component
+        if (onPriceLoad && data.data.median_price) {
+          const listingCount = data.data.listing_count || 0;
+          onPriceLoad({
+            estimatedValue: data.data.median_price,
+            matchConfidence: listingCount >= 10 ? 'high' : listingCount >= 5 ? 'medium' : 'low',
+            productName: card.card_name || card.featured || null,
+            source: 'ebay',
+          });
+        }
       } else {
         // No cached data available, fetch live
         await fetchLivePrices();
@@ -265,6 +283,16 @@ export function EbayPriceLookup({ card, cardId, category = 'sports' }: EbayPrice
         listing_count: data.total,
         updated_at: new Date().toISOString(),
       });
+
+      // Report price to parent component
+      if (onPriceLoad && data.medianPrice) {
+        onPriceLoad({
+          estimatedValue: data.medianPrice,
+          matchConfidence: data.total >= 10 ? 'high' : data.total >= 5 ? 'medium' : 'low',
+          productName: card.card_name || card.featured || null,
+          source: 'ebay',
+        });
+      }
     } catch (err) {
       console.error('[EbayPriceLookup] Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch prices');

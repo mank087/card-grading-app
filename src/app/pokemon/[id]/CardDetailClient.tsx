@@ -32,7 +32,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
-import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
+import { PokemonPriceLookup } from '@/components/pricing/PokemonPriceLookup';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -1441,6 +1441,13 @@ export function PokemonCardDetails() {
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  // 💰 DCM Pricing callout state (from PriceCharting API)
+  const [dcmPriceData, setDcmPriceData] = useState<{
+    estimatedValue: number | null;
+    matchConfidence: 'high' | 'medium' | 'low' | 'none';
+    productName: string | null;
+    priceChartingUrl?: string;
+  } | null>(null);
 
   // Fetch Pokemon card details using Pokemon-specific API
   const fetchPokemonCardDetails = useCallback(async () => {
@@ -3158,6 +3165,49 @@ export function PokemonCardDetails() {
                       influenced_grade: card.user_report_influenced_grade || false
                     } : undefined}
                   />
+                </div>
+              )}
+
+              {/* 💰 DCM Estimated Price Callout */}
+              {dcmPriceData?.estimatedValue && (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg p-5 border-2 border-emerald-200 mt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-emerald-700">DCM Estimated Value</span>
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-800">
+                        ${dcmPriceData.estimatedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                        dcmPriceData.matchConfidence === 'high' ? 'bg-green-100 text-green-700' :
+                        dcmPriceData.matchConfidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {dcmPriceData.matchConfidence === 'high' ? 'Best Match' :
+                         dcmPriceData.matchConfidence === 'medium' ? 'Good Match' : 'Partial Match'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-3 leading-relaxed">
+                    Card variant may differ from the matched listing. Review and adjust in the{' '}
+                    <a
+                      href="#market-pricing-section"
+                      className="text-emerald-700 font-medium hover:text-emerald-800 underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById('market-pricing-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Market Pricing Section
+                    </a>{' '}
+                    below.
+                  </p>
                 </div>
               )}
 
@@ -5176,12 +5226,49 @@ export function PokemonCardDetails() {
                 </h2>
               </div>
 
+              {/* PriceCharting Market Value Section */}
+              <div id="tour-live-market-pricing">
+                {(() => {
+                  const session = getStoredSession();
+                  const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                  return (
+                    <PokemonPriceLookup
+                      card={{
+                        id: card.id,
+                        player_or_character: cardInfo.player_or_character || card.featured || card.pokemon_featured,
+                        card_name: cardInfo.card_name || card.card_name,
+                        year: cardInfo.year || card.release_date,
+                        set_name: cardInfo.set_name || card.card_set,
+                        card_number: cardInfo.card_number || card.card_number,
+                        rarity_or_variant: cardInfo.rarity_or_variant,
+                        holofoil: cardInfo.holofoil || card.holofoil,
+                        first_edition: cardInfo.first_edition,
+                        reverse_holo: cardInfo.reverse_holo,
+                        dcm_selected_product_id: card.dcm_selected_product_id,
+                        dcm_selected_product_name: card.dcm_selected_product_name,
+                      }}
+                      dcmGrade={card.conversational_decimal_grade ?? undefined}
+                      isOwner={isPricingOwner}
+                      onPriceLoad={setDcmPriceData}
+                    />
+                  );
+                })()}
+              </div>
+
               {/* Find and Price This Card */}
               <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-lg font-bold mb-3 text-gray-800">Market Listings</h2>
+                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Find and Price This Card or Similar
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || card.featured || card.pokemon_featured || card.card_name} card.
+                </p>
 
                 {/* All Marketplace Buttons in One Row */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   {/* TCGPlayer Search Link - Always use search URL (direct API URLs often timeout) */}
                   {(() => {
                     // Build search URL using card name + number (most reliable)
@@ -5273,27 +5360,31 @@ export function PokemonCardDetails() {
                       <p className="text-xs text-green-700 truncate">Price history</p>
                     </div>
                   </a>
+
+                  {/* PriceCharting Search */}
+                  <a
+                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
+                      [
+                        extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured) || card.pokemon_featured,
+                        cardInfo.card_number || card.card_number
+                      ].filter(Boolean).join(' ')
+                    )}&type=prices`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
+                  >
+                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-purple-900 text-sm">PriceCharting</h3>
+                      <p className="text-xs text-purple-700 truncate">Market data</p>
+                    </div>
+                  </a>
                 </div>
 
-              </div>
-
-              {/* eBay Price Lookup Section */}
-              <div id="tour-live-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <EbayPriceLookup
-                  card={{
-                    card_name: cardInfo.card_name || card.card_name,
-                    featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured) || card.pokemon_featured,
-                    card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(cardInfo.set_era) || card.card_set,
-                    card_number: cardInfo.card_number || card.card_number,
-                    release_date: cardInfo.year || card.release_date,
-                    subset: cardInfo.rarity_tier || cardInfo.subset || card.subset,
-                    rarity_or_variant: cardInfo.rarity_or_variant || cardInfo.variant_type,
-                    manufacturer: cardInfo.manufacturer || 'Pokemon',
-                    category: 'ccg',
-                  }}
-                  cardId={card.id}
-                  category="ccg"
-                />
               </div>
 
               {/* Insta-List on eBay Section */}

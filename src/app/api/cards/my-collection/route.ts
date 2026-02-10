@@ -33,7 +33,10 @@ export async function GET(request: NextRequest) {
         serial_numbering, rarity_tier, rarity_description, autographed, autograph_type,
         memorabilia_type, rookie_card, first_print_rookie, holofoil,
         ebay_price_lowest, ebay_price_median, ebay_price_average, ebay_price_highest,
-        ebay_price_listing_count, ebay_price_updated_at
+        ebay_price_listing_count, ebay_price_updated_at,
+        dcm_price_estimate, dcm_price_raw, dcm_price_graded_high, dcm_price_median, dcm_price_average,
+        dcm_price_updated_at, dcm_price_match_confidence, dcm_price_product_id, dcm_price_product_name,
+        dcm_prices_cached_at, dcm_cached_prices
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
@@ -74,7 +77,7 @@ export async function GET(request: NextRequest) {
     // Note: Client-side Next.js Image component handles optimization
     const urlMap = new Map<string, string>();
     signedUrls?.forEach(item => {
-      if (item.signedUrl) {
+      if (item.path && item.signedUrl) {
         urlMap.set(item.path, item.signedUrl);
       }
     });

@@ -28,6 +28,7 @@ import {
 } from "@/lib/socialUtils";
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
 import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
+import { LorcanaPriceLookup } from '@/components/pricing/LorcanaPriceLookup';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
@@ -1423,6 +1424,13 @@ export function MTGCardDetails() {
   const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern');
+  // 💰 DCM Price data state (for price callout)
+  const [dcmPriceData, setDcmPriceData] = useState<{
+    estimatedValue: number | null;
+    matchConfidence: 'high' | 'medium' | 'low' | 'none';
+    productName: string | null;
+    priceChartingUrl?: string;
+  } | null>(null);
   // 🐛 Parsing error state
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
@@ -3169,6 +3177,49 @@ export function MTGCardDetails() {
                 </div>
                 );
               })()}
+
+              {/* 💰 DCM Estimated Price Callout */}
+              {dcmPriceData?.estimatedValue && (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg p-5 border-2 border-emerald-200 mt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-emerald-700">DCM Estimated Value</span>
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-800">
+                        ${dcmPriceData.estimatedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                        dcmPriceData.matchConfidence === 'high' ? 'bg-green-100 text-green-700' :
+                        dcmPriceData.matchConfidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {dcmPriceData.matchConfidence === 'high' ? 'Best Match' :
+                         dcmPriceData.matchConfidence === 'medium' ? 'Good Match' : 'Partial Match'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-3 leading-relaxed">
+                    Card variant may differ from the matched listing. Review and adjust in the{' '}
+                    <a
+                      href="#market-pricing-section"
+                      className="text-emerald-700 font-medium hover:text-emerald-800 underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById('market-pricing-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Market Pricing Section
+                    </a>{' '}
+                    below.
+                  </p>
+                </div>
+              )}
 
               {/* Overall Card Condition Summary */}
               {card.conversational_final_grade_summary && (
@@ -4972,12 +5023,43 @@ export function MTGCardDetails() {
                 </h2>
               </div>
 
+              {/* Lorcana Price Lookup Section */}
+              <div id="tour-live-market-pricing">
+                <LorcanaPriceLookup
+                  card={{
+                    id: card.id,
+                    card_name: cardInfo.card_name || card.card_name,
+                    set_name: cardInfo.set_name || card.card_set,
+                    collector_number: cardInfo.card_number || card.card_number,
+                    year: cardInfo.year || card.release_date,
+                    rarity_or_variant: cardInfo.rarity || cardInfo.rarity_tier,
+                    is_foil: cardInfo.is_foil || card.is_foil || false,
+                    dcm_selected_product_id: card.dcm_selected_product_id,
+                    dcm_selected_product_name: card.dcm_selected_product_name,
+                  }}
+                  dcmGrade={card.conversational_decimal_grade ?? recommendedGrade.recommended_decimal_grade ?? undefined}
+                  isOwner={(() => {
+                    const session = getStoredSession();
+                    return !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                  })()}
+                  onPriceLoad={setDcmPriceData}
+                />
+              </div>
+
               {/* Find and Price This Card */}
               <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-lg font-bold mb-3 text-gray-800">Market Listings</h2>
+                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Find and Price This Card or Similar
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || cardInfo.card_name || card.featured || card.card_name} card.
+                </p>
 
                 {/* All Marketplace Buttons in One Row */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   {/* Smart TCGPlayer Search */}
                   {(() => {
                     // Extract English names for US marketplace search
@@ -5103,27 +5185,32 @@ export function MTGCardDetails() {
                       </div>
                     </a>
                   )}
+
+                  {/* PriceCharting Search */}
+                  <a
+                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
+                      [
+                        extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                        extractEnglishForSearch(cardInfo.character_version) || extractEnglishForSearch(card.character_version),
+                        cardInfo.card_number || card.card_number
+                      ].filter(Boolean).join(' ')
+                    )}&type=prices`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200 group"
+                  >
+                    <div className="w-10 h-10 bg-indigo-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-indigo-900 text-sm">PriceCharting</h3>
+                      <p className="text-xs text-indigo-700 truncate">Market data</p>
+                    </div>
+                  </a>
                 </div>
 
-              </div>
-
-              {/* eBay Price Lookup Section */}
-              <div id="tour-live-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <EbayPriceLookup
-                  card={{
-                    card_name: cardInfo.card_name || card.card_name,
-                    card_set: cardInfo.set_name || card.card_set,
-                    card_number: cardInfo.card_number || card.card_number,
-                    release_date: cardInfo.year || card.release_date,
-                    rarity_or_variant: cardInfo.rarity || cardInfo.rarity_tier,
-                    ink_color: cardInfo.ink_color,
-                    is_foil: cardInfo.is_foil || card.is_foil || false,
-                    manufacturer: 'Ravensburger',
-                    game_type: 'lorcana',
-                  }}
-                  cardId={card.id}
-                  category="ccg"
-                />
               </div>
 
               {/* Insta-List on eBay Section */}
@@ -5135,20 +5222,20 @@ export function MTGCardDetails() {
                 return (
                   <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-amber-500 to-orange-600 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                       </div>
                       <div>
                         <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
-                        <p className="text-sm text-gray-500">List this card directly to eBay with one click</p>
+                        <p className="text-sm text-gray-500">List this card directly to eBay</p>
                       </div>
                     </div>
 
-                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg p-4 mb-4">
+                    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
-                        <svg className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div className="text-sm text-gray-700">

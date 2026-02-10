@@ -24,6 +24,7 @@ type Card = {
   featured?: string  // 🎯 Player/character name
   category?: string
   card_set?: string
+  subset?: string  // 🎯 Subset/insert name
   manufacturer_name?: string  // 🎯 Manufacturer
   release_date?: string  // 🎯 Year
   card_number?: string  // 🎯 Card number
@@ -60,6 +61,30 @@ type Card = {
   ebay_price_highest?: number | null
   ebay_price_listing_count?: number | null
   ebay_price_updated_at?: string | null
+  // 💰 DCM Price Cache fields (sports cards)
+  dcm_price_estimate?: number | null
+  dcm_price_raw?: number | null
+  dcm_price_graded_high?: number | null
+  dcm_price_median?: number | null
+  dcm_price_average?: number | null
+  dcm_price_updated_at?: string | null
+  dcm_price_match_confidence?: string | null
+  dcm_price_product_id?: string | null
+  dcm_price_product_name?: string | null
+  // 💰 Pokemon pricing cache timestamp (from detail page)
+  dcm_prices_cached_at?: string | null
+  // 💰 Full cached pricing data (JSON blob from detail page)
+  dcm_cached_prices?: {
+    estimatedValue?: number | null;
+    prices?: {
+      raw?: number | null;
+      productName?: string | null;
+      productId?: string | null;
+    };
+    matchConfidence?: string | null;
+  } | null
+  // 🏴‍☠️ One Piece variant type
+  op_variant_type?: string | null
 }
 
 // 🎯 Helper: Strip markdown formatting from text
@@ -84,9 +109,13 @@ const getCardInfo = (card: Card) => {
     year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || legacyCardInfo.year,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || legacyCardInfo.manufacturer,
     card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || legacyCardInfo.card_number,
-    serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || legacyCardInfo.serial_number,
+    serial_numbering: stripMarkdown(card.conversational_card_info?.serial_numbering) || stripMarkdown(card.conversational_card_info?.serial_number) || legacyCardInfo.serial_number,
     rookie_or_first: card.conversational_card_info?.rookie_or_first || legacyCardInfo.rookie_or_first,
-    subset: subset, // Keep separate for special features display
+    subset: subset, // Insert/subset name (e.g., "Downtown") - NOT used for variant search
+    parallel_type: stripMarkdown(card.conversational_card_info?.parallel_type) || null, // Actual parallel color (e.g., "Green", "Gold")
+    rarity_or_variant: stripMarkdown(card.conversational_card_info?.rarity_or_variant) || null, // Fallback variant info
+    op_variant_type: stripMarkdown(card.conversational_card_info?.variant_type) || card.op_variant_type || null, // One Piece variant: parallel, alternate_art, manga, sp, etc.
+    game_type: stripMarkdown(card.conversational_card_info?.game_type) || null, // For Other category: Yu-Gi-Oh, Digimon, Dragon Ball, etc.
     autographed: card.conversational_card_info?.autographed || false,
     facsimile_autograph: card.conversational_card_info?.facsimile_autograph || false,
     official_reprint: card.conversational_card_info?.official_reprint || false,
@@ -166,20 +195,72 @@ const formatPrice = (price: number | null | undefined): string | null => {
   }).format(price);
 };
 
-// 💰 Helper: Get card's market value (median price from eBay cache)
+// 💰 Helper: Check if card is a sports card
+const isSportsCard = (card: Card): boolean => {
+  const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
+  return sportCategories.includes(card.category || '');
+};
+
+// 💰 Helper: Check if card is a Pokemon card
+const isPokemonCard = (card: Card): boolean => {
+  return card.category === 'Pokemon';
+};
+
+// 💰 Helper: Check if card is an MTG card
+const isMTGCard = (card: Card): boolean => {
+  return card.category === 'MTG';
+};
+
+// 💰 Helper: Check if card is a Lorcana card
+const isLorcanaCard = (card: Card): boolean => {
+  return card.category === 'Lorcana';
+};
+
+// 💰 Helper: Check if card is a One Piece card
+const isOnePieceCard = (card: Card): boolean => {
+  return card.category === 'One Piece';
+};
+
+// 💰 Helper: Check if card is an Other card (Yu-Gi-Oh, Digimon, etc.)
+const isOtherCard = (card: Card): boolean => {
+  return card.category === 'Other';
+};
+
+// 💰 Helper: Check if card uses DCM pricing (sports, Pokemon, MTG, Lorcana, One Piece, or Other)
+const usesDcmPricing = (card: Card): boolean => {
+  return isSportsCard(card) || isPokemonCard(card) || isMTGCard(card) || isLorcanaCard(card) || isOnePieceCard(card) || isOtherCard(card);
+};
+
+// 💰 Helper: Get card's market value (DCM for sports/Pokemon/MTG, eBay for others)
 const getMarketValue = (card: Card): number | null => {
-  // Use eBay median price if available
+  // Use DCM price estimate for sports cards, Pokemon cards, and MTG cards
+  if (usesDcmPricing(card)) {
+    // Primary: Use dcm_price_estimate column (fast, no parsing)
+    if (card.dcm_price_estimate !== null && card.dcm_price_estimate !== undefined) {
+      return card.dcm_price_estimate;
+    }
+    // Fallback: Check dcm_cached_prices JSON blob (for cards cached before fix)
+    if (card.dcm_cached_prices?.estimatedValue !== null && card.dcm_cached_prices?.estimatedValue !== undefined) {
+      return card.dcm_cached_prices.estimatedValue;
+    }
+    // Fallback to Scryfall price for MTG cards if no DCM price yet
+    if (isMTGCard(card)) {
+      if (card.is_foil && card.scryfall_price_usd_foil) {
+        return card.scryfall_price_usd_foil;
+      }
+      if (card.scryfall_price_usd) {
+        return card.scryfall_price_usd;
+      }
+    }
+    // Fallback to eBay median for Other cards when PriceCharting doesn't have a match
+    if (isOtherCard(card) && card.ebay_price_median !== null && card.ebay_price_median !== undefined) {
+      return card.ebay_price_median;
+    }
+    return null;
+  }
+  // Use eBay median price for any remaining cards
   if (card.ebay_price_median !== null && card.ebay_price_median !== undefined) {
     return card.ebay_price_median;
-  }
-  // Fallback to Scryfall price for MTG cards
-  if (card.category === 'MTG') {
-    if (card.is_foil && card.scryfall_price_usd_foil) {
-      return card.scryfall_price_usd_foil;
-    }
-    if (card.scryfall_price_usd) {
-      return card.scryfall_price_usd;
-    }
   }
   return null;
 };
@@ -191,6 +272,34 @@ const isPriceStale = (updatedAt: string | null | undefined): boolean => {
   const now = new Date();
   const diffDays = (now.getTime() - updated.getTime()) / (1000 * 60 * 60 * 24);
   return diffDays > 7;
+};
+
+// 💰 Helper: Get the appropriate price updated timestamp for a card
+const getPriceUpdatedAt = (card: Card): string | null | undefined => {
+  if (usesDcmPricing(card)) {
+    // For all DCM-priced cards, check both dcm_price_updated_at and dcm_prices_cached_at
+    // Use whichever timestamp is more recent
+    const dcmUpdated = card.dcm_price_updated_at;
+    const detailCached = card.dcm_prices_cached_at;
+    if (dcmUpdated && detailCached) {
+      return new Date(dcmUpdated) > new Date(detailCached) ? dcmUpdated : detailCached;
+    }
+    return dcmUpdated || detailCached;
+  }
+  return card.ebay_price_updated_at;
+};
+
+// 💰 Helper: Check if a card has any DCM price (in column OR cached JSON)
+const hasDcmPrice = (card: Card): boolean => {
+  // Check dcm_price_estimate column first
+  if (card.dcm_price_estimate !== null && card.dcm_price_estimate !== undefined) {
+    return true;
+  }
+  // Check dcm_cached_prices JSON blob as fallback
+  if (card.dcm_cached_prices?.estimatedValue !== null && card.dcm_cached_prices?.estimatedValue !== undefined) {
+    return true;
+  }
+  return false;
 };
 
 const getImageQualityGrade = (card: Card) => {
@@ -285,6 +394,7 @@ function CollectionPageContent() {
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
   const [priceRefreshCount, setPriceRefreshCount] = useState(0)
+  const [isRescanningPrices, setIsRescanningPrices] = useState(false)
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
@@ -432,83 +542,597 @@ function CollectionPageContent() {
         return;
       }
 
-      // Find cards with stale prices OR null prices that might benefit from retry
-      // Include cards with null prices that were attempted recently (our improved search might find them now)
-      const staleCards = cards.filter(card => {
-        const isStale = isPriceStale(card.ebay_price_updated_at);
-        const hasNullPrice = card.ebay_price_median === null || card.ebay_price_median === undefined;
-        // Refresh if: stale OR (null price AND is Pokemon/CCG card that might benefit from improved search)
-        const isPokemonOrCCG = card.category === 'Pokemon' || card.category === 'MTG' || card.category === 'Lorcana';
-        return isStale || (hasNullPrice && isPokemonOrCCG);
+      // Separate cards by pricing source: sports (SportsCardsPro), Pokemon (PriceCharting), MTG (PriceCharting), Lorcana (PriceCharting), One Piece (PriceCharting), others (eBay)
+      const sportsCards = cards.filter(card => isSportsCard(card));
+      const pokemonCards = cards.filter(card => isPokemonCard(card));
+      const mtgCards = cards.filter(card => isMTGCard(card));
+      const lorcanaCards = cards.filter(card => isLorcanaCard(card));
+      const onepieceCards = cards.filter(card => isOnePieceCard(card));
+      const otherCategoryCards = cards.filter(card => isOtherCard(card));
+      // Cards not handled by any specific pricing API (fallback to eBay)
+      const remainingCards = cards.filter(card => !isSportsCard(card) && !isPokemonCard(card) && !isMTGCard(card) && !isLorcanaCard(card) && !isOnePieceCard(card) && !isOtherCard(card));
+
+      // Find stale sports cards (DCM pricing via SportsCardsPro)
+      // Refresh if stale (> 7 days) OR has no price (checking both column and cached JSON)
+      const staleSportsCards = sportsCards.filter(card => {
+        const isStale = isPriceStale(card.dcm_price_updated_at);
+        const hasNoPrice = !hasDcmPrice(card);
+        return isStale || hasNoPrice;
       });
-      const staleCardIds = staleCards.map(card => card.id);
 
-      console.log(`[Collection] Found ${staleCardIds.length} cards to refresh out of ${cards.length} total`);
+      // Find stale Pokemon cards (DCM pricing via PriceCharting)
+      // Check both dcm_price_updated_at (collection page) and dcm_prices_cached_at (detail page)
+      // Refresh if stale (> 7 days) OR has no price
+      const stalePokemonCards = pokemonCards.filter(card => {
+        const priceTimestamp = getPriceUpdatedAt(card); // Uses both timestamps for Pokemon/MTG
+        const isStale = isPriceStale(priceTimestamp);
+        const hasNoPrice = !hasDcmPrice(card);
+        return isStale || hasNoPrice;
+      });
 
-      if (staleCardIds.length === 0) return;
+      // Find stale MTG cards (DCM pricing via PriceCharting)
+      // Check both dcm_price_updated_at (collection page) and dcm_prices_cached_at (detail page)
+      // Refresh if stale (> 7 days) OR has no price
+      const staleMTGCards = mtgCards.filter(card => {
+        const priceTimestamp = getPriceUpdatedAt(card); // Uses both timestamps for Pokemon/MTG
+        const isStale = isPriceStale(priceTimestamp);
+        const hasNoPrice = !hasDcmPrice(card);
+        return isStale || hasNoPrice;
+      });
+
+      // Find stale Lorcana cards (DCM pricing via PriceCharting)
+      // Check both dcm_price_updated_at (collection page) and dcm_prices_cached_at (detail page)
+      // Refresh if stale (> 7 days) OR has no price
+      const staleLorcanaCards = lorcanaCards.filter(card => {
+        const priceTimestamp = getPriceUpdatedAt(card); // Uses both timestamps for Lorcana
+        const isStale = isPriceStale(priceTimestamp);
+        const hasNoPrice = !hasDcmPrice(card);
+        return isStale || hasNoPrice;
+      });
+
+      // Find stale One Piece cards (DCM pricing via PriceCharting)
+      // Check both dcm_price_updated_at (collection page) and dcm_prices_cached_at (detail page)
+      // Refresh if stale (> 7 days) OR has no price
+      const staleOnePieceCards = onepieceCards.filter(card => {
+        const priceTimestamp = getPriceUpdatedAt(card); // Uses both timestamps for One Piece
+        const isStale = isPriceStale(priceTimestamp);
+        const hasNoPrice = !hasDcmPrice(card);
+        return isStale || hasNoPrice;
+      });
+
+      // Find stale Other category cards (DCM pricing via PriceCharting - Yu-Gi-Oh, Digimon, etc.)
+      // Refresh if stale (> 7 days) OR has no price
+      const staleOtherCategoryCards = otherCategoryCards.filter(card => {
+        const priceTimestamp = getPriceUpdatedAt(card);
+        const isStale = isPriceStale(priceTimestamp);
+        const hasNoPrice = !hasDcmPrice(card);
+        return isStale || hasNoPrice;
+      });
+
+      // Find stale remaining cards (eBay pricing fallback)
+      // Refresh if stale (> 7 days) OR has no price
+      const staleRemainingCards = remainingCards.filter(card => {
+        const isStale = isPriceStale(getPriceUpdatedAt(card));
+        const hasNullPrice = card.ebay_price_median === null || card.ebay_price_median === undefined;
+        return isStale || hasNullPrice;
+      });
+
+      const totalStale = staleSportsCards.length + stalePokemonCards.length + staleMTGCards.length + staleLorcanaCards.length + staleOnePieceCards.length + staleOtherCategoryCards.length + staleRemainingCards.length;
+      console.log(`[Collection] Found ${staleSportsCards.length} sports, ${stalePokemonCards.length} Pokemon, ${staleMTGCards.length} MTG, ${staleLorcanaCards.length} Lorcana, ${staleOnePieceCards.length} One Piece, ${staleOtherCategoryCards.length} other category, ${staleRemainingCards.length} remaining cards to refresh`);
+
+      if (totalStale === 0) return;
 
       setIsRefreshingPrices(true);
-      setPriceRefreshCount(staleCardIds.length);
+      setPriceRefreshCount(totalStale);
 
       try {
-        // Process in batches of 10
         const batchSize = 10;
         let totalRefreshed = 0;
 
-        // Check if any cards need force refresh (Pokemon/CCG with null prices)
-        const cardsNeedingForceRefresh = staleCards.filter(card => {
-          const hasNullPrice = card.ebay_price_median === null || card.ebay_price_median === undefined;
-          const isPokemonOrCCG = card.category === 'Pokemon' || card.category === 'MTG' || card.category === 'Lorcana';
-          return hasNullPrice && isPokemonOrCCG && card.ebay_price_updated_at; // Has updatedAt but null price
-        });
-        const forceRefreshIds = new Set(cardsNeedingForceRefresh.map(c => c.id));
+        // Refresh sports cards with SportsCardsPro API (same logic as rescanAllSportsPrices)
+        if (staleSportsCards.length > 0) {
+          console.log(`[Collection] Refreshing ${staleSportsCards.length} sports cards with SportsCardsPro pricing`);
 
-        for (let i = 0; i < staleCardIds.length; i += batchSize) {
-          const batch = staleCardIds.slice(i, i + batchSize);
-          // Force refresh if any card in batch needs it
-          const needsForce = batch.some(id => forceRefreshIds.has(id));
+          // Generic types to filter out when determining variant
+          const genericTypes = [
+            'base', 'insert', 'modern_parallel', 'parallel', 'parallel_variant', 'sp', 'ssp',
+            'autographed', 'autograph', 'auto', 'rookie', 'rc', 'memorabilia', 'relic', 'patch'
+          ];
 
-          const response = await fetch('/api/ebay/batch-refresh-prices', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-            body: JSON.stringify({ card_ids: batch, force: needsForce }),
-          });
+          for (let i = 0; i < staleSportsCards.length; i++) {
+            const card = staleSportsCards[i];
+            const cardInfo = getCardInfo(card);
+            const dcmGrade = card.conversational_decimal_grade || 8;
 
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`[Collection] Batch refresh response:`, data);
+            // Determine the best variant value (same logic as PriceChartingLookup)
+            // Use parallel_type (actual color like "Green") - NOT subset (insert name like "Downtown")
+            const variant = cardInfo.parallel_type && !genericTypes.includes(cardInfo.parallel_type.toLowerCase())
+              ? cardInfo.parallel_type
+              : (cardInfo.rarity_or_variant && !genericTypes.includes(cardInfo.rarity_or_variant.toLowerCase())
+                  ? cardInfo.rarity_or_variant
+                  : undefined);
 
-            // Update cards state with new prices
-            if (data.results && data.results.length > 0) {
-              setCards(prevCards => {
-                const updatedCards = [...prevCards];
-                data.results.forEach((result: { id: string; success: boolean; median_price?: number | null }) => {
-                  if (result.success) {
-                    const cardIndex = updatedCards.findIndex(c => c.id === result.id);
-                    if (cardIndex !== -1) {
-                      updatedCards[cardIndex] = {
-                        ...updatedCards[cardIndex],
-                        ebay_price_median: result.median_price ?? null,
-                        ebay_price_updated_at: new Date().toISOString(),
-                      };
-                    }
-                  }
-                });
-                return updatedCards;
+            // Log search parameters
+            const setNameClean = cardInfo.set_name?.split(' - ')[0];
+            console.log(`[Collection Refresh] Card ${card.id} - Player: ${cardInfo.player_or_character}, Set: ${setNameClean}, Card#: ${cardInfo.card_number}, Serial: ${cardInfo.serial_numbering || 'none'}, Variant: ${variant || 'none'}`);
+
+            try {
+              // Pass cardId so API saves to dcm_cached_prices (which card detail page reads)
+              const response = await fetch('/api/pricing/pricecharting', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  playerName: cardInfo.player_or_character,
+                  year: cardInfo.year,
+                  setName: setNameClean,
+                  cardNumber: cardInfo.card_number,
+                  variant,
+                  rookie: cardInfo.rookie_or_first,
+                  sport: card.category,
+                  serialNumbering: cardInfo.serial_numbering,
+                  dcmGrade,
+                  cardId: card.id,  // Save to dcm_cached_prices for card detail page
+                }),
               });
-              totalRefreshed += data.refreshed || 0;
+
+              const data = await response.json();
+
+              if (data.success && data.data?.estimatedValue !== null) {
+                const priceData = {
+                  estimate: data.data.estimatedValue,
+                  raw: data.data.prices?.raw ?? null,
+                  match_confidence: data.data.matchConfidence,
+                  product_id: data.data.prices?.productId ?? null,
+                  product_name: data.data.prices?.productName ?? null,
+                };
+
+                // Save to database (dcm_price_* columns for collection page display)
+                try {
+                  await fetch('/api/pricing/dcm-save', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session.access_token}`,
+                    },
+                    body: JSON.stringify({
+                      card_id: card.id,
+                      ...priceData,
+                    }),
+                  });
+                } catch (saveError) {
+                  console.error(`[Collection] Error saving price for card ${card.id}:`, saveError);
+                }
+
+                // Update card state
+                setCards(prevCards => {
+                  const updatedCards = [...prevCards];
+                  const cardIndex = updatedCards.findIndex(c => c.id === card.id);
+                  if (cardIndex !== -1) {
+                    updatedCards[cardIndex] = {
+                      ...updatedCards[cardIndex],
+                      dcm_price_estimate: priceData.estimate,
+                      dcm_price_raw: priceData.raw,
+                      dcm_price_match_confidence: priceData.match_confidence,
+                      dcm_price_product_name: priceData.product_name,
+                      dcm_price_updated_at: new Date().toISOString(),
+                    };
+                  }
+                  return updatedCards;
+                });
+                totalRefreshed++;
+              }
+            } catch (cardError) {
+              console.error(`[Collection] Error fetching price for card ${card.id}:`, cardError);
+            }
+
+            setPriceRefreshCount(prev => Math.max(0, prev - 1));
+
+            // Rate limiting: 500ms delay between cards
+            if (i < staleSportsCards.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
             }
           }
+        }
 
-          // Update remaining count
-          setPriceRefreshCount(prev => Math.max(0, prev - batch.length));
+        // Refresh Pokemon cards with PriceCharting API
+        if (stalePokemonCards.length > 0) {
+          console.log(`[Collection] Refreshing ${stalePokemonCards.length} Pokemon cards with PriceCharting pricing`);
 
-          // Small delay between batches to avoid overwhelming the API
-          if (i + batchSize < staleCardIds.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
+          for (let i = 0; i < stalePokemonCards.length; i++) {
+            const card = stalePokemonCards[i];
+            const cardInfo = getCardInfo(card);
+            const dcmGrade = card.conversational_decimal_grade || 8;
+
+            // Determine Pokemon variant (1st Edition, Holofoil, etc.)
+            const variant = cardInfo.rarity_or_variant || cardInfo.parallel_type || undefined;
+
+            // Clean set name
+            const setNameClean = cardInfo.set_name?.split(' - ')[0];
+            console.log(`[Collection Refresh] Pokemon ${card.id} - Name: ${cardInfo.player_or_character}, Set: ${setNameClean}, Card#: ${cardInfo.card_number}, Variant: ${variant || 'none'}`);
+
+            try {
+              const response = await fetch('/api/pricing/pokemon', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  pokemonName: cardInfo.player_or_character,
+                  setName: setNameClean,
+                  cardNumber: cardInfo.card_number,
+                  year: cardInfo.year,
+                  variant,
+                  dcmGrade,
+                  cardId: card.id,  // Save to dcm_* columns for collection page
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success && data.data?.estimatedValue !== null) {
+                // Update card state with new pricing
+                setCards(prevCards => {
+                  const updatedCards = [...prevCards];
+                  const cardIndex = updatedCards.findIndex(c => c.id === card.id);
+                  if (cardIndex !== -1) {
+                    updatedCards[cardIndex] = {
+                      ...updatedCards[cardIndex],
+                      dcm_price_estimate: data.data.estimatedValue,
+                      dcm_price_raw: data.data.prices?.raw ?? null,
+                      dcm_price_match_confidence: data.data.matchConfidence,
+                      dcm_price_product_name: data.data.prices?.productName ?? null,
+                      dcm_price_updated_at: new Date().toISOString(),
+                    };
+                  }
+                  return updatedCards;
+                });
+                totalRefreshed++;
+              }
+            } catch (cardError) {
+              console.error(`[Collection] Error fetching Pokemon price for card ${card.id}:`, cardError);
+            }
+
+            setPriceRefreshCount(prev => Math.max(0, prev - 1));
+
+            // Rate limiting: 500ms delay between cards
+            if (i < stalePokemonCards.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        }
+
+        // Refresh MTG cards with PriceCharting API
+        if (staleMTGCards.length > 0) {
+          console.log(`[Collection] Refreshing ${staleMTGCards.length} MTG cards with PriceCharting pricing`);
+
+          for (let i = 0; i < staleMTGCards.length; i++) {
+            const card = staleMTGCards[i];
+            const cardInfo = getCardInfo(card);
+            const dcmGrade = card.conversational_decimal_grade || 8;
+
+            // Determine MTG variant (Foil, Borderless, etc.)
+            const variant = cardInfo.rarity_or_variant || cardInfo.parallel_type || undefined;
+            const isFoil = card.is_foil || false;
+
+            // Clean set name
+            const setNameClean = cardInfo.set_name?.split(' - ')[0];
+            console.log(`[Collection Refresh] MTG ${card.id} - Name: ${cardInfo.card_name || cardInfo.player_or_character}, Set: ${setNameClean}, Card#: ${cardInfo.card_number}, Foil: ${isFoil}, Variant: ${variant || 'none'}`);
+
+            try {
+              const response = await fetch('/api/pricing/mtg', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cardName: cardInfo.card_name || cardInfo.player_or_character,
+                  setName: setNameClean,
+                  collectorNumber: cardInfo.card_number,
+                  year: cardInfo.year,
+                  isFoil,
+                  variant,
+                  dcmGrade,
+                  cardId: card.id,  // Save to dcm_* columns for collection page
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success && data.data?.estimatedValue !== null) {
+                // Update card state with new pricing
+                setCards(prevCards => {
+                  const updatedCards = [...prevCards];
+                  const cardIndex = updatedCards.findIndex(c => c.id === card.id);
+                  if (cardIndex !== -1) {
+                    updatedCards[cardIndex] = {
+                      ...updatedCards[cardIndex],
+                      dcm_price_estimate: data.data.estimatedValue,
+                      dcm_price_raw: data.data.prices?.raw ?? null,
+                      dcm_price_match_confidence: data.data.matchConfidence,
+                      dcm_price_product_name: data.data.prices?.productName ?? null,
+                      dcm_price_updated_at: new Date().toISOString(),
+                    };
+                  }
+                  return updatedCards;
+                });
+                totalRefreshed++;
+              }
+            } catch (cardError) {
+              console.error(`[Collection] Error fetching MTG price for card ${card.id}:`, cardError);
+            }
+
+            setPriceRefreshCount(prev => Math.max(0, prev - 1));
+
+            // Rate limiting: 500ms delay between cards
+            if (i < staleMTGCards.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        }
+
+        // Refresh Lorcana cards with PriceCharting API
+        if (staleLorcanaCards.length > 0) {
+          console.log(`[Collection] Refreshing ${staleLorcanaCards.length} Lorcana cards with PriceCharting pricing`);
+
+          for (let i = 0; i < staleLorcanaCards.length; i++) {
+            const card = staleLorcanaCards[i];
+            const cardInfo = getCardInfo(card);
+            const dcmGrade = card.conversational_decimal_grade || 8;
+
+            // Determine Lorcana variant (Foil, Enchanted, etc.)
+            const variant = cardInfo.rarity_or_variant || cardInfo.parallel_type || undefined;
+            const isFoil = card.is_foil || false;
+
+            // Clean set name
+            const setNameClean = cardInfo.set_name?.split(' - ')[0];
+            console.log(`[Collection Refresh] Lorcana ${card.id} - Name: ${cardInfo.card_name || cardInfo.player_or_character}, Set: ${setNameClean}, Card#: ${cardInfo.card_number}, Foil: ${isFoil}, Variant: ${variant || 'none'}`);
+
+            try {
+              const response = await fetch('/api/pricing/lorcana', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cardName: cardInfo.card_name || cardInfo.player_or_character,
+                  setName: setNameClean,
+                  collectorNumber: cardInfo.card_number,
+                  year: cardInfo.year,
+                  isFoil,
+                  variant,
+                  dcmGrade,
+                  cardId: card.id,  // Save to dcm_* columns for collection page
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success && data.data?.estimatedValue !== null) {
+                // Update card state with new pricing
+                setCards(prevCards => {
+                  const updatedCards = [...prevCards];
+                  const cardIndex = updatedCards.findIndex(c => c.id === card.id);
+                  if (cardIndex !== -1) {
+                    updatedCards[cardIndex] = {
+                      ...updatedCards[cardIndex],
+                      dcm_price_estimate: data.data.estimatedValue,
+                      dcm_price_raw: data.data.prices?.raw ?? null,
+                      dcm_price_match_confidence: data.data.matchConfidence,
+                      dcm_price_product_name: data.data.prices?.productName ?? null,
+                      dcm_price_updated_at: new Date().toISOString(),
+                    };
+                  }
+                  return updatedCards;
+                });
+                totalRefreshed++;
+              }
+            } catch (cardError) {
+              console.error(`[Collection] Error fetching Lorcana price for card ${card.id}:`, cardError);
+            }
+
+            setPriceRefreshCount(prev => Math.max(0, prev - 1));
+
+            // Rate limiting: 500ms delay between cards
+            if (i < staleLorcanaCards.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        }
+
+        // Refresh One Piece cards with PriceCharting API
+        if (staleOnePieceCards.length > 0) {
+          console.log(`[Collection] Refreshing ${staleOnePieceCards.length} One Piece cards with PriceCharting pricing`);
+
+          for (let i = 0; i < staleOnePieceCards.length; i++) {
+            const card = staleOnePieceCards[i];
+            const cardInfo = getCardInfo(card);
+            const dcmGrade = card.conversational_decimal_grade || 8;
+
+            // Determine One Piece variant (Parallel, Alt Art, Manga Art, SP, etc.)
+            // Use op_variant_type first (stores: parallel, alternate_art, manga, sp, etc.)
+            const variant = cardInfo.op_variant_type || cardInfo.rarity_or_variant || undefined;
+
+            // Clean set name
+            const setNameClean = cardInfo.set_name?.split(' - ')[0];
+            console.log(`[Collection Refresh] One Piece ${card.id} - Name: ${cardInfo.card_name || cardInfo.player_or_character}, Set: ${setNameClean}, Card#: ${cardInfo.card_number}, Variant: ${variant || 'none'}`);
+
+            try {
+              const response = await fetch('/api/pricing/onepiece', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cardName: cardInfo.card_name || cardInfo.player_or_character,
+                  setName: setNameClean,
+                  collectorNumber: cardInfo.card_number,
+                  year: cardInfo.year,
+                  variant,
+                  dcmGrade,
+                  cardId: card.id,  // Save to dcm_* columns for collection page
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success && data.data?.estimatedValue !== null) {
+                // Update card state with new pricing
+                setCards(prevCards => {
+                  const updatedCards = [...prevCards];
+                  const cardIndex = updatedCards.findIndex(c => c.id === card.id);
+                  if (cardIndex !== -1) {
+                    updatedCards[cardIndex] = {
+                      ...updatedCards[cardIndex],
+                      dcm_price_estimate: data.data.estimatedValue,
+                      dcm_price_raw: data.data.prices?.raw ?? null,
+                      dcm_price_match_confidence: data.data.matchConfidence,
+                      dcm_price_product_name: data.data.prices?.productName ?? null,
+                      dcm_price_updated_at: new Date().toISOString(),
+                    };
+                  }
+                  return updatedCards;
+                });
+                totalRefreshed++;
+              }
+            } catch (cardError) {
+              console.error(`[Collection] Error fetching One Piece price for card ${card.id}:`, cardError);
+            }
+
+            setPriceRefreshCount(prev => Math.max(0, prev - 1));
+
+            // Rate limiting: 500ms delay between cards
+            if (i < staleOnePieceCards.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        }
+
+        // Refresh Other category cards with PriceCharting API (Yu-Gi-Oh, Digimon, Dragon Ball, etc.)
+        if (staleOtherCategoryCards.length > 0) {
+          console.log(`[Collection] Refreshing ${staleOtherCategoryCards.length} Other category cards with PriceCharting API`);
+
+          for (let i = 0; i < staleOtherCategoryCards.length; i++) {
+            const card = staleOtherCategoryCards[i];
+            const cardInfo = getCardInfo(card);
+            const dcmGrade = card.dcm_grade ?? card.ai_grading?.["Final DCM Grade"]?.["DCM Grade (Whole Number)"] ?? null;
+
+            // Extract variant from rarity_or_variant field
+            const getVariant = () => {
+              if (cardInfo.rarity_or_variant) {
+                const variantLower = cardInfo.rarity_or_variant.toLowerCase().replace(/_/g, ' ');
+                // Map common variants to PriceCharting format
+                if (variantLower.includes('alt art') || variantLower.includes('alternate art')) return 'Alt Art';
+                if (variantLower.includes('holo') || variantLower.includes('holographic')) return 'Holo';
+                if (variantLower.includes('prism')) return 'Prism';
+                if (variantLower.includes('secret')) return 'Secret';
+                if (variantLower.includes('ultra')) return 'Ultra';
+                if (variantLower.includes('super')) return 'Super';
+                if (variantLower.includes('ghost')) return 'Ghost';
+                return cardInfo.rarity_or_variant;
+              }
+              return undefined;
+            };
+            const variant = getVariant();
+
+            console.log(`[Collection Refresh] Other ${card.id} - Name: ${cardInfo.card_name || cardInfo.player_or_character}, Set: ${cardInfo.set_name}, Card#: ${cardInfo.card_number}, Game: ${cardInfo.game_type || 'other'}, Variant: ${variant || 'none'}`);
+
+            try {
+              const response = await fetch('/api/pricing/other', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  cardName: cardInfo.card_name || cardInfo.player_or_character,
+                  setName: cardInfo.set_name,
+                  cardNumber: cardInfo.card_number,
+                  year: cardInfo.year,
+                  manufacturer: cardInfo.manufacturer,
+                  variant,
+                  gameType: cardInfo.game_type || 'other',
+                  dcmGrade,
+                  cardId: card.id,  // Save to dcm_* columns for collection page
+                }),
+              });
+
+              const data = await response.json();
+
+              if (data.success && data.data?.estimatedValue !== null) {
+                // Update card state with new pricing
+                setCards(prevCards => {
+                  const updatedCards = [...prevCards];
+                  const cardIndex = updatedCards.findIndex(c => c.id === card.id);
+                  if (cardIndex !== -1) {
+                    updatedCards[cardIndex] = {
+                      ...updatedCards[cardIndex],
+                      dcm_price_estimate: data.data.estimatedValue,
+                      dcm_price_raw: data.data.prices?.raw ?? null,
+                      dcm_price_match_confidence: data.data.matchConfidence,
+                      dcm_price_product_name: data.data.prices?.productName ?? null,
+                      dcm_price_updated_at: new Date().toISOString(),
+                    };
+                  }
+                  return updatedCards;
+                });
+                totalRefreshed++;
+              }
+            } catch (cardError) {
+              console.error(`[Collection] Error fetching Other category price for card ${card.id}:`, cardError);
+            }
+
+            setPriceRefreshCount(prev => Math.max(0, prev - 1));
+
+            // Rate limiting: 500ms delay between cards
+            if (i < staleOtherCategoryCards.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 500));
+            }
+          }
+        }
+
+        // Refresh remaining cards with eBay API (fallback for unhandled categories)
+        if (staleRemainingCards.length > 0) {
+          const remainingCardIds = staleRemainingCards.map(card => card.id);
+          console.log(`[Collection] Refreshing ${remainingCardIds.length} remaining cards with eBay pricing`);
+
+          const cardsNeedingForceRefresh = staleRemainingCards.filter(card => {
+            const hasNullPrice = card.ebay_price_median === null || card.ebay_price_median === undefined;
+            return hasNullPrice && card.ebay_price_updated_at;
+          });
+          const forceRefreshIds = new Set(cardsNeedingForceRefresh.map(c => c.id));
+
+          for (let i = 0; i < remainingCardIds.length; i += batchSize) {
+            const batch = remainingCardIds.slice(i, i + batchSize);
+            const needsForce = batch.some(id => forceRefreshIds.has(id));
+
+            const response = await fetch('/api/ebay/batch-refresh-prices', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+              body: JSON.stringify({ card_ids: batch, force: needsForce }),
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              console.log(`[Collection] eBay batch refresh response:`, data);
+
+              if (data.results && data.results.length > 0) {
+                setCards(prevCards => {
+                  const updatedCards = [...prevCards];
+                  data.results.forEach((result: { id: string; success: boolean; median_price?: number | null }) => {
+                    if (result.success) {
+                      const cardIndex = updatedCards.findIndex(c => c.id === result.id);
+                      if (cardIndex !== -1) {
+                        updatedCards[cardIndex] = {
+                          ...updatedCards[cardIndex],
+                          ebay_price_median: result.median_price ?? null,
+                          ebay_price_updated_at: new Date().toISOString(),
+                        };
+                      }
+                    }
+                  });
+                  return updatedCards;
+                });
+                totalRefreshed += data.refreshed || 0;
+              }
+            }
+
+            setPriceRefreshCount(prev => Math.max(0, prev - batch.length));
+
+            if (i + batchSize < remainingCardIds.length) {
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
           }
         }
 
@@ -527,6 +1151,165 @@ function CollectionPageContent() {
     const timeoutId = setTimeout(refreshStalePrices, 2000);
     return () => clearTimeout(timeoutId);
   }, [loading, cards.length]); // Re-run when cards are loaded
+
+  // 🔄 Rescan all sports card prices with fresh API searches
+  // This ignores cached product IDs and does completely new searches
+  // Useful when card info (like subset/parallel) has been updated
+  const rescanAllSportsPrices = async () => {
+    const session = getStoredSession();
+    if (!session?.access_token) {
+      toast.error('Please log in to rescan prices');
+      return;
+    }
+
+    const sportsCards = cards.filter(card => isSportsCard(card));
+    if (sportsCards.length === 0) {
+      toast.info('No sports cards to rescan');
+      return;
+    }
+
+    setIsRescanningPrices(true);
+    setPriceRefreshCount(sportsCards.length);
+
+    // Generic types to filter out when determining variant (same logic as PriceChartingLookup)
+    const genericTypes = [
+            'base', 'insert', 'modern_parallel', 'parallel', 'parallel_variant', 'sp', 'ssp',
+            'autographed', 'autograph', 'auto', 'rookie', 'rc', 'memorabilia', 'relic', 'patch'
+          ];
+
+    try {
+      let totalRefreshed = 0;
+      let totalFailed = 0;
+
+      console.log(`[Collection] Rescanning ${sportsCards.length} sports cards using pricecharting endpoint`);
+
+      // Process cards one at a time with rate limiting (like the card detail page does)
+      for (let i = 0; i < sportsCards.length; i++) {
+        const card = sportsCards[i];
+        const cardInfo = getCardInfo(card);
+        const dcmGrade = card.conversational_decimal_grade || 8;
+
+        // Determine the best variant value (same logic as PriceChartingLookup)
+        // Use parallel_type (actual color like "Green") - NOT subset (insert name like "Downtown")
+        const variant = cardInfo.parallel_type && !genericTypes.includes(cardInfo.parallel_type.toLowerCase())
+          ? cardInfo.parallel_type
+          : (cardInfo.rarity_or_variant && !genericTypes.includes(cardInfo.rarity_or_variant.toLowerCase())
+              ? cardInfo.rarity_or_variant
+              : undefined);
+
+        // Log search parameters clearly
+        const setNameClean = cardInfo.set_name?.split(' - ')[0];
+        console.log(`[Collection Rescan] === Card ${card.id} ===`);
+        console.log(`[Collection Rescan] Player: ${cardInfo.player_or_character}`);
+        console.log(`[Collection Rescan] Year: ${cardInfo.year || '(not specified)'}`);
+        console.log(`[Collection Rescan] Set: ${setNameClean || '(not specified)'}`);
+        console.log(`[Collection Rescan] Card #: ${cardInfo.card_number || '(not specified)'}`);
+        console.log(`[Collection Rescan] Serial: ${cardInfo.serial_numbering || '(not numbered)'}`);
+        console.log(`[Collection Rescan] Parallel: ${cardInfo.parallel_type || '(none)'}`);
+        console.log(`[Collection Rescan] Subset (NOT used): ${cardInfo.subset || '(none)'}`);
+        console.log(`[Collection Rescan] VARIANT USED: ${variant || '(none)'}`);
+
+        try {
+          // Call the same pricecharting endpoint that works on the card detail page
+          // IMPORTANT: Pass cardId so the API saves to dcm_cached_prices (which card detail page reads)
+          const response = await fetch('/api/pricing/pricecharting', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              playerName: cardInfo.player_or_character,
+              year: cardInfo.year,
+              setName: setNameClean,
+              cardNumber: cardInfo.card_number,
+              variant,
+              rookie: cardInfo.rookie_or_first,
+              sport: card.category,
+              serialNumbering: cardInfo.serial_numbering,
+              dcmGrade,
+              cardId: card.id,      // Save to dcm_cached_prices for card detail page
+              forceRefresh: true,   // Bypass 7-day cache, get fresh data
+            }),
+          });
+
+          const data = await response.json();
+
+          if (data.success && data.data?.estimatedValue !== null) {
+            console.log(`[Collection] Card ${card.id} - Got estimate: $${data.data.estimatedValue}`);
+
+            const priceData = {
+              estimate: data.data.estimatedValue,
+              raw: data.data.prices?.raw ?? null,
+              match_confidence: data.data.matchConfidence,
+              product_id: data.data.prices?.productId ?? null,
+              product_name: data.data.prices?.productName ?? null,
+            };
+
+            // Save to database
+            try {
+              await fetch('/api/pricing/dcm-save', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                  card_id: card.id,
+                  ...priceData,
+                }),
+              });
+            } catch (saveError) {
+              console.error(`[Collection] Error saving price for card ${card.id}:`, saveError);
+              // Continue even if save fails - UI will still update
+            }
+
+            // Update the card state with the new DCM price
+            setCards(prevCards => {
+              const updatedCards = [...prevCards];
+              const cardIndex = updatedCards.findIndex(c => c.id === card.id);
+              if (cardIndex !== -1) {
+                updatedCards[cardIndex] = {
+                  ...updatedCards[cardIndex],
+                  dcm_price_estimate: priceData.estimate,
+                  dcm_price_raw: priceData.raw,
+                  dcm_price_match_confidence: priceData.match_confidence,
+                  dcm_price_product_name: priceData.product_name,
+                  dcm_price_updated_at: new Date().toISOString(),
+                };
+              }
+              return updatedCards;
+            });
+            totalRefreshed++;
+          } else {
+            console.log(`[Collection] Card ${card.id} - No prices found: ${data.error || 'no estimate'}`);
+            totalFailed++;
+          }
+        } catch (cardError) {
+          console.error(`[Collection] Error fetching price for card ${card.id}:`, cardError);
+          totalFailed++;
+        }
+
+        setPriceRefreshCount(prev => Math.max(0, prev - 1));
+
+        // Rate limiting: 500ms delay between cards
+        if (i < sportsCards.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+        }
+      }
+
+      const message = `Updated ${totalRefreshed} sports card prices${totalFailed > 0 ? `, ${totalFailed} failed` : ''}`;
+      if (totalFailed > 0) {
+        toast.warning(message);
+      } else {
+        toast.success(message);
+      }
+
+    } catch (err) {
+      console.error('Error rescanning prices:', err);
+      toast.error('Error rescanning prices');
+    } finally {
+      setIsRescanningPrices(false);
+      setPriceRefreshCount(0);
+    }
+  };
 
   // Handle column sorting
   const handleSort = (column: string) => {
@@ -792,20 +1575,20 @@ function CollectionPageContent() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-            {/* Price Refresh Indicator */}
-            {isRefreshingPrices && (
+            {/* Price Refresh/Rescan Indicator */}
+            {(isRefreshingPrices || isRescanningPrices) && (
               <div className="hidden sm:flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 animate-pulse">
                 <svg className="w-4 h-4 text-blue-500 animate-spin" fill="none" viewBox="0 0 24 24">
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
                 <span className="text-xs font-medium text-blue-600">
-                  Updating {priceRefreshCount} price{priceRefreshCount !== 1 ? 's' : ''}...
+                  {isRescanningPrices ? 'Rescanning' : 'Updating'} {priceRefreshCount} price{priceRefreshCount !== 1 ? 's' : ''}...
                 </span>
               </div>
             )}
             {/* Collection Value Summary */}
-            {!isRefreshingPrices && (() => {
+            {!isRefreshingPrices && !isRescanningPrices && (() => {
               const cardsWithPrices = filteredCards.filter(c => getMarketValue(c) !== null);
               if (cardsWithPrices.length === 0) return null;
 
@@ -819,6 +1602,19 @@ function CollectionPageContent() {
                 </div>
               );
             })()}
+            {/* Rescan Sports Prices Button */}
+            {!isRefreshingPrices && !isRescanningPrices && cards.some(c => isSportsCard(c)) && (
+              <button
+                onClick={rescanAllSportsPrices}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-medium text-emerald-700 transition-colors"
+                title="Rescan all sports card prices with fresh API searches"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Rescan Prices
+              </button>
+            )}
             {/* View Toggle */}
             <div className="flex items-center gap-1 sm:gap-2 bg-gray-100 rounded-lg p-1">
               <button
@@ -1005,7 +1801,11 @@ function CollectionPageContent() {
                       const priceStr = formatPrice(marketValue);
                       if (!priceStr) return null;
 
-                      const isStale = isPriceStale(card.ebay_price_updated_at);
+                      const isStale = isPriceStale(getPriceUpdatedAt(card));
+                      // Determine price source label
+                      const hasDcmEstimate = (card.dcm_price_estimate !== null && card.dcm_price_estimate !== undefined) ||
+                        (card.dcm_cached_prices?.estimatedValue !== null && card.dcm_cached_prices?.estimatedValue !== undefined);
+                      const priceLabel = hasDcmEstimate ? 'DCM estimate' : 'eBay median price';
                       return (
                         <div
                           className={`absolute -top-8 right-2 px-2 py-1 rounded-full text-xs font-semibold border-2 flex items-center gap-1 ${
@@ -1013,7 +1813,7 @@ function CollectionPageContent() {
                               ? 'bg-amber-50 text-amber-700 border-amber-400'
                               : 'bg-green-50 text-green-700 border-green-400'
                           }`}
-                          title={`eBay median price${isStale ? ' (stale - updating soon)' : ''}`}
+                          title={`${priceLabel}${isStale ? ' (stale - updating soon)' : ''}`}
                         >
                           <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
                             <path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"/>
@@ -1264,7 +2064,7 @@ function CollectionPageContent() {
                                 {(() => {
                                   const marketValue = getMarketValue(card);
                                   const priceStr = formatPrice(marketValue);
-                                  const isStale = isPriceStale(card.ebay_price_updated_at);
+                                  const isStale = isPriceStale(getPriceUpdatedAt(card));
                                   if (priceStr) {
                                     return (
                                       <span className={`text-sm font-semibold px-2 py-0.5 rounded ${isStale ? 'text-amber-600 bg-amber-50' : 'text-green-600 bg-green-50'}`}>
@@ -1503,7 +2303,7 @@ function CollectionPageContent() {
                             {(() => {
                               const marketValue = getMarketValue(card);
                               const priceStr = formatPrice(marketValue);
-                              const isStale = isPriceStale(card.ebay_price_updated_at);
+                              const isStale = isPriceStale(getPriceUpdatedAt(card));
                               const listingCount = card.ebay_price_listing_count;
 
                               if (!priceStr) {
@@ -1600,7 +2400,7 @@ function CollectionPageContent() {
       <BatchDownloadModal
         isOpen={isBatchDownloadModalOpen}
         onClose={() => setIsBatchDownloadModalOpen(false)}
-        selectedCards={cards.filter(c => selectedCardIds.has(c.id))}
+        selectedCards={cards.filter(c => selectedCardIds.has(c.id)) as any}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
       />
     </main>

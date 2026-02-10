@@ -31,7 +31,8 @@ import { getStoredSession } from '@/lib/directAuth';
 import { Card as CardType, CardDefects, DEFAULT_CARD_DEFECTS, GradingPasses } from '@/types/card';
 import { DownloadReportButton } from '@/components/reports/DownloadReportButton';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
-import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
+// EbayPriceLookup removed - sports cards now use DCM pricing from SportsCardsPro
+import { PriceChartingLookup } from '@/components/pricing/PriceChartingLookup';
 import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ThreePassSummary } from '@/components/reports/ThreePassSummary';
 import CardAnalysisAnimation from '@/app/upload/sports/CardAnalysisAnimation';
@@ -1431,6 +1432,13 @@ export function SportsCardDetails() {
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  // 💰 DCM Pricing callout state
+  const [dcmPriceData, setDcmPriceData] = useState<{
+    estimatedValue: number | null;
+    matchConfidence: 'high' | 'medium' | 'low' | 'none';
+    productName: string | null;
+    sportsCardsProUrl?: string;
+  } | null>(null);
 
   // Extract data from AI grading
   // DVG v1 data structure
@@ -2355,6 +2363,8 @@ export function SportsCardDetails() {
     serial_number: stripMarkdown(card.conversational_card_info?.serial_number) || card.serial_numbering || dvgGrading.card_info?.serial_number,
     rookie_or_first: card.conversational_card_info?.rookie_or_first || card.rookie_card || dvgGrading.card_info?.rookie_or_first,
     subset: subsetRaw, // Keep separate for special features display
+    // Also check subset_insert_name from v3.3 rarity classification (may have actual color name)
+    subset_insert_name: stripMarkdown(card.conversational_card_info?.subset_insert_name) || card.subset_insert_name || null,
     rarity_tier: stripMarkdown(card.conversational_card_info?.rarity_tier) || card.rarity_tier || dvgGrading.card_info?.rarity_tier,
     // Rarity/variant description (e.g., "Prizm Silver", "Refractor")
     rarity_or_variant: stripMarkdown(card.conversational_card_info?.rarity_or_variant) || stripMarkdown(card.conversational_card_info?.parallel_type) || card.rarity_description || dvgGrading.card_info?.rarity_or_variant,
@@ -3162,6 +3172,49 @@ export function SportsCardDetails() {
                 );
               })()}
 
+              {/* 💰 DCM Estimated Price Callout */}
+              {dcmPriceData?.estimatedValue && (
+                <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl shadow-lg p-5 border-2 border-emerald-200 mt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="text-sm font-medium text-emerald-700">DCM Estimated Value</span>
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-800">
+                        ${dcmPriceData.estimatedValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-block px-2 py-0.5 rounded text-xs font-medium ${
+                        dcmPriceData.matchConfidence === 'high' ? 'bg-green-100 text-green-700' :
+                        dcmPriceData.matchConfidence === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-orange-100 text-orange-700'
+                      }`}>
+                        {dcmPriceData.matchConfidence === 'high' ? 'Best Match' :
+                         dcmPriceData.matchConfidence === 'medium' ? 'Good Match' : 'Partial Match'}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-3 leading-relaxed">
+                    Card parallel and version may differ from the matched listing. Review and adjust in the{' '}
+                    <a
+                      href="#market-pricing-section"
+                      className="text-emerald-700 font-medium hover:text-emerald-800 underline"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        document.getElementById('market-pricing-section')?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Market Pricing Section
+                    </a>{' '}
+                    below.
+                  </p>
+                </div>
+              )}
+
               {/* User-Reported Condition - Show below AI summary */}
               {card.has_user_condition_report && card.user_condition_report && (
                 <div className="mt-6">
@@ -3590,13 +3643,42 @@ export function SportsCardDetails() {
                         </div>
                       )}
 
-                      {/* Variant */}
-                      {cardInfo.rarity_or_variant && (
-                        <div className="bg-pink-50 rounded-lg p-3 border border-pink-200">
-                          <p className="text-pink-700 text-xs font-semibold mb-1">VARIANT</p>
-                          <p className="font-bold text-pink-900">{cardInfo.rarity_or_variant}</p>
-                        </div>
-                      )}
+                      {/* Variant/Parallel - Show actual parallel name, not classification tier */}
+                      {(() => {
+                        // Priority: parallel_type > subset > subset_insert_name > rarity_or_variant
+                        // parallel_type has the actual color (e.g., "Green", "Silver Prizm")
+                        // subset has insert/parallel names (e.g., "Downtown", "Refractor")
+                        const parallelName = cardInfo.parallel_type || cardInfo.subset || cardInfo.subset_insert_name;
+
+                        // If no specific parallel name, check rarity_or_variant but filter out generic tiers
+                        let displayValue = parallelName;
+                        if (!displayValue && cardInfo.rarity_or_variant) {
+                          const variant = cardInfo.rarity_or_variant.toLowerCase();
+                          const genericVariants = [
+                            'base', 'base_common', 'common', 'standard', 'regular',
+                            'insert', 'parallel', 'modern_parallel', 'parallel_variant',
+                            'sp', 'ssp', 'autographed', 'autograph', 'auto',
+                            'rookie', 'rc', 'memorabilia', 'relic', 'patch'
+                          ];
+                          if (!genericVariants.includes(variant)) {
+                            displayValue = cardInfo.rarity_or_variant;
+                          }
+                        }
+
+                        if (!displayValue) return null;
+
+                        // Format nicely (replace underscores, title case)
+                        const formattedVariant = displayValue
+                          .replace(/_/g, ' ')
+                          .replace(/\b\w/g, (c: string) => c.toUpperCase());
+
+                        return (
+                          <div className="bg-pink-50 rounded-lg p-3 border border-pink-200">
+                            <p className="text-pink-700 text-xs font-semibold mb-1">PARALLEL</p>
+                            <p className="font-bold text-pink-900">{formattedVariant}</p>
+                          </div>
+                        );
+                      })()}
 
                       {/* Authentic */}
                       {typeof cardInfo.authentic === 'boolean' && (
@@ -4808,31 +4890,42 @@ export function SportsCardDetails() {
 
                   {/* Market & Pricing Tab Content */}
               {/* Section Header: Market & Pricing */}
-              <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg px-6 py-3 shadow-md">
+              <div id="market-pricing-section" className="bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg px-6 py-3 shadow-md">
                 <h2 className="text-xl font-bold">
                   Market & Pricing
                 </h2>
               </div>
 
-              {/* eBay Live Prices - Fetched from Browse API */}
+              {/* SportsCardsPro Market Prices - DCM Estimated Value */}
               <div id="tour-live-market-pricing">
-                <EbayPriceLookup
-                  card={{
-                    card_name: cardInfo.card_name || card.card_name,
-                    featured: cardInfo.player_or_character || card.featured,
-                    card_set: cardInfo.set_name || card.card_set,
-                    card_number: cardInfo.card_number || card.card_number,
-                    release_date: cardInfo.year || card.release_date,
-                    subset: cardInfo.subset,
-                    rarity_or_variant: cardInfo.rarity_or_variant,
-                    manufacturer: cardInfo.manufacturer,
-                    category: card.category,
-                    serial_numbering: cardInfo.serial_number || card.serial_numbering,
-                    rookie_card: cardInfo.rookie_or_first === true || card.rookie_card === true,
-                  }}
-                  cardId={card.id}
-                  category="sports"
-                />
+              {(() => {
+                const session = getStoredSession();
+                const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                return (
+                  <PriceChartingLookup
+                    card={{
+                      id: card.id,  // Card ID for saving manual parallel selection
+                      player_or_character: cardInfo.player_or_character || card.featured,
+                      year: cardInfo.year || card.release_date,
+                      set_name: cardInfo.set_name || card.card_set,
+                      card_number: cardInfo.card_number || card.card_number,
+                      rarity_or_variant: cardInfo.rarity_or_variant,
+                      subset: cardInfo.subset,  // Insert/subset name (e.g., "Downtown") - NOT used for variant
+                      subset_insert_name: cardInfo.subset_insert_name,  // Alternative field from v3.3
+                      parallel_type: cardInfo.parallel_type,  // Actual parallel color (e.g., "Green", "Gold")
+                      rookie_or_first: cardInfo.rookie_or_first === true || card.rookie_card === true,
+                      category: card.category,  // e.g., "Hockey", "Baseball", "Basketball", "Football"
+                      serial_numbering: cardInfo.serial_number || card.serial_numbering,  // e.g., "23/75"
+                      // Saved manual parallel selection
+                      dcm_selected_product_id: card.dcm_selected_product_id,
+                      dcm_selected_product_name: card.dcm_selected_product_name,
+                    }}
+                    dcmGrade={card.conversational_decimal_grade ?? undefined}
+                    isOwner={isPricingOwner}
+                    onPriceLoad={setDcmPriceData}
+                  />
+                );
+              })()}
               </div>
 
               {/* Find and Price This Card */}
@@ -4847,7 +4940,7 @@ export function SportsCardDetails() {
                   Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || card.featured || card.card_name} card.
                 </p>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-3 gap-6">
                   {/* General Search */}
                   <a
                     href={generateEbaySearchUrl({
@@ -4905,6 +4998,28 @@ export function SportsCardDetails() {
                     <h3 className="font-semibold text-green-900 mb-2 text-lg">Sold Listings</h3>
                     <p className="text-sm text-green-700 text-center leading-relaxed">See actual sale prices and market history</p>
                   </a>
+
+                  {/* SportsCardsPro Search */}
+                  <a
+                    href={dcmPriceData?.sportsCardsProUrl || `https://www.sportscardspro.com/search?q=${encodeURIComponent(
+                      [
+                        cardInfo.player_or_character || card.featured,
+                        cardInfo.set_name || card.card_set,
+                        cardInfo.year || card.release_date
+                      ].filter(Boolean).join(' ')
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col items-center p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
+                  >
+                    <div className="w-16 h-16 bg-purple-600 rounded-lg flex items-center justify-center mb-4 group-hover:scale-105 transition-transform">
+                      <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-purple-900 mb-2 text-lg">SportsCardsPro</h3>
+                    <p className="text-sm text-purple-700 text-center leading-relaxed">View market data and price history</p>
+                  </a>
                 </div>
 
                 <div className="mt-4 p-3 bg-gray-50 rounded-lg">
@@ -4924,20 +5039,20 @@ export function SportsCardDetails() {
                 return (
                   <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                         </svg>
                       </div>
                       <div>
                         <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
-                        <p className="text-sm text-gray-500">List this card directly to eBay with one click</p>
+                        <p className="text-sm text-gray-500">List this card directly to eBay</p>
                       </div>
                     </div>
 
-                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-4 mb-4">
+                    <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
-                        <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <div className="text-sm text-gray-700">
