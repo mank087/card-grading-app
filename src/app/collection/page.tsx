@@ -184,13 +184,13 @@ const getGradeSource = (card: Card): 'conversational' | 'structured' | null => {
   return null;
 };
 
-// 💰 Helper: Format price for display
+// 💰 Helper: Format price for display (always 2 decimal places)
 const formatPrice = (price: number | null | undefined): string | null => {
   if (price === null || price === undefined) return null;
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(price);
 };
@@ -2304,23 +2304,15 @@ function CollectionPageContent() {
                               const marketValue = getMarketValue(card);
                               const priceStr = formatPrice(marketValue);
                               const isStale = isPriceStale(getPriceUpdatedAt(card));
-                              const listingCount = card.ebay_price_listing_count;
 
                               if (!priceStr) {
                                 return <span className="text-sm text-gray-400">-</span>;
                               }
 
                               return (
-                                <div className="text-sm">
-                                  <span className={`font-medium ${isStale ? 'text-amber-600' : 'text-green-600'}`}>
-                                    {priceStr}
-                                  </span>
-                                  {listingCount !== null && listingCount !== undefined && (
-                                    <div className="text-xs text-gray-400">
-                                      {listingCount} listing{listingCount !== 1 ? 's' : ''}
-                                    </div>
-                                  )}
-                                </div>
+                                <span className={`text-sm font-medium ${isStale ? 'text-amber-600' : 'text-green-600'}`}>
+                                  {priceStr}
+                                </span>
                               );
                             })()}
                           </td>
