@@ -156,8 +156,8 @@ function buildPokemonCardQuery(params: PokemonCardSearchParams): string {
 
   // Card number (very important for Pokemon cards)
   if (params.cardNumber) {
-    // Remove any leading # and format as #XX
-    const cleanNumber = params.cardNumber.replace(/^#/, '').split('/')[0].trim();
+    // Remove any leading # and format as #XX, strip leading zeros to match PriceCharting format
+    const cleanNumber = params.cardNumber.replace(/^#/, '').split('/')[0].trim().replace(/^0+(\d)/, '$1');
     if (cleanNumber) {
       parts.push(`#${cleanNumber}`);
     }
@@ -484,9 +484,17 @@ function scorePokemonProductMatch(
   // CARD NUMBER VALIDATION
   if (params.cardNumber) {
     const cleanNum = params.cardNumber.replace(/^#/, '').split('/')[0].toLowerCase();
-    // Check for #XX format in product name
-    if (!productName.includes(`#${cleanNum}`) && !productName.includes(` ${cleanNum}/`)) {
-      console.log(`[PokemonPricing] SKIP: Card number mismatch - looking for "${cleanNum}", found "${productName}"`);
+    // Strip leading zeros for comparison (e.g., "027" → "27") since PriceCharting
+    // doesn't zero-pad card numbers (e.g., "#27" not "#027")
+    const cleanNumNoZeros = cleanNum.replace(/^0+(\d)/, '$1');
+    // Check for #XX format in product name (try both zero-padded and non-padded)
+    const hasMatch =
+      productName.includes(`#${cleanNum}`) ||
+      productName.includes(` ${cleanNum}/`) ||
+      productName.includes(`#${cleanNumNoZeros}`) ||
+      productName.includes(` ${cleanNumNoZeros}/`);
+    if (!hasMatch) {
+      console.log(`[PokemonPricing] SKIP: Card number mismatch - looking for "${cleanNum}" (or "${cleanNumNoZeros}"), found "${productName}"`);
       return -1;
     }
     score += 15;

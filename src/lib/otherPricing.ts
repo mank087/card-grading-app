@@ -130,7 +130,8 @@ function buildOtherCardQuery(params: OtherCardSearchParams): string {
 
   // Card number (critical for uniqueness - e.g., "#R-11")
   if (params.cardNumber) {
-    const cleanNumber = params.cardNumber.replace(/^#/, '').split('/')[0].trim();
+    // Strip leading zeros to match PriceCharting format (e.g., "027" → "27")
+    const cleanNumber = params.cardNumber.replace(/^#/, '').split('/')[0].trim().replace(/^0+(\d)/, '$1');
     if (cleanNumber) {
       parts.push(`#${cleanNumber}`);
     }
@@ -486,12 +487,20 @@ function scoreOtherProductMatch(
   // CARD NUMBER VALIDATION (critical for accurate matching)
   if (params.cardNumber) {
     const cleanNum = params.cardNumber.replace(/^#/, '').split('/')[0].trim().toLowerCase();
+    // Strip leading zeros for comparison (e.g., "027" → "27")
+    const cleanNumNoZeros = cleanNum.replace(/^0+(\d)/, '$1');
     const hasNumber = productName.includes(`#${cleanNum}`) ||
                       productName.includes(` ${cleanNum}/`) ||
                       productName.includes(` ${cleanNum} `) ||
                       productName.endsWith(` ${cleanNum}`) ||
                       productName.includes(`#${cleanNum}]`) ||
-                      productName.includes(`#${cleanNum})`);
+                      productName.includes(`#${cleanNum})`) ||
+                      productName.includes(`#${cleanNumNoZeros}`) ||
+                      productName.includes(` ${cleanNumNoZeros}/`) ||
+                      productName.includes(` ${cleanNumNoZeros} `) ||
+                      productName.endsWith(` ${cleanNumNoZeros}`) ||
+                      productName.includes(`#${cleanNumNoZeros}]`) ||
+                      productName.includes(`#${cleanNumNoZeros})`);
 
     if (hasNumber) {
       score += 35;
@@ -499,7 +508,7 @@ function scoreOtherProductMatch(
       // If we have a card number but it doesn't match, this is likely wrong card
       // Apply significant penalty
       score -= 30;
-      console.log(`[OtherPricing] Card number mismatch: looking for "#${cleanNum}", not found in "${productName}"`);
+      console.log(`[OtherPricing] Card number mismatch: looking for "#${cleanNum}" (or "#${cleanNumNoZeros}"), not found in "${productName}"`);
     }
   }
 
@@ -566,7 +575,8 @@ function buildSimpleQuery(params: OtherCardSearchParams): string {
   const parts: string[] = [coreName];
 
   if (params.cardNumber) {
-    const cleanNumber = params.cardNumber.replace(/^#/, '').split('/')[0].trim();
+    // Strip leading zeros to match PriceCharting format (e.g., "027" → "27")
+    const cleanNumber = params.cardNumber.replace(/^#/, '').split('/')[0].trim().replace(/^0+(\d)/, '$1');
     if (cleanNumber) {
       parts.push(`#${cleanNumber}`);
     }

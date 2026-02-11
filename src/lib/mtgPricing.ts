@@ -152,7 +152,8 @@ function buildMTGCardQuery(params: MTGCardSearchParams): string {
 
   // Collector number SECOND (critical for MTG - identifies exact printing)
   if (params.collectorNumber) {
-    const cleanNumber = params.collectorNumber.replace(/^#/, '').split('/')[0].trim();
+    // Strip leading zeros to match PriceCharting format (e.g., "027" → "27")
+    const cleanNumber = params.collectorNumber.replace(/^#/, '').split('/')[0].trim().replace(/^0+(\d)/, '$1');
     if (cleanNumber) {
       parts.push(`#${cleanNumber}`);
     }
@@ -476,18 +477,24 @@ function scoreMTGProductMatch(
   // COLLECTOR NUMBER VALIDATION (CRITICAL for MTG - same card reprinted in many sets)
   if (params.collectorNumber) {
     const cleanNum = params.collectorNumber.replace(/^#/, '').split('/')[0].trim().toLowerCase();
+    // Strip leading zeros for comparison (e.g., "027" → "27")
+    const cleanNumNoZeros = cleanNum.replace(/^0+(\d)/, '$1');
 
-    // Check various formats: #123, 123/, 123 (space after)
+    // Check various formats: #123, 123/, 123 (space after) — try both padded and unpadded
     const hasNumber = productName.includes(`#${cleanNum}`) ||
                       productName.includes(` ${cleanNum}/`) ||
                       productName.includes(` ${cleanNum} `) ||
-                      productName.endsWith(` ${cleanNum}`);
+                      productName.endsWith(` ${cleanNum}`) ||
+                      productName.includes(`#${cleanNumNoZeros}`) ||
+                      productName.includes(` ${cleanNumNoZeros}/`) ||
+                      productName.includes(` ${cleanNumNoZeros} `) ||
+                      productName.endsWith(` ${cleanNumNoZeros}`);
 
     if (hasNumber) {
       score += 40;  // Strong bonus for matching collector number
     } else {
       // If we have a collector number but it doesn't match, this is likely wrong card
-      console.log(`[MTGPricing] SKIP: Collector number mismatch - looking for #${cleanNum}, found "${productName}"`);
+      console.log(`[MTGPricing] SKIP: Collector number mismatch - looking for #${cleanNum} (or #${cleanNumNoZeros}), found "${productName}"`);
       return -1;
     }
   }

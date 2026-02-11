@@ -193,6 +193,14 @@ function cleanCardNumber(cardNumber: string): string {
 }
 
 /**
+ * Strip leading zeros from a card number for comparison.
+ * e.g., "027" → "27", "001" → "1", "0" → "0"
+ */
+function stripLeadingZeros(num: string): string {
+  return num.replace(/^0+(\d)/, '$1');
+}
+
+/**
  * Normalize card number for comparison - handles O/0 confusion
  * "RO5-MTG" and "R05-MTG" should match (letter O vs number 0)
  */
@@ -268,8 +276,8 @@ function buildSportsCardQuery(params: SportsCardSearchParams): string {
 
   // Card number (important for accurate matching)
   if (params.cardNumber) {
-    // Clean and normalize the card number
-    const cleanNumber = cleanCardNumber(params.cardNumber);
+    // Clean and normalize the card number, strip leading zeros to match PriceCharting format
+    const cleanNumber = stripLeadingZeros(cleanCardNumber(params.cardNumber));
     if (cleanNumber) {
       parts.push(`#${cleanNumber}`);
     }
@@ -670,17 +678,21 @@ export async function searchSportsCardPrices(
       if (params.cardNumber) {
         // Use the same cleaning logic as query building
         const cleanCardNum = cleanCardNumber(params.cardNumber).toLowerCase();
+        // Strip leading zeros (e.g., "027" → "27") since PriceCharting may not zero-pad
+        const cleanCardNumNoZeros = stripLeadingZeros(cleanCardNum);
         // Normalize for O/0 confusion
         const normalizedSearchNum = normalizeCardNumberForComparison(cleanCardNum);
+        const normalizedSearchNumNoZeros = normalizeCardNumberForComparison(cleanCardNumNoZeros);
         const normalizedProductName = normalizeCardNumberForComparison(productName);
 
-        // Check if product name contains the card number (with or without #)
-        // First try exact match, then normalized match
-        const exactMatch = productName.includes(`#${cleanCardNum}`) || productName.includes(cleanCardNum);
-        const normalizedMatch = normalizedProductName.includes(`#${normalizedSearchNum}`) || normalizedProductName.includes(normalizedSearchNum);
+        // Check if product name contains the card number (with or without #, with or without leading zeros)
+        const exactMatch = productName.includes(`#${cleanCardNum}`) || productName.includes(cleanCardNum) ||
+          productName.includes(`#${cleanCardNumNoZeros}`) || productName.includes(cleanCardNumNoZeros);
+        const normalizedMatch = normalizedProductName.includes(`#${normalizedSearchNum}`) || normalizedProductName.includes(normalizedSearchNum) ||
+          normalizedProductName.includes(`#${normalizedSearchNumNoZeros}`) || normalizedProductName.includes(normalizedSearchNumNoZeros);
 
         if (!exactMatch && !normalizedMatch) {
-          console.log(`[SportsCardsPro] SKIP: Card # mismatch - looking for "${cleanCardNum}", found "${productName}"`);
+          console.log(`[SportsCardsPro] SKIP: Card # mismatch - looking for "${cleanCardNum}" (or "${cleanCardNumNoZeros}"), found "${productName}"`);
           return -1;
         }
         score += 10; // Card number matches
@@ -927,12 +939,16 @@ export async function getAvailableParallels(
     // If we have a card number, product MUST contain it
     if (params.cardNumber) {
       const cleanCardNum = cleanCardNumber(params.cardNumber).toLowerCase();
+      const cleanCardNumNoZeros = stripLeadingZeros(cleanCardNum);
       const normalizedSearchNum = normalizeCardNumberForComparison(cleanCardNum);
+      const normalizedSearchNumNoZeros = normalizeCardNumberForComparison(cleanCardNumNoZeros);
       const normalizedProductName = normalizeCardNumberForComparison(productName);
 
-      // Check both exact and normalized matches
-      const exactMatch = productName.includes(`#${cleanCardNum}`) || productName.includes(cleanCardNum);
-      const normalizedMatch = normalizedProductName.includes(`#${normalizedSearchNum}`) || normalizedProductName.includes(normalizedSearchNum);
+      // Check both exact and normalized matches, with and without leading zeros
+      const exactMatch = productName.includes(`#${cleanCardNum}`) || productName.includes(cleanCardNum) ||
+        productName.includes(`#${cleanCardNumNoZeros}`) || productName.includes(cleanCardNumNoZeros);
+      const normalizedMatch = normalizedProductName.includes(`#${normalizedSearchNum}`) || normalizedProductName.includes(normalizedSearchNum) ||
+        normalizedProductName.includes(`#${normalizedSearchNumNoZeros}`) || normalizedProductName.includes(normalizedSearchNumNoZeros);
 
       if (!exactMatch && !normalizedMatch) {
         return false;
