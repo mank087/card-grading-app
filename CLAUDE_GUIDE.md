@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: February 5, 2026 (v8.1 - VIP Package, Card Lovers Subscription, SEO Metadata, Database Optimizations)
+> Last Updated: February 11, 2026 (v8.2 - Affiliate/Partner Program with commission tracking, referral attribution, admin dashboard)
 
 ---
 
@@ -33,6 +33,7 @@
 
 **Core Features:**
 - AI-powered card grading with three-pass consensus system
+- **v8.2: Affiliate/Partner Program with referral tracking, commissions, admin dashboard, Stripe promo codes**
 - **v8.1: VIP Package ($99/150 credits), Card Lovers subscription, SEO metadata, database optimizations**
 - **v8.0: Blog CMS, eBay auction listings (AddItem/Chinese), global scroll-to-top**
 - **v7.9: Three-pass reorder (passes-first), SEO & CLS fixes, Google Ads conversion tracking**
@@ -98,6 +99,8 @@ src/
 │   │   ├── page.tsx
 │   │   ├── success/page.tsx
 │   │   └── layout.tsx            # SEO metadata
+│   ├── affiliates/               # Affiliate program info page (v8.2)
+│   │   └── page.tsx
 │   ├── founders/                 # Founders package
 │   │   └── layout.tsx            # SEO metadata
 │   ├── pokemon/[id]/             # Pokemon card detail
@@ -122,7 +125,17 @@ src/
 │   │   └── layout.tsx            # SEO metadata
 │   ├── unsubscribe/              # Email unsubscribe
 │   ├── admin/                    # Admin dashboard
+│   │   └── (dashboard)/
+│   │       └── affiliates/       # Affiliate management (v8.2)
 │   └── api/                      # API routes
+│       ├── affiliate/            # Public affiliate endpoints (v8.2)
+│       │   ├── click/route.ts
+│       │   └── validate/route.ts
+│       └── admin/affiliates/     # Admin affiliate endpoints (v8.2)
+│           ├── route.ts
+│           ├── [id]/route.ts
+│           ├── commissions/route.ts
+│           └── approve-commissions/route.ts
 │
 ├── lib/                          # Business logic & utilities
 │   ├── directAuth.ts             # Client-side auth
@@ -139,14 +152,16 @@ src/
 │   ├── emailTemplates.ts         # Email HTML templates
 │   ├── stripe.ts                 # Stripe configuration
 │   ├── credits.ts                # Credit management
+│   ├── affiliates.ts             # Affiliate program business logic (v8.2)
 │   └── pokemonApiVerification.ts # Pokemon TCG API
 │
 ├── components/                   # React components
-│   ├── ClientLayout.tsx          # Root layout with providers
+│   ├── ClientLayout.tsx          # Root layout with providers (includes ReferralTracker)
+│   ├── ReferralTracker.tsx       # Captures ?ref=CODE for affiliate attribution (v8.2)
 │   ├── CardSlab.tsx              # Card display component
 │   ├── camera/                   # Camera & upload components
 │   ├── reports/                  # Report & label components
-│   ├── admin/                    # Admin components
+│   ├── admin/                    # Admin components (AdminSidebar includes Affiliates link)
 │   └── ui/                       # Shared UI components
 │
 ├── contexts/                     # React contexts
@@ -189,6 +204,7 @@ src/
 | `/vip` | `app/vip/page.tsx` | VIP Package landing page (v8.1) |
 | `/card-lovers` | `app/card-lovers/page.tsx` | Card Lovers subscription page (v8.1) |
 | `/card-lovers/success` | `app/card-lovers/success/page.tsx` | Card Lovers subscription success page |
+| `/affiliates` | `app/affiliates/page.tsx` | Affiliate program info page (v8.2) |
 | `/mtg-database` | `app/mtg-database/page.tsx` | MTG card database search |
 | `/lorcana-database` | `app/lorcana-database/page.tsx` | Lorcana card database search |
 | `/onepiece-database` | `app/onepiece-database/page.tsx` | One Piece card database search |
@@ -230,6 +246,7 @@ src/
 | `/admin/blog` | `app/admin/(dashboard)/blog/page.tsx` | Blog post management (v8.0) |
 | `/admin/blog/new` | `app/admin/(dashboard)/blog/new/page.tsx` | Create new blog post (v8.0) |
 | `/admin/blog/[id]/edit` | `app/admin/(dashboard)/blog/[id]/edit/page.tsx` | Edit blog post (v8.0) |
+| `/admin/affiliates` | `app/admin/(dashboard)/affiliates/page.tsx` | Affiliate management (v8.2) |
 
 ---
 
@@ -324,8 +341,8 @@ src/
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/stripe/checkout` | POST | Create Stripe checkout session (includes founders tier) |
-| `/api/stripe/webhook` | POST | Stripe webhook handler (handles founder status) |
+| `/api/stripe/checkout` | POST | Create Stripe checkout session (includes founders tier, passes ref_code for affiliate attribution) |
+| `/api/stripe/webhook` | POST | Stripe webhook handler (handles founder/VIP status, affiliate commissions, refund reversals) |
 | `/api/stripe/credits` | GET | Get user credit balance |
 | `/api/stripe/deduct` | POST | Deduct credit for grading |
 
@@ -346,6 +363,17 @@ src/
 | `/api/user/label-emblem-preference` | GET/POST | Get/set emblem preference (founder/card_lover/vip/none/auto) |
 | `/api/stripe/cancel-subscription` | POST | Cancel Card Lovers subscription |
 | `/api/stripe/upgrade-subscription` | POST | Upgrade from monthly to annual |
+
+### Affiliate Program (v8.2)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/affiliate/validate` | GET | Validate referral code (public, no auth) |
+| `/api/affiliate/click` | POST | Record referral click (public, fire-and-forget) |
+| `/api/admin/affiliates` | GET/POST | List all affiliates / Create new affiliate (auto-creates Stripe promo code) |
+| `/api/admin/affiliates/[id]` | GET/PUT/DELETE | Get details+stats / Update settings / Deactivate affiliate |
+| `/api/admin/affiliates/commissions` | GET/POST | List commissions (filterable) / Mark commissions as paid |
+| `/api/admin/affiliates/approve-commissions` | POST | Batch approve pending commissions past 14-day hold |
 
 ### Email System
 
@@ -533,6 +561,98 @@ src/
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT false;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS founder_since TIMESTAMPTZ;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_founder_badge BOOLEAN DEFAULT true;
+```
+
+### v8.2 Affiliate/Partner Program (February 11, 2026)
+
+**Key Features:**
+
+1. **Full Affiliate Program**
+   - Affiliates earn cash commissions (default 20%) on sales they drive
+   - Buyers get 10% off first purchase via affiliate's Stripe promo code
+   - Dual attribution: referral links (`?ref=CODE`) and Stripe promo codes
+   - 14-day hold period before commissions are payable
+   - Automatic reversal on refund (`charge.refunded` webhook)
+
+2. **Referral Attribution Flow**
+   - `ReferralTracker` component in `ClientLayout.tsx` captures `?ref=CODE` on any page
+   - Validates code, stores in localStorage with 30-day expiry
+   - Records click (hashed IP, user agent, landing page)
+   - Credits, VIP, and Card Lovers pages pass `ref_code` to checkout/subscribe APIs
+   - Webhook creates commission from session metadata OR Stripe promotion code mapping
+
+3. **Admin Dashboard** (`/admin/affiliates`)
+   - Table of all affiliates with stats (referrals, earned, paid, pending)
+   - Click row for detail view with commission history
+   - Add Affiliate modal (auto-creates Stripe coupon + promotion code)
+   - Pause/Activate toggle, Approve Pending batch action
+   - Payout workflow: select approved commissions, enter reference, mark as paid
+
+4. **Fraud Prevention**
+   - Self-referral blocking (affiliate.user_id === referred_user_id)
+   - Duplicate attribution (first purchase only per user per affiliate)
+   - IP hashing (SHA-256, never raw IPs)
+   - 14-day hold period (refund buffer)
+   - Automatic reversal on refund
+   - 30-day attribution window expiry
+
+5. **Public Affiliate Page** (`/affiliates`)
+   - Info page explaining the program
+   - "Apply to Partner" email CTA
+
+**Files Created:**
+| File | Purpose |
+|------|---------|
+| `src/lib/affiliates.ts` | Core business logic (lookups, clicks, commissions, stats, payouts) |
+| `src/components/ReferralTracker.tsx` | Captures `?ref=CODE` on page load, stores in localStorage |
+| `src/app/api/affiliate/click/route.ts` | Record clicks (public, no auth) |
+| `src/app/api/affiliate/validate/route.ts` | Validate referral codes (public, no auth) |
+| `src/app/api/admin/affiliates/route.ts` | List/create affiliates (admin) |
+| `src/app/api/admin/affiliates/[id]/route.ts` | Get/update/deactivate affiliate (admin) |
+| `src/app/api/admin/affiliates/commissions/route.ts` | List/pay commissions (admin) |
+| `src/app/api/admin/affiliates/approve-commissions/route.ts` | Batch approve (admin) |
+| `src/app/admin/(dashboard)/affiliates/page.tsx` | Admin dashboard UI |
+| `src/app/affiliates/page.tsx` | Public info page |
+| `supabase/migrations/20260211_add_affiliate_program.sql` | Database schema (3 tables) |
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `src/components/ClientLayout.tsx` | Added `<ReferralTracker />` |
+| `src/components/admin/AdminSidebar.tsx` | Added "Affiliates" nav item |
+| `src/app/api/stripe/checkout/route.ts` | Reads `ref_code`, validates affiliate, passes to Stripe metadata |
+| `src/app/api/stripe/subscribe/route.ts` | Same: reads `ref_code`, passes to session + subscription metadata |
+| `src/app/api/stripe/webhook/route.ts` | Commission creation on checkout, reversal on `charge.refunded` |
+| `src/app/credits/page.tsx` | Passes `ref_code` from localStorage to checkout |
+| `src/app/vip/page.tsx` | Passes `ref_code` from localStorage to checkout |
+| `src/app/card-lovers/page.tsx` | Passes `ref_code` from localStorage to subscribe |
+
+**Database Migration:**
+```sql
+-- 3 new tables: affiliates, affiliate_commissions, affiliate_clicks
+-- See supabase/migrations/20260211_add_affiliate_program.sql
+-- Indexes on: code, user_id, status, affiliate_id, stripe_session_id, hold status
+-- RLS enabled on all tables (service role bypasses)
+```
+
+**Affiliate Attribution Data Flow:**
+```
+1. Visitor clicks dcmgrading.com/?ref=DOUG
+   └── ReferralTracker validates + stores in localStorage + records click
+
+2. Visitor purchases (credits/VIP/Card Lovers)
+   └── Frontend reads localStorage dcm_ref_code
+   └── Passes ref_code in checkout/subscribe request body
+   └── API validates affiliate, adds ref_code to Stripe session metadata
+
+3. Stripe webhook fires (checkout.session.completed)
+   └── Reads ref_code from metadata OR promotion_code from session
+   └── Maps to affiliate → createCommission() (pending, 14-day hold)
+   └── Updates affiliate totals
+
+4. After 14 days → admin approves → admin marks paid with payout reference
+
+5. On refund (charge.refunded) → commission auto-reversed
 ```
 
 ### v8.1 VIP Package, Card Lovers Subscription, SEO & Database Optimizations (February 5, 2026)
@@ -1182,6 +1302,7 @@ The `pokemonTcgApi.ts` file now searches the local Supabase database first:
 |------|---------|
 | `lib/stripe.ts` | Stripe client & price tiers |
 | `lib/credits.ts` | Credit balance management |
+| `lib/affiliates.ts` | Affiliate program: lookups, click tracking, commission CRUD, stats, payouts (v8.2) |
 
 ### Email
 
@@ -1543,6 +1664,61 @@ pokemon_cards_ja (
   created_at TIMESTAMPTZ,
   updated_at TIMESTAMPTZ
 )
+
+-- Affiliate Program (v8.2)
+affiliates (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users(id),    -- linked DCM account (nullable)
+  name TEXT NOT NULL,                          -- display name
+  email TEXT NOT NULL,                         -- contact/payout email
+  code TEXT NOT NULL UNIQUE,                   -- referral code (e.g., "DOUG")
+  stripe_promotion_code_id TEXT,               -- Stripe promo code ID (10% discount)
+  stripe_coupon_id TEXT,                       -- Stripe coupon ID
+  commission_rate DECIMAL DEFAULT 0.20,        -- 20% default
+  commission_type TEXT DEFAULT 'percentage',    -- 'percentage' or 'flat'
+  flat_commission_amount DECIMAL,
+  status TEXT DEFAULT 'active',                -- 'active', 'paused', 'deactivated'
+  payout_method TEXT DEFAULT 'manual',
+  payout_details TEXT,                         -- PayPal email, Venmo handle, etc.
+  minimum_payout DECIMAL DEFAULT 20.00,
+  attribution_window_days INTEGER DEFAULT 30,
+  total_referrals INTEGER DEFAULT 0,
+  total_commission_earned DECIMAL DEFAULT 0,
+  total_commission_paid DECIMAL DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+
+affiliate_commissions (
+  id UUID PRIMARY KEY,
+  affiliate_id UUID REFERENCES affiliates(id),
+  referred_user_id UUID REFERENCES auth.users(id),
+  stripe_session_id TEXT,
+  stripe_payment_intent_id TEXT,
+  order_amount DECIMAL NOT NULL,
+  net_amount DECIMAL NOT NULL,
+  commission_rate DECIMAL NOT NULL,
+  commission_amount DECIMAL NOT NULL,
+  status TEXT DEFAULT 'pending',               -- 'pending' → 'approved' → 'paid' | 'reversed'
+  hold_until TIMESTAMPTZ,                      -- 14-day hold before payable
+  approved_at TIMESTAMPTZ,
+  paid_at TIMESTAMPTZ,
+  payout_reference TEXT,                       -- PayPal transaction ID, etc.
+  reversal_reason TEXT,
+  metadata JSONB DEFAULT '{}',
+  created_at TIMESTAMPTZ,
+  updated_at TIMESTAMPTZ
+)
+
+affiliate_clicks (
+  id UUID PRIMARY KEY,
+  affiliate_id UUID REFERENCES affiliates(id),
+  ip_hash TEXT,                                -- SHA-256 hashed IP (not raw)
+  user_agent TEXT,
+  landing_page TEXT,
+  created_at TIMESTAMPTZ
+)
 ```
 
 ### Storage Buckets
@@ -1764,12 +1940,26 @@ preferred_label_emblem TEXT DEFAULT 'auto'
 
 ```
 1. User clicks "Buy Credits"
-2. POST /api/stripe/checkout → Create Stripe session
-3. Redirect to Stripe checkout
-4. Payment complete → Stripe webhook
-5. POST /api/stripe/webhook → addCredits()
-6. Update user_credits.balance
+2. Frontend reads dcm_ref_code from localStorage (if affiliate referral)
+3. POST /api/stripe/checkout (with ref_code) → Create Stripe session
+4. Redirect to Stripe checkout (allow_promotion_codes: true)
+5. Payment complete → Stripe webhook
+6. POST /api/stripe/webhook → addCredits()
+7. Update user_credits.balance
+8. If affiliate attribution found → createCommission() (pending, 14-day hold)
 ```
+
+### Affiliate Program (v8.2)
+
+- Affiliates earn **20% commission** (configurable) on referred sales
+- Buyers get **10% off** first purchase via affiliate Stripe promo code
+- **Dual attribution**: referral links (`?ref=CODE`) + Stripe promo codes
+- Commission lifecycle: `pending` (14-day hold) → `approved` → `paid`
+- Auto-reversal on refund (`charge.refunded` webhook)
+- Self-referral and duplicate attribution blocked
+- Admin dashboard at `/admin/affiliates` for management and payouts
+- Core logic in `lib/affiliates.ts`, tracking in `components/ReferralTracker.tsx`
+- See `docs/Affiliate-Program-Setup.md` for full setup & testing guide
 
 ### Credit Deduction
 
@@ -2038,6 +2228,8 @@ File: lib/emailTemplates.ts
 | `/admin/cards` | Card review & management |
 | `/admin/analytics` | Charts & metrics |
 | `/admin/monitoring` | API usage & errors |
+| `/admin/blog` | Blog post management (v8.0) |
+| `/admin/affiliates` | Affiliate management, commissions, payouts (v8.2) |
 
 ### Admin APIs
 
@@ -2048,6 +2240,10 @@ File: lib/emailTemplates.ts
 /api/admin/cards/[id]           - Card management
 /api/admin/users/[id]           - User management
 /api/admin/backfill-labels      - Batch regenerate labels
+/api/admin/affiliates           - List/create affiliates (v8.2)
+/api/admin/affiliates/[id]      - Get/update/deactivate affiliate (v8.2)
+/api/admin/affiliates/commissions        - List/pay commissions (v8.2)
+/api/admin/affiliates/approve-commissions - Batch approve pending (v8.2)
 ```
 
 ---
@@ -2141,6 +2337,38 @@ First Card Grade:
 4. User confirms → POST /api/unsubscribe/action
 5. Set marketing_emails_enabled = false
 6. Show success message
+```
+
+### Affiliate Referral → Commission (v8.2)
+
+```
+1. Visitor clicks dcmgrading.com/?ref=DOUG
+   └── ReferralTracker validates code via /api/affiliate/validate
+   └── Stores in localStorage: dcm_ref_code + dcm_ref_timestamp
+   └── Records click via POST /api/affiliate/click (hashed IP)
+
+2. Visitor makes purchase (credits/VIP/Card Lovers)
+   └── Frontend reads dcm_ref_code from localStorage
+   └── Passes ref_code in checkout/subscribe API body
+   └── Checkout route validates affiliate, adds to Stripe metadata
+
+3. Stripe webhook (checkout.session.completed)
+   └── Reads ref_code from metadata OR promotion_code → affiliate mapping
+   └── Fraud checks: self-referral block, duplicate attribution block
+   └── Creates affiliate_commissions record (pending, hold_until = +14 days)
+   └── Updates affiliate totals
+
+4. Admin approves (after 14 days) via /admin/affiliates
+   └── Batch approve all pending past hold period
+   └── Commission status: pending → approved
+
+5. Admin processes payout
+   └── Selects approved commissions, enters PayPal reference
+   └── Commission status: approved → paid
+
+6. On refund (charge.refunded webhook)
+   └── Reverses commission (status → reversed)
+   └── Deducts from affiliate totals
 ```
 
 ---
@@ -2448,7 +2676,7 @@ npx tsx scripts/export-users-email-list.ts
 
 ---
 
-*This guide covers active, working code as of February 2026 (v8.1). Deprecated files are not included.*
+*This guide covers active, working code as of February 2026 (v8.2). Deprecated files are not included.*
 
 ---
 
@@ -2456,6 +2684,7 @@ npx tsx scripts/export-users-email-list.ts
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v8.2 | Feb 11, 2026 | Affiliate/Partner Program: referral tracking (`?ref=CODE`), commission management (20% default), Stripe promo codes (10% buyer discount), admin dashboard, fraud prevention (self-referral/duplicate/14-day hold/auto-reversal), public info page |
 | v8.1 | Feb 5, 2026 | VIP Package ($99/150 credits), Card Lovers subscription (monthly/annual), unified emblem system, SEO metadata for all pages, database performance indexes, conversion tracking fixes |
 | v8.0 | Feb 2, 2026 | Blog CMS with admin, eBay auction listings (AddItem/Chinese), global scroll-to-top, page tour restart, eBay vintage sports & letter-based card number fixes |
 | v7.9 | Jan 27, 2026 | Three-pass reorder (passes-first), SEO sitemap/robots.txt, CLS fixes (homepage skeletons), Google Ads conversion value fix, version string fix, Avery label improvements |

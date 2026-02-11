@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { stripe, CARD_LOVERS_SUBSCRIPTION, CardLoversPlan } from '@/lib/stripe';
+import { getAffiliateByCode } from '@/lib/affiliates';
 import Stripe from 'stripe';
 
 // Create Supabase client for auth
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { plan } = body as { plan: CardLoversPlan };
+    const { plan, ref_code } = body as { plan: CardLoversPlan; ref_code?: string };
 
     if (!plan || !['monthly', 'annual'].includes(plan)) {
       return NextResponse.json(
@@ -92,6 +93,24 @@ export async function POST(request: NextRequest) {
       ? requestOrigin
       : 'https://www.dcmgrading.com';
 
+    // Look up affiliate if ref_code provided
+    let affiliateCode: string | undefined;
+    if (ref_code) {
+      const affiliate = await getAffiliateByCode(ref_code);
+      if (affiliate && affiliate.status === 'active') {
+        affiliateCode = affiliate.code;
+      }
+    }
+
+    // Build session metadata
+    const sessionMetadata: Record<string, string> = {
+      userId: user.id,
+      plan,
+    };
+    if (affiliateCode) {
+      sessionMetadata.ref_code = affiliateCode;
+    }
+
     // Build checkout session params
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
@@ -104,15 +123,9 @@ export async function POST(request: NextRequest) {
       ],
       success_url: `${origin}/card-lovers/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/card-lovers`,
-      metadata: {
-        userId: user.id,
-        plan,
-      },
+      metadata: sessionMetadata,
       subscription_data: {
-        metadata: {
-          userId: user.id,
-          plan,
-        },
+        metadata: sessionMetadata,
       },
     };
 

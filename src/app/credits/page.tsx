@@ -195,6 +195,9 @@ function CreditsPageContent() {
         return
       }
 
+      // Get referral code from localStorage if present
+      const refCode = typeof window !== 'undefined' ? localStorage.getItem('dcm_ref_code') : null
+
       // Create checkout session
       const response = await fetch('/api/stripe/checkout', {
         method: 'POST',
@@ -202,7 +205,7 @@ function CreditsPageContent() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ tier: tier.id }),
+        body: JSON.stringify({ tier: tier.id, ref_code: refCode || undefined }),
       })
 
       if (!response.ok) {

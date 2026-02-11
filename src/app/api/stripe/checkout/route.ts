@@ -9,6 +9,7 @@ import { stripe, STRIPE_PRICES, StripePriceTier, CARD_LOVERS_DISCOUNT, FOUNDER_D
 import { getUserCredits, isFirstPurchase, isActiveCardLover, hasFounderDiscount } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
 import { checkRateLimit, RATE_LIMITS, getRateLimitIdentifier, createRateLimitResponse } from '@/lib/rateLimit';
+import { getAffiliateByCode } from '@/lib/affiliates';
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +44,7 @@ export async function POST(request: NextRequest) {
 
     // Get requested tier from body
     const body = await request.json();
-    const { tier } = body as { tier: StripePriceTier };
+    const { tier, ref_code } = body as { tier: StripePriceTier; ref_code?: string };
 
     if (!tier || !STRIPE_PRICES[tier]) {
       return NextResponse.json(
@@ -122,7 +123,31 @@ export async function POST(request: NextRequest) {
       ? `${origin}/founders?canceled=true`
       : `${origin}/credits?canceled=true`;
 
+    // Look up affiliate if ref_code provided (for metadata tracking)
+    let affiliateCode: string | undefined;
+    if (ref_code) {
+      const affiliate = await getAffiliateByCode(ref_code);
+      if (affiliate && affiliate.status === 'active') {
+        affiliateCode = affiliate.code;
+      }
+    }
+
     // Build checkout session options
+    const sessionMetadata: Record<string, string> = {
+      userId: userId,
+      tier: tier,
+      credits: priceConfig.credits.toString(),
+      bonusCredits: bonusCredits.toString(),
+      isFirstPurchase: firstPurchase.toString(),
+      isFoundersPackage: isFoundersPackage.toString(),
+      isVipPackage: isVipPackage.toString(),
+    };
+
+    // Add affiliate ref_code to metadata if present
+    if (affiliateCode) {
+      sessionMetadata.ref_code = affiliateCode;
+    }
+
     const checkoutOptions: Stripe.Checkout.SessionCreateParams = {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
@@ -130,25 +155,9 @@ export async function POST(request: NextRequest) {
       allow_promotion_codes: true, // Enable promo code input on checkout page
       success_url: successUrl,
       cancel_url: cancelUrl,
-      metadata: {
-        userId: userId,
-        tier: tier,
-        credits: priceConfig.credits.toString(),
-        bonusCredits: bonusCredits.toString(),
-        isFirstPurchase: firstPurchase.toString(),
-        isFoundersPackage: isFoundersPackage.toString(),
-        isVipPackage: isVipPackage.toString(),
-      },
+      metadata: sessionMetadata,
       payment_intent_data: {
-        metadata: {
-          userId: userId,
-          tier: tier,
-          credits: priceConfig.credits.toString(),
-          bonusCredits: bonusCredits.toString(),
-          isFirstPurchase: firstPurchase.toString(),
-          isFoundersPackage: isFoundersPackage.toString(),
-          isVipPackage: isVipPackage.toString(),
-        },
+        metadata: sessionMetadata,
       },
     };
 

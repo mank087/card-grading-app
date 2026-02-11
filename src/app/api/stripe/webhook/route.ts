@@ -15,6 +15,12 @@ import {
   cancelCardLoverSubscription,
   getUserCredits,
 } from '@/lib/credits';
+import {
+  getAffiliateByCode,
+  getAffiliateByPromotionCode,
+  createCommission,
+  reverseCommission,
+} from '@/lib/affiliates';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
@@ -118,6 +124,12 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'charge.refunded': {
+        const charge = event.data.object as Stripe.Charge;
+        await handleChargeRefunded(charge);
+        break;
+      }
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -189,6 +201,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     } else {
       console.error('Failed to set founder status:', { userId, error: founderResult.error });
     }
+    await processAffiliateAttribution(session, userId);
     return;
   }
 
@@ -211,6 +224,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
     } else {
       console.error('Failed to set VIP status:', { userId, error: vipResult.error });
     }
+    await processAffiliateAttribution(session, userId);
     return;
   }
 
@@ -246,6 +260,9 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   } else {
     console.error('Failed to add credits:', { userId, result });
   }
+
+  // Affiliate attribution for one-time purchases
+  await processAffiliateAttribution(session, userId);
 }
 
 /**
@@ -315,6 +332,9 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
   } else {
     console.error('Failed to activate Card Lovers subscription:', result.error);
   }
+
+  // Affiliate attribution for subscription (first invoice only)
+  await processAffiliateAttribution(session, userId);
 }
 
 /**
@@ -457,5 +477,118 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     console.log('Card Lovers subscription cancelled:', userId);
   } else {
     console.error('Failed to cancel Card Lovers subscription:', result.error);
+  }
+}
+
+/**
+ * Process affiliate attribution for a checkout session.
+ * Looks up affiliate from metadata ref_code or Stripe promotion code.
+ */
+async function processAffiliateAttribution(session: Stripe.Checkout.Session, userId: string) {
+  try {
+    const refCode = session.metadata?.ref_code;
+    let affiliate = null;
+
+    // Method 1: ref_code from session metadata (referral link)
+    if (refCode) {
+      affiliate = await getAffiliateByCode(refCode);
+    }
+
+    // Method 2: Stripe promotion code used at checkout
+    if (!affiliate && session.total_details?.breakdown?.discounts) {
+      for (const discount of session.total_details.breakdown.discounts) {
+        const promoCodeId = typeof discount.discount?.promotion_code === 'string'
+          ? discount.discount.promotion_code
+          : (discount.discount?.promotion_code as any)?.id;
+        if (promoCodeId) {
+          affiliate = await getAffiliateByPromotionCode(promoCodeId);
+          if (affiliate) break;
+        }
+      }
+    }
+
+    if (!affiliate) {
+      // No affiliate attribution for this session
+      return;
+    }
+
+    // Calculate amounts
+    const orderAmount = (session.amount_total || 0) / 100;
+    // Net amount = what DCM receives after Stripe discount (not including Stripe fees)
+    const netAmount = (session.amount_total || 0) / 100;
+
+    const paymentIntentId = typeof session.payment_intent === 'string'
+      ? session.payment_intent
+      : undefined;
+
+    const tier = session.metadata?.tier || 'unknown';
+    const plan = session.metadata?.plan;
+
+    const commissionResult = await createCommission(affiliate.id, {
+      referredUserId: userId,
+      stripeSessionId: session.id,
+      stripePaymentIntentId: paymentIntentId,
+      orderAmount,
+      netAmount,
+      metadata: {
+        tier,
+        plan: plan || undefined,
+        credits: session.metadata?.credits,
+      },
+    });
+
+    if (commissionResult.success) {
+      if (commissionResult.skipped) {
+        console.log(`[Affiliate] Attribution skipped: ${commissionResult.skipped} for session ${session.id}`);
+      } else {
+        console.log(`[Affiliate] Commission created for session ${session.id}, affiliate ${affiliate.code}`);
+      }
+    } else {
+      console.error(`[Affiliate] Failed to create commission for session ${session.id}:`, commissionResult.error);
+    }
+  } catch (error) {
+    // Don't fail the webhook if affiliate processing fails
+    console.error('[Affiliate] Error processing attribution:', error);
+  }
+}
+
+/**
+ * Handle charge.refunded event — reverse affiliate commission
+ */
+async function handleChargeRefunded(charge: Stripe.Charge) {
+  console.log('Processing charge.refunded:', charge.id);
+
+  // Get the payment intent to find the checkout session
+  const paymentIntentId = typeof charge.payment_intent === 'string'
+    ? charge.payment_intent
+    : charge.payment_intent?.id;
+
+  if (!paymentIntentId) {
+    console.log('No payment intent on refunded charge, skipping affiliate reversal');
+    return;
+  }
+
+  try {
+    // Look up checkout sessions by payment intent
+    const sessions = await stripe.checkout.sessions.list({
+      payment_intent: paymentIntentId,
+      limit: 1,
+    });
+
+    if (sessions.data.length === 0) {
+      return;
+    }
+
+    const sessionId = sessions.data[0].id;
+    const result = await reverseCommission(sessionId, `Refund on charge ${charge.id}`);
+
+    if (result.success) {
+      console.log(`[Affiliate] Commission reversal processed for charge ${charge.id}`);
+    } else {
+      console.error(`[Affiliate] Failed to reverse commission:`, result.error);
+    }
+  } catch (error) {
+    // Don't fail the webhook if affiliate reversal fails
+    console.error('[Affiliate] Error reversing commission on refund:', error);
   }
 }

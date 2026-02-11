@@ -77,13 +77,14 @@ export default function CardLoversPage() {
 
     try {
       const session = getStoredSession()
+      const refCode = typeof window !== 'undefined' ? localStorage.getItem('dcm_ref_code') : null
       const response = await fetch('/api/stripe/subscribe', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session?.access_token}`,
         },
-        body: JSON.stringify({ plan }),
+        body: JSON.stringify({ plan, ref_code: refCode || undefined }),
       })
 
       if (!response.ok) {
