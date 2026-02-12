@@ -24,6 +24,18 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
+/**
+ * Safely convert a Stripe Unix timestamp to a Date.
+ * Returns a fallback date (30 days from now) if the timestamp is invalid.
+ */
+function safeTimestampToDate(timestamp: number | undefined | null): Date {
+  if (typeof timestamp === 'number' && timestamp > 0 && isFinite(timestamp)) {
+    return new Date(timestamp * 1000);
+  }
+  console.warn('[Webhook] Invalid timestamp, using fallback (30 days from now):', timestamp);
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+}
+
 // Create Supabase client for idempotency checks
 function getServiceClient() {
   return createClient(
@@ -314,14 +326,14 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     userId,
     plan,
     subscriptionId,
-    periodEnd: new Date(subscription.current_period_end * 1000),
+    periodEnd: safeTimestampToDate((subscription as any).current_period_end),
   });
 
   // Activate the subscription
   const result = await activateCardLoverSubscription(userId, {
     plan,
     subscriptionId,
-    currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+    currentPeriodEnd: safeTimestampToDate((subscription as any).current_period_end),
     stripeSessionId: session.id,
   });
 
@@ -389,7 +401,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     const result = await processCardLoverRenewal(userId, {
       stripeInvoiceId: invoice.id,
       subscriptionId: subscription.id,
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+      currentPeriodEnd: safeTimestampToDate((subscription as any).current_period_end),
     });
 
     if (result.success) {
@@ -442,7 +454,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   // Update period end if changed
-  const newPeriodEnd = new Date(subscription.current_period_end * 1000);
+  const newPeriodEnd = safeTimestampToDate((subscription as any).current_period_end);
   const currentPeriodEnd = userCredits.card_lover_current_period_end
     ? new Date(userCredits.card_lover_current_period_end)
     : null;
