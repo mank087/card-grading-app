@@ -91,13 +91,21 @@ export async function POST(request: NextRequest) {
 
     // Create or retrieve Stripe customer
     if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: userEmail,
-        metadata: {
-          userId: userId,
-        },
+      // Look up existing Stripe customers by email before creating a new one
+      const existingCustomers = await stripe.customers.list({
+        email: userEmail!,
+        limit: 1,
       });
-      stripeCustomerId = customer.id;
+
+      if (existingCustomers.data.length > 0) {
+        stripeCustomerId = existingCustomers.data[0].id;
+      } else {
+        const customer = await stripe.customers.create({
+          email: userEmail,
+          metadata: { userId: userId },
+        });
+        stripeCustomerId = customer.id;
+      }
     }
 
     // Determine success/cancel URLs with origin validation

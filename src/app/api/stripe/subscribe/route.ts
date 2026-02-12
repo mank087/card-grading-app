@@ -111,9 +111,36 @@ export async function POST(request: NextRequest) {
       sessionMetadata.ref_code = affiliateCode;
     }
 
+    // Ensure we have a Stripe customer ID (prevents duplicate customer creation)
+    let stripeCustomerId = userCredits?.stripe_customer_id;
+    if (!stripeCustomerId) {
+      // Look up existing Stripe customers by email before creating a new one
+      const existingCustomers = await stripe.customers.list({
+        email: user.email!,
+        limit: 1,
+      });
+
+      if (existingCustomers.data.length > 0) {
+        stripeCustomerId = existingCustomers.data[0].id;
+      } else {
+        const newCustomer = await stripe.customers.create({
+          email: user.email!,
+          metadata: { userId: user.id },
+        });
+        stripeCustomerId = newCustomer.id;
+      }
+
+      // Store the customer ID in our DB so future checkouts reuse it
+      await serviceClient
+        .from('user_credits')
+        .update({ stripe_customer_id: stripeCustomerId })
+        .eq('user_id', user.id);
+    }
+
     // Build checkout session params
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: 'subscription',
+      customer: stripeCustomerId,
       payment_method_types: ['card'],
       line_items: [
         {
@@ -128,13 +155,6 @@ export async function POST(request: NextRequest) {
         metadata: sessionMetadata,
       },
     };
-
-    // Use existing Stripe customer if available
-    if (userCredits?.stripe_customer_id) {
-      sessionParams.customer = userCredits.stripe_customer_id;
-    } else {
-      sessionParams.customer_email = user.email;
-    }
 
     // Create checkout session
     const session = await stripe.checkout.sessions.create(sessionParams);

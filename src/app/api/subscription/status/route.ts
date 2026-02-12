@@ -1,11 +1,13 @@
 /**
  * Subscription Status API
  * Returns current Card Lovers subscription status
+ * Includes reconciliation: if DB is out of sync with Stripe, auto-fixes
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { CARD_LOVERS_LOYALTY_BONUSES } from '@/lib/stripe';
+import { stripe, CARD_LOVERS_SUBSCRIPTION, CARD_LOVERS_LOYALTY_BONUSES } from '@/lib/stripe';
+import { activateCardLoverSubscription } from '@/lib/credits';
 
 // Create Supabase client for auth
 function getSupabaseClient(accessToken: string) {
@@ -63,7 +65,8 @@ export async function GET(request: NextRequest) {
         show_card_lover_badge,
         preferred_label_emblem,
         is_founder,
-        show_founder_badge
+        show_founder_badge,
+        stripe_customer_id
       `)
       .eq('user_id', user.id)
       .single();
@@ -82,9 +85,66 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if subscription is active
-    const isActive = userCredits.is_card_lover &&
+    let isActive = userCredits.is_card_lover &&
       userCredits.card_lover_current_period_end &&
       new Date(userCredits.card_lover_current_period_end) > new Date();
+
+    // RECONCILIATION: If DB shows no active subscription but user has a Stripe customer,
+    // check Stripe for active Card Lovers subscriptions that the webhook may have missed
+    if (!isActive && userCredits.stripe_customer_id) {
+      try {
+        const subscriptions = await stripe.subscriptions.list({
+          customer: userCredits.stripe_customer_id,
+          status: 'active',
+          limit: 10,
+        });
+
+        const cardLoversSub = subscriptions.data.find(sub => {
+          const priceId = sub.items.data[0]?.price.id;
+          return priceId === CARD_LOVERS_SUBSCRIPTION.monthly.priceId ||
+                 priceId === CARD_LOVERS_SUBSCRIPTION.annual.priceId;
+        });
+
+        if (cardLoversSub) {
+          const priceId = cardLoversSub.items.data[0]?.price.id;
+          const plan = priceId === CARD_LOVERS_SUBSCRIPTION.annual.priceId ? 'annual' : 'monthly';
+
+          console.log(`[Reconciliation] Found active Stripe Card Lovers subscription ${cardLoversSub.id} for user ${user.id} — activating in DB`);
+
+          // Ensure subscription has userId in metadata for future webhooks
+          if (!cardLoversSub.metadata?.userId) {
+            await stripe.subscriptions.update(cardLoversSub.id, {
+              metadata: { userId: user.id, plan },
+            });
+          }
+
+          // Activate in our DB
+          const periodEnd = (cardLoversSub as any).current_period_end;
+          const result = await activateCardLoverSubscription(user.id, {
+            plan,
+            subscriptionId: cardLoversSub.id,
+            currentPeriodEnd: new Date(periodEnd * 1000),
+          });
+
+          if (result.success) {
+            console.log(`[Reconciliation] Card Lovers activated for user ${user.id}: ${result.creditsAdded} credits added`);
+            // Update local variables so the response reflects the new state
+            isActive = true;
+            userCredits.is_card_lover = true;
+            userCredits.card_lover_plan = plan;
+            userCredits.card_lover_subscription_id = cardLoversSub.id;
+            userCredits.card_lover_current_period_end = new Date(periodEnd * 1000).toISOString();
+            userCredits.card_lover_months_active = plan === 'annual' ? 12 : 1;
+            userCredits.show_card_lover_badge = true;
+          } else {
+            console.error(`[Reconciliation] Failed to activate Card Lovers for user ${user.id}:`, result.error);
+          }
+        }
+      } catch (reconcileError) {
+        // Don't fail the status check if reconciliation fails
+        console.error('[Reconciliation] Error checking Stripe subscriptions:', reconcileError);
+      }
+    }
 
     // Calculate next loyalty bonus for monthly subscribers
     let nextLoyaltyBonus = null;

@@ -489,6 +489,7 @@ export async function activateCardLoverSubscription(
     plan: 'monthly' | 'annual';
     subscriptionId: string;
     currentPeriodEnd: Date;
+    stripeSessionId?: string;
     stripeInvoiceId?: string;
   }
 ): Promise<{ success: boolean; creditsAdded: number; error?: string }> {
@@ -544,7 +545,7 @@ export async function activateCardLoverSubscription(
     metadata: { initial_subscription: true },
   });
 
-  // Record credit transaction
+  // Record credit transaction (with stripe_session_id for idempotency checks)
   await supabase.from('credit_transactions').insert({
     user_id: userId,
     type: 'purchase',
@@ -553,6 +554,7 @@ export async function activateCardLoverSubscription(
     description: options.plan === 'annual'
       ? 'Card Lovers Annual - 900 credits (840 + 60 bonus)'
       : 'Card Lovers Monthly - 70 credits',
+    stripe_session_id: options.stripeSessionId,
     metadata: {
       subscription: 'card_lovers',
       plan: options.plan,

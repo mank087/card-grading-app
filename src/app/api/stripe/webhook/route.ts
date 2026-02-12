@@ -322,6 +322,7 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     plan,
     subscriptionId,
     currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+    stripeSessionId: session.id,
   });
 
   if (result.success) {
