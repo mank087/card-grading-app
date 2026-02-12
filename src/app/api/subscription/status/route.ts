@@ -146,6 +146,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Check if subscription has a pending cancellation (cancel_at_period_end)
+    let cancelAtPeriodEnd = false;
+    let cancelAt: string | null = null;
+    if (isActive && userCredits.card_lover_subscription_id) {
+      try {
+        const subscription = await stripe.subscriptions.retrieve(userCredits.card_lover_subscription_id);
+        const subData = subscription as any;
+        if (subData.cancel_at_period_end) {
+          cancelAtPeriodEnd = true;
+          cancelAt = new Date(subData.current_period_end * 1000).toISOString();
+        }
+      } catch (stripeError) {
+        // Don't fail status check if Stripe lookup fails
+        console.error('[SubscriptionStatus] Error checking Stripe subscription:', stripeError);
+      }
+    }
+
     // Calculate next loyalty bonus for monthly subscribers
     let nextLoyaltyBonus = null;
     if (isActive && userCredits.card_lover_plan === 'monthly') {
@@ -173,6 +190,8 @@ export async function GET(request: NextRequest) {
       subscribedAt: userCredits.card_lover_subscribed_at,
       currentPeriodEnd: userCredits.card_lover_current_period_end,
       subscriptionId: userCredits.card_lover_subscription_id,
+      cancelAtPeriodEnd,
+      cancelAt,
       nextLoyaltyBonus,
       showBadge: userCredits.show_card_lover_badge ?? true,
       labelEmblem: userCredits.preferred_label_emblem || 'auto',

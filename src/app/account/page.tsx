@@ -69,8 +69,11 @@ export default function AccountPage() {
   const [cardLoverMonthsActive, setCardLoverMonthsActive] = useState(0)
   const [nextLoyaltyBonus, setNextLoyaltyBonus] = useState<{ atMonth: number; credits: number; monthsUntil: number } | null>(null)
   const [isCancellingSubscription, setIsCancellingSubscription] = useState(false)
+  const [isResumingSubscription, setIsResumingSubscription] = useState(false)
   const [isUpgradingSubscription, setIsUpgradingSubscription] = useState(false)
   const [showCancelModal, setShowCancelModal] = useState(false)
+  const [cancelAtPeriodEnd, setCancelAtPeriodEnd] = useState(false)
+  const [cancelAt, setCancelAt] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchAccountData = async () => {
@@ -245,6 +248,8 @@ export default function AccountPage() {
             setCardLoverPeriodEnd(subData.currentPeriodEnd)
             setCardLoverMonthsActive(subData.monthsActive || 0)
             setNextLoyaltyBonus(subData.nextLoyaltyBonus)
+            setCancelAtPeriodEnd(subData.cancelAtPeriodEnd || false)
+            setCancelAt(subData.cancelAt || null)
           }
         } catch (err) {
           console.error('Error fetching subscription status:', err)
@@ -460,9 +465,9 @@ export default function AccountPage() {
 
       if (response.ok) {
         const data = await response.json()
-        // Update UI to show cancellation pending
         setShowCancelModal(false)
-        alert(`Your subscription will remain active until ${new Date(data.cancelAt).toLocaleDateString()}. You won't be charged again.`)
+        setCancelAtPeriodEnd(true)
+        setCancelAt(data.cancelAt)
       } else {
         const error = await response.json()
         alert(error.error || 'Failed to cancel subscription')
@@ -472,6 +477,37 @@ export default function AccountPage() {
       alert('Failed to cancel subscription. Please try again.')
     } finally {
       setIsCancellingSubscription(false)
+    }
+  }
+
+  // Handle resuming a cancelled subscription
+  const handleResumeSubscription = async () => {
+    setIsResumingSubscription(true)
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) {
+        return
+      }
+
+      const response = await fetch('/api/stripe/resume-subscription', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        setCancelAtPeriodEnd(false)
+        setCancelAt(null)
+      } else {
+        const error = await response.json()
+        alert(error.error || 'Failed to resume subscription')
+      }
+    } catch (err) {
+      console.error('Error resuming subscription:', err)
+      alert('Failed to resume subscription. Please try again.')
+    } finally {
+      setIsResumingSubscription(false)
     }
   }
 
@@ -1026,13 +1062,17 @@ export default function AccountPage() {
                   {cardLoverPlan === 'monthly' ? '$49.99/month' : '$449/year'}
                 </p>
               </div>
-              <div className="bg-white rounded-lg p-4 border border-purple-200">
-                <p className="text-sm text-gray-600 font-medium">Next Billing Date</p>
-                <p className="text-xl font-bold text-purple-700">
-                  {cardLoverPeriodEnd ? new Date(cardLoverPeriodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+              <div className={`bg-white rounded-lg p-4 border ${cancelAtPeriodEnd ? 'border-amber-300' : 'border-purple-200'}`}>
+                <p className="text-sm text-gray-600 font-medium">
+                  {cancelAtPeriodEnd ? 'Subscription Ends' : 'Next Billing Date'}
+                </p>
+                <p className={`text-xl font-bold ${cancelAtPeriodEnd ? 'text-amber-600' : 'text-purple-700'}`}>
+                  {(cancelAtPeriodEnd ? cancelAt : cardLoverPeriodEnd)
+                    ? new Date((cancelAtPeriodEnd ? cancelAt : cardLoverPeriodEnd)!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : 'N/A'}
                 </p>
                 <p className="text-sm text-gray-500">
-                  {cardLoverPlan === 'monthly' ? '70 credits' : '900 credits'}
+                  {cancelAtPeriodEnd ? 'Cancellation pending' : cardLoverPlan === 'monthly' ? '70 credits' : '900 credits'}
                 </p>
               </div>
               <div className="bg-white rounded-lg p-4 border border-purple-200">
@@ -1097,24 +1137,52 @@ export default function AccountPage() {
               </div>
             </div>
 
+            {/* Cancellation Pending Banner */}
+            {cancelAtPeriodEnd && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="font-semibold text-amber-800">Cancellation Pending</p>
+                    <p className="text-sm text-amber-700 mt-1">
+                      Your subscription will end on{' '}
+                      <strong>{cancelAt ? new Date(cancelAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'your next billing date'}</strong>.
+                      You&apos;ll keep full access until then. Changed your mind?
+                    </p>
+                    <button
+                      onClick={handleResumeSubscription}
+                      disabled={isResumingSubscription}
+                      className="mt-3 bg-purple-600 hover:bg-purple-700 text-white font-semibold px-5 py-2 rounded-lg transition-all disabled:opacity-50 text-sm"
+                    >
+                      {isResumingSubscription ? 'Resuming...' : 'Resume Subscription'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Action Buttons */}
-            <div className="flex flex-wrap gap-3">
-              {cardLoverPlan === 'monthly' && (
+            {!cancelAtPeriodEnd && (
+              <div className="flex flex-wrap gap-3">
+                {cardLoverPlan === 'monthly' && (
+                  <button
+                    onClick={handleUpgradeSubscription}
+                    disabled={isUpgradingSubscription}
+                    className="bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-700 hover:to-rose-700 text-white font-semibold px-6 py-2 rounded-lg transition-all disabled:opacity-50"
+                  >
+                    {isUpgradingSubscription ? 'Upgrading...' : 'Upgrade to Annual (Save $150/yr)'}
+                  </button>
+                )}
                 <button
-                  onClick={handleUpgradeSubscription}
-                  disabled={isUpgradingSubscription}
-                  className="bg-gradient-to-r from-purple-600 to-rose-600 hover:from-purple-700 hover:to-rose-700 text-white font-semibold px-6 py-2 rounded-lg transition-all disabled:opacity-50"
+                  onClick={() => setShowCancelModal(true)}
+                  className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-2 rounded-lg transition-all"
                 >
-                  {isUpgradingSubscription ? 'Upgrading...' : 'Upgrade to Annual (Save $150/yr)'}
+                  Cancel Subscription
                 </button>
-              )}
-              <button
-                onClick={() => setShowCancelModal(true)}
-                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-6 py-2 rounded-lg transition-all"
-              >
-                Cancel Subscription
-              </button>
-            </div>
+              </div>
+            )}
           </div>
         ) : (
           /* Card Lovers Promo for non-subscribers */
