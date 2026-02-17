@@ -539,6 +539,16 @@ After completing and outputting all three passes in grading_passes, synthesize f
 • Write a SINGLE synthesized narrative that reflects consensus findings
 • Only include defects that appeared in 2+ passes
 • Reference specific observations that were consistent across passes
+• When the final score differs from any individual pass (e.g., passes scored 10, 10, 9):
+  - State the three-pass outcome: "Across three evaluation passes, [category] received scores of [X, X, X]"
+  - Explain the derivation: "The averaged score of [avg] is conservatively rounded to [final] per DCM's floor-rounding methodology"
+  - Frame observations through the consensus lens, not just the majority
+• When all three passes agree on the same score:
+  - State the consensus: "All three evaluation passes consistently scored [category] at [score]"
+  - No need to detail the averaging — unanimous agreement needs no further explanation
+• NEVER describe a subgrade as "perfect" or "near-perfect" if the final score is below 10
+  - Instead, acknowledge the strong observations while explaining the conservative scoring
+  - Example: "Borders show excellent symmetry with only a very subtle shift. Across three passes, centering scored 10, 10, 9 — averaged to 9.67 and conservatively rounded to 9."
 
 **For Final Grade:**
 • Use averaged_rounded.final as decimal_grade
@@ -4057,8 +4067,12 @@ Your centering description language and score MUST be consistent in BOTH directi
 |----------------------|-----------------------------------------------------|
 | 10                   | "Borders appear very close to even" or              |
 |                      | "only a very subtle shift" or equivalent            |
-| 9                    | "slight" or "minor" shift language only             |
+| 9 (from floor-round) | Acknowledge strong centering observations, then     |
+|                      | explain: "three-pass average of [X.XX] rounded to 9"|
+| 9 (unanimous)        | "slight" or "minor" shift language only             |
 | 8 or lower           | Clear indication of visible off-centering           |
+
+**NOTE:** A score of 9 from FLOOR(9.67) and a score of 9 from three unanimous 9s should read differently. The former reflects excellent centering with conservative scoring; the latter reflects a genuine minor shift. Use three-pass context to determine which framing applies.
 
 🚨 **VALIDATION CHECK:**
 Before finalizing, verify: "Does my description language match my score?"
@@ -5144,6 +5158,20 @@ for transparency. The MIN is used for the displayed subgrade and for final grade
 • total_edges = MIN(front_edges_score, back_edges_score)
 • total_surface = MIN(front_surface_score, back_surface_score)
 ---
+STEP 8b: SUBGRADE NARRATIVE ALIGNMENT WITH THREE-PASS SCORES
+---
+When writing narrative descriptions for any subgrade (centering, corners, edges, surface):
+
+**If front=10 and back=10 but the three-pass averaged score < 10:**
+• Do NOT describe the category as "flawless" or "perfect"
+• DO explain: "Front and back both present excellent [category]. Across three independent passes, scores of [X, X, X] produced an average of [avg], conservatively rounded to [final]."
+
+**If the MIN(front, back) = 10 but three-pass consensus < 10:**
+• The three-pass consensus takes priority over single-dimension observations
+• Explain that while individual front/back assessments were strong, the three-pass consensus methodology produced a more conservative result
+
+**General rule:** The narrative should make the reader understand WHY the score is what it is. If the score seems lower than the description's tone would suggest, the description is missing the three-pass explanation.
+---
 STEP 9: GRADE CAPS APPLICATION
 ---
 Apply grade caps based on defect detection (from Section 2):
@@ -5615,8 +5643,8 @@ Before submitting JSON output, answer these questions:
 3. "Are all 8 corners and 8 edges described with UNIQUE wording?"
    If NO → Rewrite repetitive sections
 
-4. "Does my description language match my assigned scores?"
-   If NO → Adjust scores to match language (language is truth)
+4. "Does my description language explain how the three-pass consensus produced my assigned scores?"
+   If NO → Adjust language to explain the scores (three-pass scores are truth, language explains them)
 
 5. "Did I use the 4-element evidence format for ALL defect claims?"
    If NO → Reformat defect descriptions
