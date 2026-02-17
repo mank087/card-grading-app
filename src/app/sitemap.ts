@@ -114,7 +114,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     },
     // Other pages
     {
-      url: `${baseUrl}/founders`,
+      url: `${baseUrl}/card-lovers`,
       lastModified: new Date(),
       changeFrequency: 'monthly',
       priority: 0.5,
