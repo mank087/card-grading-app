@@ -207,6 +207,14 @@ export default function Navigation() {
                     </span>
                   </Link>
                   <Link
+                    href="/market-pricing"
+                    className="text-gray-700 hover:text-emerald-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                  >
+                    <span className="flex items-center gap-1">
+                      <span className="text-emerald-500">$</span> Market Pricing
+                    </span>
+                  </Link>
+                  <Link
                     href="/blog"
                     className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
                   >
@@ -570,6 +578,14 @@ export default function Navigation() {
                   >
                     <span className="w-5 h-5 flex items-center justify-center text-rose-500">♥</span>
                     Card Lovers
+                  </Link>
+                  <Link
+                    href="/market-pricing"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 text-gray-700 hover:text-emerald-600 hover:bg-emerald-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  >
+                    <span className="w-5 h-5 flex items-center justify-center text-emerald-500 font-bold">$</span>
+                    Market Pricing
                   </Link>
                   <Link
                     href="/account"
