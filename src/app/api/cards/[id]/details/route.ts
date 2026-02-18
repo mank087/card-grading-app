@@ -117,7 +117,7 @@ function validateField(field: string, value: any, category?: string): { valid: b
       return { valid: true };
 
     case 'memorabilia_type':
-      if (!['none', 'patch', 'jersey', 'bat', 'ticket', 'other', null, ''].includes(value)) {
+      if (!['none', 'patch', 'jersey', 'bat', 'ball', 'glove', 'helmet', 'shoe', 'ticket', 'other', null, ''].includes(value)) {
         return { valid: false, error: 'Invalid memorabilia type' };
       }
       return { valid: true };
@@ -134,7 +134,7 @@ function validateField(field: string, value: any, category?: string): { valid: b
 }
 
 // Build the database column updates
-function buildColumnUpdates(body: Record<string, any>): Record<string, any> {
+function buildColumnUpdates(body: Record<string, any>, category?: string): Record<string, any> {
   const columnUpdates: Record<string, any> = {};
 
   // Map request fields to database columns
@@ -169,6 +169,11 @@ function buildColumnUpdates(body: Record<string, any>): Record<string, any> {
     if (requestField in body) {
       columnUpdates[dbColumn] = body[requestField] === '' ? null : body[requestField];
     }
+  }
+
+  // Sync pokemon_featured when featured name changes for Pokemon cards
+  if (category === 'Pokemon' && 'featured' in body) {
+    columnUpdates['pokemon_featured'] = body['featured'] === '' ? null : body['featured'];
   }
 
   return columnUpdates;
@@ -325,7 +330,7 @@ export async function PATCH(
     }
 
     // 6. Build updates
-    const columnUpdates = buildColumnUpdates(body);
+    const columnUpdates = buildColumnUpdates(body, card.category);
     const jsonbUpdates = buildJsonbUpdates(body, card.conversational_card_info);
 
     console.log('[Edit Card Details] Request body:', body);
