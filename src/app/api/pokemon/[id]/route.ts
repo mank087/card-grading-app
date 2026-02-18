@@ -40,19 +40,20 @@ const cleanupStuckCards = () => {
  * Maps card denominators to their correct sets. Used to override AI hallucination.
  */
 const DENOMINATOR_TO_SET: Record<number, { set_name: string; year: string; era: string }> = {
-  // WOTC Era (1999-2003)
+  // WOTC Era (1999-2003) — only denominators unique to a single set
+  // Ambiguous denominators are omitted so database validation can disambiguate
   102: { set_name: 'Base Set', year: '1999', era: 'WOTC' },
   64: { set_name: 'Jungle', year: '1999', era: 'WOTC' },
   62: { set_name: 'Fossil', year: '1999', era: 'WOTC' },
   82: { set_name: 'Team Rocket', year: '2000', era: 'WOTC' },
-  132: { set_name: 'Gym Heroes', year: '2000', era: 'WOTC' },
-  111: { set_name: 'Neo Genesis', year: '2000', era: 'WOTC' },
+  // 132 removed: conflicts with Gym Challenge and Mega Evolution (2025)
+  // 111 removed: conflicts with Team Rocket Returns (EX era)
   75: { set_name: 'Neo Discovery', year: '2001', era: 'WOTC' },
   66: { set_name: 'Neo Revelation', year: '2001', era: 'WOTC' },
   113: { set_name: 'Neo Destiny', year: '2002', era: 'WOTC' },
-  165: { set_name: 'Legendary Collection', year: '2002', era: 'WOTC' },
+  // 165 removed: conflicts with Pokemon 151 (SV, 2023)
   147: { set_name: 'Expedition Base Set', year: '2002', era: 'WOTC' },
-  182: { set_name: 'Aquapolis', year: '2003', era: 'WOTC' },
+  // 182 removed: conflicts with Destined Rivals (SV, 2025)
   186: { set_name: 'Skyridge', year: '2003', era: 'WOTC' },
 };
 
