@@ -34,6 +34,7 @@ export default function MarketPricingPage() {
   const [listingsLoading, setListingsLoading] = useState(false);
   const [ebayConnected, setEbayConnected] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPortfolio();
@@ -42,6 +43,7 @@ export default function MarketPricingPage() {
 
   async function fetchPortfolio() {
     setLoading(true);
+    setError(null);
     try {
       const session = getStoredSession();
       if (!session?.access_token) return;
@@ -52,9 +54,12 @@ export default function MarketPricingPage() {
       if (response.ok) {
         const data = await response.json();
         setPortfolio(data);
+      } else {
+        setError('Failed to load portfolio data. Please try again.');
       }
     } catch (err) {
       console.error('Failed to fetch portfolio:', err);
+      setError('Unable to connect. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -230,7 +235,7 @@ export default function MarketPricingPage() {
                   </>
                 )}
               </button>
-              <p className="text-xs text-gray-400 mt-2">Updates stale prices from eBay</p>
+              <p className="text-xs text-gray-400 mt-2">Updates stale prices via PriceCharting &amp; eBay</p>
             </div>
           </div>
         </section>
@@ -264,6 +269,19 @@ export default function MarketPricingPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-80 animate-pulse" />
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-80 animate-pulse" />
+                </div>
+              ) : error ? (
+                <div className="bg-white rounded-xl shadow-sm p-8 border border-gray-100 text-center">
+                  <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <p className="text-gray-600 mb-3">{error}</p>
+                  <button
+                    onClick={fetchPortfolio}
+                    className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                  >
+                    Try Again
+                  </button>
                 </div>
               ) : (
                 <>
@@ -331,38 +349,50 @@ export default function MarketPricingPage() {
           {/* INSIGHTS TAB */}
           {activeTab === 'insights' && (
             <div className="space-y-6">
-              {/* Trending — reuses movers data */}
-              <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Trending in Your Collection</h3>
-                {portfolio && (portfolio.movers.gainers.length > 0 || portfolio.movers.losers.length > 0) ? (
-                  <MoversTable
-                    gainers={portfolio.movers.gainers}
-                    losers={portfolio.movers.losers}
-                  />
-                ) : (
-                  <p className="text-gray-400 text-sm text-center py-8">
-                    Trend data will appear once your cards have multiple price snapshots over time.
-                  </p>
-                )}
-              </div>
-
               {/* Category performance */}
-              {portfolio && portfolio.categoryBreakdown.length > 1 && (
+              {portfolio && portfolio.categoryBreakdown.length > 0 && (
                 <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Category Performance</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Breakdown</h3>
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
                     {portfolio.categoryBreakdown.map((cat) => (
-                      <div key={cat.category} className="bg-gray-50 rounded-lg p-4 text-center">
+                      <div key={cat.category} className="bg-gray-50 rounded-lg p-4">
                         <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
                           {cat.category}
                         </div>
                         <div className="text-lg font-bold text-gray-900">
                           ${cat.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                         </div>
-                        <div className="text-xs text-gray-400">{cat.count} cards</div>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-xs text-gray-400">{cat.count} cards</span>
+                          <span className="text-xs font-medium text-gray-500">{cat.percentage}%</span>
+                        </div>
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Pricing coverage */}
+              {portfolio && (
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Pricing Coverage</h3>
+                  <div className="flex items-center gap-4 mb-3">
+                    <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-purple-500 to-rose-500 rounded-full transition-all"
+                        style={{ width: `${portfolio.totalCards > 0 ? (portfolio.cardsWithValue / portfolio.totalCards) * 100 : 0}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium text-gray-700">
+                      {portfolio.totalCards > 0 ? Math.round((portfolio.cardsWithValue / portfolio.totalCards) * 100) : 0}%
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    {portfolio.cardsWithValue} of {portfolio.totalCards} cards have market value data.
+                    {portfolio.cardsWithValue < portfolio.totalCards && (
+                      <> Visit card detail pages or use <button onClick={handleRefreshPrices} className="text-purple-600 hover:text-purple-700 font-medium">Refresh Prices</button> to update missing values.</>
+                    )}
+                  </p>
                 </div>
               )}
 
@@ -378,6 +408,23 @@ export default function MarketPricingPage() {
                     <h4 className="font-semibold text-gray-900 mb-1">Price Alerts — Coming Soon</h4>
                     <p className="text-sm text-gray-600">
                       Set alerts for your cards and get notified when values cross your target thresholds. Stay ahead of the market without checking every day.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Historical Tracking — Coming Soon */}
+              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-100">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-gray-900 mb-1">Portfolio History Charts — Coming Soon</h4>
+                    <p className="text-sm text-gray-600">
+                      Track your total portfolio value over time with interactive charts. See how your collection&apos;s worth has changed week-by-week.
                     </p>
                   </div>
                 </div>

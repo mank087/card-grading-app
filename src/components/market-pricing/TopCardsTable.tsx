@@ -20,12 +20,17 @@ interface TopCardsTableProps {
 }
 
 const CATEGORY_BADGES: Record<string, string> = {
-  pokemon: 'bg-red-100 text-red-700',
-  sports: 'bg-blue-100 text-blue-700',
-  mtg: 'bg-purple-100 text-purple-700',
-  lorcana: 'bg-indigo-100 text-indigo-700',
-  onepiece: 'bg-orange-100 text-orange-700',
-  other: 'bg-gray-100 text-gray-700',
+  'Pokemon': 'bg-red-100 text-red-700',
+  'Football': 'bg-blue-100 text-blue-700',
+  'Baseball': 'bg-green-100 text-green-700',
+  'Basketball': 'bg-orange-100 text-orange-700',
+  'Hockey': 'bg-cyan-100 text-cyan-700',
+  'Soccer': 'bg-emerald-100 text-emerald-700',
+  'Wrestling': 'bg-violet-100 text-violet-700',
+  'MTG': 'bg-purple-100 text-purple-700',
+  'Lorcana': 'bg-indigo-100 text-indigo-700',
+  'One Piece': 'bg-orange-100 text-orange-700',
+  'Other': 'bg-gray-100 text-gray-700',
 };
 
 export default function TopCardsTable({ cards }: TopCardsTableProps) {
@@ -76,7 +81,7 @@ export default function TopCardsTable({ cards }: TopCardsTableProps) {
               {card.cardSet && (
                 <span className="text-xs text-gray-500 truncate max-w-[120px]">{card.cardSet}</span>
               )}
-              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${CATEGORY_BADGES[card.category] || CATEGORY_BADGES.other}`}>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${CATEGORY_BADGES[card.category] || CATEGORY_BADGES['Other']}`}>
                 {card.category}
               </span>
             </div>
