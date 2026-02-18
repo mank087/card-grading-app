@@ -34,15 +34,15 @@ export async function GET(request: NextRequest) {
 
     console.log('[Price Cron] Starting weekly price update job...');
 
-    // Run the batch job with conservative settings to stay within time limits
-    // Process up to 200 cards per run, in batches of 5 with 2s delays
-    // This should complete in ~3-4 minutes, well under the 5 minute limit
+    // Run the batch job for ALL graded cards across all users
+    // Time budget ensures we stop gracefully before Vercel's 5-minute timeout
+    // Unprocessed cards will be first in queue next week (oldest snapshots first)
     const result = await runPriceUpdateBatch({
-      limit: 200,
+      limit: 10000,
       batchSize: 5,
       delayBetweenBatches: 2000,
-      // Process all card types
-      cardTypes: ['sports', 'pokemon', 'other'],
+      cardTypes: ['sports', 'pokemon', 'mtg', 'lorcana', 'other'],
+      maxDurationMs: 270000, // 4.5 minutes — safe margin under 5 min Vercel limit
     });
 
     const duration = Date.now() - startTime;

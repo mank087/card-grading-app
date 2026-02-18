@@ -72,7 +72,8 @@ REQUIRED FIELDS (All Pokemon Cards)
 **set_code**: 3-letter set code (Scarlet & Violet era)
 • IMPORTANT: Modern cards (2023+) display a 3-letter set code
 • Look for small 3-letter code near card number or in copyright area
-• Common codes: SVI, PAL, OBF, MEW, PAR, PAF, TEF, TWM, SFA, SCR, SSP, SVP
+• Common codes: SVI, PAL, OBF, MEW, PAR, PAF, TEF, TWM, SFA, SCR, SSP, SVP, PRE, JTG, DRI, BLK, WHT
+• For Mega Evolution era (2025+): MEG, MEP, PFL, ASC
 • For Sword & Shield era: SSH, RCL, DAA, VIV, BST, CRE, EVS, FST, BRS, ASR, LOR, SIT, CRZ
 • Extract exactly as printed (e.g., "SVI", "PAF", "SVP")
 • null if not visible or not present (older cards pre-2020)
@@ -521,6 +522,19 @@ These are the most valuable vintage cards. NEVER misidentify as modern reprints.
 | 142         | Stellar Crown            | 2024 | Crown with stars           |
 | 226         | Shrouded Fable           | 2024 | Mystical pattern           |
 | 195         | Surging Sparks           | 2025 | Lightning spark            |
+| 131         | Prismatic Evolutions     | 2025 | Prismatic/rainbow pattern  |
+| 159         | Journey Together         | 2025 | Partner theme              |
+| 182         | Destined Rivals          | 2025 | Rival confrontation        |
+| 86          | Black Bolt / White Flare | 2025 | BLK or WHT set code        |
+
+**MEGA EVOLUTION ERA (2025+) - New Generation:**
+
+| Denominator | Set Name                 | Year | Symbol Hint                |
+|-------------|--------------------------|------|----------------------------|
+| 132         | Mega Evolution           | 2025 | Mega stone / ME monogram   |
+| 94          | Phantasmal Flames        | 2025 | Ghost flame pattern        |
+| 217         | Ascended Heroes          | 2026 | Hero/ascension symbol      |
+| MEP###      | MEP Black Star Promos    | 2025+| Black star promo, MEP prefix|
 
 **SPECIAL SETS & SUBSETS:**
 

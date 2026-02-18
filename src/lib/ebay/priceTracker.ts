@@ -31,6 +31,7 @@ export interface PriceSnapshot {
   listing_count: number;
   query_used: string;
   query_strategy: string;
+  dcm_price_estimate?: number | null;
 }
 
 export interface BatchJobResult {
@@ -47,6 +48,7 @@ export interface BatchJobResult {
 export interface CardForPricing {
   id: string;
   category: string;
+  dcm_price_estimate?: number | null;
   conversational_card_info: {
     // Primary fields (from conversational grading)
     player_or_character?: string;
@@ -202,6 +204,7 @@ export async function fetchCardPrice(card: CardForPricing): Promise<PriceSnapsho
       listing_count: result.total,
       query_used: result.queryUsed,
       query_strategy: result.queryStrategy,
+      dcm_price_estimate: card.dcm_price_estimate ?? null,
     };
   } catch (error) {
     console.error(`[PriceTracker] Error fetching price for card ${card.id}:`, error);
@@ -225,6 +228,7 @@ export async function savePriceSnapshot(snapshot: PriceSnapshot): Promise<void> 
     listing_count: snapshot.listing_count,
     query_used: snapshot.query_used,
     query_strategy: snapshot.query_strategy,
+    dcm_price_estimate: snapshot.dcm_price_estimate ?? null,
     recorded_at: new Date().toISOString(),
   });
 
@@ -244,16 +248,17 @@ export async function getCardsNeedingPriceUpdate(
   options: {
     limit?: number;
     minDaysSinceUpdate?: number;
-    cardTypes?: Array<'sports' | 'pokemon' | 'other'>;
+    cardTypes?: Array<'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other'>;
   } = {}
 ): Promise<CardForPricing[]> {
   const { limit = 100, minDaysSinceUpdate = 7, cardTypes } = options;
   const supabase = supabaseServer();
 
   // Get all cards with grading results (they have conversational_card_info populated)
+  // Also fetch dcm_price_estimate so we can snapshot PriceCharting prices
   let query = supabase
     .from('cards')
-    .select('id, category, conversational_card_info')
+    .select('id, category, conversational_card_info, dcm_price_estimate')
     .not('conversational_card_info', 'is', null)
     .limit(limit);
 
@@ -266,8 +271,14 @@ export async function getCardsNeedingPriceUpdate(
     if (cardTypes.includes('pokemon')) {
       categories.push('Pokemon', 'Pokémon');
     }
+    if (cardTypes.includes('mtg')) {
+      categories.push('MTG', 'Magic: The Gathering', 'Magic the Gathering');
+    }
+    if (cardTypes.includes('lorcana')) {
+      categories.push('Lorcana', 'Disney Lorcana');
+    }
     if (cardTypes.includes('other')) {
-      categories.push('MTG', 'Magic', 'Lorcana', 'Yu-Gi-Oh', 'Other');
+      categories.push('Yu-Gi-Oh', 'One Piece', 'Other');
     }
     if (categories.length > 0) {
       query = query.in('category', categories);
@@ -315,7 +326,8 @@ export async function runPriceUpdateBatch(
     limit?: number;
     batchSize?: number;
     delayBetweenBatches?: number;
-    cardTypes?: Array<'sports' | 'pokemon' | 'other'>;
+    cardTypes?: Array<'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'other'>;
+    maxDurationMs?: number;
   } = {}
 ): Promise<BatchJobResult> {
   const {
@@ -323,6 +335,7 @@ export async function runPriceUpdateBatch(
     batchSize = 10,
     delayBetweenBatches = 2000, // 2 seconds between batches
     cardTypes,
+    maxDurationMs = 0, // 0 = no time budget
   } = options;
 
   const startTime = Date.now();
@@ -350,6 +363,15 @@ export async function runPriceUpdateBatch(
 
     // Process in batches
     for (let i = 0; i < cards.length; i += batchSize) {
+      // Time budget check — stop gracefully before hitting Vercel timeout
+      if (maxDurationMs > 0) {
+        const elapsed = Date.now() - startTime;
+        if (elapsed >= maxDurationMs) {
+          console.log(`[PriceTracker] Time budget reached (${elapsed}ms / ${maxDurationMs}ms). Stopping after ${result.processed} cards. Remaining cards will be processed next run.`);
+          break;
+        }
+      }
+
       const batch = cards.slice(i, i + batchSize);
       console.log(`[PriceTracker] Processing batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(cards.length / batchSize)}`);
 
@@ -699,6 +721,38 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
 
     // Save to cards table cache
     await savePriceCache(card.id, prices);
+
+    // Also save initial price snapshot to history table so Market Pricing
+    // shows data immediately instead of waiting for the next weekly cron
+    try {
+      // Read current DCM/PriceCharting estimate from the card (already set during grading)
+      let dcmEstimate: number | null = card.dcm_price_estimate ?? null;
+      if (dcmEstimate === null) {
+        const supabase = supabaseServer();
+        const { data: cardRow } = await supabase
+          .from('cards')
+          .select('dcm_price_estimate')
+          .eq('id', card.id)
+          .single();
+        dcmEstimate = cardRow?.dcm_price_estimate ?? null;
+      }
+
+      await savePriceSnapshot({
+        card_id: card.id,
+        card_type: cardType,
+        lowest_price: prices.lowest,
+        median_price: prices.median,
+        highest_price: prices.highest,
+        average_price: prices.average,
+        listing_count: prices.listingCount,
+        query_used: result.queryUsed,
+        query_strategy: result.queryStrategy,
+        dcm_price_estimate: dcmEstimate,
+      });
+    } catch (snapshotError) {
+      // Don't fail the cache flow if history insert fails (e.g. duplicate constraint)
+      console.warn(`[PriceTracker] Failed to save initial price snapshot for card ${card.id}:`, snapshotError);
+    }
 
     console.log(`[PriceTracker] Cached prices for card ${card.id}: $${prices.median} median (${prices.listingCount} listings)`);
 

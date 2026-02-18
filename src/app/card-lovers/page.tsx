@@ -30,6 +30,17 @@ export default function CardLoversPage() {
   const [selectedPlan, setSelectedPlan] = useState<'monthly' | 'annual'>('annual')
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
+  // Reset loading state when page is restored from bfcache (e.g. returning from Stripe)
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setPurchasing(false)
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [])
+
   // Check authentication and subscription status
   useEffect(() => {
     const session = getStoredSession()

@@ -29,6 +29,13 @@ import {
   parseGradingMetadata
 } from "@/lib/conversationalDefectParser";
 import { fetchAndCacheCardPrice } from "@/lib/ebay/priceTracker";
+import { fetchAndCacheDcmPrice, isSportsCardCategory, type CardForDcmPricing } from "@/lib/pricing/dcmPriceTracker";
+// PriceCharting pricing for non-sports card types (Pokemon, MTG, Lorcana, One Piece, Other)
+import { searchPokemonCardPrices, estimatePokemonDcmValue, isPokemonPricingEnabled } from "@/lib/pokemonPricing";
+import { searchMTGCardPrices, estimateMTGDcmValue, isMTGPricingEnabled } from "@/lib/mtgPricing";
+import { searchLorcanaCardPrices, estimateLorcanaDcmValue, isLorcanaPricingEnabled } from "@/lib/lorcanaPricing";
+import { searchOnePieceCardPrices, estimateOnePieceDcmValue, isOnePiecePricingEnabled } from "@/lib/onepiecePricing";
+import { searchOtherCardPrices, estimateOtherDcmValue, isOtherPricingEnabled } from "@/lib/otherPricing";
 
 // Track cards currently being processed
 const processingCards = new Map<string, number>();
@@ -2004,33 +2011,192 @@ EXTRACTION RULES:
       }
     }
 
-    // 💰 eBay Price Caching (Post-Grading)
-    // Fetch initial eBay prices and cache for display
+    // 💰 Price Caching (Post-Grading)
+    // All card types: PriceCharting API for dcm_price_estimate
+    // Sports cards: SportsCardsPro (via dcmPriceTracker)
+    // Non-sports cards: PriceCharting + eBay fallback
     try {
-      console.log(`[EBAY PRICE] Starting post-grading price caching for card ${cardId}`);
+      const isSportsCard = isSportsCardCategory(cardCategory || '');
+      const cardInfo = conversationalGradingData?.card_info || null;
+      const dcmGrade = conversationalGradingData?.decimal_grade || conversationalGradingData?.whole_grade || 8;
 
-      const cardForPricing = {
-        id: cardId,
-        category: cardCategory || 'Other',
-        conversational_card_info: conversationalGradingData?.card_info || null,
-      };
+      if (isSportsCard) {
+        // 💰 DCM Price Caching for Sports Cards (SportsCardsPro)
+        console.log(`[DCM PRICE] Starting post-grading price caching for sports card ${cardId}`);
 
-      // Fire and forget - don't wait for price caching to complete
-      // This prevents slowing down the grading response
-      fetchAndCacheCardPrice(cardForPricing)
-        .then((cachedPrice) => {
-          if (cachedPrice) {
-            console.log(`[EBAY PRICE] Cached prices for card ${cardId}: $${cachedPrice.median_price} median (${cachedPrice.listing_count} listings)`);
-          } else {
-            console.log(`[EBAY PRICE] No price data available for card ${cardId}`);
-          }
-        })
-        .catch((priceError) => {
-          console.error(`[EBAY PRICE] Price caching failed for card ${cardId}:`, priceError.message);
-          // Don't fail grading - price caching is optional enhancement
-        });
+        const cardForDcmPricing: CardForDcmPricing = {
+          id: cardId,
+          category: cardCategory || 'Sports',
+          conversational_decimal_grade: dcmGrade,
+          conversational_card_info: cardInfo,
+        };
+
+        // Fire and forget - don't wait for price caching to complete
+        fetchAndCacheDcmPrice(cardForDcmPricing)
+          .then((cachedPrice) => {
+            if (cachedPrice) {
+              console.log(`[DCM PRICE] Cached DCM estimate for card ${cardId}: $${cachedPrice.estimate} (${cachedPrice.match_confidence} match)`);
+            } else {
+              console.log(`[DCM PRICE] No DCM price data available for card ${cardId}`);
+            }
+          })
+          .catch((priceError) => {
+            console.error(`[DCM PRICE] Price caching failed for card ${cardId}:`, priceError.message);
+          });
+      } else {
+        // 💰 PriceCharting + eBay for non-sports cards
+        // Fire both in parallel — PriceCharting for dcm_price_estimate, eBay as fallback
+        const category = cardCategory || 'Other';
+        const playerOrCharacter = cardInfo?.player_or_character || cardInfo?.card_name;
+        const cardName = cardInfo?.card_name || cardInfo?.player_or_character;
+        const setName = cardInfo?.set_name?.split(' - ')[0];
+        const cardNumber = cardInfo?.card_number_raw || cardInfo?.card_number;
+        const year = cardInfo?.year;
+        const variant = cardInfo?.rarity_or_variant || cardInfo?.parallel_type;
+
+        // 1) PriceCharting pricing (writes dcm_price_estimate)
+        if (process.env.PRICECHARTING_API_KEY) {
+          const priceChartingPromise = (async () => {
+            try {
+              let estimatedValue: number | null = null;
+              let matchConfidence: string = 'none';
+              let productId: string | null = null;
+              let productName: string | null = null;
+              let rawPrice: number | null = null;
+
+              if (category === 'Pokemon' && isPokemonPricingEnabled() && playerOrCharacter) {
+                console.log(`[PRICECHARTING] Fetching Pokemon pricing for card ${cardId}`);
+                const result = await searchPokemonCardPrices({
+                  pokemonName: playerOrCharacter,
+                  setName,
+                  cardNumber,
+                  year,
+                  variant,
+                });
+                if (result.prices) {
+                  estimatedValue = estimatePokemonDcmValue(result.prices, dcmGrade);
+                  matchConfidence = result.matchConfidence;
+                  productId = result.prices.productId;
+                  productName = result.prices.productName;
+                  rawPrice = result.prices.raw;
+                }
+              } else if (category === 'MTG' && isMTGPricingEnabled() && cardName) {
+                console.log(`[PRICECHARTING] Fetching MTG pricing for card ${cardId}`);
+                const result = await searchMTGCardPrices({
+                  cardName,
+                  setName,
+                  collectorNumber: cardNumber,
+                  year,
+                  variant,
+                });
+                if (result.prices) {
+                  estimatedValue = estimateMTGDcmValue(result.prices, dcmGrade);
+                  matchConfidence = result.matchConfidence;
+                  productId = result.prices.productId;
+                  productName = result.prices.productName;
+                  rawPrice = result.prices.raw;
+                }
+              } else if (category === 'Lorcana' && isLorcanaPricingEnabled() && cardName) {
+                console.log(`[PRICECHARTING] Fetching Lorcana pricing for card ${cardId}`);
+                const result = await searchLorcanaCardPrices({
+                  cardName,
+                  setName,
+                  collectorNumber: cardNumber,
+                  year,
+                  variant,
+                });
+                if (result.prices) {
+                  estimatedValue = estimateLorcanaDcmValue(result.prices, dcmGrade);
+                  matchConfidence = result.matchConfidence;
+                  productId = result.prices.productId;
+                  productName = result.prices.productName;
+                  rawPrice = result.prices.raw;
+                }
+              } else if (category === 'One Piece' && isOnePiecePricingEnabled() && cardName) {
+                console.log(`[PRICECHARTING] Fetching One Piece pricing for card ${cardId}`);
+                const result = await searchOnePieceCardPrices({
+                  cardName,
+                  setName,
+                  collectorNumber: cardNumber,
+                  year,
+                  variant,
+                });
+                if (result.prices) {
+                  estimatedValue = estimateOnePieceDcmValue(result.prices, dcmGrade);
+                  matchConfidence = result.matchConfidence;
+                  productId = result.prices.productId;
+                  productName = result.prices.productName;
+                  rawPrice = result.prices.raw;
+                }
+              } else if (category === 'Other' && isOtherPricingEnabled() && cardName) {
+                console.log(`[PRICECHARTING] Fetching Other pricing for card ${cardId}`);
+                const result = await searchOtherCardPrices({
+                  cardName,
+                  setName,
+                  cardNumber,
+                  year,
+                  manufacturer: cardInfo?.manufacturer,
+                  variant,
+                });
+                if (result.prices) {
+                  estimatedValue = estimateOtherDcmValue(result.prices, dcmGrade);
+                  matchConfidence = result.matchConfidence;
+                  productId = result.prices.productId;
+                  productName = result.prices.productName;
+                  rawPrice = result.prices.raw;
+                }
+              }
+
+              // Save to DB if we got a result
+              if (estimatedValue !== null) {
+                const supabase = supabaseServer();
+                const now = new Date().toISOString();
+                await supabase
+                  .from('cards')
+                  .update({
+                    dcm_price_estimate: estimatedValue,
+                    dcm_price_raw: rawPrice,
+                    dcm_price_updated_at: now,
+                    dcm_price_match_confidence: matchConfidence,
+                    dcm_price_product_id: productId,
+                    dcm_price_product_name: productName,
+                    dcm_prices_cached_at: now,
+                  })
+                  .eq('id', cardId);
+
+                console.log(`[PRICECHARTING] Cached estimate for card ${cardId}: $${estimatedValue} (${matchConfidence} match)`);
+              } else {
+                console.log(`[PRICECHARTING] No pricing found for card ${cardId} (${category})`);
+              }
+            } catch (pcError: any) {
+              console.error(`[PRICECHARTING] Failed for card ${cardId}:`, pcError.message);
+            }
+          })();
+          // Fire and forget
+          priceChartingPromise.catch(() => {});
+        }
+
+        // 2) eBay pricing as fallback (writes ebay_price_* columns)
+        console.log(`[EBAY PRICE] Starting post-grading price caching for card ${cardId}`);
+        const cardForPricing = {
+          id: cardId,
+          category,
+          conversational_card_info: cardInfo,
+        };
+        fetchAndCacheCardPrice(cardForPricing)
+          .then((cachedPrice) => {
+            if (cachedPrice) {
+              console.log(`[EBAY PRICE] Cached prices for card ${cardId}: $${cachedPrice.median_price} median (${cachedPrice.listing_count} listings)`);
+            } else {
+              console.log(`[EBAY PRICE] No price data available for card ${cardId}`);
+            }
+          })
+          .catch((priceError) => {
+            console.error(`[EBAY PRICE] Price caching failed for card ${cardId}:`, priceError.message);
+          });
+      }
     } catch (priceError: any) {
-      console.error(`[EBAY PRICE] Price caching setup error:`, priceError.message);
+      console.error(`[PRICE CACHE] Price caching setup error:`, priceError.message);
       // Don't fail grading - price caching is optional enhancement
     }
 

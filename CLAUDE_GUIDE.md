@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: February 11, 2026 (v8.2 - Affiliate/Partner Program with commission tracking, referral attribution, admin dashboard)
+> Last Updated: February 17, 2026 (v8.3 - Market Pricing dashboard, price history improvements, /founders redirect)
 
 ---
 
@@ -33,6 +33,7 @@
 
 **Core Features:**
 - AI-powered card grading with three-pass consensus system
+- **v8.3: Market Pricing dashboard (Card Lovers exclusive), price history with DCM/PriceCharting tracking, /founders→/card-lovers redirect**
 - **v8.2: Affiliate/Partner Program with referral tracking, commissions, admin dashboard, Stripe promo codes**
 - **v8.1: VIP Package ($99/150 credits), Card Lovers subscription, SEO metadata, database optimizations**
 - **v8.0: Blog CMS, eBay auction listings (AddItem/Chinese), global scroll-to-top**
@@ -99,6 +100,9 @@ src/
 │   │   ├── page.tsx
 │   │   ├── success/page.tsx
 │   │   └── layout.tsx            # SEO metadata
+│   ├── market-pricing/            # Market Pricing dashboard (v8.3, Card Lovers exclusive)
+│   │   ├── page.tsx
+│   │   └── layout.tsx            # SEO metadata
 │   ├── affiliates/               # Affiliate program info page (v8.2)
 │   │   └── page.tsx
 │   ├── founders/                 # Founders package
@@ -128,6 +132,9 @@ src/
 │   │   └── (dashboard)/
 │   │       └── affiliates/       # Affiliate management (v8.2)
 │   └── api/                      # API routes
+│       ├── market-pricing/       # Market Pricing APIs (v8.3)
+│       │   ├── portfolio/route.ts
+│       │   └── listings/route.ts
 │       ├── affiliate/            # Public affiliate endpoints (v8.2)
 │       │   ├── click/route.ts
 │       │   └── validate/route.ts
@@ -161,6 +168,12 @@ src/
 │   ├── CardSlab.tsx              # Card display component
 │   ├── camera/                   # Camera & upload components
 │   ├── reports/                  # Report & label components
+│   ├── market-pricing/            # Market Pricing components (v8.3)
+│   │   ├── MarketPricingGate.tsx  # Card Lovers subscription gate
+│   │   ├── CategoryBreakdownChart.tsx # Recharts bar chart by category
+│   │   ├── TopCardsTable.tsx      # Top 10 most valuable cards
+│   │   ├── MoversTable.tsx        # Price gainers/losers
+│   │   └── MyEbayListings.tsx     # eBay listings management
 │   ├── admin/                    # Admin components (AdminSidebar includes Affiliates link)
 │   └── ui/                       # Shared UI components
 │
@@ -199,8 +212,7 @@ src/
 | `/reports-and-labels` | `app/reports-and-labels/page.tsx` | Reports and labels info |
 | `/card-shows` | `app/card-shows/page.tsx` | Card shows directory |
 | `/card-shows/[slug]` | `app/card-shows/[slug]/page.tsx` | Individual card show page |
-| `/founders` | `app/founders/page.tsx` | Founders Package landing page (v7.6) |
-| `/founders/success` | `app/founders/success/page.tsx` | Founders purchase success page |
+| `/founders` | `app/founders/page.tsx` | Redirects to `/card-lovers` (v8.3, promotion ended) |
 | `/vip` | `app/vip/page.tsx` | VIP Package landing page (v8.1) |
 | `/card-lovers` | `app/card-lovers/page.tsx` | Card Lovers subscription page (v8.1) |
 | `/card-lovers/success` | `app/card-lovers/success/page.tsx` | Card Lovers subscription success page |
@@ -221,6 +233,7 @@ src/
 | `/collection` | `app/collection/page.tsx` | User's graded cards |
 | `/account` | `app/account/page.tsx` | Account settings |
 | `/credits` | `app/credits/page.tsx` | Purchase credits |
+| `/market-pricing` | `app/market-pricing/page.tsx` | Market Pricing dashboard (Card Lovers exclusive, v8.3) |
 
 ### Card Detail Pages (Public if card is public)
 
@@ -297,6 +310,13 @@ src/
 |----------|--------|---------|
 | `/api/pokemon-database/search` | GET | Search Pokemon cards (EN/JA/All) |
 | `/api/pokemon-database/sets` | GET | Get sets list by language |
+
+### Market Pricing (v8.3)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/market-pricing/portfolio` | GET | Portfolio value, category breakdown, top cards, movers (Card Lovers only) |
+| `/api/market-pricing/listings` | GET | User's eBay listings with card info (Card Lovers only) |
 
 ### eBay Price Caching (v7.7)
 
@@ -561,6 +581,100 @@ src/
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS is_founder BOOLEAN DEFAULT false;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS founder_since TIMESTAMPTZ;
 ALTER TABLE user_credits ADD COLUMN IF NOT EXISTS show_founder_badge BOOLEAN DEFAULT true;
+```
+
+### v8.3 Market Pricing Dashboard & Price History Improvements (February 17, 2026)
+
+**Key Features:**
+
+1. **Market Pricing Dashboard** (`/market-pricing`) — Card Lovers Exclusive
+   - Portfolio value summary with total value, cards with pricing, refresh button
+   - 3 tabs: Overview, My eBay Listings, Market Insights
+   - **Overview tab:** Category breakdown bar chart (Recharts), Top 10 most valuable cards, Price Movers (gainers/losers)
+   - **My eBay Listings tab:** eBay connection status, listing table with status badges, direct eBay links
+   - **Market Insights tab:** Trending cards, category performance comparison, Price Alerts (coming soon placeholder)
+   - Gated by `MarketPricingGate` component (checks Card Lovers subscription, shows upsell for non-subscribers)
+   - Navigation link added (emerald `$` icon) in desktop and mobile menus
+   - Added to sitemap
+
+2. **Price History Improvements**
+   - **DCM/PriceCharting tracking:** Added `dcm_price_estimate` column to `card_price_history` table for more accurate trend analysis
+   - **Expanded card types:** CHECK constraint updated from `(sports, pokemon, other)` to `(sports, pokemon, mtg, lorcana, other)` — MTG and Lorcana cards no longer silently fail
+   - **Removed 200-card limit:** Cron now processes up to 10,000 cards per run with a 4.5-minute time budget (graceful stop before Vercel 5-min timeout)
+   - **Initial snapshot on grading:** `fetchAndCacheCardPrice()` now also writes to `card_price_history` so new cards have data immediately
+   - **Portfolio movers use DCM prices:** Falls back to eBay median for older snapshots without DCM data
+   - **Chunked queries:** Portfolio API chunks `.in()` queries to avoid PostgREST URL length limits
+
+3. **Founders Page Redirect**
+   - `/founders` now server-side redirects to `/card-lovers` (promotion ended)
+   - Sitemap updated
+
+**Files Created:**
+| File | Purpose |
+|------|---------|
+| `src/app/market-pricing/page.tsx` | Main market pricing dashboard with 3 tabs |
+| `src/app/market-pricing/layout.tsx` | SEO metadata |
+| `src/app/api/market-pricing/portfolio/route.ts` | Portfolio aggregation API (auth + Card Lovers gated) |
+| `src/app/api/market-pricing/listings/route.ts` | eBay listings API (auth + Card Lovers gated) |
+| `src/components/market-pricing/MarketPricingGate.tsx` | Subscription gate with upsell |
+| `src/components/market-pricing/CategoryBreakdownChart.tsx` | Horizontal bar chart (Recharts) with per-category colors |
+| `src/components/market-pricing/TopCardsTable.tsx` | Top 10 cards with thumbnails, grades, values |
+| `src/components/market-pricing/MoversTable.tsx` | Gainers/losers with % change indicators |
+| `src/components/market-pricing/MyEbayListings.tsx` | eBay listings table with status badges |
+| `supabase/migrations/20260217_expand_card_price_history_types.sql` | Expand card_type CHECK, add dcm_price_estimate column |
+
+**Files Modified:**
+| File | Changes |
+|------|---------|
+| `src/app/ui/Navigation.tsx` | Added "$ Market Pricing" link (emerald) in desktop + mobile nav |
+| `src/app/sitemap.ts` | Added `/market-pricing`, changed `/founders` to `/card-lovers` |
+| `src/app/founders/page.tsx` | Replaced with server-side redirect to `/card-lovers` |
+| `src/lib/ebay/priceTracker.ts` | DCM tracking in snapshots, time budget, MTG/Lorcana types, initial snapshot on grading |
+| `src/app/api/cron/update-card-prices/route.ts` | Limit 10,000, all 5 card types, 4.5 min time budget |
+
+**Database Migration:**
+```sql
+-- Expand card_type to include MTG and Lorcana
+ALTER TABLE card_price_history DROP CONSTRAINT card_price_history_card_type_check;
+ALTER TABLE card_price_history ADD CONSTRAINT card_price_history_card_type_check
+  CHECK (card_type IN ('sports', 'pokemon', 'mtg', 'lorcana', 'other'));
+
+-- Add PriceCharting estimate column for trend analysis
+ALTER TABLE card_price_history ADD COLUMN IF NOT EXISTS dcm_price_estimate DECIMAL(10, 2);
+```
+
+**Category Colors (CategoryBreakdownChart):**
+| Category | Color | Hex |
+|----------|-------|-----|
+| Pokemon | Red | `#EF4444` |
+| Football | Blue | `#3B82F6` |
+| Baseball | Green | `#10B981` |
+| Basketball | Orange | `#F97316` |
+| Hockey | Cyan | `#06B6D4` |
+| Soccer | Emerald | `#22C55E` |
+| Wrestling | Purple | `#A855F7` |
+| MTG | Violet | `#8B5CF6` |
+| Lorcana | Indigo | `#6366F1` |
+| One Piece | Rose | `#E11D48` |
+| Other | Gray | `#6B7280` |
+
+**Portfolio API Value Priority:** `dcm_price_estimate` > `ebay_price_median` > `scryfall_price_usd` > 0
+
+**Price History Data Flow:**
+```
+1. Card Graded → vision-grade route → fetchAndCacheCardPrice()
+   └── Saves eBay cache to cards table
+   └── NEW: Also saves initial snapshot to card_price_history (with DCM estimate)
+
+2. Weekly Cron (Sunday 3 AM UTC) → /api/cron/update-card-prices
+   └── Processes ALL graded cards (up to 10,000, time budget 4.5 min)
+   └── Fetches eBay prices + reads current DCM estimate from cards table
+   └── Saves snapshot to card_price_history
+
+3. Market Pricing page → /api/market-pricing/portfolio
+   └── Reads card_price_history (chunked queries)
+   └── Compares latest 2 snapshots per card for movers
+   └── Prefers dcm_price_estimate, falls back to eBay median_price
 ```
 
 ### v8.2 Affiliate/Partner Program (February 11, 2026)
@@ -2684,6 +2798,7 @@ npx tsx scripts/export-users-email-list.ts
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v8.3 | Feb 17, 2026 | Market Pricing dashboard (Card Lovers exclusive): portfolio value, category bar chart, top 10 cards, price movers, eBay listings tab, market insights. Price history: DCM/PriceCharting tracking, MTG/Lorcana card types, 10k card limit with time budget, initial snapshot on grading. /founders→/card-lovers redirect |
 | v8.2 | Feb 11, 2026 | Affiliate/Partner Program: referral tracking (`?ref=CODE`), commission management (20% default), Stripe promo codes (10% buyer discount), admin dashboard, fraud prevention (self-referral/duplicate/14-day hold/auto-reversal), public info page |
 | v8.1 | Feb 5, 2026 | VIP Package ($99/150 credits), Card Lovers subscription (monthly/annual), unified emblem system, SEO metadata for all pages, database performance indexes, conversion tracking fixes |
 | v8.0 | Feb 2, 2026 | Blog CMS with admin, eBay auction listings (AddItem/Chinese), global scroll-to-top, page tour restart, eBay vintage sports & letter-based card number fixes |

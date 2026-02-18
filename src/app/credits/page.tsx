@@ -97,6 +97,17 @@ function CreditsPageContent() {
   const canceled = searchParams.get('canceled')
   const welcome = searchParams.get('welcome')
 
+  // Reset loading state when page is restored from bfcache (e.g. returning from Stripe)
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setPurchaseLoading(null)
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [])
+
   useEffect(() => {
     const session = getStoredSession()
     // Set authentication state but don't redirect - page works for everyone
@@ -135,6 +146,7 @@ function CreditsPageContent() {
 
   useEffect(() => {
     if (canceled) {
+      setPurchaseLoading(null)
       setError('Payment was canceled. No charges were made.')
       // Clear the query param
       router.replace('/credits')

@@ -1195,8 +1195,8 @@ export const DENOMINATOR_TO_SETS: Record<number, { setIds: string[], era: string
   64: { setIds: ['base2'], era: 'WOTC', sets: ['Jungle'] },
   62: { setIds: ['base3'], era: 'WOTC', sets: ['Fossil'] },
   82: { setIds: ['base5'], era: 'WOTC', sets: ['Team Rocket'] },
-  132: { setIds: ['gym1', 'gym2'], era: 'WOTC', sets: ['Gym Heroes', 'Gym Challenge'] },
-  111: { setIds: ['neo1'], era: 'WOTC', sets: ['Neo Genesis'] },
+  132: { setIds: ['gym1', 'gym2', 'me1'], era: 'Mixed', sets: ['Gym Heroes', 'Gym Challenge', 'Mega Evolution'] },
+  111: { setIds: ['neo1', 'ex7'], era: 'Mixed', sets: ['Neo Genesis', 'Team Rocket Returns'] },
   75: { setIds: ['neo2'], era: 'WOTC', sets: ['Neo Discovery'] },
   66: { setIds: ['neo3'], era: 'WOTC', sets: ['Neo Revelation'] },
   105: { setIds: ['neo4'], era: 'WOTC', sets: ['Neo Destiny'] },
@@ -1213,7 +1213,6 @@ export const DENOMINATOR_TO_SETS: Record<number, { setIds: string[], era: string
   95: { setIds: ['ex4'], era: 'EX', sets: ['Team Magma vs Team Aqua'] },
   101: { setIds: ['ex5', 'ex10'], era: 'EX', sets: ['Hidden Legends', 'Unseen Forces'] },
   104: { setIds: ['ex6'], era: 'EX', sets: ['FireRed & LeafGreen'] },
-  111: { setIds: ['neo1', 'ex7'], era: 'Mixed', sets: ['Neo Genesis', 'Team Rocket Returns'] },
   107: { setIds: ['ex8'], era: 'EX', sets: ['Deoxys'] },
   92: { setIds: ['ex11'], era: 'EX', sets: ['Delta Species'] },
 
@@ -1246,6 +1245,13 @@ export const DENOMINATOR_TO_SETS: Record<number, { setIds: string[], era: string
   167: { setIds: ['sv6'], era: 'SV', sets: ['Twilight Masquerade'] },
   142: { setIds: ['sv7'], era: 'SV', sets: ['Stellar Crown'] },
   226: { setIds: ['sv6pt5'], era: 'SV', sets: ['Shrouded Fable'] },
+  131: { setIds: ['sv8pt5'], era: 'SV', sets: ['Prismatic Evolutions'] },
+  159: { setIds: ['sv9'], era: 'SV', sets: ['Journey Together'] },
+  182: { setIds: ['sv10'], era: 'SV', sets: ['Destined Rivals'] },
+  86: { setIds: ['sv10pt5b', 'sv10pt5w'], era: 'SV', sets: ['Black Bolt', 'White Flare'] },
+  // Mega Evolution Era (2025+)
+  94: { setIds: ['me2'], era: 'ME', sets: ['Phantasmal Flames'] },
+  217: { setIds: ['me2pt5'], era: 'ME', sets: ['Ascended Heroes'] },
 };
 
 /**
@@ -1265,8 +1271,18 @@ const SET_CODE_TO_ID: Record<string, string> = {
   'SFA': 'sv6pt5',   // Shrouded Fable
   'SCR': 'sv7',      // Stellar Crown
   'SSP': 'sv8',      // Surging Sparks
+  'PRE': 'sv8pt5',   // Prismatic Evolutions
+  'JTG': 'sv9',      // Journey Together
+  'DRI': 'sv10',     // Destined Rivals
+  'BLK': 'sv10pt5b', // Black Bolt
+  'WHT': 'sv10pt5w', // White Flare
   'SVP': 'svp',      // SV Promos
   'SVE': 'sve',      // SV Energies
+  // Mega Evolution Era (2025+)
+  'MEG': 'me1',      // Mega Evolution
+  'MEP': 'mep',      // MEP Black Star Promos
+  'PFL': 'me2',      // Phantasmal Flames
+  'ASC': 'me2pt5',   // Ascended Heroes
   // Sword & Shield Era (2020-2023)
   'SSH': 'swsh1',    // Sword & Shield Base
   'RCL': 'swsh2',    // Rebel Clash
@@ -1327,9 +1343,117 @@ export async function lookupSetByCardNumber(
   options?: SetLookupOptions
 ): Promise<SetLookupResult> {
 
-  // If external API is disabled, return a failure result
+  // If external API is disabled, try local mappings before returning failure
   if (DISABLE_EXTERNAL_API) {
-    console.log('[Pokemon API] lookupSetByCardNumber disabled - external API is off');
+    console.log('[Pokemon API] External API disabled - trying local set mappings');
+
+    // Try SET_CODE_TO_ID first (most specific)
+    if (options?.setCode) {
+      const setId = SET_CODE_TO_ID[options.setCode.toUpperCase()];
+      if (setId) {
+        console.log(`[Pokemon API] Local set_code match: ${options.setCode} → ${setId}`);
+        // Query local Supabase for set details
+        if (supabase) {
+          try {
+            const { data: setData } = await supabase
+              .from('pokemon_sets')
+              .select('id, name, series, release_date')
+              .eq('id', setId)
+              .single();
+            if (setData) {
+              const yearMatch = setData.release_date?.toString().match(/^(\d{4})/);
+              const result: SetLookupResult = {
+                success: true,
+                set_name: setData.name,
+                set_id: setData.id,
+                set_year: yearMatch ? parseInt(yearMatch[1]) : null,
+                set_era: setData.series,
+                set_confidence: 'high',
+                set_identifier_source: ['set_code', 'local_db'],
+                set_identifier_reason: `Matched via set_code ${options.setCode} → ${setData.name} (local DB)`,
+                cache_hit: false
+              };
+              setLookupCache.set(`${cardNumber}|${pokemonName || ''}|${year || ''}|${options?.setCode || ''}|${options?.cardFormat || ''}`, result);
+              return result;
+            }
+          } catch (e) {
+            console.warn('[Pokemon API] Local set_code DB lookup failed:', e);
+          }
+        }
+      }
+    }
+
+    // Try DENOMINATOR_TO_SETS from card number
+    const denomMatch = cardNumber.match(/^[A-Z0-9]+\/(\d+)$/i);
+    if (denomMatch) {
+      const denominator = parseInt(denomMatch[1]);
+      const setInfo = DENOMINATOR_TO_SETS[denominator];
+      if (setInfo && setInfo.setIds.length > 0) {
+        // If only one set matches this denominator, use it directly
+        // If multiple, try to disambiguate with year or set_code
+        let bestSetId = setInfo.setIds[0];
+        if (setInfo.setIds.length > 1 && year) {
+          // Try to find the set matching the year
+          if (supabase) {
+            try {
+              const { data: candidates } = await supabase
+                .from('pokemon_sets')
+                .select('id, name, release_date')
+                .in('id', setInfo.setIds);
+              if (candidates) {
+                const yearMatch = candidates.find(c => c.release_date?.toString().startsWith(year));
+                if (yearMatch) bestSetId = yearMatch.id;
+              }
+            } catch (e) { /* use first */ }
+          }
+        }
+
+        // Look up full set details
+        if (supabase) {
+          try {
+            const { data: setData } = await supabase
+              .from('pokemon_sets')
+              .select('id, name, series, release_date')
+              .eq('id', bestSetId)
+              .single();
+            if (setData) {
+              const yearMatch = setData.release_date?.toString().match(/^(\d{4})/);
+              const result: SetLookupResult = {
+                success: true,
+                set_name: setData.name,
+                set_id: setData.id,
+                set_year: yearMatch ? parseInt(yearMatch[1]) : null,
+                set_era: setData.series || setInfo.era,
+                set_confidence: setInfo.setIds.length === 1 ? 'high' : 'medium',
+                set_identifier_source: ['denominator', 'local_db'],
+                set_identifier_reason: `Matched denominator ${denominator} → ${setData.name} (local DB)`,
+                cache_hit: false
+              };
+              setLookupCache.set(`${cardNumber}|${pokemonName || ''}|${year || ''}|${options?.setCode || ''}|${options?.cardFormat || ''}`, result);
+              return result;
+            }
+          } catch (e) {
+            console.warn('[Pokemon API] Local denominator DB lookup failed:', e);
+          }
+        }
+
+        // Fallback: return set info from static mapping without DB
+        console.log(`[Pokemon API] Local denominator match: ${denominator} → ${setInfo.sets[0]}`);
+        return {
+          success: true,
+          set_name: setInfo.sets[0],
+          set_id: bestSetId,
+          set_year: year ? parseInt(year) : null,
+          set_era: setInfo.era,
+          set_confidence: setInfo.setIds.length === 1 ? 'medium' : 'low',
+          set_identifier_source: ['denominator', 'local_mapping'],
+          set_identifier_reason: `Matched denominator ${denominator} → ${setInfo.sets[0]} (local mapping)`,
+          cache_hit: false
+        };
+      }
+    }
+
+    console.log('[Pokemon API] No local mapping found, returning failure');
     return {
       success: false,
       set_name: null,
@@ -1338,7 +1462,7 @@ export async function lookupSetByCardNumber(
       set_era: null,
       set_confidence: 'low',
       set_identifier_source: ['local_only'],
-      set_identifier_reason: 'External API disabled - using local database only',
+      set_identifier_reason: 'External API disabled and no local mapping found',
       cache_hit: false,
       error: 'External API disabled'
     };

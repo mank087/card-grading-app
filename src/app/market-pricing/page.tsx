@@ -294,6 +294,11 @@ export default function MarketPricingPage() {
                       losers={portfolio?.movers.losers || []}
                     />
                   </div>
+
+                  {/* Pricing footnote */}
+                  <p className="text-xs text-gray-400 text-center">
+                    Prices are updated weekly every Sunday. Trend data and price changes will populate automatically as more snapshots are collected.
+                  </p>
                 </>
               )}
             </div>

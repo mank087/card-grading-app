@@ -144,28 +144,36 @@ export async function GET(request: NextRequest) {
     // Movers: compare latest vs previous price for cards with history
     const cardIdsWithPricing = cards
       .filter(c => c.dcm_price_updated_at || c.ebay_price_median)
-      .map(c => c.id as string)
-      .slice(0, 100); // Limit to avoid massive query
+      .map(c => c.id as string);
 
     let movers: { gainers: typeof topCards; losers: typeof topCards } = { gainers: [], losers: [] };
 
     if (cardIdsWithPricing.length > 0) {
-      // Get latest 2 price history entries per card to calculate change
-      const { data: priceHistory } = await supabase
-        .from('card_price_history')
-        .select('card_id, median_price, recorded_at')
-        .in('card_id', cardIdsWithPricing)
-        .not('median_price', 'is', null)
-        .order('recorded_at', { ascending: false })
-        .limit(cardIdsWithPricing.length * 2);
+      // Get price history entries for user's cards in chunks
+      // (PostgREST has URL length limits with large .in() clauses)
+      // Prefer dcm_price_estimate (PriceCharting) over median_price (eBay listings)
+      const priceHistory: Array<{ card_id: string; median_price: number | null; dcm_price_estimate: number | null; recorded_at: string }> = [];
+      const chunkSize = 50;
+      for (let i = 0; i < cardIdsWithPricing.length; i += chunkSize) {
+        const chunk = cardIdsWithPricing.slice(i, i + chunkSize);
+        const { data: chunkData } = await supabase
+          .from('card_price_history')
+          .select('card_id, median_price, dcm_price_estimate, recorded_at')
+          .in('card_id', chunk)
+          .order('recorded_at', { ascending: false });
+        if (chunkData) priceHistory.push(...chunkData);
+      }
 
-      if (priceHistory && priceHistory.length > 0) {
+      if (priceHistory.length > 0) {
         // Group by card_id, get latest 2 entries
+        // Use dcm_price_estimate if available, fall back to median_price (eBay)
         const historyByCard = new Map<string, number[]>();
         for (const entry of priceHistory) {
+          const price = entry.dcm_price_estimate ?? entry.median_price;
+          if (price === null || price === undefined) continue;
           const existing = historyByCard.get(entry.card_id) || [];
           if (existing.length < 2) {
-            existing.push(entry.median_price);
+            existing.push(price);
             historyByCard.set(entry.card_id, existing);
           }
         }
@@ -175,7 +183,7 @@ export async function GET(request: NextRequest) {
         historyByCard.forEach((prices, cardId) => {
           if (prices.length === 2 && prices[1] > 0) {
             const changePercent = ((prices[0] - prices[1]) / prices[1]) * 100;
-            if (Math.abs(changePercent) >= 1) { // Only meaningful changes
+            if (Math.abs(changePercent) >= 0.1) { // Show even small changes
               changes.push({ cardId, changePercent: Math.round(changePercent * 10) / 10 });
             }
           }

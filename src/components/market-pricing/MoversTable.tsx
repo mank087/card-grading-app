@@ -45,7 +45,7 @@ export default function MoversTable({ gainers, losers }: MoversTableProps) {
   if (!hasData) {
     return (
       <div className="text-center py-8 text-gray-400 text-sm">
-        Price change data will appear once your cards have multiple price snapshots.
+        Price change data requires at least two weekly snapshots. Prices update every Sunday — check back next week!
       </div>
     );
   }

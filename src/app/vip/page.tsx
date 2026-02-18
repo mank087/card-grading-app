@@ -25,6 +25,17 @@ export default function VipPage() {
   const [purchasing, setPurchasing] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
 
+  // Reset loading state when page is restored from bfcache (e.g. returning from Stripe)
+  useEffect(() => {
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        setPurchasing(false)
+      }
+    }
+    window.addEventListener('pageshow', handlePageShow)
+    return () => window.removeEventListener('pageshow', handlePageShow)
+  }, [])
+
   // Check authentication and VIP status
   useEffect(() => {
     const session = getStoredSession()
