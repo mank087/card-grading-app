@@ -2032,7 +2032,7 @@ EXTRACTION RULES:
         };
 
         // Fire and forget - don't wait for price caching to complete
-        fetchAndCacheDcmPrice(cardForDcmPricing)
+        fetchAndCacheDcmPrice(cardForDcmPricing, { isInitialGrading: true })
           .then((cachedPrice) => {
             if (cachedPrice) {
               console.log(`[DCM PRICE] Cached DCM estimate for card ${cardId}: $${cachedPrice.estimate} (${cachedPrice.match_confidence} match)`);
@@ -2151,17 +2151,33 @@ EXTRACTION RULES:
               if (estimatedValue !== null) {
                 const supabase = supabaseServer();
                 const now = new Date().toISOString();
+
+                // Check if this is the first time pricing (set grading baseline)
+                const { data: existingCard } = await supabase
+                  .from('cards')
+                  .select('dcm_price_at_grading')
+                  .eq('id', cardId)
+                  .single();
+
+                const updateData: Record<string, unknown> = {
+                  dcm_price_estimate: estimatedValue,
+                  dcm_price_raw: rawPrice,
+                  dcm_price_updated_at: now,
+                  dcm_price_match_confidence: matchConfidence,
+                  dcm_price_product_id: productId,
+                  dcm_price_product_name: productName,
+                  dcm_prices_cached_at: now,
+                };
+
+                // Set "price at grading" only once (never overwrite)
+                if (!existingCard?.dcm_price_at_grading) {
+                  updateData.dcm_price_at_grading = estimatedValue;
+                  updateData.dcm_price_at_grading_date = now;
+                }
+
                 await supabase
                   .from('cards')
-                  .update({
-                    dcm_price_estimate: estimatedValue,
-                    dcm_price_raw: rawPrice,
-                    dcm_price_updated_at: now,
-                    dcm_price_match_confidence: matchConfidence,
-                    dcm_price_product_id: productId,
-                    dcm_price_product_name: productName,
-                    dcm_prices_cached_at: now,
-                  })
+                  .update(updateData)
                   .eq('id', cardId);
 
                 console.log(`[PRICECHARTING] Cached estimate for card ${cardId}: $${estimatedValue} (${matchConfidence} match)`);

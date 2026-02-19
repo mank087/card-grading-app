@@ -478,6 +478,26 @@ export default function CardLoversPage() {
                   </div>
                 </div>
               </div>
+
+              <div className="bg-white rounded-xl p-6 shadow-md border border-purple-100 md:col-span-2">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-600 to-rose-500 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 mb-1">Market Pricing Dashboard</h3>
+                    <p className="text-gray-600 text-sm">
+                      Track your entire collection&apos;s market value with interactive charts, grade and value breakdowns, top cards rankings, and price change tracking since grading. Filter by category, refresh prices on demand, and manage eBay listings — all in one place.
+                    </p>
+                    <Link href="/market-pricing" className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium mt-2">
+                      View Market Pricing
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

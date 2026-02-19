@@ -230,23 +230,42 @@ async function saveDcmPriceCache(
     matchConfidence: string;
     productId: string;
     productName: string;
-  }
+  },
+  options: { isInitialGrading?: boolean } = {}
 ): Promise<void> {
   const supabase = supabaseServer();
+  const now = new Date().toISOString();
+
+  const updateData: Record<string, unknown> = {
+    dcm_price_estimate: data.estimate,
+    dcm_price_raw: data.raw,
+    dcm_price_graded_high: data.gradedHigh,
+    dcm_price_median: data.median,
+    dcm_price_average: data.average,
+    dcm_price_updated_at: now,
+    dcm_price_match_confidence: data.matchConfidence,
+    dcm_price_product_id: data.productId,
+    dcm_price_product_name: data.productName,
+  };
+
+  // Set "price at grading" only on initial grading (never overwrite)
+  if (options.isInitialGrading && data.estimate !== null) {
+    // Check if already set (e.g. re-grade scenario)
+    const { data: existing } = await supabase
+      .from('cards')
+      .select('dcm_price_at_grading')
+      .eq('id', cardId)
+      .single();
+
+    if (!existing?.dcm_price_at_grading) {
+      updateData.dcm_price_at_grading = data.estimate;
+      updateData.dcm_price_at_grading_date = now;
+    }
+  }
 
   const { error } = await supabase
     .from('cards')
-    .update({
-      dcm_price_estimate: data.estimate,
-      dcm_price_raw: data.raw,
-      dcm_price_graded_high: data.gradedHigh,
-      dcm_price_median: data.median,
-      dcm_price_average: data.average,
-      dcm_price_updated_at: new Date().toISOString(),
-      dcm_price_match_confidence: data.matchConfidence,
-      dcm_price_product_id: data.productId,
-      dcm_price_product_name: data.productName,
-    })
+    .update(updateData)
     .eq('id', cardId);
 
   if (error) {
@@ -258,7 +277,7 @@ async function saveDcmPriceCache(
 /**
  * Fetch DCM prices from SportsCardsPro and cache to cards table
  */
-export async function fetchAndCacheDcmPrice(card: CardForDcmPricing): Promise<DcmCachedPrice | null> {
+export async function fetchAndCacheDcmPrice(card: CardForDcmPricing, options: { isInitialGrading?: boolean } = {}): Promise<DcmCachedPrice | null> {
   // Check if PriceCharting API is enabled
   if (!isPriceChartingEnabled()) {
     console.error('[DcmPriceTracker] SportsCardsPro API is not configured');
@@ -362,7 +381,7 @@ export async function fetchAndCacheDcmPrice(card: CardForDcmPricing): Promise<Dc
     };
 
     // Save to cache
-    await saveDcmPriceCache(card.id, cacheData);
+    await saveDcmPriceCache(card.id, cacheData, { isInitialGrading: options.isInitialGrading });
 
     console.log(`[DcmPriceTracker] Cached DCM price for card ${card.id}: $${cacheData.estimate} (${result.matchConfidence} match)`);
 

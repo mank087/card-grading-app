@@ -8,8 +8,15 @@ import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdow
 import TopCardsTable from '@/components/market-pricing/TopCardsTable';
 import MoversTable from '@/components/market-pricing/MoversTable';
 import MyEbayListings from '@/components/market-pricing/MyEbayListings';
+import GradeDistributionChart from '@/components/market-pricing/GradeDistributionChart';
+import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart';
+import ValueByGradeChart from '@/components/market-pricing/ValueByGradeChart';
+import TopSetsChart from '@/components/market-pricing/TopSetsChart';
+import PriceSourceChart from '@/components/market-pricing/PriceSourceChart';
+import GradeVsValueChart from '@/components/market-pricing/GradeVsValueChart';
 
-type TabId = 'overview' | 'listings' | 'insights';
+
+type TabId = 'overview' | 'listings';
 
 interface PortfolioData {
   totalValue: number;
@@ -21,9 +28,19 @@ interface PortfolioData {
     imageUrl: string | null; cardPath: string; cardSet?: string; cardNumber?: string;
   }>;
   movers: {
-    gainers: Array<{ id: string; name: string; category: string; value: number; changePercent: number; cardPath: string }>;
-    losers: Array<{ id: string; name: string; category: string; value: number; changePercent: number; cardPath: string }>;
+    gainers: Array<{ id: string; name: string; category: string; value: number; gradingValue: number; changePercent: number; cardPath: string }>;
+    losers: Array<{ id: string; name: string; category: string; value: number; gradingValue: number; changePercent: number; cardPath: string }>;
+    totalGradingValue: number;
+    totalCurrentValue: number;
+    cardsWithGradingPrice: number;
   };
+  gradeDistribution: Array<{ grade: string; count: number }>;
+  valueDistribution: Array<{ label: string; count: number }>;
+  valueByGrade: Array<{ grade: string; totalValue: number; avgValue: number; count: number }>;
+  topSets: Array<{ set: string; category: string; value: number; count: number }>;
+  priceSourceBreakdown: Array<{ source: string; count: number }>;
+  gradeVsValue: Array<{ grade: number; value: number; name: string; cardPath: string }>;
+
 }
 
 export default function MarketPricingPage() {
@@ -35,11 +52,30 @@ export default function MarketPricingPage() {
   const [ebayConnected, setEbayConnected] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [refreshCount, setRefreshCount] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const stored = localStorage.getItem('dcm_refresh_data');
+    if (!stored) return 0;
+    try {
+      const { count, date } = JSON.parse(stored);
+      // Reset if it's a new day
+      if (date !== new Date().toISOString().slice(0, 10)) return 0;
+      return count || 0;
+    } catch { return 0; }
+  });
+  const maxRefreshesPerDay = 2;
+  const refreshLimitReached = refreshCount >= maxRefreshesPerDay;
 
   useEffect(() => {
     fetchPortfolio();
     checkEbayStatus();
   }, []);
+
+  // Re-fetch when category filter changes
+  useEffect(() => {
+    fetchPortfolio();
+  }, [selectedCategory]);
 
   async function fetchPortfolio() {
     setLoading(true);
@@ -48,7 +84,11 @@ export default function MarketPricingPage() {
       const session = getStoredSession();
       if (!session?.access_token) return;
 
-      const response = await fetch('/api/market-pricing/portfolio', {
+      const params = new URLSearchParams();
+      if (selectedCategory) params.set('category', selectedCategory);
+      const qs = params.toString();
+
+      const response = await fetch(`/api/market-pricing/portfolio${qs ? `?${qs}` : ''}`, {
         headers: { 'Authorization': `Bearer ${session.access_token}` },
       });
       if (response.ok) {
@@ -103,19 +143,32 @@ export default function MarketPricingPage() {
   }
 
   async function handleRefreshPrices() {
+    if (refreshLimitReached) return;
     setRefreshing(true);
     try {
       const session = getStoredSession();
       if (!session?.access_token) return;
 
-      await fetch('/api/ebay/batch-refresh-prices', {
+      const res = await fetch('/api/market-pricing/refresh-prices', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ force: false }),
       });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        console.error('Refresh failed:', data.error || res.statusText);
+      }
+
+      // Track refresh count (2 per day limit)
+      const newCount = refreshCount + 1;
+      setRefreshCount(newCount);
+      localStorage.setItem('dcm_refresh_data', JSON.stringify({
+        count: newCount,
+        date: new Date().toISOString().slice(0, 10),
+      }));
 
       // Re-fetch portfolio after refresh
       await fetchPortfolio();
@@ -152,15 +205,6 @@ export default function MarketPricingPage() {
         </svg>
       ),
     },
-    {
-      id: 'insights',
-      label: 'Market Insights',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg>
-      ),
-    },
   ];
 
   return (
@@ -185,7 +229,9 @@ export default function MarketPricingPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Total Value */}
             <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
-              <div className="text-sm text-gray-500 mb-1">Total Portfolio Value</div>
+              <div className="text-sm text-gray-500 mb-1">
+                {selectedCategory ? `${selectedCategory} Value` : 'Total Portfolio Value'}
+              </div>
               {loading ? (
                 <div className="h-8 bg-gray-100 rounded animate-pulse w-32" />
               ) : (
@@ -214,34 +260,61 @@ export default function MarketPricingPage() {
               </div>
             </div>
 
-            {/* Refresh */}
-            <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100 flex flex-col justify-center items-center">
-              <button
-                onClick={handleRefreshPrices}
-                disabled={refreshing}
-                className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white font-medium px-5 py-2.5 rounded-lg transition-colors"
-              >
-                {refreshing ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Refreshing...
-                  </>
-                ) : (
-                  <>
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh Prices
-                  </>
-                )}
-              </button>
-              <p className="text-xs text-gray-400 mt-2">Updates stale prices via PriceCharting &amp; eBay</p>
+            {/* Average Card Value */}
+            <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
+              <div className="text-sm text-gray-500 mb-1">Average Card Value</div>
+              {loading ? (
+                <div className="h-8 bg-gray-100 rounded animate-pulse w-24" />
+              ) : (
+                <div className="text-2xl md:text-3xl font-bold text-gray-900">
+                  ${portfolio && portfolio.cardsWithValue > 0
+                    ? (portfolio.totalValue / portfolio.cardsWithValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                    : '0.00'}
+                </div>
+              )}
+              <div className="text-xs text-gray-400 mt-1">Across {portfolio?.cardsWithValue || 0} priced cards</div>
             </div>
           </div>
         </section>
 
+        {/* Category Filter Pills */}
+        {portfolio && portfolio.categoryBreakdown.length > 1 && (
+          <section className="max-w-7xl mx-auto px-4 mt-5">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              <span className="text-xs text-gray-400 font-medium flex-shrink-0 mr-1">Filter:</span>
+              {/* "All" pill */}
+              <button
+                onClick={() => setSelectedCategory(null)}
+                className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  selectedCategory === null
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                }`}
+              >
+                All ({portfolio.categoryBreakdown.reduce((sum, c) => sum + c.count, 0)})
+              </button>
+              {/* Category pills derived from breakdown data */}
+              {portfolio.categoryBreakdown.map(cat => (
+                <button
+                  key={cat.category}
+                  onClick={() => setSelectedCategory(
+                    selectedCategory === cat.category ? null : cat.category
+                  )}
+                  className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                    selectedCategory === cat.category
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  {cat.category} ({cat.count})
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
         {/* Tabs */}
-        <section className="max-w-7xl mx-auto px-4 mt-6">
+        <section className="max-w-7xl mx-auto px-4 mt-4">
           <div className="flex border-b border-gray-200">
             {tabs.map((tab) => (
               <button
@@ -286,13 +359,25 @@ export default function MarketPricingPage() {
               ) : (
                 <>
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {/* Category Breakdown */}
-                    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Collection Value by Category</h3>
-                      <CategoryBreakdownChart data={portfolio?.categoryBreakdown || []} />
+                    {/* Left column: Category + Grade + Value Distribution */}
+                    <div className="space-y-6">
+                      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Collection Value by Category</h3>
+                        <CategoryBreakdownChart data={portfolio?.categoryBreakdown || []} />
+                      </div>
+
+                      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Grade Distribution</h3>
+                        <GradeDistributionChart data={portfolio?.gradeDistribution || []} />
+                      </div>
+
+                      <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Value Distribution</h3>
+                        <ValueDistributionChart data={portfolio?.valueDistribution || []} />
+                      </div>
                     </div>
 
-                    {/* Top 10 Cards */}
+                    {/* Right column: Most Valuable Cards */}
                     <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
                       <div className="flex items-center justify-between mb-4">
                         <h3 className="text-lg font-semibold text-gray-900">Most Valuable Cards</h3>
@@ -304,19 +389,51 @@ export default function MarketPricingPage() {
                     </div>
                   </div>
 
+                  {/* Row 3: Value by Grade (full width) */}
+                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Value by Grade</h3>
+                    <p className="text-xs text-gray-400 mb-4">Total and average card value at each grade tier</p>
+                    <ValueByGradeChart data={portfolio?.valueByGrade || []} />
+                  </div>
+
+                  {/* Row 4: Top Sets + Price Source */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Sets by Value</h3>
+                      <TopSetsChart data={portfolio?.topSets || []} />
+                    </div>
+
+                    <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Data Sources</h3>
+                      <PriceSourceChart data={portfolio?.priceSourceBreakdown || []} />
+                    </div>
+                  </div>
+
+                  {/* Row 5: Grade vs Value Scatter (full width) */}
+                  <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Grade vs Value</h3>
+                    <p className="text-xs text-gray-400 mb-4">Each dot is a card — see how grade correlates with market value</p>
+                    <GradeVsValueChart data={portfolio?.gradeVsValue || []} />
+                  </div>
+
                   {/* Movers */}
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Price Movers</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">Value Changes Since Grading</h3>
+                    <p className="text-xs text-gray-400 mb-4">Comparing current market value to the price when each card was graded</p>
                     <MoversTable
                       gainers={portfolio?.movers.gainers || []}
                       losers={portfolio?.movers.losers || []}
+                      totalGradingValue={portfolio?.movers.totalGradingValue || 0}
+                      totalCurrentValue={portfolio?.movers.totalCurrentValue || 0}
+                      cardsWithGradingPrice={portfolio?.movers.cardsWithGradingPrice || 0}
+                      onRefresh={handleRefreshPrices}
+                      refreshing={refreshing}
+                      refreshLimitReached={refreshLimitReached}
+                      refreshCount={refreshCount}
+                      maxRefreshesPerDay={maxRefreshesPerDay}
                     />
                   </div>
 
-                  {/* Pricing footnote */}
-                  <p className="text-xs text-gray-400 text-center">
-                    Prices are updated weekly every Sunday. Trend data and price changes will populate automatically as more snapshots are collected.
-                  </p>
                 </>
               )}
             </div>
@@ -346,91 +463,6 @@ export default function MarketPricingPage() {
             </div>
           )}
 
-          {/* INSIGHTS TAB */}
-          {activeTab === 'insights' && (
-            <div className="space-y-6">
-              {/* Category performance */}
-              {portfolio && portfolio.categoryBreakdown.length > 0 && (
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Portfolio Breakdown</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {portfolio.categoryBreakdown.map((cat) => (
-                      <div key={cat.category} className="bg-gray-50 rounded-lg p-4">
-                        <div className="text-xs text-gray-500 uppercase tracking-wide mb-1">
-                          {cat.category}
-                        </div>
-                        <div className="text-lg font-bold text-gray-900">
-                          ${cat.value.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                        </div>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-xs text-gray-400">{cat.count} cards</span>
-                          <span className="text-xs font-medium text-gray-500">{cat.percentage}%</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Pricing coverage */}
-              {portfolio && (
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Pricing Coverage</h3>
-                  <div className="flex items-center gap-4 mb-3">
-                    <div className="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-purple-500 to-rose-500 rounded-full transition-all"
-                        style={{ width: `${portfolio.totalCards > 0 ? (portfolio.cardsWithValue / portfolio.totalCards) * 100 : 0}%` }}
-                      />
-                    </div>
-                    <span className="text-sm font-medium text-gray-700">
-                      {portfolio.totalCards > 0 ? Math.round((portfolio.cardsWithValue / portfolio.totalCards) * 100) : 0}%
-                    </span>
-                  </div>
-                  <p className="text-sm text-gray-500">
-                    {portfolio.cardsWithValue} of {portfolio.totalCards} cards have market value data.
-                    {portfolio.cardsWithValue < portfolio.totalCards && (
-                      <> Visit card detail pages or use <button onClick={handleRefreshPrices} className="text-purple-600 hover:text-purple-700 font-medium">Refresh Prices</button> to update missing values.</>
-                    )}
-                  </p>
-                </div>
-              )}
-
-              {/* Price Alerts — Coming Soon */}
-              <div className="bg-gradient-to-br from-purple-50 to-rose-50 rounded-xl p-6 border border-purple-100">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Price Alerts — Coming Soon</h4>
-                    <p className="text-sm text-gray-600">
-                      Set alerts for your cards and get notified when values cross your target thresholds. Stay ahead of the market without checking every day.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Historical Tracking — Coming Soon */}
-              <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl p-6 border border-blue-100">
-                <div className="flex items-start gap-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Portfolio History Charts — Coming Soon</h4>
-                    <p className="text-sm text-gray-600">
-                      Track your total portfolio value over time with interactive charts. See how your collection&apos;s worth has changed week-by-week.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </section>
       </main>
     </MarketPricingGate>
