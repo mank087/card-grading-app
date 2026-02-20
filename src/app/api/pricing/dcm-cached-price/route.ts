@@ -26,6 +26,7 @@ import {
   isSportsCardCategory,
   type DcmCachedPrice,
 } from '@/lib/pricing/dcmPriceTracker';
+import { mapPricingErrorToHttpStatus } from '@/lib/pricingFetch';
 
 export interface DcmCachedPriceResponse {
   success: boolean;
@@ -205,7 +206,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<DcmCachedP
         is_stale: true,
         error: error instanceof Error ? error.message : 'Failed to fetch DCM price',
       },
-      { status: 500 }
+      { status: mapPricingErrorToHttpStatus(error) }
     );
   }
 }

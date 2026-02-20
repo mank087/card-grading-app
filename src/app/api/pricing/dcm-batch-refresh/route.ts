@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { batchRefreshDcmPrices } from '@/lib/pricing/dcmPriceTracker';
+import { mapPricingErrorToHttpStatus } from '@/lib/pricingFetch';
 
 const MAX_CARDS_PER_REQUEST = 10;
 const DELAY_BETWEEN_CARDS_MS = 500;
@@ -196,7 +197,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<DcmBatchR
         results: [],
         error: error instanceof Error ? error.message : 'Failed to batch refresh prices',
       },
-      { status: 500 }
+      { status: mapPricingErrorToHttpStatus(error) }
     );
   }
 }

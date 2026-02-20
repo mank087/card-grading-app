@@ -16,6 +16,7 @@ import {
   type LorcanaCardSearchParams,
   type NormalizedLorcanaPrices,
 } from '@/lib/lorcanaPricing';
+import { mapPricingErrorToHttpStatus } from '@/lib/pricingFetch';
 
 // Cache duration: 7 days in milliseconds
 const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -307,7 +308,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<LorcanaPr
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch prices',
       },
-      { status: 500 }
+      { status: mapPricingErrorToHttpStatus(error) }
     );
   }
 }
@@ -359,7 +360,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch prices',
       },
-      { status: 500 }
+      { status: mapPricingErrorToHttpStatus(error) }
     );
   }
 }

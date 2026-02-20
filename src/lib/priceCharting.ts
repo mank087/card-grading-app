@@ -18,6 +18,8 @@
  * - condition-18-price: SGC 10
  */
 
+import { safePricingFetch, pricingDelay, PricingApiError } from './pricingFetch';
+
 // SportsCardsPro API base URL (for sports trading cards)
 const API_BASE_URL = 'https://www.sportscardspro.com/api';
 
@@ -309,7 +311,7 @@ function buildSportsCardQuery(params: SportsCardSearchParams): string {
 
 /**
  * Search for products by query string
- * Includes retry logic for transient API errors
+ * Uses safePricingFetch for Cloudflare detection, retry, and proper error handling
  */
 export async function searchProducts(
   query: string,
@@ -331,64 +333,28 @@ export async function searchProducts(
 
   console.log(`[SportsCardsPro] Searching: "${query}"`);
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+  const { data, error } = await safePricingFetch<PriceChartingSearchResult>(url.toString(), {
+    retries,
+    logPrefix: '[SportsCardsPro]',
+    throwOnError: true,
+  });
 
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        // Check for transient errors (deadline exceeded, timeout)
-        if (errorText.includes('DeadlineExceeded') || errorText.includes('timeout')) {
-          if (attempt < retries) {
-            console.log(`[SportsCardsPro] Timeout, retrying (attempt ${attempt + 2}/${retries + 1})...`);
-            await new Promise(r => setTimeout(r, 1000 * (attempt + 1))); // Exponential backoff
-            continue;
-          }
-        }
-        console.error(`[SportsCardsPro] Search failed: ${response.status} - ${errorText}`);
-        throw new Error(`SportsCardsPro API error: ${response.status}`);
-      }
-
-      const data: PriceChartingSearchResult = await response.json();
-
-      if (data.status !== 'success' || !data.products) {
-        console.log(`[SportsCardsPro] No products found for query: "${query}"`);
-        return [];
-      }
-
-      console.log(`[SportsCardsPro] Found ${data.products.length} products`);
-      return data.products;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (attempt < retries) {
-          console.log(`[SportsCardsPro] Request timeout, retrying (attempt ${attempt + 2}/${retries + 1})...`);
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        console.error('[SportsCardsPro] Request timed out after all retries');
-        throw new Error('SportsCardsPro API timeout');
-      }
-      throw error;
-    }
+  if (error || !data) {
+    return [];
   }
 
-  return [];
+  if (data.status !== 'success' || !data.products) {
+    console.log(`[SportsCardsPro] No products found for query: "${query}"`);
+    return [];
+  }
+
+  console.log(`[SportsCardsPro] Found ${data.products.length} products`);
+  return data.products;
 }
 
 /**
  * Get detailed pricing for a specific product by ID
- * Includes retry logic for transient API errors
+ * Uses safePricingFetch for Cloudflare detection, retry, and proper error handling
  */
 export async function getProductPrices(productId: string, retries: number = 2): Promise<SportsCardsPriceResult | null> {
   const apiKey = process.env.PRICECHARTING_API_KEY;
@@ -404,61 +370,24 @@ export async function getProductPrices(productId: string, retries: number = 2): 
 
   console.log(`[SportsCardsPro] Fetching prices for product: ${productId}`);
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+  const { data, error } = await safePricingFetch<SportsCardsPriceResult>(url.toString(), {
+    retries,
+    logPrefix: '[SportsCardsPro]',
+    throwOnError: false, // Price lookups return null on failure instead of throwing
+  });
 
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        if (errorText.includes('DeadlineExceeded') || errorText.includes('timeout')) {
-          if (attempt < retries) {
-            console.log(`[SportsCardsPro] Timeout fetching prices, retrying...`);
-            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-            continue;
-          }
-        }
-        console.error(`[SportsCardsPro] Price fetch failed: ${response.status} - ${errorText}`);
-        return null;
-      }
-
-      const data: SportsCardsPriceResult = await response.json();
-
-      // Log all keys in the response to see what fields are available
-      console.log(`[SportsCardsPro] Full API response keys:`, Object.keys(data));
-      console.log(`[SportsCardsPro] Full API response:`, JSON.stringify(data, null, 2));
-
-      if (data.status !== 'success') {
-        console.log(`[SportsCardsPro] Failed to get prices for product: ${productId}`);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (attempt < retries) {
-          console.log(`[SportsCardsPro] Price fetch timeout, retrying...`);
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        console.error('[SportsCardsPro] Price fetch timed out after all retries');
-        return null;
-      }
-      throw error;
-    }
+  if (error || !data) {
+    return null;
   }
 
-  return null;
+  console.log(`[SportsCardsPro] Full API response keys:`, Object.keys(data));
+
+  if (data.status !== 'success') {
+    console.log(`[SportsCardsPro] Failed to get prices for product: ${productId}`);
+    return null;
+  }
+
+  return data;
 }
 
 /**
@@ -796,8 +725,12 @@ export async function searchSportsCardPrices(
     let exactMatchWithoutPrices: { product: any; score: number } | null = null;
 
     // Iterate through scored products (best matches first) to find one with price data
-    for (const { product, score } of scoredProducts) {
+    for (let i = 0; i < scoredProducts.length; i++) {
+      const { product, score } = scoredProducts[i];
       console.log(`[SportsCardsPro] Checking product (score ${score}):`, product['product-name'], '-', product['console-name']);
+
+      // Add delay between sequential API calls to avoid rate limiting
+      if (i > 0) await pricingDelay();
 
       const priceData = await getProductPrices(product.id);
       if (priceData) {

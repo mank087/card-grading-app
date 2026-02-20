@@ -219,7 +219,7 @@ export async function getEbayUserInfo(accessToken: string): Promise<{
 
   try {
     // Use the Commerce Identity API
-    const response = await fetch(`${apiUrl}/commerce/identity/v1/user/`, {
+    const response = await fetch(`${apiUrl}/commerce/identity/v1/user`, {
       headers: {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',

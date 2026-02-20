@@ -16,6 +16,7 @@ import {
   type PokemonCardSearchParams,
   type NormalizedPokemonPrices,
 } from '@/lib/pokemonPricing';
+import { mapPricingErrorToHttpStatus } from '@/lib/pricingFetch';
 
 // Cache duration: 7 days in milliseconds
 const CACHE_DURATION_MS = 7 * 24 * 60 * 60 * 1000;
@@ -310,7 +311,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<PokemonPr
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch prices',
       },
-      { status: 500 }
+      { status: mapPricingErrorToHttpStatus(error) }
     );
   }
 }
@@ -360,7 +361,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to fetch prices',
       },
-      { status: 500 }
+      { status: mapPricingErrorToHttpStatus(error) }
     );
   }
 }

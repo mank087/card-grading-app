@@ -23,6 +23,8 @@
  * - bgs-10-price: BGS 10 (Black Label)
  */
 
+import { safePricingFetch, pricingDelay, PricingApiError } from './pricingFetch';
+
 // PriceCharting API base URL
 const API_BASE_URL = 'https://www.pricecharting.com/api';
 
@@ -186,6 +188,7 @@ function buildOnePieceCardQuery(params: OnePieceCardSearchParams): string {
 
 /**
  * Search for One Piece card products by query string
+ * Uses safePricingFetch for Cloudflare detection, retry, and proper error handling
  */
 export async function searchOnePieceProducts(
   query: string,
@@ -207,68 +210,34 @@ export async function searchOnePieceProducts(
 
   console.log(`[OnePiecePricing] Searching: "${query}"`);
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+  const { data, error } = await safePricingFetch<OnePiecePriceSearchResult>(url.toString(), {
+    retries,
+    logPrefix: '[OnePiecePricing]',
+    throwOnError: true,
+  });
 
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        if (errorText.includes('DeadlineExceeded') || errorText.includes('timeout')) {
-          if (attempt < retries) {
-            console.log(`[OnePiecePricing] Timeout, retrying (attempt ${attempt + 2}/${retries + 1})...`);
-            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-            continue;
-          }
-        }
-        console.error(`[OnePiecePricing] Search failed: ${response.status} - ${errorText}`);
-        throw new Error(`PriceCharting API error: ${response.status}`);
-      }
-
-      const data: OnePiecePriceSearchResult = await response.json();
-
-      if (data.status !== 'success' || !data.products) {
-        console.log(`[OnePiecePricing] No products found for query: "${query}"`);
-        return [];
-      }
-
-      // Filter to only One Piece-related products
-      const onePieceProducts = data.products.filter(p => {
-        const consoleName = p['console-name']?.toLowerCase() || '';
-        return consoleName.includes('one piece');
-      });
-
-      console.log(`[OnePiecePricing] Found ${onePieceProducts.length} One Piece products (${data.products.length} total)`);
-      return onePieceProducts;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (attempt < retries) {
-          console.log(`[OnePiecePricing] Request timeout, retrying (attempt ${attempt + 2}/${retries + 1})...`);
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        console.error('[OnePiecePricing] Request timed out after all retries');
-        throw new Error('PriceCharting API timeout');
-      }
-      throw error;
-    }
+  if (error || !data) {
+    return [];
   }
 
-  return [];
+  if (data.status !== 'success' || !data.products) {
+    console.log(`[OnePiecePricing] No products found for query: "${query}"`);
+    return [];
+  }
+
+  // Filter to only One Piece-related products
+  const onePieceProducts = data.products.filter(p => {
+    const consoleName = p['console-name']?.toLowerCase() || '';
+    return consoleName.includes('one piece');
+  });
+
+  console.log(`[OnePiecePricing] Found ${onePieceProducts.length} One Piece products (${data.products.length} total)`);
+  return onePieceProducts;
 }
 
 /**
  * Get detailed pricing for a specific product by ID
+ * Uses safePricingFetch for Cloudflare detection, retry, and proper error handling
  */
 export async function getOnePieceProductPrices(productId: string, retries: number = 2): Promise<OnePiecePriceResult | null> {
   const apiKey = process.env.PRICECHARTING_API_KEY;
@@ -284,58 +253,23 @@ export async function getOnePieceProductPrices(productId: string, retries: numbe
 
   console.log(`[OnePiecePricing] Fetching prices for product: ${productId}`);
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+  const { data, error } = await safePricingFetch<OnePiecePriceResult>(url.toString(), {
+    retries,
+    logPrefix: '[OnePiecePricing]',
+    throwOnError: false,
+  });
 
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        if (errorText.includes('DeadlineExceeded') || errorText.includes('timeout')) {
-          if (attempt < retries) {
-            console.log(`[OnePiecePricing] Timeout fetching prices, retrying...`);
-            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-            continue;
-          }
-        }
-        console.error(`[OnePiecePricing] Price fetch failed: ${response.status} - ${errorText}`);
-        return null;
-      }
-
-      const data: OnePiecePriceResult = await response.json();
-
-      if (data.status !== 'success') {
-        console.log(`[OnePiecePricing] Failed to get prices for product: ${productId}`);
-        return null;
-      }
-
-      console.log(`[OnePiecePricing] Got prices for: ${data['product-name']}`);
-      return data;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (attempt < retries) {
-          console.log(`[OnePiecePricing] Price fetch timeout, retrying...`);
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        console.error('[OnePiecePricing] Price fetch timed out after all retries');
-        return null;
-      }
-      throw error;
-    }
+  if (error || !data) {
+    return null;
   }
 
-  return null;
+  if (data.status !== 'success') {
+    console.log(`[OnePiecePricing] Failed to get prices for product: ${productId}`);
+    return null;
+  }
+
+  console.log(`[OnePiecePricing] Got prices for: ${data['product-name']}`);
+  return data;
 }
 
 /**
@@ -575,8 +509,12 @@ export async function searchOnePieceCardPrices(
 
     let exactMatchWithoutPrices: { product: any; score: number } | null = null;
 
-    for (const { product, score } of scoredProducts) {
+    for (let i = 0; i < scoredProducts.length; i++) {
+      const { product, score } = scoredProducts[i];
       console.log(`[OnePiecePricing] Checking product (score ${score}):`, product['product-name']);
+
+      // Add delay between sequential API calls to avoid rate limiting
+      if (i > 0) await pricingDelay();
 
       const priceData = await getOnePieceProductPrices(product.id);
       if (priceData) {

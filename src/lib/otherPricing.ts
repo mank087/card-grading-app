@@ -20,6 +20,8 @@
  * - bgs-10-price: BGS 10 (Black Label)
  */
 
+import { safePricingFetch, pricingDelay, PricingApiError } from './pricingFetch';
+
 // PriceCharting API base URL
 const API_BASE_URL = 'https://www.pricecharting.com/api';
 
@@ -196,79 +198,41 @@ export async function searchOtherProducts(
 
   console.log(`[OtherPricing] Searching: "${query}"`);
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+  const { data, error } = await safePricingFetch<OtherPriceSearchResult>(url.toString(), {
+    retries,
+    logPrefix: '[OtherPricing]',
+    throwOnError: true,
+  });
+  if (error || !data) return [];
 
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        if (errorText.includes('DeadlineExceeded') || errorText.includes('timeout')) {
-          if (attempt < retries) {
-            console.log(`[OtherPricing] Timeout, retrying (attempt ${attempt + 2}/${retries + 1})...`);
-            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-            continue;
-          }
-        }
-        console.error(`[OtherPricing] Search failed: ${response.status} - ${errorText}`);
-        throw new Error(`PriceCharting API error: ${response.status}`);
-      }
-
-      const data: OtherPriceSearchResult = await response.json();
-
-      if (data.status !== 'success' || !data.products) {
-        console.log(`[OtherPricing] No products found for query: "${query}"`);
-        return [];
-      }
-
-      // Filter out sports cards and video games (we want trading cards only)
-      const tradingCards = data.products.filter(p => {
-        const consoleName = p['console-name']?.toLowerCase() || '';
-        // Exclude sports cards (handled separately), video games, and non-card items
-        const isExcluded =
-          consoleName.includes('football') ||
-          consoleName.includes('baseball') ||
-          consoleName.includes('basketball') ||
-          consoleName.includes('hockey') ||
-          consoleName.includes('soccer') ||
-          consoleName.includes('wrestling') ||
-          consoleName.includes('nintendo') ||
-          consoleName.includes('playstation') ||
-          consoleName.includes('xbox') ||
-          consoleName.includes('sega') ||
-          consoleName.includes('atari') ||
-          consoleName.includes('funko');
-
-        return !isExcluded;
-      });
-
-      console.log(`[OtherPricing] Found ${tradingCards.length} trading card products (${data.products.length} total)`);
-      return tradingCards;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (attempt < retries) {
-          console.log(`[OtherPricing] Request timeout, retrying (attempt ${attempt + 2}/${retries + 1})...`);
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        console.error('[OtherPricing] Request timed out after all retries');
-        throw new Error('PriceCharting API timeout');
-      }
-      throw error;
-    }
+  if (data.status !== 'success' || !data.products) {
+    console.log(`[OtherPricing] No products found for query: "${query}"`);
+    return [];
   }
 
-  return [];
+  // Filter out sports cards and video games (we want trading cards only)
+  const tradingCards = data.products.filter(p => {
+    const consoleName = p['console-name']?.toLowerCase() || '';
+    // Exclude sports cards (handled separately), video games, and non-card items
+    const isExcluded =
+      consoleName.includes('football') ||
+      consoleName.includes('baseball') ||
+      consoleName.includes('basketball') ||
+      consoleName.includes('hockey') ||
+      consoleName.includes('soccer') ||
+      consoleName.includes('wrestling') ||
+      consoleName.includes('nintendo') ||
+      consoleName.includes('playstation') ||
+      consoleName.includes('xbox') ||
+      consoleName.includes('sega') ||
+      consoleName.includes('atari') ||
+      consoleName.includes('funko');
+
+    return !isExcluded;
+  });
+
+  console.log(`[OtherPricing] Found ${tradingCards.length} trading card products (${data.products.length} total)`);
+  return tradingCards;
 }
 
 /**
@@ -288,58 +252,20 @@ export async function getOtherProductPrices(productId: string, retries: number =
 
   console.log(`[OtherPricing] Fetching prices for product: ${productId}`);
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+  const { data, error } = await safePricingFetch<OtherPriceResult>(url.toString(), {
+    retries,
+    logPrefix: '[OtherPricing]',
+    throwOnError: false,
+  });
+  if (error || !data) return null;
 
-      const response = await fetch(url.toString(), {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        if (errorText.includes('DeadlineExceeded') || errorText.includes('timeout')) {
-          if (attempt < retries) {
-            console.log(`[OtherPricing] Timeout fetching prices, retrying...`);
-            await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-            continue;
-          }
-        }
-        console.error(`[OtherPricing] Price fetch failed: ${response.status} - ${errorText}`);
-        return null;
-      }
-
-      const data: OtherPriceResult = await response.json();
-
-      if (data.status !== 'success') {
-        console.log(`[OtherPricing] Failed to get prices for product: ${productId}`);
-        return null;
-      }
-
-      console.log(`[OtherPricing] Got prices for: ${data['product-name']} (${data['console-name']})`);
-      return data;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (attempt < retries) {
-          console.log(`[OtherPricing] Price fetch timeout, retrying...`);
-          await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-          continue;
-        }
-        console.error('[OtherPricing] Price fetch timed out after all retries');
-        return null;
-      }
-      throw error;
-    }
+  if (data.status !== 'success') {
+    console.log(`[OtherPricing] Failed to get prices for product: ${productId}`);
+    return null;
   }
 
-  return null;
+  console.log(`[OtherPricing] Got prices for: ${data['product-name']} (${data['console-name']})`);
+  return data;
 }
 
 /**
@@ -652,7 +578,9 @@ export async function searchOtherCardPrices(
 
     let exactMatchWithoutPrices: { product: any; score: number } | null = null;
 
-    for (const { product, score } of scoredProducts) {
+    for (let i = 0; i < scoredProducts.length; i++) {
+      const { product, score } = scoredProducts[i];
+      if (i > 0) await pricingDelay();
       console.log(`[OtherPricing] Checking product (score ${score}):`, product['product-name']);
 
       const priceData = await getOtherProductPrices(product.id);
