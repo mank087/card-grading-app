@@ -2335,9 +2335,10 @@ export function OtherCardDetails() {
   // 🎯 Card info - Use top-level database fields (populated by conversational AI)
   // Helper: Strip markdown formatting from text
   const stripMarkdown = (text: any): string | null => {
-    if (!text) return null;
+    if (text === null || text === undefined) return null;
     // Convert to string if not already
     const str = typeof text === 'string' ? text : String(text);
+    if (!str) return null;
     // Handle "null" string (AI sometimes returns this)
     if (str === 'null') return null;
     // Remove **bold** formatting

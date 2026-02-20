@@ -33,8 +33,10 @@ interface DashboardStats {
 
 // Helper functions - EXACT MATCH to collection page logic
 const stripMarkdown = (text: string | null | undefined): string | null => {
-  if (!text) return null
-  return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '')
+  if (text === null || text === undefined) return null
+  const str = typeof text === 'string' ? text : String(text)
+  if (!str) return null
+  return str.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '')
 }
 
 // Build card info object (matches collection page from line 46)

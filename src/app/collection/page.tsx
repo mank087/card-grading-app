@@ -89,8 +89,10 @@ type Card = {
 
 // 🎯 Helper: Strip markdown formatting from text
 const stripMarkdown = (text: string | null | undefined): string | null => {
-  if (!text) return null;
-  return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '');
+  if (text === null || text === undefined) return null;
+  const str = typeof text === 'string' ? text : String(text);
+  if (!str) return null;
+  return str.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '');
 };
 
 // 🎯 Helper: Build card info object (matches detail page logic from line 1999)

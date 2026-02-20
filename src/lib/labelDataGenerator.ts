@@ -53,8 +53,8 @@ export function containsCJK(text: string): boolean {
  * Check if a value should be filtered (unknown, n/a, etc.)
  */
 function shouldFilterValue(text: string): boolean {
-  if (!text) return true;
-  const lower = text.toLowerCase().trim();
+  if (text === null || text === undefined || text === '') return true;
+  const lower = (typeof text === 'string' ? text : String(text)).toLowerCase().trim();
   return (
     lower === 'unknown' ||
     lower === 'n/a' ||
@@ -70,16 +70,18 @@ export function extractAsciiSafe(
   fallback: string = 'Card',
   englishFallback?: string
 ): string {
-  if (!text) return englishFallback || fallback;
+  if (text === null || text === undefined || text === '') return englishFallback || fallback;
+  // Coerce non-string values (e.g., numbers from JSONB) to strings
+  const str = typeof text === 'string' ? text : String(text);
 
   // Filter out "Unknown...", "N/A", etc. values
-  if (shouldFilterValue(text)) {
+  if (shouldFilterValue(str)) {
     return englishFallback || fallback;
   }
 
   // If no CJK characters, return the text as-is (just clean it)
-  if (!containsCJK(text)) {
-    const cleaned = text.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
+  if (!containsCJK(str)) {
+    const cleaned = str.replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
     // Check if cleaned result should be filtered
     if (shouldFilterValue(cleaned)) {
       return fallback;
@@ -91,12 +93,12 @@ export function extractAsciiSafe(
 
   // Check for "Japanese (English)" format - extract English from parentheses
   // This handles AI output like "メガゲンガー (Mega Gengar)" or "ピカチュウ (Pikachu)"
-  const parenMatch = text.match(/\(([^)]+)\)/);
+  const parenMatch = str.match(/\(([^)]+)\)/);
   if (parenMatch && parenMatch[1]) {
     const englishFromParens = parenMatch[1].replace(/[^\x20-\x7E]/g, '').replace(/\s+/g, ' ').trim();
     if (englishFromParens && /[a-zA-Z]/.test(englishFromParens)) {
       // Add " - Japanese" suffix if the original had CJK outside parentheses
-      const outsideParens = text.replace(/\([^)]+\)/, '').trim();
+      const outsideParens = str.replace(/\([^)]+\)/, '').trim();
       if (containsCJK(outsideParens)) {
         return `${englishFromParens} - Japanese`;
       }
@@ -105,14 +107,14 @@ export function extractAsciiSafe(
   }
 
   // Extract ASCII portion from the text
-  const asciiOnly = text
+  const asciiOnly = str
     .replace(/[^\x20-\x7E]/g, '') // Remove non-printable ASCII (including CJK)
     .replace(/\s+/g, ' ')         // Normalize whitespace
     .trim();
 
   // Helper to fix double variants and build result
-  const fixDoubleVariants = (str: string): string => {
-    return str.replace(/\b(VMAX|VSTAR|V|GX|EX|Prime)\s+\1\b/gi, '$1');
+  const fixDoubleVariants = (s: string): string => {
+    return s.replace(/\b(VMAX|VSTAR|V|GX|EX|Prime)\s+\1\b/gi, '$1');
   };
 
   // Check englishFallback first - it might have better translation
@@ -303,9 +305,11 @@ export interface CardForLabel {
  * Strip markdown formatting from text
  */
 function stripMarkdown(text: string | null | undefined): string | null {
-  if (!text) return null;
-  if (text === 'null' || text === 'undefined') return null;
-  return text.replace(/\*\*/g, '').trim() || null;
+  if (text === null || text === undefined) return null;
+  // Coerce non-string values (e.g., numbers from JSONB) to strings
+  const str = typeof text === 'string' ? text : String(text);
+  if (!str || str === 'null' || str === 'undefined') return null;
+  return str.replace(/\*\*/g, '').trim() || null;
 }
 
 /**
@@ -337,9 +341,12 @@ function isValidSerialNumber(serial: string | null | undefined): boolean {
  * E.g., "XY – Flashfire (assumed from card number...)" → "XY – Flashfire"
  */
 function cleanValue(value: string | null | undefined): string | null {
-  if (!value) return null;
+  if (value === null || value === undefined) return null;
+  // Coerce non-string values (e.g., numbers from JSONB) to strings
+  const strValue = typeof value === 'string' ? value : String(value);
+  if (!strValue) return null;
 
-  let cleaned = value.trim();
+  let cleaned = strValue.trim();
 
   // Remove parenthetical explanations (but keep short ones like "(2014)" or "(Holo)")
   // Match opening paren followed by lowercase word (indicates explanation)
@@ -379,8 +386,9 @@ function cleanValue(value: string | null | undefined): string | null {
  * Filters out: null, undefined, "unknown", "n/a", "??", values starting with "Unknown", etc.
  */
 function isValidValue(value: string | null | undefined): boolean {
-  if (!value) return false;
-  const trimmed = value.trim();
+  if (value === null || value === undefined) return false;
+  // Coerce non-string values (e.g., numbers from JSONB) to strings
+  const trimmed = (typeof value === 'string' ? value : String(value)).trim();
   const lower = trimmed.toLowerCase();
 
   // Reject empty
@@ -1064,7 +1072,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
   if (category === 'Lorcana' || category === 'Pokemon') {
     // Lorcana/Pokemon: Database column first (verified from internal database or OCR override)
     // Extract year from release_date if it's a full date string
-    const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
+    const releaseYear = card.release_date ? String(card.release_date).slice(0, 4) : null;
     rawYear = releaseYear ||
               stripMarkdown(cardInfo.year) ||
               stripMarkdown(cardInfo.set_year) ||

@@ -2341,9 +2341,11 @@ export function SportsCardDetails() {
   // 🎯 Card info - Use top-level database fields (populated by conversational AI)
   // Helper: Strip markdown formatting from text
   const stripMarkdown = (text: string | null | undefined): string | null => {
-    if (!text) return null;
+    if (text === null || text === undefined) return null;
+    const str = typeof text === 'string' ? text : String(text);
+    if (!str) return null;
     // Remove **bold** formatting
-    return text.replace(/\*\*/g, '').trim();
+    return str.replace(/\*\*/g, '').trim();
   };
 
   // 🎯 v3.2: Use conversational_card_info first, then database fields, then DVG fallback

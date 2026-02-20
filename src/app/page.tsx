@@ -10,8 +10,10 @@ import { getCardLabelData } from '@/lib/useLabelData'
 
 // Helper functions to extract card info (matching collection page)
 const stripMarkdown = (text: string | null | undefined): string | null => {
-  if (!text) return null
-  return text.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '')
+  if (text === null || text === undefined) return null
+  const str = typeof text === 'string' ? text : String(text)
+  if (!str) return null
+  return str.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '')
 }
 
 const getCardInfo = (card: any) => {
