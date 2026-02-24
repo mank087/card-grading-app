@@ -1,5 +1,6 @@
 import { MetadataRoute } from 'next';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { POP_CATEGORIES } from '@/lib/popReport';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://www.dcmgrading.com';
@@ -125,6 +126,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: 'weekly',
       priority: 0.6,
     },
+    // Population Report
+    {
+      url: `${baseUrl}/pop`,
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.8,
+    },
+    ...POP_CATEGORIES.map((cat) => ({
+      url: `${baseUrl}/pop/${cat.slug}`,
+      lastModified: new Date(),
+      changeFrequency: 'daily' as const,
+      priority: 0.7,
+    })),
     {
       url: `${baseUrl}/credits`,
       lastModified: new Date(),

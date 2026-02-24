@@ -157,6 +157,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/pop" className="text-gray-400 hover:text-white transition-colors">
+                  Pop Report
+                </Link>
+              </li>
+              <li>
                 <Link href="/pokemon-database" className="text-gray-400 hover:text-white transition-colors">
                   Pokémon Database
                 </Link>
