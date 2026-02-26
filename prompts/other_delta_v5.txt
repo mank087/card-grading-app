@@ -257,20 +257,4 @@ E. NOTES FOR UNCOMMON/OBSCURE TCGs
    • Focus on physical condition (universal across all cards)
    • Document any unique characteristics in notes
 
-═══════════════════════════════════════════════════════════════════════
-END OF OTHER/GENERIC DELTA v5.5
-═══════════════════════════════════════════════════════════════════════
-
-**TOTAL LINES:** ~260
-**ESTIMATED TOKENS:** ~2,000-2,400
-
-**COMBINED PROMPT SIZE (Master + Other Delta):**
-• Master Rubric: ~18,000-20,000 tokens
-• Other Delta: ~2,000-2,400 tokens
-• **TOTAL: ~20,000-22,400 tokens** ✓ Within target range
-
-When grading other/generic trading cards, use:
-1. Master Grading Rubric v5.5 (universal grading rules)
-2. Other Delta v5.5 (this file - generic card rules)
-
-Apply ALL instructions from BOTH files to complete grading analysis.
+--- END OF OTHER DELTA v5.5 ---

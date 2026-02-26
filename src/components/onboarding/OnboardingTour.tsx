@@ -9,108 +9,81 @@ interface TourStep {
   targetId: string // ID of the element to highlight
   title: string
   description: string
-  position: 'top' | 'bottom' | 'left' | 'right'
 }
 
-// Define tour steps
+// Define tour steps — order matches visual page layout (hero zone first, then accordion sections)
 const TOUR_STEPS: TourStep[] = [
   {
     id: 'card-images',
     targetId: 'tour-card-images',
     title: 'Your Graded Card Images',
     description: 'Your card has been professionally analyzed! The front and back images now include DCM identification labels and grade information, making it easy to share and verify your card\'s authenticity.',
-    position: 'bottom',
   },
   {
     id: 'visibility-toggle',
     targetId: 'tour-visibility-toggle',
     title: 'Privacy & Label Style',
     description: 'Control who can see your card with the Public/Private toggle. You can also switch between Modern and Traditional label styles to match your preference.',
-    position: 'bottom',
   },
   {
     id: 'grade-score',
     targetId: 'tour-grade-score',
     title: 'Your DCM Grade',
-    description: 'This is your card\'s overall grade on a 1-10 scale. The confidence indicator (A, B, C, or D) shows how certain DCM Optic™ is about the grade based on image quality and card clarity.',
-    position: 'bottom',
-  },
-  {
-    id: 'condition-summary',
-    targetId: 'tour-condition-summary',
-    title: 'Condition Summary',
-    description: 'A detailed written analysis of your card\'s overall condition, highlighting key observations about centering, corners, edges, and surface quality.',
-    position: 'top',
-  },
-  {
-    id: 'download-buttons',
-    targetId: 'tour-download-buttons',
-    title: 'Download Reports & Labels',
-    description: 'Download your official DCM grading report as a PDF, or get printable labels for your card holders. You can also download images of your cards with their graded labels included!',
-    position: 'top',
-  },
-  {
-    id: 'card-info',
-    targetId: 'tour-card-info',
-    title: 'Card Information',
-    description: 'DCM Optic™ has identified your card\'s details including the player/character, set name, card number, and more. This information is used for market pricing and marketplace listings.',
-    position: 'top',
-  },
-  {
-    id: 'edit-details',
-    targetId: 'tour-edit-details',
-    title: 'Edit Card Details',
-    description: 'Sometimes our system can misidentify cards. Use this button to correct any card information.',
-    position: 'bottom',
+    description: 'This is your card\'s overall grade on a 1-10 scale. The confidence indicator (A, B, C, or D) shows how certain DCM Optic\u2122 is about the grade based on image quality and card clarity.',
   },
   {
     id: 'subgrades',
     targetId: 'tour-subgrades',
     title: 'Sub-Grade Scores',
     description: 'Individual grades for Centering, Corners, Edges, and Surface. These four categories combine to determine your overall grade.',
-    position: 'top',
+  },
+  {
+    id: 'condition-summary',
+    targetId: 'tour-condition-summary',
+    title: 'Condition Summary',
+    description: 'A detailed written analysis of your card\'s overall condition, highlighting key observations about centering, corners, edges, and surface quality.',
+  },
+  {
+    id: 'download-buttons',
+    targetId: 'tour-download-buttons',
+    title: 'Download Reports & Labels',
+    description: 'Download your official DCM grading report as a PDF, or get printable labels for your card holders. You can also download images of your cards with their graded labels included!',
+  },
+  {
+    id: 'card-info',
+    targetId: 'tour-card-info',
+    title: 'Card Information',
+    description: 'Your card\'s identified details including player/character, set name, card number, and more. You can edit any details that need correcting to improve market pricing accuracy.',
   },
   {
     id: 'centering',
     targetId: 'tour-centering',
     title: 'Centering Analysis',
     description: 'Precise measurements of your card\'s centering ratios for both front and back. Perfect centering (50/50) scores highest, with detailed analysis of any misalignment.',
-    position: 'top',
   },
   {
     id: 'optic-score',
     targetId: 'tour-optic-score',
-    title: 'DCM Optic Confidence',
+    title: 'DCM Optic\u2122 Confidence',
     description: 'This score reflects the quality of your uploaded images. Higher quality photos allow for more accurate grading. Tips: use good lighting, avoid glare, and capture the full card.',
-    position: 'top',
+  },
+  {
+    id: 'market-value',
+    targetId: 'tour-market-value',
+    title: 'Market Value',
+    description: 'Your estimated card value based on real market data, plus quick links to search eBay, TCGplayer, and other marketplaces. Pricing updates weekly to track market changes.',
   },
   {
     id: 'pro-estimates',
     targetId: 'tour-pro-estimates',
-    title: 'Professional Grading Estimates',
-    description: 'See estimated grades from mail away companies like PSA, BGS and CGC (calculated using their published grading rubrics). These scores help you understand how your card might score if sent out.',
-    position: 'top',
-  },
-  {
-    id: 'live-market-pricing',
-    targetId: 'tour-live-market-pricing',
-    title: 'Market Value',
-    description: 'Your estimated card value based on real market data. We calculate a DCM Value using raw card prices adjusted for your grade. Pricing updates weekly to track market changes.',
-    position: 'top',
-  },
-  {
-    id: 'market-pricing',
-    targetId: 'tour-market-pricing',
-    title: 'Find Similar Cards',
-    description: 'Quick links to search eBay, TCGplayer, PriceCharting, and other marketplaces for similar cards. Use these to research current listings and compare prices.',
-    position: 'top',
+    title: 'Estimated Mail-Away Grade Scores',
+    description: 'See estimated grades from mail-away companies like PSA, BGS, and CGC (calculated using their published grading rubrics). These scores help you understand how your card might score if sent out.',
   },
   {
     id: 'insta-list',
     targetId: 'tour-insta-list',
     title: 'Insta-List on eBay',
     description: 'List your card directly to eBay with one click! We automatically include your graded images, DCM report, and pre-fill all the item details for you.',
-    position: 'top',
   },
 ]
 
@@ -124,34 +97,59 @@ interface OnboardingTourProps {
 
 export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0)
-  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({})
-  const [arrowPosition, setArrowPosition] = useState<'top' | 'bottom' | 'left' | 'right'>('top')
   const [isVisible, setIsVisible] = useState(false)
   const [showFinalModal, setShowFinalModal] = useState(false)
-  const [elementFound, setElementFound] = useState(true)
-  const tooltipRef = useRef<HTMLDivElement>(null)
+  const [highlightRect, setHighlightRect] = useState<DOMRect | null>(null)
+  const cardRef = useRef<HTMLDivElement>(null)
   const retryCountRef = useRef(0)
+  const expandedSectionRef = useRef<HTMLElement | null>(null)
+  const lastToggledStepRef = useRef<number>(-1)
 
   // Get current step config
   const step = TOUR_STEPS[currentStep]
 
-  // Calculate tooltip position relative to target element
-  const updatePosition = useCallback(() => {
+  // Expand or collapse a CollapsibleSection by clicking its button
+  const setCollapsibleOpen = useCallback((el: HTMLElement, open: boolean) => {
+    const button = el.querySelector(':scope > button') as HTMLButtonElement
+    if (!button) return
+    const contentDiv = button.nextElementSibling as HTMLElement
+    if (!contentDiv) return
+    const isCurrentlyOpen = !contentDiv.classList.contains('hidden')
+    if (open !== isCurrentlyOpen) {
+      button.click()
+    }
+  }, [])
+
+  // Collapse any section the tour previously expanded
+  const collapseExpandedSection = useCallback(() => {
+    if (expandedSectionRef.current) {
+      setCollapsibleOpen(expandedSectionRef.current, false)
+      expandedSectionRef.current = null
+    }
+  }, [setCollapsibleOpen])
+
+  // Update highlight ring position (called on scroll/resize)
+  const updateHighlight = useCallback(() => {
+    if (!step) return
+    const targetEl = document.getElementById(step.targetId)
+    if (targetEl) {
+      setHighlightRect(targetEl.getBoundingClientRect())
+    }
+  }, [step])
+
+  // Scroll to the target element, positioning it below the fixed tour card
+  const scrollToTarget = useCallback(() => {
     if (!step) return
 
     const targetEl = document.getElementById(step.targetId)
     if (!targetEl) {
-      console.log(`[Tour] Element not found: ${step.targetId}`)
-      setElementFound(false)
-
-      // Retry more times (element might be loading or needs scrolling into view)
+      // Retry — element might be loading
       if (retryCountRef.current < 6) {
         retryCountRef.current++
-        setTimeout(updatePosition, 800)
+        setTimeout(scrollToTarget, 800)
         return
       }
-
-      // Skip to next step if element truly doesn't exist
+      // Skip step if element truly doesn't exist
       retryCountRef.current = 0
       if (currentStep < TOUR_STEPS.length - 1) {
         setCurrentStep(prev => prev + 1)
@@ -159,167 +157,53 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
       return
     }
 
-    setElementFound(true)
     retryCountRef.current = 0
 
-    const rect = targetEl.getBoundingClientRect()
-    const tooltipWidth = 340
-    const tooltipHeight = 200
-    const padding = 16
-    const arrowSize = 12
+    // Only toggle CollapsibleSections once per step
+    let didExpand = false
+    if (lastToggledStepRef.current !== currentStep) {
+      lastToggledStepRef.current = currentStep
+      collapseExpandedSection()
 
-    let top = 0
-    let left = 0
-    let arrow: 'top' | 'bottom' | 'left' | 'right' = 'top'
-
-    // Calculate position based on step config (using viewport coordinates for fixed positioning)
-    switch (step.position) {
-      case 'bottom':
-        top = rect.bottom + arrowSize + padding
-        left = rect.left + rect.width / 2 - tooltipWidth / 2
-        arrow = 'top'
-        break
-      case 'top':
-        top = rect.top - tooltipHeight - arrowSize - padding
-        left = rect.left + rect.width / 2 - tooltipWidth / 2
-        arrow = 'bottom'
-        break
-      case 'left':
-        top = rect.top + rect.height / 2 - tooltipHeight / 2
-        left = rect.left - tooltipWidth - arrowSize - padding
-        arrow = 'right'
-        break
-      case 'right':
-        top = rect.top + rect.height / 2 - tooltipHeight / 2
-        left = rect.right + arrowSize + padding
-        arrow = 'left'
-        break
-    }
-
-    // Keep tooltip within viewport
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    if (left < padding) left = padding
-    if (left + tooltipWidth > viewportWidth - padding) left = viewportWidth - tooltipWidth - padding
-
-    // If tooltip would be above viewport, flip to bottom
-    if (top < padding) {
-      top = rect.bottom + arrowSize + padding
-      arrow = 'top'
-    }
-
-    // If tooltip would be below viewport, flip to top
-    if (top + tooltipHeight > viewportHeight - padding) {
-      top = rect.top - tooltipHeight - arrowSize - padding
-      arrow = 'bottom'
-
-      // If still off screen, just position at bottom of viewport
-      if (top < padding) {
-        top = viewportHeight - tooltipHeight - padding
+      if (targetEl.hasAttribute('data-tour')) {
+        setCollapsibleOpen(targetEl, true)
+        expandedSectionRef.current = targetEl
+        didExpand = true
       }
     }
 
-    setTooltipStyle({
-      position: 'fixed',
-      top: `${top}px`,
-      left: `${left}px`,
-      width: `${tooltipWidth}px`,
-      zIndex: 57,
-    })
-    setArrowPosition(arrow)
-  }, [step, currentStep])
+    // After any expand, wait for DOM to settle before scrolling
+    const doScroll = () => {
+      const rect = targetEl.getBoundingClientRect()
+      const elementTop = window.scrollY + rect.top
+      const gap = 16
 
-  // After positioning, verify the tooltip + target highlight are both visible and do a corrective scroll if needed
-  const ensureTooltipVisible = useCallback(() => {
-    if (!tooltipRef.current || !step) return
-
-    const targetEl = document.getElementById(step.targetId)
-    if (!targetEl) return
-
-    const tooltipRect = tooltipRef.current.getBoundingClientRect()
-    const targetRect = targetEl.getBoundingClientRect()
-    const viewportHeight = window.innerHeight
-    const padding = 20
-
-    // Combined bounding box of target highlight + tooltip
-    const combinedTop = Math.min(tooltipRect.top, targetRect.top)
-    const combinedBottom = Math.max(tooltipRect.bottom, targetRect.bottom)
-
-    if (combinedTop < padding) {
-      // Combined area extends above viewport — scroll up
-      window.scrollBy({ top: combinedTop - padding, behavior: 'smooth' })
-      setTimeout(updatePosition, 500)
-    } else if (combinedBottom > viewportHeight - padding) {
-      // Combined area extends below viewport — scroll down
-      window.scrollBy({ top: combinedBottom - viewportHeight + padding, behavior: 'smooth' })
-      setTimeout(updatePosition, 500)
-    }
-  }, [step, updatePosition])
-
-  // Scroll to element and update position
-  const scrollToElement = useCallback(() => {
-    if (!step) return
-
-    const targetEl = document.getElementById(step.targetId)
-    if (!targetEl) {
-      // Will be handled by updatePosition retry logic
-      updatePosition()
-      return
-    }
-
-    // For the first step, scroll to the very top to ensure tooltip is visible on mobile
-    if (currentStep === 0) {
+      const cardHeight = cardRef.current?.getBoundingClientRect().height ?? 160
       window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
+        top: Math.max(0, elementTop - cardHeight - gap),
+        behavior: 'smooth',
       })
-      setTimeout(() => {
-        updatePosition()
-        setTimeout(ensureTooltipVisible, 150)
-      }, 1000)
-      return
+
+      // Update highlight after scroll settles
+      setTimeout(updateHighlight, 400)
     }
 
-    const rect = targetEl.getBoundingClientRect()
-    const elementTop = window.scrollY + rect.top
-    const elementBottom = window.scrollY + rect.bottom
-    const viewportHeight = window.innerHeight
-    const tooltipSpace = 228 // tooltipHeight(200) + arrowSize(12) + padding(16)
-
-    let scrollTo: number
-
-    if (step.position === 'top') {
-      // Tooltip appears above target — leave room above the element
-      scrollTo = elementTop - tooltipSpace - 20
-    } else if (step.position === 'bottom') {
-      // Tooltip appears below target — put element near top so tooltip fits below
-      scrollTo = elementTop - 60
+    if (didExpand) {
+      setTimeout(doScroll, 150)
     } else {
-      // Left/right — center the element vertically
-      const elementHeight = elementBottom - elementTop
-      scrollTo = elementTop - (viewportHeight - elementHeight) / 2
+      doScroll()
     }
+  }, [step, currentStep, collapseExpandedSection, setCollapsibleOpen, updateHighlight])
 
-    window.scrollTo({
-      top: Math.max(0, scrollTo),
-      behavior: 'smooth'
-    })
-
-    // Update position after scroll completes, then verify both target + tooltip are visible
-    setTimeout(() => {
-      updatePosition()
-      setTimeout(ensureTooltipVisible, 150)
-    }, 1000)
-  }, [step, currentStep, updatePosition, ensureTooltipVisible])
-
-  // Reset tour state when re-activated (e.g. via Page Tour button)
+  // Reset tour state when re-activated
   useEffect(() => {
     if (isActive) {
       setCurrentStep(0)
       setShowFinalModal(false)
       setIsVisible(false)
+      setHighlightRect(null)
       retryCountRef.current = 0
+      lastToggledStepRef.current = -1
     }
   }, [isActive])
 
@@ -327,48 +211,50 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   useEffect(() => {
     if (isActive && !showFinalModal) {
       localStorage.setItem(TOUR_STARTED_KEY, 'true')
-      // Small delay to let the page render
       const timer = setTimeout(() => {
         setIsVisible(true)
-        scrollToElement()
+        scrollToTarget()
       }, 500)
       return () => clearTimeout(timer)
     }
-  }, [isActive, showFinalModal, scrollToElement])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isActive, showFinalModal])
 
-  // Update position on step change
+  // Navigate on step change
   useEffect(() => {
     if (isVisible && !showFinalModal) {
-      scrollToElement()
+      scrollToTarget()
     }
-  }, [currentStep, isVisible, showFinalModal, scrollToElement])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStep])
 
-  // Update position on scroll and resize
+  // Update highlight on scroll and resize
   useEffect(() => {
     if (!isVisible || showFinalModal) return
 
+    let rafId: number
     const handleUpdate = () => {
-      // Debounce updates
-      setTimeout(updatePosition, 100)
+      cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(updateHighlight)
     }
 
-    window.addEventListener('scroll', handleUpdate)
+    window.addEventListener('scroll', handleUpdate, { passive: true })
     window.addEventListener('resize', handleUpdate)
 
     return () => {
+      cancelAnimationFrame(rafId)
       window.removeEventListener('scroll', handleUpdate)
       window.removeEventListener('resize', handleUpdate)
     }
-  }, [isVisible, showFinalModal, updatePosition])
+  }, [isVisible, showFinalModal, updateHighlight])
 
   const handleNext = () => {
     retryCountRef.current = 0
     if (currentStep < TOUR_STEPS.length - 1) {
       setCurrentStep(prev => prev + 1)
     } else {
-      // Tour complete, show final modal
+      collapseExpandedSection()
       setShowFinalModal(true)
-      // Scroll to top
       window.scrollTo({ top: 0, behavior: 'smooth' })
     }
   }
@@ -381,12 +267,14 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
   }
 
   const handleSkip = () => {
+    collapseExpandedSection()
     localStorage.setItem(TOUR_COMPLETED_KEY, 'true')
     setIsVisible(false)
     onComplete()
   }
 
   const handleFinalClose = () => {
+    collapseExpandedSection()
     localStorage.setItem(TOUR_COMPLETED_KEY, 'true')
     setShowFinalModal(false)
     setIsVisible(false)
@@ -458,115 +346,106 @@ export function OnboardingTour({ isActive, onComplete }: OnboardingTourProps) {
     )
   }
 
-  // Tour tooltip
+  // Tour UI — fixed card at top + highlight ring on target
   return (
     <>
-      {/* Overlay - clicking skips the tour */}
-      <div
-        className="fixed inset-0 bg-black/50 z-[54]"
-        onClick={(e) => {
-          e.stopPropagation()
-          // Don't skip on overlay click, just prevent interaction
-        }}
-      />
-
-      {/* Highlight ring around target element */}
-      {elementFound && step && (() => {
-        const targetEl = document.getElementById(step.targetId)
-        if (!targetEl) return null
-
-        const rect = targetEl.getBoundingClientRect()
-        return (
-          <div
-            className="fixed pointer-events-none z-[55] rounded-lg"
-            style={{
-              top: rect.top - 4,
-              left: rect.left - 4,
-              width: rect.width + 8,
-              height: rect.height + 8,
-              boxShadow: '0 0 0 4px rgba(124, 58, 237, 0.6), 0 0 0 9999px rgba(0, 0, 0, 0.5)',
-              background: 'transparent',
-            }}
-          />
-        )
-      })()}
-
-      {/* Tooltip */}
-      <div
-        ref={tooltipRef}
-        className="bg-white rounded-xl shadow-2xl animate-fadeIn"
-        style={tooltipStyle}
-      >
-        {/* Arrow */}
+      {/* Dark overlay with cutout for highlighted element */}
+      {highlightRect && highlightRect.height > 0 ? (
         <div
-          className={`absolute w-4 h-4 bg-white transform rotate-45 ${
-            arrowPosition === 'top' ? '-top-2 left-1/2 -translate-x-1/2 shadow-[-2px_-2px_4px_rgba(0,0,0,0.1)]' :
-            arrowPosition === 'bottom' ? '-bottom-2 left-1/2 -translate-x-1/2 shadow-[2px_2px_4px_rgba(0,0,0,0.1)]' :
-            arrowPosition === 'left' ? '-left-2 top-1/2 -translate-y-1/2 shadow-[-2px_2px_4px_rgba(0,0,0,0.1)]' :
-            '-right-2 top-1/2 -translate-y-1/2 shadow-[2px_-2px_4px_rgba(0,0,0,0.1)]'
-          }`}
+          className="fixed inset-0 z-[54] pointer-events-auto"
+          style={{
+            background: 'transparent',
+            boxShadow: `
+              0 0 0 4px rgba(124, 58, 237, 0.7),
+              0 0 0 9999px rgba(0, 0, 0, 0.55)
+            `,
+            top: highlightRect.top - 4,
+            left: highlightRect.left - 4,
+            width: highlightRect.width + 8,
+            height: highlightRect.height + 8,
+            borderRadius: '12px',
+            position: 'fixed',
+          }}
+          onClick={(e) => e.stopPropagation()}
         />
+      ) : (
+        <div
+          className="fixed inset-0 bg-black/55 z-[54]"
+          onClick={(e) => e.stopPropagation()}
+        />
+      )}
 
-        {/* Content */}
-        <div className="p-5">
-          {/* Progress indicator */}
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs text-purple-600 font-semibold">
-              Step {currentStep + 1} of {TOUR_STEPS.length}
-            </span>
-            <button
-              onClick={handleSkip}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              Skip tour
-            </button>
-          </div>
-
-          {/* Progress bar */}
-          <div className="h-1.5 bg-gray-100 rounded-full mb-4 overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full transition-all duration-500"
-              style={{ width: `${((currentStep + 1) / TOUR_STEPS.length) * 100}%` }}
-            />
-          </div>
-
-          {/* Title */}
-          <h3 className="text-lg font-bold text-gray-800 mb-2">{step?.title}</h3>
-
-          {/* Description */}
-          <p className="text-sm text-gray-600 leading-relaxed mb-5">{step?.description}</p>
-
-          {/* Navigation */}
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              {currentStep > 0 ? (
-                <button
-                  onClick={handleBack}
-                  className="text-sm text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  Back
-                </button>
-              ) : (
-                <button
-                  onClick={handleSkip}
-                  className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-                >
-                  Exit tour
-                </button>
-              )}
+      {/* Fixed tour card at top of screen */}
+      <div
+        ref={cardRef}
+        className="fixed top-0 left-0 right-0 z-[57] animate-fadeIn"
+      >
+        <div className="mx-auto max-w-lg w-full p-3">
+          <div className="bg-white rounded-xl shadow-2xl overflow-hidden border border-purple-100">
+            {/* Gradient header strip */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-4 py-2 flex items-center justify-between">
+              <span className="text-white text-xs font-semibold">
+                Step {currentStep + 1} of {TOUR_STEPS.length}
+              </span>
+              <button
+                onClick={handleSkip}
+                className="text-white/70 hover:text-white text-xs transition-colors"
+              >
+                Skip tour
+              </button>
             </div>
-            <button
-              onClick={handleNext}
-              className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-2.5 px-6 rounded-lg transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg"
-            >
-              {currentStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+
+            {/* Progress bar */}
+            <div className="h-1 bg-gray-100">
+              <div
+                className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-500"
+                style={{ width: `${((currentStep + 1) / TOUR_STEPS.length) * 100}%` }}
+              />
+            </div>
+
+            {/* Content */}
+            <div className="p-4">
+              <h3 className="text-base font-bold text-gray-800 mb-1">{step?.title}</h3>
+              <p className="text-sm text-gray-600 leading-relaxed mb-4">{step?.description}</p>
+
+              {/* Navigation */}
+              <div className="flex justify-between items-center">
+                {currentStep > 0 ? (
+                  <button
+                    onClick={handleBack}
+                    className="text-sm text-purple-600 hover:text-purple-800 transition-colors flex items-center gap-1"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                    Back
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleSkip}
+                    className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    Exit tour
+                  </button>
+                )}
+                <button
+                  onClick={handleNext}
+                  className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-2 px-5 rounded-lg transition-all duration-200 flex items-center gap-2 shadow-md hover:shadow-lg text-sm"
+                >
+                  {currentStep === TOUR_STEPS.length - 1 ? 'Finish' : 'Next'}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Down arrow indicator */}
+            <div className="flex justify-center -mb-2 pb-1">
+              <svg className="w-5 h-5 text-purple-400 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" />
               </svg>
-            </button>
+            </div>
           </div>
         </div>
       </div>

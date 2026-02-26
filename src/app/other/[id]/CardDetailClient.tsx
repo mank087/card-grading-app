@@ -44,6 +44,11 @@ import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
 import { OtherPriceLookup } from '@/components/pricing/OtherPriceLookup';
+import { DefectOverlay } from '@/components/grading/DefectOverlay';
+import { DefectLegend } from '@/components/grading/DefectLegend';
+import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
+import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
+import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1431,6 +1436,10 @@ export function OtherCardDetails() {
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
   const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern');
+  const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
+  const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
+  const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
+  const [showOverlays, setShowOverlays] = useState(true);
   // 💰 DCM Pricing callout state (from PriceCharting API or eBay fallback)
   const [dcmPriceData, setDcmPriceData] = useState<{
     estimatedValue: number | null;
@@ -1685,6 +1694,17 @@ export function OtherCardDetails() {
       console.error('[Defects Error] ❌ Failed to get defects:', error);
     }
   }, [card]);
+
+  // Extract overlay defects from raw conversational_grading JSON
+  useEffect(() => {
+    if (!card?.conversational_grading) {
+      setFrontDefects([]);
+      setBackDefects([]);
+      return;
+    }
+    setFrontDefects(extractOverlayDefects(card.conversational_grading, 'front'));
+    setBackDefects(extractOverlayDefects(card.conversational_grading, 'back'));
+  }, [card?.conversational_grading]);
 
   // Open zoom modal
   const openZoomModal = (imageUrl: string, alt: string, title: string) => {
@@ -2757,7 +2777,7 @@ export function OtherCardDetails() {
 
               {/* Front Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.front_url, "Other card front", "Card Front - Click for detailed view")}
               >
                 <Image
@@ -2933,7 +2953,7 @@ export function OtherCardDetails() {
 
               {/* Back Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.back_url, "Other card back", "Card Back - Click for detailed view")}
               >
                 <Image
@@ -2953,31 +2973,6 @@ export function OtherCardDetails() {
         {/* Card Details and Grading */}
         <div className="space-y-6">
 
-          {/* Professional Grading Slab Information */}
-          {card.slab_detected && card.slab_company && (
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl p-6 shadow-lg">
-              <div className="flex items-center justify-center mb-4">
-                <h2 className="text-2xl font-bold">Professional Grading</h2>
-              </div>
-              <div className="space-y-3 text-center">
-                <div className="bg-white/20 rounded-lg p-4">
-                  <p className="text-sm font-medium text-green-100 mb-1">Professional Grade</p>
-                  <p className="text-3xl font-extrabold">
-                    {card.slab_company} {card.slab_grade}
-                    {card.slab_grade_description && (
-                      <span className="text-xl ml-2">({card.slab_grade_description})</span>
-                    )}
-                  </p>
-                </div>
-                {card.slab_cert_number && (
-                  <div className="bg-white/20 rounded-lg p-3">
-                    <p className="text-sm font-medium text-green-100 mb-1">Certification Number</p>
-                    <p className="text-lg font-semibold font-mono">{card.slab_cert_number}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* DVG v1 Grading Results */}
           {dvgGrading && Object.keys(dvgGrading).length > 0 && (
@@ -3328,10 +3323,14 @@ export function OtherCardDetails() {
               {/* 📄 Scrollable Content Sections */}
               <div className="space-y-8">
 
-                  {/* Professional Grades Tab Content */}
+              {/* 1. Card Information (includes slab detection when applicable) */}
+              <CollapsibleSection
+                title="Card Information"
+                tourId="tour-card-info"
+              >
               {/* Professional Grading Slab Detection - Dual Display */}
               {card.slab_detected && card.slab_company && (
-                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl shadow-xl p-6 border-4 border-yellow-400">
+                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl shadow-xl p-6 border-4 border-yellow-400 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-gray-800">
                       Professional Grade Detected
@@ -3456,19 +3455,13 @@ export function OtherCardDetails() {
                 </div>
               )}
 
-                  {/* Card Details Tab Content */}
-              {/* Section Header: Card Information */}
-              <div id="tour-card-info" className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Card Information
-                </h2>
-              </div>
-
-              {/* Other Card Information Section */}
-              <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200">
-                  🎴 Card Information
-                </h2>
+              {/* Card Information with Rarity Features */}
+              <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">
+                <div className="flex items-center justify-between mb-6 border-b pb-3">
+                  <h3 className="text-xl font-bold text-gray-800">
+                    Card Information
+                  </h3>
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -3875,16 +3868,14 @@ export function OtherCardDetails() {
                     )}
                   </div>
                 )}
-              </div>
+              </CollapsibleSection>
 
-                  {/* Centering Tab Content */}
-              {/* Section Header: Centering Details */}
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Centering Details
-                </h2>
-              </div>
-
+              {/* 2. Centering Analysis */}
+              <CollapsibleSection
+                title="Centering Analysis"
+                badge={card.conversational_sub_scores?.centering ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+                tourId="tour-centering"
+              >
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}
               {(card.conversational_sub_scores || centering.front_left_right_ratio_text || centering.back_left_right_ratio_text) && (
               <div id="tour-centering" className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
@@ -3981,12 +3972,14 @@ export function OtherCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.front_url}
-                                alt="Card Front"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.front_url}
+                                  alt="Card Front"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4032,12 +4025,14 @@ export function OtherCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.back_url}
-                                alt="Card Back"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.back_url}
+                                  alt="Card Back"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4156,15 +4151,49 @@ export function OtherCardDetails() {
                 )}
               </div>
               )}
+              </CollapsibleSection>
 
-
-                  {/* Corners Tab Content */}
-              {/* Section Header: Corners, Edges and Surface Analysis */}
-              <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  Corners, Edges and Surface Analysis
-                </h2>
-              </div>
+              {/* 3. Corners, Edges & Surface Analysis */}
+              <CollapsibleSection
+                title="Corners, Edges & Surface Analysis"
+              >
+              {/* Defect Overlay Images */}
+              {(frontDefects.length > 0 || backDefects.length > 0) && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-800">Defect Map</h3>
+                    <button
+                      onClick={() => setShowOverlays(!showOverlays)}
+                      className="text-xs text-gray-600 hover:text-gray-800 transition-colors flex items-center gap-1 px-3 py-1 rounded-full border border-gray-300 hover:border-gray-400"
+                    >
+                      <span className={`w-2 h-2 rounded-full ${showOverlays ? 'bg-green-400' : 'bg-gray-400'}`} />
+                      {showOverlays ? 'Hide' : 'Show'} Markers
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Front</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.front_url} alt="Card Front" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={frontDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && frontDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={frontDefects} activeDefectId={hoveredDefect?.side === 'front' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Back</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.back_url} alt="Card Back" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={backDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && backDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={backDefects} activeDefectId={hoveredDefect?.side === 'back' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {(() => {
                 // Extract JSON data or fall back to parsed data
@@ -4241,6 +4270,11 @@ export function OtherCardDetails() {
                       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg px-4 py-2 shadow-md">
                         <h3 className="text-lg font-bold">Front Side</h3>
                       </div>
+
+                      {/* Front Corner Zoom Crops */}
+                      {card.front_url && (
+                        <CornerZoomCrops imageUrl={card.front_url} side="front" slabDetected={!!card.slab_detected} />
+                      )}
 
                       {/* Front Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-blue-200 p-4 min-h-[280px] flex flex-col">
@@ -4386,6 +4420,11 @@ export function OtherCardDetails() {
                         <h3 className="text-lg font-bold">Back Side</h3>
                       </div>
 
+                      {/* Back Corner Zoom Crops */}
+                      {card.back_url && (
+                        <CornerZoomCrops imageUrl={card.back_url} side="back" slabDetected={!!card.slab_detected} />
+                      )}
+
                       {/* Back Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-purple-200 p-4 min-h-[280px] flex flex-col">
                         <div className="flex items-center justify-between mb-3">
@@ -4526,10 +4565,18 @@ export function OtherCardDetails() {
                   </div>
                 );
               })()}
+              </CollapsibleSection>
 
-
-              {/* DCM Optic™ Confidence Score */}
-              <div id="tour-optic-score" className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
+              {/* 4. DCM Optic Confidence Score */}
+              <CollapsibleSection
+                title="DCM Optic™ Confidence Score"
+                badge={(() => {
+                  const ig = card.conversational_image_confidence || card.dvg_image_quality || card.ai_confidence_score || 'B';
+                  return ig;
+                })()}
+                tourId="tour-optic-score"
+              >
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-800">
                   DCM Optic™ Confidence Score
                 </h2>
@@ -4777,20 +4824,142 @@ export function OtherCardDetails() {
                   );
                 })()}
               </div>
-                  {/* Professional Grades Tab Content - Grade Estimates */}
-              {/* Section Header: Professional Grades */}
-              <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Professional Grades
-                </h2>
+              </CollapsibleSection>
+
+              {/* 5. Market Value */}
+              <CollapsibleSection
+                title="Market Value"
+                badge={dcmPriceData?.estimatedValue ? `~$${dcmPriceData.estimatedValue}` : undefined}
+                tourId="tour-market-value"
+              >
+
+              {/* Market Value Section */}
+              <div id="tour-live-market-pricing">
+                {(() => {
+                  const session = getStoredSession();
+                  const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                  return (
+                    <OtherPriceLookup
+                      card={{
+                        card_name: cardInfo.card_name || card.card_name,
+                        featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                        card_set: extractEnglishForSearch(cardInfo.set_name) || card.card_set,
+                        card_number: cardInfo.card_number || card.card_number,
+                        release_date: cardInfo.year || card.release_date,
+                        subset: cardInfo.subset,
+                        rarity_or_variant: cardInfo.rarity_or_variant,
+                        manufacturer: cardInfo.manufacturer || card.manufacturer,
+                        game_type: cardInfo.game_type || 'other',
+                      }}
+                      cardId={card.id}
+                      dcmGrade={card.conversational_decimal_grade ?? undefined}
+                      isOwner={isPricingOwner}
+                      onPriceLoad={setDcmPriceData}
+                    />
+                  );
+                })()}
               </div>
 
-              {/* Professional Grading Company Estimates */}
+              {/* Find and Price This Card */}
+              <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Find and Price This Card or Similar
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || cardInfo.card_name || card.featured || card.card_name} card.
+                </p>
+
+                {/* eBay Marketplace Buttons */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  {/* eBay General Search */}
+                  <a
+                    href={generateOtherEbaySearchUrl({
+                      category: 'Other',
+                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
+                      manufacturer: extractEnglishForSearch(cardInfo.manufacturer) || extractEnglishForSearch(card.manufacturer),
+                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
+                      card_date: cardInfo.card_date || card.card_date,
+                      card_number: cardInfo.card_number || card.card_number,
+                      dcm_grade_whole: card.conversational_whole_grade
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
+                  >
+                    <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-blue-900 text-sm">eBay</h3>
+                      <p className="text-xs text-blue-700 truncate">Active listings</p>
+                    </div>
+                  </a>
+
+                  {/* eBay Sold Listings */}
+                  <a
+                    href={generateOtherEbaySoldListingsUrl({
+                      category: 'Other',
+                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
+                      manufacturer: extractEnglishForSearch(cardInfo.manufacturer) || extractEnglishForSearch(card.manufacturer),
+                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
+                      card_date: cardInfo.card_date || card.card_date,
+                      card_number: cardInfo.card_number || card.card_number,
+                      dcm_grade_whole: card.conversational_whole_grade
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
+                  >
+                    <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-green-900 text-sm">eBay Sold</h3>
+                      <p className="text-xs text-green-700 truncate">Price history</p>
+                    </div>
+                  </a>
+
+                  {/* PriceCharting Search */}
+                  <a
+                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
+                      [
+                        extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                        extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
+                        cardInfo.card_number || card.card_number
+                      ].filter(Boolean).join(' ')
+                    )}&type=prices`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
+                  >
+                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-purple-900 text-sm">PriceCharting</h3>
+                      <p className="text-xs text-purple-700 truncate">Market data</p>
+                    </div>
+                  </a>
+                </div>
+
+              </div>
+              </CollapsibleSection>
+
+              {/* 6. Estimated Mail-Away Grade Scores */}
               {professionalGrades && (
-                <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
-                  <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
-                    Professional Grading Estimates
-                  </h2>
+              <CollapsibleSection
+                title="Estimated Mail-Away Grade Scores"
+                tourId="tour-pro-estimates"
+              >
                   <p className="text-sm text-gray-600 mb-6">
                     Estimated grades from major grading companies based on measured DCM metrics. These are projections only and not official grades.
                   </p>
@@ -4952,161 +5121,24 @@ export function OtherCardDetails() {
                   {/* Disclaimer */}
                   <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
                     <p className="text-xs text-amber-900">
-                      <strong>⚠️ Disclaimer:</strong> These are estimates based on visual analysis and published grading standards.
+                      <strong>Disclaimer:</strong> These are estimates based on visual analysis and published grading standards.
                       Actual professional grades may vary. Only official grading by these companies provides authentic certification.
                     </p>
                   </div>
-                </div>
+              </CollapsibleSection>
               )}
 
-                  {/* Market & Pricing Tab Content */}
-              {/* Section Header: Market & Pricing */}
-              <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Market & Pricing
-                </h2>
-              </div>
-
-              {/* Market Value Section */}
-              <div id="tour-live-market-pricing">
-                {(() => {
-                  const session = getStoredSession();
-                  const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
-                  return (
-                    <OtherPriceLookup
-                      card={{
-                        card_name: cardInfo.card_name || card.card_name,
-                        featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                        card_set: extractEnglishForSearch(cardInfo.set_name) || card.card_set,
-                        card_number: cardInfo.card_number || card.card_number,
-                        release_date: cardInfo.year || card.release_date,
-                        subset: cardInfo.subset,
-                        rarity_or_variant: cardInfo.rarity_or_variant,
-                        manufacturer: cardInfo.manufacturer || card.manufacturer,
-                        game_type: cardInfo.game_type || 'other',
-                      }}
-                      cardId={card.id}
-                      dcmGrade={card.conversational_decimal_grade ?? undefined}
-                      isOwner={isPricingOwner}
-                      onPriceLoad={setDcmPriceData}
-                    />
-                  );
-                })()}
-              </div>
-
-              {/* Find and Price This Card */}
-              <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Find and Price This Card or Similar
-                </h2>
-                <p className="text-gray-600 mb-4">
-                  Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || cardInfo.card_name || card.featured || card.card_name} card.
-                </p>
-
-                {/* eBay Marketplace Buttons */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  {/* eBay General Search */}
-                  <a
-                    href={generateOtherEbaySearchUrl({
-                      category: 'Other',
-                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
-                      manufacturer: extractEnglishForSearch(cardInfo.manufacturer) || extractEnglishForSearch(card.manufacturer),
-                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
-                      card_date: cardInfo.card_date || card.card_date,
-                      card_number: cardInfo.card_number || card.card_number,
-                      dcm_grade_whole: card.conversational_whole_grade
-                    } as CardData)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
-                  >
-                    <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-blue-900 text-sm">eBay</h3>
-                      <p className="text-xs text-blue-700 truncate">Active listings</p>
-                    </div>
-                  </a>
-
-                  {/* eBay Sold Listings */}
-                  <a
-                    href={generateOtherEbaySoldListingsUrl({
-                      category: 'Other',
-                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
-                      manufacturer: extractEnglishForSearch(cardInfo.manufacturer) || extractEnglishForSearch(card.manufacturer),
-                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
-                      card_date: cardInfo.card_date || card.card_date,
-                      card_number: cardInfo.card_number || card.card_number,
-                      dcm_grade_whole: card.conversational_whole_grade
-                    } as CardData)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
-                  >
-                    <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-green-900 text-sm">eBay Sold</h3>
-                      <p className="text-xs text-green-700 truncate">Price history</p>
-                    </div>
-                  </a>
-
-                  {/* PriceCharting Search */}
-                  <a
-                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
-                      [
-                        extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                        extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
-                        cardInfo.card_number || card.card_number
-                      ].filter(Boolean).join(' ')
-                    )}&type=prices`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
-                  >
-                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-purple-900 text-sm">PriceCharting</h3>
-                      <p className="text-xs text-purple-700 truncate">Market data</p>
-                    </div>
-                  </a>
-                </div>
-
-              </div>
-
-              {/* Insta-List on eBay Section */}
+              {/* 7. Insta-List on eBay (owner only) */}
               {(() => {
                 const session = getStoredSession();
                 const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
                 if (!isOwner) return null;
 
                 return (
-                  <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
-                        <p className="text-sm text-gray-500">List this card directly to eBay</p>
-                      </div>
-                    </div>
-
+                  <CollapsibleSection
+                    title="Insta-List on eBay"
+                    tourId="tour-insta-list"
+                  >
                     <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
                         <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5130,12 +5162,16 @@ export function OtherCardDetails() {
                       labelStyle={labelStyle}
                       className="w-full"
                     />
-                  </div>
+                  </CollapsibleSection>
                 );
               })()}
+
+              </div>
             </div>
           )}
 
+          {/* LEGACY_SECTIONS_START - removed in layout redesign */}
+          {false && (() => {
           {/* 3. Category Breakdown Scores (v3.0) - Legacy Fallback */}
           {(!dvgGrading || Object.keys(dvgGrading).length === 0) && (() => {
             // v3.1: Read category scores with fallback to v3.1 category_scores field
@@ -5581,46 +5617,14 @@ export function OtherCardDetails() {
               )}
             </div>
           )}
+          return null;
+          })()}
 
-          {/* DCM Optic™ Report */}
+          {/* 8. DCM Optic Report */}
           {card.conversational_grading && (
-            <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl shadow-xl p-8 mt-8 border border-indigo-200">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-6 border-b-2 border-indigo-200">
-                <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 shadow-lg">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">DCM Optic™ Report</h2>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowConversationalGrading(!showConversationalGrading)}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl font-semibold"
-                >
-                  {showConversationalGrading ? (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                      </svg>
-                      Hide Full Report
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      View Full Report
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Expanded Report */}
-              {showConversationalGrading && (
+            <CollapsibleSection
+              title="DCM Optic™ Report"
+            >
                 <div className="space-y-6">
                   {/* Professional Executive Report */}
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -6184,8 +6188,7 @@ export function OtherCardDetails() {
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+            </CollapsibleSection>
           )}
 
           {/* DCM Optic Version and Graded Date Section */}

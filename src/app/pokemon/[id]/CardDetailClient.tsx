@@ -46,6 +46,11 @@ import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
+import { DefectOverlay } from '@/components/grading/DefectOverlay';
+import { DefectLegend } from '@/components/grading/DefectLegend';
+import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
+import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
+import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1435,6 +1440,10 @@ export function PokemonCardDetails() {
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
+  const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
+  const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
+  const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
+  const [showOverlays, setShowOverlays] = useState(true);
   // 📊 Track grade_card_complete event (only once per card)
   const hasTrackedGradeComplete = useRef(false);
   // 🎉 First grade conversion modal state
@@ -1698,6 +1707,17 @@ export function PokemonCardDetails() {
       console.error('[Defects Error] ❌ Failed to get defects:', error);
     }
   }, [card]);
+
+  // Extract overlay defects from raw conversational_grading JSON
+  useEffect(() => {
+    if (!card?.conversational_grading) {
+      setFrontDefects([]);
+      setBackDefects([]);
+      return;
+    }
+    setFrontDefects(extractOverlayDefects(card.conversational_grading, 'front'));
+    setBackDefects(extractOverlayDefects(card.conversational_grading, 'back'));
+  }, [card?.conversational_grading]);
 
   // Open zoom modal
   const openZoomModal = (imageUrl: string, alt: string, title: string) => {
@@ -2762,7 +2782,7 @@ export function PokemonCardDetails() {
 
               {/* Front Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.front_url, "Pokemon card front", "Card Front - Click for detailed view")}
               >
                 <Image
@@ -2938,7 +2958,7 @@ export function PokemonCardDetails() {
 
               {/* Back Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.back_url, "Pokemon card back", "Card Back - Click for detailed view")}
               >
                 <Image
@@ -3322,10 +3342,14 @@ export function PokemonCardDetails() {
               {/* 📄 Scrollable Content Sections */}
               <div className="space-y-8">
 
-                  {/* Professional Grades Tab Content */}
+              {/* 1. Card Information (includes slab detection when applicable) */}
+              <CollapsibleSection
+                title="Card Information"
+                tourId="tour-card-info"
+              >
               {/* Professional Grading Slab Detection - Dual Display */}
               {card.slab_detected && card.slab_company && (
-                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl shadow-xl p-6 border-4 border-yellow-400">
+                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl shadow-xl p-6 border-4 border-yellow-400 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-gray-800">
                       Professional Grade Detected
@@ -3449,14 +3473,6 @@ export function PokemonCardDetails() {
                   </div>
                 </div>
               )}
-
-                  {/* Card Details Tab Content */}
-              {/* Section Header: Card Information */}
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Card Information
-                </h2>
-              </div>
 
               {/* Card Information with Rarity Features */}
               <div id="tour-card-info" className="bg-gradient-to-br from-white to-gray-50 rounded-xl shadow-lg p-6 border-2 border-gray-200">
@@ -4032,14 +4048,13 @@ export function PokemonCardDetails() {
                   </div>
                 )}
               </div>
+              </CollapsibleSection>
 
-                  {/* Centering Tab Content */}
-              {/* Section Header: Centering Details */}
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Centering Details
-                </h2>
-              </div>
+              {/* 2. Centering Analysis */}
+              <CollapsibleSection
+                title="Centering Analysis"
+                badge={card.conversational_sub_scores?.centering?.weighted ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+              >
 
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}
               {(card.conversational_sub_scores || centering.front_left_right_ratio_text || centering.back_left_right_ratio_text) && (
@@ -4415,14 +4430,55 @@ export function PokemonCardDetails() {
                 )}
               </div>
               )}
+              </CollapsibleSection>
 
-
-                  {/* Corners Tab Content */}
-              {/* Section Header: Corners, Edges and Surface Analysis */}
-              <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  Corners, Edges and Surface Analysis
-                </h2>
+              {/* 3. Corners, Edges & Surface Analysis */}
+              <CollapsibleSection
+                title="Corners, Edges & Surface Analysis"
+              >
+              {/* Defect Overlay Images */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Front defect overlay */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-gray-700 text-center uppercase tracking-wide">Front</h3>
+                  <div className="relative rounded-lg border-2 border-orange-300 shadow-md">
+                    <img src={card.front_url} alt="Card Front" className="w-full h-auto rounded-lg" />
+                    <DefectOverlay defects={frontDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                  </div>
+                  {frontDefects.length > 0 && (
+                    <div>
+                      <button
+                        onClick={() => setShowOverlays(!showOverlays)}
+                        className="text-xs text-gray-600 hover:text-gray-800 transition-colors flex items-center gap-1 mx-auto"
+                      >
+                        <span className={`w-2 h-2 rounded-full ${showOverlays ? 'bg-green-400' : 'bg-gray-400'}`} />
+                        {showOverlays ? 'Hide' : 'Show'} Defect Markers
+                      </button>
+                      {showOverlays && (
+                        <DefectLegend
+                          defects={frontDefects}
+                          activeDefectId={hoveredDefect?.side === 'front' ? hoveredDefect.id : null}
+                          onDefectHover={setHoveredDefect}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* Back defect overlay */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-bold text-gray-700 text-center uppercase tracking-wide">Back</h3>
+                  <div className="relative rounded-lg border-2 border-orange-300 shadow-md">
+                    <img src={card.back_url} alt="Card Back" className="w-full h-auto rounded-lg" />
+                    <DefectOverlay defects={backDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                  </div>
+                  {backDefects.length > 0 && showOverlays && (
+                    <DefectLegend
+                      defects={backDefects}
+                      activeDefectId={hoveredDefect?.side === 'back' ? hoveredDefect.id : null}
+                      onDefectHover={setHoveredDefect}
+                    />
+                  )}
+                </div>
               </div>
 
               {(() => {
@@ -4500,6 +4556,11 @@ export function PokemonCardDetails() {
                       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg px-4 py-2 shadow-md">
                         <h3 className="text-lg font-bold">Front Side</h3>
                       </div>
+
+                      {/* Front Corner Zoom Crops */}
+                      {card.front_url && (
+                        <CornerZoomCrops imageUrl={card.front_url} side="front" slabDetected={!!card.slab_detected} />
+                      )}
 
                       {/* Front Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-blue-200 p-4 min-h-[280px] flex flex-col">
@@ -4645,6 +4706,11 @@ export function PokemonCardDetails() {
                         <h3 className="text-lg font-bold">Back Side</h3>
                       </div>
 
+                      {/* Back Corner Zoom Crops */}
+                      {card.back_url && (
+                        <CornerZoomCrops imageUrl={card.back_url} side="back" slabDetected={!!card.slab_detected} />
+                      )}
+
                       {/* Back Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-purple-200 p-4 min-h-[280px] flex flex-col">
                         <div className="flex items-center justify-between mb-3">
@@ -4785,13 +4851,17 @@ export function PokemonCardDetails() {
                   </div>
                 );
               })()}
+              </CollapsibleSection>
 
-
-              {/* DCM Optic™ Confidence Score */}
-              <div id="tour-optic-score" className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-800">
-                  DCM Optic™ Confidence Score
-                </h2>
+              {/* 4. DCM Optic Confidence Score */}
+              <CollapsibleSection
+                title="DCM Optic™ Confidence Score"
+                badge={(() => {
+                  const ig = card.conversational_image_confidence || card.dvg_image_quality || imageQuality?.grade || card.ai_confidence_score || 'B';
+                  return ig;
+                })()}
+                tourId="tour-optic-score"
+              >
 
                 {(() => {
                   // Calculate image grade first (use same priority as display)
@@ -5037,15 +5107,182 @@ export function PokemonCardDetails() {
                     </>
                   );
                 })()}
-              </div>
-                  {/* Professional Grades Tab Content - Grade Estimates */}
-              {/* Section Header: Professional Grades */}
-              <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Professional Grades
-                </h2>
+              </CollapsibleSection>
+
+              {/* 5. Market Value */}
+              <CollapsibleSection
+                title="Market Value"
+                badge={dcmPriceData?.estimatedValue ? `$${dcmPriceData.estimatedValue.toFixed(2)}` : undefined}
+                tourId="tour-market-value"
+              >
+
+              {/* PriceCharting Market Value Section */}
+              <div id="tour-live-market-pricing">
+                {(() => {
+                  const session = getStoredSession();
+                  const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
+                  return (
+                    <PokemonPriceLookup
+                      card={{
+                        id: card.id,
+                        player_or_character: cardInfo.player_or_character || card.featured || card.pokemon_featured,
+                        card_name: cardInfo.card_name || card.card_name,
+                        year: cardInfo.year || card.release_date,
+                        set_name: cardInfo.set_name || card.card_set,
+                        card_number: cardInfo.card_number || card.card_number,
+                        rarity_or_variant: cardInfo.rarity_or_variant,
+                        holofoil: cardInfo.holofoil || card.holofoil,
+                        first_edition: cardInfo.first_edition,
+                        reverse_holo: cardInfo.reverse_holo,
+                        dcm_selected_product_id: card.dcm_selected_product_id,
+                        dcm_selected_product_name: card.dcm_selected_product_name,
+                      }}
+                      dcmGrade={card.conversational_decimal_grade ?? undefined}
+                      isOwner={isPricingOwner}
+                      onPriceLoad={setDcmPriceData}
+                    />
+                  );
+                })()}
               </div>
 
+              {/* Find and Price This Card */}
+              <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Find and Price This Card or Similar
+                </h2>
+                <p className="text-gray-600 mb-4">
+                  Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || card.featured || card.pokemon_featured || card.card_name} card.
+                </p>
+
+                {/* All Marketplace Buttons in One Row */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  {/* TCGPlayer Search Link - Always use search URL (direct API URLs often timeout) */}
+                  {(() => {
+                    // Build search URL using card name + number (most reliable)
+                    const pokemonName = extractEnglishForSearch(cardInfo.player_or_character) ||
+                                       extractEnglishForSearch(card.featured) ||
+                                       card.pokemon_featured;
+                    const setName = extractEnglishForSearch(cardInfo.set_name) ||
+                                   extractEnglishForSearch(cardInfo.set_era) ||
+                                   card.card_set;
+
+                    const cardData = {
+                      featured: pokemonName,
+                      card_set: setName,
+                      card_number: cardInfo.card_number || card.card_number,
+                      subset: cardInfo.rarity_tier || cardInfo.subset || card.subset
+                    } as CardData;
+
+                    // Use direct TCGPlayer URLs only - skip prices.pokemontcg.io redirect URLs (unreliable/timeout)
+                    // Only use stored URL if it's a direct tcgplayer.com link
+                    const storedUrl = card.tcgplayer_url ||
+                                     card.conversational_card_info?.tcgplayer_url ||
+                                     card.pokemon_api_data?.tcgplayer?.url;
+                    const isDirectTcgplayerUrl = storedUrl && storedUrl.includes('tcgplayer.com');
+                    const tcgplayerUrl = isDirectTcgplayerUrl
+                                        ? storedUrl
+                                        : (generateTCGPlayerSetSearchUrl(cardData) || generateTCGPlayerSearchUrl(cardData));
+                    const displaySetName = cardInfo.set_name || cardInfo.set_era || card.card_set;
+
+                    return (
+                      <a
+                        href={tcgplayerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200 group"
+                      >
+                        <div className="w-10 h-10 bg-orange-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-orange-900 text-sm">TCGPlayer</h3>
+                          <p className="text-xs text-orange-700 truncate">
+                            {displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Search listings'}
+                          </p>
+                        </div>
+                      </a>
+                    );
+                  })()}
+
+                  {/* eBay General Search */}
+                  <a
+                    href={generatePokemonEbaySearchUrl({
+                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                      card_number: cardInfo.card_number || card.card_number
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
+                  >
+                    <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-blue-900 text-sm">eBay</h3>
+                      <p className="text-xs text-blue-700 truncate">Active listings</p>
+                    </div>
+                  </a>
+
+                  {/* eBay Sold Listings */}
+                  <a
+                    href={generatePokemonEbaySoldListingsUrl({
+                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                      card_number: cardInfo.card_number || card.card_number
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
+                  >
+                    <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-green-900 text-sm">eBay Sold</h3>
+                      <p className="text-xs text-green-700 truncate">Price history</p>
+                    </div>
+                  </a>
+
+                  {/* PriceCharting Search */}
+                  <a
+                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
+                      [
+                        extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured) || card.pokemon_featured,
+                        cardInfo.card_number || card.card_number
+                      ].filter(Boolean).join(' ')
+                    )}&type=prices`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
+                  >
+                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-purple-900 text-sm">PriceCharting</h3>
+                      <p className="text-xs text-purple-700 truncate">Market data</p>
+                    </div>
+                  </a>
+                </div>
+
+              </div>
+              </CollapsibleSection>
+
+              {/* 6. Estimated Mail-Away Grade Scores */}
+              <CollapsibleSection
+                title="Estimated Mail-Away Grade Scores"
+                tourId="tour-pro-estimates"
+              >
               {/* Professional Grading Company Estimates */}
               {professionalGrades && (
                 <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
@@ -5219,196 +5456,20 @@ export function PokemonCardDetails() {
                   </div>
                 </div>
               )}
+              </CollapsibleSection>
 
-                  {/* Market & Pricing Tab Content */}
-              {/* Section Header: Market & Pricing */}
-              <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Market & Pricing
-                </h2>
-              </div>
-
-              {/* PriceCharting Market Value Section */}
-              <div id="tour-live-market-pricing">
-                {(() => {
-                  const session = getStoredSession();
-                  const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
-                  return (
-                    <PokemonPriceLookup
-                      card={{
-                        id: card.id,
-                        player_or_character: cardInfo.player_or_character || card.featured || card.pokemon_featured,
-                        card_name: cardInfo.card_name || card.card_name,
-                        year: cardInfo.year || card.release_date,
-                        set_name: cardInfo.set_name || card.card_set,
-                        card_number: cardInfo.card_number || card.card_number,
-                        rarity_or_variant: cardInfo.rarity_or_variant,
-                        holofoil: cardInfo.holofoil || card.holofoil,
-                        first_edition: cardInfo.first_edition,
-                        reverse_holo: cardInfo.reverse_holo,
-                        dcm_selected_product_id: card.dcm_selected_product_id,
-                        dcm_selected_product_name: card.dcm_selected_product_name,
-                      }}
-                      dcmGrade={card.conversational_decimal_grade ?? undefined}
-                      isOwner={isPricingOwner}
-                      onPriceLoad={setDcmPriceData}
-                    />
-                  );
-                })()}
-              </div>
-
-              {/* Find and Price This Card */}
-              <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Find and Price This Card or Similar
-                </h2>
-                <p className="text-gray-600 mb-4">
-                  Search eBay to find similar cards and current market pricing for this {cardInfo.player_or_character || card.featured || card.pokemon_featured || card.card_name} card.
-                </p>
-
-                {/* All Marketplace Buttons in One Row */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  {/* TCGPlayer Search Link - Always use search URL (direct API URLs often timeout) */}
-                  {(() => {
-                    // Build search URL using card name + number (most reliable)
-                    const pokemonName = extractEnglishForSearch(cardInfo.player_or_character) ||
-                                       extractEnglishForSearch(card.featured) ||
-                                       card.pokemon_featured;
-                    const setName = extractEnglishForSearch(cardInfo.set_name) ||
-                                   extractEnglishForSearch(cardInfo.set_era) ||
-                                   card.card_set;
-
-                    const cardData = {
-                      featured: pokemonName,
-                      card_set: setName,
-                      card_number: cardInfo.card_number || card.card_number,
-                      subset: cardInfo.rarity_tier || cardInfo.subset || card.subset
-                    } as CardData;
-
-                    // Use direct TCGPlayer URLs only - skip prices.pokemontcg.io redirect URLs (unreliable/timeout)
-                    // Only use stored URL if it's a direct tcgplayer.com link
-                    const storedUrl = card.tcgplayer_url ||
-                                     card.conversational_card_info?.tcgplayer_url ||
-                                     card.pokemon_api_data?.tcgplayer?.url;
-                    const isDirectTcgplayerUrl = storedUrl && storedUrl.includes('tcgplayer.com');
-                    const tcgplayerUrl = isDirectTcgplayerUrl
-                                        ? storedUrl
-                                        : (generateTCGPlayerSetSearchUrl(cardData) || generateTCGPlayerSearchUrl(cardData));
-                    const displaySetName = cardInfo.set_name || cardInfo.set_era || card.card_set;
-
-                    return (
-                      <a
-                        href={tcgplayerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200 group"
-                      >
-                        <div className="w-10 h-10 bg-orange-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-orange-900 text-sm">TCGPlayer</h3>
-                          <p className="text-xs text-orange-700 truncate">
-                            {displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Search listings'}
-                          </p>
-                        </div>
-                      </a>
-                    );
-                  })()}
-
-                  {/* eBay General Search */}
-                  <a
-                    href={generatePokemonEbaySearchUrl({
-                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                      card_number: cardInfo.card_number || card.card_number
-                    } as CardData)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
-                  >
-                    <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-blue-900 text-sm">eBay</h3>
-                      <p className="text-xs text-blue-700 truncate">Active listings</p>
-                    </div>
-                  </a>
-
-                  {/* eBay Sold Listings */}
-                  <a
-                    href={generatePokemonEbaySoldListingsUrl({
-                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                      card_number: cardInfo.card_number || card.card_number
-                    } as CardData)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
-                  >
-                    <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-green-900 text-sm">eBay Sold</h3>
-                      <p className="text-xs text-green-700 truncate">Price history</p>
-                    </div>
-                  </a>
-
-                  {/* PriceCharting Search */}
-                  <a
-                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
-                      [
-                        extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured) || card.pokemon_featured,
-                        cardInfo.card_number || card.card_number
-                      ].filter(Boolean).join(' ')
-                    )}&type=prices`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
-                  >
-                    <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-purple-900 text-sm">PriceCharting</h3>
-                      <p className="text-xs text-purple-700 truncate">Market data</p>
-                    </div>
-                  </a>
-                </div>
-
-              </div>
-
-              {/* Insta-List on eBay Section */}
+              {/* 7. Insta-List on eBay (owner only) */}
               {(() => {
                 const session = getStoredSession();
                 const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
                 if (!isOwner) return null;
 
                 return (
-                  <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
-                        <p className="text-sm text-gray-500">List this Pokémon card directly to eBay</p>
-                      </div>
-                    </div>
-
+                  <CollapsibleSection
+                    title="Insta-List on eBay"
+                    tourId="tour-insta-list"
+                  >
+                  <div className="bg-white rounded-lg shadow-lg p-6">
                     <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
                         <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5434,12 +5495,16 @@ export function PokemonCardDetails() {
                       className="w-full"
                     />
                   </div>
+                  </CollapsibleSection>
                 );
               })()}
 
               </div>
             </div>
           )}
+
+          {/* LEGACY_SECTIONS_START - removed in layout redesign */}
+          {false && (() => {
 
           {/* 3. Category Breakdown Scores (v3.0) - Legacy Fallback */}
           {(!dvgGrading || Object.keys(dvgGrading).length === 0) && (() => {
@@ -5886,6 +5951,9 @@ export function PokemonCardDetails() {
               )}
             </div>
           )}
+
+          return null;
+          })()}
 
           {/* DCM Optic™ Report */}
           {card.conversational_grading && (

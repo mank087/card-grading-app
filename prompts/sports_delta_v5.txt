@@ -565,20 +565,4 @@ Grading the card condition independently of the relic window:
 
 The presence of the memorabilia window does not negatively impact the grade; it is an intentional design feature. The card is assessed based on its condition as a relic card, with the window treated as part of the original design rather than a defect."
 
-═══════════════════════════════════════════════════════════════════════
-END OF SPORTS DELTA v5.0
-═══════════════════════════════════════════════════════════════════════
-
-**TOTAL LINES:** ~620
-**ESTIMATED TOKENS:** ~4,500-5,000
-
-**COMBINED PROMPT SIZE (Master + Sports Delta):**
-• Master Rubric: ~20,000-22,000 tokens
-• Sports Delta: ~4,500-5,000 tokens
-• **TOTAL: ~24,500-27,000 tokens** ✓ Within target range
-
-When grading sports cards, use:
-1. Master Grading Rubric v5.0 (universal grading rules)
-2. Sports Delta v5.0 (this file - sports-specific rules)
-
-Apply ALL instructions from BOTH files to complete grading analysis.
+--- END OF SPORTS DELTA v5.0 ---

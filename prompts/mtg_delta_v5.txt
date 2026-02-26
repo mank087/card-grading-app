@@ -446,20 +446,4 @@ E. MTG CARD GRADING EXAMPLES
 **SURFACE EXAMPLE (MTG Etched Foil):**
 "This Magic card features an etched foil treatment with a matte holographic finish across the entire front surface. The etched pattern creates a subtle textured appearance. Examining under angled lighting, I detect one hairline scratch in the center area running approximately 4mm diagonally. The scratch appears as a glossy line where the matte etched texture has been smoothed down. Additionally, there is minor edge wear at the top edge with 2 small white flecks visible where the black border has chipped. Overall surface score: 9.0."
 
-═══════════════════════════════════════════════════════════════════════
-END OF MTG DELTA v5.0
-═══════════════════════════════════════════════════════════════════════
-
-**TOTAL LINES:** ~470
-**ESTIMATED TOKENS:** ~3,500-4,000
-
-**COMBINED PROMPT SIZE (Master + MTG Delta):**
-• Master Rubric: ~18,000-20,000 tokens
-• MTG Delta: ~3,500-4,000 tokens
-• **TOTAL: ~21,500-24,000 tokens** ✓ Within target range
-
-When grading MTG cards, use:
-1. Master Grading Rubric v5.0 (universal grading rules)
-2. MTG Delta v5.0 (this file - MTG-specific rules)
-
-Apply ALL instructions from BOTH files to complete grading analysis.
+--- END OF MTG DELTA v5.0 ---

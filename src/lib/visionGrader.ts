@@ -1715,16 +1715,22 @@ Provide detailed analysis as markdown with all required sections.`
         defect_type: d.type || 'unknown',
         location: d.location || 'unknown',
         severity: d.severity || 'minor',
-        size: d.size || 'unknown',
-        description: d.description || ''
+        size: d.size_mm?.toString() || d.size || 'unknown',
+        description: d.description || '',
+        x_percent: d.coordinates?.x_percent ?? null,
+        y_percent: d.coordinates?.y_percent ?? null,
+        coordinate_confidence: d.coordinates?.confidence ?? null
       })) || [];
 
       const defectCoordinatesBack: DefectCoordinate[] = jsonData.surface?.back?.defects?.map((d: any) => ({
         defect_type: d.type || 'unknown',
         location: d.location || 'unknown',
         severity: d.severity || 'minor',
-        size: d.size || 'unknown',
-        description: d.description || ''
+        size: d.size_mm?.toString() || d.size || 'unknown',
+        description: d.description || '',
+        x_percent: d.coordinates?.x_percent ?? null,
+        y_percent: d.coordinates?.y_percent ?? null,
+        coordinate_confidence: d.coordinates?.confidence ?? null
       })) || [];
 
       // Build grading metadata from JSON
@@ -1751,8 +1757,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v7.2-json',
-          prompt_version: 'DCM_Grading_v7.2'
+          version: 'conversational-v7.4.2-json',
+          prompt_version: 'DCM_Grading_v7.4.2'
         }
       };
 
@@ -1803,8 +1809,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v7.2-markdown',
-          prompt_version: 'DCM_Grading_v7.2'
+          version: 'conversational-v7.4.1-markdown',
+          prompt_version: 'DCM_Grading_v7.4.2'
         }
       };
 

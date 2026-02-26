@@ -453,20 +453,4 @@ E. ONE PIECE SPECIFIC EXTRACTION RULES
 • Both colors should be listed in card_color
 • Format: "Red/Green" or "Blue/Purple"
 
-═══════════════════════════════════════════════════════════════════════
-END OF ONE PIECE DELTA v5.0
-═══════════════════════════════════════════════════════════════════════
-
-**TOTAL LINES:** ~400
-**ESTIMATED TOKENS:** ~3,000-3,500
-
-**COMBINED PROMPT SIZE (Master + One Piece Delta):**
-• Master Rubric: ~18,000-20,000 tokens
-• One Piece Delta: ~3,000-3,500 tokens
-• **TOTAL: ~21,000-23,500 tokens** ✓ Within acceptable range
-
-When grading One Piece TCG cards, use:
-1. Master Grading Rubric v5.0 (universal grading rules)
-2. One Piece Delta v5.0 (this file - One Piece-specific rules)
-
-Apply ALL instructions from BOTH files to complete grading analysis.
+--- END OF ONE PIECE DELTA v5.0 ---

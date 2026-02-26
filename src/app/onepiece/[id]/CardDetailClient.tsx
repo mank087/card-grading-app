@@ -48,6 +48,11 @@ import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
+import { DefectOverlay } from '@/components/grading/DefectOverlay';
+import { DefectLegend } from '@/components/grading/DefectLegend';
+import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
+import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
+import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1465,6 +1470,10 @@ export function OnePieceCardDetails() {
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
+  const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
+  const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
+  const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
+  const [showOverlays, setShowOverlays] = useState(true);
   // 💰 Insufficient credits modal
   const [showInsufficientCredits, setShowInsufficientCredits] = useState(false);
   // 📊 Track grade_card_complete event (only once per card)
@@ -1723,6 +1732,17 @@ export function OnePieceCardDetails() {
       console.error('[Defects Error] ❌ Failed to get defects:', error);
     }
   }, [card]);
+
+  // Extract overlay defects from raw conversational_grading JSON
+  useEffect(() => {
+    if (!card?.conversational_grading) {
+      setFrontDefects([]);
+      setBackDefects([]);
+      return;
+    }
+    setFrontDefects(extractOverlayDefects(card.conversational_grading, 'front'));
+    setBackDefects(extractOverlayDefects(card.conversational_grading, 'back'));
+  }, [card?.conversational_grading]);
 
   // Open zoom modal
   const openZoomModal = (imageUrl: string, alt: string, title: string) => {
@@ -2826,7 +2846,7 @@ export function OnePieceCardDetails() {
 
               {/* Front Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.front_url, "One Piece card front", "Card Front - Click for detailed view")}
               >
                 <Image
@@ -3002,7 +3022,7 @@ export function OnePieceCardDetails() {
 
               {/* Back Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.back_url, "One Piece card back", "Card Back - Click for detailed view")}
               >
                 <Image
@@ -3021,32 +3041,6 @@ export function OnePieceCardDetails() {
 
         {/* Card Details and Grading */}
         <div className="space-y-6">
-
-          {/* Professional Grading Slab Information */}
-          {card.slab_detected && card.slab_company && (
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl p-6 shadow-lg">
-              <div className="flex items-center justify-center mb-4">
-                <h2 className="text-2xl font-bold">Professional Grading</h2>
-              </div>
-              <div className="space-y-3 text-center">
-                <div className="bg-white/20 rounded-lg p-4">
-                  <p className="text-sm font-medium text-green-100 mb-1">Professional Grade</p>
-                  <p className="text-3xl font-extrabold">
-                    {card.slab_company} {card.slab_grade}
-                    {card.slab_grade_description && (
-                      <span className="text-xl ml-2">({card.slab_grade_description})</span>
-                    )}
-                  </p>
-                </div>
-                {card.slab_cert_number && (
-                  <div className="bg-white/20 rounded-lg p-3">
-                    <p className="text-sm font-medium text-green-100 mb-1">Certification Number</p>
-                    <p className="text-lg font-semibold font-mono">{card.slab_cert_number}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* DVG v1 Grading Results */}
           {dvgGrading && Object.keys(dvgGrading).length > 0 && (
@@ -3384,7 +3378,11 @@ export function OnePieceCardDetails() {
               {/* 📄 Scrollable Content Sections */}
               <div className="space-y-8">
 
-                  {/* Professional Grades Tab Content */}
+              {/* 1. Card Information (includes slab detection when applicable) */}
+              <CollapsibleSection
+                title="Card Information"
+                tourId="tour-card-info"
+              >
               {/* Professional Grading Slab Detection - Dual Display */}
               {card.slab_detected && card.slab_company && (
                 <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl shadow-xl p-6 border-4 border-yellow-400">
@@ -3512,15 +3510,7 @@ export function OnePieceCardDetails() {
                 </div>
               )}
 
-                  {/* Card Details Tab Content */}
-              {/* Section Header: Card Information */}
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Card Information
-                </h2>
-              </div>
-
-              {/* One Piece Card Information Section */}
+              {/* Card Information with Rarity Features */}
               <div id="tour-card-info" className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6">
                 <div className="flex items-center justify-between mb-6 pb-3 border-b-2 border-gray-200">
                   <h2 className="text-2xl font-bold text-gray-900">
@@ -4112,19 +4102,17 @@ export function OnePieceCardDetails() {
                     )}
                   </div>
                 )}
-              </div>
+              </CollapsibleSection>
 
-                  {/* Centering Tab Content */}
-              {/* Section Header: Centering Details */}
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Centering Details
-                </h2>
-              </div>
-
+              {/* 2. Centering Analysis */}
+              <CollapsibleSection
+                title="Centering Analysis"
+                badge={card.conversational_sub_scores?.centering ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+                tourId="tour-centering"
+              >
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}
               {(card.conversational_sub_scores || centering.front_left_right_ratio_text || centering.back_left_right_ratio_text) && (
-              <div id="tour-centering" className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
+              <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
 
                 {/* Card Images with Centering Bars */}
                 <div className="mb-6">
@@ -4218,12 +4206,14 @@ export function OnePieceCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.front_url}
-                                alt="Card Front"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.front_url}
+                                  alt="Card Front"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4269,12 +4259,14 @@ export function OnePieceCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.back_url}
-                                alt="Card Back"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.back_url}
+                                  alt="Card Back"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4393,15 +4385,49 @@ export function OnePieceCardDetails() {
                 )}
               </div>
               )}
+              </CollapsibleSection>
 
-
-                  {/* Corners Tab Content */}
-              {/* Section Header: Corners, Edges and Surface Analysis */}
-              <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  Corners, Edges and Surface Analysis
-                </h2>
-              </div>
+              {/* 3. Corners, Edges & Surface Analysis */}
+              <CollapsibleSection
+                title="Corners, Edges & Surface Analysis"
+              >
+              {/* Defect Overlay Images */}
+              {(frontDefects.length > 0 || backDefects.length > 0) && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-800">Defect Map</h3>
+                    <button
+                      onClick={() => setShowOverlays(!showOverlays)}
+                      className="text-xs text-gray-600 hover:text-gray-800 transition-colors flex items-center gap-1 px-3 py-1 rounded-full border border-gray-300 hover:border-gray-400"
+                    >
+                      <span className={`w-2 h-2 rounded-full ${showOverlays ? 'bg-green-400' : 'bg-gray-400'}`} />
+                      {showOverlays ? 'Hide' : 'Show'} Markers
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Front</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.front_url} alt="Card Front" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={frontDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && frontDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={frontDefects} activeDefectId={hoveredDefect?.side === 'front' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Back</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.back_url} alt="Card Back" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={backDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && backDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={backDefects} activeDefectId={hoveredDefect?.side === 'back' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {(() => {
                 // Extract JSON data or fall back to parsed data
@@ -4478,6 +4504,11 @@ export function OnePieceCardDetails() {
                       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg px-4 py-2 shadow-md">
                         <h3 className="text-lg font-bold">Front Side</h3>
                       </div>
+
+                      {/* Front Corner Zoom Crops */}
+                      {card.front_url && (
+                        <CornerZoomCrops imageUrl={card.front_url} side="front" slabDetected={!!card.slab_detected} />
+                      )}
 
                       {/* Front Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-blue-200 p-4 min-h-[280px] flex flex-col">
@@ -4623,6 +4654,11 @@ export function OnePieceCardDetails() {
                         <h3 className="text-lg font-bold">Back Side</h3>
                       </div>
 
+                      {/* Back Corner Zoom Crops */}
+                      {card.back_url && (
+                        <CornerZoomCrops imageUrl={card.back_url} side="back" slabDetected={!!card.slab_detected} />
+                      )}
+
                       {/* Back Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-purple-200 p-4 min-h-[280px] flex flex-col">
                         <div className="flex items-center justify-between mb-3">
@@ -4763,10 +4799,18 @@ export function OnePieceCardDetails() {
                   </div>
                 );
               })()}
+              </CollapsibleSection>
 
-
-              {/* DCM Optic™ Confidence Score */}
-              <div id="tour-optic-score" className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
+              {/* 4. DCM Optic Confidence Score */}
+              <CollapsibleSection
+                title="DCM Optic™ Confidence Score"
+                badge={(() => {
+                  const ig = card.conversational_image_confidence || card.dvg_image_quality || card.ai_confidence_score || 'B';
+                  return ig;
+                })()}
+                tourId="tour-optic-score"
+              >
+              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
                 <h2 className="text-xl font-bold mb-4 text-gray-800">
                   DCM Optic™ Confidence Score
                 </h2>
@@ -5016,20 +5060,14 @@ export function OnePieceCardDetails() {
                   );
                 })()}
               </div>
-                  {/* Professional Grades Tab Content - Grade Estimates */}
-              {/* Section Header: Professional Grades */}
-              <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Professional Grades
-                </h2>
-              </div>
+              </CollapsibleSection>
 
-              {/* Professional Grading Company Estimates */}
+              {/* 6. Estimated Mail-Away Grade Scores */}
               {professionalGrades && (
-                <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
-                  <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
-                    Professional Grading Estimates
-                  </h2>
+              <CollapsibleSection
+                title="Estimated Mail-Away Grade Scores"
+                tourId="tour-pro-estimates"
+              >
                   <p className="text-sm text-gray-600 mb-6">
                     Estimated grades from major grading companies based on measured DCM metrics. These are projections only and not official grades.
                   </p>
@@ -5195,16 +5233,15 @@ export function OnePieceCardDetails() {
                       Actual professional grades may vary. Only official grading by these companies provides authentic certification.
                     </p>
                   </div>
-                </div>
+              </CollapsibleSection>
               )}
 
-                  {/* Market & Pricing Tab Content */}
-              {/* Section Header: Market & Pricing */}
-              <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Market & Pricing
-                </h2>
-              </div>
+              {/* 5. Market Value */}
+              <CollapsibleSection
+                title="Market Value"
+                badge={dcmPriceData?.estimatedValue ? `~$${dcmPriceData.estimatedValue}` : undefined}
+                tourId="tour-market-value"
+              >
 
               {/* PriceCharting Market Value Section */}
               <div id="tour-live-market-pricing">
@@ -5359,27 +5396,19 @@ export function OnePieceCardDetails() {
                 </div>
 
               </div>
+              </CollapsibleSection>
 
-              {/* Insta-List on eBay Section */}
+              {/* 7. Insta-List on eBay (owner only) */}
               {(() => {
                 const session = getStoredSession();
                 const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
                 if (!isOwner) return null;
 
                 return (
-                  <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
-                        <p className="text-sm text-gray-500">List this One Piece card directly to eBay</p>
-                      </div>
-                    </div>
-
+                  <CollapsibleSection
+                    title="Insta-List on eBay"
+                    tourId="tour-insta-list"
+                  >
                     <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
                         <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5404,13 +5433,16 @@ export function OnePieceCardDetails() {
                       labelStyle={labelStyle}
                       className="w-full"
                     />
-                  </div>
+                  </CollapsibleSection>
                 );
               })()}
 
+              </div>
             </div>
           )}
 
+          {/* LEGACY_SECTIONS_START - removed in layout redesign */}
+          {false && (() => {
           {/* 3. Category Breakdown Scores (v3.0) - Legacy Fallback */}
           {(!dvgGrading || Object.keys(dvgGrading).length === 0) && (() => {
             // v3.1: Read category scores with fallback to v3.1 category_scores field
@@ -5856,46 +5888,14 @@ export function OnePieceCardDetails() {
               )}
             </div>
           )}
+          return null;
+          })()}
 
-          {/* DCM Optic™ Report */}
+          {/* 8. DCM Optic Report */}
           {card.conversational_grading && (
-            <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl shadow-xl p-8 mt-8 border border-indigo-200">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-6 border-b-2 border-indigo-200">
-                <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 shadow-lg">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">DCM Optic™ Report</h2>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowConversationalGrading(!showConversationalGrading)}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl font-semibold"
-                >
-                  {showConversationalGrading ? (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                      </svg>
-                      Hide Full Report
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      View Full Report
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Expanded Report */}
-              {showConversationalGrading && (
+            <CollapsibleSection
+              title="DCM Optic™ Report"
+            >
                 <div className="space-y-6">
                   {/* Professional Executive Report */}
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -6490,8 +6490,7 @@ export function OnePieceCardDetails() {
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+            </CollapsibleSection>
           )}
 
           {/* DCM Optic Version and Graded Date Section */}

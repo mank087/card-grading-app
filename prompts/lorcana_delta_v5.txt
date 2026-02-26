@@ -236,20 +236,4 @@ E. LORCANA CARD GRADING EXAMPLES
 **ENCHANTED VARIANT EXAMPLE:**
 "This Enchanted variant Lorcana card has a full-art holographic treatment across the entire front surface. Examining the holographic layer, I detect one hairline scratch in the center running approximately 6mm. The scratch disrupts the rainbow holographic pattern. Surface score: 9.0 due to holo scratch."
 
-═══════════════════════════════════════════════════════════════════════
-END OF LORCANA DELTA v5.0
-═══════════════════════════════════════════════════════════════════════
-
-**TOTAL LINES:** ~260
-**ESTIMATED TOKENS:** ~2,000-2,500
-
-**COMBINED PROMPT SIZE (Master + Lorcana Delta):**
-• Master Rubric: ~18,000-20,000 tokens
-• Lorcana Delta: ~2,000-2,500 tokens
-• **TOTAL: ~20,000-22,500 tokens** ✓ Within target range
-
-When grading Disney Lorcana cards, use:
-1. Master Grading Rubric v5.0 (universal grading rules)
-2. Lorcana Delta v5.0 (this file - Lorcana-specific rules)
-
-Apply ALL instructions from BOTH files to complete grading analysis.
+--- END OF LORCANA DELTA v5.0 ---

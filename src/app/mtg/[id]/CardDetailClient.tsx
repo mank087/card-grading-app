@@ -48,6 +48,11 @@ import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
+import { DefectOverlay } from '@/components/grading/DefectOverlay';
+import { DefectLegend } from '@/components/grading/DefectLegend';
+import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
+import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
+import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1458,6 +1463,11 @@ export function MTGCardDetails() {
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
+  // 🔍 Visual defect overlay state
+  const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
+  const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
+  const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
+  const [showOverlays, setShowOverlays] = useState(true);
   // 💰 DCM pricing data from PriceCharting
   const [dcmPriceData, setDcmPriceData] = useState<{
     estimatedValue: number | null;
@@ -1723,6 +1733,17 @@ export function MTGCardDetails() {
       console.error('[Defects Error] ❌ Failed to get defects:', error);
     }
   }, [card]);
+
+  // Extract overlay defects from raw conversational_grading JSON
+  useEffect(() => {
+    if (!card?.conversational_grading) {
+      setFrontDefects([]);
+      setBackDefects([]);
+      return;
+    }
+    setFrontDefects(extractOverlayDefects(card.conversational_grading, 'front'));
+    setBackDefects(extractOverlayDefects(card.conversational_grading, 'back'));
+  }, [card?.conversational_grading]);
 
   // Open zoom modal
   const openZoomModal = (imageUrl: string, alt: string, title: string) => {
@@ -2825,7 +2846,7 @@ export function MTGCardDetails() {
 
               {/* Front Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.front_url, "MTG card front", "Card Front - Click for detailed view")}
               >
                 <Image
@@ -3001,7 +3022,7 @@ export function MTGCardDetails() {
 
               {/* Back Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.back_url, "MTG card back", "Card Back - Click for detailed view")}
               >
                 <Image
@@ -3020,32 +3041,6 @@ export function MTGCardDetails() {
 
         {/* Card Details and Grading */}
         <div className="space-y-6">
-
-          {/* Professional Grading Slab Information */}
-          {card.slab_detected && card.slab_company && (
-            <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-2xl p-6 shadow-lg">
-              <div className="flex items-center justify-center mb-4">
-                <h2 className="text-2xl font-bold">Professional Grading</h2>
-              </div>
-              <div className="space-y-3 text-center">
-                <div className="bg-white/20 rounded-lg p-4">
-                  <p className="text-sm font-medium text-green-100 mb-1">Professional Grade</p>
-                  <p className="text-3xl font-extrabold">
-                    {card.slab_company} {card.slab_grade}
-                    {card.slab_grade_description && (
-                      <span className="text-xl ml-2">({card.slab_grade_description})</span>
-                    )}
-                  </p>
-                </div>
-                {card.slab_cert_number && (
-                  <div className="bg-white/20 rounded-lg p-3">
-                    <p className="text-sm font-medium text-green-100 mb-1">Certification Number</p>
-                    <p className="text-lg font-semibold font-mono">{card.slab_cert_number}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* DVG v1 Grading Results */}
           {dvgGrading && Object.keys(dvgGrading).length > 0 && (
@@ -3511,13 +3506,11 @@ export function MTGCardDetails() {
                 </div>
               )}
 
-                  {/* Card Details Tab Content */}
-              {/* Section Header: Card Information */}
-              <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Card Information
-                </h2>
-              </div>
+              {/* 1. Card Information (includes slab detection when applicable) */}
+              <CollapsibleSection
+                title="Card Information"
+                tourId="tour-card-info"
+              >
 
               {/* MTG Card Information Section */}
               <div id="tour-card-info" className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6">
@@ -4153,16 +4146,14 @@ export function MTGCardDetails() {
                     )}
                   </div>
                 )}
-              </div>
+              </CollapsibleSection>
 
-                  {/* Centering Tab Content */}
-              {/* Section Header: Centering Details */}
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Centering Details
-                </h2>
-              </div>
-
+              {/* 2. Centering Analysis */}
+              <CollapsibleSection
+                title="Centering Analysis"
+                badge={card.conversational_sub_scores?.centering ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+                tourId="tour-centering"
+              >
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}
               {(card.conversational_sub_scores || centering.front_left_right_ratio_text || centering.back_left_right_ratio_text) && (
               <div id="tour-centering" className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
@@ -4259,12 +4250,14 @@ export function MTGCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.front_url}
-                                alt="Card Front"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.front_url}
+                                  alt="Card Front"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4310,12 +4303,14 @@ export function MTGCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.back_url}
-                                alt="Card Back"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.back_url}
+                                  alt="Card Back"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4434,15 +4429,46 @@ export function MTGCardDetails() {
                 )}
               </div>
               )}
+              </CollapsibleSection>
 
-
-                  {/* Corners Tab Content */}
-              {/* Section Header: Corners, Edges and Surface Analysis */}
-              <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  Corners, Edges and Surface Analysis
-                </h2>
-              </div>
+              {/* 3. Corners, Edges & Surface Analysis */}
+              <CollapsibleSection
+                title="Corners, Edges & Surface Analysis"
+              >
+              {/* Defect Overlay Images */}
+              {(frontDefects.length > 0 || backDefects.length > 0) && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-800">Defect Map</h3>
+                    <button onClick={() => setShowOverlays(!showOverlays)} className="text-xs text-gray-600 hover:text-gray-800 transition-colors flex items-center gap-1 px-3 py-1 rounded-full border border-gray-300 hover:border-gray-400">
+                      <span className={`w-2 h-2 rounded-full ${showOverlays ? 'bg-green-400' : 'bg-gray-400'}`} />
+                      {showOverlays ? 'Hide' : 'Show'} Markers
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Front</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.front_url} alt="Card Front" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={frontDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && frontDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={frontDefects} activeDefectId={hoveredDefect?.side === 'front' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Back</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.back_url} alt="Card Back" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={backDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && backDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={backDefects} activeDefectId={hoveredDefect?.side === 'back' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {(() => {
                 // Extract JSON data or fall back to parsed data
@@ -4519,6 +4545,11 @@ export function MTGCardDetails() {
                       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg px-4 py-2 shadow-md">
                         <h3 className="text-lg font-bold">Front Side</h3>
                       </div>
+
+                      {/* Front Corner Zoom Crops */}
+                      {card.front_url && (
+                        <CornerZoomCrops imageUrl={card.front_url} side="front" slabDetected={!!card.slab_detected} />
+                      )}
 
                       {/* Front Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-blue-200 p-4 min-h-[280px] flex flex-col">
@@ -4664,6 +4695,11 @@ export function MTGCardDetails() {
                         <h3 className="text-lg font-bold">Back Side</h3>
                       </div>
 
+                      {/* Back Corner Zoom Crops */}
+                      {card.back_url && (
+                        <CornerZoomCrops imageUrl={card.back_url} side="back" slabDetected={!!card.slab_detected} />
+                      )}
+
                       {/* Back Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-purple-200 p-4 min-h-[280px] flex flex-col">
                         <div className="flex items-center justify-between mb-3">
@@ -4804,13 +4840,14 @@ export function MTGCardDetails() {
                   </div>
                 );
               })()}
+              </CollapsibleSection>
 
-
-              {/* DCM Optic™ Confidence Score */}
-              <div id="tour-optic-score" className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-800">
-                  DCM Optic™ Confidence Score
-                </h2>
+              {/* 4. DCM Optic Confidence Score */}
+              <CollapsibleSection
+                title="DCM Optic™ Confidence Score"
+                badge={card.conversational_image_confidence || card.dvg_image_quality || imageQuality?.grade || 'B'}
+                tourId="tour-optic-score"
+              >
 
                 {(() => {
                   // Calculate image grade first (use same priority as display)
@@ -5056,14 +5093,210 @@ export function MTGCardDetails() {
                     </>
                   );
                 })()}
+              </CollapsibleSection>
+
+              {/* 5. Market Value */}
+              <CollapsibleSection
+                title="Market Value"
+                badge={dcmPriceData?.estimatedPrice ? `$${dcmPriceData.estimatedPrice}` : undefined}
+                tourId="tour-market-value"
+              >
+              {/* DCM Price Lookup Section */}
+              <div>
+                {(() => {
+                  const session = getStoredSession();
+                  const isPricingOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+
+                  return (
+                    <MTGPriceLookup
+                      card={{
+                        id: card.id,
+                        card_name: cardInfo.card_name || card.card_name,
+                        set_name: cardInfo.set_name || card.card_set,
+                        collector_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
+                        expansion_code: cardInfo.expansion_code || card.expansion_code,
+                        year: cardInfo.set_year || card.release_date,
+                        is_foil: cardInfo.is_foil || card.is_foil || false,
+                        rarity_or_variant: cardInfo.rarity_or_variant || cardInfo.rarity || card.mtg_rarity,
+                      }}
+                      dcmGrade={card.conversational_decimal_grade ?? undefined}
+                      isOwner={isPricingOwner}
+                      onPriceLoad={setDcmPriceData}
+                    />
+                  );
+                })()}
               </div>
-                  {/* Professional Grades Tab Content - Grade Estimates */}
-              {/* Section Header: Professional Grades */}
-              <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Professional Grades
+
+              {/* Find and Price This Card */}
+              <div className="bg-white rounded-lg shadow-lg p-6">
+                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
+                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  Find and Price This Card or Similar
                 </h2>
+                <p className="text-gray-600 mb-4">
+                  Search eBay to find similar cards and current market pricing for this {cardInfo.card_name || card.card_name || card.featured} card.
+                </p>
+
+                {/* All Marketplace Buttons in One Row */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {/* TCGPlayer Search Link - Always use search URL (direct API URLs often timeout) */}
+                  {(() => {
+                    // Build search URL using card name + number (most reliable)
+                    const cardName = extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name);
+                    const setName = extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set);
+
+                    const cardData = {
+                      category: 'MTG',
+                      card_name: cardName,
+                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                      card_set: setName,
+                      card_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
+                      expansion_code: cardInfo.expansion_code || card.expansion_code,
+                      is_foil: cardInfo.is_foil || card.is_foil || false,
+                      subset: extractEnglishForSearch(cardInfo.subset) || extractEnglishForSearch(card.subset),
+                      language: cardInfo.language || card.language
+                    } as CardData;
+
+                    const setSearchUrl = generateTCGPlayerSetSearchUrl(cardData);
+                    const tcgplayerUrl = setSearchUrl || generateTCGPlayerSearchUrl(cardData);
+                    const displaySetName = cardInfo.set_name || card.card_set;
+
+                    return (
+                      <a
+                        href={tcgplayerUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200 group"
+                      >
+                        <div className="w-10 h-10 bg-orange-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-orange-900 text-sm">TCGPlayer</h3>
+                          <p className="text-xs text-orange-700 truncate">
+                            {displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Search listings'}
+                          </p>
+                        </div>
+                      </a>
+                    );
+                  })()}
+
+                  {/* eBay General Search */}
+                  <a
+                    href={generateMTGEbaySearchUrl({
+                      category: 'MTG',
+                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
+                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
+                      card_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
+                      expansion_code: cardInfo.expansion_code || card.expansion_code,
+                      is_foil: cardInfo.is_foil || card.is_foil || false,
+                      subset: extractEnglishForSearch(cardInfo.subset) || extractEnglishForSearch(card.subset),
+                      language: cardInfo.language || card.language,
+                      dcm_grade_whole: card.conversational_whole_grade || recommendedGrade.recommended_whole_grade
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
+                  >
+                    <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-blue-900 text-sm">eBay</h3>
+                      <p className="text-xs text-blue-700 truncate">Active listings</p>
+                    </div>
+                  </a>
+
+                  {/* eBay Sold Listings */}
+                  <a
+                    href={generateMTGEbaySoldListingsUrl({
+                      category: 'MTG',
+                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
+                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
+                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
+                      card_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
+                      expansion_code: cardInfo.expansion_code || card.expansion_code,
+                      is_foil: cardInfo.is_foil || card.is_foil || false,
+                      subset: extractEnglishForSearch(cardInfo.subset) || extractEnglishForSearch(card.subset),
+                      language: cardInfo.language || card.language,
+                      dcm_grade_whole: card.conversational_whole_grade || recommendedGrade.recommended_whole_grade
+                    } as CardData)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
+                  >
+                    <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-green-900 text-sm">eBay Sold</h3>
+                      <p className="text-xs text-green-700 truncate">Price history</p>
+                    </div>
+                  </a>
+
+                  {/* Scryfall - Link to verified card page */}
+                  {(card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id) && (
+                    <a
+                      href={`https://scryfall.com/card/${card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
+                    >
+                      <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-purple-900 text-sm">Scryfall</h3>
+                        <p className="text-xs text-purple-700 truncate">
+                          {card.mtg_api_verified ? 'Verified card' : 'Card database'}
+                        </p>
+                      </div>
+                    </a>
+                  )}
+
+                  {/* PriceCharting Search */}
+                  <a
+                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
+                      [
+                        extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
+                        extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set)
+                      ].filter(Boolean).join(' ')
+                    )}&type=prices`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center p-3 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200 group"
+                  >
+                    <div className="w-10 h-10 bg-indigo-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-indigo-900 text-sm">PriceCharting</h3>
+                      <p className="text-xs text-indigo-700 truncate">Market data</p>
+                    </div>
+                  </a>
+                </div>
+
               </div>
+              </CollapsibleSection>
+
+              {/* 6. Estimated Mail-Away Grade Scores */}
+              <CollapsibleSection
+                title="Estimated Mail-Away Grade Scores"
+                tourId="tour-pro-estimates"
+              >
 
               {/* Professional Grading Company Estimates */}
               {professionalGrades && (
@@ -5238,213 +5471,19 @@ export function MTGCardDetails() {
                   </div>
                 </div>
               )}
+              </CollapsibleSection>
 
-                  {/* Market & Pricing Tab Content */}
-              {/* Section Header: Market & Pricing */}
-              <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Market & Pricing
-                </h2>
-              </div>
-
-              {/* DCM Price Lookup Section */}
-              <div id="tour-live-market-pricing">
-                {(() => {
-                  const session = getStoredSession();
-                  const isPricingOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
-
-                  return (
-                    <MTGPriceLookup
-                      card={{
-                        id: card.id,
-                        card_name: cardInfo.card_name || card.card_name,
-                        set_name: cardInfo.set_name || card.card_set,
-                        collector_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
-                        expansion_code: cardInfo.expansion_code || card.expansion_code,
-                        year: cardInfo.set_year || card.release_date,
-                        is_foil: cardInfo.is_foil || card.is_foil || false,
-                        rarity_or_variant: cardInfo.rarity_or_variant || cardInfo.rarity || card.mtg_rarity,
-                      }}
-                      dcmGrade={card.conversational_decimal_grade ?? undefined}
-                      isOwner={isPricingOwner}
-                      onPriceLoad={setDcmPriceData}
-                    />
-                  );
-                })()}
-              </div>
-
-              {/* Find and Price This Card */}
-              <div id="tour-market-pricing" className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-800 flex items-center">
-                  <svg className="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                  Find and Price This Card or Similar
-                </h2>
-                <p className="text-gray-600 mb-4">
-                  Search eBay to find similar cards and current market pricing for this {cardInfo.card_name || card.card_name || card.featured} card.
-                </p>
-
-                {/* All Marketplace Buttons in One Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {/* TCGPlayer Search Link - Always use search URL (direct API URLs often timeout) */}
-                  {(() => {
-                    // Build search URL using card name + number (most reliable)
-                    const cardName = extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name);
-                    const setName = extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set);
-
-                    const cardData = {
-                      category: 'MTG',
-                      card_name: cardName,
-                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                      card_set: setName,
-                      card_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
-                      expansion_code: cardInfo.expansion_code || card.expansion_code,
-                      is_foil: cardInfo.is_foil || card.is_foil || false,
-                      subset: extractEnglishForSearch(cardInfo.subset) || extractEnglishForSearch(card.subset),
-                      language: cardInfo.language || card.language
-                    } as CardData;
-
-                    const setSearchUrl = generateTCGPlayerSetSearchUrl(cardData);
-                    const tcgplayerUrl = setSearchUrl || generateTCGPlayerSearchUrl(cardData);
-                    const displaySetName = cardInfo.set_name || card.card_set;
-
-                    return (
-                      <a
-                        href={tcgplayerUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center p-3 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors border border-orange-200 group"
-                      >
-                        <div className="w-10 h-10 bg-orange-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-orange-900 text-sm">TCGPlayer</h3>
-                          <p className="text-xs text-orange-700 truncate">
-                            {displaySetName && displaySetName !== 'Unknown' ? displaySetName : 'Search listings'}
-                          </p>
-                        </div>
-                      </a>
-                    );
-                  })()}
-
-                  {/* eBay General Search */}
-                  <a
-                    href={generateMTGEbaySearchUrl({
-                      category: 'MTG',
-                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
-                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
-                      card_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
-                      expansion_code: cardInfo.expansion_code || card.expansion_code,
-                      is_foil: cardInfo.is_foil || card.is_foil || false,
-                      subset: extractEnglishForSearch(cardInfo.subset) || extractEnglishForSearch(card.subset),
-                      language: cardInfo.language || card.language,
-                      dcm_grade_whole: card.conversational_whole_grade || recommendedGrade.recommended_whole_grade
-                    } as CardData)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors border border-blue-200 group"
-                  >
-                    <div className="w-10 h-10 bg-blue-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-blue-900 text-sm">eBay</h3>
-                      <p className="text-xs text-blue-700 truncate">Active listings</p>
-                    </div>
-                  </a>
-
-                  {/* eBay Sold Listings */}
-                  <a
-                    href={generateMTGEbaySoldListingsUrl({
-                      category: 'MTG',
-                      card_name: extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
-                      featured: extractEnglishForSearch(cardInfo.player_or_character) || extractEnglishForSearch(card.featured),
-                      card_set: extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set),
-                      card_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
-                      expansion_code: cardInfo.expansion_code || card.expansion_code,
-                      is_foil: cardInfo.is_foil || card.is_foil || false,
-                      subset: extractEnglishForSearch(cardInfo.subset) || extractEnglishForSearch(card.subset),
-                      language: cardInfo.language || card.language,
-                      dcm_grade_whole: card.conversational_whole_grade || recommendedGrade.recommended_whole_grade
-                    } as CardData)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-green-50 rounded-lg hover:bg-green-100 transition-colors border border-green-200 group"
-                  >
-                    <div className="w-10 h-10 bg-green-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-green-900 text-sm">eBay Sold</h3>
-                      <p className="text-xs text-green-700 truncate">Price history</p>
-                    </div>
-                  </a>
-
-                  {/* Scryfall - Link to verified card page */}
-                  {(card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id) && (
-                    <a
-                      href={`https://scryfall.com/card/${card.mtg_api_id || card.scryfall_id || cardInfo.scryfall_id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center p-3 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors border border-purple-200 group"
-                    >
-                      <div className="w-10 h-10 bg-purple-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                        <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                        </svg>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-purple-900 text-sm">Scryfall</h3>
-                        <p className="text-xs text-purple-700 truncate">
-                          {card.mtg_api_verified ? '✓ Verified card' : 'Card database'}
-                        </p>
-                      </div>
-                    </a>
-                  )}
-
-                  {/* PriceCharting Search */}
-                  <a
-                    href={dcmPriceData?.priceChartingUrl || `https://www.pricecharting.com/search-products?q=${encodeURIComponent(
-                      [
-                        extractEnglishForSearch(cardInfo.card_name) || extractEnglishForSearch(card.card_name),
-                        extractEnglishForSearch(cardInfo.set_name) || extractEnglishForSearch(card.card_set)
-                      ].filter(Boolean).join(' ')
-                    )}&type=prices`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center p-3 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition-colors border border-indigo-200 group"
-                  >
-                    <div className="w-10 h-10 bg-indigo-600 rounded flex items-center justify-center mr-3 group-hover:scale-105 transition-transform flex-shrink-0">
-                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-indigo-900 text-sm">PriceCharting</h3>
-                      <p className="text-xs text-indigo-700 truncate">Market data</p>
-                    </div>
-                  </a>
-                </div>
-
-              </div>
-
-              {/* Insta-List on eBay Section */}
+              {/* 7. Insta-List on eBay (owner only) */}
               {(() => {
                 const session = getStoredSession();
                 const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
                 if (!isOwner) return null;
 
                 return (
-                  <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
+                  <CollapsibleSection
+                    title="Insta-List on eBay"
+                    tourId="tour-insta-list"
+                  >
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
                         <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5452,7 +5491,6 @@ export function MTGCardDetails() {
                         </svg>
                       </div>
                       <div>
-                        <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
                         <p className="text-sm text-gray-500">List this MTG card directly to eBay</p>
                       </div>
                     </div>
@@ -5480,497 +5518,19 @@ export function MTGCardDetails() {
                       labelStyle={labelStyle}
                       className="w-full"
                     />
-                  </div>
+                  </CollapsibleSection>
                 );
               })()}
-            </div>
-          )}
 
-          {/* 3. Category Breakdown Scores (v3.0) - Legacy Fallback */}
-          {(!dvgGrading || Object.keys(dvgGrading).length === 0) && (() => {
-            // v3.1: Read category scores with fallback to v3.1 category_scores field
-            const categoryScores = gradingScale["Category Scores"] || card.ai_grading?.category_scores;
-            return categoryScores && (
-              <div className="bg-white rounded-lg shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-800">Category Breakdown Scores</h2>
-                {card.ai_grading?.["Alteration Check"]?.card_is_altered && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-800">
-                    ⚠️ Category scores are not applicable for altered cards. See Alteration Check section below for details.
-                  </div>
-                )}
-                <div className="space-y-4">
-                  {Object.entries(categoryScores).map(([category, data]: [string, any]) => {
-                  const rawScore = data.score;
-                  const isNA = rawScore === "NA" || rawScore === null || rawScore === undefined;
-                  const score = isNA ? 0 : (typeof rawScore === 'number' ? rawScore : parseFloat(rawScore) || 0);
-                  const weight = data.weight || 0;
-                  const contribution = data.contribution || 0;
-                  const percentage = isNA ? 0 : (score / 10) * 100;
-                  // Convert weight to percentage if it's a decimal (0.30 → 30%)
-                  const weightPercent = weight < 1 ? safeToFixed(weight * 100, 0) : safeToFixed(weight, 0);
-
-                  return (
-                    <div key={category} className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="font-semibold text-gray-800 capitalize">
-                          {category.replace(/_/g, ' ')}
-                        </span>
-                        <div className="text-right">
-                          <span className={`text-2xl font-bold ${isNA ? 'text-red-600' : 'text-blue-600'}`}>
-                            {isNA ? 'NA' : safeToFixed(score, 1)}
-                          </span>
-                          {!isNA && <span className="text-sm text-gray-500 ml-2">/ 10</span>}
-                        </div>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                        <div
-                          className={`h-full rounded-full transition-all ${
-                            isNA ? 'bg-gray-400' :
-                            percentage >= 90 ? 'bg-green-500' :
-                            percentage >= 80 ? 'bg-blue-500' :
-                            percentage >= 70 ? 'bg-yellow-500' :
-                            'bg-red-500'
-                          }`}
-                          style={{ width: `${percentage}%` }}
-                        />
-                      </div>
-                      <div className="flex justify-between text-sm text-gray-600">
-                        <span>Weight: {weightPercent}%</span>
-                        <span>Contribution: {isNA ? 'N/A' : safeToFixed(contribution, 2)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-                {gradingScale["Weighted Composite Score"] && (
-                  <div className="mt-6 pt-4 border-t border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <span className="text-lg font-bold text-gray-800">Weighted Composite Score:</span>
-                      <span className={`text-3xl font-bold ${card.ai_grading?.["Alteration Check"]?.card_is_altered ? 'text-red-600' : 'text-blue-600'}`}>
-                        {card.ai_grading?.["Alteration Check"]?.card_is_altered
-                          ? 'NA'
-                          : safeToFixed(gradingScale["Weighted Composite Score"], 2)}
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-            );
-          })()}
-
-          {/* 4. DCM Confidence and Image Quality */}
-          {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Confidence and Image Quality</h2>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* DCM Confidence Section */}
-                {card.ai_grading?.["AI Confidence Assessment"] && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">DCM Confidence</h3>
-                    <div className="space-y-3">
-                      <div>
-                        <span className="font-semibold text-gray-600">Confidence Tier:</span>
-                        <span className={`ml-2 capitalize font-bold ${
-                          card.ai_grading["AI Confidence Assessment"]["Confidence Tier"] === 'high' ? 'text-green-600' :
-                          card.ai_grading["AI Confidence Assessment"]["Confidence Tier"] === 'medium' ? 'text-blue-600' :
-                          'text-yellow-600'
-                        }`}>
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Confidence Tier"])}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-600">Confidence Letter Grade:</span>
-                        <span className="ml-2 font-bold text-lg text-blue-600">
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Confidence Letter Grade"])}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-600">Grade Uncertainty:</span>
-                        <span className="ml-2 font-semibold">
-                          {renderValue(card.ai_grading["AI Confidence Assessment"]["Grade Uncertainty"])}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Image Quality Section */}
-                {card.ai_grading?.["Image Conditions"] && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Image Quality</h3>
-
-                    {/* Overall Quality Score */}
-                    {card.ai_grading["Image Conditions"]["Overall Quality Score"] && (
-                      <div className="mb-3 p-3 bg-gradient-to-r from-green-50 to-blue-50 rounded-lg">
-                        <div className="flex items-center justify-between">
-                          <span className="font-semibold text-gray-700">Overall Score:</span>
-                          <span className={`text-2xl font-bold ${
-                            Number(card.ai_grading["Image Conditions"]["Overall Quality Score"]) >= 7 ? 'text-green-600' :
-                            Number(card.ai_grading["Image Conditions"]["Overall Quality Score"]) >= 5 ? 'text-blue-600' :
-                            'text-yellow-600'
-                          }`}>
-                            {renderValue(card.ai_grading["Image Conditions"]["Overall Quality Score"])}/10
-                          </span>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-600">Resolution:</span>
-                        <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Resolution"] === 'high' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Resolution"] === 'standard' ? 'text-blue-600' :
-                          'text-red-600'
-                        }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Resolution"])}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-600">Lighting:</span>
-                        <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Lighting"] === 'even' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Lighting"] === 'adequate' ? 'text-blue-600' :
-                          'text-red-600'
-                        }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Lighting"])}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-600">Clarity:</span>
-                        <span className={`capitalize ${
-                          card.ai_grading["Image Conditions"]["Clarity"] === 'sharp' ? 'text-green-600 font-semibold' :
-                          card.ai_grading["Image Conditions"]["Clarity"] === 'moderate' ? 'text-blue-600' :
-                          'text-red-600'
-                        }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Clarity"])}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-600">Glare:</span>
-                        <span className={`${
-                          card.ai_grading["Image Conditions"]["Glare Present"] === 'Yes' ? 'text-red-600 font-semibold' :
-                          'text-green-600 font-semibold'
-                        }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Glare Present"])}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="font-semibold text-gray-600">Quality Tier:</span>
-                        <span className={`capitalize font-semibold ${
-                          card.ai_grading["Image Conditions"]["Quality Tier"] === 'high' ? 'text-green-600' :
-                          card.ai_grading["Image Conditions"]["Quality Tier"] === 'medium' ? 'text-blue-600' :
-                          'text-yellow-600'
-                        }`}>
-                          {renderValue(card.ai_grading["Image Conditions"]["Quality Tier"])}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Additional Info Sections */}
-              {card.ai_grading?.["AI Confidence Assessment"]?.["Grading Reliability"] && (
-                <div className="mt-6 bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Grading Reliability: </span>
-                    {card.ai_grading["AI Confidence Assessment"]["Grading Reliability"]}
-                  </p>
-                </div>
-              )}
-
-              {card.ai_grading?.["Image Conditions"]?.["Impact on Grading"] && (
-                <div className="mt-4 bg-blue-50 rounded-lg p-4">
-                  <p className="text-sm text-gray-700">
-                    <span className="font-semibold">Impact on Grading: </span>
-                    {card.ai_grading["Image Conditions"]["Impact on Grading"]}
-                  </p>
-                </div>
-              )}
-
-              {card.ai_grading?.["AI Confidence Assessment"]?.["Recommendations"] && (
-                <div className="mt-4 bg-yellow-50 rounded-lg p-4">
-                  <h3 className="font-semibold text-gray-800 mb-2">Recommendations</h3>
-                  {Array.isArray(card.ai_grading["AI Confidence Assessment"]["Recommendations"]) ? (
-                    <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
-                      {card.ai_grading["AI Confidence Assessment"]["Recommendations"].map((rec: string, idx: number) => (
-                        <li key={idx}>{rec}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-gray-700">{card.ai_grading["AI Confidence Assessment"]["Recommendations"]}</p>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 4. Card Detection Assessment */}
-          {card.ai_grading?.["Card Detection Assessment"] && (
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">Card Detection Assessment</h2>
-              <div className="grid md:grid-cols-2 gap-6">
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-semibold text-gray-600">Detection Confidence:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Confidence"])}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-600">Aspect Ratio:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detected Aspect Ratio"])}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-600">Aspect Ratio Validation:</span>
-                    <span className={`ml-2 ${card.ai_grading["Card Detection Assessment"]["Aspect Ratio Validation"] === "Pass" ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}`}>
-                      {renderValue(card.ai_grading["Card Detection Assessment"]["Aspect Ratio Validation"])}
-                    </span>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-semibold text-gray-600">Boundary Quality:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Card Boundary Quality"])}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-600">Detection Factors:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Factors"])}</span>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-600">Impact on Grading:</span>
-                    <span className="ml-2">{renderValue(card.ai_grading["Card Detection Assessment"]["Detection Impact on Grading"])}</span>
-                  </div>
-                </div>
-              </div>
-              {card.ai_grading["Card Detection Assessment"]["Fallback Methods Used"] && (
-                <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-                  <span className="font-semibold text-yellow-800">Fallback Methods Used:</span>
-                  <span className="ml-2 text-yellow-700">{card.ai_grading["Card Detection Assessment"]["Fallback Methods Used"]}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 5. Professional Grading Company Estimates - REMOVED OLD SECTION */}
-          {/* v2.2 REVISED: Execution Control & Fatal Flags */}
-          {card.ai_grading?.["Execution Control"] && (
-            <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
-              <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                  </svg>
-                  Grading Process Status
-                </h3>
-              </div>
-              <div className="p-4 bg-white space-y-3">
-                {/* All Steps Completed */}
-                <div className="flex items-center gap-2">
-                  {card.ai_grading["Execution Control"].all_steps_completed ? (
-                    <>
-                      <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm text-green-700 font-medium">All grading steps completed successfully</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 text-yellow-600" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm text-yellow-700 font-medium">Some steps incomplete or skipped</span>
-                    </>
-                  )}
-                </div>
-
-                {/* Skipped Steps Warning */}
-                {card.ai_grading["Execution Control"].skipped_steps && card.ai_grading["Execution Control"].skipped_steps.length > 0 && (
-                  <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
-                    <div className="text-sm font-medium text-yellow-800 mb-1">⚠️ Skipped Steps:</div>
-                    <ul className="text-sm text-yellow-700 list-disc list-inside">
-                      {card.ai_grading["Execution Control"].skipped_steps.map((step, idx) => (
-                        <li key={idx}>{step}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Fatal Flags Alert */}
-                {card.ai_grading["Execution Control"].fatal_flags && card.ai_grading["Execution Control"].fatal_flags.length > 0 && (
-                  <div className="p-3 bg-red-50 border border-red-200 rounded">
-                    <div className="text-sm font-medium text-red-800 mb-1">🚨 Critical Issues Detected:</div>
-                    <ul className="text-sm text-red-700 list-disc list-inside">
-                      {card.ai_grading["Execution Control"].fatal_flags.map((flag, idx) => (
-                        <li key={idx}>{flag}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
-          {/* END OF DVG SECTIONS */}
-
-          {/* Delete Card Section */}
-          {/* 7. Front/Back Specific Feedback (Parallel Processing v2.3) */}
-          {(card.ai_grading?.front_specific_feedback || card.ai_grading?.back_specific_feedback) && (
-            <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">📊 Front/Back Analysis</h2>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Front Analysis */}
-                {card.ai_grading.front_specific_feedback && (
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-900 mb-3">
-                      Front Condition
-                    </h3>
-                    <p className="text-sm text-blue-800 mb-3">
-                      {card.ai_grading.front_specific_feedback.overall_front_condition || 'Analysis complete'}
-                    </p>
-                    <div className="text-xs text-blue-700 space-y-1">
-                      {card.ai_grading.front_specific_feedback.corner_status && (
-                        <div><strong>Corners:</strong> {card.ai_grading.front_specific_feedback.corner_status}</div>
-                      )}
-                      {card.ai_grading.front_specific_feedback.edge_status && (
-                        <div><strong>Edges:</strong> {card.ai_grading.front_specific_feedback.edge_status}</div>
-                      )}
-                      {card.ai_grading.front_specific_feedback.surface_status && (
-                        <div><strong>Surface:</strong> {card.ai_grading.front_specific_feedback.surface_status}</div>
-                      )}
-                      {card.ai_grading.front_specific_feedback.centering_lr && card.ai_grading.front_specific_feedback.centering_tb && (
-                        <div><strong>Centering:</strong> {card.ai_grading.front_specific_feedback.centering_lr} L/R, {card.ai_grading.front_specific_feedback.centering_tb} T/B</div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Back Analysis */}
-                {card.ai_grading.back_specific_feedback && (
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-green-900 mb-3">
-                      Back Condition
-                    </h3>
-                    <p className="text-sm text-green-800 mb-3">
-                      {card.ai_grading.back_specific_feedback.overall_back_condition || 'Analysis complete'}
-                    </p>
-                    <div className="text-xs text-green-700 space-y-1">
-                      {card.ai_grading.back_specific_feedback.corner_status && (
-                        <div><strong>Corners:</strong> {card.ai_grading.back_specific_feedback.corner_status}</div>
-                      )}
-                      {card.ai_grading.back_specific_feedback.edge_status && (
-                        <div><strong>Edges:</strong> {card.ai_grading.back_specific_feedback.edge_status}</div>
-                      )}
-                      {card.ai_grading.back_specific_feedback.surface_status && (
-                        <div><strong>Surface:</strong> {card.ai_grading.back_specific_feedback.surface_status}</div>
-                      )}
-                      {card.ai_grading.back_specific_feedback.centering_lr && card.ai_grading.back_specific_feedback.centering_tb && (
-                        <div><strong>Centering:</strong> {card.ai_grading.back_specific_feedback.centering_lr} L/R, {card.ai_grading.back_specific_feedback.centering_tb} T/B</div>
-                      )}
-                      {card.ai_grading.back_specific_feedback.authentication_status && (
-                        <div className="font-semibold mt-2 pt-2 border-t border-green-200">
-                          {card.ai_grading.back_specific_feedback.authentication_status}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 8. Text Transcription (OCR) - Parallel Processing v2.3 */}
-          {card.ai_grading?.text_transcription_summary && (
-            <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
-              <h2 className="text-xl font-bold mb-4 text-gray-800">Card Text (OCR)</h2>
-              <p className="text-xs text-gray-500 mb-4 italic">
-                All visible text extracted from card images for searchability and verification
-              </p>
-
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Front Text */}
-                {card.ai_grading.text_transcription_summary.front_key_text && card.ai_grading.text_transcription_summary.front_key_text.length > 0 && (
-                  <div className="border-l-4 border-blue-500 pl-4">
-                    <h3 className="font-semibold text-gray-700 mb-2">Front Text ({card.ai_grading.text_transcription_summary.front_text_count || 0} items)</h3>
-                    <ul className="text-sm space-y-1 text-gray-600">
-                      {card.ai_grading.text_transcription_summary.front_key_text.map((text: string, i: number) => (
-                        <li key={i} className="flex items-start">
-                          <span className="text-blue-500 mr-2">•</span>
-                          <span>{text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Back Text */}
-                {card.ai_grading.text_transcription_summary.back_key_text && card.ai_grading.text_transcription_summary.back_key_text.length > 0 && (
-                  <div className="border-l-4 border-green-500 pl-4">
-                    <h3 className="font-semibold text-gray-700 mb-2">Back Text ({card.ai_grading.text_transcription_summary.back_text_count || 0} items)</h3>
-                    <ul className="text-sm space-y-1 text-gray-600">
-                      {card.ai_grading.text_transcription_summary.back_key_text.map((text: string, i: number) => (
-                        <li key={i} className="flex items-start">
-                          <span className="text-green-500 mr-2">•</span>
-                          <span>{text}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {card.ai_grading.text_transcription_summary.transcription_confidence && (
-                <div className="mt-4 text-xs text-gray-500 text-center">
-                  Transcription Confidence: <span className={`font-semibold ${
-                    card.ai_grading.text_transcription_summary.transcription_confidence === 'high' ? 'text-green-600' :
-                    card.ai_grading.text_transcription_summary.transcription_confidence === 'medium' ? 'text-yellow-600' :
-                    'text-red-600'
-                  }`}>{card.ai_grading.text_transcription_summary.transcription_confidence.toUpperCase()}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* DCM Optic™ Report */}
+          {/* 8. DCM Optic Report */}
           {card.conversational_grading && (
-            <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl shadow-xl p-8 mt-8 border border-indigo-200">
-              {/* Header */}
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6 pb-6 border-b-2 border-indigo-200">
-                <div className="flex items-center gap-3">
-                  <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl p-3 shadow-lg">
-                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">DCM Optic™ Report</h2>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowConversationalGrading(!showConversationalGrading)}
-                  className="flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white rounded-xl transition-all shadow-lg hover:shadow-xl font-semibold"
-                >
-                  {showConversationalGrading ? (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                      </svg>
-                      Hide Full Report
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                      View Full Report
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Expanded Report */}
-              {showConversationalGrading && (
+            <CollapsibleSection
+              title="DCM Optic™ Report"
+            >
                 <div className="space-y-6">
                   {/* Professional Executive Report */}
                   <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -6557,8 +6117,7 @@ export function MTGCardDetails() {
                     </div>
                   </div>
                 </div>
-              )}
-            </div>
+            </CollapsibleSection>
           )}
 
           {/* DCM Optic Version and Graded Date Section */}

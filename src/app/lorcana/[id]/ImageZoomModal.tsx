@@ -4,11 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 
 interface ImageZoomModalProps {
-  imageUrl: string | null
+  isOpen: boolean
   onClose: () => void
+  imageUrl: string
+  alt: string
+  title: string
 }
 
-export default function ImageZoomModal({ imageUrl, onClose }: ImageZoomModalProps) {
+export default function ImageZoomModal({ isOpen, onClose, imageUrl, alt, title }: ImageZoomModalProps) {
   const [isDesktop, setIsDesktop] = useState(false)
   const [magnifierVisible, setMagnifierVisible] = useState(false)
   const [magnifierPosition, setMagnifierPosition] = useState({ x: 0, y: 0 })
@@ -25,28 +28,20 @@ export default function ImageZoomModal({ imageUrl, onClose }: ImageZoomModalProp
 
   // Handle ESC key
   useEffect(() => {
-    // Only set overflow and add listeners if we have a valid imageUrl
-    if (!imageUrl || imageUrl === '') {
-      return;
-    }
-
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
 
-    document.addEventListener('keydown', handleEsc)
-    document.body.style.overflow = 'hidden'
+    if (isOpen) {
+      document.addEventListener('keydown', handleEsc)
+      document.body.style.overflow = 'hidden'
+    }
 
     return () => {
       document.removeEventListener('keydown', handleEsc)
       document.body.style.overflow = 'auto'
     }
-  }, [onClose, imageUrl])
-
-  // Don't render if no image URL (after all hooks)
-  if (!imageUrl || imageUrl === '') {
-    return null;
-  }
+  }, [isOpen, onClose])
 
   // Update image dimensions when image loads
   const handleImageLoad = () => {
@@ -114,6 +109,8 @@ export default function ImageZoomModal({ imageUrl, onClose }: ImageZoomModalProp
     setMagnifierVisible(false)
   }
 
+  if (!isOpen) return null
+
   const magnifierSize = 200
   const zoomLevel = 2.5
 
@@ -128,6 +125,11 @@ export default function ImageZoomModal({ imageUrl, onClose }: ImageZoomModalProp
         ✕
       </button>
 
+      {/* Modal title */}
+      <div className="absolute top-4 left-4 text-white text-lg font-medium z-10">
+        {title}
+      </div>
+
       {/* Click outside to close */}
       <div
         className="absolute inset-0"
@@ -136,13 +138,13 @@ export default function ImageZoomModal({ imageUrl, onClose }: ImageZoomModalProp
 
       {/* Image container */}
       <div
-        className="relative max-w-[70vw] max-h-[80vh] flex items-center justify-center"
+        className="relative max-w-[70vw] max-h-[70vh] flex items-center justify-center"
         onClick={(e) => e.stopPropagation()}
       >
         <Image
           ref={imageRef}
           src={imageUrl}
-          alt="Card zoomed view"
+          alt={alt}
           width={800}
           height={1120}
           className="max-w-full max-h-full object-contain"

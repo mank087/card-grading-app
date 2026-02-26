@@ -46,6 +46,11 @@ import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottom
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
+import { DefectOverlay } from '@/components/grading/DefectOverlay';
+import { DefectLegend } from '@/components/grading/DefectLegend';
+import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
+import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
+import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1443,6 +1448,10 @@ export function MTGCardDetails() {
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
+  const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
+  const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
+  const [showOverlays, setShowOverlays] = useState(true);
 
   // Fetch Lorcana Card Details using MTG-specific API
   const fetchMTGCardDetails = useCallback(async () => {
@@ -1693,6 +1702,17 @@ export function MTGCardDetails() {
       console.error('[Defects Error] ❌ Failed to get defects:', error);
     }
   }, [card]);
+
+  // Extract overlay defects from raw conversational_grading JSON
+  useEffect(() => {
+    if (!card?.conversational_grading) {
+      setFrontDefects([]);
+      setBackDefects([]);
+      return;
+    }
+    setFrontDefects(extractOverlayDefects(card.conversational_grading, 'front'));
+    setBackDefects(extractOverlayDefects(card.conversational_grading, 'back'));
+  }, [card?.conversational_grading]);
 
   // Open zoom modal
   const openZoomModal = (imageUrl: string, alt: string, title: string) => {
@@ -2797,7 +2817,7 @@ export function MTGCardDetails() {
 
               {/* Front Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.front_url, "Lorcana card front", "Card Front - Click for detailed view")}
               >
                 <Image
@@ -2973,7 +2993,7 @@ export function MTGCardDetails() {
 
               {/* Back Card Image */}
               <div
-                className="cursor-pointer transition-transform hover:scale-[1.02]"
+                className="relative cursor-pointer transition-transform hover:scale-[1.02]"
                 onClick={() => openZoomModal(card.back_url, "Lorcana card back", "Card Back - Click for detailed view")}
               >
                 <Image
@@ -3355,10 +3375,14 @@ export function MTGCardDetails() {
               {/* 📄 Scrollable Content Sections */}
               <div className="space-y-8">
 
-                  {/* Professional Grades Tab Content */}
+              {/* 1. Card Information (includes slab detection when applicable) */}
+              <CollapsibleSection
+                title="Card Information"
+                tourId="tour-card-info"
+              >
               {/* Professional Grading Slab Detection - Dual Display */}
               {card.slab_detected && card.slab_company && (
-                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl shadow-xl p-6 border-4 border-yellow-400">
+                <div className="bg-gradient-to-br from-yellow-50 to-amber-50 rounded-xl shadow-xl p-6 border-4 border-yellow-400 mb-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="text-2xl font-bold text-gray-800">
                       Professional Grade Detected
@@ -3484,12 +3508,6 @@ export function MTGCardDetails() {
               )}
 
                   {/* Card Details Tab Content */}
-              {/* Section Header: Card Information */}
-              <div id="tour-card-info" className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Card Information
-                </h2>
-              </div>
 
               {/* Lorcana Card Information Section */}
               <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6">
@@ -3932,19 +3950,17 @@ export function MTGCardDetails() {
                     )}
                   </div>
                 )}
-              </div>
+              </CollapsibleSection>
 
-                  {/* Centering Tab Content */}
-              {/* Section Header: Centering Details */}
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Centering Details
-                </h2>
-              </div>
-
+              {/* 2. Centering Analysis */}
+              <CollapsibleSection
+                title="Centering Analysis"
+                badge={card.conversational_sub_scores?.centering ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+                tourId="tour-centering"
+              >
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}
               {(card.conversational_sub_scores || centering.front_left_right_ratio_text || centering.back_left_right_ratio_text) && (
-              <div id="tour-centering" className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
+              <div className="bg-gradient-to-br from-white to-blue-50 rounded-xl border-2 border-blue-200 p-6 shadow-lg">
 
                 {/* Card Images with Centering Bars */}
                 <div className="mb-6">
@@ -4038,12 +4054,14 @@ export function MTGCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.front_url}
-                                alt="Card Front"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.front_url}
+                                  alt="Card Front"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4089,12 +4107,14 @@ export function MTGCardDetails() {
                             )}
 
                             {/* Card Image */}
-                            <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl w-full max-w-xs">
-                              <img
-                                src={card.back_url}
-                                alt="Card Back"
-                                className="w-full h-auto"
-                              />
+                            <div className="flex items-center justify-center w-full">
+                              <div className="relative overflow-hidden rounded-lg border-4 border-purple-300 shadow-xl max-w-xs">
+                                <img
+                                  src={card.back_url}
+                                  alt="Card Back"
+                                  className="w-full h-auto"
+                                />
+                              </div>
                             </div>
 
                             {/* DCM Analysis */}
@@ -4213,15 +4233,46 @@ export function MTGCardDetails() {
                 )}
               </div>
               )}
+              </CollapsibleSection>
 
-
-                  {/* Corners Tab Content */}
-              {/* Section Header: Corners, Edges and Surface Analysis */}
-              <div className="bg-gradient-to-r from-orange-600 to-amber-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold flex items-center gap-2">
-                  Corners, Edges and Surface Analysis
-                </h2>
-              </div>
+              {/* 3. Corners, Edges & Surface Analysis */}
+              <CollapsibleSection
+                title="Corners, Edges & Surface Analysis"
+              >
+              {/* Defect Overlay Images */}
+              {(frontDefects.length > 0 || backDefects.length > 0) && (
+                <div className="mb-6">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-lg font-bold text-gray-800">Defect Map</h3>
+                    <button onClick={() => setShowOverlays(!showOverlays)} className="text-xs text-gray-600 hover:text-gray-800 transition-colors flex items-center gap-1 px-3 py-1 rounded-full border border-gray-300 hover:border-gray-400">
+                      <span className={`w-2 h-2 rounded-full ${showOverlays ? 'bg-green-400' : 'bg-gray-400'}`} />
+                      {showOverlays ? 'Hide' : 'Show'} Markers
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Front</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.front_url} alt="Card Front" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={frontDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && frontDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={frontDefects} activeDefectId={hoveredDefect?.side === 'front' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2 text-center">Back</p>
+                      <div className="relative rounded-lg border-2 border-gray-200 max-w-xs mx-auto">
+                        <img src={card.back_url} alt="Card Back" className="w-full h-auto rounded-lg" />
+                        <DefectOverlay defects={backDefects} visible={showOverlays} onDefectHover={setHoveredDefect} />
+                      </div>
+                      {showOverlays && backDefects.length > 0 && (
+                        <div className="mt-2"><DefectLegend defects={backDefects} activeDefectId={hoveredDefect?.side === 'back' ? hoveredDefect.id : null} onDefectHover={setHoveredDefect} /></div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {(() => {
                 // Extract JSON data or fall back to parsed data
@@ -4298,6 +4349,11 @@ export function MTGCardDetails() {
                       <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg px-4 py-2 shadow-md">
                         <h3 className="text-lg font-bold">Front Side</h3>
                       </div>
+
+                      {/* Front Corner Zoom Crops */}
+                      {card.front_url && (
+                        <CornerZoomCrops imageUrl={card.front_url} side="front" slabDetected={!!card.slab_detected} />
+                      )}
 
                       {/* Front Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-blue-200 p-4 min-h-[280px] flex flex-col">
@@ -4443,6 +4499,11 @@ export function MTGCardDetails() {
                         <h3 className="text-lg font-bold">Back Side</h3>
                       </div>
 
+                      {/* Back Corner Zoom Crops */}
+                      {card.back_url && (
+                        <CornerZoomCrops imageUrl={card.back_url} side="back" slabDetected={!!card.slab_detected} />
+                      )}
+
                       {/* Back Corners */}
                       <div className="bg-white rounded-lg shadow-md border-2 border-purple-200 p-4 min-h-[280px] flex flex-col">
                         <div className="flex items-center justify-between mb-3">
@@ -4583,14 +4644,17 @@ export function MTGCardDetails() {
                   </div>
                 );
               })()}
+              </CollapsibleSection>
 
-
-              {/* DCM Optic™ Confidence Score */}
+              {/* 4. DCM Optic Confidence Score */}
+              <CollapsibleSection
+                title="DCM Optic™ Confidence Score"
+                badge={(() => {
+                  const ig = card.conversational_image_confidence || card.dvg_image_quality || card.ai_confidence_score || 'B';
+                  return ig;
+                })()}
+              >
               <div id="tour-optic-score" className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-300 shadow-lg p-6">
-                <h2 className="text-xl font-bold mb-4 text-gray-800">
-                  DCM Optic™ Confidence Score
-                </h2>
-
                 {(() => {
                   // Calculate image grade first (use same priority as display)
                   const imageGrade = card.conversational_image_confidence || card.dvg_image_quality || imageQuality?.grade || card.ai_confidence_score || 'B';
@@ -4834,195 +4898,14 @@ export function MTGCardDetails() {
                   );
                 })()}
               </div>
-                  {/* Professional Grades Tab Content - Grade Estimates */}
-              {/* Section Header: Professional Grades */}
-              <div id="tour-pro-estimates" className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Professional Grades
-                </h2>
-              </div>
+              </CollapsibleSection>
 
-              {/* Professional Grading Company Estimates */}
-              {professionalGrades && (
-                <div className="bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-6 shadow-lg">
-                  <h2 className="text-xl font-bold mb-6 text-gray-800 border-b pb-3">
-                    Professional Grading Estimates
-                  </h2>
-                  <p className="text-sm text-gray-600 mb-6">
-                    Estimated grades from major grading companies based on measured DCM metrics. These are projections only and not official grades.
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* PSA Card */}
-                    <div className="bg-white rounded-lg border-2 border-blue-200 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-t-lg">
-                        <h3 className="text-lg font-bold">PSA</h3>
-                        <p className="text-xs opacity-90">Professional Sports Authenticator</p>
-                      </div>
-                      <div className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <p className="text-3xl font-bold text-blue-700">
-                              {professionalGrades.PSA.estimated_grade}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Numeric: {professionalGrades.PSA.numeric_score}
-                            </p>
-                          </div>
-                          <div>
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                              professionalGrades.PSA.confidence === 'high'
-                                ? 'bg-green-100 text-green-800 border border-green-300'
-                                : professionalGrades.PSA.confidence === 'medium'
-                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                                : 'bg-gray-100 text-gray-800 border border-gray-300'
-                            }`}>
-                              {professionalGrades.PSA.confidence.toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                          {professionalGrades.PSA.notes}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* BGS Card */}
-                    <div className="bg-white rounded-lg border-2 border-amber-200 shadow-md hover:shadow-lg transition-shadow">
-                      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white px-4 py-3 rounded-t-lg">
-                        <h3 className="text-lg font-bold">
-                          BGS
-                        </h3>
-                        <p className="text-xs opacity-90">Beckett Grading Services</p>
-                      </div>
-                      <div className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <div>
-                            <p className="text-3xl font-bold text-amber-600">
-                              {professionalGrades.BGS.estimated_grade}
-                            </p>
-                            <p className="text-sm text-gray-600">
-                              Numeric: {professionalGrades.BGS.numeric_score}
-                            </p>
-                          </div>
-                          <div>
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                              professionalGrades.BGS.confidence === 'high'
-                                ? 'bg-green-100 text-green-800 border border-green-300'
-                                : professionalGrades.BGS.confidence === 'medium'
-                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                                : 'bg-gray-100 text-gray-800 border border-gray-300'
-                            }`}>
-                              {professionalGrades.BGS.confidence.toUpperCase()}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                          {professionalGrades.BGS.notes}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SGC Card (with fallback to TAG for old cards) */}
-                    {(professionalGrades.SGC || professionalGrades.TAG) && (
-                      <div className="bg-white rounded-lg border-2 border-gray-800 shadow-md hover:shadow-lg transition-shadow">
-                        <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white px-4 py-3 rounded-t-lg">
-                          <h3 className="text-lg font-bold">SGC</h3>
-                          <p className="text-xs opacity-90">Sportscard Guaranty</p>
-                        </div>
-                        <div className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <p className="text-3xl font-bold text-gray-800">
-                                {(professionalGrades.SGC || professionalGrades.TAG).estimated_grade}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG).numeric_score}
-                              </p>
-                            </div>
-                            <div>
-                              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.SGC || professionalGrades.TAG).confidence === 'high'
-                                  ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.SGC || professionalGrades.TAG).confidence === 'medium'
-                                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                                  : 'bg-gray-100 text-gray-800 border border-gray-300'
-                              }`}>
-                                {(professionalGrades.SGC || professionalGrades.TAG).confidence.toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.SGC || professionalGrades.TAG).notes}
-                            {!professionalGrades.SGC && professionalGrades.TAG && (
-                              <div className="mt-2 text-xs text-amber-600">
-                                ⚠️ Showing TAG estimate (legacy) - regrade to get SGC estimate
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* CGC Card (with fallback to CSG for old cards) */}
-                    {(professionalGrades.CGC || professionalGrades.CSG) && (
-                      <div className="bg-white rounded-lg border-2 border-teal-200 shadow-md hover:shadow-lg transition-shadow">
-                        <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white px-4 py-3 rounded-t-lg">
-                          <h3 className="text-lg font-bold">CGC</h3>
-                          <p className="text-xs opacity-90">Certified Guaranty Company</p>
-                        </div>
-                        <div className="p-4">
-                          <div className="flex items-center justify-between mb-3">
-                            <div>
-                              <p className="text-3xl font-bold text-teal-700">
-                                {(professionalGrades.CGC || professionalGrades.CSG).estimated_grade}
-                              </p>
-                              <p className="text-sm text-gray-600">
-                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG).numeric_score}
-                              </p>
-                            </div>
-                            <div>
-                              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
-                                (professionalGrades.CGC || professionalGrades.CSG).confidence === 'high'
-                                  ? 'bg-green-100 text-green-800 border border-green-300'
-                                  : (professionalGrades.CGC || professionalGrades.CSG).confidence === 'medium'
-                                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
-                                  : 'bg-gray-100 text-gray-800 border border-gray-300'
-                              }`}>
-                                {(professionalGrades.CGC || professionalGrades.CSG).confidence.toUpperCase()}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
-                            {(professionalGrades.CGC || professionalGrades.CSG).notes}
-                            {!professionalGrades.CGC && professionalGrades.CSG && (
-                              <div className="mt-2 text-xs text-amber-600">
-                                ⚠️ Showing CSG estimate (legacy) - regrade to get CGC estimate
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Disclaimer */}
-                  <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <p className="text-xs text-amber-900">
-                      <strong>⚠️ Disclaimer:</strong> These are estimates based on visual analysis and published grading standards.
-                      Actual professional grades may vary. Only official grading by these companies provides authentic certification.
-                    </p>
-                  </div>
-                </div>
-              )}
-
-                  {/* Market & Pricing Tab Content */}
-              {/* Section Header: Market & Pricing */}
-              <div className="bg-gradient-to-r from-gray-700 to-gray-900 text-white rounded-lg px-6 py-3 shadow-md">
-                <h2 className="text-xl font-bold">
-                  Market & Pricing
-                </h2>
-              </div>
+              {/* 5. Market Value */}
+              <CollapsibleSection
+                title="Market Value"
+                badge={dcmPriceData?.estimatedValue ? `~$${dcmPriceData.estimatedValue}` : undefined}
+                tourId="tour-market-value"
+              >
 
               {/* Lorcana Price Lookup Section */}
               <div id="tour-live-market-pricing">
@@ -5213,27 +5096,193 @@ export function MTGCardDetails() {
                 </div>
 
               </div>
+              </CollapsibleSection>
 
-              {/* Insta-List on eBay Section */}
+              {/* 6. Estimated Mail-Away Grade Scores */}
+              {professionalGrades && (
+              <CollapsibleSection
+                title="Estimated Mail-Away Grade Scores"
+                tourId="tour-pro-estimates"
+              >
+                <p className="text-sm text-gray-600 mb-6">
+                    Estimated grades from major grading companies based on measured DCM metrics. These are projections only and not official grades.
+                  </p>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* PSA Card */}
+                    <div className="bg-white rounded-lg border-2 border-blue-200 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-4 py-3 rounded-t-lg">
+                        <h3 className="text-lg font-bold">PSA</h3>
+                        <p className="text-xs opacity-90">Professional Sports Authenticator</p>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-3xl font-bold text-blue-700">
+                              {professionalGrades.PSA.estimated_grade}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Numeric: {professionalGrades.PSA.numeric_score}
+                            </p>
+                          </div>
+                          <div>
+                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                              professionalGrades.PSA.confidence === 'high'
+                                ? 'bg-green-100 text-green-800 border border-green-300'
+                                : professionalGrades.PSA.confidence === 'medium'
+                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                : 'bg-gray-100 text-gray-800 border border-gray-300'
+                            }`}>
+                              {professionalGrades.PSA.confidence.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
+                          {professionalGrades.PSA.notes}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* BGS Card */}
+                    <div className="bg-white rounded-lg border-2 border-amber-200 shadow-md hover:shadow-lg transition-shadow">
+                      <div className="bg-gradient-to-r from-gray-900 to-gray-800 text-white px-4 py-3 rounded-t-lg">
+                        <h3 className="text-lg font-bold">
+                          BGS
+                        </h3>
+                        <p className="text-xs opacity-90">Beckett Grading Services</p>
+                      </div>
+                      <div className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <div>
+                            <p className="text-3xl font-bold text-amber-600">
+                              {professionalGrades.BGS.estimated_grade}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Numeric: {professionalGrades.BGS.numeric_score}
+                            </p>
+                          </div>
+                          <div>
+                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                              professionalGrades.BGS.confidence === 'high'
+                                ? 'bg-green-100 text-green-800 border border-green-300'
+                                : professionalGrades.BGS.confidence === 'medium'
+                                ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                : 'bg-gray-100 text-gray-800 border border-gray-300'
+                            }`}>
+                              {professionalGrades.BGS.confidence.toUpperCase()}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
+                          {professionalGrades.BGS.notes}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* SGC Card (with fallback to TAG for old cards) */}
+                    {(professionalGrades.SGC || professionalGrades.TAG) && (
+                      <div className="bg-white rounded-lg border-2 border-gray-800 shadow-md hover:shadow-lg transition-shadow">
+                        <div className="bg-gradient-to-r from-gray-800 to-gray-900 text-white px-4 py-3 rounded-t-lg">
+                          <h3 className="text-lg font-bold">SGC</h3>
+                          <p className="text-xs opacity-90">Sportscard Guaranty</p>
+                        </div>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <p className="text-3xl font-bold text-gray-800">
+                                {(professionalGrades.SGC || professionalGrades.TAG).estimated_grade}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                Numeric: {(professionalGrades.SGC || professionalGrades.TAG).numeric_score}
+                              </p>
+                            </div>
+                            <div>
+                              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                (professionalGrades.SGC || professionalGrades.TAG).confidence === 'high'
+                                  ? 'bg-green-100 text-green-800 border border-green-300'
+                                  : (professionalGrades.SGC || professionalGrades.TAG).confidence === 'medium'
+                                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                  : 'bg-gray-100 text-gray-800 border border-gray-300'
+                              }`}>
+                                {(professionalGrades.SGC || professionalGrades.TAG).confidence.toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
+                            {(professionalGrades.SGC || professionalGrades.TAG).notes}
+                            {!professionalGrades.SGC && professionalGrades.TAG && (
+                              <div className="mt-2 text-xs text-amber-600">
+                                ⚠️ Showing TAG estimate (legacy) - regrade to get SGC estimate
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* CGC Card (with fallback to CSG for old cards) */}
+                    {(professionalGrades.CGC || professionalGrades.CSG) && (
+                      <div className="bg-white rounded-lg border-2 border-teal-200 shadow-md hover:shadow-lg transition-shadow">
+                        <div className="bg-gradient-to-r from-teal-600 to-teal-700 text-white px-4 py-3 rounded-t-lg">
+                          <h3 className="text-lg font-bold">CGC</h3>
+                          <p className="text-xs opacity-90">Certified Guaranty Company</p>
+                        </div>
+                        <div className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <div>
+                              <p className="text-3xl font-bold text-teal-700">
+                                {(professionalGrades.CGC || professionalGrades.CSG).estimated_grade}
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                Numeric: {(professionalGrades.CGC || professionalGrades.CSG).numeric_score}
+                              </p>
+                            </div>
+                            <div>
+                              <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
+                                (professionalGrades.CGC || professionalGrades.CSG).confidence === 'high'
+                                  ? 'bg-green-100 text-green-800 border border-green-300'
+                                  : (professionalGrades.CGC || professionalGrades.CSG).confidence === 'medium'
+                                  ? 'bg-yellow-100 text-yellow-800 border border-yellow-300'
+                                  : 'bg-gray-100 text-gray-800 border border-gray-300'
+                              }`}>
+                                {(professionalGrades.CGC || professionalGrades.CSG).confidence.toUpperCase()}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-600 bg-gray-50 rounded p-2">
+                            {(professionalGrades.CGC || professionalGrades.CSG).notes}
+                            {!professionalGrades.CGC && professionalGrades.CSG && (
+                              <div className="mt-2 text-xs text-amber-600">
+                                ⚠️ Showing CSG estimate (legacy) - regrade to get CGC estimate
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Disclaimer */}
+                  <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p className="text-xs text-amber-900">
+                      <strong>Disclaimer:</strong> These are estimates based on visual analysis and published grading standards.
+                      Actual professional grades may vary. Only official grading by these companies provides authentic certification.
+                    </p>
+                  </div>
+              </CollapsibleSection>
+              )}
+
+              {/* 7. Insta-List on eBay (owner only) */}
               {(() => {
                 const session = getStoredSession();
                 const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
                 if (!isOwner) return null;
 
                 return (
-                  <div id="tour-insta-list" className="bg-white rounded-lg shadow-lg p-6">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg flex items-center justify-center">
-                        <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-bold text-gray-800">Insta-List on eBay</h2>
-                        <p className="text-sm text-gray-500">List this card directly to eBay</p>
-                      </div>
-                    </div>
-
+                  <CollapsibleSection
+                    title="Insta-List on eBay"
+                    tourId="tour-insta-list"
+                  >
                     <div className="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-lg p-4 mb-4">
                       <div className="flex items-start gap-3">
                         <svg className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -5257,15 +5306,16 @@ export function MTGCardDetails() {
                       labelStyle={labelStyle}
                       className="w-full"
                     />
-                  </div>
+                  </CollapsibleSection>
                 );
               })()}
 
+              </div>
             </div>
           )}
 
-          {/* 3. Category Breakdown Scores (v3.0) - Legacy Fallback */}
-          {(!dvgGrading || Object.keys(dvgGrading).length === 0) && (() => {
+          {/* LEGACY_SECTIONS_START - removed in layout redesign */}
+          {false && (() => {
             // v3.1: Read category scores with fallback to v3.1 category_scores field
             const categoryScores = gradingScale["Category Scores"] || card.ai_grading?.category_scores;
             return categoryScores && (
@@ -5336,8 +5386,8 @@ export function MTGCardDetails() {
             );
           })()}
 
-          {/* 4. DCM Confidence and Image Quality */}
-          {(card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
+          {/* 4. DCM Confidence and Image Quality - Legacy */}
+          {false && (card.ai_grading?.["AI Confidence Assessment"] || card.ai_grading?.["Image Conditions"]) && (
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">DCM Confidence and Image Quality</h2>
 
@@ -5485,8 +5535,8 @@ export function MTGCardDetails() {
             </div>
           )}
 
-          {/* 4. Card Detection Assessment */}
-          {card.ai_grading?.["Card Detection Assessment"] && (
+          {/* 4. Card Detection Assessment - Legacy */}
+          {false && card.ai_grading?.["Card Detection Assessment"] && (
             <div className="bg-white rounded-lg shadow-lg p-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">Card Detection Assessment</h2>
               <div className="grid md:grid-cols-2 gap-6">
@@ -5531,8 +5581,8 @@ export function MTGCardDetails() {
           )}
 
           {/* 5. Professional Grading Company Estimates - REMOVED OLD SECTION */}
-          {/* v2.2 REVISED: Execution Control & Fatal Flags */}
-          {card.ai_grading?.["Execution Control"] && (
+          {/* v2.2 REVISED: Execution Control & Fatal Flags - Legacy */}
+          {false && card.ai_grading?.["Execution Control"] && (
             <div className="mt-6 border border-gray-200 rounded-lg overflow-hidden">
               <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
                 <h3 className="font-semibold text-gray-800 flex items-center gap-2">
@@ -5591,9 +5641,8 @@ export function MTGCardDetails() {
 
           {/* END OF DVG SECTIONS */}
 
-          {/* Delete Card Section */}
-          {/* 7. Front/Back Specific Feedback (Parallel Processing v2.3) */}
-          {(card.ai_grading?.front_specific_feedback || card.ai_grading?.back_specific_feedback) && (
+          {/* 7. Front/Back Specific Feedback - Legacy */}
+          {false && (card.ai_grading?.front_specific_feedback || card.ai_grading?.back_specific_feedback) && (
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">📊 Front/Back Analysis</h2>
 
@@ -5658,8 +5707,8 @@ export function MTGCardDetails() {
             </div>
           )}
 
-          {/* 8. Text Transcription (OCR) - Parallel Processing v2.3 */}
-          {card.ai_grading?.text_transcription_summary && (
+          {/* 8. Text Transcription (OCR) - Legacy */}
+          {false && card.ai_grading?.text_transcription_summary && (
             <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
               <h2 className="text-xl font-bold mb-4 text-gray-800">Card Text (OCR)</h2>
               <p className="text-xs text-gray-500 mb-4 italic">

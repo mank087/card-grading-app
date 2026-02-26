@@ -784,20 +784,4 @@ For centering assessment on this borderless card, I use internal design anchors:
 
 The presence of minor texture wear and one fine scratch results in a surface score of 9.0 for the front."
 
-═══════════════════════════════════════════════════════════════════════
-END OF POKEMON DELTA v5.0
-═══════════════════════════════════════════════════════════════════════
-
-**TOTAL LINES:** ~650
-**ESTIMATED TOKENS:** ~5,000-5,500
-
-**COMBINED PROMPT SIZE (Master + Pokemon Delta):**
-• Master Rubric: ~18,000-20,000 tokens
-• Pokemon Delta: ~5,000-5,500 tokens
-• **TOTAL: ~23,000-25,500 tokens** ✓ Within target range
-
-When grading Pokemon TCG cards, use:
-1. Master Grading Rubric v5.0 (universal grading rules)
-2. Pokemon Delta v5.0 (this file - Pokemon-specific rules)
-
-Apply ALL instructions from BOTH files to complete grading analysis.
+--- END OF POKEMON DELTA v5.0 ---
