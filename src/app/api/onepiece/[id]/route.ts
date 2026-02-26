@@ -889,6 +889,13 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
       conversational_defects_front: conversationalGradingData?.transformedDefects?.front || null,
       conversational_defects_back: conversationalGradingData?.transformedDefects?.back || null,
       conversational_slab_detection: conversationalGradingData?.professional_slab || null,
+      // Legacy slab fields for frontend display
+      slab_detected: conversationalGradingData?.professional_slab?.detected || (conversationalGradingData as any)?.slab_detection?.detected || false,
+      slab_company: conversationalGradingData?.professional_slab?.company || (conversationalGradingData as any)?.slab_detection?.company || null,
+      slab_grade: conversationalGradingData?.professional_slab?.grade || (conversationalGradingData as any)?.slab_detection?.grade || null,
+      slab_grade_description: conversationalGradingData?.professional_slab?.grade_description || (conversationalGradingData as any)?.slab_detection?.grade_description || null,
+      slab_cert_number: conversationalGradingData?.professional_slab?.cert_number || (conversationalGradingData as any)?.slab_detection?.cert_number || null,
+      slab_serial: conversationalGradingData?.professional_slab?.serial_number || (conversationalGradingData as any)?.slab_detection?.serial_number || null,
       conversational_prompt_version: conversationalGradingData?.meta?.prompt_version || 'v4.2',
       conversational_evaluated_at: conversationalGradingData?.meta?.evaluated_at_utc ? new Date(conversationalGradingData.meta.evaluated_at_utc) : new Date(),
 
@@ -1028,6 +1035,13 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
       conversational_defects_front: conversationalGradingData?.transformedDefects?.front || null,
       conversational_defects_back: conversationalGradingData?.transformedDefects?.back || null,
       conversational_slab_detection: conversationalGradingData?.professional_slab || null,
+      // Legacy slab fields for frontend display
+      slab_detected: conversationalGradingData?.professional_slab?.detected || (conversationalGradingData as any)?.slab_detection?.detected || false,
+      slab_company: conversationalGradingData?.professional_slab?.company || (conversationalGradingData as any)?.slab_detection?.company || null,
+      slab_grade: conversationalGradingData?.professional_slab?.grade || (conversationalGradingData as any)?.slab_detection?.grade || null,
+      slab_grade_description: conversationalGradingData?.professional_slab?.grade_description || (conversationalGradingData as any)?.slab_detection?.grade_description || null,
+      slab_cert_number: conversationalGradingData?.professional_slab?.cert_number || (conversationalGradingData as any)?.slab_detection?.cert_number || null,
+      slab_serial: conversationalGradingData?.professional_slab?.serial_number || (conversationalGradingData as any)?.slab_detection?.serial_number || null,
       raw_decimal_grade: rawGrade,
       dcm_grade_whole: wholeGrade,
       ai_confidence_score: confidence,

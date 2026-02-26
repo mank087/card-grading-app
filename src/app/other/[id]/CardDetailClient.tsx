@@ -4273,7 +4273,7 @@ export function OtherCardDetails() {
 
                       {/* Front Corner Zoom Crops */}
                       {card.front_url && (
-                        <CornerZoomCrops imageUrl={card.front_url} side="front" slabDetected={!!card.slab_detected} />
+                        <CornerZoomCrops imageUrl={card.front_url} side="front" slabDetected={!!card.slab_detected || !!(card as any).conversational_slab_detection?.detected} />
                       )}
 
                       {/* Front Corners */}
@@ -4422,7 +4422,7 @@ export function OtherCardDetails() {
 
                       {/* Back Corner Zoom Crops */}
                       {card.back_url && (
-                        <CornerZoomCrops imageUrl={card.back_url} side="back" slabDetected={!!card.slab_detected} />
+                        <CornerZoomCrops imageUrl={card.back_url} side="back" slabDetected={!!card.slab_detected || !!(card as any).conversational_slab_detection?.detected} />
                       )}
 
                       {/* Back Corners */}

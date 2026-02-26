@@ -830,6 +830,13 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       conversational_image_confidence: conversationalGradingData?.image_confidence || null,
       conversational_case_detection: conversationalGradingData?.case_detection || null,
       conversational_slab_detection: conversationalGradingData?.slab_detection || null,
+      // Legacy slab fields for frontend display
+      slab_detected: conversationalGradingData?.slab_detection?.detected || false,
+      slab_company: conversationalGradingData?.slab_detection?.company || null,
+      slab_grade: conversationalGradingData?.slab_detection?.grade || null,
+      slab_grade_description: conversationalGradingData?.slab_detection?.grade_description || null,
+      slab_cert_number: conversationalGradingData?.slab_detection?.cert_number || null,
+      slab_serial: conversationalGradingData?.slab_detection?.serial_number || null,
       conversational_weighted_sub_scores: conversationalGradingData?.weighted_sub_scores || null,
       conversational_limiting_factor: conversationalGradingData?.limiting_factor || null,
       conversational_preliminary_grade: conversationalGradingData?.preliminary_grade || null,
