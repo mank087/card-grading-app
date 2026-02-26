@@ -35,7 +35,7 @@ export async function GET(
     // Get user's cards
     const { data: cards, error: cardsError } = await supabaseAdmin
       .from('cards')
-      .select('id, category, created_at, conversational_decimal_grade')
+      .select('id, serial, card_name, category, created_at, conversational_decimal_grade, conversational_whole_grade, conversational_condition_label, conversational_card_info, ai_grading, featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number')
       .eq('user_id', id)
       .order('created_at', { ascending: false })
       .limit(10)

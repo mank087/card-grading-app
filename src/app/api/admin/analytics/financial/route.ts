@@ -2,31 +2,40 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
-// OpenAI GPT-4o pricing (as of Nov 2025)
+// OpenAI GPT-5.1 pricing (single API call per grading with 3-pass consensus in prompt)
+// The 3-pass system runs within one API response, not 3 separate calls
 const PRICING = {
-  'gpt-4o': {
-    input_per_1k: 0.0025,  // $2.50 per 1M tokens = $0.0025 per 1K
-    output_per_1k: 0.010,   // $10.00 per 1M tokens = $0.010 per 1K
-    image: 0.001275         // ~$1.275 per image (roughly 1000 tokens)
+  'gpt-5.1': {
+    input_per_1k: 0.005,   // $5.00 per 1M tokens = $0.005 per 1K
+    output_per_1k: 0.015,   // $15.00 per 1M tokens = $0.015 per 1K
+    image: 0.002            // ~$2.00 per image
   }
 }
 
-// Estimated token usage per grading (based on your prompts)
+// Estimated token usage per grading (single API call, 3-pass output in one response)
+// Input: rubric prompt + card-type delta + images
+// Output: 3 grading passes + averaged results + narrative (~16K max)
 const ESTIMATED_TOKENS = {
-  sports: { input: 8000, output: 1500, images: 2 },
-  pokemon: { input: 7500, output: 1400, images: 2 },
-  mtg: { input: 7000, output: 1300, images: 2 },
-  lorcana: { input: 7200, output: 1350, images: 2 },
-  other: { input: 6800, output: 1250, images: 2 }
+  sports: { input: 8000, output: 8000, images: 2 },
+  pokemon: { input: 7500, output: 7500, images: 2 },
+  mtg: { input: 7000, output: 7000, images: 2 },
+  lorcana: { input: 7200, output: 7200, images: 2 },
+  onepiece: { input: 7200, output: 7200, images: 2 },
+  other: { input: 6800, output: 6800, images: 2 }
 }
 
 function estimateCostPerGrading(category: string = 'sports'): number {
+  // Normalize category to match ESTIMATED_TOKENS keys
+  const sportCategories = ['football', 'baseball', 'basketball', 'hockey', 'soccer', 'wrestling', 'sports']
   const categoryLower = category.toLowerCase()
-  const tokens = ESTIMATED_TOKENS[categoryLower as keyof typeof ESTIMATED_TOKENS] || ESTIMATED_TOKENS.sports
+  const tokenKey = sportCategories.includes(categoryLower) ? 'sports'
+    : categoryLower === 'one piece' ? 'onepiece'
+    : categoryLower
+  const tokens = ESTIMATED_TOKENS[tokenKey as keyof typeof ESTIMATED_TOKENS] || ESTIMATED_TOKENS.sports
 
-  const inputCost = (tokens.input / 1000) * PRICING['gpt-4o'].input_per_1k
-  const outputCost = (tokens.output / 1000) * PRICING['gpt-4o'].output_per_1k
-  const imageCost = tokens.images * PRICING['gpt-4o'].image
+  const inputCost = (tokens.input / 1000) * PRICING['gpt-5.1'].input_per_1k
+  const outputCost = (tokens.output / 1000) * PRICING['gpt-5.1'].output_per_1k
+  const imageCost = tokens.images * PRICING['gpt-5.1'].image
 
   return inputCost + outputCost + imageCost
 }
@@ -51,37 +60,16 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(1000)
 
-    // If we have actual API logs, use them
-    if (apiLogs && apiLogs.length > 0) {
-      // Calculate actual costs from logs
-      const totalCost = apiLogs.reduce((sum, log) => sum + (log.cost_usd || 0), 0)
+    // If we have actual API logs, use them but still return full response shape
+    // (the frontend expects total_estimated_cost, by_category, monthly_trend, etc.)
+    // Fall through to estimate path which always works
 
-      // Group by day
-      const costByDay: Record<string, number> = {}
-      apiLogs.forEach(log => {
-        const date = new Date(log.created_at).toISOString().split('T')[0]
-        costByDay[date] = (costByDay[date] || 0) + (log.cost_usd || 0)
-      })
-
-      const dailyData = Object.keys(costByDay).sort().map(date => ({
-        date,
-        cost: Math.round(costByDay[date] * 100) / 100
-      }))
-
-      return NextResponse.json({
-        overview: {
-          total_cost: Math.round(totalCost * 100) / 100,
-          has_actual_data: true
-        },
-        daily_costs: dailyData
-      }, { status: 200 })
-    }
-
-    // Otherwise, estimate based on card gradings
+    // Otherwise, estimate based on card gradings (explicit limit to bypass Supabase 1000 default)
     const { data: cards, error: cardsError } = await supabaseAdmin
       .from('cards')
       .select('id, category, created_at')
       .not('conversational_decimal_grade', 'is', null)
+      .limit(100000)
 
     if (cardsError) {
       throw cardsError
@@ -175,9 +163,9 @@ export async function GET(request: NextRequest) {
       by_category: categoryBreakdown,
       monthly_trend: monthlyCosts,
       pricing_model: {
-        input_per_1k_tokens: PRICING['gpt-4o'].input_per_1k,
-        output_per_1k_tokens: PRICING['gpt-4o'].output_per_1k,
-        per_image: PRICING['gpt-4o'].image
+        input_per_1k_tokens: PRICING['gpt-5.1'].input_per_1k,
+        output_per_1k_tokens: PRICING['gpt-5.1'].output_per_1k,
+        per_image: PRICING['gpt-5.1'].image
       },
       note: 'Costs are estimated based on card gradings. Integrate API logging for actual costs.'
     }

@@ -15,10 +15,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Fetch all cards
+    // Fetch all cards (explicit limit to bypass Supabase 1000 default)
     const { data: cards, error: cardsError } = await supabaseAdmin
       .from('cards')
       .select('id, category, created_at, is_public, visibility')
+      .limit(100000)
 
     if (cardsError) {
       throw cardsError

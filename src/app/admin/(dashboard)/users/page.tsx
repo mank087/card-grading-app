@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import AdminAuthGuard from '@/components/admin/AdminAuthGuard'
 
 interface User {
@@ -22,9 +23,21 @@ interface UserDetails {
   }
   recent_cards: Array<{
     id: string
+    serial: string | null
+    card_name: string | null
     category: string
     created_at: string
     conversational_decimal_grade: number | null
+    conversational_whole_grade: number | null
+    conversational_condition_label: string | null
+    conversational_card_info: any
+    ai_grading: any
+    featured: string | null
+    pokemon_featured: string | null
+    card_set: string | null
+    release_date: string | null
+    manufacturer_name: string | null
+    card_number: string | null
   }>
 }
 
@@ -41,6 +54,59 @@ export default function AdminUsersPage() {
       {(admin) => <UsersContent adminRole={admin.role} />}
     </AdminAuthGuard>
   )
+}
+
+// Helper functions for card display
+const stripMarkdown = (text: string | null | undefined): string | null => {
+  if (text === null || text === undefined) return null
+  const str = typeof text === 'string' ? text : String(text)
+  if (!str) return null
+  return str.replace(/\*\*/g, '').replace(/\*/g, '').replace(/\#/g, '').replace(/\_/g, '')
+}
+
+const getCardInfo = (card: UserDetails['recent_cards'][0]) => {
+  const dvgGrading = card.ai_grading || {}
+  const legacyCardInfo = dvgGrading["Card Information"] || dvgGrading.card_info || {}
+  return {
+    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || legacyCardInfo.card_name,
+    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || card.pokemon_featured || legacyCardInfo.player_or_character,
+    set_name: stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || legacyCardInfo.set_name,
+    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || legacyCardInfo.year,
+  }
+}
+
+const getPlayerName = (card: UserDetails['recent_cards'][0]) => {
+  const cardInfo = getCardInfo(card)
+  const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
+  const isOtherCard = card.category === 'Other'
+  return (isSportsCard || isOtherCard)
+    ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown')
+    : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card')
+}
+
+const categoryRoutes: Record<string, string> = {
+  'Football': '/sports', 'Baseball': '/sports', 'Basketball': '/sports',
+  'Hockey': '/sports', 'Soccer': '/sports', 'Wrestling': '/sports',
+  'Sports': '/sports', 'Pokemon': '/pokemon', 'MTG': '/mtg',
+  'Lorcana': '/lorcana', 'One Piece': '/onepiece', 'Other': '/other'
+}
+
+const getCategoryBadge = (category: string | null) => {
+  const config: Record<string, { bg: string; text: string; label: string }> = {
+    'Football': { bg: 'bg-orange-100', text: 'text-orange-800', label: '🏈 Football' },
+    'Baseball': { bg: 'bg-red-100', text: 'text-red-800', label: '⚾ Baseball' },
+    'Basketball': { bg: 'bg-amber-100', text: 'text-amber-800', label: '🏀 Basketball' },
+    'Hockey': { bg: 'bg-sky-100', text: 'text-sky-800', label: '🏒 Hockey' },
+    'Soccer': { bg: 'bg-green-100', text: 'text-green-800', label: '⚽ Soccer' },
+    'Wrestling': { bg: 'bg-purple-100', text: 'text-purple-800', label: '🤼 Wrestling' },
+    'Sports': { bg: 'bg-blue-100', text: 'text-blue-800', label: '🏆 Sports' },
+    'Pokemon': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '⚡ Pokemon' },
+    'MTG': { bg: 'bg-indigo-100', text: 'text-indigo-800', label: '🎴 MTG' },
+    'Lorcana': { bg: 'bg-pink-100', text: 'text-pink-800', label: '✨ Lorcana' },
+    'One Piece': { bg: 'bg-rose-100', text: 'text-rose-800', label: '🏴‍☠️ One Piece' },
+    'Other': { bg: 'bg-gray-100', text: 'text-gray-800', label: '📦 Other' },
+  }
+  return config[category || ''] || { bg: 'bg-gray-100', text: 'text-gray-600', label: category || 'Unknown' }
 }
 
 function UsersContent({ adminRole }: { adminRole: string }) {
@@ -447,28 +513,71 @@ function UsersContent({ adminRole }: { adminRole: string }) {
                     {selectedUser.recent_cards.length === 0 ? (
                       <p className="text-gray-500">No cards uploaded yet</p>
                     ) : (
-                      selectedUser.recent_cards.map((card) => (
-                        <div
-                          key={card.id}
-                          className="flex justify-between items-center bg-gray-50 rounded-lg p-3"
-                        >
-                          <div>
-                            <div className="font-medium">{card.category}</div>
-                            <div className="text-sm text-gray-500">
-                              {new Date(card.created_at).toLocaleDateString()}
+                      selectedUser.recent_cards.map((card) => {
+                        const route = categoryRoutes[card.category || ''] || '/other'
+                        const badge = getCategoryBadge(card.category)
+                        const cardInfo = getCardInfo(card)
+                        const name = getPlayerName(card)
+                        const grade = card.conversational_decimal_grade
+                        const wholeGrade = grade !== null ? Math.round(grade) : null
+
+                        return (
+                          <Link
+                            key={card.id}
+                            href={`${route}/${card.id}`}
+                            className="flex items-center gap-3 bg-gray-50 hover:bg-gray-100 rounded-lg p-3 transition-colors group"
+                          >
+                            {/* Grade circle */}
+                            <div className="flex-shrink-0">
+                              {wholeGrade !== null ? (
+                                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-purple-100 text-purple-800 font-bold text-sm">
+                                  {wholeGrade}
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gray-200 text-gray-400 text-xs">
+                                  N/A
+                                </span>
+                              )}
                             </div>
-                          </div>
-                          <div>
-                            {card.conversational_decimal_grade ? (
-                              <span className="text-lg font-bold text-blue-600">
-                                {card.conversational_decimal_grade}
-                              </span>
-                            ) : (
-                              <span className="text-gray-400">Not graded</span>
-                            )}
-                          </div>
-                        </div>
-                      ))
+
+                            {/* Card info */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-0.5">
+                                <span className="font-semibold text-gray-900 truncate group-hover:text-purple-700">
+                                  {name}
+                                </span>
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0 ${badge.bg} ${badge.text}`}>
+                                  {badge.label}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-gray-500">
+                                {cardInfo.set_name && (
+                                  <span className="truncate">{cardInfo.set_name}</span>
+                                )}
+                                {cardInfo.year && (
+                                  <span>({cardInfo.year})</span>
+                                )}
+                                {card.conversational_condition_label && (
+                                  <>
+                                    <span className="text-gray-300">|</span>
+                                    <span>{card.conversational_condition_label.replace(/\s*\([A-Z]+\)/, '')}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Serial */}
+                            <div className="flex-shrink-0 text-right">
+                              {card.serial && (
+                                <div className="text-[10px] font-mono text-gray-400">{card.serial}</div>
+                              )}
+                              <div className="text-[10px] text-gray-400">
+                                {new Date(card.created_at).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </Link>
+                        )
+                      })
                     )}
                   </div>
                 </div>

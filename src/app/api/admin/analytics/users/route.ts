@@ -21,11 +21,12 @@ export async function GET(request: NextRequest) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
 
-    // Fetch all users for calculations
+    // Fetch all users for calculations (explicit limit to bypass Supabase 1000 default)
     const { data: allUsers, error: usersError } = await supabaseAdmin
       .from('users')
       .select('id, email, created_at')
       .order('created_at', { ascending: true })
+      .limit(100000)
 
     if (usersError) {
       throw usersError
@@ -59,10 +60,12 @@ export async function GET(request: NextRequest) {
     const ninetyDaysAgo = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
 
     // Get users who have uploaded cards (active users)
+    // Explicit limits to bypass Supabase 1000 default
     const { data: activeUsersData } = await supabaseAdmin
       .from('cards')
       .select('user_id, created_at')
       .gte('created_at', sevenDaysAgo.toISOString())
+      .limit(100000)
 
     const activeUsers7Days = new Set(activeUsersData?.map(c => c.user_id) || []).size
 
@@ -70,6 +73,7 @@ export async function GET(request: NextRequest) {
       .from('cards')
       .select('user_id')
       .gte('created_at', thirtyDaysAgo.toISOString())
+      .limit(100000)
 
     const activeUsers30Days = new Set(activeUsers30Data?.map(c => c.user_id) || []).size
 
@@ -77,6 +81,7 @@ export async function GET(request: NextRequest) {
       .from('cards')
       .select('user_id')
       .gte('created_at', ninetyDaysAgo.toISOString())
+      .limit(100000)
 
     const activeUsers90Days = new Set(activeUsers90Data?.map(c => c.user_id) || []).size
 
@@ -85,6 +90,7 @@ export async function GET(request: NextRequest) {
     const usersWithCards = await supabaseAdmin
       .from('cards')
       .select('user_id')
+      .limit(100000)
       .then(({ data }) => new Set(data?.map(c => c.user_id) || []).size)
 
     const engagementRate = totalUsers > 0 ? (usersWithCards / totalUsers) * 100 : 0

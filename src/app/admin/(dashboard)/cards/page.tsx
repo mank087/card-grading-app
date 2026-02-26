@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import AdminAuthGuard from '@/components/admin/AdminAuthGuard'
 import Link from 'next/link'
-import Image from 'next/image'
 
 interface Card {
   id: string
@@ -39,6 +38,8 @@ interface Card {
   is_foil: boolean | null
   scryfall_price_usd: number | null
   scryfall_price_usd_foil: number | null
+  dcm_price_estimate: number | null
+  dcm_cached_prices: any
 }
 
 interface PaginationData {
@@ -139,12 +140,17 @@ const formatPrice = (price: number | null | undefined): string | null => {
   }).format(price)
 }
 
-// Get market value (eBay median or Scryfall fallback)
+// Get market value (DCM pricing primary, eBay/Scryfall fallback)
 const getMarketValue = (card: Card): number | null => {
-  if (card.ebay_price_median !== null && card.ebay_price_median !== undefined) {
-    return card.ebay_price_median
+  // PRIMARY: DCM price estimate
+  if (card.dcm_price_estimate !== null && card.dcm_price_estimate !== undefined) {
+    return card.dcm_price_estimate
   }
-  // Fallback to Scryfall price for MTG cards
+  // FALLBACK: DCM cached prices
+  if (card.dcm_cached_prices?.estimatedValue) {
+    return card.dcm_cached_prices.estimatedValue
+  }
+  // FALLBACK: Scryfall price for MTG cards
   if (card.category === 'MTG') {
     if (card.is_foil && card.scryfall_price_usd_foil) {
       return card.scryfall_price_usd_foil
@@ -152,6 +158,10 @@ const getMarketValue = (card: Card): number | null => {
     if (card.scryfall_price_usd) {
       return card.scryfall_price_usd
     }
+  }
+  // LEGACY: eBay median
+  if (card.ebay_price_median !== null && card.ebay_price_median !== undefined) {
+    return card.ebay_price_median
   }
   return null
 }
@@ -396,7 +406,7 @@ function CardsContent() {
 
         {/* Quick Stats Bar */}
         {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
             <div className="bg-white rounded-lg shadow p-3 border-l-4 border-purple-500">
               <div className="text-2xl font-bold text-gray-900">{stats.total.toLocaleString()}</div>
               <div className="text-xs text-gray-500 uppercase">Total Cards</div>
@@ -405,7 +415,8 @@ function CardsContent() {
               <div className="text-2xl font-bold text-gray-900">{stats.graded.toLocaleString()}</div>
               <div className="text-xs text-gray-500 uppercase">Graded</div>
             </div>
-            {Object.entries(stats.byCategory).slice(0, 4).map(([cat, count]) => {
+            {['Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Other'].map((cat) => {
+              const count = stats.byCategory[cat] || 0
               const badge = getCategoryBadge(cat)
               return (
                 <div key={cat} className={`bg-white rounded-lg shadow p-3 border-l-4 ${badge.bg.replace('bg-', 'border-').replace('-100', '-500')}`}>
@@ -425,7 +436,7 @@ function CardsContent() {
           <div className="flex-1">
             <input
               type="text"
-              placeholder="Search by name, set, manufacturer, card number..."
+              placeholder="Search by name, set, manufacturer, card number, or user email..."
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
@@ -446,11 +457,7 @@ function CardsContent() {
               className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             >
               <option value="all">All Categories</option>
-              <option value="Football">🏈 Football</option>
-              <option value="Baseball">⚾ Baseball</option>
-              <option value="Basketball">🏀 Basketball</option>
-              <option value="Hockey">🏒 Hockey</option>
-              <option value="Soccer">⚽ Soccer</option>
+              <option value="Sports">🏆 Sports</option>
               <option value="Pokemon">⚡ Pokemon</option>
               <option value="MTG">🎴 MTG</option>
               <option value="Lorcana">✨ Lorcana</option>
@@ -590,29 +597,14 @@ function CardsContent() {
                 return (
                   <div key={card.id} className={`p-4 ${selectedCards.has(card.id) ? 'bg-purple-50' : ''}`}>
                     <div className="flex gap-3">
-                      {/* Checkbox + Image */}
-                      <div className="flex flex-col items-center gap-2">
+                      {/* Checkbox */}
+                      <div className="flex flex-col items-center gap-2 pt-1">
                         <input
                           type="checkbox"
                           checked={selectedCards.has(card.id)}
                           onChange={() => toggleCardSelection(card.id)}
                           className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
                         />
-                        <div className="w-12 h-16 relative rounded overflow-hidden bg-gray-100 flex-shrink-0">
-                          {card.front_url ? (
-                            <Image
-                              src={card.front_url}
-                              alt={getPlayerName(card)}
-                              fill
-                              className="object-cover"
-                              sizes="48px"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-[10px]">
-                              No img
-                            </div>
-                          )}
-                        </div>
                       </div>
 
                       {/* Card Info */}
@@ -693,18 +685,14 @@ function CardsContent() {
                       title="Select all on page"
                     />
                   </th>
-                  {/* Thumbnail */}
-                  <th className="w-[5%] px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Image
-                  </th>
                   {/* Category */}
-                  <th className="w-[8%] px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-[9%] px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Type
                   </th>
                   {/* Card Name - Sortable */}
                   <th
                     onClick={() => handleSort('name')}
-                    className="w-[16%] px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="w-[18%] px-2 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                   >
                     <div className="flex items-center gap-1">
                       Card Name
@@ -824,24 +812,6 @@ function CardsContent() {
                           onChange={() => toggleCardSelection(card.id)}
                           className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer"
                         />
-                      </td>
-                      {/* Thumbnail */}
-                      <td className="px-2 py-2">
-                        <div className="w-10 h-14 relative rounded overflow-hidden bg-gray-100 flex-shrink-0">
-                          {card.front_url ? (
-                            <Image
-                              src={card.front_url}
-                              alt={getPlayerName(card)}
-                              fill
-                              className="object-cover"
-                              sizes="40px"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">
-                              No img
-                            </div>
-                          )}
-                        </div>
                       </td>
                       {/* Category Badge */}
                       <td className="px-2 py-3">

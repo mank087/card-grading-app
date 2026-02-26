@@ -30,6 +30,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all users (with optional date filter on signup)
+    // Explicit limit to bypass Supabase 1000 default
     let usersQuery = supabaseAdmin
       .from('user_credits')
       .select('user_id, created_at, is_founder, total_purchased, first_purchase_bonus_claimed')
@@ -41,7 +42,7 @@ export async function GET(request: NextRequest) {
       usersQuery = usersQuery.lte('created_at', endDate)
     }
 
-    const { data: users, error: usersError } = await usersQuery
+    const { data: users, error: usersError } = await usersQuery.limit(100000)
 
     if (usersError) {
       console.error('Error fetching users:', usersError)
@@ -49,12 +50,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all grade transactions (users who used credits)
+    // Explicit limit to bypass Supabase 1000 default
     const gradesQuery = supabaseAdmin
       .from('credit_transactions')
       .select('user_id, created_at')
       .eq('type', 'grade')
 
-    const { data: grades, error: gradesError } = await gradesQuery
+    const { data: grades, error: gradesError } = await gradesQuery.limit(100000)
 
     if (gradesError) {
       console.error('Error fetching grades:', gradesError)
@@ -62,12 +64,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all purchase transactions
+    // Explicit limit to bypass Supabase 1000 default
     const purchasesQuery = supabaseAdmin
       .from('credit_transactions')
       .select('user_id, created_at, amount, description, metadata')
       .eq('type', 'purchase')
 
-    const { data: purchases, error: purchasesError } = await purchasesQuery
+    const { data: purchases, error: purchasesError } = await purchasesQuery.limit(100000)
 
     if (purchasesError) {
       console.error('Error fetching purchases:', purchasesError)
@@ -121,9 +124,9 @@ export async function GET(request: NextRequest) {
     const within30Days = timeToPurchase.filter(d => d <= 30).length
     const over30Days = timeToPurchase.filter(d => d > 30).length
 
-    // Package breakdown
-    const packageCounts: Record<string, number> = { basic: 0, pro: 0, elite: 0, founders: 0 }
-    const packageRevenue: Record<string, number> = { basic: 0, pro: 0, elite: 0, founders: 0 }
+    // Package breakdown (includes all package types)
+    const packageCounts: Record<string, number> = { basic: 0, pro: 0, elite: 0, vip: 0, card_lovers_monthly: 0, card_lovers_annual: 0, founders: 0 }
+    const packageRevenue: Record<string, number> = { basic: 0, pro: 0, elite: 0, vip: 0, card_lovers_monthly: 0, card_lovers_annual: 0, founders: 0 }
 
     purchases?.forEach(p => {
       const desc = (p.description || '').toLowerCase()
@@ -132,6 +135,17 @@ export async function GET(request: NextRequest) {
       if (desc.includes('founder') || meta.package === 'founders') {
         packageCounts.founders++
         packageRevenue.founders += 99
+      } else if (desc.includes('vip') || meta.package === 'vip') {
+        packageCounts.vip++
+        packageRevenue.vip += 99
+      } else if (meta.subscription === 'card_lovers' || desc.includes('card lovers')) {
+        if (meta.plan === 'annual' || desc.includes('annual')) {
+          packageCounts.card_lovers_annual++
+          packageRevenue.card_lovers_annual += 449
+        } else {
+          packageCounts.card_lovers_monthly++
+          packageRevenue.card_lovers_monthly += 49.99
+        }
       } else if (desc.includes('elite') || meta.tier === 'elite' || p.amount === 20) {
         packageCounts.elite++
         packageRevenue.elite += 19.99
@@ -173,7 +187,11 @@ export async function GET(request: NextRequest) {
     // Founder count
     const founderCount = users?.filter(u => u.is_founder).length || 0
 
-    const totalUsers = users?.length || 0
+    // Get actual total user count from users table (user_credits may not have all users)
+    const { count: actualTotalUsers } = await supabaseAdmin
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+    const totalUsers = actualTotalUsers || users?.length || 0
     const totalRevenue = Object.values(packageRevenue).reduce((a, b) => a + b, 0)
 
     const analytics = {

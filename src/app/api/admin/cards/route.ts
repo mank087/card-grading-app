@@ -68,11 +68,15 @@ export async function GET(request: NextRequest) {
         ebay_price_updated_at,
         is_foil,
         scryfall_price_usd,
-        scryfall_price_usd_foil
+        scryfall_price_usd_foil,
+        dcm_price_estimate,
+        dcm_cached_prices
       `, { count: 'exact' })
 
-    // Apply category filter
-    if (category !== 'all') {
+    // Apply category filter (consolidate sports subcategories)
+    if (category === 'Sports') {
+      query = query.in('category', ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'])
+    } else if (category !== 'all') {
       query = query.eq('category', category)
     }
 
@@ -90,10 +94,26 @@ export async function GET(request: NextRequest) {
       query = query.or('is_featured.is.null,is_featured.eq.false')
     }
 
-    // Apply search filter (search across multiple fields)
+    // Apply search filter (search across multiple fields including user email)
     if (search) {
-      // Search across multiple text fields for comprehensive search
-      query = query.or(`card_name.ilike.%${search}%,serial.ilike.%${search}%,featured.ilike.%${search}%,card_set.ilike.%${search}%,manufacturer_name.ilike.%${search}%,card_number.ilike.%${search}%,pokemon_featured.ilike.%${search}%`)
+      // Check if search looks like an email - look up matching user IDs
+      let emailUserIds: string[] = []
+      if (search.includes('@') || search.includes('.')) {
+        const { data: matchedUsers } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .ilike('email', `%${search}%`)
+          .limit(50)
+        emailUserIds = matchedUsers?.map(u => u.id) || []
+      }
+
+      // Build OR filter with card fields + optional user_id match
+      const cardFieldFilters = `card_name.ilike.%${search}%,serial.ilike.%${search}%,featured.ilike.%${search}%,card_set.ilike.%${search}%,manufacturer_name.ilike.%${search}%,card_number.ilike.%${search}%,pokemon_featured.ilike.%${search}%`
+      if (emailUserIds.length > 0) {
+        query = query.or(`${cardFieldFilters},user_id.in.(${emailUserIds.join(',')})`)
+      } else {
+        query = query.or(cardFieldFilters)
+      }
     }
 
     // Apply sorting - map frontend column names to database fields
@@ -103,7 +123,7 @@ export async function GET(request: NextRequest) {
       'year': 'release_date',
       'grade': 'conversational_decimal_grade',
       'date': 'created_at',
-      'price': 'ebay_price_median',
+      'price': 'dcm_price_estimate',
       'visibility': 'visibility',
       'created_at': 'created_at',
     }
@@ -139,7 +159,7 @@ export async function GET(request: NextRequest) {
     if (frontPaths.length > 0) {
       // Generate signed URLs in batch (1 hour expiry)
       const { data: signedUrls } = await storageClient.storage
-        .from('card-images')
+        .from('cards')
         .createSignedUrls(frontPaths, 3600)
 
       signedUrls?.forEach((item) => {
@@ -184,20 +204,38 @@ export async function GET(request: NextRequest) {
       return enrichedCard
     })
 
-    // Get category stats for the header
-    const { data: statsData } = await supabaseAdmin
-      .from('cards')
-      .select('category, conversational_decimal_grade')
+    // Get category stats using count queries (avoids Supabase default 1000 row limit)
+    const sportCategories = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports']
+    const allCategories = [...sportCategories, 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Other']
+
+    const [totalResult, gradedResult, ...categoryResults] = await Promise.all([
+      supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }),
+      supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).not('conversational_decimal_grade', 'is', null),
+      ...allCategories.map(cat =>
+        supabaseAdmin.from('cards').select('*', { count: 'exact', head: true }).eq('category', cat)
+      )
+    ])
+
+    // Build category counts and consolidate sports
+    const consolidatedByCategory: Record<string, number> = {}
+    let sportsTotal = 0
+    allCategories.forEach((cat, i) => {
+      const catCount = categoryResults[i].count || 0
+      if (sportCategories.includes(cat)) {
+        sportsTotal += catCount
+      } else {
+        consolidatedByCategory[cat] = catCount
+      }
+    })
+    if (sportsTotal > 0) {
+      consolidatedByCategory['Sports'] = sportsTotal
+    }
 
     const stats = {
-      total: statsData?.length || 0,
-      graded: statsData?.filter(c => c.conversational_decimal_grade !== null).length || 0,
-      byCategory: {} as Record<string, number>
+      total: totalResult.count || 0,
+      graded: gradedResult.count || 0,
+      byCategory: consolidatedByCategory
     }
-    statsData?.forEach(card => {
-      const cat = card.category || 'Unknown'
-      stats.byCategory[cat] = (stats.byCategory[cat] || 0) + 1
-    })
 
     return NextResponse.json({
       cards: enrichedCards,

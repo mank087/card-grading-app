@@ -96,6 +96,9 @@ const PACKAGE_COLORS: Record<string, string> = {
   basic: '#3b82f6',
   pro: '#8b5cf6',
   elite: '#f59e0b',
+  vip: '#dc2626',
+  card_lovers_monthly: '#ec4899',
+  card_lovers_annual: '#be185d',
   founders: '#fbbf24'
 }
 
@@ -649,8 +652,8 @@ export default function AdminAnalyticsPage() {
                   <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
                       <Pie
-                        data={Object.entries(conversionAnalytics.package_breakdown.counts).map(([name, value]) => ({
-                          name: name.charAt(0).toUpperCase() + name.slice(1),
+                        data={Object.entries(conversionAnalytics.package_breakdown.counts).filter(([, v]) => v > 0).map(([name, value]) => ({
+                          name: name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
                           value
                         }))}
                         dataKey="value"
@@ -673,11 +676,11 @@ export default function AdminAnalyticsPage() {
                 <div className="bg-white rounded-lg shadow p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue by Package</h3>
                   <div className="space-y-4">
-                    {Object.entries(conversionAnalytics.package_breakdown.revenue).map(([pkg, revenue]) => (
+                    {Object.entries(conversionAnalytics.package_breakdown.revenue).filter(([, rev]) => rev > 0).map(([pkg, revenue]) => (
                       <div key={pkg} className="flex items-center justify-between">
                         <div className="flex items-center">
                           <div className="w-4 h-4 rounded-full mr-3" style={{ backgroundColor: PACKAGE_COLORS[pkg] || '#6b7280' }}></div>
-                          <span className="font-medium text-gray-900 capitalize">{pkg}</span>
+                          <span className="font-medium text-gray-900">{pkg.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-gray-900">${revenue.toFixed(2)}</p>
