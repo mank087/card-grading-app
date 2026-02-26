@@ -152,11 +152,17 @@ function buildMTGCardQuery(params: MTGCardSearchParams): string {
   // Card name first (required) - this is the most important identifier
   parts.push(params.cardName);
 
-  // Collector number SECOND (critical for MTG - identifies exact printing)
+  // Collector number SECOND (helps identify exact printing)
   if (params.collectorNumber) {
-    // Strip leading zeros to match PriceCharting format (e.g., "027" → "27")
-    const cleanNumber = params.collectorNumber.replace(/^#/, '').split('/')[0].trim().replace(/^0+(\d)/, '$1');
-    if (cleanNumber) {
+    // Strip leading zeros and non-numeric prefixes to match PriceCharting format
+    // Handles: "027" → "27", "M 0354" → "354", "#123" → "123"
+    let cleanNumber = params.collectorNumber.replace(/^#/, '').split('/')[0].trim();
+    // If it has non-numeric prefixes (e.g., "M 0354"), extract just the number
+    const numericMatch = cleanNumber.match(/(\d+)/);
+    if (numericMatch) {
+      cleanNumber = numericMatch[1].replace(/^0+(\d)/, '$1');
+    }
+    if (cleanNumber && /^\d+$/.test(cleanNumber)) {
       parts.push(`#${cleanNumber}`);
     }
   }
@@ -408,11 +414,13 @@ function scoreMTGProductMatch(
     }
   }
 
-  // COLLECTOR NUMBER VALIDATION (CRITICAL for MTG - same card reprinted in many sets)
+  // COLLECTOR NUMBER VALIDATION (helpful for MTG - same card reprinted in many sets)
   if (params.collectorNumber) {
     const cleanNum = params.collectorNumber.replace(/^#/, '').split('/')[0].trim().toLowerCase();
     // Strip leading zeros for comparison (e.g., "027" → "27")
     const cleanNumNoZeros = cleanNum.replace(/^0+(\d)/, '$1');
+    // Extract just the numeric portion for flexible matching (e.g., "M 0354" → "354")
+    const numericOnly = cleanNum.replace(/[^0-9]/g, '').replace(/^0+(\d)/, '$1');
 
     // Check various formats: #123, 123/, 123 (space after) — try both padded and unpadded
     const hasNumber = productName.includes(`#${cleanNum}`) ||
@@ -422,14 +430,20 @@ function scoreMTGProductMatch(
                       productName.includes(`#${cleanNumNoZeros}`) ||
                       productName.includes(` ${cleanNumNoZeros}/`) ||
                       productName.includes(` ${cleanNumNoZeros} `) ||
-                      productName.endsWith(` ${cleanNumNoZeros}`);
+                      productName.endsWith(` ${cleanNumNoZeros}`) ||
+                      (numericOnly && numericOnly !== cleanNumNoZeros && (
+                        productName.includes(`#${numericOnly}`) ||
+                        productName.includes(` ${numericOnly}/`) ||
+                        productName.includes(` ${numericOnly} `) ||
+                        productName.endsWith(` ${numericOnly}`)
+                      ));
 
     if (hasNumber) {
       score += 40;  // Strong bonus for matching collector number
     } else {
-      // If we have a collector number but it doesn't match, this is likely wrong card
-      console.log(`[MTGPricing] SKIP: Collector number mismatch - looking for #${cleanNum} (or #${cleanNumNoZeros}), found "${productName}"`);
-      return -1;
+      // Penalize but don't reject — collector number formats vary across sources
+      score -= 10;
+      console.log(`[MTGPricing] Collector number mismatch (penalty) - looking for #${cleanNum}, found "${productName}"`);
     }
   }
 
@@ -590,6 +604,57 @@ export async function searchMTGCardPrices(
         matchConfidence: 'low',
         queryUsed: query,
       };
+    }
+  }
+
+  // Fallback: try simpler query with just card name + set (no collector number)
+  if (params.collectorNumber || (params.setName && query.includes(params.setName))) {
+    const fallbackParams = { ...params, collectorNumber: undefined };
+    const fallbackQuery = buildMTGCardQuery(fallbackParams);
+
+    // Only retry if the fallback query is actually different
+    if (fallbackQuery !== query) {
+      console.log(`[MTGPricing] Retrying with simplified query: "${fallbackQuery}"`);
+      await pricingDelay();
+
+      const fallbackProducts = await searchMTGProducts(fallbackQuery, { limit: 15 });
+
+      if (fallbackProducts.length > 0) {
+        const scoredFallback = fallbackProducts
+          .map(product => ({
+            product,
+            score: scoreMTGProductMatch(product, { ...params, collectorNumber: undefined })
+          }))
+          .filter(p => p.score >= 0)
+          .sort((a, b) => b.score - a.score);
+
+        console.log(`[MTGPricing] Fallback scored ${scoredFallback.length} products`);
+        scoredFallback.slice(0, 3).forEach((p, i) => {
+          console.log(`[MTGPricing]   ${i + 1}. Score ${p.score}: ${p.product['product-name']} (${p.product['console-name']})`);
+        });
+
+        for (let i = 0; i < Math.min(scoredFallback.length, 3); i++) {
+          const { product, score } = scoredFallback[i];
+          if (i > 0) await pricingDelay();
+
+          const priceData = await getMTGProductPrices(product.id);
+          if (priceData) {
+            const normalized = normalizeMTGPrices(priceData);
+            const hasAnyPrice = (normalized.raw !== null && normalized.raw > 0) ||
+              Object.values(normalized.psa).some(p => p > 0) ||
+              Object.values(normalized.bgs).some(p => p > 0);
+
+            if (hasAnyPrice) {
+              console.log(`[MTGPricing] Fallback found pricing: ${product['product-name']}`);
+              return {
+                prices: normalized,
+                matchConfidence: score >= 40 ? 'medium' as const : 'low' as const,
+                queryUsed: fallbackQuery,
+              };
+            }
+          }
+        }
+      }
     }
   }
 
