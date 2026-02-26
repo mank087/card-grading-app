@@ -447,6 +447,12 @@ function FeaturedCardsCarousel({
           <div>
             <h2 className="text-3xl font-bold text-gray-900">Featured Grades</h2>
             <p className="text-gray-600 mt-2">Professionally graded cards from our community</p>
+            <Link
+              href="/featured"
+              className="inline-block mt-2 text-sm font-semibold text-purple-600 hover:text-purple-700 transition-colors"
+            >
+              View All &rarr;
+            </Link>
           </div>
           {/* Navigation Arrows */}
           <div className="flex gap-2">

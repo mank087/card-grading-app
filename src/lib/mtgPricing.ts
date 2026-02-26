@@ -150,7 +150,12 @@ function buildMTGCardQuery(params: MTGCardSearchParams): string {
   const parts: string[] = [];
 
   // Card name first (required) - this is the most important identifier
-  parts.push(params.cardName);
+  // For double-faced cards ("Front // Back"), use only the front face name
+  // PriceCharting lists these by front face only
+  const cardName = params.cardName.includes('//')
+    ? params.cardName.split('//')[0].trim()
+    : params.cardName;
+  parts.push(cardName);
 
   // Collector number SECOND (helps identify exact printing)
   if (params.collectorNumber) {
@@ -393,7 +398,12 @@ function scoreMTGProductMatch(
 
   // CARD NAME VALIDATION (CRITICAL - must match)
   if (params.cardName) {
-    const cardNameLower = params.cardName.toLowerCase().trim();
+    // For double-faced cards ("Front Name // Back Name"), use only the front face
+    // PriceCharting typically lists just the front face name
+    const fullNameLower = params.cardName.toLowerCase().trim();
+    const cardNameLower = fullNameLower.includes('//')
+      ? fullNameLower.split('//')[0].trim()
+      : fullNameLower;
 
     // Check for exact match at start of product name (most reliable)
     if (productName.startsWith(cardNameLower + ' ') || productName.startsWith(cardNameLower + '#') || productName === cardNameLower) {
@@ -407,7 +417,7 @@ function scoreMTGProductMatch(
       const matchRatio = nameParts.length > 0 ? matchingParts.length / nameParts.length : 0;
 
       if (matchRatio < 0.8) {
-        console.log(`[MTGPricing] SKIP: Card name mismatch - looking for "${params.cardName}", found "${productName}" (${matchingParts.length}/${nameParts.length} words)`);
+        console.log(`[MTGPricing] SKIP: Card name mismatch - looking for "${cardNameLower}", found "${productName}" (${matchingParts.length}/${nameParts.length} words)`);
         return -1;
       }
       score += matchingParts.length * 10;
