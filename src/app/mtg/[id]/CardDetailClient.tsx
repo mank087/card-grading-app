@@ -5098,7 +5098,7 @@ export function MTGCardDetails() {
               {/* 5. Market Value */}
               <CollapsibleSection
                 title="Market Value"
-                badge={dcmPriceData?.estimatedPrice ? `$${dcmPriceData.estimatedPrice}` : undefined}
+                badge={dcmPriceData?.estimatedValue ? `$${dcmPriceData.estimatedValue.toFixed(2)}` : undefined}
                 tourId="tour-market-value"
               >
               {/* DCM Price Lookup Section */}
@@ -5115,9 +5115,11 @@ export function MTGCardDetails() {
                         set_name: cardInfo.set_name || card.card_set,
                         collector_number: cardInfo.collector_number || cardInfo.card_number || card.card_number,
                         expansion_code: cardInfo.expansion_code || card.expansion_code,
-                        year: cardInfo.set_year || card.release_date,
+                        year: cardInfo.year || card.release_date,
                         is_foil: cardInfo.is_foil || card.is_foil || false,
                         rarity_or_variant: cardInfo.rarity_or_variant || cardInfo.rarity || card.mtg_rarity,
+                        dcm_selected_product_id: card.dcm_selected_product_id,
+                        dcm_selected_product_name: card.dcm_selected_product_name,
                       }}
                       dcmGrade={card.conversational_decimal_grade ?? undefined}
                       isOwner={isPricingOwner}
