@@ -167,14 +167,29 @@ export function normalizeSetCode(code: string): string {
  * Handles formats like:
  * - "234" → "234"
  * - "23a" → "23a"  (variant letters)
- * - "F1" → "F1"    (promo prefixes)
+ * - "F1" → "f1"    (promo prefixes)
  * - "★1" → "★1"    (special characters)
  * - "001" → "1"    (leading zeros for numeric)
+ * - "M 0010" → "10" (Universes Beyond prefix + leading zeros, e.g., Marvel "M 0010")
+ * - "234/516" → "234" (fraction format — extract numerator)
  */
 export function normalizeCollectorNumber(num: string): string {
   if (!num) return '';
 
-  const normalized = num.trim();
+  let normalized = num.trim();
+
+  // Handle fraction format "234/516" — extract numerator only
+  const fractionMatch = normalized.match(/^(\d+)\s*\/\s*\d+$/);
+  if (fractionMatch) {
+    normalized = fractionMatch[1];
+  }
+
+  // Handle Universes Beyond / crossover prefix format: "M 0010", "S 0023"
+  // A single letter followed by a space and a number → strip the prefix
+  const prefixMatch = normalized.match(/^[A-Za-z]\s+0*(\d+)$/);
+  if (prefixMatch) {
+    return prefixMatch[1] || '0';
+  }
 
   // If purely numeric, remove leading zeros
   if (/^\d+$/.test(normalized)) {
@@ -212,11 +227,28 @@ export async function lookupBySetAndNumber(
       .from('mtg_cards')
       .select('*')
       .eq('set_code', normalizedCode)
-      .eq('collector_number', collectorNumber.toLowerCase())
+      .eq('collector_number', collectorNumber.toLowerCase().trim())
       .limit(1)
       .single();
 
-    return fallbackData as MtgCard | null;
+    if (fallbackData) return fallbackData as MtgCard;
+
+    // Try extracting just the numeric portion as final fallback
+    // Handles cases like "M 0010" → "10", "C0053" → "53"
+    const numericOnly = collectorNumber.replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';
+    if (numericOnly !== normalizedNumber) {
+      const { data: numericData } = await supabase
+        .from('mtg_cards')
+        .select('*')
+        .eq('set_code', normalizedCode)
+        .eq('collector_number', numericOnly)
+        .limit(1)
+        .single();
+
+      return numericData as MtgCard | null;
+    }
+
+    return null;
   }
 
   return data as MtgCard;
