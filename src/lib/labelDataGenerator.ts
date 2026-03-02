@@ -191,6 +191,7 @@ export interface LabelData {
 
 export interface ConversationalCardInfo {
   card_name?: string | null;
+  flavor_name?: string | null;  // Crossover/alternate name (Universes Beyond, Secret Lair)
   player_or_character?: string | null;
   set_name?: string | null;
   set_era?: string | null;
@@ -550,8 +551,11 @@ function getPokemonName(cardInfo: ConversationalCardInfo, card: CardForLabel): s
  * MTG: Full card name is primary (e.g., "Jace, the Mind Sculptor")
  */
 function getMTGName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
+  const flavorName = stripMarkdown(cardInfo.flavor_name);
   const cardName = stripMarkdown(cardInfo.card_name);
   const characterName = stripMarkdown(cardInfo.player_or_character);
+  // Prefer flavor_name (crossover name printed on card) when present
+  if (isValidValue(flavorName)) return flavorName!;
   if (isValidValue(cardName)) return cardName!;
   if (isValidValue(characterName)) return characterName!;
   if (isValidValue(card.card_name)) return card.card_name!;

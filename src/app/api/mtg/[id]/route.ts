@@ -902,11 +902,15 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
               const releaseYear = dbCard.released_at ? new Date(dbCard.released_at).getFullYear().toString() : null;
 
               // Name safety check: verify DB name is compatible with AI-extracted name
+              // Also check flavor_name for crossover cards (Universes Beyond, Secret Lair)
               const aiName = (aiCardInfo.card_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
               const dbName = (dbCard.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const dbFlavorName = (dbCard.flavor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
               const nameIsCompatible = !aiName || !dbName ||
                 dbName.includes(aiName.substring(0, 5)) ||
-                aiName.includes(dbName.substring(0, 5));
+                aiName.includes(dbName.substring(0, 5)) ||
+                (dbFlavorName && dbFlavorName.includes(aiName.substring(0, 5))) ||
+                (dbFlavorName && aiName.includes(dbFlavorName.substring(0, 5)));
 
               if (!nameIsCompatible) {
                 console.log(`[GET /api/mtg/${cardId}] ⚠️ DB name "${dbCard.name}" doesn't match AI name "${aiCardInfo.card_name}" — SKIPPING all DB overrides`);
@@ -923,6 +927,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
                 ...conversationalGradingData.card_info,
                 // === CORE IDENTIFICATION (verified from database) ===
                 card_name: dbCard.name,
+                flavor_name: dbCard.flavor_name || null,  // Crossover name (Universes Beyond, Secret Lair)
                 set_name: dbCard.set_name,
                 collector_number: dbCard.collector_number,
                 expansion_code: dbCard.set_code,

@@ -2439,6 +2439,7 @@ export function MTGCardDetails() {
   const cardInfo = {
     // Core identification - from conversational_card_info (Scryfall data merged in by API)
     card_name: stripMarkdown(convInfo.card_name) || card.card_name || dvgGrading.card_info?.card_name,
+    flavor_name: stripMarkdown(convInfo.flavor_name) || null,  // Crossover name (Universes Beyond, Secret Lair)
     player_or_character: stripMarkdown(convInfo.player_or_character) || card.pokemon_featured || card.featured || dvgGrading.card_info?.player_or_character,
     set_name: setNameWithSubset,
     set_era: stripMarkdown(convInfo.set_era) || dvgGrading.card_info?.set_era,
@@ -3539,13 +3540,24 @@ export function MTGCardDetails() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-                  {/* Card Name with bilingual support */}
+                  {/* Card Name with bilingual and crossover name support */}
                   {(cardInfo.card_name || card.card_name) && (
                     <div className="space-y-1">
                       <p className="text-gray-500 text-xs uppercase tracking-wide">Card Name</p>
                       {(() => {
                         const cardName = cardInfo.card_name || card.card_name;
+                        const flavorName = cardInfo.flavor_name;
                         const hasJapanese = /[぀-ゟ゠-ヿ一-龯]/.test(cardName);
+
+                        // Crossover card: show flavor_name as primary, canonical name as secondary
+                        if (flavorName && flavorName !== cardName) {
+                          return (
+                            <div>
+                              <p className="font-semibold text-gray-900">{flavorName}</p>
+                              <p className="text-xs text-gray-500 mt-0.5">({cardName})</p>
+                            </div>
+                          );
+                        }
 
                         if (hasJapanese) {
                           const parts = cardName.split(/[/()（）]/);

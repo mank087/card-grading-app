@@ -11,6 +11,7 @@ export interface MtgCard {
   id: string;                    // Scryfall card UUID
   oracle_id: string | null;      // Oracle ID for grouping all prints
   name: string;                  // Card name (first face for DFCs)
+  flavor_name: string | null;    // Crossover/alternate name (Universes Beyond, Secret Lair)
 
   // Mana and casting
   mana_cost: string | null;      // "{2}{U}{U}"
@@ -260,11 +261,11 @@ export async function lookupBySetAndNumber(
 export async function searchByName(name: string, limit: number = 10): Promise<MtgCard[]> {
   const supabase = supabaseServer();
 
-  // Search name field with case-insensitive partial match
+  // Search name and flavor_name fields with case-insensitive partial match
   const { data, error } = await supabase
     .from('mtg_cards')
     .select('*')
-    .ilike('name', `%${name}%`)
+    .or(`name.ilike.%${name}%,flavor_name.ilike.%${name}%`)
     .order('released_at', { ascending: false })
     .limit(limit);
 
@@ -289,7 +290,7 @@ export async function searchByNameAndSet(
   const { data, error } = await supabase
     .from('mtg_cards')
     .select('*')
-    .ilike('name', `%${name}%`)
+    .or(`name.ilike.%${name}%,flavor_name.ilike.%${name}%`)
     .ilike('set_name', `%${setName}%`)
     .order('released_at', { ascending: false })
     .limit(limit);
@@ -316,7 +317,7 @@ export async function searchByNameAndSetCode(
   const { data, error } = await supabase
     .from('mtg_cards')
     .select('*')
-    .ilike('name', `%${name}%`)
+    .or(`name.ilike.%${name}%,flavor_name.ilike.%${name}%`)
     .eq('set_code', normalizedCode)
     .order('collector_number', { ascending: true })
     .limit(limit);
@@ -426,15 +427,20 @@ export function findBestMatchWithConfidence(
       }
     }
 
-    // Name match - weight 3
+    // Name match - weight 3 (also check flavor_name for crossover cards)
     if (aiIdentification.name) {
-      const nameScore = calculateSimilarity(card.name, aiIdentification.name);
+      let nameScore = calculateSimilarity(card.name, aiIdentification.name);
+      // If flavor_name exists and gives a better match, use that score
+      if (card.flavor_name) {
+        const flavorScore = calculateSimilarity(card.flavor_name, aiIdentification.name);
+        nameScore = Math.max(nameScore, flavorScore);
+      }
       score += nameScore * 3;
       factors += 3;
       confidence.nameScore = nameScore;
       confidence.nameMatched = nameScore >= 0.7;
       if (nameScore < 0.5) {
-        confidence.warnings.push(`Name mismatch: "${aiIdentification.name}" vs "${card.name}"`);
+        confidence.warnings.push(`Name mismatch: "${aiIdentification.name}" vs "${card.name}"${card.flavor_name ? ` / "${card.flavor_name}"` : ''}`);
       }
     }
 
@@ -514,6 +520,11 @@ export async function lookupMtgCard(
 
       if (name) {
         nameScore = calculateSimilarity(directMatch.name, name);
+        // Also check flavor_name for crossover cards (Universes Beyond, Secret Lair)
+        if (directMatch.flavor_name) {
+          const flavorScore = calculateSimilarity(directMatch.flavor_name, name);
+          nameScore = Math.max(nameScore, flavorScore);
+        }
         nameMatched = nameScore >= 0.5;
 
         if (nameScore < 0.35) {

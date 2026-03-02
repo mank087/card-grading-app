@@ -299,6 +299,7 @@ async function importCardsForSet(set) {
         id: card.id,
         oracle_id: card.oracle_id || null,
         name: card.name,
+        flavor_name: card.flavor_name || null,  // Crossover name (Universes Beyond, Secret Lair)
         mana_cost: content.mana_cost,
         cmc: card.cmc || null,
         type_line: content.type_line,
