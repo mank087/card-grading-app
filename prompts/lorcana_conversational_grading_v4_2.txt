@@ -419,11 +419,14 @@ If the card displays text in a non-English language (French, German, Italian, et
   - true = Enchanted variant
   - false = Standard card
 
-• **is_foil**: Boolean - Foil finish
-  - true = card has holographic/foil layer
-  - false = non-foil card
+• **is_foil**: Boolean - Foil finish (DEFAULT TO FALSE)
+  - true = card has holographic/foil layer (REQUIRE MULTIPLE INDICATORS)
+  - false = non-foil card (use when uncertain)
   - Standard foil has foil layer over normal card design with borders
   - Different from Enchanted (which is borderless)
+  - ⚠️ FALSE POSITIVE WARNING: Glare, glossy finish, sleeve reflections, and
+    lighting artifacts are NOT foil. ALL Lorcana cards have glossy finish.
+    Only mark true if you see clear rainbow/prismatic color shifting.
 
 • **expansion_code**: Set code (3-letter abbreviation)
   - Extract from bottom-center near card number
@@ -1835,7 +1838,7 @@ Return valid JSON object with this EXACT structure:
     "abilities": ["string"] or [],  // ⚡ LORCANA: Array of ability text or empty array
     "flavor_text": "string or null",  // ⚡ LORCANA: Italic flavor text or null
     "is_enchanted": true or false,  // ⚡ LORCANA REQUIRED: true if Enchanted variant (borderless full-art), false otherwise
-    "is_foil": true or false,  // ⚡ LORCANA REQUIRED: true if foil finish, false if non-foil
+    "is_foil": true or false,  // ⚡ LORCANA REQUIRED: DEFAULT FALSE. Only true with multiple clear holographic indicators. Glare/glossy/sleeve reflections are NOT foil.
     "artist_name": "string or null",  // ⚡ LORCANA: Artist name from bottom or null
     "franchise": "Disney",  // ⚡ LORCANA: ALWAYS "Disney" for Lorcana cards
     "language": "string or null"  // ⚡ LORCANA: "English", "French", "German", etc.

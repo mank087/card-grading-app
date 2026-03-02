@@ -215,9 +215,13 @@ ENHANCED FIELDS
 **subset**: Additional variant/promo designation
 • Promo, Tournament, Box Topper, etc.
 
-**is_foil**: Holographic treatment (true|false)
-• true for Parallel, SEC, and some SR cards
-• false for standard printings
+**is_foil**: Holographic treatment (true|false) — DEFAULT TO FALSE
+• true ONLY for cards with clear holographic/prismatic surface treatment
+  (Parallel variants, SEC, and some SR cards)
+• false for standard printings and when uncertain
+• ⚠️ COMMON FALSE POSITIVES: Camera glare, glossy card stock, sleeve reflections,
+  and lighting artifacts are NOT foil. Only set true with clear rainbow/prismatic shifting.
+• If card is in a protective sleeve/holder: almost always set false
 
 **language**: Card language
 • Usually "English" or "Japanese"

@@ -108,11 +108,36 @@ REQUIRED FIELDS (All Lorcana Cards)
 ENHANCED FIELDS
 ────────────────────────────────────────────────────────────────────────
 
+**is_foil**: Foil card detection (boolean - REQUIRED)
+• true: Card has holographic/foil layer over standard card design with borders
+• false: Standard non-foil printing
+• 🚨 **DEFAULT TO FALSE** — Foil detection from static images is inherently unreliable.
+  Only set true when you see MULTIPLE clear indicators:
+  - Rainbow/prismatic color shifting across card surface
+  - Holographic shimmer on card frame, borders, or text areas
+  - Metallic sheen on text that standard cards do not have
+• ⚠️ **COMMON FALSE POSITIVES — These are NOT foil indicators:**
+  - Camera flash or lighting glare on glossy card surface
+  - Reflections from protective sleeves or holders
+  - Glossy card stock (ALL Lorcana cards have glossy finish)
+  - Light reflections on ink splash border designs
+  - Image artifacts or compression
+• If card is in a protective sleeve/holder: almost always set false
+• When in doubt: **set false**
+• NOTE: Enchanted variants are NOT the same as Foil. Enchanted is a rarity tier
+  with full-art borderless holographic treatment. Regular Foil retains normal borders.
+
+**is_enchanted**: Enchanted variant detection (boolean)
+• true: Card is an Enchanted variant (full-art borderless holographic)
+• false: Standard card design with borders
+
 **rarity_tier**: Card rarity
 • See Rarity Classification section below
 
 **subset**: Variant type
 • Options: Foil, Enchanted, Promo, etc.
+• Set to "Foil" when is_foil = true
+• Set to "Enchanted" when is_enchanted = true
 • Enchanted = ultra-rare holographic variant
 
 **card_front_text**: Abilities and effects

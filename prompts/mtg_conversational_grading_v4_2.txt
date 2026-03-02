@@ -796,7 +796,7 @@ BEFORE PROCEEDING TO STEP 2, VERIFY YOU HAVE ATTEMPTED TO EXTRACT:
 ✅ **expansion_code** - 3-letter set code (e.g., "BLB", "MH3") or null
 ✅ **collector_number** - Card number (e.g., "C0053", "123/281") or null
 ✅ **artist_name** - Artist name from bottom center or null
-✅ **is_foil** - true or false (check for holographic sheen)
+✅ **is_foil** - true or false (DEFAULT FALSE — only true with multiple clear holographic indicators. Glare, glossy finish, and sleeve reflections are NOT foil)
 ✅ **is_promo** - true or false (check for promo designation)
 ✅ **border_color** - "Black", "White", "Silver", "Gold", or null
 ✅ **frame_version** - "Modern", "Old", "Borderless", etc. or null
@@ -2453,7 +2453,7 @@ Return valid JSON object with this EXACT structure:
     "creature_type": "string or null",  // ⚡ MTG: Creature subtype (e.g., "Human Wizard", "Dragon", "Elf Warrior") or null for non-creatures
     "power_toughness": "string or null",  // ⚡ MTG: Power/Toughness for creatures (e.g., "3/3", "5/5", "*/2") or null for non-creatures
     "artist_name": "string or null",  // ⚡ MTG: Artist name from bottom-center (e.g., "Rebecca Guay", "Mark Tedin")
-    "is_foil": true or false,  // ⚡ MTG: true if foil finish, false if non-foil
+    "is_foil": true or false,  // ⚡ MTG: DEFAULT FALSE. Only true with multiple clear holographic indicators. Glare/glossy/sleeve reflections are NOT foil.
     "is_promo": true or false,  // ⚡ MTG: true if promo (Prerelease, FNM, etc.), false otherwise
     "border_color": "string or null",  // ⚡ MTG: "Black", "White", "Silver", "Gold", or null
     "frame_version": "string or null",  // ⚡ MTG: "Modern", "Future", "Old", "M15", "Borderless", or null

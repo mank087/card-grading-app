@@ -213,8 +213,13 @@ ENHANCED FIELDS (Pokemon TCG Specific)
 
 **Detection Tips:**
 • Check card back for small text at bottom, top, or sides
-• Look for foil pattern designations
+• Look for foil pattern designations on the card itself
 • Check card number - if > set total, it's a secret rare
+• 🚨 **HOLOFOIL FALSE POSITIVE WARNING**: Camera glare, glossy card stock, sleeve
+  reflections, and lighting artifacts are NOT holofoil indicators. ALL Pokemon cards
+  have a glossy finish. Only identify as Holo/Reverse Holo when you see clear
+  holographic pattern shifting (rainbow, cosmos, sunburst, etc.) in the artwork
+  or card background. When in doubt, do NOT add holofoil to subset.
 • 🇯🇵 For Japanese cards: Extract in "日本語 (English)" format (e.g., "AR (Art Rare)")
 
 **serial_number**: Serial number if present (uncommon in Pokemon)

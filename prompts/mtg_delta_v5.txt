@@ -40,12 +40,21 @@ CRITICAL API FIELDS (Required for Scryfall Verification)
 **is_foil**: Foil card detection (boolean - REQUIRED)
 • true: Card has holographic/metallic/rainbow finish
 • false: Standard non-foil printing
-• Detection methods:
-  - Rainbow shimmer visible across card surface
-  - Holographic pattern in artwork or frame
-  - Reflective/metallic appearance when tilted
-  - Text/borders have metallic sheen
-• If card is in holder and finish cannot be determined with confidence: false
+• 🚨 **DEFAULT TO FALSE** — Foil detection from static images is inherently unreliable.
+  Only set true when you see MULTIPLE clear indicators:
+  - Rainbow/prismatic color shifting across card surface or frame
+  - Holographic pattern clearly visible in artwork, text, or borders
+  - Metallic sheen on text/borders that non-foil cards do not have
+• ⚠️ **COMMON FALSE POSITIVES — These are NOT foil indicators:**
+  - Camera flash or lighting glare on glossy card surface
+  - Reflections from protective sleeves, toploaders, or card holders
+  - Glossy/shiny card stock (all modern cards have glossy finish)
+  - Light reflections on dark artwork areas
+  - Image compression artifacts creating shimmer-like patterns
+  - Standard card stock sheen visible at certain angles
+• If card is in a protective sleeve/holder: almost always set false
+  (sleeve reflections make foil detection impossible)
+• When in doubt: **set false** — a false negative is better than a false positive
 
 **foil_type**: Specific foil variant (if is_foil = true)
 • Options: "Traditional", "Etched", "Galaxy", "Surge", "Textured", "Gilded", "Confetti", null

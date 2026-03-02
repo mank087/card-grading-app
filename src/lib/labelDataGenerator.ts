@@ -657,18 +657,38 @@ function getPokemonSubset(cardInfo: ConversationalCardInfo, card: CardForLabel):
 
 /**
  * Get subset for MTG cards
- * MTG: Frame treatment (Borderless, Extended Art, Showcase, etc.)
+ * MTG: Frame treatment (Borderless, Extended Art, Showcase, etc.) + Foil
  */
 function getMTGSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): string | null {
-  return stripMarkdown(cardInfo.subset);
+  const subset = stripMarkdown(cardInfo.subset);
+  const isFoil = cardInfo.is_foil === true || card.is_foil === true;
+  const foilType = stripMarkdown(cardInfo.foil_type) || card.foil_type;
+
+  if (subset && isFoil) {
+    return `${subset} • ${foilType || 'Foil'}`;
+  }
+  if (isFoil) {
+    return foilType || 'Foil';
+  }
+  return subset;
 }
 
 /**
  * Get subset for Lorcana cards
- * Lorcana: Usually no separate subset
+ * Lorcana: Foil / Enchanted variants shown on context line
  */
 function getLorcanaSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): string | null {
-  return stripMarkdown(cardInfo.subset);
+  const subset = stripMarkdown(cardInfo.subset);
+  const isFoil = cardInfo.is_foil === true;
+  const isEnchanted = cardInfo.is_enchanted === true;
+
+  if (isEnchanted) {
+    return subset || 'Enchanted';
+  }
+  if (isFoil) {
+    return subset || 'Foil';
+  }
+  return subset;
 }
 
 /**
@@ -779,15 +799,10 @@ function getPokemonFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel
 
 /**
  * Build features array for MTG cards
+ * Note: Foil is now shown on the context line (subset), not duplicated here
  */
 function getMTGFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): string[] {
   const features: string[] = [];
-
-  // Foil
-  if (cardInfo.is_foil === true || card.is_foil === true) {
-    const foilType = stripMarkdown(cardInfo.foil_type) || card.foil_type;
-    features.push(foilType || 'Foil');
-  }
 
   // Promo
   if (cardInfo.is_promo === true) {
@@ -816,19 +831,10 @@ function getMTGFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): s
 
 /**
  * Build features array for Lorcana cards
+ * Note: Foil/Enchanted now shown on context line (subset), not duplicated here
  */
 function getLorcanaFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): string[] {
   const features: string[] = [];
-
-  // Enchanted (premium variant)
-  if (cardInfo.is_enchanted === true) {
-    features.push('Enchanted');
-  }
-
-  // Foil
-  if (cardInfo.is_foil === true) {
-    features.push('Foil');
-  }
 
   // Serial Number
   const serialNum = stripMarkdown(cardInfo.serial_number);
@@ -850,30 +856,11 @@ function getOnePieceFeatures(cardInfo: ConversationalCardInfo, card: CardForLabe
     features.push('Leader');
   }
 
-  // Variant types
+  // Foil — only show if not already captured by variant type on context line
+  // (Parallel variants are inherently foil/holographic)
   const variantType = cardInfo.op_variant_type?.toLowerCase();
-  if (variantType) {
-    switch (variantType) {
-      case 'parallel':
-        features.push('Parallel');
-        break;
-      case 'manga':
-        features.push('Manga');
-        break;
-      case 'parallel_manga':
-        features.push('Parallel Manga');
-        break;
-      case 'sp':
-        features.push('SP');
-        break;
-      case 'alternate_art':
-        features.push('Alt Art');
-        break;
-    }
-  }
-
-  // Foil (if applicable)
-  if (cardInfo.is_foil === true) {
+  const isParallel = variantType === 'parallel' || variantType === 'parallel_manga';
+  if (cardInfo.is_foil === true && !isParallel) {
     features.push('Foil');
   }
 
