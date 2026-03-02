@@ -12,7 +12,7 @@ declare global {
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
-import { getStoredSession } from '@/lib/directAuth'
+import { getStoredSession, getValidSession } from '@/lib/directAuth'
 import { loadStripe } from '@stripe/stripe-js'
 import Image from 'next/image'
 import FloatingCardsBackground from '../ui/FloatingCardsBackground'
@@ -201,7 +201,7 @@ function CreditsPageContent() {
     }
 
     try {
-      const session = getStoredSession()
+      const session = await getValidSession()
       if (!session?.access_token) {
         router.push('/login?redirect=/credits')
         return
@@ -276,7 +276,7 @@ function CreditsPageContent() {
     }
 
     try {
-      const session = getStoredSession()
+      const session = await getValidSession()
       if (!session?.access_token) {
         router.push('/login?redirect=/credits')
         return
@@ -327,7 +327,7 @@ function CreditsPageContent() {
     setError(null)
 
     try {
-      const session = getStoredSession()
+      const session = await getValidSession()
       if (!session?.access_token) {
         throw new Error('Not authenticated')
       }

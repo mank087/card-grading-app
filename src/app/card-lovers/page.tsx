@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useCredits } from '@/contexts/CreditsContext'
-import { getStoredSession } from '@/lib/directAuth'
+import { getStoredSession, getValidSession } from '@/lib/directAuth'
 
 // Global types for tracking pixels are declared elsewhere
 
@@ -87,7 +87,7 @@ export default function CardLoversPage() {
     setPurchasing(true)
 
     try {
-      const session = getStoredSession()
+      const session = await getValidSession()
       const refCode = typeof window !== 'undefined' ? localStorage.getItem('dcm_ref_code') : null
       const response = await fetch('/api/stripe/subscribe', {
         method: 'POST',
