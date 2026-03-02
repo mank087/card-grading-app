@@ -897,9 +897,22 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
               console.log(`[GET /api/mtg/${cardId}]   Rarity: ${matchResult.card.rarity}, Type: ${matchResult.card.type_line}`);
 
               // Enhance card_info with verified database data
-              // IMPORTANT: Database values take priority over AI-identified values for accuracy
+              // IMPORTANT: Database values take priority — BUT only if name actually matches
               const dbCard = matchResult.card;
               const releaseYear = dbCard.released_at ? new Date(dbCard.released_at).getFullYear().toString() : null;
+
+              // Name safety check: verify DB name is compatible with AI-extracted name
+              const aiName = (aiCardInfo.card_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const dbName = (dbCard.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const nameIsCompatible = !aiName || !dbName ||
+                dbName.includes(aiName.substring(0, 5)) ||
+                aiName.includes(dbName.substring(0, 5));
+
+              if (!nameIsCompatible) {
+                console.log(`[GET /api/mtg/${cardId}] ⚠️ DB name "${dbCard.name}" doesn't match AI name "${aiCardInfo.card_name}" — SKIPPING all DB overrides`);
+                matchedDatabaseCard = null;
+                databaseMatchConfidence = null;
+              } else {
 
               // Format power/toughness
               const powerToughness = (dbCard.power && dbCard.toughness)
@@ -947,6 +960,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
                 mana_cost: conversationalGradingData.card_info.mana_cost,
                 rarity: conversationalGradingData.card_info.rarity_or_variant
               });
+              } // end nameIsCompatible else block
             } else {
               console.log(`[GET /api/mtg/${cardId}] ⚠️ No internal database match found (or low confidence)`);
             }

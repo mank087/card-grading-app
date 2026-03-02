@@ -7,7 +7,7 @@ The master grading rubric (Sections 1-13) applies to ALL MTG cards.
 This delta provides card-specific extraction rules, defect patterns, and examples.
 
 **CARD TYPES COVERED:**
-Magic: The Gathering cards from all sets (Alpha 1993 - present)
+Magic: The Gathering cards from all sets (Alpha 1993 through Star Trek 2026)
 
 **v5.1 UPDATES:** Added Scryfall API verification fields (sport_or_category, set_code,
 is_foil, foil_type, language, is_double_faced)
@@ -254,10 +254,25 @@ C. MTG SET IDENTIFICATION MODULE
 • Tertiary: Card number denominator + year
 
 ────────────────────────────────────────────────────────────────────────
-COMMON MODERN SETS LOOKUP TABLE (2020-2025)
+COMMON MODERN SETS LOOKUP TABLE (2020-2026)
 ────────────────────────────────────────────────────────────────────────
 
-**2024-2025 Standard Sets:**
+**2025-2026 Sets:**
+| Set Code | Set Name                         | Year | Cards |
+|----------|----------------------------------|------|-------|
+| INR      | Innistrad Remastered             | 2025 | 291   |
+| DFT      | Aetherdrift                      | 2025 | 286   |
+| TDM      | Tarkir: Dragonstorm              | 2025 | 281   |
+| FIN      | Final Fantasy                    | 2025 | 287   |
+| EOE      | Edge of Eternities               | 2025 | TBD   |
+| SPM      | Marvel's Spider-Man              | 2025 | TBD   |
+| TLA      | Avatar: The Last Airbender       | 2025 | TBD   |
+| ECL      | Lorwyn Eclipsed                  | 2026 | TBD   |
+| TMT      | Teenage Mutant Ninja Turtles     | 2026 | TBD   |
+| SOS      | Secrets of Strixhaven            | 2026 | TBD   |
+| MSH      | Marvel Super Heroes              | 2026 | TBD   |
+
+**2024 Standard Sets:**
 | Set Code | Set Name                    | Year | Cards |
 |----------|----------------------------|------|-------|
 | MH3      | Modern Horizons 3           | 2024 | 303+  |
@@ -266,7 +281,6 @@ COMMON MODERN SETS LOOKUP TABLE (2020-2025)
 | DSK      | Duskmourn                   | 2024 | 276   |
 | FDN      | Foundations                 | 2024 | 291   |
 | MKM      | Murders at Karlov Manor     | 2024 | 286   |
-| SPM      | Spider-Man Crossover        | 2025 | TBD   |
 
 **2023 Standard Sets:**
 | Set Code | Set Name                    | Year | Cards |

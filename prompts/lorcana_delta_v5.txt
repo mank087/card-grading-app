@@ -7,7 +7,7 @@ The master grading rubric (Sections 1-13) applies to ALL Lorcana cards.
 This delta provides card-specific extraction rules, defect patterns, and examples.
 
 **CARD TYPES COVERED:**
-Disney Lorcana TCG cards from all sets (The First Chapter 2023 - present)
+Disney Lorcana TCG cards from all sets (The First Chapter 2023 through Winterspell 2026)
 
 ═══════════════════════════════════════════════════════════════════════
 A. LORCANA CARD INFORMATION EXTRACTION
@@ -164,17 +164,25 @@ Assign highest visible tier only (in priority order):
 C. LORCANA SET IDENTIFICATION MODULE
 ═══════════════════════════════════════════════════════════════════════
 
-**COMMON LORCANA SETS (2023-2024):**
+**COMMON LORCANA SETS (2023-2026):**
 
 | Set Code | Set Name                    | Year | Cards |
 |----------|----------------------------|------|-------|
-| TFC      | The First Chapter           | 2023 | 204   |
-| ROF      | Rise of the Floodborn       | 2023 | 204   |
-| ITI      | Into the Inklands           | 2024 | 204   |
-| URU      | Ursula's Return             | 2024 | 204   |
-| SHI      | Shimmering Skies            | 2024 | 204   |
-| AZU      | Azurite Sea                 | 2024 | 204   |
+| 1 / TFC  | The First Chapter           | 2023 | 204   |
+| 2 / ROF  | Rise of the Floodborn       | 2023 | 204   |
+| 3 / ITI  | Into the Inklands           | 2024 | 204   |
+| 4 / URU  | Ursula's Return             | 2024 | 204   |
+| 5 / SHI  | Shimmering Skies            | 2024 | 204   |
+| 6 / AZU  | Azurite Sea                 | 2024 | 204   |
+| 7        | Archazia's Island           | 2025 | 204   |
+| 8        | Reign of Jafar              | 2025 | 204   |
+| 9        | Fabled                      | 2025 | 204   |
+| 10       | Whispers in the Well        | 2025 | 204   |
+| 11       | Winterspell                 | 2026 | 204   |
 | PRO      | Promo Cards                 | Var. | —     |
+
+**IMPORTANT:** There are now 11 main Lorcana sets. Do NOT confuse newer sets with older ones.
+Cards with collector numbers above 204 (e.g., #205-216) are Enchanted variants within that set.
 
 **OUTPUT FORMAT:**
 {

@@ -470,27 +470,67 @@ export async function lookupMtgCard(
   const name = aiIdentification.card_name;
   const setName = aiIdentification.set_name;
 
-  // Strategy 1: Direct set code + collector number lookup (most reliable)
+  // Strategy 1: Direct set code + collector number lookup
+  // IMPORTANT: Must validate name to prevent misidentification (e.g., wrong set code → wrong card)
   if (setCode && collectorNumber) {
     const directMatch = await lookupBySetAndNumber(setCode, collectorNumber);
     if (directMatch) {
-      console.log('[MTG Matcher] Direct set/number match found:', directMatch.name);
-      return {
-        card: directMatch,
-        score: 1.0,
-        confidence: {
-          setCodeMatched: true,
-          setCodeScore: 1.0,
-          numberMatched: true,
-          numberScore: 1.0,
-          nameMatched: true,
-          nameScore: 1.0,
-          overallConfidence: 'high',
-          matchedFeatures: 3,
-          totalFeatures: 3,
-          warnings: []
+      // Validate name against AI-extracted name (prevents wrong card from number-only matches)
+      let nameScore = 1.0;
+      let nameMatched = true;
+      const warnings: string[] = [];
+
+      if (name) {
+        nameScore = calculateSimilarity(directMatch.name, name);
+        nameMatched = nameScore >= 0.5;
+
+        if (nameScore < 0.35) {
+          // Name is very different — this is likely a wrong card
+          console.log(`[MTG Matcher] Direct set/number match REJECTED: name mismatch "${name}" vs "${directMatch.name}" (score: ${nameScore.toFixed(2)})`);
+          // Fall through to Strategy 1b and beyond
+        } else {
+          const confidence: 'high' | 'medium' | 'low' = nameScore >= 0.65 ? 'high' : 'medium';
+          if (!nameMatched) {
+            warnings.push(`Name partially matched: "${name}" vs "${directMatch.name}" (score: ${nameScore.toFixed(2)})`);
+          }
+          console.log(`[MTG Matcher] Direct set/number match found: ${directMatch.name} (name score: ${nameScore.toFixed(2)}, confidence: ${confidence})`);
+          return {
+            card: directMatch,
+            score: nameScore >= 0.65 ? 1.0 : 0.85,
+            confidence: {
+              setCodeMatched: true,
+              setCodeScore: 1.0,
+              numberMatched: true,
+              numberScore: 1.0,
+              nameMatched,
+              nameScore,
+              overallConfidence: confidence,
+              matchedFeatures: nameMatched ? 3 : 2,
+              totalFeatures: 3,
+              warnings
+            }
+          };
         }
-      };
+      } else {
+        // No AI name to validate against — trust set/number match with medium confidence
+        console.log(`[MTG Matcher] Direct set/number match found (no name to validate): ${directMatch.name}`);
+        return {
+          card: directMatch,
+          score: 0.85,
+          confidence: {
+            setCodeMatched: true,
+            setCodeScore: 1.0,
+            numberMatched: true,
+            numberScore: 1.0,
+            nameMatched: false,
+            nameScore: 0,
+            overallConfidence: 'medium',
+            matchedFeatures: 2,
+            totalFeatures: 3,
+            warnings: ['No AI card name provided for validation']
+          }
+        };
+      }
     }
     // Strategy 1b: Set+number failed, try just collector number across ALL sets
     // This handles AI misidentifying the set code

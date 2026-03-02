@@ -623,11 +623,26 @@ Recognition: Check set symbol color for rarity, card number for variants (e.g., 
    - Check bottom area for set name text
    - If found → Use directly (highest confidence)
 
-📊 **COMMON MODERN MTG SETS REFERENCE** (2020-2025)
+📊 **COMMON MODERN MTG SETS REFERENCE** (2020-2026)
 
 Use this table for QUICK IDENTIFICATION of modern Magic: The Gathering cards:
 
-**2024-2025 STANDARD SETS:**
+**2025-2026 SETS:**
+| Set Code | Set Name                | Total Cards | Year | Notes                      |
+|----------|-------------------------|-------------|------|----------------------------|
+| INR      | Innistrad Remastered    | 311         | 2025 | Remastered set             |
+| DFT      | Aetherdrift             | 276         | 2025 | Racing/vehicle theme       |
+| TDM      | Tarkir: Dragonstorm     | 286         | 2025 | Return to Tarkir           |
+| FIN      | Final Fantasy           | 302         | 2025 | Final Fantasy crossover    |
+| EOE      | Edge of Eternities      | 271         | 2025 | Unknown theme              |
+| SPM      | Marvel's Spider-Man     | 256         | 2025 | Marvel crossover set       |
+| TLA      | Avatar: The Last Airbender | 256      | 2025 | Avatar crossover set       |
+| ECL      | Lorwyn Eclipsed         | 276         | 2025 | Return to Lorwyn           |
+| TMT      | TMNT                    | 256         | 2025 | TMNT crossover set         |
+| SOS      | Secrets of Strixhaven   | 281         | 2025 | Return to Strixhaven       |
+| MSH      | Marvel Super Heroes     | 271         | 2026 | Marvel crossover set       |
+
+**2024 STANDARD SETS:**
 | Set Code | Set Name                | Total Cards | Year | Notes                      |
 |----------|-------------------------|-------------|------|----------------------------|
 | MH3      | Modern Horizons 3       | 516         | 2024 | Special reprint set        |
@@ -636,7 +651,6 @@ Use this table for QUICK IDENTIFICATION of modern Magic: The Gathering cards:
 | BLB      | Bloomburrow             | 281         | 2024 | Animal folk theme          |
 | DSK      | Duskmourn               | 276         | 2024 | Horror theme               |
 | FDN      | Foundations             | 291         | 2024 | Core-set style             |
-| SPM      | Marvel's Spider-Man     | 256         | 2025 | Marvel crossover set       |
 
 **2023 STANDARD SETS:**
 | Set Code | Set Name                | Total Cards | Year | Notes                      |

@@ -892,56 +892,75 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
 
           // Enhance card_info with verified database data
           // IMPORTANT: Database values take priority over AI-identified values for accuracy
-          // AI should only be trusted for: card name (OCR), card number (OCR), and grading
-          // All other details come from our verified internal database
+          // BUT only if the name actually matches — prevents wrong card name from number-only matches
           const dbCard = matchResult.card;
           const releaseYear = dbCard.released_at ? new Date(dbCard.released_at).getFullYear().toString() : null;
 
-          conversationalGradingData.card_info = {
-            ...conversationalGradingData.card_info,
-            // === CORE IDENTIFICATION (verified from database) ===
-            card_name: dbCard.full_name,
-            character_name: dbCard.name,
-            character_version: dbCard.version,
-            set_name: dbCard.set_name,
-            card_number: dbCard.collector_number,
-            expansion_code: dbCard.set_code,
-            // === RELEASE INFO (from database, not AI) ===
-            year: releaseYear,
-            set_year: releaseYear,
-            release_date: dbCard.released_at,
-            // === LORCANA-SPECIFIC ATTRIBUTES (from database) ===
-            ink_color: dbCard.ink,
-            lorcana_card_type: dbCard.card_type ? dbCard.card_type.join(', ') : null,
-            inkwell: dbCard.inkwell,
-            ink_cost: dbCard.cost,
-            strength: dbCard.strength,
-            willpower: dbCard.willpower,
-            lore_value: dbCard.lore,
-            move_cost: dbCard.move_cost,
-            // === CARD TEXT & ABILITIES (from database) ===
-            card_front_text: dbCard.card_text,
-            flavor_text: dbCard.flavor_text,
-            classifications: dbCard.classifications || null,
-            abilities: dbCard.keywords || null,
-            // === RARITY & ARTIST (from database) ===
-            rarity_or_variant: dbCard.rarity,
-            rarity_tier: dbCard.rarity,
-            illustrators: dbCard.illustrators || null,
-            artist_name: dbCard.illustrators ? dbCard.illustrators.join(', ') : null,
-            // === PRICING (from database if available) ===
-            price_usd: dbCard.price_usd,
-            price_usd_foil: dbCard.price_usd_foil,
-            // === DATABASE REFERENCE ===
-            _database_match: {
-              lorcana_card_id: dbCard.id,
-              match_confidence: databaseMatchConfidence,
-              match_score: matchResult.score,
-              image_url: dbCard.image_normal || dbCard.image_large
-            }
-          };
+          // Name safety check: verify DB name is compatible with AI-extracted name before overriding
+          // This is the last line of defense against misidentification (like Pokemon's name substring check)
+          const aiName = aiCardInfo.card_name || '';
+          const dbName = dbCard.full_name || dbCard.name || '';
+          const normalizedAiName = aiName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const normalizedDbName = dbName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const nameIsCompatible = !normalizedAiName || !normalizedDbName ||
+            normalizedDbName.includes(normalizedAiName.substring(0, 5)) ||
+            normalizedAiName.includes(normalizedDbName.substring(0, 5));
 
-          console.log(`[GET /api/lorcana/${cardId}] ✅ Card info enhanced with database data`);
+          if (!nameIsCompatible) {
+            // Name mismatch — this is the wrong card. Skip ALL DB overrides to avoid
+            // contaminating AI-extracted data with wrong card's stats/abilities/rarity.
+            // This prevents issues like "Max Goof" getting "Donald Duck - Pie Slinger"'s stats.
+            console.log(`[GET /api/lorcana/${cardId}] ⚠️ DB name "${dbName}" doesn't match AI name "${aiName}" — SKIPPING all DB overrides`);
+            matchedDatabaseCard = null;
+            databaseMatchConfidence = null;
+          } else {
+            // Name is compatible — safe to enhance card_info with verified database data
+            conversationalGradingData.card_info = {
+              ...conversationalGradingData.card_info,
+              // === CORE IDENTIFICATION (verified from database) ===
+              card_name: dbCard.full_name,
+              character_name: dbCard.name,
+              character_version: dbCard.version,
+              set_name: dbCard.set_name,
+              card_number: dbCard.collector_number,
+              expansion_code: dbCard.set_code,
+              // === RELEASE INFO (from database, not AI) ===
+              year: releaseYear,
+              set_year: releaseYear,
+              release_date: dbCard.released_at,
+              // === LORCANA-SPECIFIC ATTRIBUTES (from database) ===
+              ink_color: dbCard.ink,
+              lorcana_card_type: dbCard.card_type ? dbCard.card_type.join(', ') : null,
+              inkwell: dbCard.inkwell,
+              ink_cost: dbCard.cost,
+              strength: dbCard.strength,
+              willpower: dbCard.willpower,
+              lore_value: dbCard.lore,
+              move_cost: dbCard.move_cost,
+              // === CARD TEXT & ABILITIES (from database) ===
+              card_front_text: dbCard.card_text,
+              flavor_text: dbCard.flavor_text,
+              classifications: dbCard.classifications || null,
+              abilities: dbCard.keywords || null,
+              // === RARITY & ARTIST (from database) ===
+              rarity_or_variant: dbCard.rarity,
+              rarity_tier: dbCard.rarity,
+              illustrators: dbCard.illustrators || null,
+              artist_name: dbCard.illustrators ? dbCard.illustrators.join(', ') : null,
+              // === PRICING (from database if available) ===
+              price_usd: dbCard.price_usd,
+              price_usd_foil: dbCard.price_usd_foil,
+              // === DATABASE REFERENCE ===
+              _database_match: {
+                lorcana_card_id: dbCard.id,
+                match_confidence: databaseMatchConfidence,
+                match_score: matchResult.score,
+                image_url: dbCard.image_normal || dbCard.image_large
+              }
+            };
+
+            console.log(`[GET /api/lorcana/${cardId}] ✅ Card info enhanced with database data`);
+          }
         } else {
           console.log(`[GET /api/lorcana/${cardId}] ⚠️ No high-confidence database match found`);
           if (matchResult.confidence.warnings.length > 0) {

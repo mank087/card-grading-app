@@ -7,7 +7,7 @@ The master grading rubric (Sections 1-13) applies to ALL One Piece cards.
 This delta provides card-specific extraction rules, defect patterns, and examples.
 
 **CARD TYPES COVERED:**
-One Piece Trading Card Game from all sets (OP-01 Romance Dawn 2022 - present)
+One Piece Trading Card Game from all sets (OP-01 Romance Dawn 2022 through OP-15 Adventure on KAMI's Island 2026)
 
 ═══════════════════════════════════════════════════════════════════════
 A. ONE PIECE CARD INFORMATION EXTRACTION
@@ -114,7 +114,7 @@ REQUIRED FIELDS (All One Piece Cards)
 
 **year**: Release year
 • 4-digit year based on set release
-• 2022 for early sets, 2023-2024 for recent
+• 2022 for early sets, 2023-2026 for recent
 
 **manufacturer**: Card publisher
 • "Bandai" for all One Piece TCG cards
@@ -240,9 +240,12 @@ B. ONE PIECE SET IDENTIFICATION MODULE
 | OP-07    | 500 Years in the Future         | 2024 | 121   |
 | OP-08    | Two Legends                     | 2024 | 121   |
 | OP-09    | The Four Emperors               | 2024 | 121   |
-| OP-10    | Royal Blood                     | 2025 | TBD   |
-| OP-11    | TBD                             | 2025 | TBD   |
-| OP-12    | TBD                             | 2025 | TBD   |
+| OP-10    | Royal Blood                     | 2025 | 121   |
+| OP-11    | A Fist of Divine Speed          | 2025 | 121   |
+| OP-12    | Legacy of the Master            | 2025 | 121   |
+| OP-13    | Carrying On His Will            | 2025 | 121   |
+| OP-14    | The Azure Sea's Seven           | 2026 | 121   |
+| OP-15    | Adventure on KAMI's Island      | 2026 | 121   |
 
 **STARTER DECKS:**
 
@@ -272,7 +275,7 @@ B. ONE PIECE SET IDENTIFICATION MODULE
 | OP-PR    | Promo Cards                     |
 
 **SET CODE IDENTIFICATION:**
-• OP-XX = Main booster set (OP-01 through OP-12)
+• OP-XX = Main booster set (OP-01 through OP-15)
 • ST-XX = Starter deck
 • EB-XX = Extra booster
 • PRB-XX = Premium booster

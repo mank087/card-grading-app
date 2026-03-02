@@ -427,8 +427,8 @@ If the card displays text in a non-English language (French, German, Italian, et
 
 • **expansion_code**: Set code (3-letter abbreviation)
   - Extract from bottom-center near card number
-  - Options: TFC, ROF, ITI, URU, SHI, AZU, PRO
-  - Format: Three-letter uppercase code
+  - Options: TFC, ROF, ITI, URU, SHI, AZU, 7, 8, 9, 10, 11, PRO
+  - Format: Three-letter code OR numeric set code for newer sets
   - See SET LOOKUP TABLE below for valid codes
 
 • **set_name**: Set/expansion name
@@ -456,23 +456,30 @@ If the card displays text in a non-English language (French, German, Italian, et
   - Default: "English"
   - Other options: "French", "German", "Italian", etc.
 
-🆕 **LORCANA SET LOOKUP TABLE:**
+🆕 **LORCANA SET LOOKUP TABLE (ALL 11 MAIN SETS):**
 DO NOT make up descriptive set names like "Special Edition". Use ONLY these official codes:
 
 | Set Code | Set Name                | Total Cards | Year | Notes                      |
 |----------|-------------------------|-------------|------|----------------------------|
-| TFC      | The First Chapter       | 204         | 2023 | First Lorcana set          |
-| ROF      | Rise of the Floodborn   | 204         | 2024 | Second set                 |
-| ITI      | Into the Inklands       | 204         | 2024 | Third set                  |
-| URU      | Ursula's Return         | 204         | 2024 | Fourth set (villain-themed)|
-| SHI      | Shimmering Skies        | 204         | 2024 | Fifth set                  |
-| AZU      | Azurite Sea             | 204         | 2024 | Sixth set (Pirates theme)  |
+| TFC / 1  | The First Chapter       | 204         | 2023 | First Lorcana set          |
+| ROF / 2  | Rise of the Floodborn   | 204         | 2023 | Second set                 |
+| ITI / 3  | Into the Inklands       | 204         | 2024 | Third set                  |
+| URU / 4  | Ursula's Return         | 204         | 2024 | Fourth set (villain-themed)|
+| SHI / 5  | Shimmering Skies        | 204         | 2024 | Fifth set                  |
+| AZU / 6  | Azurite Sea             | 204         | 2024 | Sixth set (Pirates theme)  |
+| 7        | Archazia's Island       | 204         | 2025 | Seventh set                |
+| 8        | Reign of Jafar          | 204         | 2025 | Eighth set                 |
+| 9        | Fabled                  | 204         | 2025 | Ninth set                  |
+| 10       | Whispers in the Well    | 204         | 2025 | Tenth set                  |
+| 11       | Winterspell             | 204         | 2026 | Eleventh set               |
 | PRO      | Promo Cards             | Varies      | 2023+| Convention/event promos    |
 
-🚨 CRITICAL RULE:
+🚨 CRITICAL RULES:
+- There are 11 main Lorcana sets (2023-2026). Do NOT confuse newer sets with older ones.
 - If you find a set code in this table, use the expansion_code and set_name from the table
 - If you find a set code NOT in this table, use the code as expansion_code and set set_name to null
 - DO NOT create descriptive names like "Special Edition", "Limited Edition", etc.
+- Cards with collector numbers above 204 (e.g., #205-216) are Enchanted variants within that set
 
 ────────────────────────────────────────────
 INK COLOR CLASSIFICATION
@@ -719,19 +726,27 @@ Recognition: Check set symbol for rarity, card frame for Enchanted variant, fini
    - Check bottom area for set name text
    - If found → Use directly (highest confidence)
 
-📊 **LORCANA SET LOOKUP TABLE:**
+📊 **LORCANA SET LOOKUP TABLE (ALL 11 MAIN SETS):**
 
 Use this table for identification of Lorcana cards:
 
 | Set Code | Set Name                | Total Cards | Year | Notes                      |
 |----------|-------------------------|-------------|------|----------------------------|
-| TFC      | The First Chapter       | 204         | 2023 | First Lorcana set          |
-| ROF      | Rise of the Floodborn   | 204         | 2024 | Second set                 |
-| ITI      | Into the Inklands       | 204         | 2024 | Third set                  |
-| URU      | Ursula's Return         | 204         | 2024 | Fourth set (villain-themed)|
-| SHI      | Shimmering Skies        | 204         | 2024 | Fifth set                  |
-| AZU      | Azurite Sea             | 204         | 2024 | Sixth set (Pirates theme)  |
+| TFC / 1  | The First Chapter       | 204         | 2023 | First Lorcana set          |
+| ROF / 2  | Rise of the Floodborn   | 204         | 2023 | Second set                 |
+| ITI / 3  | Into the Inklands       | 204         | 2024 | Third set                  |
+| URU / 4  | Ursula's Return         | 204         | 2024 | Fourth set (villain-themed)|
+| SHI / 5  | Shimmering Skies        | 204         | 2024 | Fifth set                  |
+| AZU / 6  | Azurite Sea             | 204         | 2024 | Sixth set (Pirates theme)  |
+| 7        | Archazia's Island       | 204         | 2025 | Seventh set                |
+| 8        | Reign of Jafar          | 204         | 2025 | Eighth set                 |
+| 9        | Fabled                  | 204         | 2025 | Ninth set                  |
+| 10       | Whispers in the Well    | 204         | 2025 | Tenth set                  |
+| 11       | Winterspell             | 204         | 2026 | Eleventh set               |
 | PRO      | Promo Cards             | Varies      | 2023+| Convention/event promos    |
+
+🚨 IMPORTANT: There are 11 main sets. Newer sets (7-11) use numeric codes, not 3-letter codes.
+Cards with numbers above 204 are Enchanted variants (e.g., #214/204 is an Enchanted card in that set).
 
 🔍 **DETECTION LOGIC:**
 
@@ -828,7 +843,7 @@ BEFORE PROCEEDING TO STEP 2, VERIFY YOU HAVE ATTEMPTED TO EXTRACT:
 ✅ **flavor_text** - Italic flavor text or null
 ✅ **is_enchanted** - Boolean (borderless full-art variant)
 ✅ **is_foil** - Boolean (foil finish)
-✅ **expansion_code** - 3-letter set code (TFC, ROF, ITI, URU, SHI, AZU, PRO) or null
+✅ **expansion_code** - Set code (TFC, ROF, ITI, URU, SHI, AZU, 7, 8, 9, 10, 11, PRO) or null
 ✅ **set_name** - Set name from lookup table or null with needs_api_lookup: true
 ✅ **set_year** - Year of release or null
 ✅ **card_number** - Collector number (e.g., "123/204") or null
@@ -1784,7 +1799,7 @@ Return valid JSON object with this EXACT structure:
     "player_or_character": "string or null",  // ⚡ LORCANA: Primary character name for search (e.g., "Mickey Mouse", "Elsa", "Stitch")
     "set_name": "string or null",  // ⚡ LORCANA: Full set name from SET LOOKUP TABLE. If not in table, set to null and flag needs_api_lookup: true.
     "set_era": "string or null",  // ⚡ LORCANA: NOT APPLICABLE (always null for Lorcana)
-    "expansion_code": "string or null",  // ⚡ LORCANA: Three-letter set code (TFC, ROF, ITI, URU, SHI, AZU, PRO)
+    "expansion_code": "string or null",  // ⚡ LORCANA: Set code (TFC, ROF, ITI, URU, SHI, AZU, 7, 8, 9, 10, 11, PRO)
     "collector_number": "string or null",  // ⚡ LORCANA: Card number from bottom-center (e.g., "123/204")
     "set_year": number or null,  // ⚡ LORCANA: Release year (2023, 2024, etc.)
     "set_confidence": "high" or "medium" or "low" or null,  // ⚡ LORCANA: Confidence in set identification

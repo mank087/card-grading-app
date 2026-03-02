@@ -442,30 +442,76 @@ export async function lookupLorcanaCard(
 ): Promise<MatchResult> {
   console.log('[Lorcana Matcher] Looking up card:', aiIdentification);
 
-  // Strategy 1: Direct set code + collector number lookup (most reliable)
+  // Strategy 1: Direct set code + collector number lookup
+  // IMPORTANT: Must validate name to prevent misidentification (e.g., wrong set code → wrong card)
   if (aiIdentification.setCode && aiIdentification.collectorNumber) {
     const directMatch = await lookupBySetAndNumber(
       aiIdentification.setCode,
       aiIdentification.collectorNumber
     );
     if (directMatch) {
-      console.log('[Lorcana Matcher] Direct set/number match found:', directMatch.full_name);
-      return {
-        card: directMatch,
-        score: 1.0,
-        confidence: {
-          setCodeMatched: true,
-          setCodeScore: 1.0,
-          numberMatched: true,
-          numberScore: 1.0,
-          nameMatched: true,
-          nameScore: 1.0,
-          overallConfidence: 'high',
-          matchedFeatures: 3,
-          totalFeatures: 3,
-          warnings: []
+      // Validate name against AI-extracted name (like Pokemon verification does)
+      let nameScore = 1.0;
+      let nameMatched = true;
+      const warnings: string[] = [];
+
+      if (aiIdentification.name) {
+        nameScore = Math.max(
+          calculateSimilarity(directMatch.name, aiIdentification.name),
+          calculateSimilarity(directMatch.full_name || directMatch.name, aiIdentification.name)
+        );
+        nameMatched = nameScore >= 0.5;
+
+        if (nameScore < 0.35) {
+          // Name is very different — this is likely a wrong card (wrong set code or wrong number)
+          // Don't trust this match, fall through to other strategies
+          console.log(`[Lorcana Matcher] Direct set/number match REJECTED: name mismatch "${aiIdentification.name}" vs "${directMatch.full_name}" (score: ${nameScore.toFixed(2)})`);
+          warnings.push(`Direct match rejected: AI name "${aiIdentification.name}" doesn't match DB "${directMatch.full_name}" (score: ${nameScore.toFixed(2)})`);
+          // Fall through to Strategy 1b and beyond
+        } else {
+          // Name validation passed (or close enough)
+          const confidence: 'high' | 'medium' | 'low' = nameScore >= 0.65 ? 'high' : 'medium';
+          if (!nameMatched) {
+            warnings.push(`Name partially matched: "${aiIdentification.name}" vs "${directMatch.full_name}" (score: ${nameScore.toFixed(2)})`);
+          }
+          console.log(`[Lorcana Matcher] Direct set/number match found: ${directMatch.full_name} (name score: ${nameScore.toFixed(2)}, confidence: ${confidence})`);
+          return {
+            card: directMatch,
+            score: nameScore >= 0.65 ? 1.0 : 0.85,
+            confidence: {
+              setCodeMatched: true,
+              setCodeScore: 1.0,
+              numberMatched: true,
+              numberScore: 1.0,
+              nameMatched,
+              nameScore,
+              overallConfidence: confidence,
+              matchedFeatures: nameMatched ? 3 : 2,
+              totalFeatures: 3,
+              warnings
+            }
+          };
         }
-      };
+      } else {
+        // No AI name to validate against — trust set/number match with medium confidence
+        console.log(`[Lorcana Matcher] Direct set/number match found (no name to validate): ${directMatch.full_name}`);
+        return {
+          card: directMatch,
+          score: 0.85,
+          confidence: {
+            setCodeMatched: true,
+            setCodeScore: 1.0,
+            numberMatched: true,
+            numberScore: 1.0,
+            nameMatched: false,
+            nameScore: 0,
+            overallConfidence: 'medium',
+            matchedFeatures: 2,
+            totalFeatures: 3,
+            warnings: ['No AI card name provided for validation']
+          }
+        };
+      }
     }
     // Strategy 1b: Set+number failed, try just collector number across ALL sets
     // This handles AI misidentifying the set name
@@ -530,6 +576,54 @@ export async function lookupLorcanaCard(
           warnings: ['Set code not provided, matched by collector number only']
         }
       };
+    }
+  }
+
+  // Strategy 2.5: Name-first search with collector number validation
+  // When set code may be wrong but name and number are right,
+  // search by name first, then pick the result whose collector number matches
+  if (aiIdentification.name && aiIdentification.collectorNumber) {
+    console.log(`[Lorcana Matcher] Strategy 2.5: Searching by name "${aiIdentification.name}" then validating number "${aiIdentification.collectorNumber}"...`);
+    const nameResults = await searchByName(aiIdentification.name);
+    if (nameResults.length > 0) {
+      const normalizedAiNum = normalizeCollectorNumber(aiIdentification.collectorNumber);
+      // Filter to cards whose collector number matches
+      const nameAndNumberMatches = nameResults.filter(
+        c => normalizeCollectorNumber(c.collector_number) === normalizedAiNum
+      );
+      if (nameAndNumberMatches.length > 0) {
+        const bestMatch = findBestMatchWithConfidence(nameAndNumberMatches, aiIdentification);
+        if (bestMatch.card && bestMatch.confidence.overallConfidence !== 'low') {
+          console.log(`[Lorcana Matcher] Strategy 2.5 match: ${bestMatch.card.full_name} (${bestMatch.card.set_name}) - confidence: ${bestMatch.confidence.overallConfidence}`);
+          return bestMatch;
+        }
+      }
+      // Even without number match, if name is very strong and only one result, use it
+      if (nameResults.length === 1) {
+        const singleNameScore = Math.max(
+          calculateSimilarity(nameResults[0].name, aiIdentification.name),
+          calculateSimilarity(nameResults[0].full_name || nameResults[0].name, aiIdentification.name)
+        );
+        if (singleNameScore >= 0.8) {
+          console.log(`[Lorcana Matcher] Strategy 2.5: Single strong name match: ${nameResults[0].full_name} (score: ${singleNameScore.toFixed(2)})`);
+          return {
+            card: nameResults[0],
+            score: singleNameScore,
+            confidence: {
+              setCodeMatched: false,
+              setCodeScore: 0,
+              numberMatched: false,
+              numberScore: 0,
+              nameMatched: true,
+              nameScore: singleNameScore,
+              overallConfidence: 'medium',
+              matchedFeatures: 1,
+              totalFeatures: 3,
+              warnings: [`Matched by name only (collector number ${aiIdentification.collectorNumber} did not match ${nameResults[0].collector_number})`]
+            }
+          };
+        }
+      }
     }
   }
 

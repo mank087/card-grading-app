@@ -581,7 +581,7 @@ Recognition: Check rarity symbol, card number (secret if over set total), holofo
 
 📊 **COMMON MODERN SETS LOOKUP TABLE** (Fast Path - 85% Coverage)
 
-Use this table for QUICK IDENTIFICATION of modern Pokemon TCG cards (2020-2025):
+Use this table for QUICK IDENTIFICATION of modern Pokemon TCG cards (2020-2026):
 
 **SWORD & SHIELD ERA (2020-2022) - Yellow Borders:**
 | Denominator | Set Name              | Year | Symbol Hint                |
@@ -617,6 +617,18 @@ Use this table for QUICK IDENTIFICATION of modern Pokemon TCG cards (2020-2025):
 | 142         | Stellar Crown            | 2024 | Crown with stars           |
 | 226         | Shrouded Fable           | 2024 | Mystical pattern           |
 | 195         | Surging Sparks           | 2025 | Lightning spark            |
+| 131         | Prismatic Evolutions     | 2025 | Prismatic/rainbow pattern  |
+| 159         | Journey Together         | 2025 | Partner theme              |
+| 182         | Destined Rivals          | 2025 | Rival confrontation        |
+| 86          | Black Bolt / White Flare | 2025 | BLK or WHT set code        |
+
+**MEGA EVOLUTION ERA (2025+) - New Generation:**
+| Denominator | Set Name                 | Year | Symbol Hint                |
+|-------------|--------------------------|------|----------------------------|
+| 132         | Mega Evolution           | 2025 | Mega stone / ME monogram   |
+| 94          | Phantasmal Flames        | 2025 | Ghost flame pattern        |
+| 217         | Ascended Heroes          | 2026 | Hero/ascension symbol      |
+| MEP###      | MEP Black Star Promos    | 2025+| Black star promo, MEP prefix|
 
 **SPECIAL SETS & SUBSETS:**
 | Pattern      | Set Name              | Year | Identification                        |
