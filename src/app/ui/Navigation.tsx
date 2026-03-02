@@ -177,61 +177,48 @@ export default function Navigation() {
                 </>
               ) : user ? (
                 <>
-                  {/* Logged In: My Collection */}
+                  {/* Logged In: Core nav links (3 items) */}
                   <Link
                     href="/collection"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
                   >
-                    My Collection
+                    Collection
                   </Link>
-                  <Link
-                    href="/credits"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Buy Credits
-                  </Link>
-                  <Link
-                    href="/vip"
-                    className="text-gray-700 hover:text-indigo-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="text-indigo-500">◆</span> VIP
-                    </span>
-                  </Link>
-                  <Link
-                    href="/card-lovers"
-                    className="text-gray-700 hover:text-rose-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="text-rose-500">♥</span> Card Lovers
-                    </span>
-                  </Link>
+                  <div className="relative group">
+                    <Link
+                      href="/credits"
+                      className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex items-center gap-1"
+                    >
+                      Credits
+                      <svg className="w-3.5 h-3.5 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </Link>
+                    <div className="absolute top-full left-0 pt-1 w-44 z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150">
+                    <div className="bg-white rounded-md shadow-lg border border-gray-200">
+                      <div className="py-1">
+                        <Link
+                          href="/card-lovers"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                        >
+                          <span className="text-rose-500">♥</span> Card Lovers
+                        </Link>
+                        <Link
+                          href="/vip"
+                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                        >
+                          <span className="text-indigo-500">◆</span> VIP Package
+                        </Link>
+                      </div>
+                    </div>
+                    </div>
+                  </div>
                   <Link
                     href="/market-pricing"
-                    className="text-gray-700 hover:text-emerald-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
+                    className="text-gray-700 hover:text-emerald-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     <span className="flex items-center gap-1">
                       <span className="text-emerald-500">$</span> Market Pricing
-                    </span>
-                  </Link>
-                  <Link
-                    href="/blog"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Blog
-                  </Link>
-                  <Link
-                    href="/featured"
-                    className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    Featured
-                  </Link>
-                  <Link
-                    href="/pop"
-                    className="text-gray-700 hover:text-blue-600 px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    <span className="flex items-center gap-1">
-                      <span className="text-blue-500">#</span> Pop Report
                     </span>
                   </Link>
                 </>
@@ -378,7 +365,7 @@ export default function Navigation() {
                     </button>
 
                     {accountDropdownOpen && (
-                      <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                      <div className="absolute top-full right-0 mt-1 w-52 bg-white rounded-md shadow-lg border border-gray-200 z-50">
                         <div className="py-1">
                           <Link
                             href="/account"
@@ -386,6 +373,43 @@ export default function Navigation() {
                             onClick={() => setAccountDropdownOpen(false)}
                           >
                             My Account
+                          </Link>
+                          <hr className="my-1 border-gray-200" />
+                          <Link
+                            href="/vip"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors"
+                            onClick={() => setAccountDropdownOpen(false)}
+                          >
+                            <span className="text-indigo-500">◆</span> VIP Package
+                          </Link>
+                          <Link
+                            href="/card-lovers"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                            onClick={() => setAccountDropdownOpen(false)}
+                          >
+                            <span className="text-rose-500">♥</span> Card Lovers
+                          </Link>
+                          <hr className="my-1 border-gray-200" />
+                          <Link
+                            href="/featured"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                            onClick={() => setAccountDropdownOpen(false)}
+                          >
+                            Featured Cards
+                          </Link>
+                          <Link
+                            href="/pop"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                            onClick={() => setAccountDropdownOpen(false)}
+                          >
+                            <span className="text-blue-500">#</span> Pop Report
+                          </Link>
+                          <Link
+                            href="/blog"
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                            onClick={() => setAccountDropdownOpen(false)}
+                          >
+                            Blog
                           </Link>
                           <Link
                             href="/grading-rubric"
@@ -407,13 +431,6 @@ export default function Navigation() {
                             onClick={() => setAccountDropdownOpen(false)}
                           >
                             About Us
-                          </Link>
-                          <Link
-                            href="/blog"
-                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-600 transition-colors"
-                            onClick={() => setAccountDropdownOpen(false)}
-                          >
-                            Blog
                           </Link>
                           <hr className="my-1 border-gray-200" />
                           <button
