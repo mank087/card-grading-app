@@ -350,6 +350,7 @@ SECTION 2: UNIFIED DEFECT REFERENCE
 **FIBER EXPOSURE / CORNER WHITENING:**
 • Visual: WHITE cardstock fibers at corner tip against colored border; bright "flash" or "dot" at apex
 • Detection: Zoom max on each corner tip; look for ANY white not part of card design
+• ⚠️ LIGHTING FALSE POSITIVE: A corner that appears bright due to light reflection/glare is NOT whitening. Real whitening shows FIBER TEXTURE and sharp contrast where coating is MISSING. If the corner is simply brighter due to photo lighting angle (smooth brightness, no fiber texture, border color still present but lighter), do NOT flag as whitening. Apply the LIGHTING VALIDATION CHECK from Section 2.4.
 • Severity → Grade Impact:
   - Microscopic (<0.1mm, 10x required): −1 → max 9
   - Minor (0.1-0.3mm, close inspection): −1 to −2 → max 9
@@ -388,6 +389,7 @@ SECTION 2: UNIFIED DEFECT REFERENCE
 **EDGE WHITENING:**
 • Visual: White cardstock fibers along edge line; white line or dots along perimeter
 • Detection: Scan entire edge length; ANY break in solid color along edge line
+• ⚠️ LIGHTING FALSE POSITIVE: An edge that appears lighter because it faces the light source is NOT whitening. If one edge is uniformly brighter while the opposite edge is darker, this indicates uneven lighting. Real whitening appears as ISOLATED spots or segments with visible fiber/cardstock exposure — not a uniform brightness increase across an entire edge. Apply the LIGHTING VALIDATION CHECK from Section 2.4.
 • Severity → Grade Impact:
   - Microscopic (1-2 tiny flecks, max zoom only): −1 per fleck → max 9
   - Minor (several spots, ~5-15% of edge): −1 → max 9
@@ -446,6 +448,18 @@ SECTION 2: UNIFIED DEFECT REFERENCE
 **PRINT DEFECTS (Manufacturing):**
 • Visual: Print lines (roller marks), ink voids, ink spots, registration issues, smudging
 • Still affects grade even though factory defect
+
+**⚠️ DESIGN PATTERN vs. PRINT LINE DIFFERENTIATION (CRITICAL):**
+• Many modern cards feature INTENTIONAL line patterns as part of holographic/parallel designs
+• Topps Chrome Geometric, Mosaic, Prizm Wave, Select Tie-Dye, Cracked Ice, and similar parallels have prominent geometric lines, wave patterns, or repeating line structures as DESIGN ELEMENTS
+• These design lines are NOT print line defects. Before flagging ANY line as a "print line" defect:
+  1. CHECK: Does the line follow a REPEATING, UNIFORM PATTERN across the card surface? → DESIGN ELEMENT (not a defect)
+  2. CHECK: Is the line part of a holographic/refractor effect that shifts with viewing angle? → DESIGN ELEMENT (not a defect)
+  3. CHECK: Do OTHER lines of similar character appear across the card in a consistent geometric arrangement? → DESIGN ELEMENT (not a defect)
+  4. CHECK: Does the line match the known pattern style of this card's parallel/variant type? → DESIGN ELEMENT (not a defect)
+• A TRUE print line defect is: isolated, does NOT repeat in a pattern, inconsistent with the card's holographic design, typically horizontal from roller contact, and appears as an anomaly against the surrounding finish
+• When grading patterned/geometric holographic cards, ONE prominent design line catching light differently due to photo angle is NOT a defect — it is the holographic pattern reacting to lighting
+• IF UNCERTAIN: Ask whether the line exists independently of the card's holographic pattern. If it is part of the pattern → NOT a defect
 
 **DENTS / INDENTATIONS:**
 • Visual: Depressed area in surface; creates subtle shadow or highlight
@@ -515,8 +529,41 @@ SECTION 2: UNIFIED DEFECT REFERENCE
 **BUSY BACKGROUND SAFETY RULE (Full-Art & Holographic):**
 On cards with busy backgrounds, use the OUTER GEOMETRIC FRAME as primary reference for detecting corner fiber, edge whitening, and border damage. Compare defect color against BORDER/FRAME color, NOT artwork.
 
-**"WHEN IN DOUBT, WHITENING" RULE:**
-Ambiguous bright pixels at edges/corners → Treat as whitening at minimum microscopic level, apply deduction, document in defects array. You are NOT allowed to silently ignore ambiguous bright flecks.
+**"WHEN IN DOUBT, WHITENING" RULE (with lighting validation):**
+Ambiguous bright pixels at edges/corners → FIRST apply the LIGHTING VALIDATION CHECK below. If the bright pixels pass validation (confirmed NOT caused by lighting), treat as whitening at minimum microscopic level, apply deduction, document in defects array. You are NOT allowed to silently ignore ambiguous bright flecks that pass validation.
+
+**⚠️ LIGHTING VALIDATION CHECK (MANDATORY before flagging whitening):**
+Before reporting ANY bright area as "whitening" or "fiber exposure," perform these checks:
+
+1. **SYMMETRY CHECK:** Does ONE SIDE of the card appear uniformly brighter than the opposite side?
+   - If the entire left edge/corners appear lighter while the right side appears darker (or vice versa) → This is UNEVEN LIGHTING from the photo, NOT whitening
+   - Real whitening appears at SPECIFIC POINTS (corner tips, edge segments) and does NOT uniformly brighten one whole side
+
+2. **GLARE/HOTSPOT CHECK:** Is there a bright gradient or wash across a region of the card?
+   - A smooth bright gradient fading across an edge or corner → LIGHTING ARTIFACT (camera flash, overhead light, window light)
+   - Real whitening is SHARP-EDGED: white fiber against colored border creates a distinct contrast boundary, not a smooth gradient
+
+3. **CROSS-REFERENCE CHECK:** Compare the SAME corner/edge on FRONT vs BACK photos.
+   - If the same corner appears "white" on both front AND back in the SAME position relative to the photo frame → Almost certainly a LIGHTING ARTIFACT (light hits the same physical corner from the same angle in both shots)
+   - Real whitening may appear on front, back, or both — but its appearance correlates with the CARD'S physical wear pattern, not the photo's lighting angle
+
+4. **TEXTURE CHECK:** Does the bright area show physical characteristics of fiber exposure?
+   - Real whitening: Irregular texture, visible fiber strands, rough/fuzzy appearance, sharp contrast against border color
+   - Lighting artifact: Smooth, even brightness with no fiber texture, color washes out gradually, no sharp boundary
+
+5. **SURROUNDING CONTEXT CHECK:** Is the border color washed out in the bright area?
+   - Real whitening: The border COLOR is MISSING/WORN, revealing WHITE cardstock underneath — the colored coating is physically absent
+   - Lighting artifact: The border color is STILL PRESENT but appears lighter/brighter — the coating is intact, just illuminated more strongly
+
+**DECISION MATRIX:**
+| Observation | Verdict |
+|-------------|---------|
+| Bright area has fuzzy/fibrous texture, sharp boundary, color coating MISSING | ✅ REAL WHITENING — deduct |
+| Bright area is smooth gradient, one side of card uniformly lighter | ❌ LIGHTING ARTIFACT — do NOT deduct |
+| Bright spot at corner tip with fiber texture visible | ✅ REAL WHITENING — deduct |
+| Entire edge appears lighter than opposite edge, smooth appearance | ❌ UNEVEN LIGHTING — do NOT deduct |
+| Bright area in same position relative to photo frame on front AND back | ❌ LIKELY LIGHTING ARTIFACT — do NOT deduct unless fiber texture confirmed |
+| Isolated bright fleck with sharp edges against dark border | ✅ LIKELY REAL WHITENING — deduct |
 ---
 SECTION 3: PRE-GRADING PROTOCOLS
 ---
@@ -537,6 +584,15 @@ Your level of scrutiny MUST BE IDENTICAL whether or not user hints are provided.
 | Has physical characteristics (depth, texture) | Flat appearance with no depth |
 | Located on specific card features | Random distribution unrelated to card |
 | Present on either front OR back | Same pattern on BOTH front AND back |
+
+**LIGHTING/GLARE ARTIFACTS ARE NOT DEFECTS:**
+| Real Whitening/Wear | Lighting/Glare Artifact |
+|---------------------|------------------------|
+| Fiber texture visible, rough/fuzzy | Smooth, even brightness, no texture |
+| Sharp boundary where coating is MISSING | Gradual brightness gradient, coating intact |
+| Isolated spots/segments at specific wear points | One entire side/edge uniformly lighter |
+| Border color ABSENT, white cardstock exposed | Border color PRESENT but brighter/washed out |
+| Appears differently on front vs back (wear pattern) | Appears in same frame position on both photos (lighting angle) |
 
 **SCANNING STEPS:**
 STEP 1: Back Surface Scan (where MOST defects hide)

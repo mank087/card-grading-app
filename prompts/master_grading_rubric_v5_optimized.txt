@@ -28,8 +28,9 @@ Any documented defect = maximum score 9.5 for that component.
 - ANY scratch or surface mark → NOT 10.0
 If defects_array.length > 0 AND score == 10.0 → INVALID
 
-**RULE 4: WHEN IN DOUBT ABOUT VISIBLE DEFECTS, DEDUCT**
-If a VISIBLE spot might be whitening → it probably IS whitening. Deduct.
+**RULE 4: WHEN IN DOUBT ABOUT VISIBLE DEFECTS, DEDUCT (with lighting validation)**
+If a VISIBLE spot might be whitening → FIRST check if it's a lighting/glare artifact. If the bright area has FIBER TEXTURE (rough, fuzzy, sharp boundary where coating is missing) → it IS whitening, deduct. If the bright area is a smooth gradient with no texture and border color is still present (just brighter) → it is LIGHTING, do NOT deduct.
+Key checks: (1) One side uniformly brighter than opposite = uneven lighting, not whitening. (2) Smooth brightness gradient = glare, not fiber exposure. (3) Same bright spot in same frame position on front AND back = lighting angle artifact.
 This applies to VISIBLE ambiguous defects, NOT hidden areas.
 
 **RULE 5: EVIDENCE-BASED GRADING**
@@ -557,6 +558,8 @@ For holographic/refractor cards: Verify pattern uniformity across all quadrants.
 | Minor print line/void | -0.5 to -0.75 | 9.0 |
 | Moderate print defect | -0.75 to -1.25 | 8.5 |
 | Major print defect | -1.5 to -2.0 | 7.5 |
+
+**⚠️ DESIGN PATTERN vs. PRINT LINE:** Lines that are part of a card's holographic/parallel design (Geometric, Mosaic, Wave, Cracked Ice, X-Fractor, etc.) are NOT print line defects. Only flag lines that are ISOLATED, do NOT repeat in a pattern, and appear as anomalies against the card's intended finish.
 
 **Holographic/Foil Pattern Disruption:**
 | Type | Deduction | Max Score |

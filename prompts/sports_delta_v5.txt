@@ -405,7 +405,29 @@ Many sports cards feature legitimate manufacturer artwork on card backs that may
 • Glossy surfaces show print defects more readily than matte
 • Print lines are manufacturing artifacts, not handling damage
 
-**Common Print Line Locations:**
+**⚠️ CRITICAL: DESIGN PATTERN LINES vs. PRINT LINE DEFECTS:**
+Many modern sports card parallels feature INTENTIONAL line/geometric patterns as part of their design:
+• **Topps Chrome Geometric**: Prominent geometric line pattern across entire card — lines ARE the design
+• **Panini Mosaic**: Geometric mosaic/tile pattern — angular lines ARE the design
+• **Prizm Wave/Shimmer**: Wavy holographic line patterns — waves ARE the design
+• **Select Tie-Dye/Zebra**: Swirling or striped patterns — stripes ARE the design
+• **Cracked Ice**: Ice-crack line patterns — fracture lines ARE the design
+• **Topps Chrome X-Fractor**: X-shaped refractor pattern — crossing lines ARE the design
+
+🚨 **DO NOT flag design pattern lines as "print lines":**
+• If a line is part of a REPEATING geometric/holographic pattern visible across the card → NOT a defect
+• If one line in the pattern appears MORE PROMINENT due to lighting angle → NOT a defect (holographic effect)
+• If 3/3 or all cards of same parallel type show same "line" in same pattern → It's a design feature, not a defect
+• ONLY flag a line as a print line defect if it is ISOLATED, does NOT match the card's pattern design, and appears as an anomaly
+
+**Identifying ACTUAL Print Lines (True Defects):**
+• Isolated line that does NOT repeat in a pattern across the card
+• Runs contrary to or independent of the holographic/parallel design pattern
+• Typically horizontal (from printing rollers), consistent width
+• Appears as an anomaly against the card's intended finish
+• Present regardless of viewing angle (unlike holographic pattern lines that shift)
+
+**Common Print Line Locations (when they ARE actual defects):**
 • Along player image edges (where photo meets background)
 • In solid color areas (sky, background, uniform colors)
 • Horizontal or vertical roller lines from printing process
@@ -414,10 +436,11 @@ Many sports cards feature legitimate manufacturer artwork on card backs that may
 • Print line: Surface-level ink defect, doesn't break cardstock, straight line, consistent width
 • Crease: Structural damage, cardstock folded, visible at angles, disrupts surface plane
 
-**Grading Impact:**
+**Grading Impact (for CONFIRMED actual print line defects only):**
 • Single print line: -0.3 to -0.5 (manufacturing defect, not handling)
 • Multiple print lines: -0.7 to -1.0
 • Print line does NOT trigger structural damage caps (not a crease)
+• Design pattern lines that are part of the card's parallel/variant: NO DEDUCTION (not defects)
 
 ────────────────────────────────────────────────────────────────────────
 4. HOLOFOIL/REFRACTOR PATTERN DEFECTS
@@ -427,13 +450,22 @@ Many sports cards feature legitimate manufacturer artwork on card backs that may
 • Prizm: Rainbow holographic pattern across entire card
 • Refractor: Wavelike rainbow effect (Topps Chrome)
 • Chrome: Metallic reflective finish with rainbow
-• Mosaic: Geometric holographic pattern
+• Chrome Geometric: Geometric line pattern overlaying chrome finish — lines are INTENTIONAL DESIGN
+• Mosaic: Geometric holographic pattern — mosaic tiles/lines are INTENTIONAL DESIGN
 • Optic: Holographic coating with color variants
+• X-Fractor: X-shaped crossing refractor pattern — X lines are INTENTIONAL DESIGN
 
-**Common Holofoil Defects:**
-• **Holo scratches**: Scratches in holographic layer (disrupts rainbow pattern)
+**⚠️ CRITICAL: UNDERSTAND THE CARD'S INTENDED PATTERN BEFORE GRADING:**
+Before reporting ANY pattern-related defect on a holographic/parallel card:
+1. IDENTIFY the card's parallel type (Geometric, Mosaic, Wave, Prizm, Refractor, etc.)
+2. UNDERSTAND that parallel's intended pattern (geometric lines, waves, mosaic tiles, etc.)
+3. ONLY flag defects that DEVIATE FROM the intended pattern (scratches through it, missing sections, dead spots)
+4. A design line appearing prominent due to lighting/photo angle is the holographic effect working as intended — NOT a defect
+
+**Common Holofoil Defects (ACTUAL defects, not design features):**
+• **Holo scratches**: Scratches THROUGH holographic layer that BREAK the pattern (not lines that ARE the pattern)
 • **Holo bleed**: Holographic pattern extending outside intended area
-• **Pattern disruption**: Missing or damaged sections of holo pattern
+• **Pattern disruption**: Missing or damaged sections — dull/dead spots where pattern SHOULD be but ISN'T
 • **Foil peeling**: Holographic layer separating from cardstock (rare but serious)
 
 **Detection Method:**
@@ -441,6 +473,7 @@ Many sports cards feature legitimate manufacturer artwork on card backs that may
 • Tilt card under light - holo defects catch light differently
 • Scratches will appear as breaks in rainbow pattern
 • Pattern disruption visible as dull/non-reflective areas
+• Design lines that shift uniformly with viewing angle = holographic design working correctly (NOT defects)
 
 **Grading Impact:**
 • Single holo scratch (hairline): -0.5 minimum

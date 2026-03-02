@@ -76,6 +76,7 @@ BEFORE GRADING: Verify ALL 8 corners (4 front + 4 back) are FULLY VISIBLE in fra
 - Width: 0.1-0.5mm wide band
 - Length: Can range from 2mm to entire edge length
 - Most visible on dark-colored borders (black, navy, dark blue, dark red)
+- ⚠️ **NOT whitening:** If an ENTIRE edge appears uniformly lighter while the opposite edge appears darker → this is UNEVEN LIGHTING, not whitening. Real whitening is localized (specific segments/spots with fiber texture), not a uniform brightness shift across a full edge. Check that the border color COATING is actually MISSING (exposing white cardstock) rather than simply appearing brighter due to illumination.
 
 **Type 3: Edge Chipping** (Missing material)
 - Appearance: Irregular edge profile, "notches" or "dents" in edge line
@@ -190,6 +191,7 @@ For EACH of the 8 corners, perform this inspection:
    - Compare tip color to edge color 1mm away - is tip lighter?
    - On dark borders: Micro whitening appears as bright white dot
    - Look for "sparkle" effect at corner tip
+   - ⚠️ **LIGHTING CHECK:** Before flagging, verify the bright spot shows FIBER TEXTURE (rough, fuzzy, sharp boundary). If the corner is simply brighter due to lighting angle (smooth brightness, no texture, border color still visible), it is NOT whitening — it is glare/lighting artifact. Compare ALL 4 corners: if corners on one side are all brighter while the opposite side is darker, that's uneven lighting.
 
 **❌ COMMON MISTAKES TO AVOID:**
 
@@ -197,8 +199,13 @@ For EACH of the 8 corners, perform this inspection:
 2. ❌ Glancing at edges instead of methodical 5-segment inspection per edge
 3. ❌ Missing micro white dots because they seem "too small to matter"
    - They DO matter: Even one 0.1mm dot disqualifies 10.0 grade
-4. ❌ Confusing glare/reflection with actual edge defect
-   - Solution: Compare to opposite edge to verify
+4. ❌ Confusing glare/reflection/uneven lighting with actual whitening
+   - CRITICAL: Uneven lighting makes one side of the card appear brighter — this is NOT whitening
+   - Glare from camera flash creates smooth bright spots at corners/edges — this is NOT fiber exposure
+   - Solution: Check for FIBER TEXTURE (real whitening is fuzzy/rough with sharp edges where coating is missing)
+   - Solution: Compare to opposite edge — if one side is uniformly brighter and the other uniformly darker, it's lighting
+   - Solution: Check if border COLOR is still present but brighter (lighting) vs. completely MISSING/white (real whitening)
+   - If bright area is a smooth gradient with no fiber texture → DO NOT flag as whitening
 5. ❌ Only checking corners and ignoring edge segments between corners
 6. ❌ Scanning too quickly when card "looks perfect"
    - When card looks mint, you unconsciously scan FASTER and MISS micro-defects
@@ -277,6 +284,7 @@ If you answer NO to any question → RE-EXAMINE before proceeding
 - **Hickeys:** Circular printing defects, donut/ring shapes (0.5-2mm diameter)
 - **Registration errors:** Color layer misalignment, ghost images, rainbow halos
 - **Missing ink:** Areas where ink didn't adhere properly
+- ⚠️ **NOT print defects:** Lines that are part of a card's holographic/parallel DESIGN PATTERN (e.g., Topps Chrome Geometric lines, Mosaic tiles, Prizm waves, Cracked Ice fractures, X-Fractor crosses). If a line REPEATS in a uniform pattern across the card or shifts with viewing angle as part of the holographic effect → it is the card's INTENDED DESIGN, not a defect. Only flag lines that are ISOLATED anomalies independent of the card's pattern.
 
 **Type 5: Stains & Discoloration**
 - Wax stains (from wax pack storage)
