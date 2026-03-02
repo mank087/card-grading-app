@@ -357,6 +357,7 @@ export function extractMTGDisplayMetadata(apiCard: ScryfallCard) {
   return {
     // Card details
     card_name: apiCard.name,
+    flavor_name: apiCard.flavor_name || null,  // Crossover name (Universes Beyond, Secret Lair)
     mana_cost: apiCard.mana_cost || apiCard.card_faces?.[0]?.mana_cost || null,
     cmc: apiCard.cmc,
     type_line: apiCard.type_line,

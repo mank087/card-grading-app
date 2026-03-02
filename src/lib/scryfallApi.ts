@@ -43,6 +43,9 @@ export interface ScryfallCard {
     };
   }>;
 
+  // Crossover/alternate name (Universes Beyond, Secret Lair)
+  flavor_name?: string;
+
   // Card details
   mana_cost?: string;
   cmc: number;

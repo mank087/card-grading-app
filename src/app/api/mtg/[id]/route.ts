@@ -1191,6 +1191,10 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           // Merge API data into card_info (following Pokemon pattern)
           conversationalGradingData.card_info.set_name = m.set_name;
           conversationalGradingData.card_info.card_name = m.card_name || conversationalGradingData.card_info.card_name;
+          // Populate flavor_name from Scryfall (crossover name for Universes Beyond, Secret Lair)
+          if (m.flavor_name) {
+            conversationalGradingData.card_info.flavor_name = m.flavor_name;
+          }
           conversationalGradingData.card_info.scryfall_collector_number = m.collector_number;
 
           // 🔧 FIX: Handle card_number with "???" (when AI couldn't read set total)
@@ -1223,7 +1227,13 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           conversationalGradingData.card_info.expansion_code = m.set_code;
           conversationalGradingData.card_info.rarity_or_variant = m.rarity;
           conversationalGradingData.card_info.artist_name = m.artist;
-          conversationalGradingData.card_info.is_foil = m.is_foil || false;
+          // IMPORTANT: Don't override AI's foil determination with Scryfall's foil field.
+          // Scryfall's `foil` means "a foil printing exists", NOT "this card is foil".
+          // The AI actually examines the physical card to determine foil status.
+          // Only use Scryfall foil data if AI didn't make a determination.
+          if (conversationalGradingData.card_info.is_foil === undefined || conversationalGradingData.card_info.is_foil === null) {
+            conversationalGradingData.card_info.is_foil = m.is_foil || false;
+          }
           conversationalGradingData.card_info.language = m.language || 'English';
           conversationalGradingData.card_info.is_double_faced = m.is_double_faced || false;
 
