@@ -627,11 +627,16 @@ export async function lookupLorcanaCard(
     }
   }
 
-  // Strategy 3: Search by name and set
+  // Strategy 3: Search by name and set (then fall back to name-only)
   let searchResults: LorcanaCard[] = [];
 
   if (aiIdentification.name && aiIdentification.set) {
     searchResults = await searchByNameAndSet(aiIdentification.name, aiIdentification.set);
+    // If name+set returns nothing, the AI's set is likely wrong — try name-only
+    if (searchResults.length === 0) {
+      console.log(`[Lorcana Matcher] Strategy 3: name+set returned 0 results (AI set "${aiIdentification.set}" likely wrong), falling back to name-only search`);
+      searchResults = await searchByName(aiIdentification.name);
+    }
   } else if (aiIdentification.name) {
     searchResults = await searchByName(aiIdentification.name);
   }

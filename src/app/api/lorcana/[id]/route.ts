@@ -12,7 +12,7 @@ import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Lorcana cards
-import { lookupLorcanaCard, extractSetCodeFromCardNumber, type LorcanaCard } from "@/lib/lorcanaCardMatcher";
+import { lookupLorcanaCard, extractSetCodeFromCardNumber, searchByName as searchLorcanaByName, type LorcanaCard } from "@/lib/lorcanaCardMatcher";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -969,6 +969,86 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
         }
       } catch (dbLookupError) {
         console.error(`[GET /api/lorcana/${cardId}] ⚠️ Database lookup failed:`, dbLookupError);
+      }
+    }
+
+    // 🛡️ LAST-RESORT SET CORRECTION: If we still don't have a DB match but have a card name,
+    // do a simple name-only lookup to at least correct the set_name from the database.
+    // This prevents the AI's hallucinated set_name (e.g., "Rise of the Floodborn") from persisting.
+    if (!matchedDatabaseCard && conversationalGradingData?.card_info?.card_name) {
+      try {
+        const aiCardName = conversationalGradingData.card_info.card_name;
+        console.log(`[GET /api/lorcana/${cardId}] 🔄 Last-resort: searching DB by name "${aiCardName}" to correct set_name...`);
+        const nameResults = await searchLorcanaByName(aiCardName, 5);
+
+        if (nameResults.length > 0) {
+          // If we have a collector number, prefer the result that matches it
+          const aiNumber = conversationalGradingData.card_info.card_number;
+          let bestResult = nameResults[0];
+
+          if (aiNumber) {
+            const normalizedNum = aiNumber.replace(/^0+/, '').split('/')[0].trim();
+            const numberMatch = nameResults.find(
+              c => c.collector_number.replace(/^0+/, '') === normalizedNum
+            );
+            if (numberMatch) bestResult = numberMatch;
+          }
+
+          // Verify name similarity before applying
+          const aiNameNorm = aiCardName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          const dbNameNorm = (bestResult.full_name || bestResult.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const nameOverlap = dbNameNorm.includes(aiNameNorm.substring(0, 5)) || aiNameNorm.includes(dbNameNorm.substring(0, 5));
+
+          if (nameOverlap) {
+            console.log(`[GET /api/lorcana/${cardId}] ✅ Last-resort match: "${bestResult.full_name}" from set "${bestResult.set_name}" (set_code: ${bestResult.set_code})`);
+
+            // Apply full DB override since we found the right card
+            matchedDatabaseCard = bestResult;
+            databaseMatchConfidence = 'medium';
+            const releaseYear = bestResult.released_at ? new Date(bestResult.released_at).getFullYear().toString() : null;
+
+            conversationalGradingData.card_info = {
+              ...conversationalGradingData.card_info,
+              card_name: bestResult.full_name,
+              character_name: bestResult.name,
+              character_version: bestResult.version,
+              set_name: bestResult.set_name,
+              card_number: bestResult.collector_number,
+              expansion_code: bestResult.set_code,
+              year: releaseYear,
+              set_year: releaseYear,
+              release_date: bestResult.released_at,
+              ink_color: bestResult.ink,
+              lorcana_card_type: bestResult.card_type ? bestResult.card_type.join(', ') : null,
+              inkwell: bestResult.inkwell,
+              ink_cost: bestResult.cost,
+              strength: bestResult.strength,
+              willpower: bestResult.willpower,
+              lore_value: bestResult.lore,
+              move_cost: bestResult.move_cost,
+              card_front_text: bestResult.card_text,
+              flavor_text: bestResult.flavor_text,
+              classifications: bestResult.classifications || null,
+              abilities: bestResult.keywords || null,
+              rarity_or_variant: bestResult.rarity,
+              rarity_tier: bestResult.rarity,
+              illustrators: bestResult.illustrators || null,
+              artist_name: bestResult.illustrators ? bestResult.illustrators.join(', ') : null,
+              price_usd: bestResult.price_usd,
+              price_usd_foil: bestResult.price_usd_foil,
+              _database_match: {
+                lorcana_card_id: bestResult.id,
+                match_confidence: 'medium',
+                match_score: 0.75,
+                image_url: bestResult.image_normal || bestResult.image_large
+              }
+            };
+          } else {
+            console.log(`[GET /api/lorcana/${cardId}] ⚠️ Last-resort name match too weak: "${bestResult.full_name}" vs "${aiCardName}"`);
+          }
+        }
+      } catch (lastResortError) {
+        console.error(`[GET /api/lorcana/${cardId}] ⚠️ Last-resort set correction failed:`, lastResortError);
       }
     }
 
