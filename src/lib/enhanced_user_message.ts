@@ -49,11 +49,11 @@ BEFORE GRADING: Verify ALL 8 corners (4 front + 4 back) are FULLY VISIBLE in fra
 🔴 PRIORITY 4: EDGE DEFECTS - SYSTEMATIC SCAN (ALL 4 EDGES)
 **⚠️ YOU MUST EXAMINE EVERY EDGE - DO NOT ASSUME PERFECTION ⚠️**
 
-**📊 STATISTICAL REALITY - EXPECTED FINDINGS:**
-- 60-70% of cards have edge defects on BOTTOM edge (most common location)
-- 40-50% of cards have edge defects on TOP edge
-- 30-40% of cards have edge defects on LEFT/RIGHT edges
-- ⚠️ **IF YOU FIND ZERO EDGE DEFECTS → YOU ARE MISSING THEM - Re-examine immediately**
+**INSPECTION GUIDANCE:**
+- Bottom edges are the most common location for edge defects
+- Top edges are the second most common location
+- Left/right edges are less frequently affected
+- If you find zero edge defects, verify you completed a thorough segment-by-segment scan
 
 **🔍 WHAT EDGE DEFECTS LOOK LIKE - VISUAL IDENTIFICATION GUIDE:**
 
@@ -68,7 +68,7 @@ BEFORE GRADING: Verify ALL 8 corners (4 front + 4 back) are FULLY VISIBLE in fra
   * WHITE borders → HARDEST - look for slightly brighter areas or texture changes
 - Pattern: Usually appear as isolated single dots OR clusters of 2-4 micro-dots
 - Visual cue: Create "sparkle" effect - micro-dots catch light like tiny pinpoints
-- **Even ONE micro white dot disqualifies 10.0 grade**
+- **Any micro white dot is a handling defect — document and deduct accordingly**
 
 **Type 2: Continuous Whitening** (Linear white bands)
 - Appearance: Linear light bands or lines running along edge (like thin white stripe)
@@ -130,10 +130,9 @@ BEFORE GRADING: Verify ALL 8 corners (4 front + 4 back) are FULLY VISIBLE in fra
 4. **MANDATORY VALIDATION CHECK:**
    - Question: "Did I find ANY defects on bottom edge?"
    - If YES → Document all findings, proceed to STEP 2
-   - If NO → ⚠️ **STOP - You are likely missing defects**
-     * Re-scan segments B2, B3, B4 for 10 seconds each
+   - If NO → Verify you completed a thorough scan of segments B2, B3, B4
+     * Re-scan those segments for 10 seconds each
      * Look specifically for micro white dots on dark borders
-     * 70% of cards have bottom edge defects - finding zero is statistically rare
 
 **STEP 2: TOP EDGE** 🟡 SECOND PRIORITY
 ⏱️ TIME REQUIRED: 40 seconds minimum
@@ -198,7 +197,7 @@ For EACH of the 8 corners, perform this inspection:
 1. ❌ "Edges look good" without systematic segment-by-segment scan
 2. ❌ Glancing at edges instead of methodical 5-segment inspection per edge
 3. ❌ Missing micro white dots because they seem "too small to matter"
-   - They DO matter: Even one 0.1mm dot disqualifies 10.0 grade
+   - They DO matter: Document all defects with measurements for accurate grading
 4. ❌ Confusing glare/reflection/uneven lighting with actual whitening
    - CRITICAL: Uneven lighting makes one side of the card appear brighter — this is NOT whitening
    - Glare from camera flash creates smooth bright spots at corners/edges — this is NOT fiber exposure
@@ -230,25 +229,18 @@ BAD - Vague and Unmeasurable:
 
 Ask yourself these questions:
 1. Did I scan ALL 4 edges in 5-segment pattern? (20 segments front, 20 segments back = 40 total)
-2. Did I find ANY edge defects on bottom edge? (70% probability - finding zero is rare)
-3. Did I examine ALL 8 corners for micro whitening? (70-80% have some corner whitening)
-4. Did I spend adequate time? (Minimum 150-200 seconds for complete edge+corner inspection)
+2. Did I examine ALL 8 corners for micro whitening?
+3. Did I spend adequate time? (Minimum 150-200 seconds for complete edge+corner inspection)
 
 If you answer NO to any question → RE-EXAMINE before proceeding
-
-**⚠️ STATISTICAL REALITY CHECK:**
-- Finding ZERO edge defects across all edges = <5% probability (extremely rare)
-- Finding ZERO corner defects across 8 corners = <20% probability (rare)
-- If you're reporting zero defects on edges AND corners → **YOU ARE MISSING THEM**
 
 🔴 PRIORITY 5: SURFACE DEFECTS - SCAN FRONT AND BACK COMPLETELY
 **⚠️ SCAN ENTIRE SURFACE - DO NOT JUST GLANCE ⚠️**
 
-**📊 STATISTICAL REALITY - EXPECTED FINDINGS:**
-- 50-60% of cards have surface white dots/print defects
-- 30-40% of cards have visible scratches
-- 20-30% of cards have print defects (dots, lines, hickeys)
-- ⚠️ **IF YOU FIND ZERO SURFACE DEFECTS → YOU ARE LIKELY MISSING THEM - Re-examine**
+**INSPECTION GUIDANCE:**
+- Surface white dots and print defects are common — inspect solid color areas carefully
+- Scratches may only be visible at certain angles — check for light reflections
+- Print defects (dots, lines, hickeys) occur during manufacturing
 
 **🔍 WHAT SURFACE DEFECTS LOOK LIKE - VISUAL IDENTIFICATION GUIDE:**
 
@@ -259,14 +251,14 @@ If you answer NO to any question → RE-EXAMINE before proceeding
 - Visibility: Most visible on darker backgrounds, solid colors, or uniform areas
 - Visual cue: Appear as isolated light spots against background
 - Detection tip: Easier to see on solid color zones than busy graphics
-- **Even ONE surface white dot disqualifies 10.0 grade**
+- **Surface white dots are handling defects — document and deduct accordingly**
 
 **Type 2: Print Dots** (Factory manufacturing defects)
 - Appearance: Tiny white dots in printed areas (0.1-0.3mm diameter)
 - Cause: Missing ink from printing process, dust on printing plate
 - Pattern: Usually isolated single dots, occasionally clusters
 - Location: Most common on solid color backgrounds
-- **PSA 10 ALLOWANCE:** Single tiny print dot <0.3mm in non-critical area (border/background) MAY allow 10.0 if doesn't impair appeal
+- **MANUFACTURING VARIANCE:** Single tiny print dot <0.3mm in non-critical area (border/background) is acceptable for 10.0 — this is a manufacturing defect, not handling wear
 - **NO 10.0 if:** Dot >0.3mm OR on critical area (player face, main subject) OR multiple dots
 
 **Type 3: Scratches**
@@ -415,45 +407,33 @@ Ask yourself these questions:
 
 If you answer NO to any question → RE-EXAMINE before finalizing grade
 
-**⚠️ STATISTICAL REALITY CHECK:**
-- Finding ZERO surface defects on both front and back = <40% probability
-- Finding ZERO white dots on solid color backgrounds = <50% probability
-- If reporting zero surface defects on card with large solid color areas → **LIKELY MISSING THEM**
+**⚠️ SURFACE VALIDATION:**
+- If reporting zero surface defects on a card with large solid color areas, double-check those areas — defects are easiest to spot on solid backgrounds
 
-**⚠️ GRADE 10.0 REALITY CHECK:**
+**GRADE 10.0 — GEM MINT (Virtually Perfect):**
 
-Before assigning grade 10.0 to corners, edges, OR surface:
+Grade 10.0 is achievable for genuinely exceptional cards. Requirements:
 
 **GRADE 10.0 REQUIREMENTS - ALL must be true:**
-✓ ZERO corner defects on all 8 corners (no micro whitening)
-✓ ZERO edge defects on all 40 edge segments (no micro white dots)
-✓ ZERO surface defects on all 18 zones (may allow single tiny print dot <0.3mm in non-critical area per PSA)
-✓ Perfect centering (50/50 or 51/49)
+✓ No handling defects on corners (no whitening, no wear)
+✓ No handling defects on edges (no whitening, no chipping)
+✓ No handling defects on surface (no scratches, no scuffs)
+✓ A single minor manufacturing print dot (<0.3mm in non-critical area) is acceptable
+✓ Centering 55/45 or better on all axes
 ✓ Zero structural damage
 
-**STATISTICAL REALITY:**
-- Grade 10.0 is EXCEPTIONALLY RARE (<1% of all cards)
-- Even "perfect-looking" cards usually have 9.5 due to microscopic manufacturing variance
-- 70-80% of cards have corner whitening somewhere
-- 60-70% of cards have bottom edge defects
-- 50-60% of cards have surface white dots
-
-**⚠️ IF ASSIGNING 10.0 TO ANY CATEGORY:**
-1. STOP immediately
-2. RE-EXAMINE that category at highest scrutiny
-3. Specifically look for microscopic defects you may have missed
-4. Remember: Missing defects = inflated grades = user dissatisfaction
-5. When uncertain between 9.5 and 10.0 → ALWAYS choose 9.5 (safety default)
+**IF ASSIGNING 10.0 TO ANY CATEGORY:**
+1. Verify thorough inspection was completed for that category
+2. Confirm no handling defects were found
+3. Document what you examined and your findings
 
 ⚠️ CRITICAL REMINDERS:
 - If you detect an UNVERIFIED AUTOGRAPH → Grade 1.0 (Altered)
 - If you detect a CREASE or BENT CORNER → Maximum grade 4.0
 - If you detect HANDWRITTEN MARKING → Grade 1.0 (Altered)
-- If you detect ANY edge/corner defect → Card is NOT a 10.0
-- If you detect ANY surface white dot on critical area → Card is NOT a 10.0
-- Grade 10.0 is <1% of cards - most high-quality cards are 9.0-9.5
-- Be APPROPRIATELY CRITICAL - look for defects, don't assume perfection
-- ASSUME DEFECTS EXIST UNTIL PROVEN OTHERWISE
+- If you detect ANY handling defect on edges/corners → Card is NOT a 10.0
+- If you detect ANY scratch or scuff on surface → Card is NOT a 10.0
+- Be thorough — inspect carefully, but grade based on what you actually observe
 
 **FINAL VALIDATION CHECKLIST:**
 
