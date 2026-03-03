@@ -259,6 +259,38 @@ D. LORCANA CARD DEFECT PATTERNS
 • Same as standard edge grading
 • Whitening visible against colored borders
 
+────────────────────────────────────────────────────────────────────────
+3. BACK DESIGN PATTERN — NOT DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**⚠️ CRITICAL — Lorcana Card Back Design:**
+• ALL Lorcana cards share a standard back featuring circular/swirl design
+  patterns printed on a dark (black/dark blue) glossy surface
+• These circular design elements can appear as subtle curved lines that
+  resemble scratches or scuff marks — they are PART OF THE CARD DESIGN
+• Under reflection or at certain angles, the swirl patterns may appear to
+  slightly dull the black gloss, mimicking surface wear
+
+**How the AI has misidentified this design:**
+• "Subtle curved scuff line about 5-7mm long, slightly dulling the black
+  gloss when viewed under reflection" — this describes the PRINTED DESIGN,
+  not a defect
+• Curved lines that follow the swirl pattern of the back design
+• Areas where the matte/glossy contrast of the printed pattern creates the
+  appearance of surface wear
+
+**How to distinguish design from real defects:**
+• DESIGN: Curved lines follow the circular/swirl pattern, appear symmetrical
+  or part of a repeating motif, present on all Lorcana card backs
+• REAL SCRATCH: Straight or irregular line that cuts across the design
+  pattern, does NOT follow the swirl motif, may expose underlying cardstock
+• REAL SCUFF: Irregular patch of gloss loss unrelated to the printed pattern,
+  often from handling/friction, breaks the surface uniformity
+
+**Rule:** Do NOT deduct for curved marks on Lorcana card backs that align
+with the circular/swirl design pattern. Only deduct for marks that clearly
+cut across or are independent of the printed back design.
+
 ════════════════════════════════════════════════════════════════════════
 E. LORCANA CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
