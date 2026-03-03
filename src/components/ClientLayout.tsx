@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import PersistentStatusBar from '@/components/PersistentStatusBar'
+import HelpBot from '@/components/helpbot/HelpBot'
 import ReferralTracker from '@/components/ReferralTracker'
 import { useBackgroundGrading } from '@/hooks/useBackgroundGrading'
 import { initSessionRefresh, cleanupSessionRefresh } from '@/lib/directAuth'
@@ -59,6 +60,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
           }}
         />
         <PersistentStatusBar />
+        <HelpBot />
         {children}
       </GradingQueueProvider>
     </CreditsProvider>
