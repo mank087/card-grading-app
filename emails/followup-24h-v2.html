@@ -1,35 +1,3 @@
-/**
- * Email Templates
- * HTML templates for marketing emails
- *
- * NOTE: Email HTML optimized for Outlook/Gmail compatibility:
- * - No CSS gradients (use solid bgcolor)
- * - No divs (use tables for layout)
- * - No border-radius on containers
- * - Use bgcolor attribute AND background-color style (for different clients)
- * - Use HTML entities for special characters
- * - Inline all styles (no <style> blocks)
- * - Use role="presentation" on layout tables
- * - Use align/valign attributes for positioning
- * - Specify width in pixels, not percentages where possible
- * - Include MSO conditionals for Outlook-specific rendering
- */
-
-/**
- * 24-Hour Follow-Up Email Subject
- */
-export function getFollowUp24hEmailSubject(): string {
-  return "Your free credits are waiting — grade your first card";
-}
-
-/**
- * 24-Hour Follow-Up Email HTML
- * Sent 24 hours after account creation
- *
- * @param unsubscribeUrl - URL for one-click unsubscribe
- */
-export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
-  return `
 <!DOCTYPE html>
 <html>
 <head>
@@ -537,7 +505,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                       &copy; 2026 DCM Grading. All rights reserved.
                     </p>
                     <p style="color: #6b7280; font-size: 10px; margin: 0;">
-                      <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> from marketing emails
+                      <a href="#UNSUBSCRIBE_URL" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> from marketing emails
                     </p>
                   </td>
                 </tr>
@@ -551,5 +519,3 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
   </table>
 </body>
 </html>
-  `.trim();
-}
