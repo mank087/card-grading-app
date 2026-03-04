@@ -54,7 +54,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
       'Upload front and back photos of your card. Our system runs three independent evaluations using DCM Optic\u2122, then combines them using consensus rules. You get a final grade (1\u201310), eight component scores, a consistency rating, and detailed defect notes\u2014all in about 60 seconds.',
     keywords: ['how', 'work', 'process', 'steps', 'upload', 'three-pass', 'consensus'],
     category: 'getting-started',
-    links: [{ label: 'Start grading', href: '/grade' }],
+    links: [{ label: 'Start grading', href: '/upload' }],
     relatedIds: ['what-is-dcm', 'three-pass', 'component-scores'],
   },
   {
@@ -64,7 +64,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
       'DCM supports Sports cards (baseball, basketball, football, hockey, soccer), Pok\u00e9mon, Magic: The Gathering, Disney Lorcana, One Piece TCG, and other trading cards. Select your card type when uploading for the most accurate evaluation.',
     keywords: ['types', 'cards', 'sports', 'pokemon', 'mtg', 'magic', 'lorcana', 'one piece', 'supported'],
     category: 'getting-started',
-    links: [{ label: 'Grade a card', href: '/grade' }],
+    links: [{ label: 'Grade a card', href: '/upload' }],
     relatedIds: ['what-is-dcm'],
   },
   {
@@ -218,7 +218,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
       'Yes! DCM is fully mobile-friendly. You can take photos directly from your phone camera and upload them right away. The mobile experience is optimized for easy grading on the go.',
     keywords: ['phone', 'mobile', 'upload', 'camera', 'iphone', 'android', 'smartphone'],
     category: 'photo-tips',
-    links: [{ label: 'Start grading', href: '/grade' }],
+    links: [{ label: 'Start grading', href: '/upload' }],
     relatedIds: ['photo-tips', 'image-formats'],
   },
 
@@ -250,7 +250,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
       'New accounts receive complimentary credits so you can try DCM risk-free. Sign up and start grading immediately\u2014no credit card required for your first grades.',
     keywords: ['free', 'trial', 'complimentary', 'credits', 'new account', 'try', 'sign up', 'no cost'],
     category: 'pricing-credits',
-    links: [{ label: 'Sign up free', href: '/auth' }],
+    links: [{ label: 'Sign up free', href: '/get-started' }],
     relatedIds: ['pricing'],
   },
   {
@@ -322,7 +322,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
       'Speed (60 seconds vs. weeks), cost (as low as $0.50 per card vs. $20\u2013$150+), convenience (grade from home), transparency (see exactly what was found), and unlimited re-grades. DCM is ideal for pre-screening, personal collections, and quick assessments.',
     keywords: ['why', 'advantage', 'benefit', 'better', 'instead', 'reason', 'worth it'],
     category: 'dcm-vs-mailaway',
-    links: [{ label: 'Start grading', href: '/grade' }],
+    links: [{ label: 'Start grading', href: '/upload' }],
     relatedIds: ['dcm-vs-mailaway', 'pricing'],
   },
 
