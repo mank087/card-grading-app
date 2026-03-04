@@ -51,7 +51,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'how-it-works',
     question: 'How does DCM Grading work?',
     answer:
-      'Upload front and back photos of your card. Our AI runs three independent evaluations using DCM Optic\u2122, then combines them using consensus rules. You get a final grade (1\u201310), eight component scores, a consistency rating, and detailed defect notes\u2014all in about 60 seconds.',
+      'Upload front and back photos of your card. Our system runs three independent evaluations using DCM Optic\u2122, then combines them using consensus rules. You get a final grade (1\u201310), eight component scores, a consistency rating, and detailed defect notes\u2014all in about 60 seconds.',
     keywords: ['how', 'work', 'process', 'steps', 'upload', 'three-pass', 'consensus'],
     category: 'getting-started',
     links: [{ label: 'Start grading', href: '/grade' }],
@@ -148,6 +148,16 @@ export const knowledgeBase: KnowledgeEntry[] = [
     category: 'grading-scores',
     links: [],
     relatedIds: ['three-pass', 'image-confidence'],
+  },
+  {
+    id: 'unexpected-grade',
+    question: 'What if a card scores higher or lower than I expect it to?',
+    answer:
+      'The DCM system is dependent on the images uploaded to be clear of visual issues like blur and glare to ensure the highest accuracy possible. If a grade is very far off from what is expected, try to re-grade that card with better lighting and a neutral contrasting background. Also, be sure to properly enter any defects or issues with the card that the photos may not see like warping, scratches, angular defects, etc.',
+    keywords: ['unexpected', 'higher', 'lower', 'expect', 'wrong grade', 'too high', 'too low', 'surprised', 'disagree'],
+    category: 'grading-scores',
+    links: [],
+    relatedIds: ['regrade', 'photo-tips', 'image-confidence'],
   },
 
   // ── Photo Tips ──
@@ -257,7 +267,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'collection-pricing',
     question: 'How do I see the value of my collection?',
     answer:
-      'Card Lovers subscribers can view estimated values for each graded card and see their total collection value on the Collection page. Pricing is based on recent market data matched to each card\'s grade.',
+      'Card Lovers subscribers can view estimated values for each graded card and see their total collection value on the Collection page and in the Market Pricing dashboard. For non-Card Lovers, pricing will show per card in the card details page and on the Collection page. Pricing is based on recent market data matched to each card\'s grade.',
     keywords: ['collection', 'value', 'total', 'portfolio', 'worth', 'price', 'estimate'],
     category: 'pricing-credits',
     links: [{ label: 'View collection', href: '/collection' }],
@@ -267,7 +277,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'parallel-mismatch',
     question: 'What if my card\'s parallel or variant isn\'t matched correctly?',
     answer:
-      'Sometimes DCM\'s AI may not perfectly identify a card\'s specific parallel (e.g., holo, reverse holo, full art). You can fix this yourself on the card\'s detail page. Scroll to the Market Pricing section and use the dropdown to manually select the correct parallel. This updates the pricing to match the right version of your card.',
+      'Sometimes DCM may not perfectly identify a card\'s specific parallel (e.g., holo, reverse holo, full art) which may have an impact on estimated card value. You can fix this yourself on the card\'s detail page. Scroll to the Market Pricing section and use the dropdown to manually select the correct parallel from the list when available. This updates the pricing to match the right version of your card.',
     keywords: ['parallel', 'variant', 'wrong card', 'mismatch', 'holo', 'reverse holo', 'full art', 'incorrect', 'wrong version', 'update parallel'],
     category: 'pricing-credits',
     links: [],
@@ -289,7 +299,7 @@ export const knowledgeBase: KnowledgeEntry[] = [
     id: 'accuracy',
     question: 'How accurate are DCM grades?',
     answer:
-      'DCM uses three-pass consensus, evidence-based grading, and industry-aligned standards to maximize accuracy. While no photo-based system is identical to physical inspection, DCM provides a reliable assessment that aligns closely with professional grades.',
+      'DCM uses three-pass consensus, evidence-based grading, and industry-aligned standards to maximize accuracy. While no photo-based system is identical to physical inspection, DCM provides a reliable assessment that aligns closely with mail-away graders.',
     keywords: ['accurate', 'accuracy', 'reliable', 'correct', 'trustworthy', 'how good', 'precision'],
     category: 'dcm-vs-mailaway',
     links: [],
@@ -348,14 +358,14 @@ export const knowledgeBase: KnowledgeEntry[] = [
     relatedIds: ['card-types', 'grading-scale'],
   },
   {
-    id: 'error-cards',
-    question: 'How does DCM handle error cards and variations?',
+    id: 'fake-cards',
+    question: 'Can DCM determine fake cards?',
     answer:
-      'Manufacturing errors (miscuts, misprints, off-center printing) are noted as features, not defects. The grade reflects the card\'s physical condition, not its error status. Error cards can still receive high grades if they\'re in great condition.',
-    keywords: ['error', 'miscut', 'misprint', 'variation', 'variant', 'manufacturing', 'print error'],
+      'DCM looks for manufacturer authentication, copyrights, and related authenticity markings. Counterfeit or fake cards can be hard to spot and DCM may not always accurately determine the authenticity of a card. Check with your local card store or convention for true authenticity analysis.',
+    keywords: ['fake', 'counterfeit', 'authentic', 'authenticity', 'real', 'legit', 'legitimate', 'forgery', 'reproduction'],
     category: 'special-cases',
     links: [],
-    relatedIds: ['grade-caps', 'grading-scale'],
+    relatedIds: ['altered-cards', 'autographed'],
   },
 
   // ── Account & Collection ──
@@ -388,6 +398,16 @@ export const knowledgeBase: KnowledgeEntry[] = [
     category: 'account-collection',
     links: [{ label: 'Go to collection', href: '/collection' }],
     relatedIds: ['consistency', 'image-confidence'],
+  },
+  {
+    id: 'my-account',
+    question: 'How do I view My Account, credits purchased, and Subscription information?',
+    answer:
+      'All account details including Card Lovers subscription status is found in the My Account page.',
+    keywords: ['account', 'my account', 'credits purchased', 'subscription', 'billing', 'plan', 'settings', 'profile'],
+    category: 'account-collection',
+    links: [{ label: 'My Account', href: '/account' }],
+    relatedIds: ['card-lovers', 'pricing'],
   },
   {
     id: 'contact-support',
