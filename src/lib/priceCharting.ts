@@ -168,10 +168,37 @@ function normalizeSport(sport: string | undefined): string | undefined {
  * Handles variations like "CJ" vs "C.J." vs "C. J."
  */
 function normalizePlayerName(name: string): string {
-  // Add periods after single capital letters that are initials
-  // "CJ Stroud" -> "C.J. Stroud", "AJ Brown" -> "A.J. Brown"
   let normalized = name;
 
+  // Extract English name from parentheses for Japanese/foreign language cards
+  // e.g., "ピカチュウ (Pikachu)" -> "Pikachu", "リザードン (Charizard)" -> "Charizard"
+  const parenMatch = normalized.match(/\(([A-Za-z][\w\s.'-]+)\)/);
+  if (parenMatch) {
+    normalized = parenMatch[1].trim();
+  } else {
+    // Check if name contains non-Latin characters (Japanese, Chinese, Korean, etc.)
+    // If so, try to find any Latin-script portion
+    const hasNonLatin = /[^\u0000-\u024F\s]/.test(normalized);
+    if (hasNonLatin) {
+      // Extract any Latin-script words
+      const latinParts = normalized.match(/[A-Za-z][\w'-]*/g);
+      if (latinParts && latinParts.length > 0) {
+        normalized = latinParts.join(' ');
+      }
+    }
+  }
+
+  // Handle multi-player cards: "Caleb Williams / Jayden Daniels / Drake Maye" -> use first player
+  if (normalized.includes('/')) {
+    const players = normalized.split('/').map(p => p.trim()).filter(Boolean);
+    if (players.length > 1) {
+      // Use first player name only for search (multi-player cards rarely match by full name)
+      normalized = players[0];
+    }
+  }
+
+  // Add periods after single capital letters that are initials
+  // "CJ Stroud" -> "C.J. Stroud", "AJ Brown" -> "A.J. Brown"
   // Match patterns like "CJ " or "AJ " at the start (two uppercase letters followed by space)
   normalized = normalized.replace(/^([A-Z])([A-Z])\s+/i, '$1.$2. ');
 
@@ -244,7 +271,8 @@ function buildSportsCardQuery(params: SportsCardSearchParams): string {
   }
 
   // Set name for accurate matching (e.g., "Topps Allen and Ginter")
-  if (params.setName) {
+  // Guard against literal "undefined" string being passed
+  if (params.setName && params.setName !== 'undefined') {
     // Clean up set name - remove bullets/dashes, duplicate manufacturer, redundant sport words
     let cleanSetName = params.setName
       .replace(/[•·●–—-]/g, ' ')           // Remove bullet and dash characters
@@ -512,6 +540,12 @@ export function estimateDcmValue(
 export async function searchSportsCardPrices(
   params: SportsCardSearchParams
 ): Promise<{ prices: NormalizedPrices | null; matchConfidence: 'high' | 'medium' | 'low' | 'none'; queryUsed: string }> {
+  // Sanitize params: clear literal "undefined" strings
+  if (params.setName === 'undefined') params.setName = undefined;
+  if (params.year === 'undefined') params.year = undefined;
+  if (params.variant === 'undefined') params.variant = undefined;
+  if (params.cardNumber === 'undefined') params.cardNumber = undefined;
+
   // Log search parameters clearly
   console.log('[SportsCardsPro] === SEARCH REQUEST ===');
   console.log('[SportsCardsPro] Player:', params.playerName);
@@ -552,7 +586,9 @@ export async function searchSportsCardPrices(
             .trim();
         };
 
-        const normalizedPlayer = normalizeForComparison(params.playerName);
+        // Use normalizePlayerName to handle Japanese/foreign names and multi-player cards
+        const effectivePlayerName = normalizePlayerName(params.playerName);
+        const normalizedPlayer = normalizeForComparison(effectivePlayerName);
         const normalizedProduct = normalizeForComparison(productName);
 
         // Split into parts for matching, filter out very short parts (like "jr")
@@ -614,14 +650,21 @@ export async function searchSportsCardPrices(
         const normalizedSearchNumNoZeros = normalizeCardNumberForComparison(cleanCardNumNoZeros);
         const normalizedProductName = normalizeCardNumberForComparison(productName);
 
+        // Also create space/hyphen-normalized versions for matching
+        // "LS 4" should match "ls-4", "INM CKP" should match "inm-ckp"
+        const flexNum = cleanCardNum.replace(/[\s-]+/g, '');  // Remove spaces and hyphens
+        const flexNumProduct = productName.toLowerCase().replace(/[\s-]+/g, '');
+
         // Check if product name contains the card number (with or without #, with or without leading zeros)
         const exactMatch = productName.includes(`#${cleanCardNum}`) || productName.includes(cleanCardNum) ||
           productName.includes(`#${cleanCardNumNoZeros}`) || productName.includes(cleanCardNumNoZeros);
         const normalizedMatch = normalizedProductName.includes(`#${normalizedSearchNum}`) || normalizedProductName.includes(normalizedSearchNum) ||
           normalizedProductName.includes(`#${normalizedSearchNumNoZeros}`) || normalizedProductName.includes(normalizedSearchNumNoZeros);
+        // Flexible match: collapse spaces/hyphens and compare
+        const flexMatch = flexNumProduct.includes(`#${flexNum}`) || flexNumProduct.includes(flexNum);
 
-        if (!exactMatch && !normalizedMatch) {
-          console.log(`[SportsCardsPro] SKIP: Card # mismatch - looking for "${cleanCardNum}" (or "${cleanCardNumNoZeros}"), found "${productName}"`);
+        if (!exactMatch && !normalizedMatch && !flexMatch) {
+          console.log(`[SportsCardsPro] SKIP: Card # mismatch - looking for "${cleanCardNum}" (or "${cleanCardNumNoZeros}", flex "${flexNum}"), found "${productName}"`);
           return -1;
         }
         score += 10; // Card number matches

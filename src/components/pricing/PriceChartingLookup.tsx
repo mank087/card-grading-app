@@ -123,6 +123,13 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
   // Non-owner notification
   const [showOwnerNote, setShowOwnerNote] = useState(false);
 
+  // Manual search state
+  const [showManualSearch, setShowManualSearch] = useState(false);
+  const [manualSearchQuery, setManualSearchQuery] = useState('');
+  const [manualSearchResults, setManualSearchResults] = useState<{ id: string; name: string; setName: string; hasPrice: boolean }[]>([]);
+  const [searchingManual, setSearchingManual] = useState(false);
+  const [manualSearchError, setManualSearchError] = useState<string | null>(null);
+
   const fetchPrices = async (overrideProductId?: string, forceRefresh: boolean = false) => {
     if (!card.player_or_character) {
       return;
@@ -441,6 +448,49 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
     }
   };
 
+  // Manual search for card identification
+  const handleManualSearch = async () => {
+    if (!manualSearchQuery.trim() || manualSearchQuery.trim().length < 2) return;
+
+    setSearchingManual(true);
+    setManualSearchError(null);
+    setManualSearchResults([]);
+
+    try {
+      const response = await fetch(`/api/pricing/pricecharting/search?q=${encodeURIComponent(manualSearchQuery.trim())}`);
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'Search failed');
+      }
+
+      setManualSearchResults(data.results || []);
+      if (!data.results?.length) {
+        setManualSearchError('No results found. Try different search terms.');
+      }
+    } catch (err) {
+      console.error('[PriceChartingLookup] Manual search error:', err);
+      setManualSearchError(err instanceof Error ? err.message : 'Search failed');
+    } finally {
+      setSearchingManual(false);
+    }
+  };
+
+  // Handle selecting a result from manual search
+  const handleManualSearchSelect = async (productId: string, productName: string) => {
+    setShowManualSearch(false);
+    setManualSearchResults([]);
+    setManualSearchQuery('');
+    setSelectedProductId(productId);
+    setLoading(true);
+
+    await fetchPrices(productId);
+
+    if (card.id) {
+      await saveSelection(productId, productName);
+    }
+  };
+
   // Handle parallel selection from dropdown
   const handleParallelSelect = async (productId: string) => {
     console.log('[PriceChartingLookup] handleParallelSelect CALLED with:', productId);
@@ -744,8 +794,113 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
     return allPrices.length > 0 ? Math.max(...allPrices) : null;
   };
 
+  // If no player name, show a minimal panel with manual search option
   if (!card.player_or_character) {
-    return null;
+    if (!isOwner) return null;
+    return (
+      <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border-2 border-emerald-200 p-4 sm:p-6 shadow-lg">
+        <div className="flex items-center gap-2 sm:gap-3 mb-4">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base sm:text-lg font-bold text-gray-800">Market Value</h3>
+            <p className="text-xs sm:text-sm text-gray-500">Card not identified automatically</p>
+          </div>
+        </div>
+
+        {!showManualSearch ? (
+          <button
+            onClick={() => setShowManualSearch(true)}
+            className="w-full px-3 py-3 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            Search for this card manually
+          </button>
+        ) : (
+          <div>
+            <p className="text-xs text-gray-500 mb-3">
+              Search SportsCardsPro directly. Try: player name, year, set name, card number.
+            </p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={manualSearchQuery}
+                onChange={(e) => setManualSearchQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+                placeholder="e.g. Patrick Mahomes 2017 Prizm"
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              />
+              <button
+                onClick={handleManualSearch}
+                disabled={searchingManual || manualSearchQuery.trim().length < 2}
+                className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+              >
+                {searchingManual ? 'Searching...' : 'Search'}
+              </button>
+            </div>
+
+            {manualSearchError && (
+              <p className="text-xs text-red-600 mt-2">{manualSearchError}</p>
+            )}
+
+            {manualSearchResults.length > 0 && (
+              <div className="mt-3 max-h-64 overflow-y-auto space-y-1 border-t border-gray-100 pt-3">
+                <p className="text-xs text-gray-500 mb-2">{manualSearchResults.length} results — select the correct card:</p>
+                {manualSearchResults.map((result) => (
+                  <button
+                    key={result.id}
+                    onClick={() => handleManualSearchSelect(result.id, result.name)}
+                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                      result.hasPrice
+                        ? 'bg-white hover:bg-emerald-50 text-gray-700 border border-gray-200 hover:border-emerald-200'
+                        : 'bg-white text-gray-400 border border-gray-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="truncate font-medium">{result.name}</span>
+                      <span className={`text-xs flex-shrink-0 ml-2 ${result.hasPrice ? 'text-green-600' : 'text-gray-400'}`}>
+                        {result.hasPrice ? 'Has prices' : 'No prices'}
+                      </span>
+                    </div>
+                    {result.setName && (
+                      <span className="text-xs text-gray-500 truncate block mt-0.5">{result.setName}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex items-center justify-center py-4 mt-3">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-emerald-600"></div>
+            <span className="ml-3 text-sm text-gray-600">Loading prices...</span>
+          </div>
+        )}
+
+        {priceData && (
+          <div className="mt-4 pt-4 border-t border-emerald-200">
+            <div className="bg-white rounded-lg border border-gray-200 p-3 mb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-800">{priceData.prices.productName}</p>
+                  {priceData.prices.setName && (
+                    <p className="text-xs text-gray-500">{priceData.prices.setName}</p>
+                  )}
+                </div>
+                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Manual Selection</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 text-center">
+              Pricing data loaded. Scroll down or refresh the page to see full details.
+            </p>
+          </div>
+        )}
+      </div>
+    );
   }
 
   const priceIncrease = getPriceIncrease();
@@ -788,11 +943,204 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
         <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
           <p className="text-sm text-red-700">
             {error === 'No matching products found'
-              ? 'No pricing data found for this card. Try adjusting the search or check that the card details are correct.'
+              ? 'No pricing data found for this card automatically.'
               : error.includes('timeout') || error.includes('API error')
               ? 'Price service temporarily unavailable. Click Refresh to try again.'
               : error}
           </p>
+          {error === 'No matching products found' && isOwner && !showManualSearch && (
+            <button
+              onClick={() => {
+                setShowManualSearch(true);
+                // Pre-fill with card info
+                const prefill = [card.player_or_character, card.year, card.set_name].filter(Boolean).join(' ');
+                setManualSearchQuery(prefill);
+              }}
+              className="mt-2 px-3 py-1.5 text-xs bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              Search Manually
+            </button>
+          )}
+
+          {/* Inline Manual Search - appears right where the button was */}
+          {showManualSearch && isOwner && (
+            <div className="mt-3 bg-white border border-emerald-200 rounded-lg p-3">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-sm font-semibold text-gray-700">Manual Card Search</h4>
+                <button
+                  onClick={() => {
+                    setShowManualSearch(false);
+                    setManualSearchResults([]);
+                    setManualSearchError(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <p className="text-xs text-gray-500 mb-2">
+                Search SportsCardsPro directly. Try: player name, year, set name, card number.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={manualSearchQuery}
+                  onChange={(e) => setManualSearchQuery(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+                  placeholder="e.g. Patrick Mahomes 2017 Prizm"
+                  className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+                  autoFocus
+                />
+                <button
+                  onClick={handleManualSearch}
+                  disabled={searchingManual || manualSearchQuery.trim().length < 2}
+                  className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                >
+                  {searchingManual ? 'Searching...' : 'Search'}
+                </button>
+              </div>
+
+              {manualSearchError && (
+                <p className="text-xs text-red-600 mt-2">{manualSearchError}</p>
+              )}
+
+              {manualSearchResults.length > 0 && (
+                <div className="mt-3 max-h-64 overflow-y-auto space-y-1 border-t border-gray-100 pt-3">
+                  <p className="text-xs text-gray-500 mb-2">{manualSearchResults.length} results found — select the correct card:</p>
+                  {manualSearchResults.map((result) => {
+                    const serialMatch = result.name.match(/\s*(\/\d+)/);
+                    const serialNumber = serialMatch ? serialMatch[1] : null;
+                    const nameWithoutSerial = serialNumber
+                      ? result.name.replace(/\s*\/\d+/, '').trim()
+                      : result.name;
+
+                    return (
+                      <button
+                        key={result.id}
+                        onClick={() => handleManualSearchSelect(result.id, result.name)}
+                        className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                          result.hasPrice
+                            ? 'bg-gray-50 hover:bg-emerald-50 text-gray-700 border border-transparent hover:border-emerald-200'
+                            : 'bg-gray-50 text-gray-400 border border-transparent'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="truncate font-medium">{nameWithoutSerial}</span>
+                            {serialNumber && (
+                              <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded flex-shrink-0">
+                                {serialNumber}
+                              </span>
+                            )}
+                          </div>
+                          <span className={`text-xs flex-shrink-0 ml-2 ${result.hasPrice ? 'text-green-600' : 'text-gray-400'}`}>
+                            {result.hasPrice ? 'Has prices' : 'No prices'}
+                          </span>
+                        </div>
+                        {result.setName && (
+                          <span className="text-xs text-gray-500 truncate block mt-0.5">
+                            {result.setName}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Manual Search Panel - shown when triggered from the variations/details section (priceData exists) */}
+      {showManualSearch && isOwner && !error && (
+        <div id="manual-search-panel" className="bg-white border-2 border-emerald-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-semibold text-gray-700">Manual Card Search</h4>
+            <button
+              onClick={() => {
+                setShowManualSearch(false);
+                setManualSearchResults([]);
+                setManualSearchError(null);
+              }}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p className="text-xs text-gray-500 mb-3">
+            Search SportsCardsPro directly. Try: player name, year, set name, card number.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={manualSearchQuery}
+              onChange={(e) => setManualSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleManualSearch()}
+              placeholder="e.g. Patrick Mahomes 2017 Prizm"
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none"
+              autoFocus
+            />
+            <button
+              onClick={handleManualSearch}
+              disabled={searchingManual || manualSearchQuery.trim().length < 2}
+              className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+            >
+              {searchingManual ? 'Searching...' : 'Search'}
+            </button>
+          </div>
+
+          {manualSearchError && (
+            <p className="text-xs text-red-600 mt-2">{manualSearchError}</p>
+          )}
+
+          {manualSearchResults.length > 0 && (
+            <div className="mt-3 max-h-64 overflow-y-auto space-y-1 border-t border-gray-100 pt-3">
+              <p className="text-xs text-gray-500 mb-2">{manualSearchResults.length} results found — select the correct card:</p>
+              {manualSearchResults.map((result) => {
+                const serialMatch = result.name.match(/\s*(\/\d+)/);
+                const serialNumber = serialMatch ? serialMatch[1] : null;
+                const nameWithoutSerial = serialNumber
+                  ? result.name.replace(/\s*\/\d+/, '').trim()
+                  : result.name;
+
+                return (
+                  <button
+                    key={result.id}
+                    onClick={() => handleManualSearchSelect(result.id, result.name)}
+                    className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                      result.hasPrice
+                        ? 'bg-gray-50 hover:bg-emerald-50 text-gray-700 border border-transparent hover:border-emerald-200'
+                        : 'bg-gray-50 text-gray-400 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 truncate">
+                        <span className="truncate font-medium">{nameWithoutSerial}</span>
+                        {serialNumber && (
+                          <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded flex-shrink-0">
+                            {serialNumber}
+                          </span>
+                        )}
+                      </div>
+                      <span className={`text-xs flex-shrink-0 ml-2 ${result.hasPrice ? 'text-green-600' : 'text-gray-400'}`}>
+                        {result.hasPrice ? 'Has prices' : 'No prices'}
+                      </span>
+                    </div>
+                    {result.setName && (
+                      <span className="text-xs text-gray-500 truncate block mt-0.5">
+                        {result.setName}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -837,7 +1185,7 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
                 <svg className="w-3 h-3 transition-transform duration-200 group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                See other card variations, parallels and closely matched cards
+                Wrong card? See variations or search manually
               </summary>
 
               <div className="mt-3">
@@ -944,6 +1292,24 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
                       })}
                     </div>
                   </>
+                )}
+                {/* Manual search button */}
+                {isOwner && (
+                  <button
+                    onClick={() => {
+                      setShowManualSearch(true);
+                      setError(null); // Clear error so standalone panel renders above
+                      const prefill = [card.player_or_character, card.year, card.set_name].filter(Boolean).join(' ');
+                      setManualSearchQuery(prefill);
+                      // Scroll to the search panel after render
+                      setTimeout(() => {
+                        document.getElementById('manual-search-panel')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                      }, 100);
+                    }}
+                    className="w-full text-center px-3 py-2 mt-2 rounded text-sm bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 transition-colors"
+                  >
+                    Can't find your card? Search manually
+                  </button>
                 )}
               </div>
             </details>
