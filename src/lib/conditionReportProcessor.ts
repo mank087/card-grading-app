@@ -561,15 +561,19 @@ ${factorySection}
 ${notesSection}
 
 ───────────────────────────────────────────────────────────────────────
-RULES FOR USING THESE HINTS:
+RULES FOR USING THESE HINTS (MANDATORY - DO NOT SKIP):
 ───────────────────────────────────────────────────────────────────────
-1. Look MORE CAREFULLY at areas where user reported defects
-2. If you SEE the reported defect → confirm it in your analysis
-3. If you do NOT see it → note "User reported X but not visible in photos"
-4. NEVER improve scores based on user claims
-5. User hints can only ADD defect awareness, never remove defects you see
-6. Treat user notes as supplementary only - your visual analysis is primary
-7. Report which user hints you confirmed vs. which were not visible
+1. You MUST address EVERY defect type listed above in your grading analysis
+2. For EACH reported defect type, state: CONFIRMED, NOT CONFIRMED, or AMBIGUOUS
+3. If CONFIRMED → include in defects array and apply normal deduction
+4. If NOT CONFIRMED → explicitly state "User reported [X] — not visible in
+   submitted photos" in the relevant description field
+5. If AMBIGUOUS → apply MINIMUM deduction (user physically held the card and
+   likely saw something real that photos may not capture clearly)
+6. NEVER improve scores based on user claims — hints only ADD defect awareness
+7. Your visual analysis is primary, but you MUST NOT silently ignore hints
+8. VIOLATION: Saying a surface is "flawless" or "clean" when the user reported
+   multiple defects on that surface WITHOUT addressing each one individually
 ═══════════════════════════════════════════════════════════════════════
 `;
 
