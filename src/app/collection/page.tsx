@@ -1907,7 +1907,7 @@ function CollectionPageContent() {
                                   className="fixed inset-0 z-40"
                                   onClick={() => setShowLabelTypeSelector(false)}
                                 />
-                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                                <div className="fixed inset-x-4 bottom-20 md:absolute md:inset-auto md:right-0 md:bottom-auto md:mt-2 w-auto md:w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
                                   <div className="p-2">
                                     <p className="text-xs text-gray-500 px-2 py-1 mb-1">Select label type:</p>
                                     <button

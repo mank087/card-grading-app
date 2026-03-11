@@ -177,7 +177,7 @@ const FONT_RATIO = {
   name: 1.0,       // base (e.g. 34px)
   context: 0.76,   // ~26px at base 34 — larger for print readability
   features: 0.70,  // ~24px at base 34
-  serial: 0.64,    // ~22px at base 34
+  serial: 0.76,    // matches context line size for visual consistency
 };
 
 /** Spacing ratios relative to the name font size */
@@ -359,13 +359,14 @@ async function renderFrontLabelCanvas(
     ? 'AUTHENTIC'
     : (data.condition || '').toUpperCase();
 
-  const gradeAreaWidth = 100;
+  // Modern uses larger grade/condition to match back label; traditional keeps original sizes
+  const gradeAreaWidth = isModern ? 130 : 100;
   const gradeRightPadding = padding + 20; // extra inset so grade doesn't touch cut line
   const gradeCenterX = B + CW - gradeRightPadding - gradeAreaWidth / 2;
 
   // Measure total height of grade + divider + condition to center them
-  const gradeFontSize = 56;
-  const condFontSize = 16;
+  const gradeFontSize = isModern ? 88 : 62;  // modern matches back label (88px)
+  const condFontSize = isModern ? 24 : 18;   // modern matches back label (24px)
   const dividerGap = isModern ? 4 : 8; // space for divider line in traditional
   const condGap = 4;
   const totalGradeH = gradeFontSize + dividerGap + condFontSize;
@@ -573,8 +574,8 @@ async function renderBackLabelCanvas(
     ? 'AUTHENTIC'
     : (data.condition || '').toUpperCase();
 
-  const gradeFontSize = 80;
-  const condFontSize = 22;
+  const gradeFontSize = 88;  // +10% from 80
+  const condFontSize = 24;   // +10% from 22
   const condGapBack = 8;
   const totalH = gradeFontSize + (conditionText ? condGapBack + condFontSize : 0);
   const centerStartY = B + (CH - totalH) / 2;
@@ -591,12 +592,13 @@ async function renderBackLabelCanvas(
     ctx.fillText(conditionText, centerX, centerStartY + gradeFontSize + condGapBack);
   }
 
-  // ── RIGHT: Sub-scores (vertically centered as a block) ──
+  // ── RIGHT: Sub-scores (vertically centered, inset from cut line) ──
   if (data.subScores) {
-    const rightEdge = B + CW - padding;
-    const subFontSize = 22;
-    const lineHeight = subFontSize + 12;
-    const totalSubH = lineHeight * 4 - 12; // 4 lines, no gap after last
+    const cutLinePadding = 30; // extra inset so text doesn't crowd the cut line
+    const rightEdge = B + CW - padding - cutLinePadding;
+    const subFontSize = 26;   // +~18% from 22 for better readability
+    const lineHeight = subFontSize + 10;
+    const totalSubH = lineHeight * 4 - 10; // 4 lines, no gap after last
     const subStartY = B + (CH - totalSubH) / 2;
 
     const drawSubScore = (label: string, value: number, index: number) => {
@@ -641,15 +643,17 @@ function getMirroredLabelPosition(index: number) {
 
 /**
  * Draw cut guides (dotted lines + scissor icons).
- * The cut line sits exactly at the label edge.
+ * The cut line sits exactly at the label edge (2.8" x 0.8").
+ * Uses white lines for modern (dark) style, black for traditional (light).
  */
-function drawCutGuides(doc: jsPDF, labelX: number, labelY: number) {
+function drawCutGuides(doc: jsPDF, labelX: number, labelY: number, style: 'modern' | 'traditional' = 'traditional') {
   const cutX = labelX;
   const cutY = labelY;
-  const cutW = LABEL_WIDTH;
-  const cutH = LABEL_HEIGHT;
+  const cutW = LABEL_WIDTH;   // 2.8" = 201.6pt
+  const cutH = LABEL_HEIGHT;  // 0.8" = 57.6pt
 
-  doc.setDrawColor('#000000');
+  const guideColor = style === 'modern' ? '#ffffff' : '#000000';
+  doc.setDrawColor(guideColor);
   doc.setLineWidth(0.5);
   doc.setLineDashPattern([3, 3], 0);
   doc.rect(cutX, cutY, cutW, cutH, 'S');
@@ -657,7 +661,7 @@ function drawCutGuides(doc: jsPDF, labelX: number, labelY: number) {
 
   // Scissor icons just outside each corner
   doc.setFontSize(7);
-  doc.setTextColor('#000000');
+  doc.setTextColor(guideColor);
   doc.text('\u2702', cutX - 7, cutY + 3);
   doc.text('\u2702', cutX + cutW + 1, cutY + 3);
   doc.text('\u2702', cutX - 7, cutY + cutH + 3);
@@ -713,14 +717,14 @@ export async function generateSlabLabel(
   const frontImg = await renderFrontLabelCanvas(data, style);
   drawPageHeader(doc, 'front', 1, 1);
   placeLabelImage(doc, frontImg, singleX, singleY);
-  drawCutGuides(doc, singleX, singleY);
+  drawCutGuides(doc, singleX, singleY, style);
 
   // Page 2: Back label
   doc.addPage('letter', 'portrait');
   const backImg = await renderBackLabelCanvas(data, style);
   drawPageHeader(doc, 'back', 1, 1);
   placeLabelImage(doc, backImg, singleX, singleY);
-  drawCutGuides(doc, singleX, singleY);
+  drawCutGuides(doc, singleX, singleY, style);
 
   return doc.output('blob');
 }
@@ -764,7 +768,7 @@ export async function generateBatchSlabLabels(
       const gridIdx = i - startIdx;
       const { labelX, labelY } = getLabelPosition(gridIdx);
       placeLabelImage(doc, frontImages[i], labelX, labelY);
-      drawCutGuides(doc, labelX, labelY);
+      drawCutGuides(doc, labelX, labelY, style);
     }
 
     // Back side (new page, mirrored X)
@@ -774,7 +778,7 @@ export async function generateBatchSlabLabels(
       const gridIdx = i - startIdx;
       const { labelX, labelY } = getMirroredLabelPosition(gridIdx);
       placeLabelImage(doc, backImages[i], labelX, labelY);
-      drawCutGuides(doc, labelX, labelY);
+      drawCutGuides(doc, labelX, labelY, style);
     }
   }
 
