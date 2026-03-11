@@ -735,6 +735,11 @@ export async function generateBatchSlabLabels(
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
+  // Single label: use centered layout (symmetric — works with any duplex setting)
+  if (dataArray.length === 1) {
+    return generateSlabLabel(dataArray[0], style);
+  }
+
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
   // Pre-render all labels to canvas images
