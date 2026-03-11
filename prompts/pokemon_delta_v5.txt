@@ -602,9 +602,9 @@ D. POKEMON CARD DEFECT PATTERNS
 • Look for holo shimmer in border areas or text zones
 
 **Grading Impact:**
-• Minor bleed (small extension <1mm): -0.2 to -0.3
-• Moderate bleed (visible in multiple areas): -0.5 to -0.7
-• Heavy bleed (extensive, obvious): -1.0 or more
+• Minor bleed (small extension <1mm): -1
+• Moderate bleed (visible in multiple areas): -1 to -2
+• Heavy bleed (extensive, obvious): -2 or more
 
 ────────────────────────────────────────────────────────────────────────
 2. PRINT LINES ON HOLOFOIL CARDS
@@ -625,8 +625,8 @@ D. POKEMON CARD DEFECT PATTERNS
 • Scratch: Variable width, any direction, surface damage, handling wear
 
 **Grading Impact:**
-• Single print line: -0.3 to -0.5 (manufacturing defect)
-• Multiple print lines: -0.7 to -1.0
+• Single print line: -1 (manufacturing defect)
+• Multiple print lines: -1 to -2
 • Print lines do NOT trigger structural damage caps
 
 ────────────────────────────────────────────────────────────────────────
@@ -649,10 +649,10 @@ D. POKEMON CARD DEFECT PATTERNS
 • Edges (sliding in/out of binders)
 
 **Grading Impact:**
-• Single hairline holo scratch: -0.5 minimum (high-end card expectation)
-• Multiple holo scratches: -1.0 to -1.5
-• Deep holo scratches: -1.5 to -2.0
-• Prevents 10.0 surface score
+• Single hairline holo scratch: -1 minimum (high-end card expectation)
+• Multiple holo scratches: -1 to -2
+• Deep holo scratches: -2 to -3
+• Prevents 10 surface score
 
 ────────────────────────────────────────────────────────────────────────
 4. TEXTURE WEAR ON FULL ART CARDS
@@ -674,9 +674,9 @@ D. POKEMON CARD DEFECT PATTERNS
 • Compare texture across card surface
 
 **Grading Impact:**
-• Minor texture wear (small area <5mm²): -0.3 to -0.5
-• Moderate texture wear (visible area 5-15mm²): -0.7 to -1.0
-• Heavy texture wear (extensive, obvious): -1.5 or more
+• Minor texture wear (small area <5mm²): -1
+• Moderate texture wear (visible area 5-15mm²): -1 to -2
+• Heavy texture wear (extensive, obvious): -2 or more
 
 ────────────────────────────────────────────────────────────────────────
 5. WHITENING ON COLORED BORDERS
@@ -718,7 +718,7 @@ D. POKEMON CARD DEFECT PATTERNS
 • Look for scratches that interrupt holo effect
 
 **Grading Impact:**
-• Similar to regular holo scratches: -0.5 to -1.5 depending on severity
+• Similar to regular holo scratches: -1 to -2 depending on severity
 
 ────────────────────────────────────────────────────────────────────────
 7. VINTAGE POKEMON CARD ISSUES (WOTC Era 1999-2003)
@@ -737,8 +737,8 @@ D. POKEMON CARD DEFECT PATTERNS
 • Centering issues (factory variance)
 
 **Grading Expectations:**
-• 10.0 extremely rare for WOTC cards
-• 9.0-9.5 considered excellent condition for vintage
+• 10 extremely rare for WOTC cards
+• 8-9 considered excellent condition for vintage
 • Factory defects (print lines, slight centering issues) more tolerated
 
 ═══════════════════════════════════════════════════════════════════════
@@ -751,7 +751,7 @@ E. POKEMON CARD GRADING EXAMPLES
 CENTERING EXAMPLE (Pokemon Card with Yellow Border)
 ────────────────────────────────────────────────────────────────────────
 
-"This Pokemon card from the Sword & Shield era features the characteristic yellow border surrounding the artwork. Examining the front, I measure the visible borders: left border ≈ 3.2mm, right border ≈ 2.8mm, top border ≈ 3.0mm, bottom border ≈ 3.5mm. Calculating the left-right ratio: 2.8mm (narrower) ÷ 3.2mm (wider) × 100 = 87.5%, expressed as 87.5/12.5 ratio. For top-bottom: 3.0mm ÷ 3.5mm × 100 = 85.7%, expressed as 86/14 ratio. The worst axis is top-bottom at 86/14, which according to the centering caps table limits the maximum centering score to 4.0. The card shows visible off-centering with the artwork shifted toward the top edge."
+"This Pokemon card from the Sword & Shield era features the characteristic yellow border surrounding the artwork. Examining the front, I measure the visible borders: left border ≈ 3.2mm, right border ≈ 2.8mm, top border ≈ 3.0mm, bottom border ≈ 3.5mm. Calculating the left-right ratio: 2.8mm (narrower) ÷ 3.2mm (wider) × 100 = 87.5%, expressed as 87.5/12.5 ratio. For top-bottom: 3.0mm ÷ 3.5mm × 100 = 85.7%, expressed as 86/14 ratio. The worst axis is top-bottom at 86/14, which according to the centering caps table limits the maximum centering score to 4. The card shows visible off-centering with the artwork shifted toward the top edge."
 
 ────────────────────────────────────────────────────────────────────────
 CORNER EXAMPLE (Pokemon Holofoil Card)
@@ -765,14 +765,14 @@ EDGE EXAMPLE (Pokemon Card)
 ────────────────────────────────────────────────────────────────────────
 
 **Right Edge (Front):**
-"The right edge of this Pokemon card runs along the yellow border characteristic of the Sword & Shield era. Scanning the full length of this edge from top to bottom, I detect 2 small white flecks where the yellow border ink has chipped away to reveal white cardstock underneath. The first fleck is located approximately one-third down from the top-right corner and measures less than 0.1mm in length. The second fleck appears near the bottom-right corner, also measuring approximately 0.1mm. These white spots are highly visible against the yellow border, creating clear contrast. The factory cut quality along this edge appears clean and straight with no roughness detected. The presence of two minor white flecks results in an edge score of 9.5 for this edge."
+"The right edge of this Pokemon card runs along the yellow border characteristic of the Sword & Shield era. Scanning the full length of this edge from top to bottom, I detect 2 small white flecks where the yellow border ink has chipped away to reveal white cardstock underneath. The first fleck is located approximately one-third down from the top-right corner and measures less than 0.1mm in length. The second fleck appears near the bottom-right corner, also measuring approximately 0.1mm. These white spots are highly visible against the yellow border, creating clear contrast. The factory cut quality along this edge appears clean and straight with no roughness detected. The presence of two minor white flecks results in an edge score of 9 for this edge."
 
 ────────────────────────────────────────────────────────────────────────
 SURFACE EXAMPLE (Pokemon Holofoil Card)
 ────────────────────────────────────────────────────────────────────────
 
 **Front Surface:**
-"The front surface of this Pokemon holofoil rare card features a holographic pattern overlaying the Pokemon artwork in the center of the card, with a yellow border frame surrounding the holographic area. The card displays the traditional cosmos holographic pattern, creating a swirling rainbow effect when viewed at angles. Examining the holographic layer by tilting the card under good lighting, I detect one hairline scratch located in the upper portion of the Pokemon artwork area. This scratch runs diagonally for approximately 5mm and is visible as a break in the holographic rainbow pattern - when tilting the card, the scratch appears as a dull line where the cosmos holo effect is disrupted. The scratch does not penetrate through to the cardstock beneath; it affects only the holographic surface layer. Additionally, I observe one very faint horizontal print line running across the middle section of the card, approximately 8mm in length, visible in the solid background color area. This appears to be a manufacturing roller mark rather than handling damage. The yellow border areas show no surface defects, maintaining clean glossy finish. The combination of one holo scratch and one print line prevents a perfect 10.0 surface score, resulting in a 9.0 grade for the front surface."
+"The front surface of this Pokemon holofoil rare card features a holographic pattern overlaying the Pokemon artwork in the center of the card, with a yellow border frame surrounding the holographic area. The card displays the traditional cosmos holographic pattern, creating a swirling rainbow effect when viewed at angles. Examining the holographic layer by tilting the card under good lighting, I detect one hairline scratch located in the upper portion of the Pokemon artwork area. This scratch runs diagonally for approximately 5mm and is visible as a break in the holographic rainbow pattern - when tilting the card, the scratch appears as a dull line where the cosmos holo effect is disrupted. The scratch does not penetrate through to the cardstock beneath; it affects only the holographic surface layer. Additionally, I observe one very faint horizontal print line running across the middle section of the card, approximately 8mm in length, visible in the solid background color area. This appears to be a manufacturing roller mark rather than handling damage. The yellow border areas show no surface defects, maintaining clean glossy finish. The combination of one holo scratch and one print line prevents a perfect 10 surface score, resulting in a 9 grade for the front surface."
 
 ────────────────────────────────────────────────────────────────────────
 FULL ART VMAX EXAMPLE (Modern Textured Card)
@@ -785,8 +785,8 @@ Examining the textured surface under various lighting angles, I observe the text
 
 Additionally, I detect one very fine scratch in the upper-left area of the card, running for approximately 3mm. This scratch is visible when tilting the card and appears to affect the surface coating.
 
-For centering assessment on this borderless card, I use internal design anchors: the Pokemon's positioning and the card text elements. The Pokemon appears centered within the card frame with the text box positioned symmetrically. Estimating internal centering at approximately 55/45 left-right and 52/48 top-bottom, with left-right being the worst axis. Maximum centering score: 9.5 (borderless card).
+For centering assessment on this borderless card, I use internal design anchors: the Pokemon's positioning and the card text elements. The Pokemon appears centered within the card frame with the text box positioned symmetrically. Estimating internal centering at approximately 55/45 left-right and 52/48 top-bottom, with left-right being the worst axis. Maximum centering score: 9 (borderless card).
 
-The presence of minor texture wear and one fine scratch results in a surface score of 9.0 for the front."
+The presence of minor texture wear and one fine scratch results in a surface score of 9 for the front."
 
 --- END OF POKEMON DELTA v5.0 ---

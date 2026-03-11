@@ -11,6 +11,7 @@ import { getCardLabelData } from '@/lib/useLabelData'
 import { useToast } from '@/hooks/useToast'
 import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
+import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
 
 type Card = {
@@ -388,8 +389,11 @@ function CollectionPageContent() {
   const [isFounder, setIsFounder] = useState(false)
   const [isVip, setIsVip] = useState(false)
   const [isCardLover, setIsCardLover] = useState(false)
+  const [selectedEmblems, setSelectedEmblems] = useState<string[]>([])
+  const [emblemsLoaded, setEmblemsLoaded] = useState(false)
   const [isBatchLabelModalOpen, setIsBatchLabelModalOpen] = useState(false)
   const [isBatch8167ModalOpen, setIsBatch8167ModalOpen] = useState(false)
+  const [isBatchSlabLabelModalOpen, setIsBatchSlabLabelModalOpen] = useState(false)
   const [showLabelTypeSelector, setShowLabelTypeSelector] = useState(false)
   const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
@@ -425,40 +429,33 @@ function CollectionPageContent() {
     const session = getStoredSession()
     if (!session?.access_token) return
 
-    fetch('/api/founders/status', {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`
-      }
-    })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.isFounder) {
-          setIsFounder(true)
-        }
-        if (data?.isVip) {
-          setIsVip(true)
-        }
-      })
-      .catch(err => console.error('Error checking founder/VIP status:', err))
-  }, [])
+    // Fetch status and emblem preference in parallel
+    Promise.all([
+      fetch('/api/founders/status', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      }).then(res => res.ok ? res.json() : null),
+      fetch('/api/user/label-emblem-preference', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` }
+      }).then(res => res.ok ? res.json() : null),
+    ])
+      .then(([statusData, emblemData]) => {
+        if (statusData?.isFounder) setIsFounder(true)
+        if (statusData?.isVip) setIsVip(true)
+        if (statusData?.isCardLover) setIsCardLover(true)
 
-  // Check Card Lovers subscription status
-  useEffect(() => {
-    const session = getStoredSession()
-    if (!session?.access_token) return
-
-    fetch('/api/subscription/status', {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`
-      }
-    })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.isActive) {
-          setIsCardLover(true)
+        if (emblemData) {
+          // Also use emblem API as fallback for status flags
+          if (emblemData.isFounder) setIsFounder(true)
+          if (emblemData.isVip) setIsVip(true)
+          if (emblemData.isCardLover) setIsCardLover(true)
+          setSelectedEmblems(emblemData.selectedEmblems || [])
         }
+        setEmblemsLoaded(true)
       })
-      .catch(err => console.error('Error checking Card Lovers status:', err))
+      .catch(err => {
+        console.error('Error checking status/emblem preference:', err)
+        setEmblemsLoaded(true)
+      })
   }, [])
 
   // Multi-select handlers
@@ -1933,6 +1930,16 @@ function CollectionPageContent() {
                                       <div className="font-medium text-gray-800 text-sm">Toploader Labels</div>
                                       <div className="text-xs text-gray-500">Avery 8167 - 1.75" × 0.5"</div>
                                     </button>
+                                    <button
+                                      onClick={() => {
+                                        setShowLabelTypeSelector(false);
+                                        setIsBatchSlabLabelModalOpen(true);
+                                      }}
+                                      className="w-full text-left px-3 py-2 rounded-md hover:bg-purple-50 transition-colors"
+                                    >
+                                      <div className="font-medium text-gray-800 text-sm">Graded Slab Labels</div>
+                                      <div className="text-xs text-gray-500">2.8" × 0.8" — Duplex PDF with cut guides</div>
+                                    </button>
                                   </div>
                                 </div>
                               </>
@@ -2388,6 +2395,21 @@ function CollectionPageContent() {
           front_image_url: c.front_url || undefined
         }))}
         cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
+      />
+
+      {/* Batch Slab Insert Label Modal */}
+      <BatchSlabLabelModal
+        isOpen={isBatchSlabLabelModalOpen}
+        onClose={() => setIsBatchSlabLabelModalOpen(false)}
+        selectedCards={cards.filter(c => selectedCardIds.has(c.id)).map(c => ({
+          ...c,
+          front_image_url: c.front_url || undefined
+        }))}
+        cardType={selectedCategory === 'Pokemon' ? 'pokemon' : selectedCategory === 'MTG' ? 'mtg' : selectedCategory === 'Lorcana' ? 'lorcana' : selectedCategory === 'Sports' || ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'].includes(selectedCategory) ? 'sports' : 'card'}
+        labelStyle={labelStyle}
+        showFounderEmblem={isFounder && (!emblemsLoaded || selectedEmblems.length === 0 || selectedEmblems.includes('founder'))}
+        showVipEmblem={isVip && (!emblemsLoaded || selectedEmblems.length === 0 || selectedEmblems.includes('vip'))}
+        showCardLoversEmblem={isCardLover && (!emblemsLoaded || selectedEmblems.length === 0 || selectedEmblems.includes('card_lover'))}
       />
 
       {/* Batch Download Modal */}

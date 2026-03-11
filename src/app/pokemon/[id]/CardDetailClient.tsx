@@ -44,6 +44,7 @@ import { UserConditionReportInput } from '@/types/conditionReport';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
+import { EditCardLabelModal } from '@/components/EditCardLabelModal';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { DefectOverlay } from '@/components/grading/DefectOverlay';
@@ -1450,6 +1451,8 @@ export function PokemonCardDetails() {
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  // ✏️ Edit card label modal
+  const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   // 💰 DCM Pricing callout state (from PriceCharting API)
   const [dcmPriceData, setDcmPriceData] = useState<{
     estimatedValue: number | null;
@@ -2796,6 +2799,23 @@ export function PokemonCardDetails() {
               </div>
               </div>
               <p className="text-xs text-white/80 mt-1 text-center">Click to zoom</p>
+              {/* Edit Card Label — owner only */}
+              {(() => {
+                const session = getStoredSession();
+                const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                if (!isOwner) return null;
+                return (
+                  <button
+                    onClick={() => setShowEditLabelModal(true)}
+                    className="mt-1 text-xs text-purple-300 hover:text-purple-100 transition-colors flex items-center justify-center gap-1 w-full"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Card Label
+                  </button>
+                );
+              })()}
             </div>
 
             {/* Back Card with Label - Metallic Slab */}
@@ -2875,7 +2895,7 @@ export function PokemonCardDetails() {
                               fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                               fontWeight: 600,
                               fontSize: '8px',
-                              color: '#FFFFFF',
+                              color: '#f43f5e',
                               writingMode: 'vertical-rl',
                               transform: 'rotate(180deg)',
                               marginTop: '3px',
@@ -6756,6 +6776,31 @@ export function PokemonCardDetails() {
         balance={balance}
         isFirstPurchase={isFirstPurchase}
       />
+
+      {/* Edit Card Label Modal */}
+      {card && (
+        <EditCardLabelModal
+          isOpen={showEditLabelModal}
+          onClose={() => setShowEditLabelModal(false)}
+          cardId={card.id}
+          labelData={labelData}
+          hasCustomLabel={!!card.custom_label_data}
+          onSaved={async () => {
+            // Refetch card data to pick up custom label changes
+            try {
+              const session = getStoredSession();
+              const userParam = session?.user?.id ? `&user_id=${session.user.id}` : '';
+              const res = await fetch(`/api/pokemon/${card.id}?t=${Date.now()}${userParam}`);
+              if (res.ok) {
+                const data = await res.json();
+                setCard(data);
+              }
+            } catch (e) {
+              console.error('Failed to refresh card after label edit:', e);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

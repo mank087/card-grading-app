@@ -15,10 +15,13 @@ import {
 } from '../../lib/foldableLabelGenerator';
 import { generateMiniReportJpg } from '../../lib/miniReportJpgGenerator';
 import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGenerator';
-import { generateToploaderLabelPair, CalibrationOffsets as CalibrationOffsets8167 } from '../../lib/avery8167LabelGenerator';
+import { generateToploaderLabelPair, generateFoldOverLabel8167, CalibrationOffsets as CalibrationOffsets8167 } from '../../lib/avery8167LabelGenerator';
 import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator';
+import { downloadSlabLabel, SlabLabelData } from '../../lib/slabLabelGenerator';
+import { loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 import { Avery8167LabelModal } from './Avery8167LabelModal';
+import { FoldOverLabelModal } from './FoldOverLabelModal';
 import { getCardLabelData } from '../../lib/useLabelData';
 import { extractAsciiSafe } from '../../lib/labelDataGenerator';
 
@@ -48,11 +51,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   labelStyle = 'modern'
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
-  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'mini-jpg' | 'card-images' | null>(null);
+  const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'foldover' | 'mini-jpg' | 'card-images' | null>(null);
   const [isLabelsDropdownOpen, setIsLabelsDropdownOpen] = React.useState(false);
   const [isReportsDropdownOpen, setIsReportsDropdownOpen] = React.useState(false);
   const [isAveryModalOpen, setIsAveryModalOpen] = React.useState(false);
   const [isAvery8167ModalOpen, setIsAvery8167ModalOpen] = React.useState(false);
+  const [isFoldOverModalOpen, setIsFoldOverModalOpen] = React.useState(false);
   const labelsDropdownRef = React.useRef<HTMLDivElement>(null);
   const reportsDropdownRef = React.useRef<HTMLDivElement>(null);
 
@@ -1024,13 +1028,127 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     }
   };
 
+  /**
+   * Handle opening the Fold-Over label position selector modal
+   */
+  const handleOpenFoldOverModal = () => {
+    setIsLabelsDropdownOpen(false);
+    setIsFoldOverModalOpen(true);
+  };
+
+  /**
+   * Handle Fold-Over Toploader Label generation (single label per card)
+   */
+  const handleDownloadFoldOverLabel = async (positionIndex: number, offsets: CalibrationOffsets8167) => {
+    try {
+      setIsGenerating(true);
+      setGeneratingType('foldover');
+
+      const cleanLabelData = getCardLabelData(card);
+      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+
+      const blob = await generateFoldOverLabel8167(
+        {
+          grade: cleanLabelData.grade ?? 0,
+          conditionLabel: cleanLabelData.condition,
+          qrCodeUrl: cardUrl,
+          cardName: cleanLabelData.primaryName,
+        },
+        positionIndex,
+        offsets
+      );
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+
+      const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+      const cardNameClean = sanitize(cleanLabelData.primaryName);
+      const serialClean = sanitize(cleanLabelData.serial);
+
+      link.download = `DCM-FoldOver-Label-${cardNameClean}-${serialClean}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      setIsFoldOverModalOpen(false);
+    } catch (error) {
+      console.error('[FOLD-OVER] Error generating label:', error);
+      alert('Failed to generate fold-over label. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+      setGeneratingType(null);
+    }
+  };
+
+  /**
+   * Handle Slab Insert Label PDF generation (duplex front/back)
+   */
+  const handleDownloadSlabLabel = async () => {
+    try {
+      setIsGenerating(true);
+      setGeneratingType('label');
+      setIsLabelsDropdownOpen(false);
+
+      console.log('[SLAB LABEL] Starting generation...');
+
+      const cleanLabelData = getCardLabelData(card);
+      const weightedScores = card.conversational_weighted_sub_scores || {};
+      const subScores = card.conversational_sub_scores || {};
+      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
+
+      const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
+        generateQRCodePlain(cardUrl),
+        loadLogoAsBase64().catch(() => undefined),
+        loadWhiteLogoAsBase64().catch(() => undefined),
+      ]);
+
+      const slabData: SlabLabelData = {
+        primaryName: cleanLabelData.primaryName,
+        contextLine: cleanLabelData.contextLine,
+        features: cleanLabelData.features,
+        featuresLine: cleanLabelData.featuresLine,
+        serial: cleanLabelData.serial,
+        grade: cleanLabelData.grade,
+        gradeFormatted: cleanLabelData.gradeFormatted,
+        condition: cleanLabelData.condition,
+        isAlteredAuthentic: cleanLabelData.isAlteredAuthentic,
+        englishName,
+        qrCodeDataUrl,
+        subScores: {
+          centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
+          corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
+          edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
+          surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
+        },
+        showFounderEmblem,
+        showVipEmblem,
+        showCardLoversEmblem,
+        logoDataUrl,
+        whiteLogoDataUrl,
+      };
+
+      await downloadSlabLabel(slabData, labelStyle);
+
+      console.log('[SLAB LABEL] ✅ PDF generated successfully');
+    } catch (error) {
+      console.error('[SLAB LABEL] ❌ Error generating slab label:', error);
+      alert('Failed to generate slab label. Please try again or contact support if the issue persists.');
+    } finally {
+      setIsGenerating(false);
+      setGeneratingType(null);
+    }
+  };
+
   // Labels dropdown menu items (card images and printable labels for slabs/toploaders)
   const labelsMenuItems = [
     {
-      id: 'card-images',
-      label: 'Card Images with Grade Label (Front & Back)',
-      description: 'Images for Online Marketplaces and Social Media Sharing',
-      onClick: handleDownloadCardImages,
+      id: 'slab-insert',
+      label: 'Label for Graded Slab',
+      description: '2.8" × 0.8" — Duplex PDF with cut guides',
+      onClick: handleDownloadSlabLabel,
     },
     {
       id: 'avery',
@@ -1043,6 +1161,18 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       label: 'Label for Toploader',
       description: 'Avery 8167 (1.75" × 0.5")',
       onClick: handleOpenAvery8167Modal,
+    },
+    {
+      id: 'foldover',
+      label: 'Fold-Over Label for Toploader',
+      description: 'Avery 8167 — Grade on front, QR on back',
+      onClick: handleOpenFoldOverModal,
+    },
+    {
+      id: 'card-images',
+      label: 'Card Images for Grade Label (Front & Back)',
+      description: 'Images for Online Marketplaces and Social Media Sharing',
+      onClick: handleDownloadCardImages,
     },
   ];
 
@@ -1076,11 +1206,11 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         <div className="relative" ref={labelsDropdownRef}>
           <button
             onClick={() => setIsLabelsDropdownOpen(!isLabelsDropdownOpen)}
-            disabled={isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167')}
+            disabled={isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167' || generatingType === 'foldover')}
             className="flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors shadow-sm text-sm font-medium"
             title="Download Labels"
           >
-            {isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167') ? (
+            {isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167' || generatingType === 'foldover') ? (
               <span>Generating...</span>
             ) : (
               <>
@@ -1171,6 +1301,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           onConfirm={handleDownloadAvery8167Label}
           isGenerating={isGenerating && generatingType === 'avery8167'}
         />
+
+        {/* Fold-Over Toploader Label Modal */}
+        <FoldOverLabelModal
+          isOpen={isFoldOverModalOpen}
+          onClose={() => setIsFoldOverModalOpen(false)}
+          onConfirm={handleDownloadFoldOverLabel}
+          isGenerating={isGenerating && generatingType === 'foldover'}
+        />
       </div>
     );
   }
@@ -1182,12 +1320,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       <div className="relative" ref={labelsDropdownRef}>
         <button
           onClick={() => setIsLabelsDropdownOpen(!isLabelsDropdownOpen)}
-          disabled={isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167')}
+          disabled={isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167' || generatingType === 'foldover')}
           className="flex items-center justify-center gap-3 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow-lg font-semibold text-base"
           title="Download Labels"
         >
-          {isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167') ? (
-            <span>{generatingType === 'avery' ? 'Generating Label...' : generatingType === 'avery8167' ? 'Generating Labels...' : 'Generating Images...'}</span>
+          {isGenerating && (generatingType === 'card-images' || generatingType === 'avery' || generatingType === 'avery8167' || generatingType === 'foldover') ? (
+            <span>{generatingType === 'avery' ? 'Generating Label...' : generatingType === 'avery8167' ? 'Generating Labels...' : generatingType === 'foldover' ? 'Generating Label...' : 'Generating Images...'}</span>
           ) : (
             <>
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1276,6 +1414,14 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         onClose={() => setIsAvery8167ModalOpen(false)}
         onConfirm={handleDownloadAvery8167Label}
         isGenerating={isGenerating && generatingType === 'avery8167'}
+      />
+
+      {/* Fold-Over Toploader Label Modal */}
+      <FoldOverLabelModal
+        isOpen={isFoldOverModalOpen}
+        onClose={() => setIsFoldOverModalOpen(false)}
+        onConfirm={handleDownloadFoldOverLabel}
+        isGenerating={isGenerating && generatingType === 'foldover'}
       />
     </div>
   );

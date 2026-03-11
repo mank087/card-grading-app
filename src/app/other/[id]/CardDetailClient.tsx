@@ -40,6 +40,8 @@ import { getCardLabelData } from '@/lib/useLabelData';
 import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal';
 import { OnboardingTour } from '@/components/onboarding/OnboardingTour';
 import { LowCreditsBottomBanner } from '@/components/conversion/LowCreditsBottomBanner';
+import { EditCardLabelModal } from '@/components/EditCardLabelModal';
+import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { ModernFrontLabel } from '@/components/labels/ModernFrontLabel';
 import { ModernBackLabel } from '@/components/labels/ModernBackLabel';
 import { EbayListingButton } from '@/components/ebay';
@@ -1424,6 +1426,7 @@ export function OtherCardDetails() {
   const [parsingError, setParsingError] = useState<string | null>(null);
   // 📦 Parsed defects state
   const [conversationalDefects, setConversationalDefects] = useState<CardDefects | null>(null);
+  const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   // 🔄 Re-grading state - stores image URL for loading screen
   const [regradingImageUrl, setRegradingImageUrl] = useState<string | null>(null);
   const [showRegradeConfirm, setShowRegradeConfirm] = useState(false);
@@ -2791,6 +2794,23 @@ export function OtherCardDetails() {
               </div>
               </div>
               <p className="text-xs text-white/80 mt-1 text-center">Click to zoom</p>
+              {/* Edit Card Label — owner only */}
+              {(() => {
+                const session = getStoredSession();
+                const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                if (!isOwner) return null;
+                return (
+                  <button
+                    onClick={() => setShowEditLabelModal(true)}
+                    className="mt-1 text-xs text-purple-300 hover:text-purple-100 transition-colors flex items-center justify-center gap-1 w-full"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Card Label
+                  </button>
+                );
+              })()}
             </div>
 
             {/* Back Card with Label - Metallic Slab */}
@@ -2870,7 +2890,7 @@ export function OtherCardDetails() {
                               fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                               fontWeight: 600,
                               fontSize: '8px',
-                              color: '#FFFFFF',
+                              color: '#f43f5e',
                               writingMode: 'vertical-rl',
                               transform: 'rotate(180deg)',
                               marginTop: '3px',
@@ -3461,6 +3481,23 @@ export function OtherCardDetails() {
                   <h3 className="text-xl font-bold text-gray-800">
                     Card Information
                   </h3>
+                  {(() => {
+                    const session = getStoredSession();
+                    const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                    if (!isOwner) return null;
+                    return (
+                      <div id="tour-edit-details">
+                      <EditCardDetailsButton
+                        card={card}
+                        currentUserId={session?.user?.id}
+                        onEditComplete={(updatedCard) => {
+                          window.location.reload();
+                        }}
+                        variant="icon-only"
+                      />
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -6379,6 +6416,29 @@ export function OtherCardDetails() {
         balance={balance}
         isFirstPurchase={isFirstPurchase}
       />
+      {/* Edit Card Label Modal */}
+      {card && (
+        <EditCardLabelModal
+          isOpen={showEditLabelModal}
+          onClose={() => setShowEditLabelModal(false)}
+          cardId={card.id}
+          labelData={labelData}
+          hasCustomLabel={!!card.custom_label_data}
+          onSaved={async () => {
+            try {
+              const session = getStoredSession();
+              const userParam = session?.user?.id ? `&user_id=${session.user.id}` : '';
+              const res = await fetch(`/api/other/${card.id}?t=${Date.now()}${userParam}`);
+              if (res.ok) {
+                const data = await res.json();
+                setCard(data);
+              }
+            } catch (e) {
+              console.error('Failed to refresh card after label edit:', e);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

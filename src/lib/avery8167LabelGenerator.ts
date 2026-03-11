@@ -786,3 +786,335 @@ export async function generateToploaderLabelSheetMultiPage(
 export function getAvery8167CardsPerPage(): number {
   return 40; // 20 rows × 2 card pairs per row
 }
+
+// ============================================================================
+// FOLD-OVER LABEL VARIANT
+// ============================================================================
+//
+// A single label that folds over the top edge of a toploader.
+// Left half: Grade + Condition (rotated 90° CW) — becomes the front when folded
+// Right half: QR code (rotated 90° CCW) — becomes the back when folded
+// Center: subtle dotted fold line
+//
+// Each card uses ONE label position (not a front+back pair),
+// so 80 cards fit per sheet instead of 40.
+
+/**
+ * Draw the fold-over label at the given position.
+ *
+ * Layout (flat, before folding):
+ * ┌────────────┬────────────┐
+ * │  GRADE 9   │   [QR]     │  ← 1.75" × 0.5"
+ * │  GEM MINT  │            │
+ * │ (rotated   │  (rotated  │
+ * │   90° CW)  │   90° CCW) │
+ * └────────────┴────────────┘
+ *              ↑ fold line
+ *
+ * When folded over toploader top:
+ * - Front shows grade/condition upright
+ * - Back shows QR code upright
+ */
+/**
+ * Load a base64 image into an HTMLImageElement, waiting for it to fully decode.
+ * Returns null if loading fails or if not in a browser environment.
+ */
+function loadImageAsync(base64: string): Promise<HTMLImageElement | null> {
+  if (typeof document === 'undefined') return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = base64;
+  });
+}
+
+/**
+ * Draw the fold-over label at the given position.
+ *
+ * Dimensions reminder (all in points, 1 inch = 72pt):
+ *   Label:   126pt × 36pt  (1.75" × 0.5")
+ *   Each half: 63pt × 36pt (0.875" × 0.5")
+ *
+ * Text is rotated 90° CW (angle: -90 in jsPDF).
+ * With 90° CW rotation the font size maps to the HORIZONTAL extent
+ * and the text width maps to the VERTICAL extent.
+ * So everything must fit within 36pt horizontally and 63pt vertically.
+ */
+async function drawFoldOverLabel(
+  doc: jsPDF,
+  x: number,
+  y: number,
+  data: ToploaderLabelData,
+  qrCodeBase64: string,
+  logoBase64?: string
+): Promise<void> {
+  const labelW = LABEL_WIDTH;   // 126pt
+  const labelH = LABEL_HEIGHT;  // 36pt
+  const halfW = labelW / 2;     // 63pt
+  const pad = 3;                // padding from label edges
+
+  // White background
+  doc.setFillColor(COLORS.white);
+  doc.roundedRect(x, y, labelW, labelH, CORNER_RADIUS, CORNER_RADIUS, 'F');
+
+  // ── LEFT HALF: DCM logo watermark + Grade + Condition (rotated 90° CW) ──
+
+  const gradeText = formatGradeDisplay(data.grade);
+  const conditionText = data.conditionLabel.toUpperCase();
+
+  // DCM logo watermark grid on BOTH halves (20% opacity).
+  // Left half: logos rotated 90° CW (upright when folded onto front).
+  // Right half: logos rotated 90° CCW (upright when folded onto back).
+  if (logoBase64) {
+    try {
+      const logoImg = await loadImageAsync(logoBase64);
+      let leftTile = logoBase64;
+      let rightTile = logoBase64;
+
+      if (logoImg) {
+        const lcSize = 100;
+
+        // Left half tile: 90° CW
+        const lcCW = document.createElement('canvas');
+        lcCW.width = lcSize; lcCW.height = lcSize;
+        const ctxCW = lcCW.getContext('2d')!;
+        ctxCW.translate(lcSize, 0);
+        ctxCW.rotate(Math.PI / 2);
+        ctxCW.drawImage(logoImg, 0, 0, lcSize, lcSize);
+        leftTile = lcCW.toDataURL('image/png');
+
+        // Right half tile: 90° CCW (180° from left tile)
+        const lcCCW = document.createElement('canvas');
+        lcCCW.width = lcSize; lcCCW.height = lcSize;
+        const ctxCCW = lcCCW.getContext('2d')!;
+        ctxCCW.translate(0, lcSize);
+        ctxCCW.rotate(-Math.PI / 2);
+        ctxCCW.drawImage(logoImg, 0, 0, lcSize, lcSize);
+        rightTile = lcCCW.toDataURL('image/png');
+      }
+
+      doc.saveGraphicsState();
+      const gState = new GState({ opacity: 0.20 });
+      doc.setGState(gState);
+
+      const wmSize = 9;
+      const wmSpacing = 12;
+      const foldLineX = x + halfW;
+
+      // Left half: 90° CW logos
+      for (let wx = x + 2; wx + wmSize <= foldLineX - 1; wx += wmSpacing) {
+        for (let wy = y + 1.5; wy + wmSize <= y + labelH; wy += wmSpacing) {
+          doc.addImage(leftTile, 'PNG', wx, wy, wmSize, wmSize);
+        }
+      }
+
+      // Right half: 90° CCW logos
+      for (let wx = foldLineX + 2; wx + wmSize <= x + labelW - 2; wx += wmSpacing) {
+        for (let wy = y + 1.5; wy + wmSize <= y + labelH; wy += wmSpacing) {
+          doc.addImage(rightTile, 'PNG', wx, wy, wmSize, wmSize);
+        }
+      }
+
+      doc.restoreGraphicsState();
+    } catch (e) {
+      console.warn('Failed to draw fold-over watermark:', e);
+    }
+  }
+
+  // Render grade + condition as a pre-rotated canvas image.
+  // This avoids jsPDF text rotation quirks and gives pixel-perfect control.
+  //
+  // The canvas is drawn in the UPRIGHT orientation (as it should appear on
+  // the toploader front after folding), then rotated 90° CW before placing
+  // on the PDF label.
+  //
+  // Upright layout (what the user sees on the toploader front):
+  //   ┌──────────┐
+  //   │    9     │  ← grade, large
+  //   │ NEAR MINT│  ← condition, smaller
+  //   └──────────┘
+  //
+  // This upright canvas is rotated 90° CW to fit the landscape label half.
+
+  if (typeof document !== 'undefined') {
+    // Render grade + condition on a canvas in UPRIGHT orientation
+    // (as the user will see it on the toploader front after folding),
+    // then rotate 90° CW to fit the landscape label half.
+    //
+    // Upright dimensions (portrait):
+    //   width  = labelH (36pt) — the narrow top-edge of the toploader
+    //   height = halfW  (63pt) — how far down the label extends
+    //
+    // After 90° CW rotation the canvas becomes landscape (63pt × 36pt)
+    // and maps exactly to the left half of the label.
+
+    const scale = 6; // render scale for crisp print
+    const uprightW = Math.round(labelH * scale);  // 36 * 6 = 216px
+    const uprightH = Math.round(halfW * scale);    // 63 * 6 = 378px
+
+    const tc = document.createElement('canvas');
+    tc.width = uprightW;
+    tc.height = uprightH;
+    const tctx = tc.getContext('2d')!;
+    tctx.clearRect(0, 0, uprightW, uprightH);
+
+    // ── Grade number — large, centered in upper portion ──
+    const gradePx = Math.round(18 * scale); // 18pt equiv → fills ~50% of the narrow width
+    tctx.font = `bold ${gradePx}px Helvetica, Arial, sans-serif`;
+    tctx.fillStyle = COLORS.purplePrimary;
+    tctx.textAlign = 'center';
+    tctx.textBaseline = 'middle';
+    tctx.fillText(gradeText, uprightW / 2, uprightH * 0.36);
+
+    // ── Condition label — smaller, centered in lower portion ──
+    let condPx = Math.round(7 * scale); // 7pt equiv
+    tctx.font = `bold ${condPx}px Helvetica, Arial, sans-serif`;
+    // Auto-shrink if text wider than canvas (with padding)
+    const maxCondW = uprightW - Math.round(4 * scale);
+    let condMeasured = tctx.measureText(conditionText).width;
+    if (condMeasured > maxCondW) {
+      condPx = Math.round(condPx * (maxCondW / condMeasured));
+      tctx.font = `bold ${condPx}px Helvetica, Arial, sans-serif`;
+    }
+    tctx.fillStyle = COLORS.purplePrimary;
+    tctx.textAlign = 'center';
+    tctx.textBaseline = 'middle';
+    tctx.fillText(conditionText, uprightW / 2, uprightH * 0.62);
+
+    // ── Rotate 90° CW → landscape for the label ──
+    const rotCanvas = document.createElement('canvas');
+    rotCanvas.width = uprightH;   // 378 → maps to halfW (63pt)
+    rotCanvas.height = uprightW;  // 216 → maps to labelH (36pt)
+    const rctx = rotCanvas.getContext('2d')!;
+    rctx.translate(rotCanvas.width, 0);
+    rctx.rotate(Math.PI / 2); // 90° CW
+    rctx.drawImage(tc, 0, 0);
+
+    const textImageData = rotCanvas.toDataURL('image/png');
+    doc.addImage(textImageData, 'PNG', x, y, halfW, labelH);
+  }
+
+  // ── CENTER: Purple solid fold line ──
+  const foldX = x + halfW;
+  doc.setDrawColor(COLORS.purplePrimary);
+  doc.setLineWidth(1.5);
+  doc.setLineDashPattern([], 0);
+  doc.line(foldX, y, foldX, y + labelH);
+
+  // ── RIGHT HALF: QR code (rotated 90° CCW) ──
+  // When folded over the toploader top, the right half flips onto the back.
+  // We rotate the QR 90° CCW so it appears upright when viewed from the back
+  // with the toploader in portrait orientation.
+
+  const rightCenterX = x + halfW + halfW / 2;
+  const rightCenterY = y + labelH / 2;
+
+  // QR size: constrained by label height (36pt) minus padding
+  const qrSize = labelH - 2 * pad; // 30pt ≈ 0.42"
+
+  // Rotate the QR image 90° CCW using a canvas (must await image load)
+  const img = await loadImageAsync(qrCodeBase64);
+  if (img) {
+    try {
+      const canvas = document.createElement('canvas');
+      const res = 200;
+      canvas.width = res;
+      canvas.height = res;
+      const ctx = canvas.getContext('2d')!;
+      // Rotate 90° CCW: translate to bottom-left corner, then rotate
+      ctx.translate(0, res);
+      ctx.rotate(-Math.PI / 2);
+      ctx.drawImage(img, 0, 0, res, res);
+      const rotatedQR = canvas.toDataURL('image/png');
+
+      doc.addImage(
+        rotatedQR, 'PNG',
+        rightCenterX - qrSize / 2,
+        rightCenterY - qrSize / 2,
+        qrSize, qrSize
+      );
+    } catch {
+      // Canvas rotation failed — place QR unrotated (still scannable)
+      doc.addImage(
+        qrCodeBase64, 'PNG',
+        rightCenterX - qrSize / 2,
+        rightCenterY - qrSize / 2,
+        qrSize, qrSize
+      );
+    }
+  } else {
+    // No browser Image support (SSR) or load failed — place unrotated
+    doc.addImage(
+      qrCodeBase64, 'PNG',
+      rightCenterX - qrSize / 2,
+      rightCenterY - qrSize / 2,
+      qrSize, qrSize
+    );
+  }
+}
+
+/**
+ * Generate a fold-over label at a specified position on an Avery 8167 sheet.
+ * Each card uses 1 label (not 2), so 80 cards per sheet.
+ */
+export async function generateFoldOverLabel8167(
+  data: ToploaderLabelData,
+  positionIndex: number,
+  offsets?: CalibrationOffsets
+): Promise<Blob> {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+
+  const position = indexToPosition8167(positionIndex);
+  const { x, y } = getLabelPosition(position, offsets);
+
+  const [qrCodeBase64, logoBase64] = await Promise.all([
+    generateQRCodeBase64(data.qrCodeUrl, 200),
+    loadLogoAsBase64().catch(() => ''),
+  ]);
+
+  await drawFoldOverLabel(doc, x, y, data, qrCodeBase64, logoBase64);
+
+  return doc.output('blob');
+}
+
+/**
+ * Generate a full sheet of fold-over labels (up to 80 per page, auto-paginates).
+ */
+export async function generateFoldOverLabelSheet(
+  cardsData: ToploaderLabelData[],
+  offsets?: CalibrationOffsets,
+  startPosition: number = 0
+): Promise<Blob> {
+  if (cardsData.length === 0) throw new Error('No cards to generate labels for');
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+
+  const logoBase64 = await loadLogoAsBase64().catch(() => '');
+
+  for (let i = 0; i < cardsData.length; i++) {
+    const globalIndex = startPosition + i;
+    const pageIndex = Math.floor(globalIndex / TOTAL_LABELS);
+    const posOnPage = globalIndex % TOTAL_LABELS;
+
+    if (posOnPage === 0 && pageIndex > 0) {
+      doc.addPage();
+    }
+
+    const position = indexToPosition8167(posOnPage);
+    const { x, y } = getLabelPosition(position, offsets);
+
+    const qrCodeBase64 = await generateQRCodeBase64(cardsData[i].qrCodeUrl, 200);
+    await drawFoldOverLabel(doc, x, y, cardsData[i], qrCodeBase64, logoBase64);
+  }
+
+  return doc.output('blob');
+}
+
+/**
+ * Get the number of cards that fit per page for fold-over labels.
+ * Each card uses 1 label (not a pair), so all 80 positions are available.
+ */
+export function getFoldOverCardsPerPage(): number {
+  return TOTAL_LABELS; // 80
+}

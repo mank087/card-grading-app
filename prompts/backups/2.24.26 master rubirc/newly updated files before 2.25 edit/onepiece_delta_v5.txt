@@ -1,0 +1,456 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: ONE PIECE TCG v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY One Piece TCG card-specific rules.
+The master grading rubric (Sections 1-13) applies to ALL One Piece cards.
+This delta provides card-specific extraction rules, defect patterns, and examples.
+
+**CARD TYPES COVERED:**
+One Piece Trading Card Game from all sets (OP-01 Romance Dawn 2022 - present)
+
+═══════════════════════════════════════════════════════════════════════
+A. ONE PIECE CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from One Piece TCG cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All One Piece Cards)
+────────────────────────────────────────────────────────────────────────
+
+**player_or_character**: Character name
+• One Piece character name from the manga/anime
+• Example: "Monkey D. Luffy", "Roronoa Zoro", "Nami", "Trafalgar Law", "Shanks"
+• Use full character name as printed on card
+
+**card_name**: Full card title
+• Character name as printed, may include version/subtitle
+• Example: "Monkey D. Luffy", "Roronoa Zoro", "Shanks"
+• Some cards have same character with different versions in different sets
+
+**card_id**: Card set identifier
+🚨 **CRITICAL - EXACT OCR REQUIRED**:
+• READ THE ACTUAL PRINTED NUMBER ON THE CARD - DO NOT INFER OR CORRECT
+• Transcribe EXACTLY what is printed, character-by-character
+• Format: "OPXX-XXX" (e.g., "OP01-001", "OP03-122", "ST01-001")
+• Located at bottom of card
+• DO NOT "fix" numbers based on your knowledge of set sizes
+• If partially obscured, report what IS visible with uncertainty note
+
+**card_number**: Collector number (same as card_id for One Piece)
+• Same format as card_id: "OP01-001", "ST01-012", etc.
+
+**card_color**: Card color (CRITICAL for One Piece TCG)
+• Options: Red, Blue, Green, Purple, Black, Yellow
+• Multi-color cards exist (e.g., "Red/Green", "Blue/Purple")
+• Determined by card frame/border color
+• Red = aggressive/attack focused
+• Blue = control/draw focused
+• Green = ramp/DON!! focused
+• Purple = discard/trash focused
+• Black = defensive/blocker focused
+• Yellow = life manipulation focused
+
+**op_card_type**: Card type
+• Options: Leader, Character, Event, Stage
+• Leader = deck commander, has Life value, unique gameplay rules
+• Character = main card type, has Power and optional Counter
+• Event = one-time effect cards
+• Stage = permanent field effects
+
+**rarity**: Rarity level
+• L = Leader (deck leader cards)
+• C = Common
+• UC = Uncommon
+• R = Rare
+• SR = Super Rare (holographic)
+• SEC = Secret Rare (premium holographic)
+• SP = Special/Promo
+• P = Promo
+
+**card_cost**: Cost to play (DON!! cost)
+• Numeric value (typically 0-10)
+• Located in top-left corner circle
+• Leaders have no cost (they start in play)
+
+**card_power**: Power value
+• Numeric value (e.g., 5000, 6000, 7000, 8000)
+• Located at bottom-left
+• Determines combat strength
+• Leaders and Characters have Power
+• Events and Stages do not have Power
+
+**life**: Life value (Leader cards ONLY)
+• Numeric value (typically 3, 4, or 5)
+• Only Leader cards have Life
+• Located on Leader card
+• null for non-Leader cards
+
+**counter_amount**: Counter value (Character cards)
+• Options: 1000, 2000, or null (no counter)
+• Located at bottom of Character cards
+• Used when blocking attacks
+• null for Leaders, Events, Stages
+
+**attribute**: Combat attribute
+• Options: Slash, Strike, Ranged, Special, Wisdom
+• Indicates attack style icon on card
+• Some cards have multiple attributes
+
+**sub_types**: Character traits/affiliations
+• Example: "Straw Hat Crew", "Supernovas", "The Four Emperors", "Navy"
+• Multiple traits possible, comma-separated
+• Located in card type line
+• Important for deck building synergies
+
+**set_name**: Set/expansion name
+• See Set Identification Module below
+• Extract from set code prefix
+
+**set_id**: Set code
+• Format: "OP-01", "OP-02", "ST-01", etc.
+• Derived from card_id prefix
+
+**year**: Release year
+• 4-digit year based on set release
+• 2022 for early sets, 2023-2024 for recent
+
+**manufacturer**: Card publisher
+• "Bandai" for all One Piece TCG cards
+
+**authentic**: Licensed product verification (true|false)
+• true if official Bandai One Piece TCG card
+• Check for Bandai logo, official card back design
+• false if proxy/counterfeit
+
+────────────────────────────────────────────────────────────────────────
+VARIANT DETECTION (CRITICAL FOR ONE PIECE)
+────────────────────────────────────────────────────────────────────────
+
+**variant_type**: Card variant classification
+
+🚨 **CRITICAL:** One Piece TCG has many valuable variants that share the SAME card number.
+A Parallel Shanks (OP01-120) can be worth 100x more than the base version.
+Correctly identifying variants is ESSENTIAL for accurate valuation.
+
+VARIANT TYPES (in order of typical value):
+
+• **null/Base**: Standard printing
+  - Regular card stock
+  - No special treatments
+  - Most common version
+
+• **parallel**: Parallel Rare
+  - Full-card holographic/foil treatment
+  - Rainbow prismatic pattern
+  - Distinctly shiny surface
+  - Card art same as base but with holo finish
+
+• **manga**: Manga Art variant
+  - Black and white manga panel artwork
+  - Distinctive manga-style illustration
+  - Different art from standard version
+  - Usually depicts manga scene
+
+• **parallel_manga**: Parallel + Manga combination
+  - Manga art WITH holographic treatment
+  - Extremely rare
+  - Highest value variants
+
+• **sp**: Special Art
+  - Tournament prizes or special releases
+  - Unique artwork
+  - Often full-art treatment
+
+• **alternate_art**: Alternate Art version
+  - Different illustration from base
+  - Same card stats/abilities
+  - Full-art or extended art
+
+• **box_topper**: Box Topper promo
+  - Included with booster box purchases
+  - Often oversized or special finish
+
+• **treasure_rare**: Treasure Rare
+  - Premium foil variant
+  - Special border treatment
+  - Very limited
+
+• **super_parallel**: Super Parallel
+  - Ultra-rare parallel variant
+  - Enhanced holographic effect
+
+• **red_super_alt_art**: Red Super Alternate Art
+  - Special red signature series
+  - Premium alternate artwork
+
+VARIANT INDICATORS TO LOOK FOR:
+- Holographic/rainbow surface = Parallel variant
+- Black & white manga panels = Manga variant
+- Different artwork composition = Alternate Art
+- Special border/frame treatment = SP or Treasure
+- "P" in card number = Promo variant
+
+OUTPUT FORMAT:
+{
+  "variant_type": "parallel",
+  "variant_confidence": "high",
+  "variant_indicators": ["holographic surface", "rainbow pattern visible"]
+}
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS
+────────────────────────────────────────────────────────────────────────
+
+**card_text**: Card abilities and effects
+• Extract all card text
+• Include [Trigger], [Blocker], [Rush], [DON!!x1] abilities
+• Format with line breaks
+
+**rarity_tier**: Visual rarity classification
+• Based on card finish and rarity symbol
+• Options: Common, Uncommon, Rare, Super Rare, Secret Rare, Special
+
+**subset**: Additional variant/promo designation
+• Promo, Tournament, Box Topper, etc.
+
+**is_foil**: Holographic treatment (true|false)
+• true for Parallel, SEC, and some SR cards
+• false for standard printings
+
+**language**: Card language
+• Usually "English" or "Japanese"
+• Japanese cards may have different values
+
+═══════════════════════════════════════════════════════════════════════
+B. ONE PIECE SET IDENTIFICATION MODULE
+═══════════════════════════════════════════════════════════════════════
+
+**BOOSTER SETS (Main Expansions):**
+
+| Set Code | Set Name                        | Year | Cards |
+|----------|--------------------------------|------|-------|
+| OP-01    | Romance Dawn                    | 2022 | 121   |
+| OP-02    | Paramount War                   | 2023 | 121   |
+| OP-03    | Pillars of Strength             | 2023 | 121   |
+| OP-04    | Kingdoms of Intrigue            | 2023 | 121   |
+| OP-05    | Awakening of the New Era        | 2023 | 121   |
+| OP-06    | Wings of the Captain            | 2024 | 121   |
+| OP-07    | 500 Years in the Future         | 2024 | 121   |
+| OP-08    | Two Legends                     | 2024 | 121   |
+| OP-09    | The Four Emperors               | 2024 | 121   |
+| OP-10    | Royal Blood                     | 2025 | TBD   |
+| OP-11    | TBD                             | 2025 | TBD   |
+| OP-12    | TBD                             | 2025 | TBD   |
+
+**STARTER DECKS:**
+
+| Set Code | Set Name                        |
+|----------|--------------------------------|
+| ST-01    | Straw Hat Crew                  |
+| ST-02    | Worst Generation                |
+| ST-03    | The Seven Warlords of the Sea   |
+| ST-04    | Animal Kingdom Pirates          |
+| ST-05    | ONE PIECE FILM edition          |
+| ST-06    | Navy Absolute Justice           |
+| ST-07    | Big Mom Pirates                 |
+| ST-08    | Monkey D. Luffy                 |
+| ST-09    | Yamato                          |
+| ST-10    | Ultimate Deck: The Three Captains|
+| ST-11    | Uta                             |
+| ST-12    | Zoro and Sanji                  |
+| ST-13    | Ultimate Deck: The Three Brothers|
+| ST-14    | 3D2Y                            |
+
+**SPECIAL PRODUCTS:**
+
+| Set Code | Set Name                        |
+|----------|--------------------------------|
+| EB-01    | Memorial Collection             |
+| PRB-01   | Premium Booster                 |
+| OP-PR    | Promo Cards                     |
+
+**SET CODE IDENTIFICATION:**
+• OP-XX = Main booster set (OP-01 through OP-12)
+• ST-XX = Starter deck
+• EB-XX = Extra booster
+• PRB-XX = Premium booster
+• PR/P = Promo cards
+
+**OUTPUT FORMAT:**
+{
+  "set_name": "Romance Dawn",
+  "set_code": "OP-01",
+  "set_year": 2022,
+  "set_confidence": "high"
+}
+
+═══════════════════════════════════════════════════════════════════════
+C. ONE PIECE CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common One Piece TCG Defects:**
+
+────────────────────────────────────────────────────────────────────────
+1. PARALLEL/HOLOGRAPHIC DEFECTS (HIGH VALUE CARDS)
+────────────────────────────────────────────────────────────────────────
+
+**Parallel Card Characteristics:**
+• Full-card prismatic/rainbow holographic treatment
+• Entire card surface is holographic
+• More susceptible to surface defects
+• Highly sought after by collectors
+
+**Common Parallel Issues:**
+• Holo scratches across surface (micro-scratches visible under light)
+• Pattern disruption or clouding
+• Fingerprints visible on holo surface
+• Rainbow pattern inconsistency
+• Surface scuffing dulling the holo effect
+
+**Grading Impact:**
+• Single holo scratch: -0.5 to -1.0
+• Multiple holo scratches: -1.0 to -2.0
+• Pattern disruption: -0.5 to -1.0
+• Prevents 10.0 surface score if any holo defects present
+
+────────────────────────────────────────────────────────────────────────
+2. COLORED BORDER DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**One Piece Card Borders:**
+• Border color matches card color (Red, Blue, Green, etc.)
+• Colored borders provide high contrast with white cardstock
+• Edge wear shows as white fiber exposure against colored border
+
+**Detection:**
+• Examine all four edges for whitening
+• Red/Blue/Green borders make whitening highly visible
+• Check corners where borders meet
+
+**Grading Impact:**
+• Minor edge whitening: -0.5 per affected edge
+• Moderate whitening: -1.0 per affected edge
+• Heavy whitening/chipping: -1.5 to -2.0
+
+────────────────────────────────────────────────────────────────────────
+3. CORNER DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**One Piece Card Corners:**
+• Rounded corners (standard TCG radius)
+• Colored border extends to corner edges
+• Corner wear common from shuffling/handling
+
+**Common Issues:**
+• Corner rounding/blunting from wear
+• White fiber exposure at corner tips
+• Corner dings or dents
+• Peeling at corner layers
+
+**Grading Impact:**
+• Light rounding: -0.5 per corner
+• Moderate wear: -1.0 per corner
+• Heavy damage: -1.5 to -2.0 per corner
+
+────────────────────────────────────────────────────────────────────────
+4. SURFACE DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Standard Card Surface:**
+• Glossy front surface with character artwork
+• Standard card back with One Piece logo pattern
+
+**Common Issues:**
+• Print lines through artwork
+• Scratches across character art (highly visible)
+• Surface indentations or pressure marks
+• Ink spots or printing errors
+• Silvering on dark areas
+
+**Character Art Considerations:**
+• Defects on character face/focal point more impactful
+• Defects in background less severe
+• Center artwork damage most noticeable
+
+**Grading Impact:**
+• Light surface scratches: -0.5 to -1.0
+• Scratches on character face: -1.0 to -1.5
+• Print lines: -0.5 to -1.0
+• Heavy surface damage: -2.0+
+
+────────────────────────────────────────────────────────────────────────
+5. PRINTING/MANUFACTURING DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Common Factory Issues:**
+• Off-center printing (affects centering grade)
+• Ink roller lines
+• Color registration errors
+• Miscut cards
+• Crimped edges from packaging
+
+**Grading Impact:**
+• Minor printing variance: -0.5
+• Visible print defects: -1.0 to -1.5
+• Miscuts: May cap grade depending on severity
+
+═══════════════════════════════════════════════════════════════════════
+D. ONE PIECE CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**CENTERING EXAMPLE (Standard Card):**
+"This One Piece TCG card features a Red border frame. Measuring borders: left ≈ 2.8mm, right ≈ 3.2mm, top ≈ 2.5mm, bottom ≈ 3.0mm. Left-right ratio: 47/53. Top-bottom ratio: 45/55. Worst axis: top-bottom at 45/55. Good centering overall with slight bottom-heavy shift."
+
+**PARALLEL VARIANT EXAMPLE:**
+"This Shanks Parallel variant (OP01-120) displays full-card prismatic holographic treatment with rainbow pattern visible across the entire surface. Examining the holo layer under varied lighting angles, I detect one fine hairline scratch approximately 8mm in length running diagonally across the upper left quadrant. The scratch causes minor pattern disruption but does not affect the character artwork. Surface score: 9.0 due to visible holo scratch."
+
+**MANGA VARIANT EXAMPLE:**
+"This Monkey D. Luffy Manga variant (OP01-003) features distinctive black and white manga panel artwork depicting a scene from the manga. The card has standard (non-holographic) finish. Surface is clean with no visible defects. Edges show minimal handling with trace whitening at top edge measuring approximately 0.3mm. Edge score: 9.5."
+
+**CORNER ANALYSIS EXAMPLE:**
+"Examining all four corners of this Character card at maximum zoom:
+- Top-left: Sharp corner point with intact border, no fiber exposure. Pristine.
+- Top-right: Minimal rounding visible at corner tip, approximately 0.1mm. Near pristine.
+- Bottom-left: Light wear with trace white fiber visible against Blue border. Minor wear.
+- Bottom-right: Clean corner, sharp point maintained. Pristine.
+Corner score: 9.5 (minor wear at bottom-left prevents 10.0)"
+
+**EDGE ANALYSIS EXAMPLE:**
+"Examining all four edges of this Super Rare card:
+- Top edge: Clean edge line, Green border intact, no whitening visible. Pristine.
+- Bottom edge: Minor whitening approximately 2mm from right corner, otherwise clean.
+- Left edge: No defects, border color consistent throughout.
+- Right edge: Two small areas of fiber exposure totaling approximately 1.5mm.
+Edge score: 9.0 (whitening prevents higher score)"
+
+═══════════════════════════════════════════════════════════════════════
+E. ONE PIECE SPECIFIC EXTRACTION RULES
+═══════════════════════════════════════════════════════════════════════
+
+**DON!! CARD DETECTION:**
+• DON!! cards are energy cards used in gameplay
+• Not typically graded individually
+• If detected, note as "DON!! Card" in card_type
+
+**LEADER CARD IDENTIFICATION:**
+• Leaders have "Leader" type line
+• Leaders have Life value (unique to Leaders)
+• Leaders have no cost (start in play)
+• Leaders define deck color restrictions
+
+**BLOCKER ABILITY:**
+• [Blocker] keyword indicates card can block attacks
+• Important for gameplay, note in abilities
+
+**TRIGGER EFFECTS:**
+• [Trigger] indicates effect when card is added to life
+• Note trigger text in card_text field
+
+**MULTI-COLOR CARDS:**
+• Some cards have two colors (e.g., Red/Green)
+• Both colors should be listed in card_color
+• Format: "Red/Green" or "Blue/Purple"
+
+--- END OF ONE PIECE DELTA v5.0 ---

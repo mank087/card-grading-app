@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
       showFounderBadge: credits.show_founder_badge,
       isVip: credits.is_vip,
       showVipBadge: credits.show_vip_badge,
+      isCardLover: credits.is_card_lover,
+      showCardLoverBadge: credits.show_card_lover_badge,
     });
   } catch (error) {
     console.error('Founder status check error:', error);

@@ -268,6 +268,10 @@ export default function AccountPage() {
             setSelectedEmblems(emblemData.selectedEmblems || [])
             setIsVip(emblemData.isVip || false)
             setShowVipBadge(emblemData.showVipBadge ?? true)
+            // Use is_card_lover flag as reliable fallback (subscription period check can be stale)
+            if (emblemData.isCardLover) {
+              setIsCardLover(true)
+            }
           }
         } catch (err) {
           console.error('Error fetching label emblem preference:', err)

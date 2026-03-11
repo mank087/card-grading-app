@@ -523,6 +523,25 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
           }
         : card.conversational_card_info;
 
+      // Enrich cached cards with flavor_name from MTG database if missing
+      // Cards graded before flavor_name support won't have it in stored data
+      if (mergedCardInfo && !mergedCardInfo.flavor_name && mergedCardInfo.mtg_database_id) {
+        try {
+          const supabase = supabaseServer();
+          const { data: mtgCard } = await supabase
+            .from('mtg_cards')
+            .select('flavor_name')
+            .eq('id', mergedCardInfo.mtg_database_id)
+            .single();
+          if (mtgCard?.flavor_name) {
+            mergedCardInfo.flavor_name = mtgCard.flavor_name;
+            console.log(`[MTG CACHE] Enriched with flavor_name: "${mtgCard.flavor_name}"`);
+          }
+        } catch (e) {
+          // Non-critical — don't fail the response
+        }
+      }
+
       return NextResponse.json({
         ...card,
         // Add parsed conversational data if available

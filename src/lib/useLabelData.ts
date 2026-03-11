@@ -3,18 +3,58 @@
  *
  * Provides easy access to label data from cards.
  * Falls back to generating label data on-the-fly if not stored in database.
+ * Applies user custom_label_data overrides when present.
  */
 
-import { generateLabelData, type LabelData, type CardForLabel } from './labelDataGenerator';
+import { generateLabelData, type LabelData, type CardForLabel, buildContextLine, buildFeaturesLine } from './labelDataGenerator';
+
+/** Fields that can be overridden via custom_label_data */
+export interface CustomLabelFields {
+  primaryName?: string;
+  setName?: string | null;
+  subset?: string | null;
+  cardNumber?: string | null;
+  year?: string | null;
+  features?: string[];
+}
+
+/**
+ * Apply custom_label_data overrides to generated label data.
+ * Only overrides fields the user has explicitly customized.
+ */
+function applyCustomOverrides(labelData: LabelData, custom: CustomLabelFields): LabelData {
+  const result = { ...labelData };
+
+  if (custom.primaryName !== undefined) {
+    result.primaryName = custom.primaryName;
+  }
+
+  // If any context line component is overridden, rebuild the full context line
+  const hasContextOverride = custom.setName !== undefined || custom.subset !== undefined
+    || custom.cardNumber !== undefined || custom.year !== undefined;
+
+  if (hasContextOverride) {
+    if (custom.setName !== undefined) result.setName = custom.setName;
+    if (custom.subset !== undefined) result.subset = custom.subset;
+    if (custom.cardNumber !== undefined) result.cardNumber = custom.cardNumber;
+    if (custom.year !== undefined) result.year = custom.year;
+    result.contextLine = buildContextLine(result.setName, result.subset, result.cardNumber, result.year);
+  }
+
+  if (custom.features !== undefined) {
+    result.features = custom.features;
+    result.featuresLine = buildFeaturesLine(custom.features);
+  }
+
+  return result;
+}
 
 /**
  * Extract label data from a card object
- * 🔧 v7.2: Always generates fresh label data to ensure accuracy
- * This fixes issues where stored label_data was incomplete
+ * Generates fresh label data, then applies any custom_label_data overrides.
  */
 export function getCardLabelData(card: any): LabelData {
   // Always generate fresh label data from card fields
-  // This ensures we use the latest data regardless of what's stored in label_data
   const cardForLabel: CardForLabel = {
     id: card.id,
     category: card.category,
@@ -49,7 +89,14 @@ export function getCardLabelData(card: any): LabelData {
     ai_grading: card.ai_grading,     // Alternative nested structure
   } as CardForLabel & { dvg_grading?: any; ai_grading?: any };
 
-  return generateLabelData(cardForLabel);
+  let labelData = generateLabelData(cardForLabel);
+
+  // Apply user's custom label overrides if present
+  if (card.custom_label_data && typeof card.custom_label_data === 'object') {
+    labelData = applyCustomOverrides(labelData, card.custom_label_data as CustomLabelFields);
+  }
+
+  return labelData;
 }
 
 /**

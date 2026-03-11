@@ -1,7 +1,7 @@
 # DCM Grading Application - Comprehensive Guide
 
 > **Quick Reference for Claude Sessions**
-> Last Updated: February 17, 2026 (v8.3 - Market Pricing dashboard, price history improvements, /founders redirect)
+> Last Updated: February 26, 2026 (v8.4 - Featured cards page, Pop Reports, DCM pricing system, admin panel fixes)
 
 ---
 
@@ -29,10 +29,11 @@
 
 ## 1. Project Overview
 
-**DCM Grading** is a full-stack card grading platform that uses AI (GPT-4o vision) to grade trading cards (Pokemon, MTG, Sports, Lorcana, One Piece, Other). Users upload card images, receive AI-powered condition grades, and can download professional labels/reports.
+**DCM Grading** is a full-stack card grading platform that uses AI (GPT-5.1 vision) to grade trading cards (Pokemon, MTG, Sports, Lorcana, One Piece, Other). Users upload card images, receive AI-powered condition grades, and can download professional labels/reports.
 
 **Core Features:**
-- AI-powered card grading with three-pass consensus system
+- AI-powered card grading with three-pass consensus system (DCM Grading v8.0 engine)
+- **v8.4: Featured cards page (/featured), Pop Reports (/pop), DCM pricing system (SportsCardsPro/PriceCharting), admin panel accuracy fixes**
 - **v8.3: Market Pricing dashboard (Card Lovers exclusive), price history with DCM/PriceCharting tracking, /founders→/card-lovers redirect**
 - **v8.2: Affiliate/Partner Program with referral tracking, commissions, admin dashboard, Stripe promo codes**
 - **v8.1: VIP Package ($99/150 credits), Card Lovers subscription, SEO metadata, database optimizations**
@@ -103,6 +104,15 @@ src/
 │   ├── market-pricing/            # Market Pricing dashboard (v8.3, Card Lovers exclusive)
 │   │   ├── page.tsx
 │   │   └── layout.tsx            # SEO metadata
+│   ├── featured/                 # Featured cards showcase page (v8.4)
+│   │   ├── page.tsx
+│   │   └── FeaturedPageClient.tsx
+│   ├── pop/                      # Population Reports (v8.4)
+│   │   ├── page.tsx              # Pop report hub (all categories)
+│   │   ├── layout.tsx            # SEO metadata
+│   │   └── [category]/           # Category-specific pop report
+│   │       ├── page.tsx
+│   │       └── layout.tsx
 │   ├── affiliates/               # Affiliate program info page (v8.2)
 │   │   └── page.tsx
 │   ├── founders/                 # Founders package
@@ -135,6 +145,20 @@ src/
 │       ├── market-pricing/       # Market Pricing APIs (v8.3)
 │       │   ├── portfolio/route.ts
 │       │   └── listings/route.ts
+│       ├── pricing/              # DCM Pricing APIs (v8.3+)
+│       │   ├── dcm-save/route.ts
+│       │   ├── dcm-select/route.ts
+│       │   ├── dcm-cached-price/route.ts
+│       │   ├── dcm-batch-refresh/route.ts
+│       │   ├── pricecharting/route.ts
+│       │   ├── pokemon/route.ts
+│       │   ├── mtg/route.ts
+│       │   ├── lorcana/route.ts
+│       │   ├── onepiece/route.ts
+│       │   └── other/route.ts
+│       ├── pop/                  # Population Report APIs (v8.4)
+│       │   ├── categories/route.ts
+│       │   └── [category]/sets/route.ts
 │       ├── affiliate/            # Public affiliate endpoints (v8.2)
 │       │   ├── click/route.ts
 │       │   └── validate/route.ts
@@ -160,7 +184,17 @@ src/
 │   ├── stripe.ts                 # Stripe configuration
 │   ├── credits.ts                # Credit management
 │   ├── affiliates.ts             # Affiliate program business logic (v8.2)
-│   └── pokemonApiVerification.ts # Pokemon TCG API
+│   ├── pokemonApiVerification.ts # Pokemon TCG API
+│   ├── priceCharting.ts          # SportsCardsPro/PriceCharting API client (v8.3+)
+│   ├── pricingFetch.ts           # Safe pricing fetch utility with error handling
+│   ├── pokemonPricing.ts         # Pokemon-specific pricing logic
+│   ├── mtgPricing.ts             # MTG-specific pricing logic
+│   ├── lorcanaPricing.ts         # Lorcana-specific pricing logic
+│   ├── onepiecePricing.ts        # One Piece-specific pricing logic
+│   ├── otherPricing.ts           # Other card-type pricing logic
+│   ├── popReport.ts              # Population report helpers (v8.4)
+│   └── pricing/
+│       └── dcmPriceTracker.ts    # DCM price caching and batch refresh
 │
 ├── components/                   # React components
 │   ├── ClientLayout.tsx          # Root layout with providers (includes ReferralTracker)
@@ -174,6 +208,13 @@ src/
 │   │   ├── TopCardsTable.tsx      # Top 10 most valuable cards
 │   │   ├── MoversTable.tsx        # Price gainers/losers
 │   │   └── MyEbayListings.tsx     # eBay listings management
+│   ├── pricing/                  # DCM Pricing components (v8.3+)
+│   │   ├── PriceChartingLookup.tsx  # SportsCardsPro price lookup
+│   │   ├── PokemonPriceLookup.tsx   # Pokemon TCGPlayer pricing
+│   │   ├── MTGPriceLookup.tsx       # MTG Scryfall pricing
+│   │   ├── LorcanaPriceLookup.tsx   # Lorcana pricing
+│   │   ├── OnePiecePriceLookup.tsx  # One Piece pricing
+│   │   └── OtherPriceLookup.tsx     # Other card pricing
 │   ├── admin/                    # Admin components (AdminSidebar includes Affiliates link)
 │   └── ui/                       # Shared UI components
 │
@@ -223,6 +264,9 @@ src/
 | `/blog` | `app/blog/page.tsx` | Blog listing page with categories (v8.0) |
 | `/blog/[slug]` | `app/blog/[slug]/page.tsx` | Individual blog post page (v8.0) |
 | `/blog/category/[category]` | `app/blog/category/[category]/page.tsx` | Blog posts filtered by category (v8.0) |
+| `/featured` | `app/featured/page.tsx` | Featured cards showcase with grades, pricing, slab images (v8.4) |
+| `/pop` | `app/pop/page.tsx` | Population Report hub — card counts by category (v8.4) |
+| `/pop/[category]` | `app/pop/[category]/page.tsx` | Category-specific population report with grade breakdown (v8.4) |
 
 ### Protected Pages (Require Login)
 
@@ -318,6 +362,28 @@ src/
 | `/api/market-pricing/portfolio` | GET | Portfolio value, category breakdown, top cards, movers (Card Lovers only) |
 | `/api/market-pricing/listings` | GET | User's eBay listings with card info (Card Lovers only) |
 
+### DCM Pricing System (v8.3+)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/pricing/pricecharting` | POST | Search SportsCardsPro/PriceCharting API for card prices |
+| `/api/pricing/dcm-save` | POST | Save user-selected DCM price to card record |
+| `/api/pricing/dcm-select` | POST | Select from multiple price matches |
+| `/api/pricing/dcm-cached-price` | GET | Get cached DCM prices for a card |
+| `/api/pricing/dcm-batch-refresh` | POST | Batch refresh DCM prices for multiple cards |
+| `/api/pricing/pokemon` | POST | Pokemon pricing via TCGPlayer/PriceCharting |
+| `/api/pricing/mtg` | POST | MTG pricing via Scryfall/PriceCharting |
+| `/api/pricing/lorcana` | POST | Lorcana pricing via PriceCharting |
+| `/api/pricing/onepiece` | POST | One Piece pricing via PriceCharting |
+| `/api/pricing/other` | POST | Other card pricing via PriceCharting |
+
+### Population Reports (v8.4)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/pop/categories` | GET | Get all categories with unique card counts and total graded |
+| `/api/pop/[category]/sets` | GET | Get cards/sets for a category with grade breakdowns |
+
 ### eBay Price Caching (v7.7)
 
 | Endpoint | Method | Purpose |
@@ -409,10 +475,15 @@ src/
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/admin/stats/dashboard` | GET | Dashboard statistics |
-| `/api/admin/analytics/*` | GET | Various analytics |
+| `/api/admin/stats/dashboard` | GET | Dashboard statistics (count queries) |
+| `/api/admin/analytics/users` | GET | User analytics (signups, activity, retention) |
+| `/api/admin/analytics/cards` | GET | Card analytics (uploads, categories, trends) |
+| `/api/admin/analytics/grading` | GET | Grading analytics (distribution, quality control) |
+| `/api/admin/analytics/financial` | GET | Financial analytics (GPT-5.1 cost estimates) |
+| `/api/admin/analytics/conversion` | GET | Conversion analytics (funnel, packages, revenue) |
+| `/api/admin/cards` | GET | Card list with search, filters, pagination, DCM pricing |
 | `/api/admin/cards/[id]` | GET/DELETE | Admin card management |
-| `/api/admin/users/[id]` | GET/PUT | User management |
+| `/api/admin/users/[id]` | GET/PUT | User management (GET includes recent cards with full detail) |
 | `/api/admin/backfill-labels` | POST | Regenerate all labels |
 
 ---
@@ -466,7 +537,7 @@ src/
 | F | 9 | Minor defects only |
 | G | 10 | Zero defects (very rare) |
 
-**Rubric File:** `prompts/master_grading_rubric_v5.txt` (currently v7.1)
+**Rubric File:** `prompts/master_grading_rubric_v5.txt` (currently v8.0)
 
 ### v7.1 Database Validation & Version Tracking (December 2025)
 
@@ -496,20 +567,20 @@ src/
 
 4. **Version String Updates** (`lib/visionGrader.ts`)
    ```
-   meta.version: 'conversational-v7.1-json' or 'conversational-v7.1-markdown'
-   meta.prompt_version: 'Conversational_Grading_v7.1_THREE_PASS'
+   meta.version: 'conversational-v8.0-json' or 'conversational-v8.0-markdown'
+   meta.prompt_version: 'DCM_Grading_v8.0'
    ```
 
 **How Version Tracking Works:**
 ```
 1. At Grading Time:
-   - visionGrader.ts sets prompt_version in meta object
+   - visionGrader.ts sets prompt_version in meta object ("DCM_Grading_v8.0")
    - Stored in conversational_grading JSON column
 
 2. At Display Time:
    - Frontend reads conversational_grading JSON
-   - extractDCMOpticVersion() parses "v7.1" from prompt_version string
-   - Displays as "V7.1" in UI
+   - extractDCMOpticVersion() parses "v8.0" from prompt_version string
+   - Displays as "V8.0" in UI
 
 3. For Future Updates:
    - Change prompt_version in visionGrader.ts when rubric updates
@@ -1410,6 +1481,23 @@ The `pokemonTcgApi.ts` file now searches the local Supabase database first:
 - `searchLocalByNameNumberSetId()` - For promo cards by set ID
 - Falls back to external Pokemon TCG API if not found locally
 
+### DCM Pricing System (v8.3+)
+
+| File | Purpose |
+|------|---------|
+| `lib/priceCharting.ts` | SportsCardsPro API client (sports cards) and PriceCharting integration |
+| `lib/pricingFetch.ts` | Safe pricing fetch utility with error handling and rate limiting |
+| `lib/pricing/dcmPriceTracker.ts` | DCM price caching, batch refresh, card-to-price matching |
+| `lib/pokemonPricing.ts` | Pokemon-specific pricing (TCGPlayer/PriceCharting) |
+| `lib/mtgPricing.ts` | MTG-specific pricing (Scryfall/PriceCharting) |
+| `lib/lorcanaPricing.ts` | Lorcana-specific pricing |
+| `lib/onepiecePricing.ts` | One Piece-specific pricing |
+| `lib/otherPricing.ts` | Other card-type pricing |
+| `lib/popReport.ts` | Population report grade breakdown helpers |
+
+**DCM Pricing Value Priority (card detail / collection pages):**
+`dcm_price_estimate` > `dcm_cached_prices.estimatedValue` > `scryfall_price_usd` (MTG) > `ebay_price_median` (legacy fallback)
+
 ### Payments
 
 | File | Purpose |
@@ -1591,6 +1679,12 @@ cards (
   -- Label Data
   label_data JSONB,                         -- Pre-generated label info
 
+  -- DCM Pricing (v8.3+)
+  dcm_price_estimate DECIMAL,              -- Primary DCM estimated value
+  dcm_cached_prices JSONB,                 -- Full cached pricing data from SportsCardsPro/PriceCharting
+  scryfall_price_usd DECIMAL,              -- MTG: Scryfall price (USD)
+  scryfall_price_usd_foil DECIMAL,         -- MTG: Scryfall foil price (USD)
+
   -- Settings
   visibility VARCHAR DEFAULT 'private',     -- public/private
   is_featured BOOLEAN DEFAULT false,
@@ -1721,16 +1815,17 @@ cards.ebay_price_highest DECIMAL,         -- Highest listing price
 cards.ebay_price_listing_count INTEGER,   -- Number of active listings
 cards.ebay_price_updated_at TIMESTAMPTZ   -- When prices were last cached
 
--- eBay Price History (v7.7 - for tracking trends)
+-- eBay Price History (v7.7, expanded v8.3)
 card_price_history (
   id UUID PRIMARY KEY,
   card_id UUID REFERENCES cards(id),
-  card_type TEXT,                         -- 'sports', 'pokemon', 'other'
+  card_type TEXT,                         -- CHECK: 'sports', 'pokemon', 'mtg', 'lorcana', 'other'
   lowest_price DECIMAL,
   median_price DECIMAL,
   highest_price DECIMAL,
   average_price DECIMAL,
   listing_count INTEGER,
+  dcm_price_estimate DECIMAL,            -- DCM/PriceCharting estimated value (v8.3)
   query_used TEXT,                        -- Search query that was used
   query_strategy TEXT,                    -- 'specific', 'moderate', 'broad', 'minimal'
   recorded_at TIMESTAMPTZ,
@@ -1838,7 +1933,7 @@ affiliate_clicks (
 ### Storage Buckets
 
 ```
-cards/
+cards/                                    -- Supabase storage bucket name is "cards" (NOT "card-images")
   └── {userId}/
       └── {cardId}/
           ├── front.jpg
@@ -1912,7 +2007,7 @@ Email/Password users: email_confirmed_at within 60 seconds
 1. GET card paths from database
 2. Create signed URLs for images (1 hour expiry)
 3. LOAD PROMPT (promptLoader_v5.ts):
-   ├── master_grading_rubric_v5.txt (universal rules, v7.1, ~50k tokens)
+   ├── master_grading_rubric_v5.txt (universal rules, v8.0, ~50k tokens)
    └── {card_type}_delta_v5.txt (card-specific rules)
 4. THREE-PASS CONSENSUS GRADING (visionGrader.ts):
    ├── Pass 1 → GPT-5.1 evaluates independently
@@ -1920,7 +2015,7 @@ Email/Password users: email_confirmed_at within 60 seconds
    └── Pass 3 → GPT-5.1 (fresh evaluation)
    └── Average scores, apply dominant defect control
    └── Final grade = whole number (v7.0: floor rounding)
-   └── Version stored: "Conversational_Grading_v7.1_THREE_PASS"
+   └── Version stored: "DCM_Grading_v8.0"
 5. Parse response, extract grading_passes
 6. DATABASE VALIDATION (v7.1 - Pokemon only):
    └── Query local pokemon_cards by name + number
@@ -1930,15 +2025,16 @@ Email/Password users: email_confirmed_at within 60 seconds
 8. Update card record with grades
 ```
 
-### Grading Rules (v7.1)
+### Grading Rules (v8.0)
 
 - **Whole numbers only** (v7.0): Final grades are 1-10 integers (no 8.5, 9.5)
 - **Transparent subgrade caps** (v7.1): Direct 1:1 cap mapping, no hidden penalties
 - **Tier-first** (v6.0): Identify condition tier before calculating scores
 - **Dominant defect control**: Worst category caps the grade
-- **Three-pass consensus**: 2+/3 passes must agree on defects
+- **Three-pass consensus**: 2+/3 passes must agree on defects (runs in single API call)
 - **Floor rounding**: Always round down (8.7 → 8)
-- **Version tracking** (v7.1): Each card stores prompt version used at grading time
+- **Slab detection** (v8.0): Detects slabbed cards in corner zoom crops
+- **Version tracking**: Each card stores prompt version (`DCM_Grading_v8.0`)
 
 ### Post-Grading Verification
 
@@ -2141,6 +2237,10 @@ Purpose: AI card grading with vision
 Model: gpt-5.1 (released November 2025)
 Usage: Three-pass consensus grading with master rubric + deltas
 File: lib/visionGrader.ts → promptLoader_v5.ts
+Note: The 3-pass consensus runs within a SINGLE API call (not 3 separate calls).
+      The prompt instructs the AI to generate 3 independent passes in one response.
+Estimated tokens per grading: ~7,000-8,000 input + ~7,000-8,000 output + 2 images
+Pricing: $5/1M input tokens, $15/1M output tokens, ~$2/image
 ```
 
 ### Pokemon TCG API (with Local Database)
@@ -2279,6 +2379,34 @@ IMAGE NOTES:
   - Images hosted at: https://assets.tcgdex.net/ja/{series}/{set}/{localId}/high.webp
 ```
 
+### SportsCardsPro / PriceCharting (v8.3+)
+
+```
+Purpose: Card market pricing (DCM estimated values)
+API URLs:
+  - https://www.sportscardspro.com/api  (sports cards)
+  - https://www.pricecharting.com/api    (TCG cards)
+File: lib/priceCharting.ts
+Authentication: PRICECHARTING_API_TOKEN env var (same token for both services)
+
+Sports card price fields:
+  - loose-price: Ungraded card
+  - cib-price: Graded 7 or 7.5
+  - new-price: Graded 8 or 8.5
+  - graded-price: Graded 9
+  - box-only-price: Graded 9.5
+  - bgs-10-price: BGS 10
+  - manual-only-price: PSA 10
+
+Category-specific pricing libs:
+  - pokemonPricing.ts, mtgPricing.ts, lorcanaPricing.ts, onepiecePricing.ts, otherPricing.ts
+
+Price caching:
+  - DCM prices cached in cards.dcm_price_estimate and cards.dcm_cached_prices
+  - Batch refresh via /api/pricing/dcm-batch-refresh
+  - Tracked in pricing/dcmPriceTracker.ts
+```
+
 ### Stripe
 
 ```
@@ -2348,17 +2476,31 @@ File: lib/emailTemplates.ts
 ### Admin APIs
 
 ```
-/api/admin/stats/dashboard      - Dashboard stats
-/api/admin/analytics/users      - User analytics
-/api/admin/analytics/cards      - Card analytics
-/api/admin/cards/[id]           - Card management
-/api/admin/users/[id]           - User management
+/api/admin/stats/dashboard      - Dashboard stats (uses count queries for accuracy)
+/api/admin/analytics/users      - User analytics (signups, activity, retention)
+/api/admin/analytics/cards      - Card analytics (uploads, categories, trends)
+/api/admin/analytics/grading    - Grading analytics (grade distribution, quality control)
+/api/admin/analytics/financial  - Financial analytics (GPT-5.1 cost estimates, projections)
+/api/admin/analytics/conversion - Conversion analytics (funnel, packages, revenue)
+/api/admin/cards                - Card list with search, filters, pagination
+/api/admin/cards/[id]           - Card management (GET/DELETE)
+/api/admin/users/[id]           - User management (GET with recent cards detail, PUT)
 /api/admin/backfill-labels      - Batch regenerate labels
 /api/admin/affiliates           - List/create affiliates (v8.2)
 /api/admin/affiliates/[id]      - Get/update/deactivate affiliate (v8.2)
 /api/admin/affiliates/commissions        - List/pay commissions (v8.2)
 /api/admin/affiliates/approve-commissions - Batch approve pending (v8.2)
 ```
+
+**Admin Panel Notes (v8.4 fixes):**
+- All analytics APIs use `.limit(100000)` to bypass Supabase's default 1000-row limit
+- Dashboard stats use `{ count: 'exact', head: true }` for efficient count queries
+- Cards page consolidates sport subcategories (Football, Baseball, etc.) under "Sports"
+- Cards page supports search by user email (looks up user IDs, adds to OR filter)
+- Cards page shows DCM pricing instead of eBay median
+- User detail modal shows card names, category badges, grades, serials, and links to detail pages
+- Financial analytics uses GPT-5.1 pricing ($5/1M input, $15/1M output, $2/image)
+- Conversion analytics tracks all package types: Basic, Pro, Elite, VIP, Card Lovers (monthly/annual), Founders
 
 ---
 
@@ -2394,6 +2536,9 @@ CRON_SECRET=
 
 # Pokemon TCG (optional)
 POKEMON_TCG_API_KEY=
+
+# PriceCharting / SportsCardsPro (for DCM pricing)
+PRICECHARTING_API_TOKEN=
 ```
 
 ### Optional
@@ -2790,7 +2935,7 @@ npx tsx scripts/export-users-email-list.ts
 
 ---
 
-*This guide covers active, working code as of February 2026 (v8.2). Deprecated files are not included.*
+*This guide covers active, working code as of February 26, 2026 (v8.4). Deprecated files are not included.*
 
 ---
 
@@ -2798,6 +2943,7 @@ npx tsx scripts/export-users-email-list.ts
 
 | Version | Date | Key Changes |
 |---------|------|-------------|
+| v8.4 | Feb 26, 2026 | Featured cards page (/featured) with nav, footer, SEO. Pop Reports (/pop, /pop/[category]) with grade breakdowns. DCM pricing system: SportsCardsPro/PriceCharting API, category-specific pricing libs, dcm_price_estimate/dcm_cached_prices columns. Admin panel fixes: accurate stats (count queries vs 1000-row limit), consolidated sports, DCM pricing, email search, user modal card details with links. Grading engine renamed to v8.0, slab detection fix for corner zoom crops. MTG pricing improvements: flexible collector numbers, fallback queries |
 | v8.3 | Feb 17, 2026 | Market Pricing dashboard (Card Lovers exclusive): portfolio value, category bar chart, top 10 cards, price movers, eBay listings tab, market insights. Price history: DCM/PriceCharting tracking, MTG/Lorcana card types, 10k card limit with time budget, initial snapshot on grading. /founders→/card-lovers redirect |
 | v8.2 | Feb 11, 2026 | Affiliate/Partner Program: referral tracking (`?ref=CODE`), commission management (20% default), Stripe promo codes (10% buyer discount), admin dashboard, fraud prevention (self-referral/duplicate/14-day hold/auto-reversal), public info page |
 | v8.1 | Feb 5, 2026 | VIP Package ($99/150 credits), Card Lovers subscription (monthly/annual), unified emblem system, SEO metadata for all pages, database performance indexes, conversion tracking fixes |

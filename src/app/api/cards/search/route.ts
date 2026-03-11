@@ -54,7 +54,8 @@ export async function GET(request: NextRequest) {
         is_foil, foil_type, is_double_faced, mtg_rarity, holofoil,
         serial_numbering, rarity_tier, rarity_description,
         autographed, autograph_type, memorabilia_type,
-        rookie_card, first_print_rookie
+        rookie_card, first_print_rookie,
+        custom_label_data
       `);
 
     // Search by serial number (case-insensitive, partial match)

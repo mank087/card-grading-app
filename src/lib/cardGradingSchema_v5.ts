@@ -35,10 +35,10 @@ const MetaSchema = z.object({
  * Defect coordinate for pinpointing defect locations on card
  */
 const DefectCoordinateSchema = z.object({
-  x_percent: z.number().min(0).max(100).describe('X position as percentage from left edge (0-100)'),
-  y_percent: z.number().min(0).max(100).describe('Y position as percentage from top edge (0-100)'),
+  x_percent: z.number().min(0).max(100).describe('X position as percentage from card LEFT edge (0=left, 100=right) in card-relative orientation. For back images, mirror the x coordinate so positions match the physical card.'),
+  y_percent: z.number().min(0).max(100).describe('Y position as percentage from card TOP edge (0=top, 100=bottom)'),
   confidence: z.enum(['high', 'medium', 'low']).describe('Confidence in coordinate accuracy')
-}).describe('Approximate defect location coordinates');
+}).describe('Approximate defect location in card-relative coordinates (back image x is mirrored to match front)');
 
 /**
  * Individual defect with evidence-based documentation
@@ -165,10 +165,10 @@ const CardSideDefectsSchema = z.object({
  * Sub-scores for one grading category (centering, corners, edges, or surface)
  */
 const CategorySubScoresSchema = z.object({
-  front_score: z.number().min(0).max(10).describe('Front side score (0.0 to 10.0)'),
-  back_score: z.number().min(0).max(10).describe('Back side score (0.0 to 10.0)'),
-  weighted_score: z.number().min(0).max(10).describe('Weighted score (front 60% + back 40%)')
-}).describe('Front, back, and weighted scores for one category');
+  front_score: z.number().min(1).max(10).describe('Front side score (whole integer 1-10)'),
+  back_score: z.number().min(1).max(10).describe('Back side score (whole integer 1-10)'),
+  weighted_score: z.number().min(1).max(10).describe('Combined score = MIN(front_score, back_score). Weakest link principle — NOT a weighted average.')
+}).describe('Front, back, and MIN-based combined scores for one category');
 
 /**
  * Image quality assessment
@@ -255,20 +255,20 @@ const ProfessionalGradeEstimatesSchema = z.object({
  * Each pass contains weighted sub-scores and final grade
  */
 const GradingPassSchema = z.object({
-  centering: z.number().min(0).max(10).describe('Weighted centering score for this pass (0-10, use .0 or .5 only)'),
-  corners: z.number().min(0).max(10).describe('Weighted corners score for this pass (0-10, use .0 or .5 only)'),
-  edges: z.number().min(0).max(10).describe('Weighted edges score for this pass (0-10, use .0 or .5 only)'),
-  surface: z.number().min(0).max(10).describe('Weighted surface score for this pass (0-10, use .0 or .5 only)'),
-  final: z.number().min(0).max(10).describe('Final grade for this pass using weakest link (0-10, use .0 or .5 only)'),
+  centering: z.number().min(1).max(10).describe('Centering score for this pass = MIN(front_centering, back_centering), whole integer 1-10'),
+  corners: z.number().min(1).max(10).describe('Corners score for this pass = MIN(front_corners, back_corners), whole integer 1-10'),
+  edges: z.number().min(1).max(10).describe('Edges score for this pass = MIN(front_edges, back_edges), whole integer 1-10'),
+  surface: z.number().min(1).max(10).describe('Surface score for this pass = MIN(front_surface, back_surface), whole integer 1-10'),
+  final: z.number().min(1).max(10).describe('Final grade for this pass = MIN(centering, corners, edges, surface), whole integer 1-10'),
   defects_noted: z.array(z.string()).describe('Key defects observed in this pass')
-}).describe('Single grading pass with weighted sub-scores');
+}).describe('Single grading pass with MIN-based sub-scores (whole integers)');
 
 const GradingPassAveragedSchema = z.object({
-  centering: z.number().min(0).max(10).describe('Averaged centering score across all passes'),
-  corners: z.number().min(0).max(10).describe('Averaged corners score across all passes'),
-  edges: z.number().min(0).max(10).describe('Averaged edges score across all passes'),
-  surface: z.number().min(0).max(10).describe('Averaged surface score across all passes'),
-  final: z.number().min(0).max(10).describe('Averaged final grade across all passes')
+  centering: z.number().min(1).max(10).describe('Averaged centering score across all passes (arithmetic mean)'),
+  corners: z.number().min(1).max(10).describe('Averaged corners score across all passes (arithmetic mean)'),
+  edges: z.number().min(1).max(10).describe('Averaged edges score across all passes (arithmetic mean)'),
+  surface: z.number().min(1).max(10).describe('Averaged surface score across all passes (arithmetic mean)'),
+  final: z.number().min(1).max(10).describe('Averaged final grade across all passes (arithmetic mean)')
 }).describe('Averaged scores across all three passes');
 
 const GradingPassesSchema = z.object({
@@ -276,7 +276,7 @@ const GradingPassesSchema = z.object({
   pass_2: GradingPassSchema.describe('Second independent grading pass'),
   pass_3: GradingPassSchema.describe('Third independent grading pass'),
   averaged: GradingPassAveragedSchema.describe('Raw averaged scores (before rounding)'),
-  averaged_rounded: GradingPassAveragedSchema.describe('Averaged scores rounded to nearest 0.5'),
+  averaged_rounded: GradingPassAveragedSchema.describe('Averaged scores rounded to nearest whole integer using standard rounding (9.5 → 10, 9.4 → 9)'),
   variance: z.number().min(0).describe('Variance between passes (MAX - MIN of final grades)'),
   consistency: z.enum(['high', 'moderate', 'low']).describe(
     'Consistency classification based on variance: ' +
@@ -286,7 +286,7 @@ const GradingPassesSchema = z.object({
     'Notes about defects detected in only 1 of 3 passes (not included in final score). ' +
     'Format: "[Defect type] detected in 1 of 3 passes (not included in final score)"'
   )
-}).describe('Three-pass consensus grading results (v5.5)');
+}).describe('Three-pass consensus grading results (v7.0 whole integers)');
 
 /**
  * Final grade with validation (v6.0 - WHOLE NUMBERS ONLY)
@@ -712,7 +712,7 @@ export function validateEvidenceBasedRules(response: CardGradingResponseV5): str
     if (!Number.isInteger(response.final_grade.decimal_grade)) {
       warnings.push(
         `CRITICAL v6.0: Grade is ${response.final_grade.decimal_grade} but must be whole integer. ` +
-        `NO half-point grades allowed (no 8.5, 9.5, etc.). Round DOWN to nearest integer.`
+        `NO half-point grades allowed (no 8.5, 9.5, etc.). Round to nearest whole integer.`
       );
     }
     // Check that decimal_grade and whole_grade match
@@ -737,18 +737,31 @@ export function validateEvidenceBasedRules(response: CardGradingResponseV5): str
     }
   }
 
-  // Rule 2: If final_grade.decimal_grade < 10, at least one defect must exist
+  // Rule 2: If final_grade.decimal_grade < 10, defects should exist (with exceptions)
+  // IMPORTANT: A grade of 9 with zero defects is VALID when it results from three-pass
+  // consensus averaging (e.g., 10+10+8 = 9.33 → round → 9).
+  // Do NOT force the AI to fabricate defects to justify a rounded-down 9.
   if (response.final_grade.decimal_grade !== null &&
       response.final_grade.decimal_grade < 10) {
     const frontDefectCount = countDefects(response.defects.front);
     const backDefectCount = countDefects(response.defects.back);
 
     if (frontDefectCount === 0 && backDefectCount === 0) {
-      warnings.push(
-        `CRITICAL: Grade is ${response.final_grade.decimal_grade} but zero defects found. ` +
-        `If grade < 10, must describe defects that caused point deduction. ` +
-        `Either raise the grade to 10 or add defects to justify the deduction.`
-      );
+      if (response.final_grade.decimal_grade <= 8) {
+        // Grades 8 and below with zero defects are suspicious — something should be documented
+        warnings.push(
+          `CRITICAL: Grade is ${response.final_grade.decimal_grade} but zero defects found. ` +
+          `Grades 8 or below must have documented defects. ` +
+          `Either raise the grade or add defects to justify the deduction.`
+        );
+      } else {
+        // Grade 9 with zero defects — likely from three-pass averaging. Just a soft warning.
+        warnings.push(
+          `INFO: Grade is 9 with zero defects. This is acceptable if it resulted from ` +
+          `three-pass consensus averaging (e.g., two passes scored 10, one scored 9). ` +
+          `If defects were observed, they should be documented.`
+        );
+      }
     }
   }
 

@@ -319,9 +319,9 @@ C. SPORTS CARD DEFECT PATTERNS
 • Heavy: Extensive chipping, multiple edges affected, large areas
 
 **Grading Impact:**
-• Each white fleck: -0.3 deduction
-• Continuous whitening per edge: -0.7 deduction
-• Heavy chipping: -1.5 or more
+• Each white fleck: -1 deduction
+• Continuous whitening per edge: -1 deduction
+• Heavy chipping: -2 or more
 
 ────────────────────────────────────────────────────────────────────────
 2. TWO-SIDED DESIGN CONSIDERATIONS
@@ -394,7 +394,7 @@ Many sports cards feature legitimate manufacturer artwork on card backs that may
 • Front: Glossy, photo-quality, high-end finish
 • Back: May be matte, text-focused, different coating
 • Front surface defects more impactful (visible display side)
-• Back surface defects still count but weighted less (45% vs 55%)
+• Back surface defects still count — final sub-grade = MIN(front, back) per weakest-link principle
 
 ────────────────────────────────────────────────────────────────────────
 3. PRINT LINES ON GLOSSY SURFACES
@@ -437,8 +437,8 @@ Many modern sports card parallels feature INTENTIONAL line/geometric patterns as
 • Crease: Structural damage, cardstock folded, visible at angles, disrupts surface plane
 
 **Grading Impact (for CONFIRMED actual print line defects only):**
-• Single print line: -0.3 to -0.5 (manufacturing defect, not handling)
-• Multiple print lines: -0.7 to -1.0
+• Single print line: -1 (manufacturing defect, not handling)
+• Multiple print lines: -1 to -2
 • Print line does NOT trigger structural damage caps (not a crease)
 • Design pattern lines that are part of the card's parallel/variant: NO DEDUCTION (not defects)
 
@@ -476,10 +476,10 @@ Before reporting ANY pattern-related defect on a holographic/parallel card:
 • Design lines that shift uniformly with viewing angle = holographic design working correctly (NOT defects)
 
 **Grading Impact:**
-• Single holo scratch (hairline): -0.5 minimum
-• Multiple holo scratches: -1.0 to -1.5
-• Pattern disruption (missing holo section): -0.7 to -1.0
-• Holofoil defects prevent 10.0 surface score (high-end product expectation)
+• Single holo scratch (hairline): -1 minimum
+• Multiple holo scratches: -1 to -2
+• Pattern disruption (missing holo section): -1 to -2
+• Holofoil defects prevent 10 surface score (high-end product expectation)
 
 ────────────────────────────────────────────────────────────────────────
 5. PATCH/RELIC WINDOW CONSIDERATIONS
@@ -519,7 +519,7 @@ Before reporting ANY pattern-related defect on a holographic/parallel card:
 • Traditional border centering impossible (no straight edges)
 • Use internal geometric centering only
 • Identify design anchors (player image, text, logos)
-• Maximum centering score: 9.0 (perfect centering difficult to verify)
+• Maximum centering score: 9 (perfect centering difficult to verify)
 
 **Edge Grading:**
 • Die-cut edges are intentional, not defects
@@ -543,7 +543,7 @@ Before reporting ANY pattern-related defect on a holographic/parallel card:
 • Centering issues (off-center common, 70/30 or worse typical)
 
 **Grading Adjustments:**
-• Don't expect 10.0 corners on vintage (manufacturing limitations)
+• Don't expect 10 corners on vintage (manufacturing limitations)
 • Centering caps still apply but context-aware (60/40 is good for 1970s card)
 • Factory roughness noted but less penalized than modern cards
 
@@ -557,7 +557,7 @@ D. SPORTS CARD GRADING EXAMPLES
 CENTERING EXAMPLE (Sports Card with Colored Border)
 ────────────────────────────────────────────────────────────────────────
 
-"This 2024 Topps Chrome baseball card features a distinctive dark blue border surrounding the player photo. Examining the front borders, I measure: left border ≈ 2.8mm, right border ≈ 3.5mm, top border ≈ 3.0mm, bottom border ≈ 3.2mm. Calculating the left-right ratio: 2.8mm (narrower) ÷ 3.5mm (wider) × 100 = 80%, expressed as 80/20 ratio. For top-bottom: 3.0mm ÷ 3.2mm × 100 = 93.75%, expressed as 94/6 ratio. The worst axis is left-right at 80/20, which according to the centering caps table, limits the maximum centering score to 5.0. The card is visibly off-center with the player image shifted toward the left edge."
+"This 2024 Topps Chrome baseball card features a distinctive dark blue border surrounding the player photo. Examining the front borders, I measure: left border ≈ 2.8mm, right border ≈ 3.5mm, top border ≈ 3.0mm, bottom border ≈ 3.2mm. Calculating the left-right ratio: 2.8mm (narrower) ÷ 3.5mm (wider) × 100 = 80%, expressed as 80/20 ratio. For top-bottom: 3.0mm ÷ 3.2mm × 100 = 93.75%, expressed as 94/6 ratio. The worst axis is left-right at 80/20, which according to the centering caps table, limits the maximum centering score to 5. The card is visibly off-center with the player image shifted toward the left edge."
 
 ────────────────────────────────────────────────────────────────────────
 CORNER EXAMPLE (Sports Card with Dark Border)
@@ -574,14 +574,14 @@ EDGE EXAMPLE (Sports Card)
 ────────────────────────────────────────────────────────────────────────
 
 **Right Edge (Front):**
-"The right edge of this basketball card runs along a black border, which provides high contrast for detecting any white fiber exposure. Scanning the full length of this edge from the top-right corner to the bottom-right corner, I detect 3 small white flecks scattered along the edge line. Each fleck measures less than 0.1mm in length and appears as a tiny break in the black border coating where white cardstock shows through. Additionally, examining the factory cut quality, the middle section of this edge (approximately 3mm length) shows slight roughness - the cut line appears fuzzy rather than perfectly straight and clean. The combination of minor whitening (3 flecks) and localized roughness results in an edge score of 9.0 for this specific edge."
+"The right edge of this basketball card runs along a black border, which provides high contrast for detecting any white fiber exposure. Scanning the full length of this edge from the top-right corner to the bottom-right corner, I detect 3 small white flecks scattered along the edge line. Each fleck measures less than 0.1mm in length and appears as a tiny break in the black border coating where white cardstock shows through. Additionally, examining the factory cut quality, the middle section of this edge (approximately 3mm length) shows slight roughness - the cut line appears fuzzy rather than perfectly straight and clean. The combination of minor whitening (3 flecks) and localized roughness results in an edge score of 9 for this specific edge."
 
 ────────────────────────────────────────────────────────────────────────
 SURFACE EXAMPLE (Sports Card with Prizm Holographic Finish)
 ────────────────────────────────────────────────────────────────────────
 
 **Front Surface:**
-"The front surface of this 2023 Panini Prizm football card features a rainbow holographic refractor pattern overlaying the player image. The card displays a silver prizm parallel finish, creating a distinctive rainbow reflection across the entire front surface when viewed at angles. Examining the card under varying lighting angles to assess the holographic layer, I detect one hairline scratch located in the upper-right area of the card, near the player's shoulder. This scratch runs diagonally for approximately 4mm and is visible as a break in the refractor rainbow pattern - when tilting the card, the scratch appears as a dull line where the holographic effect is disrupted. The scratch does not appear to penetrate through to the cardstock level beneath; it is confined to the surface holographic coating. The rest of the surface maintains pristine condition with the rainbow pattern intact, no print defects observed, no staining, and no additional scratches detected in the remaining zones. The single holographic scratch prevents a perfect 10.0 surface score, resulting in a 9.5 grade for the front surface."
+"The front surface of this 2023 Panini Prizm football card features a rainbow holographic refractor pattern overlaying the player image. The card displays a silver prizm parallel finish, creating a distinctive rainbow reflection across the entire front surface when viewed at angles. Examining the card under varying lighting angles to assess the holographic layer, I detect one hairline scratch located in the upper-right area of the card, near the player's shoulder. This scratch runs diagonally for approximately 4mm and is visible as a break in the refractor rainbow pattern - when tilting the card, the scratch appears as a dull line where the holographic effect is disrupted. The scratch does not appear to penetrate through to the cardstock level beneath; it is confined to the surface holographic coating. The rest of the surface maintains pristine condition with the rainbow pattern intact, no print defects observed, no staining, and no additional scratches detected in the remaining zones. The single holographic scratch prevents a perfect 10 surface score, resulting in a 9 grade for the front surface."
 
 ────────────────────────────────────────────────────────────────────────
 MEMORABILIA/RELIC CARD EXAMPLE

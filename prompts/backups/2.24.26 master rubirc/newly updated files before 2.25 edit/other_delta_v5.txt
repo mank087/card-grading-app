@@ -1,0 +1,260 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: OTHER/GENERIC TRADING CARDS v5.5
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains rules for non-sport collectible cards.
+The master grading rubric (Sections 1-13) applies to ALL trading cards.
+This delta provides extraction rules for cards that don't fit other categories.
+
+**CARD TYPES COVERED:**
+• Non-sport trading cards (entertainment, celebrities, movies, TV shows)
+• Yu-Gi-Oh!, Cardfight!! Vanguard, Flesh and Blood, Final Fantasy TCG
+• Dragon Ball Super, Digimon, MetaZoo, Weiss Schwarz
+• Autograph cards, memorabilia/relic cards
+• Any other trading card games not covered by specific deltas
+
+═══════════════════════════════════════════════════════════════════════
+A. GENERIC CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from generic trading cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All Generic Cards)
+────────────────────────────────────────────────────────────────────────
+
+**player_or_character**: PRIMARY CARD SUBJECT (MOST IMPORTANT FIELD)
+• This is the MAIN identifier for the card - the person, character, or subject featured
+• For celebrity/entertainment cards: The person's full name (e.g., "Gisele Bundchen", "Tom Brady")
+• For character cards: The character name (e.g., "Blue-Eyes White Dragon", "Goku")
+• For team/group cards: The group name or primary figure
+• This field should ALWAYS identify WHO or WHAT the card features
+• NEVER use the set name, subset, or product line here
+
+**card_name**: Card name/title
+• The full card title as printed on the card
+• May include player name + subset (e.g., "Gisele Bundchen Pop Century Autograph")
+• For TCGs: Card name as printed (e.g., "Blue-Eyes White Dragon")
+
+**set_name**: Set/expansion/product line name
+• The product line or set the card belongs to
+• Examples: "Pop Century", "Donruss", "Legend of Blue Eyes White Dragon"
+• This is the COLLECTION, not the subject
+• If unclear: null
+
+**card_number**: Card number
+• Format varies by game/product
+• Example: "LOB-001", "#45/100", "123", "GQ-GB"
+• Extract as shown on card
+
+**year**: Release year
+• 4-digit year from copyright text or card design
+• Example: "2024", "2002"
+• If not visible: null
+
+**manufacturer**: Card publisher/producer
+• Extract game publisher or card manufacturer
+• Examples: Panini, Upper Deck, Topps, Konami, Bushiroad, etc.
+• If unclear: null
+
+**authentic**: Licensed product verification (true|false)
+• true if official licensed product
+• Check for official logos and publisher marks
+• false if proxy/counterfeit/unofficial
+
+**autographed**: Does card contain an autograph? (true|false)
+• true if card has ANY signature/autograph (on-card, sticker, cut signature)
+• Check for handwritten signatures anywhere on the card
+• true for certified autograph cards, authenticated signatures
+• false if no signature present
+
+**memorabilia**: Does card contain memorabilia/relic? (true|false)
+• true if card has embedded material (jersey swatch, fabric, game-used item)
+• Check for relic windows or embedded materials
+• true for patch cards, jersey cards, game-used memorabilia
+• false if no embedded materials
+
+**facsimile_autograph**: Does card have official facsimile autograph? (true|false)
+• true if card back explicitly states "Facsimile Autograph", "Facsimile Signature", or similar
+• This is a PRINTED/REPRODUCED signature, NOT hand-signed
+• Card is still authentic and official - grade normally
+• false if no facsimile autograph disclosure present
+• IMPORTANT: facsimile_autograph = true means autographed = false (not hand-signed)
+
+**official_reprint**: Is card an official reprint? (true|false)
+• true if card back explicitly states reproduction/reprint disclosure
+• Common text: "The front of this card is a reproduction...", "Reprint", "Official Reproduction"
+• Part of commemorative or archive series (e.g., Topps Archives)
+• Card is legitimate - grade normally with special feature notation
+• false if no reprint disclosure present
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS (Game-Specific, Extract If Visible)
+────────────────────────────────────────────────────────────────────────
+
+**rarity_tier**: Card rarity
+• Options: Common, Uncommon, Rare, Super Rare, Ultra Rare, Secret Rare, Promo, etc.
+• Rarity symbols vary by game
+• Extract based on visible indicators
+
+**subset**: Subset/variant
+• Options: Holographic, Foil, Parallel, Limited Edition, Promo, etc.
+• Extract if visible
+
+**serial_number**: Serial number (if present)
+• Format: "/99", "1/1", etc.
+• null if not present
+
+**card_type**: Card type classification
+• Examples: Monster, Spell, Trap (Yu-Gi-Oh!), Character, Event, Stage (One Piece), etc.
+• Extract from card type line
+• Game-specific terminology
+
+**card_front_text**: Card text and effects
+• Extract all rules text, abilities, effects
+• Include flavor text if present
+• Use line breaks between sections
+
+**card_back_text**: Card back description (if applicable)
+• Some games have descriptive card backs
+• Most trading cards: standard game back
+• Extract if unique text present, otherwise null
+
+═══════════════════════════════════════════════════════════════════════
+B. GENERIC CARD RARITY CLASSIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+Assign highest visible tier only (in priority order):
+
+**1. 1-of-1**
+• Serial numbered 1/1
+• Unique card
+
+**2. Authenticated Autograph**
+• Manufacturer-verified signature
+• Requires authentication markers
+
+**3. Memorabilia/Relic**
+• Embedded material (fabric, game pieces, etc.)
+• Must be manufacturer-authenticated
+
+**4. Serial Numbered (/2-/99)**
+• Limited print run with serial number
+• Higher rarity based on lower serial count
+
+**5. Holographic/Foil Ultra Rare**
+• Top standard rarity tier
+• Holographic or foil treatment
+
+**6. Super Rare**
+• High rarity tier
+• Game-specific designation
+
+**7. Rare**
+• Standard rare tier
+
+**8. Die-Cut/Special Shape**
+• Non-rectangular shape
+• Shaped edges intentional
+
+**9. Promo**
+• Promotional cards
+• Event exclusives
+
+**10. Uncommon**
+• Middle rarity tier
+
+**11. Common**
+• Most basic rarity
+
+═══════════════════════════════════════════════════════════════════════
+C. GENERIC CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common Generic TCG Defects:**
+
+────────────────────────────────────────────────────────────────────────
+1. HOLOGRAPHIC/FOIL DEFECTS (UNIVERSAL)
+────────────────────────────────────────────────────────────────────────
+
+**Applicable to All Foil Cards:**
+• Holo scratches disrupt reflective pattern
+• Foil peeling or separation
+• Pattern disruption
+
+**Detection:**
+• View at angles under light
+• Look for breaks in holographic effect
+
+**Grading Impact:**
+• Holo scratch: -0.5 to -1.5
+• Foil peeling: -1.5 to -3.0 (serious defect)
+
+────────────────────────────────────────────────────────────────────────
+2. EDGE WEAR ON DARK BORDERS
+────────────────────────────────────────────────────────────────────────
+
+**Many TCGs Have Dark Borders:**
+• Black, dark blue, dark purple borders common
+• Whitening shows high contrast
+• Easy to detect edge wear
+
+**Grading Impact:**
+• Same as standard edge grading
+• Dark borders make defects more visible
+
+────────────────────────────────────────────────────────────────────────
+3. GAME-SPECIFIC PRINTING ISSUES
+────────────────────────────────────────────────────────────────────────
+
+**Variable Print Quality:**
+• Some games have inconsistent print quality
+• Common issues: Print lines, color misregistration, ink spots
+
+**Detection:**
+• Examine surface for manufacturing defects
+• Note print quality issues separately from handling damage
+
+**Grading Impact:**
+• Print defects: -0.3 to -0.7 (manufacturing issue)
+• Not structural damage, doesn't trigger caps
+
+═══════════════════════════════════════════════════════════════════════
+D. GENERIC CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**CENTERING EXAMPLE:**
+"This trading card features a black border frame. Measuring visible borders: left ≈ 2.7mm, right ≈ 3.8mm, top ≈ 3.1mm, bottom ≈ 2.9mm. Left-right ratio: 71/29. Top-bottom ratio: 94/6. Worst axis: left-right at 71/29, capping centering at 6.0."
+
+**CORNER EXAMPLE:**
+"Top-left corner sits against a dark purple border. At maximum zoom, I observe minor white fiber exposure at the corner tip, approximately 0.15mm. The corner maintains relatively sharp geometry but shows slight whitening where the purple border coating has worn. Corner lies flat with no structural damage."
+
+**SURFACE EXAMPLE:**
+"This holographic trading card has a rainbow foil pattern across the artwork. Examining under angled lighting, I detect one hairline scratch in the center area running approximately 5mm. The scratch disrupts the holographic rainbow effect. Rest of surface pristine. Surface score: 9.0 due to single holo scratch."
+
+═══════════════════════════════════════════════════════════════════════
+E. NOTES FOR UNCOMMON/OBSCURE TCGs
+═══════════════════════════════════════════════════════════════════════
+
+**When Grading Unfamiliar Games:**
+
+1. **Apply Universal Grading Principles:**
+   • Use master rubric for all condition assessment
+   • Centering, corners, edges, surface rules are universal
+
+2. **Extract What's Visible:**
+   • Don't guess game-specific terminology
+   • Use descriptive language for unfamiliar elements
+   • Mark fields as null if unclear
+
+3. **Note Game Identity:**
+   • If game can be identified, note it
+   • If unknown, describe card characteristics
+   • Example: "Unknown TCG with fantasy artwork and Japanese text"
+
+4. **Conservative Approach:**
+   • When uncertain about rarity/special features, use conservative tier
+   • Focus on physical condition (universal across all cards)
+   • Document any unique characteristics in notes
+
+--- END OF OTHER DELTA v5.5 ---

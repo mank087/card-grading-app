@@ -247,14 +247,13 @@ The centering, defects, and final_grade sections derive from and explain your pa
 
 For EACH pass:
 1. Evaluate centering, corners, edges, surface independently
-2. Calculate weighted sub-scores
+2. Calculate sub-scores using MIN(front, back) per category
 3. Determine pass final grade using weakest link
 4. Note key defects observed
 
 After all three passes:
 - Calculate averaged scores (arithmetic mean)
-- Round sub-grade averages to nearest 0.5 increment (centering, corners, edges, surface)
-- Round FINAL grade DOWN to whole number (v6.0: no 8.5, 9.5, etc.)
+- Round ALL averages to nearest whole integer using STANDARD rounding (9.5 → 10, 9.4 → 9, 8.5 → 9)
 - Apply defect consensus (include defects from 2+ passes)
 - Note defects from only 1 pass in consensus_notes
 

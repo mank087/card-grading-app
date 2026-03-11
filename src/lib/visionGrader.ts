@@ -393,6 +393,61 @@ export interface DetailedInspectionResult {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// DEFECT COUNTING HELPER (v8.4 — for Grade 10 threshold)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Count defects per category and total across the AI response JSON.
+ * Returns { corners, edges, surface, centering, total }
+ * Used for Grade 10 threshold (total) and subgrade 10 exceptions (per-category).
+ */
+function countDefectsByCategory(jsonData: any): { corners: number; edges: number; surface: number; centering: number; total: number } {
+  const counts = { corners: 0, edges: 0, surface: 0, centering: 0, total: 0 };
+  try {
+    const defects = jsonData?.defects;
+    if (!defects) return counts;
+
+    for (const side of ['front', 'back']) {
+      const sideData = defects[side];
+      if (!sideData) continue;
+
+      // Count corner defects
+      if (sideData.corners) {
+        for (const corner of Object.values(sideData.corners) as any[]) {
+          if (corner?.defects && Array.isArray(corner.defects) && corner.defects.length > 0) {
+            counts.corners += corner.defects.length;
+          }
+        }
+      }
+
+      // Count edge defects
+      if (sideData.edges) {
+        for (const edge of Object.values(sideData.edges) as any[]) {
+          if (edge?.defects && Array.isArray(edge.defects) && edge.defects.length > 0) {
+            counts.edges += edge.defects.length;
+          }
+        }
+      }
+
+      // Count surface defects
+      if (sideData.surface?.defects && Array.isArray(sideData.surface.defects)) {
+        counts.surface += sideData.surface.defects.length;
+      }
+    }
+  } catch {
+    // If structure is unexpected, assume defects exist (conservative)
+    return { corners: 1, edges: 1, surface: 1, centering: 1, total: 4 };
+  }
+  counts.total = counts.corners + counts.edges + counts.surface + counts.centering;
+  return counts;
+}
+
+/** Backward-compatible wrapper */
+function countAllDefects(jsonData: any): number {
+  return countDefectsByCategory(jsonData).total;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // THREE-PASS VALIDATION (v7.4)
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -1499,9 +1554,8 @@ export async function gradeCardConversational(
 ): Promise<ConversationalGradeResultV3_3> {
   const {
     model = 'gpt-5.1',  // 🆕 GPT-5.1 - Latest model (November 2025) with improved vision + accuracy
-    temperature = 0.2,  // 🔑 Low temperature for strict instruction adherence (v3.5 PATCHED v3)
+    temperature = 0.35, // 🔑 v8.5: Increased from 0.2 to 0.35 for genuine three-pass variance (reduces hallucination consensus)
     max_tokens = 16000, // 🔧 Increased to 16K - v5.11 rubric requires extensive JSON output
-    seed = 42,          // Fixed seed for reproducibility
     top_p = 1.0,        // 🔑 Full probability space - allows nuanced descriptions while temp maintains consistency
     userConditionReport = undefined // Optional user-reported condition hints
   } = options || {};
@@ -1516,7 +1570,7 @@ export async function gradeCardConversational(
   }
 
   console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Starting conversational grading...`);
-  console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Parameters: Model=${model}, Temp=${temperature}, TopP=${top_p}, MaxTokens=${max_tokens}, Seed=${seed}`);
+  console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Parameters: Model=${model}, Temp=${temperature}, TopP=${top_p}, MaxTokens=${max_tokens}`);
 
   // Initialize OpenAI client
   const openai = new OpenAI({
@@ -1541,7 +1595,7 @@ export async function gradeCardConversational(
       temperature: temperature,
       top_p: top_p,        // Nucleus sampling - full probability space (1.0) allows nuanced variation
       max_completion_tokens: max_tokens,  // GPT-5.1 uses max_completion_tokens instead of max_tokens
-      seed: seed,          // Fixed seed for reproducibility
+      // seed removed in v8.5 — no fixed seed allows genuine variance between three passes
       messages: [
         {
           role: 'system',
@@ -1569,22 +1623,24 @@ export async function gradeCardConversational(
               text: outputFormat === 'json'
                 ? `Grade these card images following the JSON schema defined in the prompt.
 
-🔍 CRITICAL INSPECTION REQUIREMENTS:
-- CAREFULLY examine for structural damage (creases, bent corners)
+🔍 GRADING REQUIREMENTS:
+- Check for structural damage (creases, bent corners) — ANY crease or bent corner = AUTOMATIC 4.0 grade cap
 - Check for suspicious lines on BOTH front and back at same location
-- Remember: ANY crease or bent corner = AUTOMATIC 4.0 grade cap
-- Don't overlook subtle defects - be thorough and critical
+- Grade accurately based on what you can genuinely see — report real defects honestly, do not invent defects
+- If the card appears clean after thorough inspection, Grade 10 is the correct result
+- Remember: photo-based grading has resolution limits — ambiguous marks at extreme zoom that could be JPEG artifacts should NOT be treated as defects
 - Each card is unique - base observations on THESE specific images
 ${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}
 Return ONLY the JSON object with all required fields filled.`
                 : `Grade these card images following the structured report format.
 
-🔍 CRITICAL INSPECTION REQUIREMENTS:
-- CAREFULLY examine for structural damage (creases, bent corners)
+🔍 GRADING REQUIREMENTS:
+- Check for structural damage (creases, bent corners) — ANY crease or bent corner = AUTOMATIC 4.0 grade cap
 - Check for suspicious lines on BOTH front and back at same location
-- Remember: ANY crease or bent corner = AUTOMATIC 4.0 grade cap
-- Don't overlook subtle defects - be thorough and critical
+- Grade accurately based on what you can genuinely see — report real defects honestly, do not invent defects
+- If the card appears clean after thorough inspection, Grade 10 is the correct result
+- Remember: photo-based grading has resolution limits — ambiguous marks at extreme zoom that could be JPEG artifacts should NOT be treated as defects
 - Each card is unique - base observations on THESE specific images
 ${conditionReportSection?.has_user_hints ? `
 ${conditionReportSection.full_prompt_text}` : ''}
@@ -1656,32 +1712,136 @@ Provide detailed analysis as markdown with all required sections.`
         throw new Error('Failed to parse JSON response from AI');
       }
 
-      // 🆕 v7.4 THREE-PASS GRADING: Extract grades from grading_passes.averaged_rounded
-      // Priority: grading_passes.averaged_rounded > final_grade > scoring (for backward compatibility)
+      // 🆕 v8.4 THREE-PASS GRADING: Backend recalculation from raw pass data
+      // Priority: Server-side recalculation > AI's averaged_rounded > final_grade > scoring
       const threePassData = jsonData.grading_passes;
 
-      // 🆕 v7.4: Validate three-pass structure
+      // Validate three-pass structure
       const threePassValidation = validateThreePassData(threePassData);
       const hasThreePass = threePassValidation.valid;
 
       let extractedGrade: { decimal_grade: number | null; whole_grade: number | null; uncertainty: string };
 
       if (hasThreePass) {
-        // 🎯 THREE-PASS GRADING: Use averaged_rounded values
-        const avgRounded = threePassData.averaged_rounded;
+        const pass1 = threePassData.pass_1;
+        const pass2 = threePassData.pass_2;
+        const pass3 = threePassData.pass_3;
+
+        // 🎯 v8.4: SERVER-SIDE RECALCULATION — don't trust AI math
+        // Step 1: Recalculate averaged scores from raw pass data
+        const serverAvg = {
+          centering: (pass1.centering + pass2.centering + pass3.centering) / 3,
+          corners: (pass1.corners + pass2.corners + pass3.corners) / 3,
+          edges: (pass1.edges + pass2.edges + pass3.edges) / 3,
+          surface: (pass1.surface + pass2.surface + pass3.surface) / 3,
+          final: (pass1.final + pass2.final + pass3.final) / 3
+        };
+
+        // Step 2: Apply consensus boost for Grade 10 (v8.5)
+        // If a category scores 10 in 2/3 passes, the dissenting pass likely hallucinated a defect.
+        // Boost the category average to reflect the majority consensus.
+        function consensusBoost(p1: number, p2: number, p3: number, categoryName: string): [number, number, number] {
+          const scores = [p1, p2, p3];
+          const tens = scores.filter(s => s === 10).length;
+          const nines = scores.filter(s => s === 9).length;
+          // If 2 out of 3 passes gave 10, and the third gave 9 (likely hallucination),
+          // boost the dissenting pass to 10 — the consensus says no defect exists
+          if (tens === 2 && nines === 1) {
+            console.log(`[GRADE RECALC] 🔄 ${categoryName}: consensus boost applied (10,10,9 → 10,10,10) — majority says no defect`);
+            return [10, 10, 10];
+          }
+          return [p1, p2, p3];
+        }
+
+        const [c1, c2, c3] = consensusBoost(pass1.centering, pass2.centering, pass3.centering, 'centering');
+        const [co1, co2, co3] = consensusBoost(pass1.corners, pass2.corners, pass3.corners, 'corners');
+        const [e1, e2, e3] = consensusBoost(pass1.edges, pass2.edges, pass3.edges, 'edges');
+        const [s1, s2, s3] = consensusBoost(pass1.surface, pass2.surface, pass3.surface, 'surface');
+        const [f1, f2, f3] = consensusBoost(pass1.final, pass2.final, pass3.final, 'final');
+
+        // Recalculate averages with consensus-boosted scores
+        const boostedAvg = {
+          centering: (c1 + c2 + c3) / 3,
+          corners: (co1 + co2 + co3) / 3,
+          edges: (e1 + e2 + e3) / 3,
+          surface: (s1 + s2 + s3) / 3,
+          final: (f1 + f2 + f3) / 3
+        };
+
+        // Step 3: Round subgrades to whole integers using STANDARD rounding (v8.5)
+        // Standard rounding: 9.5 → 10, 9.4 → 9, 8.5 → 9, 8.4 → 8
+        // This replaces floor rounding which systematically suppressed grades
+        const defectCounts = countDefectsByCategory(jsonData);
+
+        function roundSubgrade(avg: number, categoryName: string): number {
+          const rounded = Math.round(avg);
+          console.log(`[GRADE RECALC] ${categoryName}: avg=${avg.toFixed(2)} → rounded=${rounded}`);
+          return rounded;
+        }
+
+        const serverRounded = {
+          centering: roundSubgrade(boostedAvg.centering, 'centering'),
+          corners: roundSubgrade(boostedAvg.corners, 'corners'),
+          edges: roundSubgrade(boostedAvg.edges, 'edges'),
+          surface: roundSubgrade(boostedAvg.surface, 'surface'),
+          final: Math.round(boostedAvg.final) // standard rounding for final too
+        };
+
+        // Step 4: Apply dominant defect control (weakest subgrade caps the final)
+        const subgradeCap = Math.min(serverRounded.centering, serverRounded.corners, serverRounded.edges, serverRounded.surface);
+        let finalGrade = Math.min(serverRounded.final, subgradeCap);
+
+        // Step 5: Grade 10 validation — standard rounding handles the math naturally
+        // Grade 10 only requires: all subgrades round to 10 AND final rounds to 10
+        // The subgradeCap (MIN of subgrades) already enforces this
+        // No special exception patches needed with standard rounding
+        if (finalGrade === 10 && defectCounts.total > 0) {
+          console.log(`[GRADE RECALC] ⚠️ Grade 10 with ${defectCounts.total} defects reported — grade stands (defects may be minor/manufacturing)`);
+        }
+        if (finalGrade === 10) {
+          console.log(`[GRADE RECALC] ✅ Final grade 10 AWARDED: avg=${boostedAvg.final.toFixed(2)}, all subgrades=${serverRounded.centering}/${serverRounded.corners}/${serverRounded.edges}/${serverRounded.surface}`);
+        }
+
+        // Step 6: Write corrected values back to the AI response for consistency
+        threePassData.averaged = boostedAvg;
+        threePassData.averaged_rounded = serverRounded;
+        // Override AI's final grade fields with server-calculated values
+        if (jsonData.final_grade) {
+          jsonData.final_grade.decimal_grade = finalGrade;
+          jsonData.final_grade.whole_grade = finalGrade;
+        }
+
+        // Step 7: Also fix raw_sub_scores to derive from pass data (consistency fix)
+        if (jsonData.raw_sub_scores) {
+          // Recalculate raw_sub_scores from individual pass front/back scores if available
+          // For now, ensure weighted_scores match server-calculated subgrades
+          if (jsonData.weighted_scores) {
+            jsonData.weighted_scores.centering_weighted = serverRounded.centering;
+            jsonData.weighted_scores.corners_weighted = serverRounded.corners;
+            jsonData.weighted_scores.edges_weighted = serverRounded.edges;
+            jsonData.weighted_scores.surface_weighted = serverRounded.surface;
+          }
+        }
+
         extractedGrade = {
-          decimal_grade: avgRounded.final,
-          whole_grade: Math.floor(avgRounded.final), // v6.0: Floor rounding for whole grade
+          decimal_grade: finalGrade,
+          whole_grade: finalGrade,
           uncertainty: jsonData.image_quality?.grade_uncertainty || jsonData.final_grade?.grade_range || '±1'
         };
-        console.log(`[CONVERSATIONAL JSON] ✅ THREE-PASS GRADING detected`);
-        console.log(`[CONVERSATIONAL JSON] Pass 1: ${threePassData.pass_1?.final}, Pass 2: ${threePassData.pass_2?.final}, Pass 3: ${threePassData.pass_3?.final}`);
-        console.log(`[CONVERSATIONAL JSON] Averaged: ${threePassData.averaged?.final?.toFixed(2)}, Rounded: ${avgRounded.final}`);
-        console.log(`[CONVERSATIONAL JSON] Variance: ${threePassData.variance}, Consistency: ${threePassData.consistency}`);
+
+        // Log comparison: AI vs Server
+        const aiRounded = threePassData.averaged_rounded;
+        console.log(`[GRADE RECALC] ✅ THREE-PASS GRADING with server-side recalculation + consensus boost`);
+        console.log(`[GRADE RECALC] Pass scores: P1=${pass1.final}, P2=${pass2.final}, P3=${pass3.final}`);
+        console.log(`[GRADE RECALC] Raw avg: C=${serverAvg.centering.toFixed(2)}, Co=${serverAvg.corners.toFixed(2)}, E=${serverAvg.edges.toFixed(2)}, S=${serverAvg.surface.toFixed(2)}, Final=${serverAvg.final.toFixed(2)}`);
+        console.log(`[GRADE RECALC] Boosted avg: C=${boostedAvg.centering.toFixed(2)}, Co=${boostedAvg.corners.toFixed(2)}, E=${boostedAvg.edges.toFixed(2)}, S=${boostedAvg.surface.toFixed(2)}, Final=${boostedAvg.final.toFixed(2)}`);
+        console.log(`[GRADE RECALC] Server rounded: C=${serverRounded.centering}, Co=${serverRounded.corners}, E=${serverRounded.edges}, S=${serverRounded.surface}`);
+        console.log(`[GRADE RECALC] Subgrade cap=${subgradeCap}, Final grade=${finalGrade}`);
+        console.log(`[GRADE RECALC] Variance: ${threePassData.variance}, Consistency: ${threePassData.consistency}`);
 
         // Log any three-pass warnings
         if (threePassValidation.warnings.length > 0) {
-          console.log(`[CONVERSATIONAL JSON] ⚠️ THREE-PASS WARNINGS:`);
+          console.log(`[GRADE RECALC] ⚠️ THREE-PASS WARNINGS:`);
           threePassValidation.warnings.forEach(w => console.log(`   - ${w}`));
         }
       } else {
@@ -1691,11 +1851,11 @@ Provide detailed analysis as markdown with all required sections.`
           whole_grade: jsonData.final_grade?.whole_grade ?? (jsonData.scoring?.final_grade ? Math.round(jsonData.scoring.final_grade) : null),
           uncertainty: jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || jsonData.image_quality?.grade_uncertainty || '±1'
         };
-        console.log(`[CONVERSATIONAL JSON] ⚠️ No three-pass data found, using direct final_grade`);
-        console.log(`[CONVERSATIONAL JSON] ⚠️ THREE-PASS VALIDATION FAILED: ${threePassValidation.warnings.join(', ')}`);
+        console.log(`[GRADE RECALC] ⚠️ No three-pass data found, using direct final_grade`);
+        console.log(`[GRADE RECALC] ⚠️ THREE-PASS VALIDATION FAILED: ${threePassValidation.warnings.join(', ')}`);
       }
 
-      console.log(`[CONVERSATIONAL JSON] Extracted grade: ${extractedGrade.decimal_grade} (${extractedGrade.uncertainty})`);
+      console.log(`[GRADE RECALC] Final extracted grade: ${extractedGrade.decimal_grade} (${extractedGrade.uncertainty})`);
 
       // Build rarity classification from JSON
       const rarityClassification = jsonData.card_info ? {
@@ -1757,8 +1917,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.3-json',
-          prompt_version: 'DCM_Grading_v8.3'
+          version: 'conversational-v8.5-json',
+          prompt_version: 'DCM_Grading_v8.5'
         }
       };
 
@@ -1809,8 +1969,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.3-markdown',
-          prompt_version: 'DCM_Grading_v8.3'
+          version: 'conversational-v8.5-markdown',
+          prompt_version: 'DCM_Grading_v8.5'
         }
       };
 

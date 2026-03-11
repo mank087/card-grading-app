@@ -11,7 +11,7 @@
  */
 
 import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from './foldableLabelGenerator';
-import { extractAsciiSafe } from './labelDataGenerator';
+import { extractAsciiSafe, extractAsciiSafePreserveBullets } from './labelDataGenerator';
 
 // Canvas dimensions - card ratio 2.5" x 3.5" (standard trading card)
 // Label adds ~110px height at 400px width scale
@@ -312,7 +312,7 @@ async function drawFrontLabel(
   // Line 2: Context line (Set • Subset • #Number • Year) - use pre-formatted contextLine
   // This matches labelDataGenerator for consistency across all label displays
   ctx.fillStyle = COLORS.textMedium;
-  const setInfo = data.contextLine ? extractAsciiSafe(data.contextLine, '') : '';
+  const setInfo = data.contextLine ? extractAsciiSafePreserveBullets(data.contextLine, '') : '';
 
   const setFontSize = 24;
   const setLines = wrapText(setInfo, infoMaxWidth, setFontSize);
@@ -325,7 +325,7 @@ async function drawFrontLabel(
 
   // Line 3: Special Features (if present) - increased from 18 to 20
   if (data.specialFeatures) {
-    const safeFeatures = extractAsciiSafe(data.specialFeatures, '');
+    const safeFeatures = extractAsciiSafePreserveBullets(data.specialFeatures, '');
     if (safeFeatures) {
       ctx.fillStyle = COLORS.featureBlue;
       ctx.font = 'bold 20px "Helvetica Neue", Arial, sans-serif';
@@ -726,7 +726,7 @@ async function drawModernFrontLabel(
 
   // Line 2: Context line (Set • Subset • #Number • Year) - with text wrapping
   ctx.fillStyle = MODERN_COLORS.textWhiteMuted;
-  const setInfo = data.contextLine ? extractAsciiSafe(data.contextLine, '') : '';
+  const setInfo = data.contextLine ? extractAsciiSafePreserveBullets(data.contextLine, '') : '';
   const setFontSize = 22;
   const setLines = wrapText(setInfo, infoMaxWidth, setFontSize);
   ctx.font = `${setFontSize}px 'Helvetica Neue', Arial, sans-serif`;
@@ -738,7 +738,7 @@ async function drawModernFrontLabel(
 
   // Line 3: Special Features
   if (data.specialFeatures) {
-    const safeFeatures = extractAsciiSafe(data.specialFeatures, '');
+    const safeFeatures = extractAsciiSafePreserveBullets(data.specialFeatures, '');
     if (safeFeatures) {
       ctx.fillStyle = MODERN_COLORS.textGreen;
       ctx.font = 'bold 20px "Helvetica Neue", Arial, sans-serif';

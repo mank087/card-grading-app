@@ -157,6 +157,20 @@ export function extractAsciiSafe(
   return fallback;
 }
 
+/**
+ * Like extractAsciiSafe but preserves bullet separators (•) used in context/features lines.
+ * The base function strips all non-ASCII chars including bullets.
+ */
+export function extractAsciiSafePreserveBullets(
+  text: string,
+  fallback: string = ''
+): string {
+  const placeholder = '::B::';
+  const preserved = text.replace(/\u2022/g, placeholder);
+  const safe = extractAsciiSafe(preserved, fallback);
+  return safe.replace(new RegExp(placeholder, 'g'), '\u2022');
+}
+
 // ============================================================================
 // TYPES
 // ============================================================================
@@ -1156,6 +1170,30 @@ export function getLabelData(card: CardForLabel & { label_data?: LabelData | nul
 
   // Otherwise generate it
   return generateLabelData(card);
+}
+
+// ============================================================================
+// CONTEXT LINE / FEATURES LINE BUILDERS (used by custom label overrides)
+// ============================================================================
+
+/** Rebuild contextLine from its component parts (Set • Subset • #Number • Year) */
+export function buildContextLine(
+  setName: string | null | undefined,
+  subset: string | null | undefined,
+  cardNumber: string | null | undefined,
+  year: string | null | undefined
+): string {
+  const parts: string[] = [];
+  if (setName) parts.push(setName);
+  if (subset) parts.push(subset);
+  if (cardNumber) parts.push(cardNumber);
+  if (year) parts.push(year);
+  return parts.join(' \u2022 ');
+}
+
+/** Rebuild featuresLine from features array */
+export function buildFeaturesLine(features: string[]): string | null {
+  return features.length > 0 ? features.join(' \u2022 ') : null;
 }
 
 // ============================================================================

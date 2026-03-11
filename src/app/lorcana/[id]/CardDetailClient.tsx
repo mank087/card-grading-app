@@ -50,6 +50,8 @@ import { DefectOverlay } from '@/components/grading/DefectOverlay';
 import { DefectLegend } from '@/components/grading/DefectLegend';
 import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
 import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
+import { EditCardLabelModal } from '@/components/EditCardLabelModal';
+import EditCardDetailsButton from '@/components/cards/EditCardDetailsButton';
 import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
 
 interface SportsAIGrading {
@@ -1448,6 +1450,7 @@ export function MTGCardDetails() {
   const [showFirstGradeModal, setShowFirstGradeModal] = useState(false);
   // 🎯 Onboarding tour state
   const [showOnboardingTour, setShowOnboardingTour] = useState(false);
+  const [showEditLabelModal, setShowEditLabelModal] = useState(false);
   const [frontDefects, setFrontDefects] = useState<OverlayDefect[]>([]);
   const [backDefects, setBackDefects] = useState<OverlayDefect[]>([]);
   const [hoveredDefect, setHoveredDefect] = useState<OverlayDefect | null>(null);
@@ -2831,6 +2834,23 @@ export function MTGCardDetails() {
               </div>
               </div>
               <p className="text-xs text-white/80 mt-1 text-center">Click to zoom</p>
+              {/* Edit Card Label — owner only */}
+              {(() => {
+                const session = getStoredSession();
+                const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                if (!isOwner) return null;
+                return (
+                  <button
+                    onClick={() => setShowEditLabelModal(true)}
+                    className="mt-1 text-xs text-purple-300 hover:text-purple-100 transition-colors flex items-center justify-center gap-1 w-full"
+                  >
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                    Edit Card Label
+                  </button>
+                );
+              })()}
             </div>
 
             {/* Back Card with Label - Metallic Slab */}
@@ -2913,7 +2933,7 @@ export function MTGCardDetails() {
                             className="font-semibold tracking-wide"
                             style={{
                               fontSize: '8px',
-                              color: '#ec4899',
+                              color: '#f43f5e',
                               writingMode: 'vertical-rl',
                               transform: 'rotate(180deg)',
                               marginTop: '3px',
@@ -3511,9 +3531,28 @@ export function MTGCardDetails() {
 
               {/* Lorcana Card Information Section */}
               <div className="bg-white rounded-xl shadow-lg border-2 border-gray-200 p-6 mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200">
-                  🎴 Card Information
-                </h2>
+                <div className="flex items-center justify-between mb-6 pb-3 border-b-2 border-gray-200">
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    🎴 Card Information
+                  </h2>
+                  {(() => {
+                    const session = getStoredSession();
+                    const isOwner = session?.user?.id && card?.user_id && session.user.id === card.user_id;
+                    if (!isOwner) return null;
+                    return (
+                      <div id="tour-edit-details">
+                      <EditCardDetailsButton
+                        card={card}
+                        currentUserId={session?.user?.id}
+                        onEditComplete={(updatedCard) => {
+                          window.location.reload();
+                        }}
+                        variant="icon-only"
+                      />
+                      </div>
+                    );
+                  })()}
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
@@ -6553,6 +6592,30 @@ export function MTGCardDetails() {
         balance={balance}
         isFirstPurchase={isFirstPurchase}
       />
+
+      {/* Edit Card Label Modal */}
+      {card && (
+        <EditCardLabelModal
+          isOpen={showEditLabelModal}
+          onClose={() => setShowEditLabelModal(false)}
+          cardId={card.id}
+          labelData={labelData}
+          hasCustomLabel={!!card.custom_label_data}
+          onSaved={async () => {
+            try {
+              const session = getStoredSession();
+              const userParam = session?.user?.id ? `&user_id=${session.user.id}` : '';
+              const res = await fetch(`/api/lorcana/${card.id}?t=${Date.now()}${userParam}`);
+              if (res.ok) {
+                const data = await res.json();
+                setCard(data);
+              }
+            } catch (e) {
+              console.error('Failed to refresh card after label edit:', e);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }
