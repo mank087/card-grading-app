@@ -641,16 +641,56 @@ function getMirroredLabelPosition(index: number) {
   return { cellX, cellY, labelX: cellX + CUT_MARGIN, labelY: cellY + CUT_MARGIN };
 }
 
+// Trim inset: cut guides are slightly inside the full label dimensions
+// so that imprecise cutting still produces a label that fits the holder.
+const TRIM_INSET_IN = 0.02; // 0.02" per side
+const TRIM_INSET_PT = TRIM_INSET_IN * INCH;
+const CUT_WIDTH = LABEL_WIDTH - TRIM_INSET_PT * 2;   // ~2.76" cut area
+const CUT_HEIGHT = LABEL_HEIGHT - TRIM_INSET_PT * 2;  // ~0.76" cut area
+
 /**
- * Draw cut guides (dotted lines + scissor icons).
- * The cut line sits exactly at the label edge (2.8" x 0.8").
- * Uses white lines for modern (dark) style, black for traditional (light).
+ * Draw L-shaped corner crop marks at the four corners of the cut area.
+ * Used on both front and back pages for alignment guidance.
  */
-function drawCutGuides(doc: jsPDF, labelX: number, labelY: number, style: 'modern' | 'traditional' = 'traditional') {
-  const cutX = labelX;
-  const cutY = labelY;
-  const cutW = LABEL_WIDTH;   // 2.8" = 201.6pt
-  const cutH = LABEL_HEIGHT;  // 0.8" = 57.6pt
+function drawCornerMarks(doc: jsPDF, labelX: number, labelY: number, style: 'modern' | 'traditional' = 'traditional') {
+  const cutX = labelX + TRIM_INSET_PT;
+  const cutY = labelY + TRIM_INSET_PT;
+  const cutW = CUT_WIDTH;
+  const cutH = CUT_HEIGHT;
+
+  const guideColor = style === 'modern' ? '#ffffff' : '#000000';
+  const markLen = 8; // length of each arm of the L-shape in points
+
+  doc.setDrawColor(guideColor);
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([], 0); // solid lines for corner marks
+
+  // Top-left corner
+  doc.line(cutX - markLen, cutY, cutX, cutY);         // horizontal
+  doc.line(cutX, cutY - markLen, cutX, cutY);          // vertical
+
+  // Top-right corner
+  doc.line(cutX + cutW, cutY, cutX + cutW + markLen, cutY);
+  doc.line(cutX + cutW, cutY - markLen, cutX + cutW, cutY);
+
+  // Bottom-left corner
+  doc.line(cutX - markLen, cutY + cutH, cutX, cutY + cutH);
+  doc.line(cutX, cutY + cutH, cutX, cutY + cutH + markLen);
+
+  // Bottom-right corner
+  doc.line(cutX + cutW, cutY + cutH, cutX + cutW + markLen, cutY + cutH);
+  doc.line(cutX + cutW, cutY + cutH, cutX + cutW, cutY + cutH + markLen);
+}
+
+/**
+ * Draw full cut guides on the FRONT page: dotted rectangle + scissors + corner marks.
+ * The cut area is inset by TRIM_INSET so the cut label fits the holder.
+ */
+function drawFrontCutGuides(doc: jsPDF, labelX: number, labelY: number, style: 'modern' | 'traditional' = 'traditional') {
+  const cutX = labelX + TRIM_INSET_PT;
+  const cutY = labelY + TRIM_INSET_PT;
+  const cutW = CUT_WIDTH;
+  const cutH = CUT_HEIGHT;
 
   const guideColor = style === 'modern' ? '#ffffff' : '#000000';
   doc.setDrawColor(guideColor);
@@ -666,6 +706,9 @@ function drawCutGuides(doc: jsPDF, labelX: number, labelY: number, style: 'moder
   doc.text('\u2702', cutX + cutW + 1, cutY + 3);
   doc.text('\u2702', cutX - 7, cutY + cutH + 3);
   doc.text('\u2702', cutX + cutW + 1, cutY + cutH + 3);
+
+  // Also add corner marks on front for consistency
+  drawCornerMarks(doc, labelX, labelY, style);
 }
 
 function drawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: number, totalPages: number) {
@@ -713,18 +756,18 @@ export async function generateSlabLabel(
   const singleX = (PAGE_WIDTH - LABEL_WIDTH) / 2;
   const singleY = (PAGE_HEIGHT - LABEL_HEIGHT) / 2;
 
-  // Render front label
+  // Render front label — full cut guides (dotted lines + scissors + corner marks)
   const frontImg = await renderFrontLabelCanvas(data, style);
   drawPageHeader(doc, 'front', 1, 1);
   placeLabelImage(doc, frontImg, singleX, singleY);
-  drawCutGuides(doc, singleX, singleY, style);
+  drawFrontCutGuides(doc, singleX, singleY, style);
 
-  // Page 2: Back label
+  // Page 2: Back label — corner marks only (no dotted lines)
   doc.addPage('letter', 'portrait');
   const backImg = await renderBackLabelCanvas(data, style);
   drawPageHeader(doc, 'back', 1, 1);
   placeLabelImage(doc, backImg, singleX, singleY);
-  drawCutGuides(doc, singleX, singleY, style);
+  drawCornerMarks(doc, singleX, singleY, style);
 
   return doc.output('blob');
 }
@@ -762,23 +805,23 @@ export async function generateBatchSlabLabels(
 
     if (sheet > 0) doc.addPage('letter', 'portrait');
 
-    // Front side
+    // Front side — full cut guides
     drawPageHeader(doc, 'front', sheet + 1, totalSheets);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
       const { labelX, labelY } = getLabelPosition(gridIdx);
       placeLabelImage(doc, frontImages[i], labelX, labelY);
-      drawCutGuides(doc, labelX, labelY, style);
+      drawFrontCutGuides(doc, labelX, labelY, style);
     }
 
-    // Back side (new page, mirrored X)
+    // Back side (new page, mirrored X) — corner marks only
     doc.addPage('letter', 'portrait');
     drawPageHeader(doc, 'back', sheet + 1, totalSheets);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
       const { labelX, labelY } = getMirroredLabelPosition(gridIdx);
       placeLabelImage(doc, backImages[i], labelX, labelY);
-      drawCutGuides(doc, labelX, labelY, style);
+      drawCornerMarks(doc, labelX, labelY, style);
     }
   }
 

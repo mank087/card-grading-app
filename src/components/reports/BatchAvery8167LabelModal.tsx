@@ -9,7 +9,7 @@ import {
   generateToploaderLabelSheetMultiPage,
   getAvery8167CardsPerPage
 } from '../../lib/avery8167LabelGenerator';
-import { getLabelData } from '../../lib/labelDataGenerator';
+import { getCardLabelData } from '../../lib/useLabelData';
 import LabelPositionGrid8167 from './LabelPositionGrid8167';
 import UnassignedCardsList from './UnassignedCardsList';
 
@@ -267,10 +267,10 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
 
   // Build label data for a card
   const buildLabelData = (card: CardData): ToploaderLabelData => {
-    const cleanLabelData = getLabelData(card as Parameters<typeof getLabelData>[0]);
+    const cleanLabelData = getCardLabelData(card);
     const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
 
-    // Use primaryName from getLabelData - this uses intelligent category-specific logic
+    // Use primaryName from getCardLabelData - this uses intelligent category-specific logic + custom overrides
     // (e.g., player_or_character for Sports, pokemon name with variant for Pokemon, etc.)
     return {
       grade: cleanLabelData.grade ?? 0,

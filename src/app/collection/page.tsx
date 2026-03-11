@@ -86,6 +86,15 @@ type Card = {
   } | null
   // 🏴‍☠️ One Piece variant type
   op_variant_type?: string | null
+  // ✏️ User-edited label overrides
+  custom_label_data?: {
+    primaryName?: string
+    setName?: string | null
+    subset?: string | null
+    cardNumber?: string | null
+    year?: string | null
+    features?: string[]
+  } | null
 }
 
 // 🎯 Helper: Strip markdown formatting from text
@@ -101,17 +110,33 @@ const getCardInfo = (card: Card) => {
   const dvgGrading = card.ai_grading || {};
   // Legacy ai_grading uses "Card Information" (with spaces), newer uses card_info
   const legacyCardInfo = dvgGrading["Card Information"] || dvgGrading.card_info || {};
-  const setNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || legacyCardInfo.set_name;
-  const subset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || legacyCardInfo.subset;
+  const custom = card.custom_label_data;
+
+  // Base AI-detected values
+  const aiCardName = stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || legacyCardInfo.card_name;
+  const aiPlayerOrCharacter = stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || legacyCardInfo.player_or_character;
+  const aiSetNameRaw = stripMarkdown(card.conversational_card_info?.set_name) || card.card_set || legacyCardInfo.set_name;
+  const aiSubset = stripMarkdown(card.conversational_card_info?.subset) || card.subset || legacyCardInfo.subset;
+  const aiYear = stripMarkdown(card.conversational_card_info?.year) || card.release_date || legacyCardInfo.year;
+  const aiCardNumber = stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || legacyCardInfo.card_number;
+
+  // Apply custom_label_data overrides (user edits take priority)
+  const cardName = custom?.primaryName || aiCardName;
+  const playerOrCharacter = custom?.primaryName || aiPlayerOrCharacter;
+  const setNameRaw = custom?.setName !== undefined ? (custom.setName || '') : aiSetNameRaw;
+  const subset = custom?.subset !== undefined ? (custom.subset || '') : aiSubset;
+  const year = custom?.year !== undefined ? (custom.year || '') : aiYear;
+  const cardNumber = custom?.cardNumber !== undefined ? (custom.cardNumber || '') : aiCardNumber;
+
   // Combine set name with subset if available (matching foldable label format)
   const setNameWithSubset = subset ? `${setNameRaw} - ${subset}` : setNameRaw;
   return {
-    card_name: stripMarkdown(card.conversational_card_info?.card_name) || card.card_name || legacyCardInfo.card_name,
-    player_or_character: stripMarkdown(card.conversational_card_info?.player_or_character) || card.featured || legacyCardInfo.player_or_character,
+    card_name: cardName,
+    player_or_character: playerOrCharacter,
     set_name: setNameWithSubset,
-    year: stripMarkdown(card.conversational_card_info?.year) || card.release_date || legacyCardInfo.year,
+    year: year,
     manufacturer: stripMarkdown(card.conversational_card_info?.manufacturer) || card.manufacturer_name || legacyCardInfo.manufacturer,
-    card_number: stripMarkdown(card.conversational_card_info?.card_number_raw) || stripMarkdown(card.conversational_card_info?.card_number) || card.card_number || legacyCardInfo.card_number,
+    card_number: cardNumber,
     serial_numbering: stripMarkdown(card.conversational_card_info?.serial_numbering) || stripMarkdown(card.conversational_card_info?.serial_number) || legacyCardInfo.serial_number,
     rookie_or_first: card.conversational_card_info?.rookie_or_first || legacyCardInfo.rookie_or_first,
     subset: subset, // Insert/subset name (e.g., "Downtown") - NOT used for variant search

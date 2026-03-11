@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { getAveryConfig, CalibrationOffsets, generateAveryLabelSheet, generateAveryLabelSheetMultiPage } from '../../lib/averyLabelGenerator';
 import { generateQRCodePlain, loadLogoAsBase64 } from '../../lib/foldableLabelGenerator';
-import { getLabelData } from '../../lib/labelDataGenerator';
+import { getCardLabelData } from '../../lib/useLabelData';
 import { FoldableLabelData } from '../../lib/foldableLabelGenerator';
 import LabelPositionGrid from './LabelPositionGrid';
 import UnassignedCardsList from './UnassignedCardsList';
@@ -285,7 +285,7 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
 
   // Build label data for a card
   const buildLabelData = async (card: CardData): Promise<FoldableLabelData> => {
-    const cleanLabelData = getLabelData(card as Parameters<typeof getLabelData>[0]);
+    const cleanLabelData = getCardLabelData(card);
 
     // Get subgrades
     const weightedScores = card.conversational_weighted_sub_scores || {};

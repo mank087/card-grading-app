@@ -3,7 +3,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { generateBatchSlabLabels, getSlabLabelConfig, SlabLabelData } from '../../lib/slabLabelGenerator';
 import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
-import { getLabelData } from '../../lib/labelDataGenerator';
+import { getCardLabelData } from '../../lib/useLabelData';
 
 interface CardData {
   id: string;
@@ -30,6 +30,8 @@ interface CardData {
   show_founder_badge?: boolean;
   show_vip_badge?: boolean;
   show_card_lover_badge?: boolean;
+  // User-edited label overrides
+  custom_label_data?: Record<string, unknown> | null;
 }
 
 interface BatchSlabLabelModalProps {
@@ -76,7 +78,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     logoDataUrl: string | undefined,
     whiteLogoDataUrl: string | undefined
   ): Promise<SlabLabelData> => {
-    const cleanLabelData = getLabelData(card as Parameters<typeof getLabelData>[0]);
+    const cleanLabelData = getCardLabelData(card);
 
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
