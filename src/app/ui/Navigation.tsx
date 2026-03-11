@@ -527,17 +527,7 @@ export default function Navigation() {
                   )}
                 </div>
               </>
-            ) : (
-              <>
-                {/* Logged Out: Sign Up Button */}
-                <Link
-                  href="/login?mode=signup"
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-md"
-                >
-                  1 Free Grade
-                </Link>
-              </>
-            )}
+            ) : null}
 
             {/* Hamburger Menu Button */}
             <button
