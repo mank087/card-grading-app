@@ -359,14 +359,15 @@ async function renderFrontLabelCanvas(
     ? 'AUTHENTIC'
     : (data.condition || '').toUpperCase();
 
-  // Modern uses larger grade/condition to match back label; traditional keeps original sizes
-  const gradeAreaWidth = isModern ? 130 : 100;
+  // Grade area sized to fit the large grade number (matches back label for both styles)
+  const gradeAreaWidth = 130;
   const gradeRightPadding = padding + 20; // extra inset so grade doesn't touch cut line
   const gradeCenterX = B + CW - gradeRightPadding - gradeAreaWidth / 2;
 
   // Measure total height of grade + divider + condition to center them
-  const gradeFontSize = isModern ? 88 : 62;  // modern matches back label (88px)
-  const condFontSize = isModern ? 24 : 18;   // modern matches back label (24px)
+  // Both styles match back label sizes: grade 88px, condition 24px
+  const gradeFontSize = 88;
+  const condFontSize = 24;
   const dividerGap = isModern ? 4 : 8; // space for divider line in traditional
   const condGap = 4;
   const totalGradeH = gradeFontSize + dividerGap + condFontSize;
@@ -389,8 +390,8 @@ async function renderFrontLabelCanvas(
     ctx.stroke();
   }
 
-  // Condition text
-  ctx.fillStyle = isModern ? 'rgba(255, 255, 255, 0.8)' : COLORS.purplePrimary;
+  // Condition text — colors match back label
+  ctx.fillStyle = isModern ? 'rgba(255, 255, 255, 0.8)' : COLORS.purpleDark;
   ctx.font = `bold ${condFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -453,9 +454,9 @@ async function renderFrontLabelCanvas(
     currentY += fs.afterFeatures;
   }
 
-  // Line 4: Serial
-  ctx.fillStyle = isModern ? MODERN_COLORS.textWhiteSubtle : COLORS.textLight;
-  ctx.font = `${fs.serial}px 'Courier New', monospace`;
+  // Line 4: Serial — match line 2 color for print readability
+  ctx.fillStyle = isModern ? MODERN_COLORS.textWhiteMuted : COLORS.textMedium;
+  ctx.font = `${fs.serial}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.fillText(data.serial, infoX, currentY);
 
   return canvas.toDataURL('image/png');
