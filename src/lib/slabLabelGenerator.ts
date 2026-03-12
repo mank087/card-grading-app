@@ -487,9 +487,9 @@ async function renderBackLabelCanvas(
 
   const padding = 18;
 
-  // ── LEFT: QR Code (vertically centered) ──
+  // ── LEFT: QR Code (vertically centered, inset from cut line) ──
   const qrSize = CH * 0.72;
-  const qrX = B + padding;
+  const qrX = B + padding + 12;
   const qrY = B + (CH - qrSize) / 2;
 
   if (isModern) {
