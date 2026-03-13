@@ -1142,6 +1142,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
     }
   };
 
+  // Label Studio URL with card pre-selected
+  const labelStudioUrl = card?.serial ? `/labels?card=${card.serial}` : '/labels';
+
   // Labels dropdown menu items (card images and printable labels for slabs/toploaders)
   const labelsMenuItems = [
     {
@@ -1228,6 +1231,15 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
           {/* Labels Dropdown Menu */}
           {isLabelsDropdownOpen && !isGenerating && (
             <div className="absolute top-full left-0 mt-2 w-72 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+              <a
+                href={labelStudioUrl}
+                className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-purple-100 bg-purple-50/50"
+              >
+                <div>
+                  <div className="font-medium text-purple-700 text-sm">Open Label Studio</div>
+                  <div className="text-xs text-purple-500">Design custom labels for any case type</div>
+                </div>
+              </a>
               {labelsMenuItems.map((item) => (
                 <button
                   key={item.id}
@@ -1342,6 +1354,15 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         {/* Labels Dropdown Menu */}
         {isLabelsDropdownOpen && !isGenerating && (
           <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden">
+            <a
+              href={labelStudioUrl}
+              className="w-full flex items-start px-4 py-3 hover:bg-purple-50 transition-colors text-left border-b border-purple-100 bg-purple-50/50"
+            >
+              <div>
+                <div className="font-semibold text-purple-700">Open Label Studio</div>
+                <div className="text-sm text-purple-500">Design custom labels for any case type</div>
+              </div>
+            </a>
             {labelsMenuItems.map((item) => (
               <button
                 key={item.id}
