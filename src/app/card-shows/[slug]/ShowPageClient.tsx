@@ -643,7 +643,10 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
             "offers": {
               "@type": "Offer",
               "url": show.website_url || `https://www.dcmgrading.com/card-shows/${show.slug}`,
-              "availability": "https://schema.org/InStock"
+              "availability": "https://schema.org/InStock",
+              "price": "0",
+              "priceCurrency": "USD",
+              "validFrom": show.start_date
             },
             "performer": {
               "@type": "Organization",
