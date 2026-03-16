@@ -204,6 +204,8 @@ function UniversalUploadPageContent() {
 
   // "No defects" acknowledgment checkbox state
   const [noDefectsConfirmed, setNoDefectsConfirmed] = useState(false);
+  // Optional card description to guide AI (visible when "no defects" checked)
+  const [cardDescription, setCardDescription] = useState('');
 
   // Update selected type when URL param changes AND reset upload state if navigating to grade a new card
   useEffect(() => {
@@ -464,8 +466,14 @@ function UniversalUploadPageContent() {
       console.log('[Upload] Saving to database...')
 
       // Process condition report if user provided any data
+      // Include card description in the condition report for AI context
+      const reportWithDescription = {
+        ...conditionReport,
+        cardDescription: cardDescription.trim() || undefined,
+      }
       const hasConditionData = hasAnyConditionData(conditionReport)
-      const processedConditionReport = hasConditionData ? processConditionReport(conditionReport) : null
+      const hasCardDescription = cardDescription.trim().length > 0
+      const processedConditionReport = (hasConditionData || hasCardDescription) ? processConditionReport(reportWithDescription) : null
 
       if (hasConditionData) {
         console.log('[Upload] User condition report provided:', processedConditionReport?.total_defects_reported, 'defects reported')
@@ -481,9 +489,9 @@ function UniversalUploadPageContent() {
         category: config.category,
         visibility: 'public', // Cards are public by default so grading API can access them
         // User condition report fields
-        user_condition_report: hasConditionData ? conditionReport : null,
+        user_condition_report: (hasConditionData || hasCardDescription) ? reportWithDescription : null,
         user_condition_processed: processedConditionReport,
-        has_user_condition_report: hasConditionData,
+        has_user_condition_report: hasConditionData || hasCardDescription,
       })
 
       if (dbError) {
@@ -1259,6 +1267,32 @@ function UniversalUploadPageContent() {
                       </p>
                     </div>
                   </label>
+
+                  {/* Optional card description - shown when no defects checked */}
+                  {noDefectsConfirmed && (
+                    <div className="mt-3 pt-3 border-t border-green-200">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm font-medium text-green-800">Card details for AI guidance</span>
+                        <span className="px-1.5 py-0.5 bg-green-200 text-green-700 text-[10px] font-semibold rounded-full uppercase">Optional</span>
+                      </div>
+                      <p className="text-xs text-green-600 mb-2">
+                        Describe unique art styles, textures, serial numbering, or features that could be mistaken for defects.
+                      </p>
+                      <textarea
+                        value={cardDescription}
+                        onChange={(e) => setCardDescription(e.target.value.slice(0, 500))}
+                        placeholder="e.g., &quot;This card has a textured holofoil surface with intentional crosshatch pattern&quot; or &quot;Full art card with dark borders that are part of the design&quot; or &quot;Serial numbered /100 stamped on front&quot;"
+                        className="w-full px-3 py-2 text-sm border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white placeholder-gray-400 resize-none"
+                        rows={3}
+                        maxLength={500}
+                      />
+                      <div className="flex justify-end mt-1">
+                        <span className={`text-xs ${cardDescription.length > 450 ? 'text-amber-600' : 'text-gray-400'}`}>
+                          {cardDescription.length}/500
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Divider with OR */}

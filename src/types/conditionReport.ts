@@ -86,6 +86,7 @@ export interface UserConditionReportInput {
   structural: StructuralDefects;  // Affects whole card
   factory: FactoryDefects;        // Factory/manufacturing defects
   notes: string;                   // Single consolidated notes field (500 chars max)
+  cardDescription?: string;        // Optional card details to guide AI (art style, serial numbering, etc.)
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -294,6 +295,7 @@ export const EMPTY_CONDITION_REPORT: UserConditionReportInput = {
   structural: { ...EMPTY_STRUCTURAL_DEFECTS },
   factory: { ...EMPTY_FACTORY_DEFECTS },
   notes: '',
+  cardDescription: '',
 };
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -383,6 +385,7 @@ export interface ProcessedConditionReport {
   notes_raw: string;
   notes_sanitized: string;
   notes_parsed: ParsedDefect[];
+  card_description?: string;
 
   has_any_reports: boolean;
   total_defects_reported: number;

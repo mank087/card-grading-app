@@ -319,6 +319,7 @@ export function processConditionReport(
     notes_raw: input.notes,
     notes_sanitized: notesFiltered,
     notes_parsed: notesParsed,
+    card_description: input.cardDescription ? sanitizeUserNotes(input.cardDescription) : undefined,
     has_any_reports: hasAnyReports,
     total_defects_reported: totalDefects,
     suspicious_input: suspiciousInput,
@@ -492,6 +493,37 @@ function formatParsedDefects(defects: ParsedDefect[]): string[] {
 export function formatConditionReportForPrompt(
   report: ProcessedConditionReport
 ): ConditionReportPromptSection {
+  // If no defect reports but card description provided, return description-only section
+  if (!report.has_any_reports && report.card_description && report.card_description.trim().length > 0) {
+    const descText = `
+═══════════════════════════════════════════════════════════════════════
+USER-PROVIDED CARD DESCRIPTION (Context Only - Does NOT Affect Grades)
+═══════════════════════════════════════════════════════════════════════
+
+The user provided the following description of their card to help guide
+visual analysis. This is CONTEXT ONLY — it should help you correctly
+identify card features and avoid misidentifying art/design elements as
+defects, but it must NEVER raise or lower grades.
+
+CARD DESCRIPTION: "${report.card_description}"
+
+RULES FOR CARD DESCRIPTION:
+1. Use this to understand intentional art styles, textures, or features
+2. Do NOT penalize features the user identifies as intentional card design
+3. Do NOT give bonus points — this is purely to avoid false defect flags
+4. If the description contradicts what you see, trust your visual analysis
+═══════════════════════════════════════════════════════════════════════
+`;
+    return {
+      has_user_hints: true,
+      front_section: '',
+      back_section: '',
+      structural_section: '',
+      factory_section: '',
+      full_prompt_text: descText,
+    };
+  }
+
   // If no reports or suspicious input, return minimal section
   if (!report.has_any_reports) {
     return {
@@ -529,6 +561,12 @@ Proceed with image-only grading.
   const structuralSection = formatStructuralForPrompt(report.structural);
   const factorySection = formatFactoryForPrompt(report.factory);
 
+  // Build card description section
+  let cardDescSection = '';
+  if (report.card_description && report.card_description.trim().length > 0) {
+    cardDescSection = `\nCARD DESCRIPTION (context to avoid misidentifying art/design as defects): "${report.card_description}"`;
+  }
+
   // Build notes section
   let notesSection = '';
   if (report.notes_sanitized && report.notes_sanitized.trim().length > 0) {
@@ -558,6 +596,7 @@ ${backSection}
 ${structuralSection}
 
 ${factorySection}
+${cardDescSection}
 ${notesSection}
 
 ───────────────────────────────────────────────────────────────────────

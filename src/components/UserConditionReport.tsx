@@ -599,8 +599,9 @@ interface ConditionReportDisplayProps {
 
 export function ConditionReportDisplay({ report, aiResponse }: ConditionReportDisplayProps) {
   const hasData = hasAnyConditionData(report)
+  const hasCardDescription = report.cardDescription && report.cardDescription.trim().length > 0
 
-  if (!hasData) {
+  if (!hasData && !hasCardDescription) {
     return null
   }
 
@@ -714,7 +715,14 @@ export function ConditionReportDisplay({ report, aiResponse }: ConditionReportDi
         {report.notes && (
           <div>
             <p className="font-medium text-amber-700">Additional notes:</p>
-            <p className="text-amber-600 italic">"{report.notes}"</p>
+            <p className="text-amber-600 italic">&quot;{report.notes}&quot;</p>
+          </div>
+        )}
+
+        {hasCardDescription && (
+          <div>
+            <p className="font-medium text-amber-700">Card details:</p>
+            <p className="text-amber-600 italic">&quot;{report.cardDescription}&quot;</p>
           </div>
         )}
 
