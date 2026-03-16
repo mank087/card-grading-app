@@ -336,7 +336,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       console.log('[DOWNLOAD REPORT] All images converted successfully');
 
       // Generate QR code for the card URL
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const cardUrl = card.serial
+        ? `https://dcmgrading.com/verify/${card.serial}`
+        : `${window.location.origin}/${cardType}/${card.id}`;
       console.log('[DOWNLOAD REPORT] Generating QR code for URL:', cardUrl);
       const qrCodeDataUrl = await generateQRCode(cardUrl);
       console.log('[DOWNLOAD REPORT] QR code generated');
@@ -526,7 +528,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const subScores = card.conversational_sub_scores || {};
 
       // Generate QR code and load logo
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const cardUrl = card.serial
+        ? `https://dcmgrading.com/verify/${card.serial}`
+        : `${window.location.origin}/${cardType}/${card.id}`;
       console.log('[FOLDABLE LABEL] Generating QR code for URL:', cardUrl);
 
       const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
@@ -636,7 +640,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const subScores = card.conversational_sub_scores || {};
 
       // Generate QR code and load logo
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const cardUrl = card.serial
+        ? `https://dcmgrading.com/verify/${card.serial}`
+        : `${window.location.origin}/${cardType}/${card.id}`;
       console.log('[MINI-REPORT JPG] Generating QR code for URL:', cardUrl);
 
       const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
@@ -782,7 +788,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         englishName, // Fallback for Japanese/Chinese/Korean card names
         grade: cleanLabelData.grade ?? 0,
         conditionLabel: cleanLabelData.condition,
-        cardUrl: `${window.location.origin}/${cardType}/${card.id}`,
+        cardUrl: card.serial
+          ? `https://dcmgrading.com/verify/${card.serial}`
+          : `${window.location.origin}/${cardType}/${card.id}`,
         frontImageUrl,
         backImageUrl,
         showFounderEmblem, // Show founder emblem on back label if user is founder with badge enabled
@@ -841,7 +849,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const subScores = card.conversational_sub_scores || {};
 
       // Generate plain QR code (no logo) for better scannability and load logo separately
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const cardUrl = card.serial
+        ? `https://dcmgrading.com/verify/${card.serial}`
+        : `${window.location.origin}/${cardType}/${card.id}`;
       console.log('[AVERY LABEL] Generating plain QR code for URL:', cardUrl);
 
       const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
@@ -985,7 +995,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const cleanLabelData = getCardLabelData(card);
 
       // Generate QR code URL for the card
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const cardUrl = card.serial
+        ? `https://dcmgrading.com/verify/${card.serial}`
+        : `${window.location.origin}/${cardType}/${card.id}`;
       console.log('[AVERY 8167] Card URL for QR:', cardUrl);
 
       // Generate combined PDF with both front and back labels
@@ -1045,7 +1057,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       setGeneratingType('foldover');
 
       const cleanLabelData = getCardLabelData(card);
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const cardUrl = card.serial
+        ? `https://dcmgrading.com/verify/${card.serial}`
+        : `${window.location.origin}/${cardType}/${card.id}`;
 
       const blob = await generateFoldOverLabel8167(
         {
@@ -1096,7 +1110,9 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
       const cleanLabelData = getCardLabelData(card);
       const weightedScores = card.conversational_weighted_sub_scores || {};
       const subScores = card.conversational_sub_scores || {};
-      const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+      const cardUrl = card.serial
+        ? `https://dcmgrading.com/verify/${card.serial}`
+        : `${window.location.origin}/${cardType}/${card.id}`;
       const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
 
       const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([

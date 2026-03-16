@@ -292,7 +292,9 @@ export const BatchAveryLabelModal: React.FC<BatchAveryLabelModalProps> = ({
     const subScores = card.conversational_sub_scores || {};
 
     // Generate QR code and load logo
-    const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+    const cardUrl = cleanLabelData.serial
+      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
+      : `${window.location.origin}/${cardType}/${card.id}`;
 
     const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
       generateQRCodePlain(cardUrl),

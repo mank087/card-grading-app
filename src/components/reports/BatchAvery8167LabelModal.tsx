@@ -268,7 +268,9 @@ export const BatchAvery8167LabelModal: React.FC<BatchAvery8167LabelModalProps> =
   // Build label data for a card
   const buildLabelData = (card: CardData): ToploaderLabelData => {
     const cleanLabelData = getCardLabelData(card);
-    const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+    const cardUrl = cleanLabelData.serial
+      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
+      : `${window.location.origin}/${cardType}/${card.id}`;
 
     // Use primaryName from getCardLabelData - this uses intelligent category-specific logic + custom overrides
     // (e.g., player_or_character for Sports, pokemon name with variant for Pokemon, etc.)

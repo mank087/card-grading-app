@@ -83,7 +83,9 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
 
-    const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+    const cardUrl = cleanLabelData.serial
+      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
+      : `${window.location.origin}/${cardType}/${card.id}`;
     const qrCodeDataUrl = await generateQRCodePlain(cardUrl);
     const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
 

@@ -232,7 +232,9 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
 
-    const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+    const cardUrl = cleanLabelData.serial
+      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
+      : `${window.location.origin}/${cardType}/${card.id}`;
     const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
       generateQRCodeWithLogo(cardUrl),
       loadLogoAsBase64().catch(() => undefined)
@@ -274,7 +276,9 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       imageToBase64(urls.back)
     ]);
 
-    const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
+    const cardUrl = cleanLabelData.serial
+      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
+      : `${window.location.origin}/${cardType}/${card.id}`;
     const qrCodeDataUrl = await generateQRCode(cardUrl);
 
     const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
