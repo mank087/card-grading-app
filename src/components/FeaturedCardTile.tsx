@@ -52,9 +52,10 @@ function getMatchConfidence(card: any): 'high' | 'medium' | 'low' | 'none' | nul
 
 interface FeaturedCardTileProps {
   card: any
+  hidePricing?: boolean
 }
 
-export default function FeaturedCardTile({ card }: FeaturedCardTileProps) {
+export default function FeaturedCardTile({ card, hidePricing = false }: FeaturedCardTileProps) {
   const labelData = getCardLabelData(card)
   const cardLink = getCardLink(card)
   const estimatedValue = getEstimatedValue(card)
@@ -183,19 +184,21 @@ export default function FeaturedCardTile({ card }: FeaturedCardTileProps) {
         )}
 
         {/* Price Estimate or "View Market Value" link */}
-        {estimatedValue ? (
-          <PriceEstimateBadge
-            estimatedValue={estimatedValue}
-            matchConfidence={matchConfidence}
-            compact
-          />
-        ) : (
-          <Link
-            href={cardLink}
-            className="block text-center text-sm text-emerald-700 font-medium hover:text-emerald-800 py-2"
-          >
-            View Market Value &rarr;
-          </Link>
+        {!hidePricing && (
+          estimatedValue ? (
+            <PriceEstimateBadge
+              estimatedValue={estimatedValue}
+              matchConfidence={matchConfidence}
+              compact
+            />
+          ) : (
+            <Link
+              href={cardLink}
+              className="block text-center text-sm text-emerald-700 font-medium hover:text-emerald-800 py-2"
+            >
+              View Market Value &rarr;
+            </Link>
+          )
         )}
 
         {/* Footer: serial + link */}

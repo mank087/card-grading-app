@@ -426,6 +426,11 @@ function CollectionPageContent() {
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
   const [priceRefreshCount, setPriceRefreshCount] = useState(0)
   const [isRescanningPrices, setIsRescanningPrices] = useState(false)
+  const [shareUsername, setShareUsername] = useState<string | null>(null)
+  const [showShareSetup, setShowShareSetup] = useState(false)
+  const [shareSetupUsername, setShareSetupUsername] = useState('')
+  const [shareSetupError, setShareSetupError] = useState<string | null>(null)
+  const [shareSetupSaving, setShareSetupSaving] = useState(false)
   const searchParams = useSearchParams()
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
@@ -447,6 +452,14 @@ function CollectionPageContent() {
         }
       })
       .catch(err => console.error('Error fetching label style:', err))
+
+    // Also fetch username for share button
+    fetch('/api/profile/username', {
+      headers: { 'Authorization': `Bearer ${session.access_token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.username) setShareUsername(data.username) })
+      .catch(() => {})
   }, [])
 
   // Check founder and VIP status
@@ -1599,6 +1612,27 @@ function CollectionPageContent() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            {/* Share Collection Button */}
+            <button
+              onClick={() => {
+                if (shareUsername) {
+                  navigator.clipboard.writeText(`https://dcmgrading.com/collection/${shareUsername}`)
+                  toast.success('Collection link copied to clipboard!')
+                } else {
+                  setShowShareSetup(true)
+                }
+              }}
+              className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                shareUsername
+                  ? 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                  : 'bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              Share
+            </button>
             {/* Price Refresh/Rescan Indicator */}
             {(isRefreshingPrices || isRescanningPrices) && (
               <div className="hidden sm:flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5 animate-pulse">
@@ -1751,6 +1785,82 @@ function CollectionPageContent() {
             </p>
           )}
         </div>
+
+        {/* Share Collection Setup Form */}
+        {showShareSetup && !shareUsername && (
+          <div className="mb-6 bg-green-50 border border-green-200 rounded-xl p-4">
+            <div className="flex items-start justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-green-800">Share Your Collection</h3>
+                <p className="text-sm text-green-600 mt-1">Choose a username for your public collection URL. Only your public cards will be visible.</p>
+              </div>
+              <button
+                onClick={() => setShowShareSetup(false)}
+                className="text-green-400 hover:text-green-600 transition-colors p-1"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-green-700 mb-1">Choose a display name</label>
+              <input
+                type="text"
+                value={shareSetupUsername}
+                onChange={(e) => {
+                  setShareSetupUsername(e.target.value.replace(/[^a-zA-Z0-9 _-]/g, '').slice(0, 30))
+                  setShareSetupError(null)
+                }}
+                placeholder="e.g., DCM Test"
+                maxLength={30}
+                className="w-full px-3 py-2 border border-green-300 rounded-lg text-sm focus:ring-2 focus:ring-green-500 focus:border-green-500"
+              />
+              {shareSetupUsername.length >= 3 && (
+                <p className="text-[10px] text-green-500 mt-1">
+                  Your URL: <span className="font-mono">dcmgrading.com/collection/{shareSetupUsername.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')}</span>
+                </p>
+              )}
+            </div>
+            {shareSetupError && (
+              <p className="text-sm text-red-600 mb-2">{shareSetupError}</p>
+            )}
+            <button
+              onClick={async () => {
+                setShareSetupSaving(true)
+                setShareSetupError(null)
+                try {
+                  const session = getStoredSession()
+                  const res = await fetch('/api/profile/username', {
+                    method: 'PATCH',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${session?.access_token}`,
+                    },
+                    body: JSON.stringify({ username: shareSetupUsername }),
+                  })
+                  const data = await res.json()
+                  if (!res.ok) {
+                    setShareSetupError(data.error || 'Failed to save')
+                  } else {
+                    setShareUsername(data.username)
+                    setShowShareSetup(false)
+                    navigator.clipboard.writeText(`https://dcmgrading.com/collection/${data.username}`)
+                    toast.success('Collection link copied to clipboard!')
+                  }
+                } catch {
+                  setShareSetupError('Failed to save. Please try again.')
+                } finally {
+                  setShareSetupSaving(false)
+                }
+              }}
+              disabled={shareSetupSaving || shareSetupUsername.length < 3}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {shareSetupSaving ? 'Saving...' : 'Create & Copy Share Link'}
+            </button>
+          </div>
+        )}
 
         {/* Category Filter Tabs */}
         <div className="mb-6 flex flex-wrap gap-2">
