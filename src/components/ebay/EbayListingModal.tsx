@@ -166,6 +166,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     miniReport: boolean;
   }>({ front: true, back: true, miniReport: true });
 
+  // User-uploaded additional photos
+  const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; blob: Blob; url: string; selected: boolean }>>([]);
+  const additionalInputRef = useRef<HTMLInputElement>(null);
+
   // Listing details state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -255,6 +259,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setImageUrls({});
       setImageBlobs({});
       setSelectedImages({ front: true, back: true, miniReport: true });
+      setAdditionalImages([]);
       setListingResult(null);
       setExistingListing(null);
       setCheckingExistingListing(false);
@@ -756,6 +761,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         back: URL.createObjectURL(back),
         miniReport: URL.createObjectURL(miniReport),
       });
+
     } catch (err) {
       console.error('[eBay Listing] Failed to generate images:', err);
       setError(err instanceof Error ? err.message : 'Failed to generate images');
@@ -792,6 +798,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       images.miniReport = await toBase64(imageBlobs.miniReport);
     }
 
+    // Convert additional user-uploaded images to base64
+    const additionalImagesBase64: string[] = [];
+    for (const img of additionalImages.filter(i => i.selected)) {
+      additionalImagesBase64.push(await toBase64(img.blob));
+    }
+
     const response = await fetch('/api/ebay/images', {
       method: 'POST',
       headers: {
@@ -801,6 +813,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       body: JSON.stringify({
         cardId: card.id,
         images,
+        additionalImages: additionalImagesBase64.length > 0 ? additionalImagesBase64 : undefined,
       }),
     });
 
@@ -814,6 +827,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     if (data.urls.front) urls.push(data.urls.front);
     if (data.urls.back) urls.push(data.urls.back);
     if (data.urls.miniReport) urls.push(data.urls.miniReport);
+    if (data.urls.additional) {
+      urls.push(...data.urls.additional);
+    }
 
     return urls;
   };
@@ -1706,6 +1722,102 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </div>
                 </div>
               )}
+              {/* Additional User Photos */}
+              {!isLoading && (
+                <div className="mt-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-sm font-medium text-gray-700">Additional Photos</h4>
+                    <span className="text-xs text-gray-400">
+                      {(() => {
+                        const total = [selectedImages.front, selectedImages.back, selectedImages.miniReport].filter(Boolean).length
+                          + additionalImages.filter(i => i.selected).length;
+                        return `${total}/12 images selected`;
+                      })()}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {additionalImages.map((img) => (
+                      <div
+                        key={img.id}
+                        className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                          img.selected ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                        }`}
+                        onClick={() => setAdditionalImages(prev => prev.map(i => i.id === img.id ? { ...i, selected: !i.selected } : i))}
+                      >
+                        <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                          <img src={img.url} alt="Additional" className="max-w-full max-h-full object-contain" />
+                        </div>
+                        <div className="absolute top-2 right-2">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                            img.selected ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
+                          }`}>
+                            {img.selected && (
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            URL.revokeObjectURL(img.url);
+                            setAdditionalImages(prev => prev.filter(i => i.id !== img.id));
+                          }}
+                          className="absolute top-2 left-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                          title="Remove"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    ))}
+
+                    {/* Add Photo Button */}
+                    {(() => {
+                      const totalSelected = [selectedImages.front, selectedImages.back, selectedImages.miniReport].filter(Boolean).length
+                        + additionalImages.filter(i => i.selected).length;
+                      const canAddMore = additionalImages.length < 9 && totalSelected < 12;
+                      return canAddMore ? (
+                        <div
+                          className="border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all"
+                          onClick={() => additionalInputRef.current?.click()}
+                        >
+                          <div className="aspect-[3/4] flex flex-col items-center justify-center text-gray-400">
+                            <svg className="w-8 h-8 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4v16m8-8H4" />
+                            </svg>
+                            <span className="text-xs">Add Photo</span>
+                          </div>
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                  <input
+                    ref={additionalInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      const remaining = 9 - additionalImages.length;
+                      const filesToAdd = files.slice(0, remaining);
+                      const newImages = filesToAdd.map(f => ({
+                        id: crypto.randomUUID(),
+                        blob: f,
+                        url: URL.createObjectURL(f),
+                        selected: true,
+                      }));
+                      setAdditionalImages(prev => [...prev, ...newImages]);
+                      // Reset input so the same file can be re-added
+                      e.target.value = '';
+                    }}
+                  />
+                </div>
+              )}
+
               <p className="mt-4 text-sm text-gray-500">
                 Click images to select/deselect. At least one image is required.
               </p>
@@ -2497,7 +2609,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 <div className="flex justify-between">
                   <span className="text-gray-600">Images:</span>
                   <span className="font-medium text-gray-900">
-                    {[selectedImages.front && 'Front', selectedImages.back && 'Back', selectedImages.miniReport && 'Report'].filter(Boolean).join(', ')}
+                    {[selectedImages.front && 'Front', selectedImages.back && 'Back', selectedImages.miniReport && 'Report', additionalImages.filter(i => i.selected).length > 0 && `+${additionalImages.filter(i => i.selected).length} additional`].filter(Boolean).join(', ')}
                   </span>
                 </div>
                 <div className="flex justify-between">

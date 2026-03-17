@@ -34,6 +34,7 @@ interface ImageUploadRequest {
     back?: string;
     miniReport?: string;
   };
+  additionalImages?: string[];  // User-uploaded extra photos (base64)
 }
 
 interface ImageUploadResponse {
@@ -41,6 +42,7 @@ interface ImageUploadResponse {
     front?: string;
     back?: string;
     miniReport?: string;
+    additional?: string[];
   };
 }
 
@@ -103,7 +105,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body: ImageUploadRequest = await request.json();
-    const { cardId, images } = body;
+    const { cardId, images, additionalImages } = body;
 
     if (!cardId) {
       return NextResponse.json(
@@ -112,7 +114,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!images || (!images.front && !images.back && !images.miniReport)) {
+    const hasAnyImages = images && (images.front || images.back || images.miniReport);
+    const hasAdditional = additionalImages && additionalImages.length > 0;
+
+    if (!hasAnyImages && !hasAdditional) {
       return NextResponse.json(
         { error: 'At least one image is required' },
         { status: 400 }
@@ -207,10 +212,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Upload additional user photos
+    const additionalUrls: string[] = [];
+    if (additionalImages && additionalImages.length > 0) {
+      for (let i = 0; i < additionalImages.length; i++) {
+        uploadPromises.push(
+          uploadImage(additionalImages[i], `additional-${i}`).then(url => {
+            if (url) additionalUrls.push(url);
+          })
+        );
+      }
+    }
+
     await Promise.all(uploadPromises);
 
+    if (additionalUrls.length > 0) {
+      urls.additional = additionalUrls;
+    }
+
     // Verify at least one upload succeeded
-    if (!urls.front && !urls.back && !urls.miniReport) {
+    const hasAnyUploaded = urls.front || urls.back || urls.miniReport || additionalUrls.length > 0;
+    if (!hasAnyUploaded) {
       return NextResponse.json(
         { error: 'Failed to upload any images' },
         { status: 500 }
@@ -221,6 +243,7 @@ export async function POST(request: NextRequest) {
       userId: user.id,
       cardId,
       uploadedImages: Object.keys(urls),
+      additionalCount: additionalUrls.length,
     });
 
     return NextResponse.json({ urls });

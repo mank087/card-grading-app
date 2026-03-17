@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
 
 // Declare gtag for TypeScript
 declare global {
@@ -207,6 +209,12 @@ function UniversalUploadPageContent() {
   // Optional card description to guide AI (visible when "no defects" checked)
   const [cardDescription, setCardDescription] = useState('');
 
+  // Crop state for Step 2 photo review
+  const [croppingSide, setCroppingSide] = useState<'front' | 'back' | null>(null);
+  const [crop, setCrop] = useState<Crop>();
+  const [completedCrop, setCompletedCrop] = useState<PixelCrop>();
+  const cropImgRef = useRef<HTMLImageElement>(null);
+
   // Update selected type when URL param changes AND reset upload state if navigating to grade a new card
   useEffect(() => {
     const categoryParam = searchParams?.get('category');
@@ -345,6 +353,72 @@ function UniversalUploadPageContent() {
       setCompressingState(false)
     }
   }
+
+  // Crop helper: extract cropped region from image and return as File
+  const getCroppedFile = useCallback(async (
+    imgEl: HTMLImageElement,
+    pixelCrop: PixelCrop,
+    fileName: string
+  ): Promise<File | null> => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+
+    const scaleX = imgEl.naturalWidth / imgEl.width;
+    const scaleY = imgEl.naturalHeight / imgEl.height;
+
+    const cropWidth = pixelCrop.width * scaleX;
+    const cropHeight = pixelCrop.height * scaleY;
+
+    canvas.width = cropWidth;
+    canvas.height = cropHeight;
+
+    ctx.drawImage(
+      imgEl,
+      pixelCrop.x * scaleX,
+      pixelCrop.y * scaleY,
+      cropWidth,
+      cropHeight,
+      0,
+      0,
+      cropWidth,
+      cropHeight
+    );
+
+    return new Promise((resolve) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(null); return; }
+          resolve(new File([blob], fileName, { type: 'image/jpeg' }));
+        },
+        'image/jpeg',
+        0.95
+      );
+    });
+  }, []);
+
+  // Apply the current crop and re-compress
+  const handleApplyCrop = useCallback(async (side: 'front' | 'back') => {
+    if (!cropImgRef.current || !completedCrop) return;
+
+    const sourceFile = side === 'front' ? frontFile : backFile;
+    if (!sourceFile) return;
+
+    const croppedFile = await getCroppedFile(
+      cropImgRef.current,
+      completedCrop,
+      sourceFile.name
+    );
+
+    if (croppedFile) {
+      // Reset crop state first
+      setCroppingSide(null);
+      setCrop(undefined);
+      setCompletedCrop(undefined);
+      // Re-run compression pipeline with cropped image
+      handleFileSelect(croppedFile, side);
+    }
+  }, [completedCrop, frontFile, backFile, getCroppedFile]);
 
   const handleUpload = async () => {
     console.log('[Upload] handleUpload called')
@@ -1136,46 +1210,140 @@ function UniversalUploadPageContent() {
                 </div>
 
                 {/* Images Preview - Larger */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className={`grid ${croppingSide ? 'grid-cols-1' : 'grid-cols-2'} gap-4 mb-6`}>
                   {/* Front Image */}
-                  <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
-                    <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-3 py-2">
-                      <h3 className="font-bold text-white text-sm text-center">FRONT</h3>
+                  {(!croppingSide || croppingSide === 'front') && (
+                    <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+                      <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 px-3 py-2">
+                        <h3 className="font-bold text-white text-sm text-center">FRONT</h3>
+                      </div>
+                      <div className="p-3">
+                        {croppingSide === 'front' ? (
+                          <>
+                            <ReactCrop
+                              crop={crop}
+                              onChange={(c) => setCrop(c)}
+                              onComplete={(c) => setCompletedCrop(c)}
+                            >
+                              <img
+                                ref={cropImgRef}
+                                src={URL.createObjectURL(frontFile)}
+                                alt="Crop front"
+                                className="w-full rounded-lg"
+                              />
+                            </ReactCrop>
+                            <p className="text-xs text-gray-500 text-center mt-2">
+                              Drag to select the area to keep
+                            </p>
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => handleApplyCrop('front')}
+                                disabled={!completedCrop?.width || !completedCrop?.height}
+                                className="flex-1 px-3 py-2.5 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                Apply Crop
+                              </button>
+                              <button
+                                onClick={() => { setCroppingSide(null); setCrop(undefined); setCompletedCrop(undefined); }}
+                                className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <img
+                              src={URL.createObjectURL(frontFile)}
+                              alt="Front of card"
+                              className="w-full rounded-lg shadow-sm"
+                            />
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => { setCroppingSide('front'); setCrop(undefined); setCompletedCrop(undefined); }}
+                                className="flex-1 px-3 py-2.5 bg-indigo-50 text-indigo-700 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors flex items-center justify-center gap-1.5 border border-indigo-200"
+                              >
+                                <span>✂</span> Crop
+                              </button>
+                              <button
+                                onClick={() => handleRetakePhoto('front')}
+                                className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-1.5"
+                              >
+                                <span>🔄</span> Retake
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="p-3">
-                      <img
-                        src={URL.createObjectURL(frontFile)}
-                        alt="Front of card"
-                        className="w-full rounded-lg shadow-sm"
-                      />
-                      <button
-                        onClick={() => handleRetakePhoto('front')}
-                        className="w-full mt-3 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <span>🔄</span> Retake Front
-                      </button>
-                    </div>
-                  </div>
+                  )}
 
                   {/* Back Image */}
-                  <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
-                    <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-3 py-2">
-                      <h3 className="font-bold text-white text-sm text-center">BACK</h3>
+                  {(!croppingSide || croppingSide === 'back') && (
+                    <div className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-200">
+                      <div className="bg-gradient-to-r from-purple-500 to-purple-600 px-3 py-2">
+                        <h3 className="font-bold text-white text-sm text-center">BACK</h3>
+                      </div>
+                      <div className="p-3">
+                        {croppingSide === 'back' ? (
+                          <>
+                            <ReactCrop
+                              crop={crop}
+                              onChange={(c) => setCrop(c)}
+                              onComplete={(c) => setCompletedCrop(c)}
+                            >
+                              <img
+                                ref={cropImgRef}
+                                src={URL.createObjectURL(backFile)}
+                                alt="Crop back"
+                                className="w-full rounded-lg"
+                              />
+                            </ReactCrop>
+                            <p className="text-xs text-gray-500 text-center mt-2">
+                              Drag to select the area to keep
+                            </p>
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => handleApplyCrop('back')}
+                                disabled={!completedCrop?.width || !completedCrop?.height}
+                                className="flex-1 px-3 py-2.5 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                Apply Crop
+                              </button>
+                              <button
+                                onClick={() => { setCroppingSide(null); setCrop(undefined); setCompletedCrop(undefined); }}
+                                className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <img
+                              src={URL.createObjectURL(backFile)}
+                              alt="Back of card"
+                              className="w-full rounded-lg shadow-sm"
+                            />
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={() => { setCroppingSide('back'); setCrop(undefined); setCompletedCrop(undefined); }}
+                                className="flex-1 px-3 py-2.5 bg-purple-50 text-purple-700 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors flex items-center justify-center gap-1.5 border border-purple-200"
+                              >
+                                <span>✂</span> Crop
+                              </button>
+                              <button
+                                onClick={() => handleRetakePhoto('back')}
+                                className="flex-1 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-1.5"
+                              >
+                                <span>🔄</span> Retake
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="p-3">
-                      <img
-                        src={URL.createObjectURL(backFile)}
-                        alt="Back of card"
-                        className="w-full rounded-lg shadow-sm"
-                      />
-                      <button
-                        onClick={() => handleRetakePhoto('back')}
-                        className="w-full mt-3 px-3 py-2.5 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <span>🔄</span> Retake Back
-                      </button>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
                 {/* Photo Tips */}
