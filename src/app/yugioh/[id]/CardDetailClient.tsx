@@ -29,7 +29,7 @@ import {
 } from "@/lib/socialUtils";
 import { mapToEbayCondition, getEbayConditionColor, getEbayConditionDescription, type EbayCondition } from '@/lib/ebayConditionMapper';
 import { EbayPriceLookup } from '@/components/ebay/EbayPriceLookup';
-import { OnePiecePriceLookup } from '@/components/pricing/OnePiecePriceLookup';
+import { OtherPriceLookup } from '@/components/pricing/OtherPriceLookup';
 import { EbayListingButton } from '@/components/ebay/EbayListingButton';
 import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { getStoredSession } from '@/lib/directAuth';
@@ -5268,14 +5268,16 @@ export function YugiohCardDetails() {
                   const session = getStoredSession();
                   const isPricingOwner = !!(session?.user?.id && card?.user_id && session.user.id === card.user_id);
                   return (
-                    <OnePiecePriceLookup
+                    <OtherPriceLookup
                       card={{
                         id: card.id,
                         card_name: cardInfo.card_name || card.card_name,
                         set_name: cardInfo.set_name || card.card_set,
-                        collector_number: cardInfo.card_id || cardInfo.collector_number || card.card_number,
+                        card_number: cardInfo.card_id || cardInfo.card_number || card.card_number,
                         year: cardInfo.set_year || card.release_date,
+                        manufacturer: 'Konami',
                         rarity_or_variant: cardInfo.rarity || cardInfo.ygo_frame_type,
+                        game_type: 'Yu-Gi-Oh',
                         dcm_selected_product_id: card.dcm_selected_product_id,
                         dcm_selected_product_name: card.dcm_selected_product_name,
                       }}
