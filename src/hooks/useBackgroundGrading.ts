@@ -10,6 +10,7 @@ const CARD_TYPES_CONFIG = {
   Lorcana: { apiEndpoint: '/api/lorcana', route: '/lorcana' },
   'One Piece': { apiEndpoint: '/api/onepiece', route: '/onepiece' },
   'Yu-Gi-Oh': { apiEndpoint: '/api/yugioh', route: '/yugioh' },
+  'Star Wars': { apiEndpoint: '/api/starwars', route: '/starwars' },
   Other: { apiEndpoint: '/api/other', route: '/other' }
 }
 

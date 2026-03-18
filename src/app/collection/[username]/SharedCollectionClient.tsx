@@ -27,6 +27,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   Lorcana: 'Lorcana',
   'One Piece': 'One Piece',
   'Yu-Gi-Oh': 'Yu-Gi-Oh',
+  'Star Wars': 'Star Wars',
   Other: 'Other',
 }
 
@@ -38,6 +39,7 @@ function getCardLink(card: any): string {
   if (card.category === 'Lorcana') return `/lorcana/${card.id}`
   if (card.category === 'One Piece') return `/onepiece/${card.id}`
   if (card.category === 'Yu-Gi-Oh') return `/yugioh/${card.id}`
+  if (card.category === 'Star Wars') return `/starwars/${card.id}`
   if (card.category === 'Other') return `/other/${card.id}`
   return `/card/${card.id}`
 }

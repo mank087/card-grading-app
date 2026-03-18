@@ -11,6 +11,7 @@ const CARD_TYPES_CONFIG = {
   Lorcana: { route: '/lorcana' },
   'One Piece': { route: '/onepiece' },
   'Yu-Gi-Oh': { route: '/yugioh' },
+  'Star Wars': { route: '/starwars' },
   Other: { route: '/other' }
 }
 

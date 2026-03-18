@@ -1008,6 +1008,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
       case 'Yu-Gi-Oh':
         rawPrimaryName = getYugiohName(cardInfo, card);
         break;
+      case 'Star Wars':
+        rawPrimaryName = getOtherName(cardInfo, card);
+        break;
       default:
         rawPrimaryName = getOtherName(cardInfo, card);
     }
@@ -1055,6 +1058,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
         break;
       case 'Yu-Gi-Oh':
         rawSubset = getYugiohSubset(cardInfo, card);
+        break;
+      case 'Star Wars':
+        rawSubset = stripMarkdown(cardInfo.subset);
         break;
       default:
         rawSubset = stripMarkdown(cardInfo.subset);
@@ -1177,6 +1183,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
         break;
       case 'Yu-Gi-Oh':
         features = getYugiohFeatures(cardInfo, card);
+        break;
+      case 'Star Wars':
+        features = getOtherFeatures(cardInfo, card);
         break;
       default:
         features = getOtherFeatures(cardInfo, card);

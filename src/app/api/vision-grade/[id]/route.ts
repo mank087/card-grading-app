@@ -2128,6 +2128,23 @@ EXTRACTION RULES:
                   productName = result.prices.productName;
                   rawPrice = result.prices.raw;
                 }
+              } else if (category === 'Star Wars' && isOtherPricingEnabled() && cardName) {
+                console.log(`[PRICECHARTING] Fetching Star Wars pricing for card ${cardId}`);
+                const result = await searchOtherCardPrices({
+                  cardName,
+                  setName,
+                  cardNumber,
+                  year,
+                  manufacturer: cardInfo?.manufacturer,
+                  variant,
+                });
+                if (result.prices) {
+                  estimatedValue = estimateOtherDcmValue(result.prices, dcmGrade);
+                  matchConfidence = result.matchConfidence;
+                  productId = result.prices.productId;
+                  productName = result.prices.productName;
+                  rawPrice = result.prices.raw;
+                }
               } else if (category === 'Yu-Gi-Oh' && isOtherPricingEnabled() && cardName) {
                 console.log(`[PRICECHARTING] Fetching Yu-Gi-Oh pricing for card ${cardId}`);
                 const result = await searchOtherCardPrices({

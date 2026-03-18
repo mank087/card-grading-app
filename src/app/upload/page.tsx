@@ -133,6 +133,22 @@ const CARD_TYPES = {
       ]
     }
   },
+  'Star Wars': {
+    label: 'Star Wars Card',
+    icon: '',
+    category: 'Star Wars',
+    apiEndpoint: '/api/starwars',
+    route: '/starwars',
+    description: {
+      title: 'Star Wars TCG',
+      items: [
+        'Topps, Panini, Decipher, and FFG cards',
+        'Chrome, Refractor, and vintage cards',
+        'Autograph and relic cards',
+        'All eras from 1977 to present'
+      ]
+    }
+  },
   Other: {
     label: 'Other Collectible Card',
     icon: '',

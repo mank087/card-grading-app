@@ -164,9 +164,9 @@ export default function StarWarsDatabasePage() {
 
   // Get Grade CTA link
   const getGradeCtaLink = () => {
-    if (!user) return '/login?mode=signup&redirect=/upload/other'
+    if (!user) return '/login?mode=signup&redirect=/upload?category=Star Wars'
     if (credits <= 0) return '/account#credits'
-    return '/upload/other'
+    return '/upload?category=Star Wars'
   }
 
   const getGradeCtaText = () => {
@@ -645,7 +645,7 @@ export default function StarWarsDatabasePage() {
         <div className="container mx-auto px-4 text-center text-gray-500 text-sm">
           <p>Data from PriceCharting. Star Wars is a trademark of Lucasfilm Ltd.</p>
           <div className="flex justify-center gap-6 mt-4">
-            <Link href="/upload/other" className="hover:text-gray-300 transition-colors">Grade Cards</Link>
+            <Link href="/upload?category=Star Wars" className="hover:text-gray-300 transition-colors">Grade Cards</Link>
             <Link href="/terms" className="hover:text-gray-300 transition-colors">Terms</Link>
             <Link href="/privacy" className="hover:text-gray-300 transition-colors">Privacy</Link>
           </div>

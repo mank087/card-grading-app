@@ -395,6 +395,11 @@ const getCardLink = (card: Card) => {
     return `/yugioh/${card.id}`;
   }
 
+  // Star Wars cards → /starwars/[id]
+  if (card.category === 'Star Wars') {
+    return `/starwars/${card.id}`;
+  }
+
   // Other cards → /other/[id]
   if (card.category === 'Other') {
     return `/other/${card.id}`;

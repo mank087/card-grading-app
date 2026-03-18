@@ -1,0 +1,313 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: STAR WARS TCG v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY Star Wars collectible card-specific rules.
+The master grading rubric (Sections 1-13) applies to ALL Star Wars cards.
+This delta provides card-specific extraction rules, defect patterns, and examples.
+
+**CARD TYPES COVERED:**
+Star Wars collectible trading cards from all manufacturers and sets including:
+- Topps Star Wars (Chrome, Galaxy, Heritage, Masterwork, Finest, Living Set)
+- Topps Star Wars: Card Trader physical releases
+- Panini Star Wars (sticker cards, trading cards)
+- Decipher Star Wars CCG (Customizable Card Game)
+- Fantasy Flight Games Star Wars: Unlimited TCG
+- Upper Deck Star Wars
+- Vintage Topps Star Wars (1977 original series)
+
+═══════════════════════════════════════════════════════════════════════
+A. STAR WARS CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from Star Wars cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All Star Wars Cards)
+────────────────────────────────────────────────────────────────────────
+
+**card_name**: Full card title
+• Exact name/title as printed on the card
+• Example: "Darth Vader", "Luke Skywalker - Jedi Knight", "Millennium Falcon"
+• Include subtitle if present: "Obi-Wan Kenobi - A New Hope"
+
+**player_or_character**: Character/subject name
+• Star Wars character, vehicle, or subject depicted
+• Example: "Darth Vader", "Yoda", "Boba Fett", "X-Wing Fighter"
+• For scene cards: describe the primary subject
+
+**card_number**: Card collector number
+🚨 **CRITICAL - EXACT OCR REQUIRED**:
+• READ THE ACTUAL PRINTED NUMBER ON THE CARD
+• Formats vary by manufacturer: "#45", "45/100", "SW-23", "45"
+• Located on front or back of card depending on set
+• If serial numbered: also capture the serial (e.g., "23/50")
+
+**set_name**: Set/series name
+• Full set name as printed
+• Example: "Star Wars Galaxy", "Chrome Perspectives", "Star Wars Heritage"
+• Include year if visible: "2023 Topps Star Wars Chrome"
+
+**year**: Release year
+• 4-digit year
+• 1977 for original Topps series through 2026
+
+**manufacturer**: Card publisher
+• "Topps" for most Star Wars cards
+• "Panini" for Panini releases
+• "Decipher" for Star Wars CCG
+• "Fantasy Flight Games" for Star Wars: Unlimited
+• "Upper Deck" for Upper Deck releases
+• Identify from logos, card back design, copyright text
+
+**authentic**: Licensed product verification (true|false)
+• true if official licensed Star Wars product
+• Check for Lucasfilm/Disney copyright, manufacturer logos
+• false if custom/fan-made
+
+────────────────────────────────────────────────────────────────────────
+STAR WARS-SPECIFIC FIELDS
+────────────────────────────────────────────────────────────────────────
+
+**sw_card_type**: Card type classification
+• **Base Card** - Standard set card
+• **Insert** - Special insert/chase card
+• **Autograph** - Signed card (auto)
+• **Relic/Memorabilia** - Contains embedded material (fabric, prop piece)
+• **Sketch Card** - Hand-drawn original art
+• **Parallel** - Alternate version (refractor, gold, numbered)
+• **Promo** - Promotional card
+• **Sticker** - Sticker card (Panini, vintage)
+• **Character Card** - CCG/TCG character card
+• **Vehicle Card** - CCG/TCG vehicle/ship card
+• **Event Card** - CCG/TCG event/action card
+• **Location Card** - CCG/TCG location card
+
+**sw_faction**: Star Wars faction/affiliation
+• Rebel Alliance / Resistance
+• Galactic Empire / First Order
+• Jedi Order
+• Sith
+• Bounty Hunters / Mandalorian
+• Republic / Clone Army
+• Separatists / Trade Federation
+• Neutral / Unaffiliated
+• Multiple affiliations possible
+
+**sw_era**: Star Wars era
+• Original Trilogy (Episodes IV-VI, 1977-1983)
+• Prequel Trilogy (Episodes I-III, 1999-2005)
+• Sequel Trilogy (Episodes VII-IX, 2015-2019)
+• Clone Wars (animated series)
+• The Mandalorian / Disney+ era
+• The High Republic
+• Legends / Expanded Universe
+• Cross-era (spans multiple eras)
+
+**sw_rarity**: Rarity/parallel type
+• Base / Common
+• Uncommon
+• Rare
+• Super Rare
+• Refractor / Chrome
+• Gold Refractor (typically numbered)
+• Black Refractor
+• Superfractor (1/1)
+• Red (/5 or /10 typically)
+• Blue (/25 or /50 typically)
+• Green (/75 or /99 typically)
+• Orange / Purple (various numbering)
+• Printing Plate (1/1)
+
+**rarity**: General rarity level
+• Common, Uncommon, Rare, Super Rare, Ultra Rare, Legendary
+• SSP (Super Short Print)
+• 1/1 (unique)
+
+**serial_numbering**: If numbered parallel
+• Format: "/50", "/99", "/199", "/1" etc.
+• Extract exact numbering from card
+
+**is_foil**: Holographic/chrome treatment (true|false)
+• true for Chrome, Refractor, Prizm variants
+• true for holographic inserts
+• false for standard base cards
+• ⚠️ Camera glare is NOT foil
+
+**autographed**: Contains authentic autograph (true|false)
+• true if card has on-card or sticker autograph
+• Note signer name in card details
+• Certified autographs add significant value
+
+**language**: Card language
+• Usually English
+• Japanese releases exist for some sets
+
+═══════════════════════════════════════════════════════════════════════
+B. STAR WARS SET IDENTIFICATION
+═══════════════════════════════════════════════════════════════════════
+
+**MAJOR SET FAMILIES:**
+
+| Manufacturer | Set Family | Years | Notes |
+|-------------|-----------|-------|-------|
+| Topps | Star Wars (Original) | 1977-1978 | 5 series, 330 cards total |
+| Topps | Empire Strikes Back | 1980 | 3 series |
+| Topps | Return of the Jedi | 1983 | 2 series |
+| Topps | Star Wars Galaxy | 1993-1995 | 3 series, premium art cards |
+| Topps | Star Wars Chrome | 2014-2024 | Chrome/refractor base |
+| Topps | Star Wars Masterwork | 2015-2023 | Premium with autos/relics |
+| Topps | Star Wars Finest | 2018-2023 | Chromium technology |
+| Topps | Star Wars Heritage | 2004 | Retro-styled cards |
+| Topps | Star Wars Living Set | 2018-present | Print-on-demand, weekly |
+| Decipher | Star Wars CCG | 1995-2001 | Customizable Card Game |
+| FFG | Star Wars: Unlimited | 2024-present | New TCG |
+
+**VINTAGE CARD IDENTIFICATION (1977-1983):**
+• Original 1977 Topps: Blue, Red, Yellow, Green, Orange series borders
+• Card backs have puzzle pieces or movie facts
+• "TM" on early printings, "©" on later
+• Centering issues common on vintage cards
+• High value in gem mint condition
+
+**SET TYPE INDICATORS:**
+• "Chrome" = Chromium/refractor technology
+• "Masterwork" = Premium set with hits
+• "Heritage" = Retro/vintage design tribute
+• "Galaxy" = Art-focused cards
+• "Finest" = Chrome variant
+• "Living Set" = Print-on-demand weekly release
+
+═══════════════════════════════════════════════════════════════════════
+C. STAR WARS CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+────────────────────────────────────────────────────────────────────────
+1. CHROME/REFRACTOR DEFECTS (HIGH VALUE CARDS)
+────────────────────────────────────────────────────────────────────────
+
+**Chrome Card Characteristics:**
+• Chromium/refractor surface with rainbow light reflection
+• More susceptible to fingerprints and scratches
+• Surface defects highly visible under varied lighting
+
+**Common Chrome Issues:**
+• Micro-scratches across chrome surface
+• Fingerprints (oils visible on chrome)
+• Chrome pattern disruption or clouding
+• Surface scuffing dulling the refractor effect
+• Chrome layer peeling at edges (severe)
+
+**Grading Impact:**
+• Single chrome scratch: -0.5 to -1.0
+• Multiple scratches: -1.0 to -2.0
+• Fingerprints on chrome: -0.5 to -1.0
+• Prevents 10.0 surface score if any chrome defects
+
+────────────────────────────────────────────────────────────────────────
+2. VINTAGE CARD DEFECTS (1977-1983)
+────────────────────────────────────────────────────────────────────────
+
+**Vintage Characteristics:**
+• Thinner cardstock than modern cards
+• Colored borders (blue, red, yellow, green, orange by series)
+• Commonly found with wax stains from pack wax
+• Age-related yellowing and foxing common
+
+**Common Vintage Issues:**
+• Wax stains (from bubble gum/wax wrapper)
+• Centering issues (very common in 1977 printing)
+• Corner wear from decades of handling
+• Edge whitening against colored borders
+• Yellowing/foxing from age
+• Rubber band marks from storage
+
+**Grading Impact:**
+• Wax stains: -0.5 to -2.0 depending on severity
+• Centering off by >60/40: -1.0 to -3.0
+• Age yellowing: -0.5 to -1.0
+• Rubber band marks: -1.0 to -2.0
+
+────────────────────────────────────────────────────────────────────────
+3. AUTOGRAPH/RELIC CARD DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Autograph Cards:**
+• On-card autos vs sticker autos
+• Auto quality varies (signature clarity, ink consistency)
+• Sticker auto adhesion and placement
+• Grade the CARD condition, not the autograph quality
+
+**Relic Cards:**
+• Embedded fabric/material behind window
+• Window integrity (no bubbling or peeling)
+• Card surface around window
+• Standard grading criteria for non-relic areas
+
+────────────────────────────────────────────────────────────────────────
+4. STANDARD SURFACE/EDGE/CORNER DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Modern Star Wars Cards:**
+• Standard card stock quality
+• Glossy front surface
+• Standard card back (varies by manufacturer)
+
+**Common Issues:**
+• Print lines through artwork
+• Scratches on card surface
+• Edge whitening (white cardstock against colored borders)
+• Corner softening from handling
+• Pack-fresh dimples or surface irregularities
+
+**Grading Impact:**
+• Same as master rubric standards
+• Colored borders make whitening more visible
+• Art-focused cards: defects on character face more impactful
+
+═══════════════════════════════════════════════════════════════════════
+D. STAR WARS CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**VINTAGE CARD EXAMPLE (1977):**
+"This 1977 Topps Star Wars Series 1 Blue Border card #1 'Luke Skywalker' shows typical vintage characteristics. Centering is 55/45 left-right and 52/48 top-bottom — acceptable for the era. Blue borders show light whitening at the top edge approximately 2mm. Corners show moderate softening typical of a 40+ year old card. No wax stains present. Surface has minor handling marks but no scratches. Grade 7 — Near Mint for vintage condition."
+
+**CHROME REFRACTOR EXAMPLE:**
+"This 2023 Topps Star Wars Chrome Refractor of 'Darth Vader' displays prismatic chrome treatment across the full card face. Under varied lighting angles, I detect one fine hairline scratch approximately 6mm running across the lower portion of the card. The refractor pattern is otherwise clean and vibrant. Chrome surface shows no fingerprints or clouding. Surface score: 9.0 due to single visible chrome scratch."
+
+**AUTOGRAPH CARD EXAMPLE:**
+"This Topps Star Wars Masterwork autograph card features an on-card signature of Mark Hamill. The autograph is clear and well-placed. Grading the CARD condition (not auto quality): Centering is 50/50 LR and 48/52 TB — excellent. All four corners are sharp with no wear. Edges clean with no whitening. Surface pristine aside from the intentional autograph area. Grade 9.5."
+
+═══════════════════════════════════════════════════════════════════════
+E. STAR WARS SPECIFIC EXTRACTION RULES
+═══════════════════════════════════════════════════════════════════════
+
+**SKETCH CARD DETECTION:**
+• Hand-drawn original art cards (1/1)
+• Each is unique — note "Sketch Card" in card_type
+• Artist name should be captured
+• Grade card condition, noting unique art nature
+
+**PRINTING PLATE DETECTION:**
+• Metal printing plates used in card production (1/1)
+• Colors: Cyan, Magenta, Yellow, Black
+• Note color and "Printing Plate" in card_type
+
+**DUAL/TRIPLE AUTOGRAPH CARDS:**
+• Cards with multiple signatures
+• Note all signers if identifiable
+• More valuable than single autos
+
+**PARALLEL NUMBERING:**
+• Many Star Wars parallels are numbered
+• Format: "XX/YY" (e.g., "23/50")
+• Lower denominator = rarer and more valuable
+• 1/1 = unique card (Superfractor, printing plate)
+
+**CARD BACK VARIATIONS:**
+• 1977 Topps: Different puzzle piece backs across series
+• Modern: Standard card back per manufacturer
+• CCG cards: Game-specific backs (Decipher, FFG)
+• Verify back matches expected set design
+
+--- END OF STAR WARS DELTA v5.0 ---
