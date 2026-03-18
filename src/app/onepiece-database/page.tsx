@@ -138,13 +138,6 @@ export default function OnePieceDatabasePage() {
 
   // Search when filters change
   const searchCards = useCallback(async (page = 1) => {
-    // Don't search if no filters applied
-    if (!debouncedName && !selectedSetId && !searchCardId && !selectedColor && !selectedType) {
-      setCards([])
-      setHasSearched(false)
-      return
-    }
-
     setIsLoading(true)
     setHasSearched(true)
 
@@ -156,7 +149,7 @@ export default function OnePieceDatabasePage() {
       if (selectedColor) params.set('card_color', selectedColor)
       if (selectedType) params.set('card_type', selectedType)
       params.set('page', page.toString())
-      params.set('limit', '50')
+      params.set('limit', '20')
 
       const res = await fetch(`/api/onepiece-database/search?${params}`)
       const data = await res.json()
@@ -574,15 +567,9 @@ export default function OnePieceDatabasePage() {
       </section>
 
       {/* Search Hint */}
-      {!hasSearched && (
-        <div className="container mx-auto px-4 py-4 text-center">
-          <p className="text-gray-500 text-sm">Use the fields above to search for cards</p>
-        </div>
-      )}
-
       {/* Results Section */}
       <section className="container mx-auto px-4 py-8">
-        {!hasSearched ? null : isLoading ? (
+        {isLoading ? (
           // Loading state
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {[...Array(12)].map((_, i) => (

@@ -121,12 +121,6 @@ export default function StarWarsDatabasePage() {
 
   // Search when filters change
   const searchCards = useCallback(async (page = 1) => {
-    if (!debouncedName && !selectedSetId && !searchNumber) {
-      setCards([])
-      setHasSearched(false)
-      return
-    }
-
     setIsLoading(true)
     setHasSearched(true)
 
@@ -136,7 +130,7 @@ export default function StarWarsDatabasePage() {
       if (selectedSetId) params.set('set_id', selectedSetId)
       if (searchNumber) params.set('card_number', searchNumber)
       params.set('page', page.toString())
-      params.set('limit', '50')
+      params.set('limit', '20')
 
       const res = await fetch(`/api/starwars-database/search?${params}`)
       const data = await res.json()
@@ -412,15 +406,9 @@ export default function StarWarsDatabasePage() {
       </section>
 
       {/* Search Hint */}
-      {!hasSearched && (
-        <div className="container mx-auto px-4 py-4 text-center">
-          <p className="text-gray-500 text-sm">Use the fields above to search for cards</p>
-        </div>
-      )}
-
       {/* Results Section */}
       <section className="container mx-auto px-4 py-8">
-        {!hasSearched ? null : isLoading ? (
+        {isLoading ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {[...Array(12)].map((_, i) => (
               <div key={i} className="animate-pulse">
