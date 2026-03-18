@@ -2128,6 +2128,23 @@ EXTRACTION RULES:
                   productName = result.prices.productName;
                   rawPrice = result.prices.raw;
                 }
+              } else if (category === 'Yu-Gi-Oh' && isOtherPricingEnabled() && cardName) {
+                console.log(`[PRICECHARTING] Fetching Yu-Gi-Oh pricing for card ${cardId}`);
+                const result = await searchOtherCardPrices({
+                  cardName,
+                  setName,
+                  cardNumber,
+                  year,
+                  manufacturer: 'Konami',
+                  variant,
+                });
+                if (result.prices) {
+                  estimatedValue = estimateOtherDcmValue(result.prices, dcmGrade);
+                  matchConfidence = result.matchConfidence;
+                  productId = result.prices.productId;
+                  productName = result.prices.productName;
+                  rawPrice = result.prices.raw;
+                }
               } else if (category === 'Other' && isOtherPricingEnabled() && cardName) {
                 console.log(`[PRICECHARTING] Fetching Other pricing for card ${cardId}`);
                 const result = await searchOtherCardPrices({

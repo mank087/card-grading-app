@@ -1020,6 +1020,45 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
 
     console.log(`[GET /api/yugioh/${cardId}] Yu-Gi-Oh card request completed in ${Date.now() - startTime}ms`);
 
+    // Fire-and-forget: Fetch pricing from PriceCharting (uses "Other" pricing which covers Yu-Gi-Oh)
+    (async () => {
+      try {
+        const { searchOtherCardPrices, estimateOtherDcmValue, isOtherPricingEnabled } = await import("@/lib/otherPricing");
+        if (!isOtherPricingEnabled()) return;
+
+        const cardInfo = conversationalGradingData?.card_info || {};
+        const pricingCardName = cardFields.card_name || cardInfo.card_name;
+        if (!pricingCardName) return;
+
+        console.log(`[GET /api/yugioh/${cardId}] Fetching pricing for: ${pricingCardName}`);
+        const result = await searchOtherCardPrices({
+          cardName: pricingCardName,
+          setName: cardFields.card_set || cardInfo.set_name,
+          cardNumber: cardFields.card_number || cardInfo.card_number,
+          year: cardFields.release_date || cardInfo.year,
+          manufacturer: 'Konami',
+          variant: cardInfo.rarity_or_variant || cardInfo.variant_type,
+        });
+
+        if (result.prices) {
+          const dcmGrade = conversationalGradingData?.decimal_grade || rawGrade;
+          const estimatedValue = estimateOtherDcmValue(result.prices, dcmGrade);
+          const priceUpdate: any = {
+            dcm_price_estimate: estimatedValue,
+            dcm_price_raw: result.prices.raw,
+            dcm_price_updated_at: new Date().toISOString(),
+            dcm_price_match_confidence: result.matchConfidence,
+            dcm_price_product_id: result.prices.productId,
+            dcm_price_product_name: result.prices.productName,
+          };
+          await supabase.from("cards").update(priceUpdate).eq("id", cardId);
+          console.log(`[GET /api/yugioh/${cardId}] Pricing saved: $${estimatedValue} (confidence: ${result.matchConfidence})`);
+        }
+      } catch (priceErr: any) {
+        console.warn(`[GET /api/yugioh/${cardId}] Pricing failed (non-blocking): ${priceErr.message}`);
+      }
+    })();
+
     // Return updated Yu-Gi-Oh card data with all structured fields
     return NextResponse.json({
       ...card,
