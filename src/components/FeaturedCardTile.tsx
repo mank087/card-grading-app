@@ -29,6 +29,7 @@ function getCardLink(card: any): string {
   if (card.category === 'MTG') return `/mtg/${card.id}`
   if (card.category === 'Lorcana') return `/lorcana/${card.id}`
   if (card.category === 'One Piece') return `/onepiece/${card.id}`
+  if (card.category === 'Yu-Gi-Oh') return `/yugioh/${card.id}`
   if (card.category === 'Other') return `/other/${card.id}`
   return `/card/${card.id}`
 }

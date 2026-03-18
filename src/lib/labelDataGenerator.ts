@@ -614,6 +614,18 @@ function getOnePieceName(cardInfo: ConversationalCardInfo, card: CardForLabel): 
 }
 
 /**
+ * Get the primary name for Yu-Gi-Oh cards
+ * Yu-Gi-Oh: Card name is primary (e.g., "Dark Magician", "Blue-Eyes White Dragon")
+ */
+function getYugiohName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
+  const cardName = stripMarkdown(cardInfo.card_name);
+  if (isValidValue(cardName)) return cardName!;
+  if (isValidValue(card.card_name)) return card.card_name!;
+  if (isValidValue(card.featured)) return card.featured!;
+  return 'Card';
+}
+
+/**
  * Get the primary name for Other cards
  */
 function getOtherName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
@@ -707,6 +719,19 @@ function getLorcanaSubset(cardInfo: ConversationalCardInfo, card: CardForLabel):
     return subset || 'Foil';
   }
   return subset;
+}
+
+/**
+ * Get subset for Yu-Gi-Oh cards
+ * Yu-Gi-Oh: Card type (Normal Monster, Effect Monster, Spell Card, Trap Card, etc.)
+ */
+function getYugiohSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): string | null {
+  const subset = stripMarkdown(cardInfo.subset);
+  if (subset) return subset;
+  // Use card type as subset (e.g., "Effect Monster", "Spell Card")
+  const cardType = (cardInfo as any).ygo_card_type || (card as any).ygo_card_type;
+  if (isValidValue(cardType)) return cardType;
+  return null;
 }
 
 /**
@@ -864,6 +889,30 @@ function getLorcanaFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel
 }
 
 /**
+ * Build features array for Yu-Gi-Oh cards
+ */
+function getYugiohFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): string[] {
+  const features: string[] = [];
+
+  // Attribute (DARK, LIGHT, FIRE, etc.)
+  const attribute = (cardInfo as any).ygo_attribute || (card as any).ygo_attribute;
+  if (isValidValue(attribute)) features.push(attribute);
+
+  // Monster type / Race (Spellcaster, Dragon, Warrior)
+  const race = (cardInfo as any).ygo_race || (card as any).ygo_race;
+  if (isValidValue(race)) features.push(race);
+
+  // Foil
+  if (cardInfo.is_foil === true) features.push('Foil');
+
+  // Serial Number
+  const serialNum = stripMarkdown(cardInfo.serial_number);
+  if (isValidSerialNumber(serialNum)) features.push(serialNum!);
+
+  return features;
+}
+
+/**
  * Build features array for One Piece cards
  */
 function getOnePieceFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): string[] {
@@ -956,6 +1005,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
       case 'One Piece':
         rawPrimaryName = getOnePieceName(cardInfo, card);
         break;
+      case 'Yu-Gi-Oh':
+        rawPrimaryName = getYugiohName(cardInfo, card);
+        break;
       default:
         rawPrimaryName = getOtherName(cardInfo, card);
     }
@@ -1000,6 +1052,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
         break;
       case 'One Piece':
         rawSubset = getOnePieceSubset(cardInfo, card);
+        break;
+      case 'Yu-Gi-Oh':
+        rawSubset = getYugiohSubset(cardInfo, card);
         break;
       default:
         rawSubset = stripMarkdown(cardInfo.subset);
@@ -1119,6 +1174,9 @@ export function generateLabelData(card: CardForLabel): LabelData {
         break;
       case 'One Piece':
         features = getOnePieceFeatures(cardInfo, card);
+        break;
+      case 'Yu-Gi-Oh':
+        features = getYugiohFeatures(cardInfo, card);
         break;
       default:
         features = getOtherFeatures(cardInfo, card);

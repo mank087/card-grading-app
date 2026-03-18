@@ -390,6 +390,11 @@ const getCardLink = (card: Card) => {
     return `/onepiece/${card.id}`;
   }
 
+  // Yu-Gi-Oh cards → /yugioh/[id]
+  if (card.category === 'Yu-Gi-Oh') {
+    return `/yugioh/${card.id}`;
+  }
+
   // Other cards → /other/[id]
   if (card.category === 'Other') {
     return `/other/${card.id}`;

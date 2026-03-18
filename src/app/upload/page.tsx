@@ -117,6 +117,22 @@ const CARD_TYPES = {
       ]
     }
   },
+  'Yu-Gi-Oh': {
+    label: 'Yu-Gi-Oh! TCG Card',
+    icon: '',
+    category: 'Yu-Gi-Oh',
+    apiEndpoint: '/api/yugioh',
+    route: '/yugioh',
+    description: {
+      title: 'Yu-Gi-Oh! TCG',
+      items: [
+        'All Yu-Gi-Oh! TCG sets and editions',
+        'Monster, Spell, and Trap cards',
+        'Fusion, Synchro, XYZ, Link, and Pendulum',
+        'Rarity and attribute analysis'
+      ]
+    }
+  },
   Other: {
     label: 'Other Collectible Card',
     icon: '',
