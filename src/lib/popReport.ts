@@ -12,6 +12,7 @@ export const POP_CATEGORIES: PopCategory[] = [
   { slug: 'mtg', dbCategory: 'MTG', displayName: 'Magic: The Gathering', icon: '\uD83E\uDDD9' },
   { slug: 'lorcana', dbCategory: 'Lorcana', displayName: 'Lorcana', icon: '\u2728' },
   { slug: 'one-piece', dbCategory: 'One Piece', displayName: 'One Piece', icon: '\uD83C\uDFF4\u200D\u2620\uFE0F' },
+  { slug: 'yugioh', dbCategory: 'Yu-Gi-Oh', displayName: 'Yu-Gi-Oh!', icon: '\uD83D\uDD2E' },
   { slug: 'football', dbCategory: 'Football', displayName: 'Football', icon: '\uD83C\uDFC8' },
   { slug: 'baseball', dbCategory: 'Baseball', displayName: 'Baseball', icon: '\u26BE' },
   { slug: 'basketball', dbCategory: 'Basketball', displayName: 'Basketball', icon: '\uD83C\uDFC0' },
@@ -49,7 +50,7 @@ export function getCategoryMeta(slug: string): PopCategory | undefined {
 }
 
 /** TCG categories where card name = character name (no separate player column needed) */
-const TCG_SLUGS = new Set(['pokemon', 'mtg', 'lorcana', 'one-piece']);
+const TCG_SLUGS = new Set(['pokemon', 'mtg', 'lorcana', 'one-piece', 'yugioh']);
 
 /** Returns true if the category is a TCG (card name IS the character) */
 export function isTcgCategory(slug: string): boolean {
