@@ -17,7 +17,7 @@ import fs from 'fs';
 import path from 'path';
 
 // Card types supported by v5.0 architecture
-export type CardType = 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
+export type CardType = 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'other';
 
 /**
  * Prompt loading result
@@ -212,7 +212,7 @@ CRITICAL REMINDERS:
  * @returns Token estimates for all card types
  */
 export function getTokenEstimates(): Record<CardType, number> {
-  const cardTypes: CardType[] = ['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'other'];
+  const cardTypes: CardType[] = ['sports', 'pokemon', 'mtg', 'lorcana', 'onepiece', 'yugioh', 'other'];
   const estimates: Record<CardType, number> = {} as any;
 
   for (const cardType of cardTypes) {
@@ -244,6 +244,7 @@ export function validatePromptFiles(): {
     'mtg_delta_v5.txt',
     'lorcana_delta_v5.txt',
     'onepiece_delta_v5.txt',
+    'yugioh_delta_v5.txt',
     'other_delta_v5.txt',
     'evidence_based_grading_protocol.txt' // Not directly loaded but should exist
   ];
@@ -287,6 +288,7 @@ export function loadLegacyPrompt(cardType: CardType): string | null {
       'mtg': 'card_grader_v4_2_mtg.txt',
       'lorcana': 'card_grader_v4_2_lorcana.txt',
       'onepiece': 'card_grader_v4_2_other.txt', // Falls back to 'other' for legacy
+      'yugioh': 'card_grader_v4_2_other.txt', // Falls back to 'other' for legacy
       'other': 'card_grader_v4_2_other.txt'
     };
 

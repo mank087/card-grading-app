@@ -1,0 +1,436 @@
+═══════════════════════════════════════════════════════════════════════
+CARD TYPE DELTA: YU-GI-OH! TCG v5.0
+═══════════════════════════════════════════════════════════════════════
+
+**DELTA PURPOSE:** This file contains ONLY Yu-Gi-Oh! TCG card-specific rules.
+The master grading rubric (Sections 1-13) applies to ALL Yu-Gi-Oh! cards.
+This delta provides card-specific extraction rules, defect patterns, and examples.
+
+**CARD TYPES COVERED:**
+Yu-Gi-Oh! Trading Card Game from all sets (Legend of Blue Eyes White Dragon 2002 through present 2026)
+
+═══════════════════════════════════════════════════════════════════════
+A. YU-GI-OH! CARD INFORMATION EXTRACTION
+═══════════════════════════════════════════════════════════════════════
+
+Extract the following fields from Yu-Gi-Oh! TCG cards:
+
+────────────────────────────────────────────────────────────────────────
+REQUIRED FIELDS (All Yu-Gi-Oh! Cards)
+────────────────────────────────────────────────────────────────────────
+
+**card_name**: Full card name
+• Exact name as printed on the card
+• Example: "Dark Magician", "Blue-Eyes White Dragon", "Pot of Greed"
+• Use full name including punctuation (hyphens, apostrophes, colons)
+• Example: "D/D/D Doom King Armageddon", "Number 39: Utopia"
+
+**player_or_character**: Same as card_name for Yu-Gi-Oh!
+• Use the card name since Yu-Gi-Oh! cards are the character
+
+**card_id**: Card set code identifier
+🚨 **CRITICAL - EXACT OCR REQUIRED**:
+• READ THE ACTUAL PRINTED CODE ON THE CARD - DO NOT INFER OR CORRECT
+• Transcribe EXACTLY what is printed, character-by-character
+• Format: "SET-LANGXXX" (e.g., "LOB-EN005", "DUEA-EN049", "CT13-EN003")
+• Located at bottom-right of card (near the passcode number)
+• Some older cards use format without language: "LOB-005", "SDK-001"
+• DO NOT "fix" codes based on your knowledge
+• If partially obscured, report what IS visible with uncertainty note
+
+**card_number**: Same as card_id for Yu-Gi-Oh!
+• The set code uniquely identifies a printing
+
+**ygo_card_type**: Card type classification
+• **Normal Monster** - Yellow frame, no effect text (italic flavor text)
+• **Effect Monster** - Orange frame, has effect text
+• **Ritual Monster** - Blue frame, summoned via Ritual Spell
+• **Fusion Monster** - Purple frame, Extra Deck card
+• **Synchro Monster** - White frame, Extra Deck card
+• **XYZ Monster** - Black frame, Extra Deck card with Rank (not Level)
+• **Pendulum Monster** - Half monster/half spell with Pendulum Scale
+• **Link Monster** - Dark blue frame, has Link Rating and Link Arrows
+• **Spell Card** - Green frame (Normal, Continuous, Equip, Quick-Play, Field, Ritual)
+• **Trap Card** - Purple/magenta frame (Normal, Continuous, Counter)
+• **Token** - Gray frame
+
+**ygo_frame_type**: Frame type for visual identification
+• "normal", "effect", "ritual", "fusion", "synchro", "xyz", "pendulum", "link", "spell", "trap", "token"
+
+**ygo_attribute**: Monster attribute (Monster cards ONLY)
+• Options: DARK, LIGHT, FIRE, WATER, EARTH, WIND, DIVINE
+• Located at top-right of card as an icon
+• DIVINE is exclusive to Egyptian God Cards
+• Spell/Trap cards have "SPELL" or "TRAP" instead of an attribute
+
+**ygo_race**: Monster type (Yu-Gi-Oh! calls this "Type" on the card)
+• Example: "Spellcaster", "Dragon", "Warrior", "Machine", "Fiend", "Fairy"
+• Located in the Type line: "[Spellcaster/Effect]"
+• For Spell/Trap: "Normal", "Continuous", "Quick-Play", "Equip", "Field", "Counter", "Ritual"
+
+**ygo_atk**: Attack points (Monster cards ONLY)
+• Numeric value (e.g., 2500, 3000, 0)
+• Located at bottom-left: "ATK/2500"
+• Link Monsters have ATK but no DEF
+• Spell/Trap cards: null
+• Some cards show "?" for variable ATK
+
+**ygo_def**: Defense points (Monster cards ONLY, NOT Link Monsters)
+• Numeric value (e.g., 2100, 0)
+• Located at bottom-right: "DEF/2100"
+• Link Monsters do NOT have DEF
+• Spell/Trap cards: null
+• Some cards show "?" for variable DEF
+
+**ygo_level**: Level or Rank
+• Level: Number of stars (1-12) at top-right for standard monsters
+• Rank: Number of stars at top-left for XYZ Monsters (they have Rank, not Level)
+• Link Monsters, Spell, and Trap cards: null
+
+**ygo_scale**: Pendulum Scale (Pendulum Monsters ONLY)
+• Numeric value (0-13) shown in the blue/red scale diamonds
+• Left and right scales are usually the same
+• null for non-Pendulum cards
+
+**ygo_linkval**: Link Rating (Link Monsters ONLY)
+• Numeric value (1-6) shown in bottom-right where DEF would be: "LINK-3"
+• null for non-Link cards
+
+**ygo_archetype**: Archetype/series
+• Card series the card belongs to
+• Example: "Dark Magician", "Blue-Eyes", "HERO", "Branded", "Spright"
+• Not all cards belong to an archetype
+• null if no clear archetype
+
+**rarity**: Rarity level
+• Common (C) - No foil treatment
+• Rare (R) - Silver name text
+• Super Rare (SR) - Holographic artwork
+• Ultra Rare (UR) - Gold name text + holographic artwork
+• Secret Rare (ScR) - Diagonal rainbow holographic pattern on name and art
+• Ultimate Rare (UtR) - Embossed/3D textured card surface
+• Ghost Rare (GhR) - 3D holographic with "ghost" image
+• Starlight Rare (StR) - Prismatic secret pattern across entire card
+• Collector's Rare (CR) - Rainbow foil across entire card
+• Quarter Century Secret Rare (QCSR) - 25th anniversary special
+• Prismatic Secret Rare (PScR) - Enhanced prismatic pattern
+• Gold Rare (GUR) - Gold foil treatment
+• Premium Gold Rare (PGR) - Enhanced gold foil
+• Short Print (SP) - Standard rarity but limited print run
+
+**card_cost**: Not applicable for Yu-Gi-Oh! (set to null)
+
+**set_name**: Set/expansion name
+• See Set Identification Module below
+• Extract from set code prefix
+
+**year**: Release year
+• 4-digit year based on set release
+• 2002 for earliest sets, through 2026
+
+**manufacturer**: Card publisher
+• "Konami" for all Yu-Gi-Oh! TCG cards
+
+**authentic**: Licensed product verification (true|false)
+• true if official Konami Yu-Gi-Oh! TCG card
+• Check for Konami logo, official card back (brown swirl design), holographic eye stamp
+• Eye of Anubis hologram present on all authentic cards (bottom-right on newer cards)
+• false if proxy/counterfeit
+
+────────────────────────────────────────────────────────────────────────
+EDITION DETECTION
+────────────────────────────────────────────────────────────────────────
+
+**edition_type**: Card edition
+• **1st Edition** - "1st Edition" text below card art on left side
+  - Higher value than Unlimited
+  - Only on initial print run
+• **Limited Edition** - "Limited Edition" text
+  - Promo and special releases
+• **Unlimited** - No edition text
+  - Standard reprint/later printing
+
+EDITION INDICATORS:
+- "1st Edition" text on card face = 1st Edition
+- "Limited Edition" text = Limited Edition
+- No edition marking = Unlimited Edition
+- Duel Terminal cards: "DT" in set code
+
+OUTPUT FORMAT:
+{
+  "edition_type": "1st Edition",
+  "edition_confidence": "high"
+}
+
+────────────────────────────────────────────────────────────────────────
+ENHANCED FIELDS
+────────────────────────────────────────────────────────────────────────
+
+**card_text**: Card effect/flavor text
+• Effect Monsters: Describe the card's effect in full
+• Normal Monsters: Italic flavor text (not a game effect)
+• Spell/Trap: Full effect text
+• Pendulum: Both Pendulum Effect and Monster Effect
+
+**rarity_tier**: Visual rarity classification
+• Based on foil treatment and rarity symbol
+• Options: Common, Rare, Super Rare, Ultra Rare, Secret Rare, Ultimate Rare, Ghost Rare, Starlight Rare
+
+**subset**: Additional designation
+• Structure Deck, Starter Deck, Tin, Special Edition, etc.
+
+**is_foil**: Holographic treatment (true|false) — DEFAULT TO FALSE
+• true ONLY for cards with clear holographic surface treatment
+  (Super Rare and above typically have foil/holo)
+• false for Common and Rare (silver name only) cards
+• ⚠️ COMMON FALSE POSITIVES: Camera glare, glossy card stock, sleeve reflections
+• If uncertain: set false
+
+**language**: Card language
+• English, Japanese, Korean, German, French, Italian, Spanish, Portuguese
+• Japanese cards typically have different set codes and layout
+
+═══════════════════════════════════════════════════════════════════════
+B. YU-GI-OH! SET IDENTIFICATION MODULE
+═══════════════════════════════════════════════════════════════════════
+
+**SET CODE PREFIX PATTERNS:**
+
+| Prefix Pattern | Set Type                | Example |
+|---------------|------------------------|---------|
+| LOB, MRD, PSV | Early TCG sets (2002-2003) | LOB-005 |
+| DCR, IOC, AST | GX era sets           | IOC-025 |
+| DUEA, NECH    | ARC-V era sets        | DUEA-EN049 |
+| BODE, DAMA    | VRAINS/modern sets    | BODE-EN010 |
+| SDK, SDY, SDJ | Starter Decks         | SDK-001 |
+| SD, SDCK      | Structure Decks       | SD44-EN001 |
+| CT, TN        | Collector Tins        | CT13-EN003 |
+| LCYW, LCJW    | Legendary Collections | LCYW-EN001 |
+| DUDE, MAGO    | Special sets          | DUDE-EN001 |
+| RA01, RA02    | Rarity Collection     | RA01-EN001 |
+| LEDE, PHNI    | Recent core sets      | LEDE-EN001 |
+| GFP2, MP23    | Gold/Mega Packs       | MP23-EN001 |
+
+**NOTABLE SETS (High Value/Common in Grading):**
+
+| Set Code | Set Name                           | Year |
+|----------|-----------------------------------|------|
+| LOB      | Legend of Blue Eyes White Dragon    | 2002 |
+| MRD      | Metal Raiders                      | 2002 |
+| PSV      | Pharaoh's Servant                  | 2002 |
+| LON      | Labyrinth of Nightmare             | 2003 |
+| IOC      | Invasion of Chaos                  | 2004 |
+| TLM      | The Lost Millennium                | 2005 |
+| BODE     | Burst of Destiny                   | 2021 |
+| POTE     | Power of the Elements              | 2022 |
+| DUNE     | Duelist Nexus                      | 2023 |
+| LEDE     | Legacy of Destruction              | 2024 |
+| BLCR     | Battles of Legend: Crystal Revenge  | 2022 |
+| RA01     | 25th Anniversary Rarity Collection | 2024 |
+
+**SET CODE IDENTIFICATION:**
+• Format is typically: SET-LANGXXX or SET-XXX
+• LANG is usually "EN" for English, "JP" for Japanese
+• Numbers are zero-padded: 001, 025, 100
+• Older sets may omit language code: LOB-005 vs LOB-EN005
+
+**OUTPUT FORMAT:**
+{
+  "set_name": "Legend of Blue Eyes White Dragon",
+  "set_code": "LOB",
+  "card_set_code": "LOB-EN005",
+  "set_year": 2002,
+  "set_confidence": "high"
+}
+
+═══════════════════════════════════════════════════════════════════════
+C. YU-GI-OH! CARD DEFECT PATTERNS
+═══════════════════════════════════════════════════════════════════════
+
+**Common Yu-Gi-Oh! TCG Defects:**
+
+────────────────────────────────────────────────────────────────────────
+1. HOLOGRAPHIC/FOIL DEFECTS (SUPER RARE AND ABOVE)
+────────────────────────────────────────────────────────────────────────
+
+**Holographic Card Characteristics:**
+• Super Rare: Holographic artwork only
+• Ultra Rare: Gold name + holographic artwork
+• Secret Rare: Diagonal rainbow pattern on name and art
+• Ultimate Rare: Embossed 3D texture across card
+• Starlight Rare: Full prismatic treatment
+
+**Common Holo Issues:**
+• Holo scratches across artwork (micro-scratches visible under light)
+• Pattern disruption or clouding on Secret Rares
+• Fingerprints visible on holo surface
+• Embossing damage on Ultimate Rares (flattened areas)
+• Prismatic pattern scratches on Starlight Rares
+
+**Grading Impact:**
+• Single holo scratch: -0.5 to -1.0
+• Multiple holo scratches: -1.0 to -2.0
+• Embossing damage: -1.0 to -2.0
+• Prevents 10.0 surface score if any holo defects present
+
+────────────────────────────────────────────────────────────────────────
+2. BORDER/EDGE DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Yu-Gi-Oh! Card Borders:**
+• Monster cards have colored frames (yellow, orange, purple, white, black, blue, dark blue)
+• Spell cards: green border
+• Trap cards: purple/magenta border
+• All have outer gold/brown border edge
+• White cardstock exposed at edges = edge wear
+
+**Detection:**
+• Examine all four edges for whitening
+• Gold/brown border makes whitening visible
+• Check corners where borders meet
+
+**Grading Impact:**
+• Minor edge whitening: -0.5 per affected edge
+• Moderate whitening: -1.0 per affected edge
+• Heavy whitening/chipping: -1.5 to -2.0
+
+────────────────────────────────────────────────────────────────────────
+3. CORNER DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Yu-Gi-Oh! Card Corners:**
+• Square corners (NOT rounded like Pokemon/One Piece)
+• More prone to damage than rounded corners
+• Gold border extends to corner points
+• Corner wear very common from shuffling
+
+**Common Issues:**
+• Corner softening/blunting
+• White fiber exposure at corner points
+• Corner dings, bends, or dents
+• Peeling at corner layers
+• "Dog ear" bends at corners
+
+**Grading Impact:**
+• Light softening: -0.5 per corner
+• Moderate wear: -1.0 per corner
+• Heavy damage/bending: -1.5 to -2.0 per corner
+• 🚨 Square corners show damage more readily than rounded corners
+
+────────────────────────────────────────────────────────────────────────
+4. SURFACE DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Standard Card Surface:**
+• Glossy front with card artwork
+• Standard brown swirl card back (consistent across all Yu-Gi-Oh! cards)
+
+**Common Issues:**
+• Print lines through artwork
+• Scratches across card art
+• Surface indentations or pressure marks
+• Ink spots or printing errors
+• Silvering on dark card areas
+• "Hologram" stamp wear (Eye of Anubis on newer cards)
+
+**Card Art Considerations:**
+• Defects on monster/character face area more impactful
+• Defects on card name text area noticeable
+• Background damage less severe but still graded
+
+**Grading Impact:**
+• Light surface scratches: -0.5 to -1.0
+• Scratches on monster face: -1.0 to -1.5
+• Print lines: -0.5 to -1.0
+• Hologram stamp damage: -0.5
+
+────────────────────────────────────────────────────────────────────────
+5. PRINTING/MANUFACTURING DEFECTS
+────────────────────────────────────────────────────────────────────────
+
+**Common Factory Issues:**
+• Off-center printing (affects centering grade)
+• Ink roller lines (common in older sets)
+• Color registration errors
+• Miscut cards (may be collectible if severe)
+• Factory crimped edges from packaging
+
+**Grading Impact:**
+• Minor printing variance: -0.5
+• Visible print defects: -1.0 to -1.5
+• Miscuts: May cap grade depending on severity
+
+═══════════════════════════════════════════════════════════════════════
+D. YU-GI-OH! CARD GRADING EXAMPLES
+═══════════════════════════════════════════════════════════════════════
+
+**CENTERING EXAMPLE (Standard Card):**
+"This Yu-Gi-Oh! card features a yellow Normal Monster frame with gold outer border. Measuring borders: left ≈ 2.5mm, right ≈ 3.0mm, top ≈ 2.2mm, bottom ≈ 2.8mm. Left-right ratio: 45/55. Top-bottom ratio: 44/56. Worst axis: top-bottom at 44/56. Acceptable centering with slight bottom-heavy shift."
+
+**SECRET RARE EXAMPLE:**
+"This Blue-Eyes White Dragon Secret Rare (CT13-EN003) displays diagonal rainbow holographic pattern across card name and artwork. Examining the holo layer under varied lighting, I detect two fine hairline scratches approximately 5mm in length across the dragon artwork. The secret rare pattern shows minor clouding in the lower third. Surface score: 8.5 due to holo scratches and pattern clouding."
+
+**1ST EDITION EXAMPLE:**
+"This Dark Magician 1st Edition (LOB-005) from Legend of Blue Eyes White Dragon displays '1st Edition' text clearly below the card artwork. The card shows age-appropriate wear for a 2002 card: corners show moderate softening with trace whitening at two corner points. Edges show light whitening along the top edge. Surface is remarkably clean for its age with minor handling marks."
+
+**CORNER ANALYSIS EXAMPLE:**
+"Examining all four SQUARE corners of this Effect Monster at maximum zoom:
+- Top-left: Light softening at corner point, minimal whitening. Minor wear.
+- Top-right: Sharp corner maintained, gold border intact. Near pristine.
+- Bottom-left: Moderate rounding with visible white fiber exposure. Notable wear.
+- Bottom-right: Light corner ding, slight depression visible. Minor damage.
+Corner score: 8.5 (bottom-left wear and bottom-right ding reduce score)"
+
+**EDGE ANALYSIS EXAMPLE:**
+"Examining all four edges of this Ultra Rare card:
+- Top edge: Clean edge line, gold border intact. One small area of whitening ≈1mm near center.
+- Bottom edge: Minor whitening approximately 2mm from left corner.
+- Left edge: No defects, border color consistent throughout. Pristine.
+- Right edge: Light chipping at one point, approximately 0.5mm whitening.
+Edge score: 9.0 (scattered minor whitening prevents higher score)"
+
+═══════════════════════════════════════════════════════════════════════
+E. YU-GI-OH! SPECIFIC EXTRACTION RULES
+═══════════════════════════════════════════════════════════════════════
+
+**PASSCODE NUMBER:**
+• 8-digit number at bottom-left of card (e.g., 46986414)
+• This is the card's unique identifier, NOT the set code
+• Do not confuse with the set code (top-right or bottom-right)
+
+**LINK MONSTER IDENTIFICATION:**
+• Dark blue/navy frame
+• Link Arrows (red triangles pointing in directions around the card)
+• "LINK-X" instead of DEF value (e.g., "LINK-3")
+• No Level stars — has Link Rating instead
+• Record Link Arrows directions: Top, Bottom, Left, Right, Top-Left, Top-Right, Bottom-Left, Bottom-Right
+
+**PENDULUM MONSTER IDENTIFICATION:**
+• Split card design: top half is monster, bottom half shows Pendulum Effect
+• Two colored diamond scales (left and right) showing Pendulum Scale number
+• Can be Normal, Effect, Fusion, Synchro, XYZ, or Ritual Pendulum
+• Record both the Pendulum Effect and Monster Effect
+
+**XYZ MONSTER IDENTIFICATION:**
+• Black card frame
+• Has Rank (left-aligned stars) instead of Level (right-aligned stars)
+• Record as "Rank X" not "Level X"
+
+**TOKEN IDENTIFICATION:**
+• Gray card frame
+• Not typically graded individually
+• If detected, note as "Token" in card_type
+
+**OLDER CARD VARIATIONS:**
+• Pre-2004 cards may have different text formatting
+• First print LOB cards are extremely valuable (especially 1st Edition)
+• "Wavy" foil pattern on early Secret Rares differs from modern pattern
+• SDK/SDY starter deck cards have no set rarity symbol
+
+**CARD BACK VERIFICATION:**
+• All authentic Yu-Gi-Oh! cards share the same brown swirl back design
+• Any deviation in back design suggests proxy/counterfeit
+• Japanese cards have the same back design as English cards
+• The back should be consistent brown/gold spiral pattern
+
+--- END OF YU-GI-OH! DELTA v5.0 ---
