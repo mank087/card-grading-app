@@ -9,6 +9,8 @@ const CARD_TYPES_CONFIG = {
   Pokemon: { route: '/pokemon' },
   MTG: { route: '/mtg' },
   Lorcana: { route: '/lorcana' },
+  'One Piece': { route: '/onepiece' },
+  'Yu-Gi-Oh': { route: '/yugioh' },
   Other: { route: '/other' }
 }
 
