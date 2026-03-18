@@ -125,6 +125,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/upload?category=Yu-Gi-Oh" className="text-gray-400 hover:text-white transition-colors">
+                  Yu-Gi-Oh! Cards
+                </Link>
+              </li>
+              <li>
                 <Link href="/upload?category=Other" className="text-gray-400 hover:text-white transition-colors">
                   Other Cards
                 </Link>
@@ -194,6 +199,11 @@ export default function Footer() {
               <li>
                 <Link href="/mtg-database" className="text-gray-400 hover:text-white transition-colors">
                   MTG Database
+                </Link>
+              </li>
+              <li>
+                <Link href="/yugioh-database" className="text-gray-400 hover:text-white transition-colors">
+                  Yu-Gi-Oh! Database
                 </Link>
               </li>
             </ul>
