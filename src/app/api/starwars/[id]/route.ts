@@ -801,22 +801,29 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
           const aiName = conversationalGradingData.card_info.card_name;
           const aiCharacter = conversationalGradingData.card_info.player_or_character;
 
+          // Strip PriceCharting bracket annotations from DB card name
+          // e.g., "The Emperor's Wrath [Mojo Refractor] #70" → "The Emperor's Wrath #70"
+          const cleanDbName = dbCard.card_name
+            ? dbCard.card_name.replace(/\s*\[[^\]]*\]\s*/g, ' ').trim()
+            : dbCard.card_name;
+
           conversationalGradingData.card_info = {
             ...conversationalGradingData.card_info,
             // Keep AI card_name and player_or_character (what's actually on the card)
-            card_name: aiName || dbCard.card_name,
-            player_or_character: aiCharacter || dbCard.card_name,
+            // Fall back to cleaned DB name (without bracket annotations) if AI didn't detect
+            card_name: aiName || cleanDbName,
+            player_or_character: aiCharacter || cleanDbName,
             // Use DB card_number only if AI didn't detect one
             card_number: conversationalGradingData.card_info.card_number || conversationalGradingData.card_info.card_id || dbCard.card_number,
-            // Use DB set_name only if AI didn't detect one
-            set_name: conversationalGradingData.card_info.set_name || dbCard.set_name,
+            // Always use DB set_name and year when matched (more reliable than AI for these)
+            set_name: dbCard.set_name || conversationalGradingData.card_info.set_name,
             // Database reference ID (always from DB)
             card_id: dbCard.id,
             // === SUPPLEMENTAL DB DATA ===
-            db_card_name: dbCard.card_name,  // Store DB name separately for reference
+            db_card_name: dbCard.card_name,  // Store original DB name (with brackets) for pricing reference
             console_name: dbCard.console_name,
             genre: dbCard.genre,
-            release_date: conversationalGradingData.card_info.year || dbCard.release_date,
+            release_date: dbCard.release_date || conversationalGradingData.card_info.year,
             // === PRICING (from database if available) ===
             market_price: dbCard.loose_price || dbCard.graded_price,
             loose_price: dbCard.loose_price,

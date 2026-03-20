@@ -44,10 +44,19 @@ export interface MatchResult {
   confidence: MatchConfidenceFlags;
 }
 
+/**
+ * Strip PriceCharting bracket annotations from card names.
+ * e.g., "The Emperor's Wrath [Mojo Refractor] #70" → "The Emperor's Wrath #70"
+ */
+function stripBrackets(str: string): string {
+  return str.replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function calculateSimilarity(str1: string, str2: string): number {
   if (!str1 || !str2) return 0;
-  const s1 = str1.toLowerCase().trim();
-  const s2 = str2.toLowerCase().trim();
+  // Strip bracket annotations before comparing (PriceCharting adds [Parallel] etc.)
+  const s1 = stripBrackets(str1).toLowerCase().trim();
+  const s2 = stripBrackets(str2).toLowerCase().trim();
   if (s1 === s2) return 1.0;
   if (s1.includes(s2) || s2.includes(s1)) return 0.8;
   const words1 = s1.split(/\s+/);
