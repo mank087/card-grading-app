@@ -41,16 +41,16 @@ function getFirstValidValue(...values: (string | null | undefined)[]): string {
 function generateMetaKeywords(card: any): string {
   const keywords: string[] = [];
 
-  // 🎯 v3.3: Prioritize database columns (verified from internal database) over JSONB
-  const cardName = getFirstValidValue(card.card_name, card.conversational_card_info?.card_name);
-  const characterName = getFirstValidValue(card.featured, card.conversational_card_info?.player_or_character);
-  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
-  const cardNumber = getFirstValidValue(card.card_number, card.conversational_card_info?.card_number);
+  // Priority: label_data (canonical display) > conversational AI > DB columns
+  const cardName = getFirstValidValue(card.label_data?.primaryName, card.conversational_card_info?.card_name, card.card_name);
+  const characterName = getFirstValidValue(card.conversational_card_info?.player_or_character, card.featured);
+  const setName = getFirstValidValue(card.label_data?.setName, card.conversational_card_info?.set_name, card.card_set);
+  const cardNumber = getFirstValidValue(card.label_data?.cardNumber, card.conversational_card_info?.card_number, card.card_number);
   // Extract year from release_date if it's a full date string
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year, card.set_year);
-  const rarity = getFirstValidValue(card.rarity, card.conversational_card_info?.rarity);
-  const inkColor = getFirstValidValue(card.ink_color, card.conversational_card_info?.ink_color);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear, card.set_year);
+  const rarity = getFirstValidValue(card.conversational_card_info?.rarity, card.rarity);
+  const inkColor = getFirstValidValue(card.conversational_card_info?.ink_color, card.ink_color);
   const grade = card.conversational_decimal_grade;
 
   // Core keywords - card name and character variations
@@ -110,13 +110,13 @@ function generateMetaKeywords(card: any): string {
 // Helper: Build dynamic title for Lorcana cards
 // Format matches Sports cards: Card Name Year Set #Number - DCM Grade X
 function buildTitle(card: any): string {
-  // 🎯 v3.3: Prioritize database columns (verified from internal database) over JSONB
-  const cardName = getFirstValidValue(card.card_name, card.conversational_card_info?.card_name);
-  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
-  const cardNumber = getFirstValidValue(card.card_number, card.conversational_card_info?.card_number);
+  // Priority: label_data (canonical display) > conversational AI > DB columns
+  const cardName = getFirstValidValue(card.label_data?.primaryName, card.conversational_card_info?.card_name, card.card_name);
+  const setName = getFirstValidValue(card.label_data?.setName, card.conversational_card_info?.set_name, card.card_set);
+  const cardNumber = getFirstValidValue(card.label_data?.cardNumber, card.conversational_card_info?.card_number, card.card_number);
   // Extract year from release_date if it's a full date string
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year, card.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear, card.set_year);
   const grade = card.conversational_decimal_grade;
 
   const titleParts: string[] = [];
@@ -168,12 +168,12 @@ function buildTitle(card: any): string {
 
 // Helper: Build description for Lorcana cards
 function buildDescription(card: any): string {
-  // 🎯 v3.3: Prioritize database columns (verified from internal database) over JSONB
-  const cardName = getFirstValidValue(card.card_name, card.conversational_card_info?.card_name);
-  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  // Priority: label_data (canonical display) > conversational AI > DB columns
+  const cardName = getFirstValidValue(card.label_data?.primaryName, card.conversational_card_info?.card_name, card.card_name);
+  const setName = getFirstValidValue(card.label_data?.setName, card.conversational_card_info?.set_name, card.card_set);
   // Extract year from release_date if it's a full date string
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year, card.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear, card.set_year);
   const grade = card.conversational_decimal_grade;
 
   const gradeDesc = card.conversational_condition_label?.replace(/\s*\([A-Z]+\)/, '') || (grade !== null && grade !== undefined ? (() => {

@@ -492,10 +492,19 @@ function scoreMTGProductMatch(
 
   // VARIANT MATCHING (Secondary)
   const normalizedVariant = normalizeVariant(params.variant, false);
+  const hasVariantMarker = /\[.*?\]/.test(productName);
+
   if (normalizedVariant && normalizedVariant !== 'Foil') {
     const variantLower = normalizedVariant.toLowerCase();
     if (productName.includes(`[${variantLower}]`) || productName.includes(variantLower)) {
       score += 15;
+    } else {
+      score -= 5;
+    }
+  } else if (!normalizedVariant && !params.isFoil) {
+    // No variant and not looking for foil — prefer base cards
+    if (!hasVariantMarker) {
+      score += 5;
     } else {
       score -= 5;
     }

@@ -489,6 +489,53 @@ function scoreOtherProductMatch(
     }
   }
 
+  // VARIANT/PARALLEL DETECTION — prefer base cards when no variant specified
+  // PriceCharting product names often contain variant markers in brackets: [Refractor], [Gold], [Parallel]
+  // or inline: "Gold Refractor", "/25", "Superfractor"
+  const variantMarkerMatch = productName.match(/\[(.*?)\]/);
+  const hasVariantMarker = !!variantMarkerMatch;
+  const hasSerialInName = /\/\d{1,4}\b/.test(productName);  // "/25", "/99", "/199"
+  const VARIANT_KEYWORDS = [
+    'refractor', 'prizm', 'parallel', 'gold', 'silver', 'bronze', 'red', 'blue', 'green',
+    'orange', 'purple', 'black', 'pink', 'superfractor', 'chrome', 'holo', 'holographic',
+    'foil', 'shimmer', 'sparkle', 'cracked ice', 'wave', 'mojo', 'xfractor',
+    'printing plate', 'proof', 'atomic', 'cosmic', 'galactic', 'nebula',
+    'autograph', 'auto', 'relic', 'patch', 'memorabilia', 'sketch',
+    '1st edition', 'first edition', 'shadowless'
+  ];
+  const hasVariantKeyword = VARIANT_KEYWORDS.some(kw => productName.includes(kw));
+  const isLikelyVariant = hasVariantMarker || hasSerialInName || hasVariantKeyword;
+
+  if (params.variant) {
+    const variantLower = params.variant.toLowerCase();
+    // Check if this is a "base" card request
+    const isBaseRequest = ['base', 'base_common', 'common', 'standard', 'regular'].includes(variantLower);
+
+    if (isBaseRequest) {
+      if (!isLikelyVariant) {
+        score += 20;  // Strong preference for base cards
+      } else {
+        score -= 15;  // Penalize parallels when looking for base
+        console.log(`[OtherPricing] -15 Looking for base, found variant: "${productName}"`);
+      }
+    } else if (productName.includes(variantLower)) {
+      score += 20;  // Variant type matches
+    } else if (hasVariantMarker && variantMarkerMatch![1].toLowerCase().includes(variantLower.split(' ')[0])) {
+      score += 10;  // Partial variant match in brackets
+    } else if (isLikelyVariant) {
+      score -= 10;  // Wrong variant
+      console.log(`[OtherPricing] -10 Wrong variant: looking for "${params.variant}", found "${productName}"`);
+    }
+  } else {
+    // No variant specified — prefer base/non-variant cards
+    if (!isLikelyVariant) {
+      score += 10;  // Prefer base cards when no variant specified
+    } else {
+      score -= 5;  // Mild penalty for parallels/variants when we don't know what variant the card is
+      console.log(`[OtherPricing] -5 No variant specified, deprioritizing variant product: "${productName}"`);
+    }
+  }
+
   return score;
 }
 

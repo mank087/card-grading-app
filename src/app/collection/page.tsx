@@ -13,6 +13,8 @@ import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
 import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchDownloadModal } from '@/components/reports/BatchDownloadModal'
+import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
+import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
 
 type Card = {
   id: string
@@ -432,7 +434,7 @@ function CollectionPageContent() {
   const [showLabelTypeSelector, setShowLabelTypeSelector] = useState(false)
   const [isBatchDownloadModalOpen, setIsBatchDownloadModalOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
+  const { labelStyle, customStyles, colorOverrides, switchStyle } = useCustomLabelStyle()
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false)
   const [priceRefreshCount, setPriceRefreshCount] = useState(0)
   const [isRescanningPrices, setIsRescanningPrices] = useState(false)
@@ -445,23 +447,10 @@ function CollectionPageContent() {
   const searchQuery = searchParams?.get('search')
   const toast = useToast()
 
-  // Fetch label style preference
+  // Fetch username for share button
   useEffect(() => {
     const session = getStoredSession()
     if (!session?.access_token) return
-
-    fetch('/api/user/label-style', {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`
-      }
-    })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.labelStyle) {
-          setLabelStyle(data.labelStyle)
-        }
-      })
-      .catch(err => console.error('Error fetching label style:', err))
 
     // Also fetch username for share button
     fetch('/api/profile/username', {
@@ -1712,47 +1701,13 @@ function CollectionPageContent() {
                 </svg>
               </button>
             </div>
-            {/* Label Style Toggle */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              <span className={`text-xs font-medium ${labelStyle === 'traditional' ? 'text-purple-600' : 'text-gray-400'}`}>
-                <span className="hidden sm:inline">Traditional</span>
-                <span className="sm:hidden">Trad</span>
-              </span>
-              <button
-                onClick={async () => {
-                  const newStyle = labelStyle === 'modern' ? 'traditional' : 'modern';
-                  setLabelStyle(newStyle);
-                  const session = getStoredSession();
-                  if (session?.access_token) {
-                    try {
-                      await fetch('/api/user/label-style', {
-                        method: 'POST',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'Authorization': `Bearer ${session.access_token}`,
-                        },
-                        body: JSON.stringify({ labelStyle: newStyle }),
-                      });
-                    } catch (err) {
-                      console.error('Failed to update label style:', err);
-                    }
-                  }
-                }}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                  labelStyle === 'modern' ? 'bg-purple-600' : 'bg-gray-300'
-                }`}
-                title="Toggle between modern and traditional label style"
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    labelStyle === 'modern' ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-              <span className={`text-xs font-medium ${labelStyle === 'modern' ? 'text-purple-600' : 'text-gray-400'}`}>
-                Modern
-              </span>
-            </div>
+            {/* Label Style Dropdown */}
+            <LabelStyleDropdown
+              labelStyle={labelStyle}
+              customStyles={customStyles}
+              onSwitch={switchStyle}
+              compact
+            />
             <div className="text-xs sm:text-sm text-gray-500 whitespace-nowrap">
               {cards.length} card{cards.length !== 1 ? 's' : ''}
             </div>
@@ -1881,6 +1836,8 @@ function CollectionPageContent() {
             { id: 'MTG', label: 'Magic', icon: '🎴' },
             { id: 'Lorcana', label: 'Lorcana', icon: '✨' },
             { id: 'One Piece', label: 'One Piece', icon: '🏴‍☠️' },
+            { id: 'Yu-Gi-Oh', label: 'Yu-Gi-Oh', icon: '🔮' },
+            { id: 'Star Wars', label: 'Star Wars', icon: '⭐' },
             { id: 'Other', label: 'Other', icon: '🃏' }
           ].map((category) => (
             <button
@@ -1926,6 +1883,7 @@ function CollectionPageContent() {
                   frontImageUrl={card.front_url || null}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
                   labelStyle={labelStyle}
+                  colorOverrides={colorOverrides}
                   className="hover:shadow-xl transition-shadow duration-200"
                 >
                   {/* Visibility & Price Badges */}

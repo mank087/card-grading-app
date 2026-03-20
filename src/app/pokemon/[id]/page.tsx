@@ -18,28 +18,30 @@ function stripMarkdown(text: string | null | undefined): string {
 function generateMetaKeywords(card: any): string {
   const keywords: string[] = [];
 
-  // 🎯 v3.3: Prioritize database columns (verified from OCR override/internal DB) over JSONB
+  // Priority: label_data (canonical display) > conversational AI > DB columns
   const pokemonName = getFirstValidValue(
+    card.label_data?.primaryName,
+    card.conversational_card_info?.player_or_character,
     card.pokemon_featured,
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.featured
   );
-  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  const setName = getFirstValidValue(card.label_data?.setName, card.conversational_card_info?.set_name, card.card_set);
   // Extract year from release_date if it's a full date string
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.year, releaseYear);
   const manufacturer = getFirstValidValue(
-    card.manufacturer_name,
-    card.conversational_card_info?.manufacturer
+    card.conversational_card_info?.manufacturer,
+    card.manufacturer_name
   ) || 'The Pokemon Company';
-  const rarity = getFirstValidValue(card.rarity_tier, card.conversational_card_info?.rarity_tier);
+  const rarity = getFirstValidValue(card.conversational_card_info?.rarity_tier, card.rarity_tier);
   const cardNumber = getFirstValidValue(
-    card.card_number,
+    card.label_data?.cardNumber,
     card.conversational_card_info?.card_number_raw,
-    card.conversational_card_info?.card_number
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
-  const pokemonType = getFirstValidValue(card.pokemon_type, card.conversational_card_info?.pokemon_type);
-  const hp = getFirstValidValue(card.hp, card.conversational_card_info?.hp);
+  const pokemonType = getFirstValidValue(card.conversational_card_info?.pokemon_type, card.pokemon_type);
+  const hp = getFirstValidValue(card.conversational_card_info?.hp, card.hp);
   const grade = card.conversational_decimal_grade;
 
   // Core keywords - Pokemon name variations
@@ -124,24 +126,26 @@ function getFirstValidValue(...values: (string | null | undefined)[]): string {
 // Helper: Build enhanced title for Pokemon cards
 // Format matches Sports cards: Name Year Set Subset Features - DCM Grade X
 function buildTitle(card: any): string {
-  // 🎯 v3.3: Prioritize database columns (verified from OCR override/internal DB) over JSONB
+  // Priority: label_data (canonical display) > conversational AI > DB columns
   const pokemonName = getFirstValidValue(
-    card.pokemon_featured,  // Database column first
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.label_data?.primaryName,
+    card.conversational_card_info?.player_or_character,
+    card.pokemon_featured,
+    card.featured
   );
   // Extract year from release_date if it's a full date string (safely handle non-string values)
   const releaseYear = card.release_date && typeof card.release_date === 'string'
     ? card.release_date.slice(0, 4)
     : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.year);
-  const setName = getFirstValidValue(card.card_set, card.conversational_card_info?.set_name);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.year, releaseYear);
+  const setName = getFirstValidValue(card.label_data?.setName, card.conversational_card_info?.set_name, card.card_set);
   const cardNumber = getFirstValidValue(
-    card.card_number,
+    card.label_data?.cardNumber,
     card.conversational_card_info?.card_number_raw,
-    card.conversational_card_info?.card_number
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
-  const rarity = getFirstValidValue(card.rarity_tier, card.conversational_card_info?.rarity_tier);
+  const rarity = getFirstValidValue(card.conversational_card_info?.rarity_tier, card.rarity_tier);
   const grade = card.conversational_decimal_grade;
 
   // Special features

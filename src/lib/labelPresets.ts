@@ -81,6 +81,71 @@ export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {
 };
 
 // ============================================================================
+// SAVED CUSTOM STYLES (persisted to DB)
+// ============================================================================
+
+export interface SavedCustomStyle {
+  id: string;           // 'custom-1' through 'custom-4'
+  name: string;         // Default "Custom Label 1", user-editable
+  config: CustomLabelConfig;
+}
+
+export interface LabelColorOverrides {
+  gradientStart: string;
+  gradientEnd: string;
+  borderEnabled: boolean;
+  borderColor: string;
+  borderWidth: number;  // inches, converted to px by consumer
+  isRainbow?: boolean;  // true when colorPreset === 'rainbow'
+}
+
+/** Rainbow CSS gradient string for reuse across components */
+export const RAINBOW_GRADIENT = 'linear-gradient(90deg, #ff0000 0%, #ff8800 17%, #ffff00 33%, #00cc00 50%, #0066ff 67%, #8800ff 83%, #ff00ff 100%)';
+
+/**
+ * Build slab wrapper styles (the metallic border around the card) from colorOverrides.
+ * Returns modern slab styles if overrides are provided, else returns default purple modern styles.
+ */
+export function getSlabWrapperStyle(overrides: LabelColorOverrides | undefined): React.CSSProperties {
+  if (overrides?.isRainbow) {
+    return {
+      background: 'linear-gradient(145deg, #ff0000 0%, #ff8800 17%, #ffff00 33%, #00cc00 50%, #0066ff 67%, #8800ff 83%, #ff00ff 100%)',
+      boxShadow: '0 0 20px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+      border: '1px solid rgba(255, 255, 255, 0.3)',
+    };
+  }
+  if (overrides) {
+    return {
+      background: `linear-gradient(145deg, ${overrides.gradientStart} 0%, ${overrides.gradientEnd} 50%, ${overrides.gradientStart} 100%)`,
+      boxShadow: `0 0 20px ${overrides.gradientEnd}66, inset 0 1px 0 ${overrides.gradientEnd}4d, inset 0 -1px 0 rgba(0,0,0,0.3)`,
+      border: `1px solid ${overrides.gradientEnd}66`,
+    };
+  }
+  // Default modern purple
+  return {
+    background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+    boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+    border: '1px solid rgba(139, 92, 246, 0.4)',
+  };
+}
+
+/**
+ * Extract color overrides from a CustomLabelConfig.
+ * Returns undefined if config is null/undefined (i.e. built-in style).
+ */
+export function extractColorOverrides(config: CustomLabelConfig | null | undefined): LabelColorOverrides | undefined {
+  if (!config) return undefined;
+  return {
+    gradientStart: config.gradientStart,
+    gradientEnd: config.gradientEnd,
+    borderEnabled: config.borderEnabled,
+    borderColor: config.borderColor,
+    borderWidth: config.borderWidth,
+    isRainbow: config.colorPreset === 'rainbow',
+  };
+}
+
+// ============================================================================
 // LABEL GALLERY TYPES
 // ============================================================================
 

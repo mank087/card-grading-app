@@ -124,9 +124,12 @@ STAR WARS-SPECIFIC FIELDS
 • SSP (Super Short Print)
 • 1/1 (unique)
 
-**serial_numbering**: If numbered parallel
-• Format: "/50", "/99", "/199", "/1" etc.
+**serial_number**: If numbered parallel (stamped serial number)
+• Format: "/50", "/99", "/199", "/1", "23/100" etc.
+• Usually foil-stamped on the card front (bottom area) or printed on card back
+• Common on Chrome parallels, Refractors, limited inserts, Masterwork cards
 • Extract exact numbering from card
+• If no serial numbering visible, return null
 
 **is_foil**: Holographic/chrome treatment (true|false)
 • true for Chrome, Refractor, Prizm variants

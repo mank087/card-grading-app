@@ -2,8 +2,11 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { generateBatchSlabLabels, getSlabLabelConfig, SlabLabelData } from '../../lib/slabLabelGenerator';
+import { generateBatchCustomSlabLabels } from '../../lib/customSlabLabelGenerator';
 import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { getCardLabelData } from '../../lib/useLabelData';
+import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
+import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 
 interface CardData {
   id: string;
@@ -39,7 +42,7 @@ interface BatchSlabLabelModalProps {
   onClose: () => void;
   selectedCards: CardData[];
   cardType?: string;
-  labelStyle?: 'modern' | 'traditional';
+  labelStyle?: string;
   // Badge settings from user profile
   showFounderEmblem?: boolean;
   showVipEmblem?: boolean;
@@ -53,7 +56,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   onClose,
   selectedCards,
   cardType = 'card',
-  labelStyle = 'modern',
+  labelStyle: labelStyleProp,
   showFounderEmblem = false,
   showVipEmblem = false,
   showCardLoversEmblem = false,
@@ -61,16 +64,33 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [style, setStyle] = useState<'modern' | 'traditional'>(labelStyle);
+
+  // Use shared hook for style + custom styles
+  const { labelStyle: hookLabelStyle, customStyles, activeConfig, switchStyle } = useCustomLabelStyle();
+
+  // Local style state - initialized from prop or hook
+  const [localStyle, setLocalStyle] = useState<LabelStyleId>(
+    (labelStyleProp as LabelStyleId) || hookLabelStyle || 'modern'
+  );
 
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
       setError(null);
       setProgress(0);
-      setStyle(labelStyle);
+      setLocalStyle((labelStyleProp as LabelStyleId) || hookLabelStyle || 'modern');
     }
-  }, [isOpen, labelStyle]);
+  }, [isOpen, labelStyleProp, hookLabelStyle]);
+
+  // Resolve the active custom config for the local style
+  const localActiveConfig = useMemo(() => {
+    if (localStyle === 'modern' || localStyle === 'traditional') return null;
+    return customStyles.find(s => s.id === localStyle)?.config || null;
+  }, [localStyle, customStyles]);
+
+  const handleStyleSwitch = (id: LabelStyleId) => {
+    setLocalStyle(id);
+  };
 
   // Build SlabLabelData for a single card
   const buildSlabLabelData = useCallback(async (
@@ -78,34 +98,31 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     logoDataUrl: string | undefined,
     whiteLogoDataUrl: string | undefined
   ): Promise<SlabLabelData> => {
-    const cleanLabelData = getCardLabelData(card);
+    const labelData = getCardLabelData(card);
+    const verifyUrl = `https://dcmgrading.com/verify/${card.serial || ''}`;
+
+    const qrCodeDataUrl = await generateQRCodePlain(verifyUrl).catch(() => '');
 
     const weightedScores = card.conversational_weighted_sub_scores || {};
     const subScores = card.conversational_sub_scores || {};
 
-    const cardUrl = cleanLabelData.serial
-      ? `https://dcmgrading.com/verify/${cleanLabelData.serial}`
-      : `${window.location.origin}/${cardType}/${card.id}`;
-    const qrCodeDataUrl = await generateQRCodePlain(cardUrl);
-    const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
-
     return {
-      primaryName: cleanLabelData.primaryName,
-      contextLine: cleanLabelData.contextLine,
-      features: cleanLabelData.features,
-      featuresLine: cleanLabelData.featuresLine,
-      serial: cleanLabelData.serial,
-      grade: cleanLabelData.grade,
-      gradeFormatted: cleanLabelData.gradeFormatted,
-      condition: cleanLabelData.condition,
-      isAlteredAuthentic: cleanLabelData.isAlteredAuthentic,
-      englishName,
+      primaryName: labelData.primaryName,
+      contextLine: labelData.contextLine,
+      features: labelData.features,
+      featuresLine: labelData.featuresLine,
+      serial: labelData.serial,
+      grade: labelData.grade,
+      gradeFormatted: labelData.gradeFormatted,
+      condition: labelData.condition,
+      isAlteredAuthentic: labelData.isAlteredAuthentic,
+      englishName: card.featured || card.pokemon_featured || card.card_name || undefined,
       qrCodeDataUrl,
       subScores: {
-        centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
-        corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
-        edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
-        surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
+        centering: weightedScores.centering ?? (subScores.centering as any)?.weighted ?? 0,
+        corners: weightedScores.corners ?? (subScores.corners as any)?.weighted ?? 0,
+        edges: weightedScores.edges ?? (subScores.edges as any)?.weighted ?? 0,
+        surface: weightedScores.surface ?? (subScores.surface as any)?.weighted ?? 0,
       },
       showFounderEmblem,
       showVipEmblem,
@@ -113,9 +130,8 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       logoDataUrl,
       whiteLogoDataUrl,
     };
-  }, [cardType, showFounderEmblem, showVipEmblem, showCardLoversEmblem]);
+  }, [showFounderEmblem, showVipEmblem, showCardLoversEmblem]);
 
-  // Generate and download the batch PDF
   const handleGenerate = useCallback(async () => {
     setIsGenerating(true);
     setError(null);
@@ -140,8 +156,16 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
 
       setProgress(85);
 
-      // Generate the PDF
-      const blob = await generateBatchSlabLabels(labelDataArray, style);
+      let blob: Blob;
+
+      if (localActiveConfig) {
+        // Custom style — use batch generator with same multi-up grid layout as standard
+        blob = await generateBatchCustomSlabLabels(labelDataArray, localActiveConfig);
+      } else {
+        // Built-in style — use standard batch generator
+        const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
+        blob = await generateBatchSlabLabels(labelDataArray, builtInStyle);
+      }
 
       setProgress(95);
 
@@ -167,7 +191,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedCards, style, buildSlabLabelData, onClose]);
+  }, [selectedCards, localStyle, localActiveConfig, buildSlabLabelData, onClose]);
 
   const totalPages = Math.ceil(selectedCards.length / LABELS_PER_PAGE);
   const totalSheets = totalPages; // Each sheet = 1 front page + 1 back page
@@ -216,31 +240,14 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
             </div>
           </div>
 
-          {/* Label Style Toggle */}
+          {/* Label Style Dropdown */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Label Style</label>
-            <div className="flex rounded-lg overflow-hidden border border-gray-300">
-              <button
-                onClick={() => setStyle('modern')}
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                  style === 'modern'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Modern (Dark)
-              </button>
-              <button
-                onClick={() => setStyle('traditional')}
-                className={`flex-1 px-4 py-2 text-sm font-medium transition-colors ${
-                  style === 'traditional'
-                    ? 'bg-purple-600 text-white'
-                    : 'bg-white text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Traditional (Light)
-              </button>
-            </div>
+            <LabelStyleDropdown
+              labelStyle={localStyle}
+              customStyles={customStyles}
+              onSwitch={handleStyleSwitch}
+            />
           </div>
 
           {/* Print Instructions */}
@@ -300,7 +307,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
             ) : (
               <>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
                 Generate {selectedCards.length} Label{selectedCards.length !== 1 ? 's' : ''} (PDF)
               </>

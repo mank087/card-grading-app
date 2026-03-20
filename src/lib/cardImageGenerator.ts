@@ -96,7 +96,7 @@ export interface CardImageData {
   // Card Lovers emblem - shown on back label when user is a Card Lover with badge enabled
   showCardLoversEmblem?: boolean;
   // Label style preference
-  labelStyle?: 'modern' | 'traditional';
+  labelStyle?: string;
   // Sub-scores for modern back label
   subScores?: SubScores;
 }
@@ -980,7 +980,7 @@ async function generateCardImage(
 
   const borderWidth = 8;
   const cornerRadius = 16;
-  const isModern = data.labelStyle === 'modern';
+  const isModern = data.labelStyle !== 'traditional';
 
   // Background - white for traditional, dark for modern
   if (isModern) {
@@ -1084,7 +1084,7 @@ async function generateCardImage(
  */
 export async function generateCardImages(data: CardImageData): Promise<{ front: Blob; back: Blob }> {
   // Generate QR code and load appropriate logo based on label style
-  const isModern = data.labelStyle === 'modern';
+  const isModern = data.labelStyle !== 'traditional';
 
   console.log('[CARD IMAGE GEN] Starting, isModern:', isModern);
 

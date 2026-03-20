@@ -41,32 +41,35 @@ function getFirstValidValue(...values: (string | null | undefined)[]): string {
 function generateMetaKeywords(card: any): string {
   const keywords: string[] = [];
 
-  // Get card info from database columns or conversational_card_info
+  // Priority: label_data (canonical display) > conversational AI > DB columns
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const characterName = getFirstValidValue(
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.conversational_card_info?.player_or_character,
+    card.featured
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const cardNumber = getFirstValidValue(
-    card.card_number,
-    card.conversational_card_info?.card_number
+    card.label_data?.cardNumber,
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const rarity = getFirstValidValue(
-    card.rarity,
-    card.conversational_card_info?.rarity
+    card.conversational_card_info?.rarity,
+    card.rarity
   );
   const cardColor = getFirstValidValue(
-    card.op_card_color,
-    card.conversational_card_info?.card_color
+    card.conversational_card_info?.card_color,
+    card.op_card_color
   );
   const cardType = getFirstValidValue(
     card.op_card_type,
@@ -142,26 +145,29 @@ function generateMetaKeywords(card: any): string {
 // Format matches other card types: Card Name Year Set #Number - DCM Grade X
 function buildTitle(card: any): string {
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const characterName = getFirstValidValue(
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.conversational_card_info?.player_or_character,
+    card.featured
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const cardNumber = getFirstValidValue(
-    card.card_number,
-    card.conversational_card_info?.card_number
+    card.label_data?.cardNumber,
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const variantType = getFirstValidValue(
-    card.op_variant_type,
-    card.conversational_card_info?.variant_type
+    card.conversational_card_info?.variant_type,
+    card.op_variant_type
   );
   const grade = card.conversational_decimal_grade;
 
@@ -223,22 +229,24 @@ function buildTitle(card: any): string {
 // Helper: Build description for One Piece cards
 function buildDescription(card: any): string {
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const cardColor = getFirstValidValue(
-    card.op_card_color,
-    card.conversational_card_info?.card_color
+    card.conversational_card_info?.card_color,
+    card.op_card_color
   );
   const variantType = getFirstValidValue(
-    card.op_variant_type,
-    card.conversational_card_info?.variant_type
+    card.conversational_card_info?.variant_type,
+    card.op_variant_type
   );
   const grade = card.conversational_decimal_grade;
 

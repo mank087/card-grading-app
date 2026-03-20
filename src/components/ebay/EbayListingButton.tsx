@@ -8,7 +8,7 @@ interface EbayListingButtonProps {
   card: any;
   cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
   showFounderEmblem?: boolean;
-  labelStyle?: 'modern' | 'traditional';
+  labelStyle?: string;
   variant?: 'default' | 'compact' | 'icon';
   className?: string;
 }

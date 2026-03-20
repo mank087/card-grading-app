@@ -18,6 +18,7 @@ import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGene
 import { generateToploaderLabelPair, generateFoldOverLabel8167, CalibrationOffsets as CalibrationOffsets8167 } from '../../lib/avery8167LabelGenerator';
 import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator';
 import { downloadSlabLabel, SlabLabelData } from '../../lib/slabLabelGenerator';
+import { downloadCustomSlabLabel } from '../../lib/customSlabLabelGenerator';
 import { loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 import { Avery8167LabelModal } from './Avery8167LabelModal';
@@ -38,7 +39,8 @@ interface DownloadReportButtonProps {
   showFounderEmblem?: boolean; // Show founder emblem on back label of card images
   showVipEmblem?: boolean; // Show VIP emblem on back label of card images
   showCardLoversEmblem?: boolean; // Show Card Lovers emblem on back label of card images
-  labelStyle?: 'modern' | 'traditional'; // Label style preference for card images
+  labelStyle?: string; // Label style preference for card images (modern, traditional, custom-1..4)
+  customLabelConfig?: import('@/lib/labelPresets').CustomLabelConfig | null; // Custom label config when using custom style
 }
 
 export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
@@ -48,7 +50,8 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   showFounderEmblem = false,
   showVipEmblem = false,
   showCardLoversEmblem = false,
-  labelStyle = 'modern'
+  labelStyle = 'modern',
+  customLabelConfig = null,
 }) => {
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [generatingType, setGeneratingType] = React.useState<'report' | 'label' | 'avery' | 'avery8167' | 'foldover' | 'mini-jpg' | 'card-images' | null>(null);
@@ -1146,7 +1149,12 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         whiteLogoDataUrl,
       };
 
-      await downloadSlabLabel(slabData, labelStyle);
+      // Use custom slab generator when a custom style is active, otherwise standard
+      if (customLabelConfig) {
+        await downloadCustomSlabLabel(slabData, customLabelConfig);
+      } else {
+        await downloadSlabLabel(slabData, labelStyle === 'traditional' ? 'traditional' : 'modern');
+      }
 
       console.log('[SLAB LABEL] ✅ PDF generated successfully');
     } catch (error) {

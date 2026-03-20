@@ -129,7 +129,7 @@ interface EbayListingModalProps {
   card: any;
   cardType?: 'pokemon' | 'sports' | 'mtg' | 'lorcana' | 'onepiece' | 'other';
   showFounderEmblem?: boolean;
-  labelStyle?: 'modern' | 'traditional';
+  labelStyle?: string;
 }
 
 type ListingStep = 'images' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error';

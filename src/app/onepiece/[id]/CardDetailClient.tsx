@@ -54,6 +54,9 @@ import { DefectLegend } from '@/components/grading/DefectLegend';
 import { CornerZoomCrops } from '@/components/grading/CornerZoomCrops';
 import { CollapsibleSection } from '@/components/grading/CollapsibleSection';
 import { extractOverlayDefects, type OverlayDefect } from '@/lib/defectOverlayData';
+import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle';
+import { getSlabWrapperStyle } from '@/lib/labelPresets';
+import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown';
 
 interface SportsAIGrading {
   "Final Score"?: {
@@ -1459,7 +1462,7 @@ export function OnePieceCardDetails() {
   // ♥ Card Lovers emblem state (for back label)
   const [showCardLoversEmblem, setShowCardLoversEmblem] = useState(false);
   // 🎨 Label style preference (modern or traditional)
-  const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern');
+  const { labelStyle, customStyles, colorOverrides, activeConfig, switchStyle } = useCustomLabelStyle();
   // 💰 DCM Price data state (for price callout)
   const [dcmPriceData, setDcmPriceData] = useState<{
     estimatedValue: number | null;
@@ -1641,24 +1644,6 @@ export function OnePieceCardDetails() {
     }
   }, [card?.owner_is_founder, card?.owner_show_founder_badge, card?.owner_is_vip, card?.owner_show_vip_badge, card?.owner_is_card_lover, card?.owner_show_card_lover_badge, card?.owner_preferred_label_emblem]);
 
-  // 🎨 Fetch label style preference for the logged-in user
-  useEffect(() => {
-    const session = getStoredSession();
-    if (!session?.access_token) return;
-
-    fetch('/api/user/label-style', {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`
-      }
-    })
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data?.labelStyle) {
-          setLabelStyle(data.labelStyle);
-        }
-      })
-      .catch(err => console.error('Error fetching label style:', err));
-  }, []);
 
   // 🎉 Show first grade conversion modal when card loads and balance is 0
   useEffect(() => {
@@ -2685,45 +2670,12 @@ export function OnePieceCardDetails() {
                 >
                   <span>{isTogglingVisibility ? 'Updating...' : visibility === 'public' ? 'Public' : 'Private'}</span>
                 </button>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-medium ${labelStyle === 'traditional' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    Traditional
-                  </span>
-                  <button
-                    onClick={async () => {
-                      const newStyle = labelStyle === 'modern' ? 'traditional' : 'modern';
-                      const session = getStoredSession();
-                      if (session?.access_token) {
-                        try {
-                          await fetch('/api/user/label-style', {
-                            method: 'POST',
-                            headers: {
-                              'Content-Type': 'application/json',
-                              'Authorization': `Bearer ${session.access_token}`,
-                            },
-                            body: JSON.stringify({ labelStyle: newStyle }),
-                          });
-                          window.location.reload();
-                        } catch (err) {
-                          console.error('Failed to update label style:', err);
-                        }
-                      }
-                    }}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                      labelStyle === 'modern' ? 'bg-purple-600' : 'bg-gray-300'
-                    }`}
-                    title="Toggle between modern and traditional label style"
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        labelStyle === 'modern' ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                  <span className={`text-xs font-medium ${labelStyle === 'modern' ? 'text-purple-600' : 'text-gray-400'}`}>
-                    Modern
-                  </span>
-                </div>
+                <LabelStyleDropdown
+                  labelStyle={labelStyle}
+                  customStyles={customStyles}
+                  onSwitch={switchStyle}
+                  compact
+                />
               </>
             );
           })()}
@@ -2738,18 +2690,14 @@ export function OnePieceCardDetails() {
             {/* Front Card with Label - Metallic Slab */}
             <div
               className="rounded-xl p-1 overflow-hidden"
-              style={labelStyle === 'modern' ? {
-                background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
-                boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
-              } : {
+              style={labelStyle !== 'traditional' ? getSlabWrapperStyle(colorOverrides) : {
                 background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
                 boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
               }}
             >
-              <div className={`${labelStyle === 'modern' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+              <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Front Label */}
-              {labelStyle === 'modern' ? (
+              {labelStyle !== 'traditional' ? (
                 <ModernFrontLabel
                   displayName={labelData.primaryName}
                   setLineText={labelData.contextLine || 'Card Details'}
@@ -2759,6 +2707,7 @@ export function OnePieceCardDetails() {
                   condition={labelData.condition}
                   isAlteredAuthentic={labelData.isAlteredAuthentic}
                   size="lg"
+                  colorOverrides={colorOverrides}
                 />
               ) : (
                 <div className="bg-gradient-to-b from-gray-50 to-white p-3 h-[110px]">
@@ -2839,7 +2788,7 @@ export function OnePieceCardDetails() {
               {/* Separator */}
               <div
                 className="h-1"
-                style={labelStyle === 'modern' ? {
+                style={labelStyle !== 'traditional' ? {
                   background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
                 } : {
                   background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
@@ -2884,18 +2833,14 @@ export function OnePieceCardDetails() {
             {/* Back Card with Label - Metallic Slab */}
             <div
               className="rounded-xl p-1 overflow-hidden"
-              style={labelStyle === 'modern' ? {
-                background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
-                boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
-              } : {
+              style={labelStyle !== 'traditional' ? getSlabWrapperStyle(colorOverrides) : {
                 background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
                 boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
               }}
             >
-              <div className={`${labelStyle === 'modern' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
+              <div className={`${labelStyle !== 'traditional' ? '' : 'bg-white'} rounded-lg overflow-hidden`}>
               {/* Back Label */}
-              {labelStyle === 'modern' ? (
+              {labelStyle !== 'traditional' ? (
                 <ModernBackLabel
                   serial={labelData.serial}
                   grade={labelData.grade}
@@ -2912,6 +2857,7 @@ export function OnePieceCardDetails() {
                   showFounderEmblem={showFounderEmblem}
                   showVipEmblem={showVipEmblem}
                   showCardLoversEmblem={showCardLoversEmblem}
+                  colorOverrides={colorOverrides}
                 />
               ) : (
                 <div className="bg-gradient-to-b from-gray-50 to-white h-[110px] p-4">
@@ -3032,7 +2978,7 @@ export function OnePieceCardDetails() {
               {/* Separator */}
               <div
                 className="h-1"
-                style={labelStyle === 'modern' ? {
+                style={labelStyle !== 'traditional' ? {
                   background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
                 } : {
                   background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
@@ -3250,11 +3196,11 @@ export function OnePieceCardDetails() {
                   <p className="text-xs text-gray-600 mt-3 leading-relaxed">
                     Card variant may differ from the matched listing. Review and adjust in the{' '}
                     <a
-                      href="#market-pricing-section"
+                      href="#tour-live-market-pricing"
                       className="text-emerald-700 font-medium hover:text-emerald-800 underline"
                       onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById('market-pricing-section')?.scrollIntoView({ behavior: 'smooth' });
+                        document.getElementById('tour-live-market-pricing')?.scrollIntoView({ behavior: 'smooth' });
                       }}
                     >
                       Market Pricing Section
@@ -3304,7 +3250,7 @@ export function OnePieceCardDetails() {
                     </div>
 
                     {/* Only show download button to card owner */}
-                    {isOwner && <DownloadReportButton card={card} cardType="onepiece" showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} />}
+                    {isOwner && <DownloadReportButton card={card} cardType="onepiece" showFounderEmblem={showFounderEmblem} showVipEmblem={showVipEmblem} showCardLoversEmblem={showCardLoversEmblem} labelStyle={labelStyle} customLabelConfig={activeConfig} />}
 
                     {/* Social Sharing Buttons */}
                     <div className="flex flex-wrap items-center gap-3">

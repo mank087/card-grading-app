@@ -451,6 +451,8 @@ function scorePokemonProductMatch(
 
   // VARIANT MATCHING
   const normalizedVariant = normalizeVariant(params.variant);
+  const hasVariantMarker = /\[.*?\]/.test(productName);
+
   if (normalizedVariant) {
     const variantLower = normalizedVariant.toLowerCase();
 
@@ -462,6 +464,13 @@ function scorePokemonProductMatch(
     } else {
       // Looking for specific variant but not found - penalize
       score -= 5;
+    }
+  } else if (!params.isFirstEdition && !params.isHolo && !params.isReverseHolo) {
+    // No variant specified and no variant flags — prefer base/non-variant cards
+    if (!hasVariantMarker) {
+      score += 5;  // Prefer base cards when no variant specified
+    } else {
+      score -= 5;  // Mild penalty for variants when we don't know what variant the card is
     }
   }
 

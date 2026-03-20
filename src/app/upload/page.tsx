@@ -288,6 +288,7 @@ function UniversalUploadPageContent() {
       // Reset wizard when going back to select
       setWizardStep(1);
       setNoDefectsConfirmed(false);
+      setCardDescription('');
     }
   }, [uploadMode]);
 
@@ -801,6 +802,7 @@ function UniversalUploadPageContent() {
     setUploadedCardCategory(null)
     setUploadMode('select')
     setConditionReport(EMPTY_CONDITION_REPORT)
+    setCardDescription('')
     console.log('[Upload] Reset upload state - ready for new card')
   }
 

@@ -459,7 +459,7 @@ async function renderFrontLabelCanvas(
   ctx.font = `${fs.serial}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.fillText(data.serial, infoX, currentY);
 
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL('image/jpeg', 0.92);
 }
 
 // ============================================================================
@@ -618,7 +618,7 @@ async function renderBackLabelCanvas(
     drawSubScore('Surface', data.subScores.surface, 3);
   }
 
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL('image/jpeg', 0.92);
 }
 
 // ============================================================================
@@ -736,7 +736,7 @@ function placeLabelImage(doc: jsPDF, imgDataUrl: string, labelX: number, labelY:
   // The image includes BLEED_PT of extra background on each side
   // Place it offset by -BLEED_PT so the background bleeds past the cut line
   doc.addImage(
-    imgDataUrl, 'PNG',
+    imgDataUrl, 'JPEG',
     labelX - BLEED_PT,
     labelY - BLEED_PT,
     LABEL_WIDTH + BLEED_PT * 2,
@@ -790,14 +790,6 @@ export async function generateBatchSlabLabels(
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  // Pre-render all labels to canvas images
-  const frontImages: string[] = [];
-  const backImages: string[] = [];
-  for (const data of dataArray) {
-    frontImages.push(await renderFrontLabelCanvas(data, style));
-    backImages.push(await renderBackLabelCanvas(data, style));
-  }
-
   const totalSheets = Math.ceil(dataArray.length / LABELS_PER_PAGE);
 
   for (let sheet = 0; sheet < totalSheets; sheet++) {
@@ -806,22 +798,24 @@ export async function generateBatchSlabLabels(
 
     if (sheet > 0) doc.addPage('letter', 'portrait');
 
-    // Front side — full cut guides
+    // Render and place front labels for this page (one at a time to avoid memory buildup)
     drawPageHeader(doc, 'front', sheet + 1, totalSheets);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
       const { labelX, labelY } = getLabelPosition(gridIdx);
-      placeLabelImage(doc, frontImages[i], labelX, labelY);
+      const frontImg = await renderFrontLabelCanvas(dataArray[i], style);
+      placeLabelImage(doc, frontImg, labelX, labelY);
       drawFrontCutGuides(doc, labelX, labelY, style);
     }
 
-    // Back side (new page, mirrored X) — corner marks only
+    // Back side (new page, mirrored X) — render one at a time
     doc.addPage('letter', 'portrait');
     drawPageHeader(doc, 'back', sheet + 1, totalSheets);
     for (let i = startIdx; i < endIdx; i++) {
       const gridIdx = i - startIdx;
       const { labelX, labelY } = getMirroredLabelPosition(gridIdx);
-      placeLabelImage(doc, backImages[i], labelX, labelY);
+      const backImg = await renderBackLabelCanvas(dataArray[i], style);
+      placeLabelImage(doc, backImg, labelX, labelY);
       drawCornerMarks(doc, labelX, labelY, style);
     }
   }

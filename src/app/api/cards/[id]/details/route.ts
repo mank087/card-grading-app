@@ -337,7 +337,22 @@ export async function PATCH(
     console.log('[Edit Card Details] Column updates:', columnUpdates);
     console.log('[Edit Card Details] Card ID:', cardId);
 
-    // 7. Update database
+    // 7. Preserve original AI-extracted card info on first user edit
+    // This allows reverting to AI values if needed, and tracking what the AI originally detected
+    if (!card.original_card_info && card.conversational_card_info) {
+      try {
+        await supabase
+          .from('cards')
+          .update({ original_card_info: card.conversational_card_info })
+          .eq('id', cardId);
+        console.log('[Edit Card Details] Preserved original AI card info');
+      } catch (preserveError) {
+        // Non-critical — continue even if preservation fails (column may not exist yet)
+        console.warn('[Edit Card Details] Could not preserve original card info:', preserveError);
+      }
+    }
+
+    // 8. Update database
     const updatePayload: Record<string, any> = {
       ...columnUpdates,
       conversational_card_info: jsonbUpdates,
@@ -367,7 +382,7 @@ export async function PATCH(
       }, { status: 500 });
     }
 
-    // 8. Fetch updated card
+    // 9. Fetch updated card
     const { data: updatedCard, error: refetchError } = await supabase
       .from('cards')
       .select('*')
@@ -379,7 +394,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Failed to fetch updated card" }, { status: 500 });
     }
 
-    // 9. Regenerate label data
+    // 10. Regenerate label data
     let labelData = null;
     try {
       labelData = generateLabelData(updatedCard);
@@ -394,7 +409,7 @@ export async function PATCH(
       // Continue even if label generation fails
     }
 
-    // 10. Return success response
+    // 11. Return success response
     return NextResponse.json({
       success: true,
       card: updatedCard,

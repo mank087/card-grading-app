@@ -6,6 +6,8 @@ import { getStoredSession, signOut } from '@/lib/directAuth'
 import { useRouter } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
+import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
+import { LabelStyleDropdown } from '@/components/labels/LabelStyleDropdown'
 
 type AccountStats = {
   totalCards: number
@@ -58,9 +60,8 @@ export default function AccountPage() {
   const [usernameSuccess, setUsernameSuccess] = useState(false)
   const [isSavingUsername, setIsSavingUsername] = useState(false)
 
-  // Label style preference
-  const [labelStyle, setLabelStyle] = useState<'modern' | 'traditional'>('modern')
-  const [isTogglingLabelStyle, setIsTogglingLabelStyle] = useState(false)
+  // Label style preference (from shared hook)
+  const { labelStyle, customStyles, switchStyle } = useCustomLabelStyle()
 
   // Label emblem preference (for users with Founder, VIP, and/or Card Lover)
   // Users can select 0, 1, or max 2 emblems to display
@@ -225,21 +226,6 @@ export default function AccountPage() {
           console.error('Error fetching founder status:', err)
         }
 
-        // Fetch label style preference
-        try {
-          const labelRes = await fetch('/api/user/label-style', {
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`
-            }
-          })
-          if (labelRes.ok) {
-            const labelData = await labelRes.json()
-            setLabelStyle(labelData.labelStyle || 'modern')
-          }
-        } catch (err) {
-          console.error('Error fetching label style:', err)
-        }
-
         // Fetch Card Lovers subscription status
         try {
           const subscriptionRes = await fetch('/api/subscription/status', {
@@ -394,34 +380,6 @@ export default function AccountPage() {
     }
   }
 
-  // Handle label style toggle
-  const handleLabelStyleToggle = async () => {
-    setIsTogglingLabelStyle(true)
-    try {
-      const session = getStoredSession()
-      if (!session?.access_token) {
-        return
-      }
-
-      const newStyle = labelStyle === 'modern' ? 'traditional' : 'modern'
-      const response = await fetch('/api/user/label-style', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ labelStyle: newStyle }),
-      })
-
-      if (response.ok) {
-        setLabelStyle(newStyle)
-      }
-    } catch (err) {
-      console.error('Error toggling label style:', err)
-    } finally {
-      setIsTogglingLabelStyle(false)
-    }
-  }
 
   // Handle label emblem toggle (checkbox style, max 2 selections)
   const handleEmblemToggle = async (emblem: EmblemType) => {
@@ -943,30 +901,14 @@ export default function AccountPage() {
             <div>
               <h3 className="font-medium text-gray-900">Card Label Design</h3>
               <p className="text-sm text-gray-600">
-                Choose between the modern dark style or traditional light style for your card labels
+                Choose a label style, or create custom styles in Label Studio
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <span className={`text-sm font-medium ${labelStyle === 'traditional' ? 'text-purple-600' : 'text-gray-400'}`}>
-                Traditional
-              </span>
-              <button
-                onClick={handleLabelStyleToggle}
-                disabled={isTogglingLabelStyle}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
-                  labelStyle === 'modern' ? 'bg-purple-600' : 'bg-gray-300'
-                } ${isTogglingLabelStyle ? 'opacity-50 cursor-not-allowed' : ''}`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    labelStyle === 'modern' ? 'translate-x-6' : 'translate-x-1'
-                  }`}
-                />
-              </button>
-              <span className={`text-sm font-medium ${labelStyle === 'modern' ? 'text-purple-600' : 'text-gray-400'}`}>
-                Modern
-              </span>
-            </div>
+            <LabelStyleDropdown
+              labelStyle={labelStyle}
+              customStyles={customStyles}
+              onSwitch={switchStyle}
+            />
           </div>
 
           {/* Style Preview */}
@@ -979,7 +921,7 @@ export default function AccountPage() {
                 <p className="text-xs text-gray-500">Light background with purple accents</p>
               </div>
             </div>
-            <div className={`p-3 rounded-lg border-2 ${labelStyle === 'modern' ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
+            <div className={`p-3 rounded-lg border-2 ${labelStyle === 'modern' || labelStyle.startsWith('custom-') ? 'border-purple-500 bg-purple-50' : 'border-gray-200 bg-gray-50'}`}>
               <div className="text-center">
                 <div className="rounded-lg p-2 mb-2 shadow-sm" style={{ background: 'linear-gradient(135deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)' }}>
                   <p className="text-xs font-bold text-white">Modern</p>

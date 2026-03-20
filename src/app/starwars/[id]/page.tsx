@@ -41,25 +41,28 @@ function getFirstValidValue(...values: (string | null | undefined)[]): string {
 function generateMetaKeywords(card: any): string {
   const keywords: string[] = [];
 
-  // Get card info from database columns or conversational_card_info
+  // Get card info: label_data (canonical) > conversational AI > DB columns
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const characterName = getFirstValidValue(
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.conversational_card_info?.player_or_character,
+    card.featured
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const cardNumber = getFirstValidValue(
-    card.card_number,
-    card.conversational_card_info?.card_number
+    card.label_data?.cardNumber,
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const rarity = getFirstValidValue(
     card.rarity,
     card.conversational_card_info?.rarity
@@ -126,25 +129,29 @@ function generateMetaKeywords(card: any): string {
 
 // Helper: Build dynamic title for Star Wars cards
 // Format matches other card types: Card Name Year Set #Number - DCM Grade X
+// Priority: label_data (canonical display) > conversational AI > DB columns
 function buildTitle(card: any): string {
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const characterName = getFirstValidValue(
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.conversational_card_info?.player_or_character,
+    card.featured
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const cardNumber = getFirstValidValue(
-    card.card_number,
-    card.conversational_card_info?.card_number
+    card.label_data?.cardNumber,
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const grade = card.conversational_decimal_grade;
 
   const titleParts: string[] = [];
@@ -199,15 +206,17 @@ function buildTitle(card: any): string {
 // Helper: Build description for Star Wars cards
 function buildDescription(card: any): string {
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const faction = getFirstValidValue(
     card.sw_faction,
     card.conversational_card_info?.faction

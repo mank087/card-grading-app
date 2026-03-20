@@ -250,7 +250,7 @@ function drawBorder(
 // FRONT LABEL RENDERER
 // ============================================================================
 
-async function renderFrontCanvas(
+export async function renderFrontCanvas(
   data: SlabLabelData,
   config: CustomLabelConfig,
   dpi: number
@@ -407,7 +407,7 @@ async function renderFrontCanvas(
 // BACK LABEL RENDERER
 // ============================================================================
 
-async function renderBackCanvas(
+export async function renderBackCanvas(
   data: SlabLabelData,
   config: CustomLabelConfig,
   dpi: number
@@ -715,4 +715,179 @@ export async function downloadCustomSlabLabel(
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ============================================================================
+// BATCH CUSTOM LABEL GENERATOR (multi-up grid, same layout as standard batch)
+// ============================================================================
+
+const BATCH_INCH = 72;
+const BATCH_DPI = 300;
+
+// Label dimensions in points (matches slabLabelGenerator)
+const BATCH_LABEL_WIDTH_IN = 2.8;
+const BATCH_LABEL_HEIGHT_IN = 0.8;
+const BATCH_LABEL_WIDTH = BATCH_LABEL_WIDTH_IN * BATCH_INCH;
+const BATCH_LABEL_HEIGHT = BATCH_LABEL_HEIGHT_IN * BATCH_INCH;
+const BATCH_BLEED_IN = 0.08;
+const BATCH_BLEED_PT = BATCH_BLEED_IN * BATCH_INCH;
+
+// Cut guide margin around each label
+const BATCH_CUT_MARGIN = 0.25 * BATCH_INCH;
+
+// Cell size (label + margins)
+const BATCH_CELL_WIDTH = BATCH_LABEL_WIDTH + BATCH_CUT_MARGIN * 2;
+const BATCH_CELL_HEIGHT = BATCH_LABEL_HEIGHT + BATCH_CUT_MARGIN * 2;
+
+// Page dimensions (US Letter)
+const BATCH_PAGE_WIDTH = 8.5 * BATCH_INCH;
+const BATCH_PAGE_HEIGHT = 11 * BATCH_INCH;
+
+// Grid layout: 2 columns x 5 rows = 10 per page
+const BATCH_COLS = 2;
+const BATCH_ROWS = 5;
+const BATCH_LABELS_PER_PAGE = BATCH_COLS * BATCH_ROWS;
+
+// Grid positioning (centered on page)
+const BATCH_GRID_WIDTH = BATCH_COLS * BATCH_CELL_WIDTH;
+const BATCH_GRID_HEIGHT = BATCH_ROWS * BATCH_CELL_HEIGHT;
+const BATCH_GRID_START_X = (BATCH_PAGE_WIDTH - BATCH_GRID_WIDTH) / 2;
+const BATCH_GRID_START_Y = (BATCH_PAGE_HEIGHT - BATCH_GRID_HEIGHT) / 2;
+
+// Trim inset for cut guides
+const BATCH_TRIM_INSET_IN = 0.02;
+const BATCH_TRIM_INSET_PT = BATCH_TRIM_INSET_IN * BATCH_INCH;
+const BATCH_CUT_WIDTH = BATCH_LABEL_WIDTH - BATCH_TRIM_INSET_PT * 2;
+const BATCH_CUT_HEIGHT = BATCH_LABEL_HEIGHT - BATCH_TRIM_INSET_PT * 2;
+
+function batchGetLabelPosition(index: number) {
+  const col = index % BATCH_COLS;
+  const row = Math.floor(index / BATCH_COLS);
+  const cellX = BATCH_GRID_START_X + col * BATCH_CELL_WIDTH;
+  const cellY = BATCH_GRID_START_Y + row * BATCH_CELL_HEIGHT;
+  return { labelX: cellX + BATCH_CUT_MARGIN, labelY: cellY + BATCH_CUT_MARGIN };
+}
+
+function batchGetMirroredLabelPosition(index: number) {
+  const col = index % BATCH_COLS;
+  const row = Math.floor(index / BATCH_COLS);
+  const mirroredCol = BATCH_COLS - 1 - col;
+  const cellX = BATCH_GRID_START_X + mirroredCol * BATCH_CELL_WIDTH;
+  const cellY = BATCH_GRID_START_Y + row * BATCH_CELL_HEIGHT;
+  return { labelX: cellX + BATCH_CUT_MARGIN, labelY: cellY + BATCH_CUT_MARGIN };
+}
+
+function batchPlaceLabelImage(doc: jsPDF, imgDataUrl: string, labelX: number, labelY: number) {
+  doc.addImage(
+    imgDataUrl, 'JPEG',
+    labelX - BATCH_BLEED_PT,
+    labelY - BATCH_BLEED_PT,
+    BATCH_LABEL_WIDTH + BATCH_BLEED_PT * 2,
+    BATCH_LABEL_HEIGHT + BATCH_BLEED_PT * 2
+  );
+}
+
+function batchDrawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: number, totalPages: number) {
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor('#9ca3af');
+  const headerY = BATCH_GRID_START_Y - 12;
+  doc.text(`${pageType === 'front' ? 'FRONT' : 'BACK'} \u2014 Custom Label \u2014 Page ${pageNum} of ${totalPages}`, BATCH_GRID_START_X, headerY);
+  const instructions = pageType === 'front'
+    ? 'Print duplex (flip on long edge) \u2022 Cut along dotted lines'
+    : 'BACK SIDE \u2022 Print duplex (flip on long edge)';
+  doc.text(instructions, BATCH_PAGE_WIDTH / 2, headerY, { align: 'center' });
+  doc.text('Label: 2.8" \u00D7 0.8"', BATCH_PAGE_WIDTH - BATCH_GRID_START_X, headerY, { align: 'right' });
+}
+
+function batchDrawCornerMarks(doc: jsPDF, labelX: number, labelY: number) {
+  const cutX = labelX + BATCH_TRIM_INSET_PT;
+  const cutY = labelY + BATCH_TRIM_INSET_PT;
+  const markLen = 8;
+  doc.setDrawColor('#ffffff');
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([], 0);
+  doc.line(cutX - markLen, cutY, cutX, cutY);
+  doc.line(cutX, cutY - markLen, cutX, cutY);
+  doc.line(cutX + BATCH_CUT_WIDTH, cutY, cutX + BATCH_CUT_WIDTH + markLen, cutY);
+  doc.line(cutX + BATCH_CUT_WIDTH, cutY - markLen, cutX + BATCH_CUT_WIDTH, cutY);
+  doc.line(cutX - markLen, cutY + BATCH_CUT_HEIGHT, cutX, cutY + BATCH_CUT_HEIGHT);
+  doc.line(cutX, cutY + BATCH_CUT_HEIGHT, cutX, cutY + BATCH_CUT_HEIGHT + markLen);
+  doc.line(cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT, cutX + BATCH_CUT_WIDTH + markLen, cutY + BATCH_CUT_HEIGHT);
+  doc.line(cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT, cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT + markLen);
+}
+
+function batchDrawFrontCutGuides(doc: jsPDF, labelX: number, labelY: number) {
+  const cutX = labelX + BATCH_TRIM_INSET_PT;
+  const cutY = labelY + BATCH_TRIM_INSET_PT;
+  doc.setDrawColor('#ffffff');
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([3, 3], 0);
+  doc.rect(cutX, cutY, BATCH_CUT_WIDTH, BATCH_CUT_HEIGHT, 'S');
+  doc.setLineDashPattern([], 0);
+  doc.setFontSize(7);
+  doc.setTextColor('#ffffff');
+  doc.text('\u2702', cutX - 7, cutY + 3);
+  doc.text('\u2702', cutX + BATCH_CUT_WIDTH + 1, cutY + 3);
+  doc.text('\u2702', cutX - 7, cutY + BATCH_CUT_HEIGHT + 3);
+  doc.text('\u2702', cutX + BATCH_CUT_WIDTH + 1, cutY + BATCH_CUT_HEIGHT + 3);
+  batchDrawCornerMarks(doc, labelX, labelY);
+}
+
+/**
+ * Generate batch custom slab labels in the same multi-up grid layout as standard batch.
+ * 10 labels per page (2x5), front/back duplex pages, cut guides, mirrored backs.
+ */
+export async function generateBatchCustomSlabLabels(
+  dataArray: SlabLabelData[],
+  config: CustomLabelConfig
+): Promise<Blob> {
+  if (dataArray.length === 0) throw new Error('No label data provided');
+
+  // Single label: use centered layout
+  if (dataArray.length === 1) {
+    return generateCustomSlabLabel(dataArray[0], config);
+  }
+
+  // Force config to standard slab dimensions for batch grid layout
+  const batchConfig: CustomLabelConfig = {
+    ...config,
+    width: BATCH_LABEL_WIDTH_IN,
+    height: BATCH_LABEL_HEIGHT_IN,
+  };
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+  const totalSheets = Math.ceil(dataArray.length / BATCH_LABELS_PER_PAGE);
+
+  for (let sheet = 0; sheet < totalSheets; sheet++) {
+    const startIdx = sheet * BATCH_LABELS_PER_PAGE;
+    const endIdx = Math.min(startIdx + BATCH_LABELS_PER_PAGE, dataArray.length);
+
+    if (sheet > 0) doc.addPage('letter', 'portrait');
+
+    // Front side
+    batchDrawPageHeader(doc, 'front', sheet + 1, totalSheets);
+    for (let i = startIdx; i < endIdx; i++) {
+      const gridIdx = i - startIdx;
+      const { labelX, labelY } = batchGetLabelPosition(gridIdx);
+      const frontCanvas = await renderFrontCanvas(dataArray[i], batchConfig, BATCH_DPI);
+      const frontImg = frontCanvas.toDataURL('image/jpeg', 0.92);
+      batchPlaceLabelImage(doc, frontImg, labelX, labelY);
+      batchDrawFrontCutGuides(doc, labelX, labelY);
+    }
+
+    // Back side (mirrored X for duplex)
+    doc.addPage('letter', 'portrait');
+    batchDrawPageHeader(doc, 'back', sheet + 1, totalSheets);
+    for (let i = startIdx; i < endIdx; i++) {
+      const gridIdx = i - startIdx;
+      const { labelX, labelY } = batchGetMirroredLabelPosition(gridIdx);
+      const backCanvas = await renderBackCanvas(dataArray[i], batchConfig, BATCH_DPI);
+      const backImg = backCanvas.toDataURL('image/jpeg', 0.92);
+      batchPlaceLabelImage(doc, backImg, labelX, labelY);
+      batchDrawCornerMarks(doc, labelX, labelY);
+    }
+  }
+
+  return doc.output('blob');
 }

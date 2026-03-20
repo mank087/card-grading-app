@@ -117,7 +117,7 @@ function extractStarWarsFieldsFromConversational(conversationalJSON: any) {
       card_number: cardInfo.card_id || cardInfo.card_number || null,
       release_date: cardInfo.set_year || cardInfo.year || null,
       manufacturer_name: cardInfo.manufacturer || 'Topps',
-      serial_numbering: cardInfo.serial_number || null,
+      serial_numbering: cardInfo.serial_number || cardInfo.serial_numbering || null,
       authentic: cardInfo.authentic !== undefined ? cardInfo.authentic : null,
       rarity_description: cardInfo.rarity || cardInfo.rarity_or_variant || null,
       autographed: cardInfo.autographed !== undefined ? cardInfo.autographed : null,
@@ -933,6 +933,10 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
       card_number: cardFields.card_number || card.card_number,
       featured: cardFields.featured || card.featured,
       release_date: cardFields.release_date || card.release_date,
+      serial_numbering: cardFields.serial_numbering || card.serial_numbering || null,
+      autographed: cardFields.autographed || card.autographed || null,
+      is_foil: cardFields.is_foil || card.is_foil || null,
+      rarity_description: cardFields.rarity_description || card.rarity_description || null,
     };
     const labelData = generateLabelData(cardForLabel);
     (updateData as any).label_data = labelData;

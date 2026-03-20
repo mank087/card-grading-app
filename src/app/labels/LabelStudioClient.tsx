@@ -21,6 +21,8 @@ import type { CardImageData } from '@/lib/cardImageGenerator'
 import { BatchSlabLabelModal } from '@/components/reports/BatchSlabLabelModal'
 import { BatchAveryLabelModal } from '@/components/reports/BatchAveryLabelModal'
 import { BatchAvery8167LabelModal } from '@/components/reports/BatchAvery8167LabelModal'
+import { useCustomLabelStyle } from '@/hooks/useCustomLabelStyle'
+import type { SavedCustomStyle } from '@/lib/labelPresets'
 
 interface Props {
   cards: any[]
@@ -1141,6 +1143,209 @@ function CustomDesigner({
 }
 
 // ============================================================================
+// SAVED STYLES MANAGER
+// ============================================================================
+
+function SavedStylesManager({
+  customConfig,
+  setConfig,
+  customStyles,
+  onSave,
+  onDelete,
+  onRename,
+  onApplyToAll,
+}: {
+  customConfig: CustomLabelConfig
+  setConfig: React.Dispatch<React.SetStateAction<CustomLabelConfig>>
+  customStyles: SavedCustomStyle[]
+  onSave: (style: { id?: string; name: string; config: CustomLabelConfig }) => Promise<SavedCustomStyle | null>
+  onDelete: (id: string) => Promise<void>
+  onRename: (id: string, name: string) => Promise<void>
+  onApplyToAll: (id: string) => Promise<void>
+}) {
+  const [saveName, setSaveName] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  const handleSaveNew = async () => {
+    if (customStyles.length >= 4) {
+      alert('Maximum 4 custom styles. Delete one first.')
+      return
+    }
+    setIsSaving(true)
+    const name = saveName.trim() || `Custom Label ${customStyles.length + 1}`
+    await onSave({ name, config: customConfig })
+    setSaveName('')
+    setIsSaving(false)
+  }
+
+  const handleUpdate = async (style: SavedCustomStyle) => {
+    setIsSaving(true)
+    await onSave({ id: style.id, name: style.name, config: customConfig })
+    setIsSaving(false)
+  }
+
+  const handleRename = async (id: string) => {
+    if (editingName.trim()) {
+      await onRename(id, editingName.trim())
+    }
+    setEditingId(null)
+  }
+
+  const handleDelete = async (id: string) => {
+    await onDelete(id)
+    setConfirmDeleteId(null)
+  }
+
+  const handleLoadIntoDesigner = (style: SavedCustomStyle) => {
+    setConfig(style.config)
+    // Also persist to localStorage so it survives page refresh
+    try {
+      localStorage.setItem('labelStudio_customConfig', JSON.stringify(style.config))
+    } catch { /* ignore */ }
+  }
+
+  return (
+    <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+        </svg>
+        <h2 className="text-lg font-bold text-gray-900">Saved Custom Styles</h2>
+        <span className="text-xs text-gray-400">{customStyles.length}/4 slots used</span>
+      </div>
+
+      {/* Save current design as new custom style */}
+      {customStyles.length < 4 && (
+        <div className="flex gap-2 mb-4">
+          <input
+            type="text"
+            value={saveName}
+            onChange={(e) => setSaveName(e.target.value)}
+            placeholder={`Custom Label ${customStyles.length + 1}`}
+            className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+          />
+          <button
+            onClick={handleSaveNew}
+            disabled={isSaving}
+            className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-medium hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {isSaving ? 'Saving...' : 'Save Current Design'}
+          </button>
+        </div>
+      )}
+
+      {customStyles.length === 4 && (
+        <p className="text-xs text-amber-600 mb-4">All 4 custom style slots are used. Delete one to save a new design.</p>
+      )}
+
+      {/* List of saved styles */}
+      {customStyles.length === 0 ? (
+        <p className="text-sm text-gray-400">No saved custom styles yet. Design a label above and save it here.</p>
+      ) : (
+        <div className="space-y-3">
+          {customStyles.map((style) => (
+            <div
+              key={style.id}
+              className="flex items-center gap-3 p-3 rounded-lg border border-gray-200 hover:border-purple-200 transition-colors"
+            >
+              {/* Color swatch preview */}
+              <div
+                className="w-10 h-10 rounded-lg flex-shrink-0"
+                style={{
+                  background: style.config.colorPreset === 'rainbow'
+                    ? 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00cc00, #0066ff, #8800ff, #ff00ff)'
+                    : `linear-gradient(135deg, ${style.config.gradientStart}, ${style.config.gradientEnd})`,
+                  border: style.config.borderEnabled ? `2px solid ${style.config.borderColor}` : '1px solid rgba(0,0,0,0.1)',
+                }}
+              />
+
+              {/* Name (editable) */}
+              <div className="flex-1 min-w-0">
+                {editingId === style.id ? (
+                  <input
+                    type="text"
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    onBlur={() => handleRename(style.id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleRename(style.id) }}
+                    autoFocus
+                    className="w-full px-2 py-1 text-sm border border-purple-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
+                  />
+                ) : (
+                  <button
+                    onClick={() => { setEditingId(style.id); setEditingName(style.name) }}
+                    className="text-sm font-medium text-gray-900 hover:text-purple-600 truncate block text-left"
+                    title="Click to rename"
+                  >
+                    {style.name}
+                  </button>
+                )}
+                <p className="text-xs text-gray-400">{style.id} &middot; {style.config.style} style</p>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap justify-end">
+                <button
+                  onClick={() => handleLoadIntoDesigner(style)}
+                  className="px-2 py-1 text-xs text-purple-600 border border-purple-300 rounded hover:bg-purple-50 transition-colors"
+                  title="Load into designer for editing"
+                >
+                  Load
+                </button>
+                <button
+                  onClick={async () => {
+                    await onApplyToAll(style.id)
+                  }}
+                  className="px-2 py-1 text-xs text-green-600 border border-green-300 rounded hover:bg-green-50 transition-colors"
+                  title="Apply this style to all labels across the site"
+                >
+                  Apply to All
+                </button>
+                <button
+                  onClick={() => handleUpdate(style)}
+                  disabled={isSaving}
+                  className="px-2 py-1 text-xs text-blue-600 border border-blue-300 rounded hover:bg-blue-50 transition-colors disabled:opacity-50"
+                  title="Update with current designer settings"
+                >
+                  Update
+                </button>
+                {confirmDeleteId === style.id ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleDelete(style.id)}
+                      className="px-2 py-1 text-xs text-white bg-red-600 rounded hover:bg-red-700 transition-colors"
+                    >
+                      Confirm
+                    </button>
+                    <button
+                      onClick={() => setConfirmDeleteId(null)}
+                      className="px-2 py-1 text-xs text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmDeleteId(style.id)}
+                    className="px-2 py-1 text-xs text-red-600 border border-red-300 rounded hover:bg-red-50 transition-colors"
+                    title="Delete this saved style"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -1218,6 +1423,9 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
 
   // Custom label preview data (with text overrides from designer)
   const [customPreviewData, setCustomPreviewData] = useState<SlabLabelData | null>(null)
+
+  // Custom label styles hook (save/load/manage from DB)
+  const { customStyles, saveCustomStyle, deleteCustomStyle, renameCustomStyle, switchStyle } = useCustomLabelStyle()
 
   // Wrap setSelectedCard to clear stale data SYNCHRONOUSLY in the same batch.
   // This is critical — if we clear in a useEffect, children render one cycle
@@ -1556,6 +1764,22 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
 
         {/* Section 3: Custom Designer */}
         <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} />
+
+        {/* Section 4: Save & Manage Custom Styles */}
+        {isAuthenticated && (
+          <SavedStylesManager
+            customConfig={customConfig}
+            setConfig={setCustomConfig}
+            customStyles={customStyles}
+            onSave={saveCustomStyle}
+            onDelete={deleteCustomStyle}
+            onRename={renameCustomStyle}
+            onApplyToAll={async (id: string) => {
+              await switchStyle(id as any)
+              alert('Style applied! This custom label style will now be used across all pages.')
+            }}
+          />
+        )}
       </div>
 
       {/* Batch Modals */}

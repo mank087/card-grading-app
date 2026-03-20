@@ -41,36 +41,39 @@ function getFirstValidValue(...values: (string | null | undefined)[]): string {
 function generateMetaKeywords(card: any): string {
   const keywords: string[] = [];
 
-  // Get card info from database columns or conversational_card_info
+  // Priority: label_data (canonical display) > conversational AI > DB columns
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const characterName = getFirstValidValue(
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.conversational_card_info?.player_or_character,
+    card.featured
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const cardNumber = getFirstValidValue(
-    card.card_number,
-    card.conversational_card_info?.card_number
+    card.label_data?.cardNumber,
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const rarity = getFirstValidValue(
-    card.rarity,
-    card.conversational_card_info?.rarity
+    card.conversational_card_info?.rarity,
+    card.rarity
   );
   const cardType = getFirstValidValue(
-    card.ygo_card_type,
-    card.conversational_card_info?.ygo_card_type
+    card.conversational_card_info?.ygo_card_type,
+    card.ygo_card_type
   );
   const attribute = getFirstValidValue(
-    card.ygo_attribute,
-    card.conversational_card_info?.attribute
+    card.conversational_card_info?.attribute,
+    card.ygo_attribute
   );
   const archetype = getFirstValidValue(
     card.ygo_archetype,
@@ -149,23 +152,26 @@ function generateMetaKeywords(card: any): string {
 // Format matches other card types: Card Name Year Set #Number - DCM Grade X
 function buildTitle(card: any): string {
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const characterName = getFirstValidValue(
-    card.featured,
-    card.conversational_card_info?.player_or_character
+    card.conversational_card_info?.player_or_character,
+    card.featured
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const cardNumber = getFirstValidValue(
-    card.card_number,
-    card.conversational_card_info?.card_number
+    card.label_data?.cardNumber,
+    card.conversational_card_info?.card_number,
+    card.card_number
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const grade = card.conversational_decimal_grade;
 
   const titleParts: string[] = [];
@@ -220,18 +226,20 @@ function buildTitle(card: any): string {
 // Helper: Build description for Yu-Gi-Oh cards
 function buildDescription(card: any): string {
   const cardName = getFirstValidValue(
-    card.card_name,
-    card.conversational_card_info?.card_name
+    card.label_data?.primaryName,
+    card.conversational_card_info?.card_name,
+    card.card_name
   );
   const setName = getFirstValidValue(
-    card.card_set,
-    card.conversational_card_info?.set_name
+    card.label_data?.setName,
+    card.conversational_card_info?.set_name,
+    card.card_set
   );
   const releaseYear = card.release_date ? card.release_date.slice(0, 4) : null;
-  const year = getFirstValidValue(releaseYear, card.conversational_card_info?.set_year);
+  const year = getFirstValidValue(card.label_data?.year, card.conversational_card_info?.set_year, releaseYear);
   const attribute = getFirstValidValue(
-    card.ygo_attribute,
-    card.conversational_card_info?.attribute
+    card.conversational_card_info?.attribute,
+    card.ygo_attribute
   );
   const grade = card.conversational_decimal_grade;
 

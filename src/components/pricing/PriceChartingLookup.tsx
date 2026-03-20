@@ -130,6 +130,36 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
   const [searchingManual, setSearchingManual] = useState(false);
   const [manualSearchError, setManualSearchError] = useState<string | null>(null);
 
+  // Save estimated price to database so collection/portfolio pages reflect the latest value
+  const savePriceEstimate = async (data: PriceChartingResult['data']) => {
+    if (!isOwner || !card.id || !data) return;
+    const session = getStoredSession();
+    if (!session?.access_token) return;
+
+    try {
+      await fetch('/api/pricing/dcm-save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          card_id: card.id,
+          estimate: data.estimatedValue,
+          raw: data.prices?.raw ?? null,
+          graded_high: data.prices?.psa?.['10'] ?? null,
+          median: null,
+          average: null,
+          match_confidence: data.matchConfidence,
+          product_id: data.prices?.productId ?? null,
+          product_name: data.prices?.productName ?? null,
+        }),
+      });
+    } catch (err) {
+      console.error('[PriceChartingLookup] Error saving price estimate:', err);
+    }
+  };
+
   const fetchPrices = async (overrideProductId?: string, forceRefresh: boolean = false) => {
     if (!card.player_or_character) {
       return;
@@ -203,6 +233,8 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
             sportsCardsProUrl,
           });
         }
+        // Persist estimated price to database for collection/portfolio pages
+        savePriceEstimate(data.data || undefined);
       } catch (err) {
         console.error('[PriceChartingLookup] Error fetching selected product:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch prices');
@@ -300,6 +332,8 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
       if (data.data?.availableParallels) {
         setAvailableParallels(data.data.availableParallels);
       }
+      // Persist estimated price to database for collection/portfolio pages
+      savePriceEstimate(data.data || undefined);
 
       if (data.cached) {
         console.log(`[PriceChartingLookup] Using cached data (${data.cacheAge} days old)`);
@@ -1180,12 +1214,18 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
             </div>
 
             {/* Expandable section for other variations */}
-            <details className="mt-4 border-t border-gray-100 pt-3 group">
-              <summary className="text-xs text-emerald-600 cursor-pointer hover:text-emerald-800 font-medium flex items-center gap-1 list-none [&::-webkit-details-marker]:hidden">
+            <details className="mt-4 border-t border-gray-100 pt-3 group" open={priceData.matchConfidence === 'low' || priceData.matchConfidence === 'medium'}>
+              <summary className={`text-xs cursor-pointer font-medium flex items-center gap-1 list-none [&::-webkit-details-marker]:hidden ${
+                priceData.matchConfidence === 'low' || priceData.matchConfidence === 'medium'
+                  ? 'text-amber-600 hover:text-amber-800'
+                  : 'text-emerald-600 hover:text-emerald-800'
+              }`}>
                 <svg className="w-3 h-3 transition-transform duration-200 group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                Wrong card? See variations or search manually
+                {priceData.matchConfidence === 'low' || priceData.matchConfidence === 'medium'
+                  ? 'Not the right card? Tap to change variant'
+                  : 'Wrong card? See variations or search manually'}
               </summary>
 
               <div className="mt-3">
@@ -1240,7 +1280,7 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
                       </div>
                     )}
 
-                    <div className="max-h-48 overflow-y-auto space-y-1">
+                    <div className="max-h-64 overflow-y-auto space-y-1">
                       {availableParallels.map((parallel) => {
                         // Extract serial number from product name (e.g., "/25", "/99", "/8")
                         // Match /digits anywhere in the name, not just at the end
@@ -1269,21 +1309,21 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
                                 : 'bg-gray-50 text-gray-400 border border-transparent'
                             } ${!isOwner && parallel.id !== priceData.prices.productId ? 'cursor-not-allowed opacity-75' : ''}`}
                           >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 truncate">
-                                <span className="truncate font-medium">{nameWithoutSerial}</span>
+                            <div className="flex flex-wrap items-start sm:items-center justify-between gap-1">
+                              <div className="flex flex-wrap items-center gap-1 min-w-0">
+                                <span className="font-medium break-words">{nameWithoutSerial}</span>
                                 {serialNumber && (
                                   <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded flex-shrink-0">
                                     {serialNumber}
                                   </span>
                                 )}
                               </div>
-                              <span className={`text-xs flex-shrink-0 ml-2 ${parallel.hasPrice ? 'text-green-600' : 'text-gray-400'}`}>
+                              <span className={`text-xs flex-shrink-0 ${parallel.hasPrice ? 'text-green-600' : 'text-gray-400'}`}>
                                 {parallel.id === priceData.prices.productId ? '✓ Current' : parallel.hasPrice ? 'Has prices' : 'No prices'}
                               </span>
                             </div>
                           {parallel.setName && (
-                            <span className="text-xs text-gray-500 truncate block mt-0.5">
+                            <span className="text-xs text-gray-500 break-words block mt-0.5">
                               {parallel.setName}
                             </span>
                           )}

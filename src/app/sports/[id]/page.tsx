@@ -20,33 +20,36 @@ function generateMetaKeywords(card: any, dvgGrading: any): string {
 
   // 🎯 v3.3: Prioritize database columns with proper validation
   const playerName = getFirstValidValue(
-    card.featured,
+    card.label_data?.primaryName,
     card.conversational_card_info?.player_or_character,
+    card.featured,
     dvgGrading?.card_info?.player_or_character
   );
   const year = getFirstValidValue(
-    card.release_date,
+    card.label_data?.year,
     card.conversational_card_info?.year,
+    card.release_date,
     dvgGrading?.card_info?.year
   );
   const manufacturer = getFirstValidValue(
-    card.manufacturer_name,
     card.conversational_card_info?.manufacturer,
+    card.manufacturer_name,
     dvgGrading?.card_info?.manufacturer
   );
   const setName = getFirstValidValue(
-    card.card_set,
+    card.label_data?.setName,
     card.conversational_card_info?.set_name,
+    card.card_set,
     dvgGrading?.card_info?.set_name
   );
   const subset = getFirstValidValue(
-    card.subset,
     card.conversational_card_info?.subset,
+    card.subset,
     dvgGrading?.card_info?.subset
   );
   const sport = getFirstValidValue(
-    card.sport,
     card.conversational_card_info?.sport_or_category,
+    card.sport,
     dvgGrading?.card_info?.sport_or_category,
     card.category
   ) || 'sports';
@@ -154,36 +157,39 @@ function getFirstValidValue(...values: (string | null | undefined)[]): string {
 
 // Helper: Build enhanced title
 function buildTitle(card: any, dvgGrading: any): string {
-  // 🎯 v3.3: Prioritize database columns (populated by AI grading) over JSONB, with proper validation
-  // Use getFirstValidValue to skip invalid values like "Unknown Player" before falling back
+  // Priority: label_data (canonical display) > conversational AI > DB columns > DVG legacy
   const playerName = getFirstValidValue(
-    card.featured,  // Database column first (populated by grading)
+    card.label_data?.primaryName,
     card.conversational_card_info?.player_or_character,
+    card.featured,
     dvgGrading?.card_info?.player_or_character
   );
   const year = getFirstValidValue(
-    card.release_date,  // Database column first
+    card.label_data?.year,
     card.conversational_card_info?.year,
+    card.release_date,
     dvgGrading?.card_info?.year
   );
   const manufacturer = getFirstValidValue(
-    card.manufacturer_name,  // Database column first
     card.conversational_card_info?.manufacturer,
+    card.manufacturer_name,
     dvgGrading?.card_info?.manufacturer
   );
   const setName = getFirstValidValue(
-    card.card_set,  // Database column first
+    card.label_data?.setName,
     card.conversational_card_info?.set_name,
+    card.card_set,
     dvgGrading?.card_info?.set_name
   );
   const subset = getFirstValidValue(
-    card.subset,  // Database column first
     card.conversational_card_info?.subset,
+    card.subset,
     dvgGrading?.card_info?.subset
   );
   const cardName = getFirstValidValue(
-    card.card_name,  // Database column first
+    card.label_data?.primaryName,
     card.conversational_card_info?.card_name,
+    card.card_name,
     dvgGrading?.card_info?.card_name
   );
   const grade = card.conversational_decimal_grade ?? dvgGrading?.recommended_grade?.recommended_decimal_grade ?? card.dvg_decimal_grade;
@@ -263,35 +269,39 @@ function buildTitle(card: any, dvgGrading: any): string {
 
 // Helper: Build enhanced description
 function buildDescription(card: any, dvgGrading: any): string {
-  // 🎯 v3.3: Prioritize database columns with proper validation
+  // Priority: label_data (canonical display) > conversational AI > DB columns > DVG legacy
   const playerName = getFirstValidValue(
-    card.featured,
+    card.label_data?.primaryName,
     card.conversational_card_info?.player_or_character,
+    card.featured,
     dvgGrading?.card_info?.player_or_character
   );
   const year = getFirstValidValue(
-    card.release_date,
+    card.label_data?.year,
     card.conversational_card_info?.year,
+    card.release_date,
     dvgGrading?.card_info?.year
   );
   const manufacturer = getFirstValidValue(
-    card.manufacturer_name,
     card.conversational_card_info?.manufacturer,
+    card.manufacturer_name,
     dvgGrading?.card_info?.manufacturer
   );
   const setName = getFirstValidValue(
-    card.card_set,
+    card.label_data?.setName,
     card.conversational_card_info?.set_name,
+    card.card_set,
     dvgGrading?.card_info?.set_name
   );
   const subset = getFirstValidValue(
-    card.subset,
     card.conversational_card_info?.subset,
+    card.subset,
     dvgGrading?.card_info?.subset
   );
   const cardName = getFirstValidValue(
-    card.card_name,
+    card.label_data?.primaryName,
     card.conversational_card_info?.card_name,
+    card.card_name,
     dvgGrading?.card_info?.card_name
   );
   const grade = card.conversational_decimal_grade ?? dvgGrading?.recommended_grade?.recommended_decimal_grade;

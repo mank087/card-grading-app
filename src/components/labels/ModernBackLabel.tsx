@@ -1,6 +1,8 @@
 'use client'
 
 import { QRCodeCanvas } from 'qrcode.react'
+import type { LabelColorOverrides } from '@/lib/labelPresets'
+import { RAINBOW_GRADIENT } from '@/lib/labelPresets'
 
 interface SubScores {
   centering: number
@@ -21,6 +23,7 @@ interface ModernBackLabelProps {
   showFounderEmblem?: boolean
   showVipEmblem?: boolean
   showCardLoversEmblem?: boolean
+  colorOverrides?: LabelColorOverrides
 }
 
 // Helper: Format grade for display
@@ -78,21 +81,55 @@ export function ModernBackLabel({
   showFounderEmblem = false,
   showVipEmblem = false,
   showCardLoversEmblem = false,
+  colorOverrides,
 }: ModernBackLabelProps) {
   const config = sizeConfig[size]
+
+  // Use color overrides if provided, else default purple
+  const gradStart = colorOverrides?.gradientStart || '#1a1625'
+  const gradEnd = colorOverrides?.gradientEnd || '#2d1f47'
+  const isRainbow = colorOverrides?.isRainbow || false
+
+  // Background gradient
+  const bgGradient = isRainbow
+    ? RAINBOW_GRADIENT
+    : `linear-gradient(135deg, ${gradStart} 0%, ${gradEnd} 50%, ${gradStart} 100%)`
+
+  const glowColor = isRainbow
+    ? 'rgba(255, 255, 255, 0.08)'
+    : colorOverrides?.gradientEnd
+      ? `${colorOverrides.gradientEnd}1a`
+      : 'rgba(139, 92, 246, 0.1)'
+
+  // QR container accent color derived from gradientEnd
+  const qrAccent40 = isRainbow
+    ? 'rgba(255, 255, 255, 0.25)'
+    : colorOverrides?.gradientEnd
+      ? `${colorOverrides.gradientEnd}66`
+      : 'rgba(139, 92, 246, 0.4)'
+  const qrAccent50 = isRainbow
+    ? 'rgba(255, 255, 255, 0.35)'
+    : colorOverrides?.gradientEnd
+      ? `${colorOverrides.gradientEnd}80`
+      : 'rgba(139, 92, 246, 0.5)'
+
+  const borderStyle = colorOverrides?.borderEnabled
+    ? { border: `${Math.round(colorOverrides.borderWidth * 96)}px solid ${colorOverrides.borderColor}` }
+    : {}
 
   return (
     <div
       className={`${config.height} ${config.padding} relative overflow-hidden`}
       style={{
-        background: 'linear-gradient(135deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+        background: bgGradient,
+        ...borderStyle,
       }}
     >
       {/* Subtle inner glow */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse at center, rgba(139, 92, 246, 0.1) 0%, transparent 70%)',
+          background: `radial-gradient(ellipse at center, ${glowColor} 0%, transparent 70%)`,
         }}
       />
 
@@ -104,9 +141,9 @@ export function ModernBackLabel({
             <div
               className="p-1.5 rounded"
               style={{
-                background: '#1a1625',
-                boxShadow: '0 0 12px rgba(139, 92, 246, 0.5)',
-                border: '1px solid rgba(139, 92, 246, 0.4)',
+                background: gradStart,
+                boxShadow: `0 0 12px ${qrAccent50}`,
+                border: `1px solid ${qrAccent40}`,
               }}
             >
               <div className="bg-white p-1 rounded">

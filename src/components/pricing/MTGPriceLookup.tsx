@@ -140,6 +140,36 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }:
     return undefined;
   };
 
+  // Save estimated price to database so collection/portfolio pages reflect the latest value
+  const savePriceEstimate = async (data: MTGPricingResult['data']) => {
+    if (!isOwner || !card.id || !data) return;
+    const session = getStoredSession();
+    if (!session?.access_token) return;
+
+    try {
+      await fetch('/api/pricing/dcm-save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          card_id: card.id,
+          estimate: data.estimatedValue,
+          raw: data.prices?.raw ?? null,
+          graded_high: data.prices?.psa?.['10'] ?? null,
+          median: null,
+          average: null,
+          match_confidence: data.matchConfidence,
+          product_id: data.prices?.productId ?? null,
+          product_name: data.prices?.productName ?? null,
+        }),
+      });
+    } catch (err) {
+      console.error('[MTGPriceLookup] Error saving price estimate:', err);
+    }
+  };
+
   const fetchPrices = async (overrideProductId?: string, forceRefresh: boolean = false) => {
     const cardName = getCardName();
     if (!cardName) {
@@ -202,6 +232,8 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }:
             priceChartingUrl,
           });
         }
+        // Persist estimated price to database for collection/portfolio pages
+        savePriceEstimate(data.data || undefined);
       } catch (err) {
         console.error('[MTGPriceLookup] Error fetching selected product:', err);
         setError(err instanceof Error ? err.message : 'Failed to fetch prices');
@@ -277,6 +309,8 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }:
       if (data.data?.availableVariants) {
         setAvailableVariants(data.data.availableVariants);
       }
+      // Persist estimated price to database for collection/portfolio pages
+      savePriceEstimate(data.data || undefined);
     } catch (err) {
       console.error('[MTGPriceLookup] Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch prices');
@@ -694,12 +728,18 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }:
             </div>
 
             {/* Expandable section for other variants */}
-            <details className="mt-4 border-t border-gray-100 pt-3 group">
-              <summary className="text-xs text-emerald-600 cursor-pointer hover:text-emerald-800 font-medium flex items-center gap-1 list-none [&::-webkit-details-marker]:hidden">
+            <details className="mt-4 border-t border-gray-100 pt-3 group" open={priceData.matchConfidence === 'low' || priceData.matchConfidence === 'medium'}>
+              <summary className={`text-xs cursor-pointer font-medium flex items-center gap-1 list-none [&::-webkit-details-marker]:hidden ${
+                priceData.matchConfidence === 'low' || priceData.matchConfidence === 'medium'
+                  ? 'text-amber-600 hover:text-amber-800'
+                  : 'text-emerald-600 hover:text-emerald-800'
+              }`}>
                 <svg className="w-3 h-3 transition-transform duration-200 group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
-                See other card variants (Foil, Borderless, etc.)
+                {priceData.matchConfidence === 'low' || priceData.matchConfidence === 'medium'
+                  ? 'Not the right version? Tap to change variant'
+                  : 'See other card variants (Foil, Borderless, etc.)'}
               </summary>
 
               <div className="mt-3">
@@ -748,7 +788,7 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }:
                       </div>
                     )}
 
-                    <div className="max-h-48 overflow-y-auto space-y-1">
+                    <div className="max-h-64 overflow-y-auto space-y-1">
                       {availableVariants.map((variant) => (
                         <button
                           key={variant.id}
@@ -768,14 +808,14 @@ export function MTGPriceLookup({ card, dcmGrade, isOwner = false, onPriceLoad }:
                               : 'bg-gray-50 text-gray-400 border border-transparent'
                           } ${!isOwner && variant.id !== priceData.prices.productId ? 'cursor-not-allowed opacity-75' : ''}`}
                         >
-                          <div className="flex items-center justify-between">
-                            <span className="truncate font-medium">{variant.name}</span>
-                            <span className={`text-xs flex-shrink-0 ml-2 ${variant.hasPrice ? 'text-green-600' : 'text-gray-400'}`}>
+                          <div className="flex flex-wrap items-start sm:items-center justify-between gap-1">
+                            <span className="font-medium break-words min-w-0">{variant.name}</span>
+                            <span className={`text-xs flex-shrink-0 ${variant.hasPrice ? 'text-green-600' : 'text-gray-400'}`}>
                               {variant.id === priceData.prices.productId ? '✓ Current' : variant.hasPrice ? 'Has prices' : 'No prices'}
                             </span>
                           </div>
                           {variant.setName && (
-                            <span className="text-xs text-gray-500 truncate block mt-0.5">{variant.setName}</span>
+                            <span className="text-xs text-gray-500 break-words block mt-0.5">{variant.setName}</span>
                           )}
                         </button>
                       ))}

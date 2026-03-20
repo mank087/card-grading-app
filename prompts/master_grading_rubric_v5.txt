@@ -2150,7 +2150,8 @@ Actual field extraction rules are defined in the card-type delta files.
   • Pokemon: pokemon_stage, pokemon_type, hp, card_type, rarity, set_number, set_code (3-letter code for modern cards)
   • MTG: mtg_card_type, mana_cost, color_identity, power_toughness, creature_type
   • Lorcana: ink_color, character_version, inkwell, strength, willpower, lore_value
-  • Other: generic fields (card_name, set_name, manufacturer, year)
+  • Star Wars: sw_card_type, sw_faction, sw_era, sw_rarity, serial_number, is_foil, autographed
+  • Other: generic fields (card_name, set_name, manufacturer, year, serial_number)
 
 **CRITICAL - EXACT TEXT TRANSCRIPTION:**
 For ALL text-based fields (card_number, card_name, set_name, year, serial_number):

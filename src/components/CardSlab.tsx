@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { QRCodeCanvas } from 'qrcode.react'
 import { ModernFrontLabel } from './labels/ModernFrontLabel'
 import { ModernBackLabel } from './labels/ModernBackLabel'
+import type { LabelColorOverrides } from '@/lib/labelPresets'
 
 // Sub-scores interface for modern labels
 export interface SubScores {
@@ -50,7 +51,7 @@ export interface CardSlabProps {
   isAlteredAuthentic?: boolean
 
   // Label style preference
-  labelStyle?: 'modern' | 'traditional'
+  labelStyle?: string
 
   // Sub-scores for modern back label
   subScores?: SubScores
@@ -93,7 +94,7 @@ export function CardSlab({
   showFounderEmblem = false,
   showCardLoversEmblem = false,
 }: CardSlabProps) {
-  const isModern = labelStyle === 'modern'
+  const isModern = labelStyle !== 'traditional'
   // Size configurations - heights match between front/back labels for consistency
   const sizeConfig = {
     sm: {
@@ -495,7 +496,8 @@ export interface CardSlabGridProps {
   isAlteredAuthentic?: boolean
   children?: ReactNode // For additional content like buttons
   className?: string
-  labelStyle?: 'modern' | 'traditional'
+  labelStyle?: string
+  colorOverrides?: LabelColorOverrides
 }
 
 export function CardSlabGrid({
@@ -510,8 +512,9 @@ export function CardSlabGrid({
   children,
   className = '',
   labelStyle = 'modern',
+  colorOverrides,
 }: CardSlabGridProps) {
-  const isModern = labelStyle === 'modern'
+  const isModern = labelStyle !== 'traditional'
 
   // Grid-specific config
   const gridConfig = {
@@ -527,12 +530,25 @@ export function CardSlabGrid({
     : Math.max(gridConfig.nameMinFontSize, Math.floor(gridConfig.nameMaxFontSize * (gridConfig.maxNameChars / displayName.length)))
 
   // Slab border styles - modern has dark with glow, traditional has metallic purple
+  // Custom styles use their own gradient colors for the slab border
   const slabBorderStyle = isModern
-    ? {
-        background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
-        boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
-        border: '1px solid rgba(139, 92, 246, 0.4)',
-      }
+    ? colorOverrides?.isRainbow
+      ? {
+          background: 'linear-gradient(145deg, #ff0000 0%, #ff8800 17%, #ffff00 33%, #00cc00 50%, #0066ff 67%, #8800ff 83%, #ff00ff 100%)',
+          boxShadow: '0 0 20px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+        }
+      : colorOverrides
+        ? {
+            background: `linear-gradient(145deg, ${colorOverrides.gradientStart} 0%, ${colorOverrides.gradientEnd} 50%, ${colorOverrides.gradientStart} 100%)`,
+            boxShadow: `0 0 20px ${colorOverrides.gradientEnd}66, inset 0 1px 0 ${colorOverrides.gradientEnd}4d, inset 0 -1px 0 rgba(0,0,0,0.3)`,
+            border: `1px solid ${colorOverrides.gradientEnd}66`,
+          }
+        : {
+            background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+            boxShadow: '0 0 20px rgba(139, 92, 246, 0.4), 0 0 40px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
+            border: '1px solid rgba(139, 92, 246, 0.4)',
+          }
     : {
         background: 'linear-gradient(145deg, #9333ea 0%, #6b21a8 25%, #a855f7 50%, #7c3aed 75%, #581c87 100%)',
         boxShadow: '0 4px 15px rgba(147, 51, 234, 0.4), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.2)',
@@ -540,9 +556,11 @@ export function CardSlabGrid({
 
   // Separator style
   const separatorStyle = isModern
-    ? {
-        background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)',
-      }
+    ? colorOverrides?.isRainbow
+      ? { background: 'linear-gradient(90deg, #ff0000, #ff8800, #ffff00, #00cc00, #0066ff, #8800ff, #ff00ff)' }
+      : colorOverrides
+        ? { background: `linear-gradient(90deg, ${colorOverrides.gradientEnd}4d 0%, ${colorOverrides.gradientEnd}99 50%, ${colorOverrides.gradientEnd}4d 100%)` }
+        : { background: 'linear-gradient(90deg, rgba(139, 92, 246, 0.3) 0%, rgba(139, 92, 246, 0.6) 50%, rgba(139, 92, 246, 0.3) 100%)' }
     : {
         background: 'linear-gradient(90deg, #9333ea 0%, #a855f7 50%, #9333ea 100%)',
       }
@@ -638,6 +656,7 @@ export function CardSlabGrid({
             condition={condition}
             isAlteredAuthentic={isAlteredAuthentic}
             size="md"
+            colorOverrides={colorOverrides}
           />
         ) : (
           <TraditionalLabel />

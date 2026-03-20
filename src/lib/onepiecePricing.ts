@@ -456,10 +456,19 @@ function scoreOnePieceProductMatch(
 
   // VARIANT MATCHING (Secondary)
   const normalizedVariant = normalizeVariant(params.variant);
+  const hasVariantMarker = /\[.*?\]/.test(productName);
+
   if (normalizedVariant) {
     const variantLower = normalizedVariant.toLowerCase();
     if (productName.includes(`[${variantLower}]`) || productName.includes(variantLower)) {
       score += 15;
+    } else {
+      score -= 5;
+    }
+  } else {
+    // No variant specified — prefer base/non-variant cards
+    if (!hasVariantMarker) {
+      score += 5;
     } else {
       score -= 5;
     }
