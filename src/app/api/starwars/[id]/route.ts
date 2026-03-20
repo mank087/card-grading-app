@@ -776,17 +776,18 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
       try {
         const aiCardInfo = conversationalGradingData.card_info;
         console.log(`[GET /api/starwars/${cardId}] Looking up card in internal database...`);
-        console.log(`[GET /api/starwars/${cardId}]   AI identified: name="${aiCardInfo.card_name}", card_number="${aiCardInfo.card_id || aiCardInfo.card_number}", set="${aiCardInfo.set_name}"`);
+        console.log(`[GET /api/starwars/${cardId}]   AI identified: name="${aiCardInfo.card_name}", character="${aiCardInfo.player_or_character}", card_number="${aiCardInfo.card_id || aiCardInfo.card_number}", set="${aiCardInfo.set_name}"`);
 
         const matchResult = await lookupStarWarsCard(
           aiCardInfo.card_name,
           aiCardInfo.card_id || aiCardInfo.card_number,
-          aiCardInfo.set_name
+          aiCardInfo.set_name,
+          aiCardInfo.player_or_character  // Character name for cross-verification
         );
 
-        if (matchResult.card && matchResult.confidence !== 'low') {
+        if (matchResult.card && matchResult.confidence.overallConfidence !== 'low') {
           matchedDatabaseCard = matchResult.card;
-          databaseMatchConfidence = matchResult.confidence;
+          databaseMatchConfidence = matchResult.confidence.overallConfidence;
 
           console.log(`[GET /api/starwars/${cardId}] Database match found (${databaseMatchConfidence} confidence):`);
           console.log(`[GET /api/starwars/${cardId}]   DB: ${matchResult.card.card_name} (${matchResult.card.set_name}) #${matchResult.card.card_number}`);
@@ -794,17 +795,28 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
           // Enhance card_info with verified database data
           const dbCard = matchResult.card;
 
+          // Enhance card_info with database data — keep AI-detected names/character as primary,
+          // only use DB to fill in missing fields and add reference data.
+          // AI reads the actual card (front + back), DB names may differ (PriceCharting format).
+          const aiName = conversationalGradingData.card_info.card_name;
+          const aiCharacter = conversationalGradingData.card_info.player_or_character;
+
           conversationalGradingData.card_info = {
             ...conversationalGradingData.card_info,
-            // === CORE IDENTIFICATION (verified from database) ===
-            card_name: dbCard.card_name,
+            // Keep AI card_name and player_or_character (what's actually on the card)
+            card_name: aiName || dbCard.card_name,
+            player_or_character: aiCharacter || dbCard.card_name,
+            // Use DB card_number only if AI didn't detect one
+            card_number: conversationalGradingData.card_info.card_number || conversationalGradingData.card_info.card_id || dbCard.card_number,
+            // Use DB set_name only if AI didn't detect one
+            set_name: conversationalGradingData.card_info.set_name || dbCard.set_name,
+            // Database reference ID (always from DB)
             card_id: dbCard.id,
-            card_number: dbCard.card_number,
-            set_name: dbCard.set_name,
-            // === STAR WARS-SPECIFIC ATTRIBUTES (from database) ===
+            // === SUPPLEMENTAL DB DATA ===
+            db_card_name: dbCard.card_name,  // Store DB name separately for reference
             console_name: dbCard.console_name,
             genre: dbCard.genre,
-            release_date: dbCard.release_date,
+            release_date: conversationalGradingData.card_info.year || dbCard.release_date,
             // === PRICING (from database if available) ===
             market_price: dbCard.loose_price || dbCard.graded_price,
             loose_price: dbCard.loose_price,
@@ -814,6 +826,9 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
               starwars_card_id: dbCard.id,
               match_confidence: databaseMatchConfidence,
               match_score: matchResult.score,
+              db_card_name: dbCard.card_name,
+              db_card_number: dbCard.card_number,
+              db_set_name: dbCard.set_name,
             }
           };
 
