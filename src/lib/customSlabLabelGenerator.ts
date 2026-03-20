@@ -12,7 +12,7 @@
  */
 
 import { jsPDF } from 'jspdf';
-import { extractAsciiSafe, extractAsciiSafePreserveBullets } from './labelDataGenerator';
+import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from './labelDataGenerator';
 import type { SlabLabelData } from './slabLabelGenerator';
 import type { CustomLabelConfig } from './labelPresets';
 
@@ -350,9 +350,17 @@ export async function renderFrontCanvas(
   const infoMaxWidth = (EB + ECW - gradeRightPadding - gradeAreaWidth) - infoX - Math.round(20 * scale);
   const infoMaxHeight = ECH - Math.round(16 * scale);
 
-  const safeCardName = extractAsciiSafe(data.primaryName, 'Card', data.englishName);
-  const safeContextLine = extractAsciiSafePreserveBullets(data.contextLine, '');
-  const safeFeatures = data.featuresLine ? extractAsciiSafePreserveBullets(data.featuresLine, '') : '';
+  // Only apply CJK-safe extraction when text contains CJK characters (canvas can't render them).
+  // For non-CJK text, use as-is since generateLabelData already cleaned it.
+  const safeCardName = containsCJK(data.primaryName)
+    ? extractAsciiSafe(data.primaryName, 'Card', data.englishName)
+    : (data.primaryName || 'Card');
+  const safeContextLine = containsCJK(data.contextLine)
+    ? extractAsciiSafePreserveBullets(data.contextLine, '')
+    : (data.contextLine || '');
+  const safeFeatures = data.featuresLine
+    ? (containsCJK(data.featuresLine) ? extractAsciiSafePreserveBullets(data.featuresLine, '') : data.featuresLine)
+    : '';
 
   const maxNameFont = Math.round(38 * scale);
   const { sizes: fs, ctxLines } = fitCardInfoFonts(

@@ -22,7 +22,7 @@
  */
 
 import { jsPDF } from 'jspdf';
-import { extractAsciiSafe, extractAsciiSafePreserveBullets } from './labelDataGenerator';
+import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from './labelDataGenerator';
 
 // ============================================================================
 // CONSTANTS
@@ -402,10 +402,16 @@ async function renderFrontLabelCanvas(
   const infoMaxWidth = (B + CW - gradeRightPadding - gradeAreaWidth) - infoX - 20;
   const infoMaxHeight = CH - 16; // small vertical padding
 
-  const safeCardName = extractAsciiSafe(data.primaryName, 'Card', data.englishName);
-  const safeContextLine = extractAsciiSafePreserveBullets(data.contextLine, '');
+  // Only apply CJK-safe extraction when text contains CJK characters (canvas can't render them).
+  // For non-CJK text, use as-is since generateLabelData already cleaned it.
+  const safeCardName = containsCJK(data.primaryName)
+    ? extractAsciiSafe(data.primaryName, 'Card', data.englishName)
+    : (data.primaryName || 'Card');
+  const safeContextLine = containsCJK(data.contextLine)
+    ? extractAsciiSafePreserveBullets(data.contextLine, '')
+    : (data.contextLine || '');
   const safeFeatures = data.featuresLine
-    ? extractAsciiSafePreserveBullets(data.featuresLine, '')
+    ? (containsCJK(data.featuresLine) ? extractAsciiSafePreserveBullets(data.featuresLine, '') : data.featuresLine)
     : '';
 
   // Dynamically fit all text into the available space
@@ -837,7 +843,7 @@ export async function downloadSlabLabel(
   link.href = url;
 
   const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
-  const cardName = sanitize(extractAsciiSafe(data.primaryName, 'Card', data.englishName));
+  const cardName = sanitize(containsCJK(data.primaryName) ? extractAsciiSafe(data.primaryName, 'Card', data.englishName) : (data.primaryName || 'Card'));
   const serial = sanitize(data.serial);
   link.download = `DCM-Slab-Label-${cardName}-${serial}.pdf`;
 
