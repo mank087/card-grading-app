@@ -611,12 +611,45 @@ function CustomDesigner({
 
   const sampleColorAt = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const canvas = eyedropperCanvasRef.current
-    if (!canvas) return null
+    const img = eyedropperImgRef.current
+    if (!canvas || !img) return null
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
+
+    // Calculate the actual rendered image bounds within the object-contain container
     const rect = e.currentTarget.getBoundingClientRect()
-    const x = Math.floor(((e.clientX - rect.left) / rect.width) * canvas.width)
-    const y = Math.floor(((e.clientY - rect.top) / rect.height) * canvas.height)
+    const containerW = rect.width
+    const containerH = rect.height
+    const imgAspect = img.naturalWidth / img.naturalHeight
+    const containerAspect = containerW / containerH
+
+    let renderW: number, renderH: number, offsetX: number, offsetY: number
+    if (imgAspect > containerAspect) {
+      // Image is wider than container — letterboxed top/bottom
+      renderW = containerW
+      renderH = containerW / imgAspect
+      offsetX = 0
+      offsetY = (containerH - renderH) / 2
+    } else {
+      // Image is taller — letterboxed left/right
+      renderH = containerH
+      renderW = containerH * imgAspect
+      offsetX = (containerW - renderW) / 2
+      offsetY = 0
+    }
+
+    // Mouse position relative to rendered image
+    const mouseX = e.clientX - rect.left - offsetX
+    const mouseY = e.clientY - rect.top - offsetY
+
+    // Check if cursor is within the actual image area
+    if (mouseX < 0 || mouseY < 0 || mouseX > renderW || mouseY > renderH) return null
+
+    const x = Math.floor((mouseX / renderW) * canvas.width)
+    const y = Math.floor((mouseY / renderH) * canvas.height)
+
+    if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return null
+
     const pixel = ctx.getImageData(x, y, 1, 1).data
     return `#${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`
   }, [])
