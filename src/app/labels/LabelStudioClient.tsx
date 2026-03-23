@@ -572,6 +572,74 @@ function CustomDesigner({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [mobilePreviewUrl, setMobilePreviewUrl] = useState<string | null>(null)
 
+  const updateConfig = useCallback((partial: Partial<CustomLabelConfig>) => {
+    setConfig((prev) => ({ ...prev, ...partial }))
+  }, [setConfig])
+
+  // Eyedropper state
+  const [eyedropperTarget, setEyedropperTarget] = useState<'start' | 'end' | 'border' | null>(null)
+  const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null)
+  const eyedropperCanvasRef = useRef<HTMLCanvasElement>(null)
+  const eyedropperImgRef = useRef<HTMLImageElement | null>(null)
+  const [eyedropperSide, setEyedropperSide] = useState<'front' | 'back'>('front')
+
+  // Load card image onto hidden canvas for pixel sampling
+  const loadEyedropperImage = useCallback((url: string) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => {
+      eyedropperImgRef.current = img
+      const canvas = eyedropperCanvasRef.current
+      if (canvas) {
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0)
+        }
+      }
+    }
+    img.src = url
+  }, [])
+
+  // Load image when eyedropper activates or side changes
+  useEffect(() => {
+    if (!eyedropperTarget || !selectedCard) return
+    const url = eyedropperSide === 'front' ? selectedCard.front_url : selectedCard.back_url
+    if (url) loadEyedropperImage(url)
+  }, [eyedropperTarget, eyedropperSide, selectedCard, loadEyedropperImage])
+
+  const sampleColorAt = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const canvas = eyedropperCanvasRef.current
+    if (!canvas) return null
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+    const rect = e.currentTarget.getBoundingClientRect()
+    const x = Math.floor(((e.clientX - rect.left) / rect.width) * canvas.width)
+    const y = Math.floor(((e.clientY - rect.top) / rect.height) * canvas.height)
+    const pixel = ctx.getImageData(x, y, 1, 1).data
+    return `#${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`
+  }, [])
+
+  const handleEyedropperMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const color = sampleColorAt(e)
+    if (color) setEyedropperHoverColor(color)
+  }, [sampleColorAt])
+
+  const handleEyedropperClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const color = sampleColorAt(e)
+    if (!color || !eyedropperTarget) return
+    if (eyedropperTarget === 'start') {
+      updateConfig({ colorPreset: 'custom', gradientStart: color })
+    } else if (eyedropperTarget === 'end') {
+      updateConfig({ colorPreset: 'custom', gradientEnd: color })
+    } else if (eyedropperTarget === 'border') {
+      updateConfig({ borderColor: color })
+    }
+    setEyedropperTarget(null)
+    setEyedropperHoverColor(null)
+  }, [eyedropperTarget, sampleColorAt, updateConfig])
+
   // Label text fields — initialized from slabData, editable directly
   interface LabelFields {
     primaryName: string
@@ -666,10 +734,6 @@ function CustomDesigner({
       setMobilePreviewUrl(canvas.toDataURL('image/png'))
     } catch { /* ignore tainted canvas */ }
   }, [isRendering])
-
-  const updateConfig = useCallback((partial: Partial<CustomLabelConfig>) => {
-    setConfig((prev) => ({ ...prev, ...partial }))
-  }, [setConfig])
 
   const handleDimensionPreset = (preset: DimensionPreset) => {
     const base: Partial<CustomLabelConfig> = {
@@ -885,25 +949,128 @@ function CustomDesigner({
 
               {/* Custom color pickers */}
               {config.colorPreset === 'custom' && (
-                <div className="flex gap-3 mt-2">
-                  <div>
-                    <label className="text-[10px] text-gray-500">Start</label>
-                    <input
-                      type="color"
-                      value={config.gradientStart}
-                      onChange={(e) => updateConfig({ gradientStart: e.target.value })}
-                      className="w-full h-7 rounded border border-gray-300 cursor-pointer"
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="text-[10px] text-gray-500">Start</label>
+                      <div className="flex gap-1 items-center">
+                        <input
+                          type="color"
+                          value={config.gradientStart}
+                          onChange={(e) => updateConfig({ gradientStart: e.target.value })}
+                          className="flex-1 h-7 rounded border border-gray-300 cursor-pointer"
+                        />
+                        {selectedCard?.front_url && (
+                          <button
+                            onClick={() => setEyedropperTarget(eyedropperTarget === 'start' ? null : 'start')}
+                            className={`w-7 h-7 rounded border flex items-center justify-center transition-colors ${
+                              eyedropperTarget === 'start'
+                                ? 'border-purple-500 bg-purple-100 text-purple-700'
+                                : 'border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600'
+                            }`}
+                            title="Pick from card"
+                          >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              <circle cx="12" cy="12" r="3" fill="currentColor" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-[10px] text-gray-500">End</label>
+                      <div className="flex gap-1 items-center">
+                        <input
+                          type="color"
+                          value={config.gradientEnd}
+                          onChange={(e) => updateConfig({ gradientEnd: e.target.value })}
+                          className="flex-1 h-7 rounded border border-gray-300 cursor-pointer"
+                        />
+                        {selectedCard?.front_url && (
+                          <button
+                            onClick={() => setEyedropperTarget(eyedropperTarget === 'end' ? null : 'end')}
+                            className={`w-7 h-7 rounded border flex items-center justify-center transition-colors ${
+                              eyedropperTarget === 'end'
+                                ? 'border-purple-500 bg-purple-100 text-purple-700'
+                                : 'border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600'
+                            }`}
+                            title="Pick from card"
+                          >
+                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              <circle cx="12" cy="12" r="3" fill="currentColor" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Eyedropper card image sampler */}
+              {eyedropperTarget && selectedCard && (
+                <div className="mt-3 rounded-lg border-2 border-purple-300 bg-purple-50 p-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">
+                        Picking: {eyedropperTarget === 'border' ? 'Border' : eyedropperTarget === 'start' ? 'Gradient Start' : 'Gradient End'}
+                      </span>
+                      {eyedropperHoverColor && (
+                        <span className="flex items-center gap-1">
+                          <span className="w-4 h-4 rounded border border-gray-400 inline-block" style={{ backgroundColor: eyedropperHoverColor }} />
+                          <span className="text-[10px] font-mono text-gray-600">{eyedropperHoverColor}</span>
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setEyedropperTarget(null); setEyedropperHoverColor(null) }}
+                      className="text-gray-400 hover:text-gray-600 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                  {/* Front/Back toggle */}
+                  <div className="flex gap-1 mb-2">
+                    <button
+                      onClick={() => setEyedropperSide('front')}
+                      className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+                        eyedropperSide === 'front' ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      Front
+                    </button>
+                    <button
+                      onClick={() => setEyedropperSide('back')}
+                      className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+                        eyedropperSide === 'back' ? 'bg-purple-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      Back
+                    </button>
+                  </div>
+                  {/* Card image for sampling */}
+                  <div
+                    className="relative rounded overflow-hidden cursor-crosshair bg-gray-200"
+                    style={{ maxHeight: '260px' }}
+                    onMouseMove={handleEyedropperMove}
+                    onClick={handleEyedropperClick}
+                    onMouseLeave={() => setEyedropperHoverColor(null)}
+                  >
+                    <img
+                      src={eyedropperSide === 'front' ? selectedCard.front_url : selectedCard.back_url}
+                      alt="Pick a color"
+                      className="w-full h-full object-contain"
+                      crossOrigin="anonymous"
+                      draggable={false}
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] text-gray-500">End</label>
-                    <input
-                      type="color"
-                      value={config.gradientEnd}
-                      onChange={(e) => updateConfig({ gradientEnd: e.target.value })}
-                      className="w-full h-7 rounded border border-gray-300 cursor-pointer"
-                    />
-                  </div>
+                  <p className="text-[9px] text-purple-600 text-center mt-1">Click on the card to pick a color</p>
+                  {/* Hidden canvas for pixel sampling */}
+                  <canvas ref={eyedropperCanvasRef} className="hidden" />
                 </div>
               )}
             </div>
@@ -960,6 +1127,22 @@ function CustomDesigner({
                             onChange={(e) => updateConfig({ borderColor: e.target.value })}
                             className="w-10 h-7 rounded border border-gray-300 cursor-pointer"
                           />
+                          {selectedCard?.front_url && (
+                            <button
+                              onClick={() => setEyedropperTarget(eyedropperTarget === 'border' ? null : 'border')}
+                              className={`w-7 h-7 rounded border flex items-center justify-center transition-colors ${
+                                eyedropperTarget === 'border'
+                                  ? 'border-purple-500 bg-purple-100 text-purple-700'
+                                  : 'border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600'
+                              }`}
+                              title="Pick from card"
+                            >
+                              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                <circle cx="12" cy="12" r="3" fill="currentColor" />
+                              </svg>
+                            </button>
+                          )}
                           {config.borderColor !== '#7c3aed' && (
                             <button
                               onClick={() => updateConfig({ borderColor: '#7c3aed' })}
