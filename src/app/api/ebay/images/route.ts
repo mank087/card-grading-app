@@ -33,6 +33,8 @@ interface ImageUploadRequest {
     front?: string;  // base64 data URL or raw base64
     back?: string;
     miniReport?: string;
+    rawFront?: string;  // Card front without grading label
+    rawBack?: string;   // Card back without grading label
   };
   additionalImages?: string[];  // User-uploaded extra photos (base64)
 }
@@ -42,6 +44,8 @@ interface ImageUploadResponse {
     front?: string;
     back?: string;
     miniReport?: string;
+    rawFront?: string;
+    rawBack?: string;
     additional?: string[];
   };
 }
@@ -114,7 +118,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hasAnyImages = images && (images.front || images.back || images.miniReport);
+    const hasAnyImages = images && (images.front || images.back || images.miniReport || images.rawFront || images.rawBack);
     const hasAdditional = additionalImages && additionalImages.length > 0;
 
     if (!hasAnyImages && !hasAdditional) {
@@ -212,6 +216,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (images.rawFront) {
+      uploadPromises.push(
+        uploadImage(images.rawFront, 'raw-front').then(url => {
+          if (url) urls.rawFront = url;
+        })
+      );
+    }
+
+    if (images.rawBack) {
+      uploadPromises.push(
+        uploadImage(images.rawBack, 'raw-back').then(url => {
+          if (url) urls.rawBack = url;
+        })
+      );
+    }
+
     // Upload additional user photos
     const additionalUrls: string[] = [];
     if (additionalImages && additionalImages.length > 0) {
@@ -231,7 +251,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify at least one upload succeeded
-    const hasAnyUploaded = urls.front || urls.back || urls.miniReport || additionalUrls.length > 0;
+    const hasAnyUploaded = urls.front || urls.back || urls.miniReport || urls.rawFront || urls.rawBack || additionalUrls.length > 0;
     if (!hasAnyUploaded) {
       return NextResponse.json(
         { error: 'Failed to upload any images' },

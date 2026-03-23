@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { pdf } from '@react-pdf/renderer';
-import { generateCardImages, CardImageData } from '@/lib/cardImageGenerator';
+import { generateCardImages, generateRawCardImages, CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { FoldableLabelData, generateQRCodeWithLogo, loadLogoAsBase64 } from '@/lib/foldableLabelGenerator';
 import { getCardLabelData } from '@/lib/useLabelData';
@@ -154,17 +154,23 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     front?: string;
     back?: string;
     miniReport?: string;
+    rawFront?: string;
+    rawBack?: string;
   }>({});
   const [imageBlobs, setImageBlobs] = useState<{
     front?: Blob;
     back?: Blob;
     miniReport?: Blob;
+    rawFront?: Blob;
+    rawBack?: Blob;
   }>({});
   const [selectedImages, setSelectedImages] = useState<{
     front: boolean;
     back: boolean;
     miniReport: boolean;
-  }>({ front: true, back: true, miniReport: true });
+    rawFront: boolean;
+    rawBack: boolean;
+  }>({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
 
   // User-uploaded additional photos
   const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; blob: Blob; url: string; selected: boolean }>>([]);
@@ -258,7 +264,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setError(null);
       setImageUrls({});
       setImageBlobs({});
-      setSelectedImages({ front: true, back: true, miniReport: true });
+      setSelectedImages({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
       setAdditionalImages([]);
       setListingResult(null);
       setExistingListing(null);
@@ -721,7 +727,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         },
       };
 
-      const { front, back } = await generateCardImages(cardImageData);
+      const [{ front, back }, rawImages] = await Promise.all([
+        generateCardImages(cardImageData),
+        generateRawCardImages(frontImageUrl, backImageUrl),
+      ]);
 
       // Generate mini-report
       const cardUrl = `${window.location.origin}/${cardType}/${card.id}`;
@@ -755,11 +764,13 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const miniReport = await generateMiniReportJpg(miniReportData);
 
       // Create preview URLs
-      setImageBlobs({ front, back, miniReport });
+      setImageBlobs({ front, back, miniReport, rawFront: rawImages.front, rawBack: rawImages.back });
       setImageUrls({
         front: URL.createObjectURL(front),
         back: URL.createObjectURL(back),
         miniReport: URL.createObjectURL(miniReport),
+        rawFront: URL.createObjectURL(rawImages.front),
+        rawBack: URL.createObjectURL(rawImages.back),
       });
 
     } catch (err) {
@@ -797,6 +808,12 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     if (selectedImages.miniReport && imageBlobs.miniReport) {
       images.miniReport = await toBase64(imageBlobs.miniReport);
     }
+    if (selectedImages.rawFront && imageBlobs.rawFront) {
+      (images as any).rawFront = await toBase64(imageBlobs.rawFront);
+    }
+    if (selectedImages.rawBack && imageBlobs.rawBack) {
+      (images as any).rawBack = await toBase64(imageBlobs.rawBack);
+    }
 
     // Convert additional user-uploaded images to base64
     const additionalImagesBase64: string[] = [];
@@ -827,6 +844,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
     if (data.urls.front) urls.push(data.urls.front);
     if (data.urls.back) urls.push(data.urls.back);
     if (data.urls.miniReport) urls.push(data.urls.miniReport);
+    if (data.urls.rawFront) urls.push(data.urls.rawFront);
+    if (data.urls.rawBack) urls.push(data.urls.rawBack);
     if (data.urls.additional) {
       urls.push(...data.urls.additional);
     }
@@ -1636,88 +1655,152 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   <span className="ml-3 text-gray-600">Generating images...</span>
                 </div>
               ) : (
-                <div className="grid grid-cols-3 gap-4">
-                  {/* Front Image */}
-                  <div
-                    className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                      selectedImages.front ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                    }`}
-                    onClick={() => setSelectedImages(s => ({ ...s, front: !s.front }))}
-                  >
-                    <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                      {imageUrls.front && (
-                        <img src={imageUrls.front} alt="Front" className="max-w-full max-h-full object-contain" />
-                      )}
-                    </div>
-                    <div className="absolute top-2 right-2">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        selectedImages.front ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                      }`}>
-                        {selectedImages.front && (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                <div>
+                  {/* Labeled images row */}
+                  <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">With Grade Label</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Front Image (with label) */}
+                    <div
+                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                        selectedImages.front ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                      }`}
+                      onClick={() => setSelectedImages(s => ({ ...s, front: !s.front }))}
+                    >
+                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                        {imageUrls.front && (
+                          <img src={imageUrls.front} alt="Front with label" className="max-w-full max-h-full object-contain" />
                         )}
                       </div>
+                      <div className="absolute top-2 right-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          selectedImages.front ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
+                        }`}>
+                          {selectedImages.front && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
+                        Front
+                      </div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                      Front
+
+                    {/* Back Image (with label) */}
+                    <div
+                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                        selectedImages.back ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                      }`}
+                      onClick={() => setSelectedImages(s => ({ ...s, back: !s.back }))}
+                    >
+                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                        {imageUrls.back && (
+                          <img src={imageUrls.back} alt="Back with label" className="max-w-full max-h-full object-contain" />
+                        )}
+                      </div>
+                      <div className="absolute top-2 right-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          selectedImages.back ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
+                        }`}>
+                          {selectedImages.back && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
+                        Back
+                      </div>
+                    </div>
+
+                    {/* Mini Report */}
+                    <div
+                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                        selectedImages.miniReport ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                      }`}
+                      onClick={() => setSelectedImages(s => ({ ...s, miniReport: !s.miniReport }))}
+                    >
+                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                        {imageUrls.miniReport && (
+                          <img src={imageUrls.miniReport} alt="Mini Report" className="max-w-full max-h-full object-contain" />
+                        )}
+                      </div>
+                      <div className="absolute top-2 right-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          selectedImages.miniReport ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
+                        }`}>
+                          {selectedImages.miniReport && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
+                        Report
+                      </div>
                     </div>
                   </div>
 
-                  {/* Back Image */}
-                  <div
-                    className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                      selectedImages.back ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                    }`}
-                    onClick={() => setSelectedImages(s => ({ ...s, back: !s.back }))}
-                  >
-                    <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                      {imageUrls.back && (
-                        <img src={imageUrls.back} alt="Back" className="max-w-full max-h-full object-contain" />
-                      )}
-                    </div>
-                    <div className="absolute top-2 right-2">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        selectedImages.back ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                      }`}>
-                        {selectedImages.back && (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                  {/* Raw card images row */}
+                  <p className="text-xs text-gray-500 mb-2 mt-4 font-medium uppercase tracking-wide">Card Only (No Label)</p>
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Raw Front */}
+                    <div
+                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                        selectedImages.rawFront ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                      }`}
+                      onClick={() => setSelectedImages(s => ({ ...s, rawFront: !s.rawFront }))}
+                    >
+                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                        {imageUrls.rawFront && (
+                          <img src={imageUrls.rawFront} alt="Front (no label)" className="max-w-full max-h-full object-contain" />
                         )}
                       </div>
+                      <div className="absolute top-2 right-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          selectedImages.rawFront ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
+                        }`}>
+                          {selectedImages.rawFront && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
+                        Front (Raw)
+                      </div>
                     </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                      Back
-                    </div>
-                  </div>
 
-                  {/* Mini Report */}
-                  <div
-                    className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                      selectedImages.miniReport ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                    }`}
-                    onClick={() => setSelectedImages(s => ({ ...s, miniReport: !s.miniReport }))}
-                  >
-                    <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                      {imageUrls.miniReport && (
-                        <img src={imageUrls.miniReport} alt="Mini Report" className="max-w-full max-h-full object-contain" />
-                      )}
-                    </div>
-                    <div className="absolute top-2 right-2">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                        selectedImages.miniReport ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                      }`}>
-                        {selectedImages.miniReport && (
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                    {/* Raw Back */}
+                    <div
+                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
+                        selectedImages.rawBack ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                      }`}
+                      onClick={() => setSelectedImages(s => ({ ...s, rawBack: !s.rawBack }))}
+                    >
+                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
+                        {imageUrls.rawBack && (
+                          <img src={imageUrls.rawBack} alt="Back (no label)" className="max-w-full max-h-full object-contain" />
                         )}
                       </div>
-                    </div>
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                      Report
+                      <div className="absolute top-2 right-2">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                          selectedImages.rawBack ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
+                        }`}>
+                          {selectedImages.rawBack && (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </div>
+                      </div>
+                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
+                        Back (Raw)
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1729,7 +1812,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     <h4 className="text-sm font-medium text-gray-700">Additional Photos</h4>
                     <span className="text-xs text-gray-400">
                       {(() => {
-                        const total = [selectedImages.front, selectedImages.back, selectedImages.miniReport].filter(Boolean).length
+                        const total = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length
                           + additionalImages.filter(i => i.selected).length;
                         return `${total}/12 images selected`;
                       })()}
@@ -1776,9 +1859,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
                     {/* Add Photo Button */}
                     {(() => {
-                      const totalSelected = [selectedImages.front, selectedImages.back, selectedImages.miniReport].filter(Boolean).length
+                      const totalSelected = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length
                         + additionalImages.filter(i => i.selected).length;
-                      const canAddMore = additionalImages.length < 9 && totalSelected < 12;
+                      const maxAdditional = 12 - [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length;
+                      const canAddMore = additionalImages.length < maxAdditional && totalSelected < 12;
                       return canAddMore ? (
                         <div
                           className="border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-purple-400 hover:bg-purple-50 transition-all"
@@ -1802,7 +1886,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                     className="hidden"
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
-                      const remaining = 9 - additionalImages.length;
+                      const systemImageCount = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length;
+                      const remaining = Math.max(0, 12 - systemImageCount - additionalImages.length);
                       const filesToAdd = files.slice(0, remaining);
                       const newImages = filesToAdd.map(f => ({
                         id: crypto.randomUUID(),
@@ -2609,7 +2694,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 <div className="flex justify-between">
                   <span className="text-gray-600">Images:</span>
                   <span className="font-medium text-gray-900">
-                    {[selectedImages.front && 'Front', selectedImages.back && 'Back', selectedImages.miniReport && 'Report', additionalImages.filter(i => i.selected).length > 0 && `+${additionalImages.filter(i => i.selected).length} additional`].filter(Boolean).join(', ')}
+                    {[selectedImages.front && 'Front', selectedImages.back && 'Back', selectedImages.miniReport && 'Report', selectedImages.rawFront && 'Raw Front', selectedImages.rawBack && 'Raw Back', additionalImages.filter(i => i.selected).length > 0 && `+${additionalImages.filter(i => i.selected).length} additional`].filter(Boolean).join(', ')}
                   </span>
                 </div>
                 <div className="flex justify-between">

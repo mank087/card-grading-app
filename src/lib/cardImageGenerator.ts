@@ -1123,6 +1123,48 @@ export async function generateCardImages(data: CardImageData): Promise<{ front: 
 }
 
 /**
+ * Generate raw card images (front & back) WITHOUT grading labels.
+ * Just the card image at high resolution, suitable for eBay listings.
+ */
+export async function generateRawCardImages(
+  frontImageUrl: string,
+  backImageUrl: string
+): Promise<{ front: Blob; back: Blob }> {
+  const [frontImg, backImg] = await Promise.all([
+    loadImage(frontImageUrl),
+    loadImage(backImageUrl),
+  ]);
+
+  const generateRaw = (img: HTMLImageElement): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = CARD_WIDTH;
+      canvas.height = CARD_HEIGHT;
+      const ctx = canvas.getContext('2d')!;
+
+      // Draw card image scaled to fill canvas
+      ctx.drawImage(img, 0, 0, CARD_WIDTH, CARD_HEIGHT);
+
+      canvas.toBlob(
+        (blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to generate raw card image'));
+        },
+        'image/jpeg',
+        0.92
+      );
+    });
+  };
+
+  const [front, back] = await Promise.all([
+    generateRaw(frontImg),
+    generateRaw(backImg),
+  ]);
+
+  return { front, back };
+}
+
+/**
  * Download card images as separate files
  */
 export async function downloadCardImages(

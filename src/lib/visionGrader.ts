@@ -1813,13 +1813,47 @@ Provide detailed analysis as markdown with all required sections.`
 
         // Step 7: Also fix raw_sub_scores to derive from pass data (consistency fix)
         if (jsonData.raw_sub_scores) {
-          // Recalculate raw_sub_scores from individual pass front/back scores if available
-          // For now, ensure weighted_scores match server-calculated subgrades
+          // Ensure weighted_scores match server-calculated subgrades
           if (jsonData.weighted_scores) {
             jsonData.weighted_scores.centering_weighted = serverRounded.centering;
             jsonData.weighted_scores.corners_weighted = serverRounded.corners;
             jsonData.weighted_scores.edges_weighted = serverRounded.edges;
             jsonData.weighted_scores.surface_weighted = serverRounded.surface;
+          }
+
+          // Reconcile front/back scores with server-rounded weighted scores
+          // If both front and back are higher than the weighted score, the display
+          // becomes confusing (e.g., F:10 B:10 but Score:9). Cap them to match.
+          const categories = ['centering', 'corners', 'edges', 'surface'] as const;
+          for (const cat of categories) {
+            const frontKey = `${cat}_front`;
+            const backKey = `${cat}_back`;
+            const weightedScore = serverRounded[cat];
+            const frontScore = jsonData.raw_sub_scores[frontKey];
+            const backScore = jsonData.raw_sub_scores[backKey];
+
+            if (frontScore != null && backScore != null) {
+              if (frontScore > weightedScore && backScore > weightedScore) {
+                // Both sides scored higher than the three-pass weighted result — cap both
+                console.log(`[GRADE RECALC] 🔧 ${cat}: front/back scores (${frontScore}/${backScore}) both exceed weighted (${weightedScore}), capping to ${weightedScore}`);
+                jsonData.raw_sub_scores[frontKey] = weightedScore;
+                jsonData.raw_sub_scores[backKey] = weightedScore;
+              } else if (frontScore > weightedScore && backScore <= weightedScore) {
+                // Back is at or below weighted — cap front so weighted average is plausible
+                const adjustedFront = Math.min(frontScore, weightedScore + 1);
+                if (adjustedFront !== frontScore) {
+                  console.log(`[GRADE RECALC] 🔧 ${cat}: front score (${frontScore}) exceeds weighted (${weightedScore}) with back=${backScore}, adjusting front to ${adjustedFront}`);
+                  jsonData.raw_sub_scores[frontKey] = adjustedFront;
+                }
+              } else if (backScore > weightedScore && frontScore <= weightedScore) {
+                // Front is at or below weighted — cap back so weighted average is plausible
+                const adjustedBack = Math.min(backScore, weightedScore + 1);
+                if (adjustedBack !== backScore) {
+                  console.log(`[GRADE RECALC] 🔧 ${cat}: back score (${backScore}) exceeds weighted (${weightedScore}) with front=${frontScore}, adjusting back to ${adjustedBack}`);
+                  jsonData.raw_sub_scores[backKey] = adjustedBack;
+                }
+              }
+            }
           }
         }
 
