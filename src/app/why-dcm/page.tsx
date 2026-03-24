@@ -402,26 +402,16 @@ function LabelHolderCard({ name, emptyImg, cardImg, desc, delay }: { name: strin
   const [showCard, setShowCard] = useState(false)
 
   useEffect(() => {
-    // Stagger the start, then cycle every 5 seconds
+    let interval: NodeJS.Timeout
     const startTimeout = setTimeout(() => {
       setShowCard(true)
-      const interval = setInterval(() => {
-        setShowCard((prev) => !prev)
-      }, 3500)
-      return () => clearInterval(interval)
-    }, delay * 1000)
-
-    // Also set up the cycling after initial delay
-    let interval: NodeJS.Timeout
-    const setupInterval = setTimeout(() => {
       interval = setInterval(() => {
         setShowCard((prev) => !prev)
-      }, 3500)
-    }, delay * 1000 + 3500)
+      }, 2000)
+    }, delay * 1000)
 
     return () => {
       clearTimeout(startTimeout)
-      clearTimeout(setupInterval)
       if (interval) clearInterval(interval)
     }
   }, [delay])
@@ -1097,11 +1087,10 @@ export default function WhyDcmPage() {
       <section className="py-16 sm:py-24 bg-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
           <SectionHeading title="Wear Your Badge" subtitle="Show off your status on every graded card label. Fun enhancements for the hobby." />
-          <div className="grid sm:grid-cols-3 gap-6">
+          <div className="grid sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
             {[
               { name: 'VIP', desc: 'Exclusive VIP emblem displayed on all your labels', color: 'from-amber-400 to-orange-500', textColor: 'text-amber-600', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
-              { name: 'Card Lovers', desc: 'Subscriber badge with loyalty rewards and premium perks', color: 'from-purple-400 to-pink-500', textColor: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
-              { name: 'Founder', desc: 'Legacy founder status — a permanent mark of being an early supporter', color: 'from-emerald-400 to-teal-500', textColor: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' },
+              { name: 'Card Lovers', desc: 'Subscriber badge with loyalty rewards and premium perks', color: 'from-purple-400 to-rose-500', textColor: 'text-purple-600', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
             ].map((badge) => (
               <div key={badge.name} className={`${badge.bgColor} ${badge.borderColor} border rounded-xl p-6`}>
                 <div className={`w-14 h-14 mx-auto rounded-full bg-gradient-to-br ${badge.color} flex items-center justify-center mb-3`}>
