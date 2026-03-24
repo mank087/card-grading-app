@@ -388,6 +388,60 @@ function StepCard({ number, icon, title, description }: { number: number; icon: 
   )
 }
 
+function LabelHolderCard({ name, emptyImg, cardImg, desc, delay }: { name: string; emptyImg: string; cardImg: string; desc: string; delay: number }) {
+  const [showCard, setShowCard] = useState(false)
+
+  useEffect(() => {
+    // Stagger the start, then cycle every 5 seconds
+    const startTimeout = setTimeout(() => {
+      setShowCard(true)
+      const interval = setInterval(() => {
+        setShowCard((prev) => !prev)
+      }, 3500)
+      return () => clearInterval(interval)
+    }, delay * 1000)
+
+    // Also set up the cycling after initial delay
+    let interval: NodeJS.Timeout
+    const setupInterval = setTimeout(() => {
+      interval = setInterval(() => {
+        setShowCard((prev) => !prev)
+      }, 3500)
+    }, delay * 1000 + 3500)
+
+    return () => {
+      clearTimeout(startTimeout)
+      clearTimeout(setupInterval)
+      if (interval) clearInterval(interval)
+    }
+  }, [delay])
+
+  return (
+    <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-5 text-center hover:bg-white/15 transition-colors">
+      <div className="w-full h-56 relative mb-4">
+        {/* Empty holder */}
+        <Image
+          src={emptyImg}
+          alt={`${name} holder`}
+          fill
+          className={`object-contain transition-opacity duration-700 ${showCard ? 'opacity-0' : 'opacity-100'}`}
+          sizes="300px"
+        />
+        {/* Holder with Lugia card */}
+        <Image
+          src={cardImg}
+          alt={`${name} with Lugia card`}
+          fill
+          className={`object-contain transition-opacity duration-700 ${showCard ? 'opacity-100' : 'opacity-0'}`}
+          sizes="300px"
+        />
+      </div>
+      <h3 className="font-bold text-lg">{name}</h3>
+      <p className="text-purple-200 text-sm mt-1">{desc}</p>
+    </div>
+  )
+}
+
 // ============================================================================
 // MAIN PAGE
 // ============================================================================
@@ -945,27 +999,25 @@ export default function WhyDcmPage() {
       {/* CARD DATABASES */}
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <SectionHeading title="Accurate Card Identification" subtitle="Comprehensive internal databases covering thousands of cards across every major game type" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
             {[
-              { name: 'Pokemon', img: '/promo-charizard.png', sub: 'English + Japanese' },
-              { name: 'MTG', img: '/homepage-cards/Black Lotus MTG.png', sub: 'Magic: The Gathering' },
-              { name: 'Sports', img: '/Sports/DCM-Card-LeBron-James-547249-front.jpg', sub: '6 categories' },
-              { name: 'Lorcana', img: '/homepage-cards/Mickey Mouse Brave Little Prince.png', sub: 'Disney Lorcana' },
-              { name: 'One Piece', img: '/homepage-cards/Magneton.png', sub: 'One Piece TCG' },
-              { name: 'Yu-Gi-Oh', img: '/homepage-cards/Charizard 1999.png', sub: 'Yu-Gi-Oh!' },
-              { name: 'Star Wars', img: '/homepage-cards/Ian Malcom, Chaotician MTG.png', sub: 'Star Wars TCG' },
-              { name: 'Other', img: '/homepage-cards/Garbage Pail Kids Adam Bomb.png', sub: 'Digimon, DBZ & more' },
+              { name: 'Pokemon', img: '/why-dcm/pikachu-graded-card.png', sub: 'English + Japanese' },
+              { name: 'Sports', img: '/why-dcm/drake-maye-graded-card.png', sub: '6 categories' },
+              { name: 'MTG', img: '/why-dcm/magic-the-gathering-graded-card.png', sub: 'Magic: The Gathering' },
+              { name: 'Lorcana', img: '/why-dcm/lorcana-graded-card.png', sub: 'Disney Lorcana' },
+              { name: 'One Piece', img: '/why-dcm/monkey-luffy-graded-card.png', sub: 'One Piece TCG' },
+              { name: 'Yu-Gi-Oh', img: '/why-dcm/yugioh-garded-card.png', sub: 'Yu-Gi-Oh!' },
+              { name: 'Star Wars', img: '/why-dcm/star-wars-graded-card.png', sub: 'Star Wars Unlimited' },
+              { name: 'Other', img: '/why-dcm/garbage-pail-kids-graded-card.png', sub: 'GPK, Digimon & more' },
             ].map((cat) => (
-              <div key={cat.name} className="bg-gray-50 rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow group">
-                <div className="aspect-[3/4] relative bg-gray-100 overflow-hidden">
-                  <Image src={cat.img} alt={cat.name} fill className="object-contain p-2 group-hover:scale-105 transition-transform" sizes="200px" />
+              <div key={cat.name} className="group text-center">
+                <div className="rounded-xl overflow-hidden shadow-md border border-gray-100 bg-white hover:shadow-xl transition-shadow">
+                  <Image src={cat.img} alt={`${cat.name} graded card`} width={400} height={600} className="w-full h-auto group-hover:scale-[1.02] transition-transform" />
                 </div>
-                <div className="p-3 text-center">
-                  <h3 className="font-bold text-gray-900 text-sm">{cat.name}</h3>
-                  <p className="text-gray-500 text-xs">{cat.sub}</p>
-                </div>
+                <h3 className="font-bold text-gray-900 text-sm mt-3">{cat.name}</h3>
+                <p className="text-gray-500 text-xs">{cat.sub}</p>
               </div>
             ))}
           </div>
@@ -980,17 +1032,11 @@ export default function WhyDcmPage() {
           <SectionHeading title="Your Label, Your Way" subtitle="Design and print professional grading labels for slabs, magnetic one-touch holders, and toploaders" light />
           <div className="grid md:grid-cols-3 gap-8 mb-10">
             {[
-              { name: 'Graded Slab', img: '/labels/graded-card-slab.png', desc: 'Insert into standard grading slab cases with front and back labels' },
-              { name: 'Magnetic One-Touch', img: '/labels/mag-one-touch-DCM.png', desc: 'Avery 6871 compatible labels for magnetic card holders' },
-              { name: 'Toploader', img: '/labels/top-loader-dcm.png', desc: 'Front + back label pairs or fold-over labels for toploaders' },
-            ].map((label) => (
-              <div key={label.name} className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-5 text-center hover:bg-white/15 transition-colors">
-                <div className="w-full h-48 relative mb-4">
-                  <Image src={label.img} alt={label.name} fill className="object-contain" sizes="300px" />
-                </div>
-                <h3 className="font-bold text-lg">{label.name}</h3>
-                <p className="text-purple-200 text-sm mt-1">{label.desc}</p>
-              </div>
+              { name: 'Graded Slab', emptyImg: '/labels/graded-card-slab.png', cardImg: '/why-dcm/lugia-graded-slab.png', desc: 'Insert into standard grading slab cases with front and back labels' },
+              { name: 'Magnetic One-Touch', emptyImg: '/labels/mag-one-touch-DCM.png', cardImg: '/why-dcm/lugia-one-touch.png', desc: 'Avery 6871 compatible labels for magnetic card holders' },
+              { name: 'Toploader', emptyImg: '/labels/top-loader-dcm.png', cardImg: '/why-dcm/lugia-top-loader.png', desc: 'Front + back label pairs or fold-over labels for toploaders' },
+            ].map((label, idx) => (
+              <LabelHolderCard key={label.name} name={label.name} emptyImg={label.emptyImg} cardImg={label.cardImg} desc={label.desc} delay={idx * 1.5} />
             ))}
           </div>
           <div className="flex flex-wrap justify-center gap-3 text-sm">
