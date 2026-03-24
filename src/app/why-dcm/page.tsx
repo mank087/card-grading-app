@@ -727,8 +727,8 @@ export default function WhyDcmPage() {
 
             {/* Left: Grading scan animation — fixed height prevents layout shift */}
             <div className="flex justify-center lg:justify-start">
-              <div className="w-full max-w-[300px] h-[540px] relative overflow-hidden">
-                <div className="absolute inset-0">
+              <div className="w-full max-w-[300px] h-[620px] relative overflow-hidden">
+                <div className="absolute inset-x-0 top-0 bottom-0">
                   <HeroGradingAnimation rawCardImage="/Sports/drake may - daniel- williams f.png" />
                 </div>
               </div>
@@ -1128,9 +1128,9 @@ export default function WhyDcmPage() {
           <SectionHeading title="Simple, Affordable Pricing" subtitle="Credits never expire. Buy what you need, grade when you're ready." />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
             {[
-              { name: 'VIP', price: '$99', credits: '150', perGrade: '$0.66', bonus: 'VIP badge on all labels', popular: false },
+              { name: 'VIP', price: '$99', credits: '150', perGrade: '$0.66', bonus: 'VIP badge on all labels', popular: true },
               { name: 'Basic', price: '$2.99', credits: '1', perGrade: '$2.99', bonus: '+1 bonus on first purchase', popular: false },
-              { name: 'Pro', price: '$9.99', credits: '5', perGrade: '$2.00', bonus: '+3 bonus on first purchase', popular: true },
+              { name: 'Pro', price: '$9.99', credits: '5', perGrade: '$2.00', bonus: '+3 bonus on first purchase', popular: false },
               { name: 'Elite', price: '$19.99', credits: '20', perGrade: '$1.00', bonus: '+5 bonus on first purchase', popular: false },
             ].map((tier) => (
               <div key={tier.name} className={`bg-white rounded-2xl shadow-lg border-2 p-6 text-center relative ${tier.popular ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'}`}>
@@ -1144,9 +1144,9 @@ export default function WhyDcmPage() {
               </div>
             ))}
           </div>
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 sm:p-8 text-center text-white">
-            <h3 className="font-bold text-xl mb-2">Card Lovers Subscription</h3>
-            <p className="text-purple-200 mb-4">For serious collectors — 70+ credits monthly, 20% discount on purchases, portfolio tracking, and loyalty bonuses</p>
+          <div className="bg-gradient-to-r from-purple-600 to-rose-500 rounded-2xl p-6 sm:p-8 text-center text-white">
+            <h3 className="font-bold text-xl mb-2">♥ Card Lovers Subscription</h3>
+            <p className="text-rose-100 mb-4">For serious collectors — 70+ credits monthly, 20% discount on purchases, portfolio tracking, and loyalty bonuses</p>
             <div className="flex justify-center gap-4">
               <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
                 <div className="font-bold text-lg">$49.99<span className="text-sm font-normal">/mo</span></div>
