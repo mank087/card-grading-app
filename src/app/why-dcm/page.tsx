@@ -51,36 +51,91 @@ const trackSignupClick = (location: string) => {
 // ============================================================================
 
 function FeaturedCardSlab({ card }: { card: any }) {
+  const grade = card.conversational_whole_grade ?? card.dcm_grade_whole ?? null
+  const condition = card.conversational_condition_label || 'Graded'
+  const name = card.card_name || 'Card'
+  const serial = card.serial || ''
+  // Truncate name for label display
+  const displayName = name.length > 22 ? name.slice(0, 20) + '…' : name
+
   return (
-    <div className="relative w-full max-w-[180px] mx-auto">
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: 'linear-gradient(145deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
-          boxShadow: '0 0 20px rgba(139,92,246,0.3), 0 0 40px rgba(139,92,246,0.15)',
-          border: '1px solid rgba(139,92,246,0.3)',
-          padding: '6px',
-        }}
-      >
-        <div className="rounded-lg overflow-hidden bg-gray-900">
-          {card.front_url && (
-            <img
-              src={card.front_url}
-              alt={card.card_name || 'Graded card'}
-              className="w-full aspect-[2.5/3.5] object-cover"
-              loading="lazy"
-            />
+    <div className="relative w-full max-w-[200px] mx-auto" style={{ aspectRatio: '280 / 460' }}>
+      {/* Slab case photo background */}
+      <img
+        src="/labels/graded-card-slab.png"
+        alt=""
+        className="absolute inset-0 w-full h-full object-contain"
+        loading="lazy"
+      />
+
+      {/* Label in the label slot */}
+      <div className="absolute overflow-hidden" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
+        <div
+          className="w-full flex items-center px-[6%] py-[3%]"
+          style={{
+            aspectRatio: '3.5 / 1',
+            background: 'linear-gradient(135deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
+            borderBottom: '1px solid rgba(139,92,246,0.3)',
+          }}
+        >
+          {/* Left: DCM logo + card info */}
+          <div className="flex-1 min-w-0 pr-1">
+            <div className="flex items-center gap-1 mb-0.5">
+              <img src="/DCM Logo white.png" alt="" className="h-[10px] w-auto opacity-80" />
+              <span style={{ fontSize: '5px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.05em' }}>GRADING</span>
+            </div>
+            <div className="text-white font-bold leading-none truncate" style={{ fontSize: '7px' }}>
+              {displayName}
+            </div>
+            {serial && (
+              <div style={{ fontSize: '4.5px', color: 'rgba(255,255,255,0.4)', marginTop: '1px' }} className="font-mono truncate">
+                {serial}
+              </div>
+            )}
+          </div>
+
+          {/* Right: Grade circle */}
+          {grade !== null && (
+            <div className="flex-shrink-0 flex flex-col items-center">
+              <div
+                className="rounded-full flex items-center justify-center font-bold text-white"
+                style={{
+                  width: '22px',
+                  height: '22px',
+                  fontSize: '10px',
+                  background: grade >= 9 ? 'linear-gradient(135deg, #22c55e, #16a34a)' : grade >= 7 ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
+                  boxShadow: grade >= 9 ? '0 0 6px rgba(34,197,94,0.5)' : '0 0 6px rgba(139,92,246,0.4)',
+                }}
+              >
+                {grade}
+              </div>
+              <div className="text-center mt-0.5" style={{ fontSize: '4px', color: 'rgba(255,255,255,0.6)' }}>
+                {condition}
+              </div>
+            </div>
           )}
         </div>
-        <div className="text-center py-1.5">
-          <div className="text-white font-bold text-lg leading-none">
-            {card.conversational_whole_grade ?? card.dcm_grade_whole ?? '—'}
-          </div>
-          <div className="text-purple-300 text-[8px] uppercase tracking-wider mt-0.5">
-            {card.conversational_condition_label || 'Graded'}
-          </div>
-        </div>
       </div>
+
+      {/* Card image in the lower window */}
+      <div className="absolute overflow-hidden" style={{ top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }}>
+        {card.front_url ? (
+          <img
+            src={card.front_url}
+            alt={name}
+            className="w-full h-full object-contain"
+            loading="lazy"
+          />
+        ) : (
+          <div className="w-full h-full bg-gray-800" />
+        )}
+      </div>
+
+      {/* Gloss overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.03) 100%)' }}
+      />
     </div>
   )
 }
