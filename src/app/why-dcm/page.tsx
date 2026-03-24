@@ -400,19 +400,20 @@ function StepCard({ number, icon, title, description }: { number: number; icon: 
 
 function LabelHolderCard({ name, emptyImg, cardImg, desc, delay }: { name: string; emptyImg: string; cardImg: string; desc: string; delay: number }) {
   const [showCard, setShowCard] = useState(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    let interval: NodeJS.Timeout
-    const startTimeout = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       setShowCard(true)
-      interval = setInterval(() => {
+      intervalRef.current = setInterval(() => {
         setShowCard((prev) => !prev)
       }, 2000)
     }, delay * 1000)
 
     return () => {
-      clearTimeout(startTimeout)
-      if (interval) clearInterval(interval)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [delay])
 
