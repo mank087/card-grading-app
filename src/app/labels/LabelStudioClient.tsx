@@ -580,24 +580,53 @@ function CustomDesigner({
   const [eyedropperTarget, setEyedropperTarget] = useState<'start' | 'end' | 'border' | null>(null)
   const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null)
   const eyedropperCanvasRef = useRef<HTMLCanvasElement>(null)
-  const eyedropperImgRef = useRef<HTMLImageElement | null>(null)
   const [eyedropperSide, setEyedropperSide] = useState<'front' | 'back'>('front')
+  const [eyedropperReady, setEyedropperReady] = useState(false)
 
-  // Load card image onto hidden canvas for pixel sampling
+  // Draw card image directly onto the visible canvas for pixel-accurate sampling
+  // This avoids CORS tainted-canvas issues and object-contain offset problems
   const loadEyedropperImage = useCallback((url: string) => {
+    setEyedropperReady(false)
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
-      eyedropperImgRef.current = img
       const canvas = eyedropperCanvasRef.current
-      if (canvas) {
-        canvas.width = img.naturalWidth
-        canvas.height = img.naturalHeight
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.drawImage(img, 0, 0)
-        }
+      if (!canvas) return
+      // Size canvas to fit within the UI (max 300px wide) while keeping aspect ratio
+      const maxW = 300
+      const scale = Math.min(maxW / img.naturalWidth, 1)
+      canvas.width = Math.round(img.naturalWidth * scale)
+      canvas.height = Math.round(img.naturalHeight * scale)
+      const ctx = canvas.getContext('2d')
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+        setEyedropperReady(true)
       }
+    }
+    img.onerror = () => {
+      // CORS fallback: try without crossOrigin via a fetch+blob approach
+      fetch(url)
+        .then(r => r.blob())
+        .then(blob => {
+          const objUrl = URL.createObjectURL(blob)
+          const fallbackImg = new Image()
+          fallbackImg.onload = () => {
+            const canvas = eyedropperCanvasRef.current
+            if (!canvas) return
+            const maxW = 300
+            const scale = Math.min(maxW / fallbackImg.naturalWidth, 1)
+            canvas.width = Math.round(fallbackImg.naturalWidth * scale)
+            canvas.height = Math.round(fallbackImg.naturalHeight * scale)
+            const ctx = canvas.getContext('2d')
+            if (ctx) {
+              ctx.drawImage(fallbackImg, 0, 0, canvas.width, canvas.height)
+              setEyedropperReady(true)
+            }
+            URL.revokeObjectURL(objUrl)
+          }
+          fallbackImg.src = objUrl
+        })
+        .catch(() => setEyedropperReady(false))
     }
     img.src = url
   }, [])
@@ -609,57 +638,32 @@ function CustomDesigner({
     if (url) loadEyedropperImage(url)
   }, [eyedropperTarget, eyedropperSide, selectedCard, loadEyedropperImage])
 
-  const sampleColorAt = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  // Sample color directly from the canvas — 1:1 pixel mapping, no offset math needed
+  const sampleColorAt = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = eyedropperCanvasRef.current
-    const img = eyedropperImgRef.current
-    if (!canvas || !img) return null
+    if (!canvas || !eyedropperReady) return null
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
 
-    // Calculate the actual rendered image bounds within the object-contain container
-    const rect = e.currentTarget.getBoundingClientRect()
-    const containerW = rect.width
-    const containerH = rect.height
-    const imgAspect = img.naturalWidth / img.naturalHeight
-    const containerAspect = containerW / containerH
-
-    let renderW: number, renderH: number, offsetX: number, offsetY: number
-    if (imgAspect > containerAspect) {
-      // Image is wider than container — letterboxed top/bottom
-      renderW = containerW
-      renderH = containerW / imgAspect
-      offsetX = 0
-      offsetY = (containerH - renderH) / 2
-    } else {
-      // Image is taller — letterboxed left/right
-      renderH = containerH
-      renderW = containerH * imgAspect
-      offsetX = (containerW - renderW) / 2
-      offsetY = 0
-    }
-
-    // Mouse position relative to rendered image
-    const mouseX = e.clientX - rect.left - offsetX
-    const mouseY = e.clientY - rect.top - offsetY
-
-    // Check if cursor is within the actual image area
-    if (mouseX < 0 || mouseY < 0 || mouseX > renderW || mouseY > renderH) return null
-
-    const x = Math.floor((mouseX / renderW) * canvas.width)
-    const y = Math.floor((mouseY / renderH) * canvas.height)
+    const rect = canvas.getBoundingClientRect()
+    // Map CSS pixels to canvas pixels (accounts for CSS scaling via w-full)
+    const scaleX = canvas.width / rect.width
+    const scaleY = canvas.height / rect.height
+    const x = Math.floor((e.clientX - rect.left) * scaleX)
+    const y = Math.floor((e.clientY - rect.top) * scaleY)
 
     if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return null
 
     const pixel = ctx.getImageData(x, y, 1, 1).data
     return `#${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`
-  }, [])
+  }, [eyedropperReady])
 
-  const handleEyedropperMove = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleEyedropperMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const color = sampleColorAt(e)
     if (color) setEyedropperHoverColor(color)
   }, [sampleColorAt])
 
-  const handleEyedropperClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+  const handleEyedropperClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     const color = sampleColorAt(e)
     if (!color || !eyedropperTarget) return
     if (eyedropperTarget === 'start') {
@@ -1085,25 +1089,24 @@ function CustomDesigner({
                       Back
                     </button>
                   </div>
-                  {/* Card image for sampling */}
-                  <div
-                    className="relative rounded overflow-hidden cursor-crosshair bg-gray-200"
-                    style={{ maxHeight: '260px' }}
-                    onMouseMove={handleEyedropperMove}
-                    onClick={handleEyedropperClick}
-                    onMouseLeave={() => setEyedropperHoverColor(null)}
-                  >
-                    <img
-                      src={eyedropperSide === 'front' ? selectedCard.front_url : selectedCard.back_url}
-                      alt="Pick a color"
-                      className="w-full h-full object-contain"
-                      crossOrigin="anonymous"
-                      draggable={false}
+                  {/* Card canvas for sampling — drawn directly, no img element */}
+                  <div className="flex justify-center rounded overflow-hidden bg-gray-200">
+                    <canvas
+                      ref={eyedropperCanvasRef}
+                      className="cursor-crosshair w-full"
+                      style={{ maxHeight: '280px', objectFit: 'contain' }}
+                      onMouseMove={handleEyedropperMove}
+                      onClick={handleEyedropperClick}
+                      onMouseLeave={() => setEyedropperHoverColor(null)}
                     />
                   </div>
+                  {!eyedropperReady && (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+                      <span className="ml-2 text-[10px] text-gray-500">Loading card image...</span>
+                    </div>
+                  )}
                   <p className="text-[9px] text-purple-600 text-center mt-1">Click on the card to pick a color</p>
-                  {/* Hidden canvas for pixel sampling */}
-                  <canvas ref={eyedropperCanvasRef} className="hidden" />
                 </div>
               )}
             </div>
