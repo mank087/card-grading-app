@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
+import HeroGradingAnimation from '@/app/sports-grading/HeroGradingAnimation'
 
 declare global {
   interface Window {
@@ -621,6 +622,14 @@ export default function WhyDcmPage() {
       <section className="py-16 sm:py-24 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <SectionHeading title="The DCM Optic™ Approach" subtitle="A structured, repeatable grading methodology that gives you confidence in every grade" />
+
+          {/* Grading scan animation */}
+          <div className="bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 rounded-2xl p-6 sm:p-10 mb-12 shadow-xl">
+            <div className="max-w-[320px] mx-auto">
+              <HeroGradingAnimation rawCardImage="/promo-charizard.png" cardName="Charizard" cardDetails="Base Set #4/102 1999" cardNumber="DCM-001" grade={9} />
+            </div>
+          </div>
+
           <div className="grid md:grid-cols-2 gap-10 items-center">
             <div className="space-y-6">
               <div className="flex gap-4">
