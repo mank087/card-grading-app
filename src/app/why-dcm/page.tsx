@@ -619,106 +619,114 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       {/* DCM OPTIC — THE APPROACH */}
       {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gray-50">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="The DCM Optic™ Approach" subtitle="A structured, repeatable grading methodology that gives you confidence in every grade" />
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="The DCM Optic™ Approach" subtitle="A structured, repeatable grading methodology that gives you confidence in every grade" light />
 
-          {/* Grading scan animation */}
-          <div className="bg-gradient-to-br from-gray-900 via-slate-900 to-gray-900 rounded-2xl p-6 sm:p-10 mb-12 shadow-xl">
-            <div className="max-w-[320px] mx-auto">
-              <HeroGradingAnimation rawCardImage="/promo-charizard.png" cardName="Charizard" cardDetails="Base Set #4/102 1999" cardNumber="DCM-001" grade={9} />
-            </div>
-          </div>
+          {/* Desktop: 3-column layout | Mobile: stacked */}
+          <div className="grid lg:grid-cols-3 gap-8 lg:gap-6 items-start">
 
-          <div className="grid md:grid-cols-2 gap-10 items-center">
-            <div className="space-y-6">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-purple-600 font-bold text-sm">3x</span>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Multi-Pass Consensus Grading</h3>
-                  <p className="text-gray-600 text-sm mt-1">Every card is evaluated three independent times. The results are averaged and reconciled server-side to eliminate variance and hallucinated defects.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Four Sub-Grade Categories</h3>
-                  <p className="text-gray-600 text-sm mt-1">Centering, corners, edges, and surface — each scored independently for front and back. Your final grade is determined by the weakest category, not an average.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Server-Verified Results</h3>
-                  <p className="text-gray-600 text-sm mt-1">We never trust raw model output. Every grade is recalculated server-side with consensus boosting and standard rounding to ensure accuracy and consistency.</p>
-                </div>
-              </div>
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center flex-shrink-0">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">No More Mailing & Waiting</h3>
-                  <p className="text-gray-600 text-sm mt-1">Mail-away grading companies take weeks or months and cost $20-$150+ per card. With DCM, you get results in minutes, from $0.50 per card, and your cards never leave your hands.</p>
-                </div>
+            {/* Left: Grading scan animation */}
+            <div className="flex justify-center lg:justify-start">
+              <div className="w-full max-w-[300px]">
+                <HeroGradingAnimation rawCardImage="/Sports/drake may - daniel- williams f.png" />
               </div>
             </div>
 
-            {/* Visual: convergence diagram */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sm:p-8">
-              <h4 className="text-center text-sm font-semibold text-gray-500 uppercase tracking-wide mb-6">Multi-Pass Consensus Example</h4>
-              <div className="space-y-4">
+            {/* Center: 4 bullet points */}
+            <div className="space-y-5">
+              <div className="flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <span className="text-purple-400 font-bold text-sm">3x</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Multi-Pass Consensus Grading</h3>
+                  <p className="text-gray-400 text-xs mt-1">Every card is evaluated three independent times. Results are averaged and reconciled server-side to eliminate variance.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Four Sub-Grade Categories</h3>
+                  <p className="text-gray-400 text-xs mt-1">Centering, corners, edges, and surface — each scored for front and back. Final grade is the weakest category.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">Server-Verified Results</h3>
+                  <p className="text-gray-400 text-xs mt-1">Every grade is recalculated server-side with consensus boosting and standard rounding for accuracy and consistency.</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-sm">No More Mailing & Waiting</h3>
+                  <p className="text-gray-400 text-xs mt-1">Mail-away grading companies take weeks and cost $20-$150+ per card. DCM delivers results in minutes from $0.50 per card.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Multi-pass convergence table */}
+            <div className="bg-white/10 backdrop-blur-sm rounded-2xl border border-white/10 p-5 sm:p-6">
+              <h4 className="text-center text-xs font-semibold text-gray-400 uppercase tracking-wide mb-5">Multi-Pass Consensus</h4>
+              <div className="space-y-3">
+                {/* Column headers */}
+                <div className="flex items-center gap-3">
+                  <span className="text-[10px] text-gray-500 w-11" />
+                  <div className="flex-1 flex gap-1.5">
+                    {['C', 'Co', 'E', 'S'].map((h) => (
+                      <div key={h} className="flex-1 text-center text-[10px] text-gray-500 font-medium">{h}</div>
+                    ))}
+                  </div>
+                </div>
                 {['Pass 1', 'Pass 2', 'Pass 3'].map((label, i) => {
                   const scores = [
-                    { c: 10, co: 9, e: 10, s: 10, f: 9 },
-                    { c: 10, co: 10, e: 9, s: 10, f: 9 },
-                    { c: 10, co: 9, e: 10, s: 10, f: 9 },
+                    { c: 10, co: 9, e: 10, s: 10 },
+                    { c: 10, co: 10, e: 9, s: 10 },
+                    { c: 10, co: 9, e: 10, s: 10 },
                   ]
                   const s = scores[i]
                   return (
                     <div key={label} className="flex items-center gap-3">
-                      <span className="text-xs font-medium text-gray-500 w-12">{label}</span>
+                      <span className="text-[10px] font-medium text-gray-400 w-11">{label}</span>
                       <div className="flex-1 flex gap-1.5">
-                        {[
-                          { label: 'C', val: s.c },
-                          { label: 'Co', val: s.co },
-                          { label: 'E', val: s.e },
-                          { label: 'S', val: s.s },
-                        ].map((sub) => (
-                          <div key={sub.label} className={`flex-1 text-center py-1.5 rounded text-xs font-bold ${sub.val === 10 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {sub.val}
+                        {[s.c, s.co, s.e, s.s].map((val, j) => (
+                          <div key={j} className={`flex-1 text-center py-1.5 rounded text-xs font-bold ${val === 10 ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                            {val}
                           </div>
                         ))}
                       </div>
                     </div>
                   )
                 })}
-                <div className="border-t-2 border-purple-200 pt-4 mt-4">
+                <div className="border-t border-white/10 pt-3 mt-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-bold text-purple-700 w-12">Final</span>
+                    <span className="text-[10px] font-bold text-purple-400 w-11">Final</span>
                     <div className="flex-1 flex gap-1.5">
-                      {['10', '9', '10', '10'].map((val, i) => (
-                        <div key={i} className={`flex-1 text-center py-1.5 rounded text-xs font-bold ${val === '10' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                      {[10, 9, 10, 10].map((val, i) => (
+                        <div key={i} className={`flex-1 text-center py-1.5 rounded text-xs font-bold ${val === 10 ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
                           {val}
                         </div>
                       ))}
                     </div>
                   </div>
-                  <div className="text-center mt-3">
-                    <span className="inline-flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-xl font-bold">
-                      Overall Grade: 9
-                      <span className="text-purple-200 text-xs font-normal">(Weakest link: Corners)</span>
+                  <div className="text-center mt-4">
+                    <span className="inline-flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-xl text-sm font-bold">
+                      Grade: 9
+                      <span className="text-purple-200 text-[10px] font-normal">(Weakest: Corners)</span>
                     </span>
                   </div>
                 </div>
               </div>
             </div>
+
           </div>
         </div>
       </section>
