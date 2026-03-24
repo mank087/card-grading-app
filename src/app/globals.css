@@ -103,3 +103,24 @@ body {
 .animate-slideUpBanner {
   animation: slideUpBanner 0.3s ease-out;
 }
+
+.animate-slide-up {
+  animation: slideUpBanner 0.3s ease-out;
+}
+
+/* Floating card animations for hero backgrounds */
+@keyframes floatSlow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+@keyframes floatMedium {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes floatFast {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float-slow { animation: floatSlow 6s ease-in-out infinite; }
+.animate-float-medium { animation: floatMedium 4s ease-in-out infinite; }
+.animate-float-fast { animation: floatFast 3s ease-in-out infinite; }
