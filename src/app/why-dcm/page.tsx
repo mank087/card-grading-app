@@ -210,6 +210,23 @@ function FloatingCtaBar({
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
 
+  // Rotating CTA messages
+  const ctaMessages = [
+    { main: 'First grade free + bonus credits', sub: 'Sign up now and start grading instantly' },
+    { main: 'Grade your cards in minutes, not weeks', sub: 'No mailing required — keep your cards safe' },
+    { main: 'Custom labels, market pricing & more', sub: 'Everything you need to grade, display, and sell' },
+    { main: 'From $0.50 per card — credits never expire', sub: 'Buy what you need, grade when you\'re ready' },
+  ]
+  const [ctaIndex, setCtaIndex] = useState(0)
+  const ctaIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  useEffect(() => {
+    ctaIntervalRef.current = setInterval(() => {
+      setCtaIndex((prev) => (prev + 1) % ctaMessages.length)
+    }, 4000)
+    return () => { if (ctaIntervalRef.current) clearInterval(ctaIntervalRef.current) }
+  }, [])
+
   if (isAuthenticated || !isVisible) return null
 
   const handleOAuth = async (provider: 'google' | 'facebook') => {
@@ -356,8 +373,8 @@ function FloatingCtaBar({
         <div className="bg-gray-900/95 backdrop-blur-lg border-t border-purple-500/30 shadow-2xl">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-semibold truncate">First grade free + bonus credits</p>
-              <p className="text-purple-300 text-xs hidden sm:block">Sign up now and start grading instantly</p>
+              <p className="text-white text-sm font-semibold truncate transition-opacity duration-300">{ctaMessages[ctaIndex].main}</p>
+              <p className="text-purple-300 text-xs hidden sm:block transition-opacity duration-300">{ctaMessages[ctaIndex].sub}</p>
             </div>
             <button
               onClick={onExpand}
@@ -702,6 +719,24 @@ export default function WhyDcmPage() {
               icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
             <StepCard number={4} title="Share & Sell" description="Print custom labels, list to eBay instantly, track your portfolio value"
               icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>} />
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* VIDEO — SEE IT IN ACTION */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-24 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="See It in Action" subtitle="Watch the full grading process from upload to finished label in under 3 minutes" />
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200" style={{ aspectRatio: '16 / 9' }}>
+            <iframe
+              src="https://www.youtube.com/embed/oSz9lfvaEK4?rel=0"
+              title="DCM Grading — Full Process Walkthrough"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen
+              className="absolute inset-0 w-full h-full"
+            />
           </div>
         </div>
       </section>
@@ -1078,6 +1113,50 @@ export default function WhyDcmPage() {
             <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-200">
               <Image src="/why-dcm/insta-list-to-ebay-DCM.png" alt="DCM InstaList to eBay — listing details view" width={600} height={800} className="w-full h-auto" />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* TESTIMONIALS */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-50 to-indigo-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="What Collectors Are Saying" subtitle="Hear from real collectors using DCM Grading every day" />
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                quote: "DCM has completely changed how I manage my collection. I can grade a card, see what it\'s worth, and organize everything in one place. It\'s like having a full grading service and portfolio tracker built into one tool.",
+                name: 'Mike R.',
+                label: 'Pokemon & Sports Collector',
+              },
+              {
+                quote: "I used to send cards off and wait 6-8 weeks just to find out a grade. Now I get results in minutes and my cards never leave my desk. The three-pass system gives me real confidence in every grade I get back.",
+                name: 'Anthony M.',
+                label: 'Sports Card Enthusiast',
+              },
+              {
+                quote: "The label studio is my favorite feature. I love being able to customize the colors and design of my slab labels to match the card inside. My display case has never looked this good — every card feels premium.",
+                name: 'Paul S.',
+                label: 'TCG Hobbyist',
+              },
+            ].map((t) => (
+              <div key={t.name} className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-col">
+                {/* Stars */}
+                <div className="flex gap-0.5 mb-3">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <svg key={s} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+                <p className="text-gray-700 text-sm leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="font-bold text-gray-900 text-sm">{t.name}</p>
+                  <p className="text-gray-500 text-xs">{t.label}</p>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
