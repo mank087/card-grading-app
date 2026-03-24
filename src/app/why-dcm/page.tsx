@@ -550,7 +550,7 @@ export default function WhyDcmPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             <StepCard number={1} title="Upload" description="Snap a photo of your card's front and back"
               icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
-            <StepCard number={2} title="DCM Optic\u2122 Grades" description="Our multi-pass grading system analyzes centering, corners, edges, and surface"
+            <StepCard number={2} title="DCM Optic™ Grades" description="Our multi-pass grading system analyzes centering, corners, edges, and surface"
               icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" /></svg>} />
             <StepCard number={3} title="Get Results" description="Detailed grade report with sub-scores, defect analysis, and market pricing"
               icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>} />
@@ -565,7 +565,7 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="The DCM Optic\u2122 Approach" subtitle="A structured, repeatable grading methodology that gives you confidence in every grade" />
+          <SectionHeading title="The DCM Optic™ Approach" subtitle="A structured, repeatable grading methodology that gives you confidence in every grade" />
           <div className="grid md:grid-cols-2 gap-10 items-center">
             <div className="space-y-6">
               <div className="flex gap-4">

@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Why DCM Grading?',
     description:
-      'Grade your cards from home with DCM Optic\u2122 technology. Instant results, market pricing, custom labels, and more.',
+      'Grade your cards from home with DCM Optic™ technology. Instant results, market pricing, custom labels, and more.',
     url: 'https://dcmgrading.com/why-dcm',
     siteName: 'DCM Grading',
     type: 'website',
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Why DCM Grading?',
     description:
-      'Grade your cards from home with DCM Optic\u2122 technology. Instant results, market pricing, custom labels, and more.',
+      'Grade your cards from home with DCM Optic™ technology. Instant results, market pricing, custom labels, and more.',
   },
   keywords: [
     'card grading',
