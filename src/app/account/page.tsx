@@ -1,8 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { getStoredSession, signOut } from '@/lib/directAuth'
+import { getStoredSession, getAuthenticatedClient, signOut } from '@/lib/directAuth'
 import { useRouter } from 'next/navigation'
 import { useCredits } from '@/contexts/CreditsContext'
 import Link from 'next/link'
@@ -97,7 +96,8 @@ export default function AccountPage() {
         setUser(user)
 
         // Fetch all user's cards
-        const { data: cards, error: cardsError } = await supabase
+        const authClient = getAuthenticatedClient()
+        const { data: cards, error: cardsError } = await authClient
           .from('cards')
           .select('*')
           .eq('user_id', user.id)
