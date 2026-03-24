@@ -724,6 +724,50 @@ export default function WhyDcmPage() {
       </section>
 
       {/* ================================================================ */}
+      {/* TESTIMONIALS */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-50 to-indigo-50">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="What Collectors Are Saying" subtitle="Hear from real collectors using DCM Grading every day" />
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                quote: "DCM has completely changed how I manage my collection. I can grade a card, see what it\'s worth, and organize everything in one place. It\'s like having a full grading service and portfolio tracker built into one tool.",
+                name: 'Mike R.',
+                label: 'Pokemon & Sports Collector',
+              },
+              {
+                quote: "I used to send cards off and wait 6-8 weeks just to find out a grade. Now I get results in minutes and my cards never leave my desk. The three-pass system gives me real confidence in every grade I get back.",
+                name: 'Anthony M.',
+                label: 'Sports Card Enthusiast',
+              },
+              {
+                quote: "The label studio is my favorite feature. I love being able to customize the colors and design of my slab labels to match the card inside. My display case has never looked this good — every card feels premium.",
+                name: 'Paul S.',
+                label: 'TCG Hobbyist',
+              },
+            ].map((t) => (
+              <div key={t.name} className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-col">
+                {/* Stars */}
+                <div className="flex gap-0.5 mb-3">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <svg key={s} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                    </svg>
+                  ))}
+                </div>
+                <p className="text-gray-700 text-sm leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <p className="font-bold text-gray-900 text-sm">{t.name}</p>
+                  <p className="text-gray-500 text-xs">{t.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
       {/* VIDEO — SEE IT IN ACTION */}
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-gray-50">
@@ -952,6 +996,35 @@ export default function WhyDcmPage() {
       </section>
 
       {/* ================================================================ */}
+      {/* CARD DATABASES */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="Accurate Card Identification" subtitle="Comprehensive internal databases covering thousands of cards across every major game type" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+            {[
+              { name: 'Pokemon', img: '/why-dcm/pikachu-graded-card.png', sub: 'English + Japanese' },
+              { name: 'Sports', img: '/why-dcm/drake-maye-graded-card.png', sub: '6 categories' },
+              { name: 'MTG', img: '/why-dcm/magic-the-gathering-graded-card.png', sub: 'Magic: The Gathering' },
+              { name: 'Lorcana', img: '/why-dcm/lorcana-graded-card.png', sub: 'Disney Lorcana' },
+              { name: 'One Piece', img: '/why-dcm/monkey-luffy-graded-card.png', sub: 'One Piece TCG' },
+              { name: 'Yu-Gi-Oh', img: '/why-dcm/yugioh-garded-card.png', sub: 'Yu-Gi-Oh!' },
+              { name: 'Star Wars', img: '/why-dcm/star-wars-graded-card.png', sub: 'Star Wars Unlimited' },
+              { name: 'Other', img: '/why-dcm/garbage-pail-kids-graded-card.png', sub: 'GPK, Digimon & more' },
+            ].map((cat) => (
+              <div key={cat.name} className="group text-center">
+                <div className="rounded-xl overflow-hidden shadow-md border border-gray-100 bg-white hover:shadow-xl transition-shadow">
+                  <Image src={cat.img} alt={`${cat.name} graded card`} width={400} height={600} className="w-full h-auto group-hover:scale-[1.02] transition-transform" />
+                </div>
+                <h3 className="font-bold text-gray-900 text-sm mt-3">{cat.name}</h3>
+                <p className="text-gray-500 text-xs">{cat.sub}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
       {/* MARKET PRICING */}
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-gray-50 relative overflow-hidden">
@@ -1036,58 +1109,6 @@ export default function WhyDcmPage() {
       </section>
 
       {/* ================================================================ */}
-      {/* CARD DATABASES */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Accurate Card Identification" subtitle="Comprehensive internal databases covering thousands of cards across every major game type" />
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-            {[
-              { name: 'Pokemon', img: '/why-dcm/pikachu-graded-card.png', sub: 'English + Japanese' },
-              { name: 'Sports', img: '/why-dcm/drake-maye-graded-card.png', sub: '6 categories' },
-              { name: 'MTG', img: '/why-dcm/magic-the-gathering-graded-card.png', sub: 'Magic: The Gathering' },
-              { name: 'Lorcana', img: '/why-dcm/lorcana-graded-card.png', sub: 'Disney Lorcana' },
-              { name: 'One Piece', img: '/why-dcm/monkey-luffy-graded-card.png', sub: 'One Piece TCG' },
-              { name: 'Yu-Gi-Oh', img: '/why-dcm/yugioh-garded-card.png', sub: 'Yu-Gi-Oh!' },
-              { name: 'Star Wars', img: '/why-dcm/star-wars-graded-card.png', sub: 'Star Wars Unlimited' },
-              { name: 'Other', img: '/why-dcm/garbage-pail-kids-graded-card.png', sub: 'GPK, Digimon & more' },
-            ].map((cat) => (
-              <div key={cat.name} className="group text-center">
-                <div className="rounded-xl overflow-hidden shadow-md border border-gray-100 bg-white hover:shadow-xl transition-shadow">
-                  <Image src={cat.img} alt={`${cat.name} graded card`} width={400} height={600} className="w-full h-auto group-hover:scale-[1.02] transition-transform" />
-                </div>
-                <h3 className="font-bold text-gray-900 text-sm mt-3">{cat.name}</h3>
-                <p className="text-gray-500 text-xs">{cat.sub}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* LABEL STUDIO */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900 text-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Your Label, Your Way" subtitle="Design and print professional grading labels for slabs, magnetic one-touch holders, and toploaders" light />
-          <div className="grid md:grid-cols-3 gap-8 mb-10">
-            {[
-              { name: 'Graded Slab', emptyImg: '/labels/graded-card-slab.png', cardImg: '/why-dcm/lugia-graded-slab.png', desc: 'Insert into standard grading slab cases with front and back labels' },
-              { name: 'Magnetic One-Touch', emptyImg: '/labels/mag-one-touch-DCM.png', cardImg: '/why-dcm/lugia-one-touch.png', desc: 'Avery 6871 compatible labels for magnetic card holders' },
-              { name: 'Toploader', emptyImg: '/labels/top-loader-dcm.png', cardImg: '/why-dcm/lugia-top-loader.png', desc: 'Front + back label pairs or fold-over labels for toploaders' },
-            ].map((label, idx) => (
-              <LabelHolderCard key={label.name} name={label.name} emptyImg={label.emptyImg} cardImg={label.cardImg} desc={label.desc} delay={idx * 1.5} />
-            ))}
-          </div>
-          <div className="flex flex-wrap justify-center gap-3 text-sm">
-            {['8 Color Themes', 'Custom Gradients', 'Border Controls', 'Color-Match Eyedropper', 'Save 4 Custom Designs'].map((feature) => (
-              <span key={feature} className="bg-white/10 border border-white/20 rounded-full px-4 py-1.5">{feature}</span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
       {/* EBAY INSTALIST */}
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
@@ -1118,44 +1139,23 @@ export default function WhyDcmPage() {
       </section>
 
       {/* ================================================================ */}
-      {/* TESTIMONIALS */}
+      {/* LABEL STUDIO */}
       {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-50 to-indigo-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="What Collectors Are Saying" subtitle="Hear from real collectors using DCM Grading every day" />
-          <div className="grid md:grid-cols-3 gap-6">
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900 text-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="Your Label, Your Way" subtitle="Design and print professional grading labels for slabs, magnetic one-touch holders, and toploaders" light />
+          <div className="grid md:grid-cols-3 gap-8 mb-10">
             {[
-              {
-                quote: "DCM has completely changed how I manage my collection. I can grade a card, see what it\'s worth, and organize everything in one place. It\'s like having a full grading service and portfolio tracker built into one tool.",
-                name: 'Mike R.',
-                label: 'Pokemon & Sports Collector',
-              },
-              {
-                quote: "I used to send cards off and wait 6-8 weeks just to find out a grade. Now I get results in minutes and my cards never leave my desk. The three-pass system gives me real confidence in every grade I get back.",
-                name: 'Anthony M.',
-                label: 'Sports Card Enthusiast',
-              },
-              {
-                quote: "The label studio is my favorite feature. I love being able to customize the colors and design of my slab labels to match the card inside. My display case has never looked this good — every card feels premium.",
-                name: 'Paul S.',
-                label: 'TCG Hobbyist',
-              },
-            ].map((t) => (
-              <div key={t.name} className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 flex flex-col">
-                {/* Stars */}
-                <div className="flex gap-0.5 mb-3">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <svg key={s} className="w-4 h-4 text-amber-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-                <p className="text-gray-700 text-sm leading-relaxed flex-1">&ldquo;{t.quote}&rdquo;</p>
-                <div className="mt-4 pt-4 border-t border-gray-100">
-                  <p className="font-bold text-gray-900 text-sm">{t.name}</p>
-                  <p className="text-gray-500 text-xs">{t.label}</p>
-                </div>
-              </div>
+              { name: 'Graded Slab', emptyImg: '/labels/graded-card-slab.png', cardImg: '/why-dcm/lugia-graded-slab.png', desc: 'Insert into standard grading slab cases with front and back labels' },
+              { name: 'Magnetic One-Touch', emptyImg: '/labels/mag-one-touch-DCM.png', cardImg: '/why-dcm/lugia-one-touch.png', desc: 'Avery 6871 compatible labels for magnetic card holders' },
+              { name: 'Toploader', emptyImg: '/labels/top-loader-dcm.png', cardImg: '/why-dcm/lugia-top-loader.png', desc: 'Front + back label pairs or fold-over labels for toploaders' },
+            ].map((label, idx) => (
+              <LabelHolderCard key={label.name} name={label.name} emptyImg={label.emptyImg} cardImg={label.cardImg} desc={label.desc} delay={idx * 1.5} />
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-3 text-sm">
+            {['8 Color Themes', 'Custom Gradients', 'Border Controls', 'Color-Match Eyedropper', 'Save 4 Custom Designs'].map((feature) => (
+              <span key={feature} className="bg-white/10 border border-white/20 rounded-full px-4 py-1.5">{feature}</span>
             ))}
           </div>
         </div>
@@ -1188,6 +1188,28 @@ export default function WhyDcmPage() {
           <p className="text-gray-500 text-xs text-center mt-3">Card Lover and VIP badges displayed on a graded card label</p>
         </div>
       </section>
+
+      {/* ================================================================ */}
+      {/* FEATURED CARDS GALLERY */}
+      {/* ================================================================ */}
+      {featuredCards.length > 0 && (
+        <section className="py-16 sm:py-24 bg-white">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            <SectionHeading title="Real Grades from Real Collectors" subtitle="Browse cards graded by the DCM community" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+              {featuredCards.slice(0, 8).map((card) => (
+                <Link key={card.id} href={`/${card.category?.toLowerCase() || 'other'}/${card.id}`} className="group">
+                  <FeaturedCardSlab card={card} />
+                  <div className="text-center mt-2">
+                    <p className="text-sm font-medium text-gray-900 truncate group-hover:text-purple-600 transition-colors">{card.card_name || 'Graded Card'}</p>
+                    <p className="text-xs text-gray-500">{card.category}</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ================================================================ */}
       {/* PRICING */}
@@ -1229,28 +1251,6 @@ export default function WhyDcmPage() {
           </div>
         </div>
       </section>
-
-      {/* ================================================================ */}
-      {/* FEATURED CARDS GALLERY */}
-      {/* ================================================================ */}
-      {featuredCards.length > 0 && (
-        <section className="py-16 sm:py-24 bg-white">
-          <div className="max-w-6xl mx-auto px-4 sm:px-6">
-            <SectionHeading title="Real Grades from Real Collectors" subtitle="Browse cards graded by the DCM community" />
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
-              {featuredCards.slice(0, 8).map((card) => (
-                <Link key={card.id} href={`/${card.category?.toLowerCase() || 'other'}/${card.id}`} className="group">
-                  <FeaturedCardSlab card={card} />
-                  <div className="text-center mt-2">
-                    <p className="text-sm font-medium text-gray-900 truncate group-hover:text-purple-600 transition-colors">{card.card_name || 'Graded Card'}</p>
-                    <p className="text-xs text-gray-500">{card.category}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
 
       {/* ================================================================ */}
       {/* FINAL CTA */}
