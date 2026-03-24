@@ -91,61 +91,79 @@ function FeaturedCardSlab({ card }: { card: any }) {
   const condition = card.conversational_condition_label || 'Graded'
   const name = card.card_name || 'Card'
   const serial = card.serial || ''
-  // Truncate name for label display
-  const displayName = name.length > 22 ? name.slice(0, 20) + '…' : name
+  const displayName = name.length > 20 ? name.slice(0, 18) + '…' : name
+
+  // Get sub-scores
+  const ws = card.conversational_weighted_sub_scores || {}
+  const ss = card.conversational_sub_scores || {}
+  const centering = ws.centering ?? ss.centering?.weighted ?? null
+  const corners = ws.corners ?? ss.corners?.weighted ?? null
+  const edges = ws.edges ?? ss.edges?.weighted ?? null
+  const surface = ws.surface ?? ss.surface?.weighted ?? null
 
   return (
     <div className="relative w-full max-w-[200px] mx-auto" style={{ aspectRatio: '280 / 460' }}>
       {/* Slab case photo background */}
-      <img
-        src="/labels/graded-card-slab.png"
-        alt=""
-        className="absolute inset-0 w-full h-full object-contain"
-        loading="lazy"
-      />
+      <img src="/labels/graded-card-slab.png" alt="" className="absolute inset-0 w-full h-full object-contain" loading="lazy" />
 
-      {/* Label in the label slot */}
+      {/* Modern dark label in the label slot */}
       <div className="absolute overflow-hidden" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
         <div
-          className="w-full flex items-center px-[6%] py-[3%]"
+          className="w-full flex items-stretch"
           style={{
             aspectRatio: '3.5 / 1',
             background: 'linear-gradient(135deg, #1a1625 0%, #2d1f47 50%, #1a1625 100%)',
             borderBottom: '1px solid rgba(139,92,246,0.3)',
           }}
         >
-          {/* Left: DCM logo + card info */}
-          <div className="flex-1 min-w-0 pr-1">
-            <div className="flex items-center gap-1 mb-0.5">
-              <img src="/DCM Logo white.png" alt="" className="h-[10px] w-auto opacity-80" />
-              <span style={{ fontSize: '5px', color: 'rgba(255,255,255,0.5)', letterSpacing: '0.05em' }}>GRADING</span>
-            </div>
-            <div className="text-white font-bold leading-none truncate" style={{ fontSize: '7px' }}>
+          {/* Left: DCM logo column */}
+          <div className="flex flex-col items-center justify-center px-[4%]" style={{ width: '15%' }}>
+            <img src="/DCM Logo white.png" alt="" className="w-[14px] h-auto opacity-90" />
+          </div>
+
+          {/* Center: Card info */}
+          <div className="flex-1 flex flex-col justify-center min-w-0 py-[2%]">
+            <div className="text-white font-bold leading-tight truncate" style={{ fontSize: '6.5px' }}>
               {displayName}
             </div>
             {serial && (
-              <div style={{ fontSize: '4.5px', color: 'rgba(255,255,255,0.4)', marginTop: '1px' }} className="font-mono truncate">
+              <div className="font-mono truncate" style={{ fontSize: '4px', color: 'rgba(255,255,255,0.4)', marginTop: '1px' }}>
                 {serial}
+              </div>
+            )}
+            {/* Sub-scores row */}
+            {centering !== null && (
+              <div className="flex gap-[2px] mt-[2px]">
+                {[
+                  { label: 'C', val: centering },
+                  { label: 'Co', val: corners },
+                  { label: 'E', val: edges },
+                  { label: 'S', val: surface },
+                ].map((s) => (
+                  <div key={s.label} className="text-center" style={{ fontSize: '4px' }}>
+                    <div style={{ color: 'rgba(255,255,255,0.35)' }}>{s.label}</div>
+                    <div style={{ color: s.val != null && s.val >= 10 ? 'rgba(34,197,94,0.9)' : 'rgba(255,255,255,0.7)' }} className="font-bold">{s.val ?? '—'}</div>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Right: Grade circle */}
+          {/* Right: Grade with glow */}
           {grade !== null && (
-            <div className="flex-shrink-0 flex flex-col items-center">
+            <div className="flex flex-col items-center justify-center px-[4%]" style={{ width: '22%' }}>
               <div
-                className="rounded-full flex items-center justify-center font-bold text-white"
+                className="font-bold text-white leading-none"
                 style={{
-                  width: '22px',
-                  height: '22px',
-                  fontSize: '10px',
-                  background: grade >= 9 ? 'linear-gradient(135deg, #22c55e, #16a34a)' : grade >= 7 ? 'linear-gradient(135deg, #8b5cf6, #6d28d9)' : 'linear-gradient(135deg, #f59e0b, #d97706)',
-                  boxShadow: grade >= 9 ? '0 0 6px rgba(34,197,94,0.5)' : '0 0 6px rgba(139,92,246,0.4)',
+                  fontSize: '14px',
+                  textShadow: grade >= 9
+                    ? '0 0 8px rgba(34,197,94,0.6), 0 0 16px rgba(34,197,94,0.3)'
+                    : '0 0 8px rgba(139,92,246,0.5), 0 0 16px rgba(139,92,246,0.25)',
                 }}
               >
                 {grade}
               </div>
-              <div className="text-center mt-0.5" style={{ fontSize: '4px', color: 'rgba(255,255,255,0.6)' }}>
+              <div className="uppercase font-semibold text-center leading-tight" style={{ fontSize: '3.5px', color: 'rgba(255,255,255,0.6)', marginTop: '1px', letterSpacing: '0.05em' }}>
                 {condition}
               </div>
             </div>
@@ -153,25 +171,17 @@ function FeaturedCardSlab({ card }: { card: any }) {
         </div>
       </div>
 
-      {/* Card image in the lower window */}
+      {/* Card image */}
       <div className="absolute overflow-hidden" style={{ top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }}>
         {card.front_url ? (
-          <img
-            src={card.front_url}
-            alt={name}
-            className="w-full h-full object-contain"
-            loading="lazy"
-          />
+          <img src={card.front_url} alt={name} className="w-full h-full object-contain" loading="lazy" />
         ) : (
           <div className="w-full h-full bg-gray-800" />
         )}
       </div>
 
       {/* Gloss overlay */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.03) 100%)' }}
-      />
+      <div className="absolute inset-0 pointer-events-none" style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.03) 100%)' }} />
     </div>
   )
 }
@@ -992,6 +1002,10 @@ export default function WhyDcmPage() {
               See how your card&apos;s <span className="font-semibold text-purple-600">grade affects its market value</span>. We pull grade-adjusted pricing so you can understand the real-world impact of condition on what your card is worth.
             </p>
           </div>
+          {/* Price by Grade chart */}
+          <div className="mt-6 bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 overflow-hidden">
+            <Image src="/why-dcm/Price-graded-cards.png" alt="Price by Grade — market prices from raw to graded" width={900} height={300} className="w-full h-auto" />
+          </div>
         </div>
       </section>
 
@@ -1070,43 +1084,9 @@ export default function WhyDcmPage() {
                 </div>
               ))}
             </div>
-            <div className="bg-gray-50 rounded-2xl border border-gray-200 p-6 text-center">
-              <div className="grid grid-cols-5 gap-2 mb-4">
-                {['Front', 'Back', 'Report', 'Raw F', 'Raw B'].map((label) => (
-                  <div key={label} className="aspect-[3/4] bg-gray-200 rounded-lg flex items-center justify-center">
-                    <span className="text-[9px] text-gray-500 font-medium">{label}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="text-gray-500 text-xs">5 professional images generated automatically for every listing</p>
+            <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-200">
+              <Image src="/why-dcm/insta-list-to-ebay-DCM.png" alt="DCM InstaList to eBay — listing details view" width={600} height={800} className="w-full h-auto" />
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
-      {/* PORTFOLIO — CARD LOVERS */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-50 to-indigo-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-10">
-            <span className="inline-block bg-purple-100 text-purple-700 text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full mb-4">Card Lovers Exclusive</span>
-            <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">Portfolio Market Pricing</h2>
-            <p className="mt-3 text-base sm:text-lg text-gray-600 max-w-2xl mx-auto">Track your entire collection&apos;s value in real-time. See price movements, identify your top cards, and understand how grades impact value.</p>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {[
-              { title: 'Total Value', desc: 'See your entire collection\u2019s market value at a glance', icon: '$' },
-              { title: 'Price Movers', desc: 'Track gainers and losers as prices change', icon: '\u2191' },
-              { title: 'Top Cards', desc: 'Identify your most valuable cards by grade and type', icon: '\u2605' },
-              { title: 'Grade vs Value', desc: 'Understand how each grade level impacts market price', icon: '\u2261' },
-            ].map((feature) => (
-              <div key={feature.title} className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center mb-3 text-purple-600 font-bold text-lg">{feature.icon}</div>
-                <h3 className="font-bold text-gray-900 text-sm">{feature.title}</h3>
-                <p className="text-gray-500 text-xs mt-1">{feature.desc}</p>
-              </div>
-            ))}
           </div>
         </div>
       </section>
@@ -1132,6 +1112,11 @@ export default function WhyDcmPage() {
               </div>
             ))}
           </div>
+          {/* Card Lover + VIP label example */}
+          <div className="mt-8 max-w-md mx-auto rounded-xl overflow-hidden shadow-lg border border-gray-200">
+            <Image src="/why-dcm/card-lover-vip-label.png" alt="Card Lover and VIP badges on a graded card label" width={600} height={200} className="w-full h-auto" />
+          </div>
+          <p className="text-gray-500 text-xs text-center mt-3">Card Lover and VIP badges displayed on a graded card label</p>
         </div>
       </section>
 
@@ -1141,8 +1126,9 @@ export default function WhyDcmPage() {
       <section className="py-16 sm:py-24 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <SectionHeading title="Simple, Affordable Pricing" subtitle="Credits never expire. Buy what you need, grade when you're ready." />
-          <div className="grid sm:grid-cols-3 gap-6 mb-10">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-10">
             {[
+              { name: 'VIP', price: '$99', credits: '150', perGrade: '$0.66', bonus: 'VIP badge on all labels', popular: false },
               { name: 'Basic', price: '$2.99', credits: '1', perGrade: '$2.99', bonus: '+1 bonus on first purchase', popular: false },
               { name: 'Pro', price: '$9.99', credits: '5', perGrade: '$2.00', bonus: '+3 bonus on first purchase', popular: true },
               { name: 'Elite', price: '$19.99', credits: '20', perGrade: '$1.00', bonus: '+5 bonus on first purchase', popular: false },
