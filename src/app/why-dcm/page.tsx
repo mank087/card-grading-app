@@ -661,10 +661,12 @@ export default function WhyDcmPage() {
           {/* Desktop: 3-column layout | Mobile: stacked */}
           <div className="grid lg:grid-cols-3 gap-8 lg:gap-6 items-start">
 
-            {/* Left: Grading scan animation */}
+            {/* Left: Grading scan animation — fixed height prevents layout shift */}
             <div className="flex justify-center lg:justify-start">
-              <div className="w-full max-w-[300px]">
-                <HeroGradingAnimation rawCardImage="/Sports/drake may - daniel- williams f.png" />
+              <div className="w-full max-w-[300px] h-[540px] relative overflow-hidden">
+                <div className="absolute inset-0">
+                  <HeroGradingAnimation rawCardImage="/Sports/drake may - daniel- williams f.png" />
+                </div>
               </div>
             </div>
 
@@ -770,43 +772,91 @@ export default function WhyDcmPage() {
       {/* DETAILED CARD REPORTS */}
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <SectionHeading title="Detailed Card Reports" subtitle="Every grade comes with a full breakdown — not just a number" />
-          <div className="grid md:grid-cols-2 gap-10 items-center">
-            {/* Featured card showcase */}
-            {featuredCards.length > 0 && (
-              <div className="grid grid-cols-2 gap-4">
-                {featuredCards.slice(0, 4).map((card) => (
-                  <FeaturedCardSlab key={card.id} card={card} />
-                ))}
-              </div>
-            )}
-            {featuredCards.length === 0 && (
-              <div className="aspect-square bg-gray-100 rounded-2xl flex items-center justify-center">
-                <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
-              </div>
-            )}
 
-            <div className="space-y-5">
-              {[
-                { title: 'Sub-Grade Breakdown', desc: 'Centering, corners, edges, and surface — each scored for front and back with a weighted composite.', color: 'purple' },
-                { title: 'Defect Analysis', desc: 'Identified defects are cataloged with severity ratings, locations, and descriptions so you know exactly what was found.', color: 'blue' },
-                { title: 'Condition Label', desc: 'Every grade includes a human-readable condition label — from "Poor" to "Gem Mint" — so there\'s no confusion.', color: 'green' },
-                { title: 'Image Confidence Rating', desc: 'We tell you how confident our system is in the grade based on image quality, so you know when to retake photos.', color: 'amber' },
-              ].map((item) => (
-                <div key={item.title} className="flex gap-4">
-                  <div className={`w-8 h-8 rounded-lg bg-${item.color}-100 flex items-center justify-center flex-shrink-0 mt-0.5`}>
-                    <svg className={`w-4 h-4 text-${item.color}-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-gray-900">{item.title}</h3>
-                    <p className="text-gray-600 text-sm mt-0.5">{item.desc}</p>
-                  </div>
-                </div>
-              ))}
+          {/* Desktop: 3-column (left cards | center text | right cards), Mobile: stacked */}
+          <div className="grid lg:grid-cols-3 gap-8 lg:gap-6 items-center">
+
+            {/* Left column: One Piece + Pokemon */}
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
+              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
+                <Image src="/why-dcm/one-piece-graded-card.png" alt="One Piece Monkey.D.Luffy graded card report" width={560} height={900} className="w-full h-auto" />
+              </div>
+              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
+                <Image src="/why-dcm/pokemon-graded-card.png" alt="Pokemon Charizard VMAX graded card report" width={560} height={900} className="w-full h-auto" />
+              </div>
             </div>
+
+            {/* Center column: feature descriptions */}
+            <div className="space-y-6 lg:px-2">
+              <div className="flex gap-4">
+                <div className="w-9 h-9 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Sub-Grade Breakdown</h3>
+                  <p className="text-gray-600 text-sm mt-0.5">Centering, corners, edges, and surface — each scored for front and back with a weighted composite.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Defect Analysis</h3>
+                  <p className="text-gray-600 text-sm mt-0.5">Identified defects are cataloged with severity ratings, locations, and descriptions so you know exactly what was found.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-9 h-9 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Condition Label</h3>
+                  <p className="text-gray-600 text-sm mt-0.5">Every grade includes a human-readable condition label — from &quot;Poor&quot; to &quot;Gem Mint&quot; — so there&apos;s no confusion.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Image Confidence Rating</h3>
+                  <p className="text-gray-600 text-sm mt-0.5">We tell you how confident our system is in the grade based on image quality, so you know when to retake photos.</p>
+                </div>
+              </div>
+              <div className="flex gap-4">
+                <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Market Value Estimate</h3>
+                  <p className="text-gray-600 text-sm mt-0.5">Every report includes a grade-adjusted market value pulled from multiple pricing sources.</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Right column: Baseball + Football */}
+            <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
+              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
+                <Image src="/why-dcm/baseball-graded-card.png" alt="Shohei Ohtani graded card report" width={560} height={900} className="w-full h-auto" />
+              </div>
+              <div className="rounded-xl overflow-hidden shadow-lg border border-gray-200">
+                <Image src="/why-dcm/football-graded-card.png" alt="Jaxson Dart graded card report" width={560} height={900} className="w-full h-auto" />
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
