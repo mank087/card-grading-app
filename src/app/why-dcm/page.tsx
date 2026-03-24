@@ -5,6 +5,41 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from '@/app/sports-grading/HeroGradingAnimation'
+import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart'
+import GradeDistributionChart from '@/components/market-pricing/GradeDistributionChart'
+import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart'
+import TopSetsChart from '@/components/market-pricing/TopSetsChart'
+import PriceSourceChart from '@/components/market-pricing/PriceSourceChart'
+
+// Static mock data for decorative background charts
+const MOCK_CATEGORIES = [
+  { category: 'Pokemon', count: 42, value: 3840.50, percentage: 38.2 },
+  { category: 'Sports', count: 28, value: 2950.00, percentage: 29.3 },
+  { category: 'MTG', count: 18, value: 1620.75, percentage: 16.1 },
+  { category: 'Lorcana', count: 12, value: 980.25, percentage: 9.7 },
+  { category: 'One Piece', count: 8, value: 670.00, percentage: 6.7 },
+]
+const MOCK_GRADES = [
+  { grade: '10', count: 8 }, { grade: '9.5', count: 14 }, { grade: '9', count: 22 },
+  { grade: '8.5', count: 18 }, { grade: '8', count: 15 }, { grade: '7.5', count: 10 },
+  { grade: '7', count: 8 }, { grade: '6', count: 5 },
+]
+const MOCK_VALUES = [
+  { label: '$0-10', count: 18, min: 0.01, max: 10 }, { label: '$10-25', count: 24, min: 10, max: 25 },
+  { label: '$25-50', count: 20, min: 25, max: 50 }, { label: '$50-100', count: 16, min: 50, max: 100 },
+  { label: '$100-250', count: 12, min: 100, max: 250 }, { label: '$250+', count: 6, min: 250, max: 999999 },
+]
+const MOCK_SETS = [
+  { set: 'Prismatic Evolutions', category: 'Pokemon', value: 1240.00, count: 8 },
+  { set: 'Gold Standard Football', category: 'Sports', value: 980.00, count: 5 },
+  { set: 'Modern Horizons 3', category: 'MTG', value: 720.50, count: 6 },
+  { set: 'The First Chapter', category: 'Lorcana', value: 540.25, count: 4 },
+  { set: 'Topps Chrome', category: 'Sports', value: 480.00, count: 7 },
+]
+const MOCK_SOURCES = [
+  { source: 'PriceCharting', count: 78 }, { source: 'eBay', count: 14 },
+  { source: 'Scryfall', count: 10 }, { source: 'Unpriced', count: 6 },
+]
 
 declare global {
   interface Window {
@@ -779,8 +814,58 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       {/* MARKET PRICING */}
       {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-gray-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+      <section className="py-16 sm:py-24 bg-gray-50 relative overflow-hidden">
+        {/* Decorative background: mock dashboard charts at low opacity */}
+        <div className="absolute inset-0 pointer-events-none select-none" aria-hidden="true">
+          <div className="opacity-[0.07] origin-top scale-[0.6] sm:scale-75 md:scale-90" style={{ width: '100%', minWidth: '900px' }}>
+            {/* Mock summary cards */}
+            <div className="max-w-7xl mx-auto px-4 mb-6">
+              <div className="grid grid-cols-3 gap-4">
+                <div className="bg-white rounded-xl shadow-md p-5">
+                  <div className="text-sm text-gray-500 mb-1">Total Portfolio Value</div>
+                  <div className="text-2xl font-bold text-gray-900">$10,061.50</div>
+                </div>
+                <div className="bg-white rounded-xl shadow-md p-5">
+                  <div className="text-sm text-gray-500 mb-1">Cards With Value</div>
+                  <div className="text-2xl font-bold text-gray-900">92 / 108</div>
+                </div>
+                <div className="bg-white rounded-xl shadow-md p-5">
+                  <div className="text-sm text-gray-500 mb-1">Average Card Value</div>
+                  <div className="text-2xl font-bold text-gray-900">$109.36</div>
+                </div>
+              </div>
+            </div>
+            {/* Mock charts */}
+            <div className="max-w-7xl mx-auto px-4">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-6">
+                  <div className="bg-white rounded-xl p-6 border border-gray-100">
+                    <CategoryBreakdownChart data={MOCK_CATEGORIES} />
+                  </div>
+                  <div className="bg-white rounded-xl p-6 border border-gray-100">
+                    <GradeDistributionChart data={MOCK_GRADES} />
+                  </div>
+                </div>
+                <div className="space-y-6">
+                  <div className="bg-white rounded-xl p-6 border border-gray-100">
+                    <ValueDistributionChart data={MOCK_VALUES} />
+                  </div>
+                  <div className="bg-white rounded-xl p-6 border border-gray-100">
+                    <TopSetsChart data={MOCK_SETS} />
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-6 mt-6">
+                <div className="bg-white rounded-xl p-6 border border-gray-100">
+                  <PriceSourceChart data={MOCK_SOURCES} />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Foreground content */}
+        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">
           <SectionHeading title="Market Pricing at Your Fingertips" subtitle="Real-time pricing from multiple sources so you always know what your cards are worth" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-10">
             {[
@@ -798,7 +883,7 @@ export default function WhyDcmPage() {
               </div>
             ))}
           </div>
-          <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 text-center">
+          <div className="bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-200 p-6 text-center">
             <p className="text-gray-700">
               See how your card&apos;s <span className="font-semibold text-purple-600">grade affects its market value</span>. We pull grade-adjusted pricing so you can understand the real-world impact of condition on what your card is worth.
             </p>
