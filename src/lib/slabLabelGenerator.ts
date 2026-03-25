@@ -865,6 +865,111 @@ export async function downloadSlabLabel(
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Generate a fold-over slab label (single-sided print, fold in half).
+ * Back on top, front on bottom — fold bottom up to get both sides.
+ */
+export async function generateFoldOverSlabLabel(
+  data: SlabLabelData,
+  style: 'modern' | 'traditional'
+): Promise<Blob> {
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+
+  const totalHeightPt = LABEL_HEIGHT * 2;
+  const startX = (PAGE_WIDTH - LABEL_WIDTH) / 2;
+  const startY = (PAGE_HEIGHT - totalHeightPt) / 2;
+
+  // Render both sides
+  const [frontImg, backImg] = await Promise.all([
+    renderFrontLabelCanvas(data, style),
+    renderBackLabelCanvas(data, style),
+  ]);
+
+  // Header
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor('#9ca3af');
+  doc.text('FOLD-OVER LABEL — Print single-sided, cut, fold at dashed line', 50, 40);
+  doc.text(`${LABEL_WIDTH_IN}" × ${LABEL_HEIGHT_IN}" (each panel)`, PAGE_WIDTH - 50, 40, { align: 'right' });
+
+  // Top panel: BACK
+  placeLabelImage(doc, backImg, startX, startY);
+
+  // Bottom panel: FRONT
+  placeLabelImage(doc, frontImg, startX, startY + LABEL_HEIGHT);
+
+  // Outer cut guides
+  const guideColor = style === 'modern' ? '#999999' : '#000000';
+  doc.setDrawColor(guideColor);
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([3, 3], 0);
+  doc.rect(startX + TRIM_INSET_PT, startY + TRIM_INSET_PT,
+    LABEL_WIDTH - TRIM_INSET_PT * 2, totalHeightPt - TRIM_INSET_PT * 2, 'S');
+  doc.setLineDashPattern([], 0);
+
+  // Corner marks
+  const markLen = 8;
+  const cx = startX + TRIM_INSET_PT;
+  const cy = startY + TRIM_INSET_PT;
+  const cw = LABEL_WIDTH - TRIM_INSET_PT * 2;
+  const ch = totalHeightPt - TRIM_INSET_PT * 2;
+  doc.line(cx - markLen, cy, cx, cy);
+  doc.line(cx, cy - markLen, cx, cy);
+  doc.line(cx + cw, cy, cx + cw + markLen, cy);
+  doc.line(cx + cw, cy - markLen, cx + cw, cy);
+  doc.line(cx - markLen, cy + ch, cx, cy + ch);
+  doc.line(cx, cy + ch, cx, cy + ch + markLen);
+  doc.line(cx + cw, cy + ch, cx + cw + markLen, cy + ch);
+  doc.line(cx + cw, cy + ch, cx + cw, cy + ch + markLen);
+
+  // Fold line
+  const foldY = startY + LABEL_HEIGHT;
+  doc.setDrawColor('#aaaaaa');
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([4, 2], 0);
+  doc.line(cx, foldY, cx + cw, foldY);
+  doc.setLineDashPattern([], 0);
+
+  // Fold line label
+  doc.setFontSize(5);
+  doc.setTextColor('#aaaaaa');
+  doc.text('FOLD HERE', startX + LABEL_WIDTH / 2, foldY - 3, { align: 'center' });
+
+  // Panel labels
+  doc.setFontSize(6);
+  doc.setTextColor('#9ca3af');
+  doc.text('BACK', startX - 15, startY + LABEL_HEIGHT / 2, { angle: 90 });
+  doc.text('FRONT', startX - 15, startY + LABEL_HEIGHT + LABEL_HEIGHT / 2, { angle: 90 });
+
+  // Dimension annotation
+  doc.setFontSize(8);
+  doc.setTextColor('#6b7280');
+  doc.text(
+    `${LABEL_WIDTH_IN}" × ${(LABEL_HEIGHT_IN * 2).toFixed(1)}" total — fold at center`,
+    PAGE_WIDTH / 2, startY + totalHeightPt + 30, { align: 'center' }
+  );
+
+  return doc.output('blob');
+}
+
+export async function downloadFoldOverSlabLabelStandard(
+  data: SlabLabelData,
+  style: 'modern' | 'traditional'
+): Promise<void> {
+  const blob = await generateFoldOverSlabLabel(data, style);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  const sanitize = (text: string) => text.replace(/[^a-zA-Z0-9\s\-]/g, '').replace(/\s+/g, '-');
+  const cardName = sanitize(containsCJK(data.primaryName) ? extractAsciiSafe(data.primaryName, 'Card', data.englishName) : (data.primaryName || 'Card'));
+  const serial = sanitize(data.serial);
+  link.download = `DCM-FoldOver-Label-${cardName}-${serial}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
 export async function downloadBatchSlabLabels(
   dataArray: SlabLabelData[],
   style: 'modern' | 'traditional'

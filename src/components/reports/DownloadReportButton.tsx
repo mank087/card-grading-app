@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { CardGradingReport, ReportCardData } from './CardGradingReport';
 import { getAuthenticatedClient } from '../../lib/directAuth';
@@ -18,7 +18,8 @@ import { generateAveryLabel, CalibrationOffsets } from '../../lib/averyLabelGene
 import { generateToploaderLabelPair, generateFoldOverLabel8167, CalibrationOffsets as CalibrationOffsets8167 } from '../../lib/avery8167LabelGenerator';
 import { downloadCardImages, CardImageData } from '../../lib/cardImageGenerator';
 import { downloadSlabLabel, SlabLabelData } from '../../lib/slabLabelGenerator';
-import { downloadCustomSlabLabel } from '../../lib/customSlabLabelGenerator';
+import { downloadCustomSlabLabel, downloadFoldOverSlabLabel } from '../../lib/customSlabLabelGenerator';
+import { downloadFoldOverSlabLabelStandard } from '../../lib/slabLabelGenerator';
 import { loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { AveryLabelModal } from './AveryLabelModal';
 import { Avery8167LabelModal } from './Avery8167LabelModal';
@@ -1100,60 +1101,77 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
   };
 
   /**
-   * Handle Slab Insert Label PDF generation (duplex front/back)
+   * Build slab label data from card (shared by both print formats)
    */
-  const handleDownloadSlabLabel = async () => {
+  const buildSlabData = async (): Promise<SlabLabelData> => {
+    const cleanLabelData = getCardLabelData(card);
+    const weightedScores = card.conversational_weighted_sub_scores || {};
+    const subScores = card.conversational_sub_scores || {};
+    const cardUrl = card.serial
+      ? `https://dcmgrading.com/verify/${card.serial}`
+      : `${window.location.origin}/${cardType}/${card.id}`;
+    const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
+
+    const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
+      generateQRCodePlain(cardUrl),
+      loadLogoAsBase64().catch(() => undefined),
+      loadWhiteLogoAsBase64().catch(() => undefined),
+    ]);
+
+    return {
+      primaryName: cleanLabelData.primaryName,
+      contextLine: cleanLabelData.contextLine,
+      features: cleanLabelData.features,
+      featuresLine: cleanLabelData.featuresLine,
+      serial: cleanLabelData.serial,
+      grade: cleanLabelData.grade,
+      gradeFormatted: cleanLabelData.gradeFormatted,
+      condition: cleanLabelData.condition,
+      isAlteredAuthentic: cleanLabelData.isAlteredAuthentic,
+      englishName,
+      qrCodeDataUrl,
+      subScores: {
+        centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
+        corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
+        edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
+        surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
+      },
+      showFounderEmblem,
+      showVipEmblem,
+      showCardLoversEmblem,
+      logoDataUrl,
+      whiteLogoDataUrl,
+    };
+  };
+
+  // Print format selection state
+  const [showPrintFormatChoice, setShowPrintFormatChoice] = useState(false);
+
+  const handleDownloadSlabLabel = () => {
+    setIsLabelsDropdownOpen(false);
+    setShowPrintFormatChoice(true);
+  };
+
+  const handleSlabDownload = async (format: 'duplex' | 'foldover') => {
+    setShowPrintFormatChoice(false);
     try {
       setIsGenerating(true);
       setGeneratingType('label');
-      setIsLabelsDropdownOpen(false);
 
-      console.log('[SLAB LABEL] Starting generation...');
+      const slabData = await buildSlabData();
 
-      const cleanLabelData = getCardLabelData(card);
-      const weightedScores = card.conversational_weighted_sub_scores || {};
-      const subScores = card.conversational_sub_scores || {};
-      const cardUrl = card.serial
-        ? `https://dcmgrading.com/verify/${card.serial}`
-        : `${window.location.origin}/${cardType}/${card.id}`;
-      const englishName = card.featured || card.pokemon_featured || card.card_name || undefined;
-
-      const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
-        generateQRCodePlain(cardUrl),
-        loadLogoAsBase64().catch(() => undefined),
-        loadWhiteLogoAsBase64().catch(() => undefined),
-      ]);
-
-      const slabData: SlabLabelData = {
-        primaryName: cleanLabelData.primaryName,
-        contextLine: cleanLabelData.contextLine,
-        features: cleanLabelData.features,
-        featuresLine: cleanLabelData.featuresLine,
-        serial: cleanLabelData.serial,
-        grade: cleanLabelData.grade,
-        gradeFormatted: cleanLabelData.gradeFormatted,
-        condition: cleanLabelData.condition,
-        isAlteredAuthentic: cleanLabelData.isAlteredAuthentic,
-        englishName,
-        qrCodeDataUrl,
-        subScores: {
-          centering: weightedScores.centering ?? subScores.centering?.weighted ?? 0,
-          corners: weightedScores.corners ?? subScores.corners?.weighted ?? 0,
-          edges: weightedScores.edges ?? subScores.edges?.weighted ?? 0,
-          surface: weightedScores.surface ?? subScores.surface?.weighted ?? 0,
-        },
-        showFounderEmblem,
-        showVipEmblem,
-        showCardLoversEmblem,
-        logoDataUrl,
-        whiteLogoDataUrl,
-      };
-
-      // Use custom slab generator when a custom style is active, otherwise standard
-      if (customLabelConfig) {
-        await downloadCustomSlabLabel(slabData, customLabelConfig);
+      if (format === 'foldover') {
+        if (customLabelConfig) {
+          await downloadFoldOverSlabLabel(slabData, customLabelConfig);
+        } else {
+          await downloadFoldOverSlabLabelStandard(slabData, labelStyle === 'traditional' ? 'traditional' : 'modern');
+        }
       } else {
-        await downloadSlabLabel(slabData, labelStyle === 'traditional' ? 'traditional' : 'modern');
+        if (customLabelConfig) {
+          await downloadCustomSlabLabel(slabData, customLabelConfig);
+        } else {
+          await downloadSlabLabel(slabData, labelStyle === 'traditional' ? 'traditional' : 'modern');
+        }
       }
 
       console.log('[SLAB LABEL] ✅ PDF generated successfully');
@@ -1468,6 +1486,48 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         onConfirm={handleDownloadFoldOverLabel}
         isGenerating={isGenerating && generatingType === 'foldover'}
       />
+      {/* Print Format Choice Modal */}
+      {showPrintFormatChoice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowPrintFormatChoice(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full mx-4" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Print Format</h3>
+            <p className="text-sm text-gray-500 mb-4">Choose how you&apos;d like to print your slab label</p>
+            <div className="space-y-3">
+              <button
+                onClick={() => handleSlabDownload('duplex')}
+                className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Front + Back (Duplex)</p>
+                    <p className="text-xs text-gray-500">2-page PDF — requires double-sided printing</p>
+                  </div>
+                </div>
+              </button>
+              <button
+                onClick={() => handleSlabDownload('foldover')}
+                className="w-full text-left p-4 rounded-xl border-2 border-gray-200 hover:border-purple-400 hover:bg-purple-50 transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">Fold-Over (Single-Sided)</p>
+                    <p className="text-xs text-gray-500">1-page PDF — cut and fold, no duplex needed</p>
+                  </div>
+                </div>
+              </button>
+            </div>
+            <button onClick={() => setShowPrintFormatChoice(false)} className="w-full mt-3 text-sm text-gray-500 hover:text-gray-700 py-2">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

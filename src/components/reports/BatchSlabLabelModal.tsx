@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { generateBatchSlabLabels, getSlabLabelConfig, SlabLabelData } from '../../lib/slabLabelGenerator';
-import { generateBatchCustomSlabLabels } from '../../lib/customSlabLabelGenerator';
+import { generateBatchSlabLabels, generateFoldOverSlabLabel, getSlabLabelConfig, SlabLabelData } from '../../lib/slabLabelGenerator';
+import { generateBatchCustomSlabLabels, generateFoldOverSlabLabel as generateFoldOverCustom } from '../../lib/customSlabLabelGenerator';
 import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { getCardLabelData } from '../../lib/useLabelData';
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
@@ -64,6 +64,7 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [printFormat, setPrintFormat] = useState<'duplex' | 'foldover'>('duplex');
 
   // Use shared hook for style + custom styles
   const { labelStyle: hookLabelStyle, customStyles, activeConfig, switchStyle } = useCustomLabelStyle();
@@ -158,7 +159,31 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
 
       let blob: Blob;
 
-      if (localActiveConfig) {
+      if (printFormat === 'foldover') {
+        // Fold-over batch: download individual fold-over PDFs (one per card)
+        for (let i = 0; i < labelDataArray.length; i++) {
+          let fBlob: Blob;
+          if (localActiveConfig) {
+            fBlob = await generateFoldOverCustom(labelDataArray[i], localActiveConfig);
+          } else {
+            const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
+            fBlob = await generateFoldOverSlabLabel(labelDataArray[i], builtInStyle);
+          }
+          const url = URL.createObjectURL(fBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `DCM-FoldOver-Label-${i + 1}-of-${labelDataArray.length}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          setProgress(85 + Math.round((i / labelDataArray.length) * 15));
+          if (i < labelDataArray.length - 1) await new Promise(r => setTimeout(r, 300));
+        }
+        setProgress(100);
+        setTimeout(() => onClose(), 500);
+        return;
+      } else if (localActiveConfig) {
         // Custom style — use batch generator with same multi-up grid layout as standard
         blob = await generateBatchCustomSlabLabels(labelDataArray, localActiveConfig);
       } else {
@@ -283,6 +308,33 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Print format toggle */}
+        <div className="px-6 py-3 border-t border-gray-100">
+          <p className="text-xs font-semibold text-gray-600 mb-2">Print Format</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPrintFormat('duplex')}
+              className={`flex-1 text-xs py-2 px-3 rounded-lg border-2 transition-colors ${
+                printFormat === 'duplex'
+                  ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                  : 'border-gray-200 text-gray-600 hover:border-purple-300'
+              }`}
+            >
+              Duplex (Front + Back)
+            </button>
+            <button
+              onClick={() => setPrintFormat('foldover')}
+              className={`flex-1 text-xs py-2 px-3 rounded-lg border-2 transition-colors ${
+                printFormat === 'foldover'
+                  ? 'border-purple-500 bg-purple-50 text-purple-700 font-semibold'
+                  : 'border-gray-200 text-gray-600 hover:border-purple-300'
+              }`}
+            >
+              Fold-Over (Single-Sided)
+            </button>
+          </div>
         </div>
 
         {/* Footer */}

@@ -10,7 +10,7 @@ import type { CustomLabelConfig, DimensionPreset, ColorPreset } from '@/lib/labe
 import { LabelMockup } from '@/components/labels/LabelMockup'
 import { useLabelPreview } from '@/hooks/useLabelPreview'
 import { downloadCustomSlabLabel, downloadFoldOverSlabLabel } from '@/lib/customSlabLabelGenerator'
-import { downloadSlabLabel } from '@/lib/slabLabelGenerator'
+import { downloadSlabLabel, downloadFoldOverSlabLabelStandard } from '@/lib/slabLabelGenerator'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import { generateQRCodePlain, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '@/lib/foldableLabelGenerator'
 import type { FoldableLabelData } from '@/lib/foldableLabelGenerator'
@@ -337,6 +337,7 @@ function LabelGallery({
 }) {
   const [expandedTip, setExpandedTip] = useState<string | null>(null)
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [galleryPrintChoice, setGalleryPrintChoice] = useState<string | null>(null) // labelType.id when showing choice
 
   const labelProps = useMemo(() => {
     if (!selectedCard) return null
@@ -373,7 +374,10 @@ function LabelGallery({
       const style = labelType.style || 'modern'
 
       if (labelType.downloadType === 'slab') {
-        await downloadSlabLabel(slabData, style)
+        // Show format choice — actual download handled by handleGallerySlabDownload
+        setGalleryPrintChoice(labelType.id)
+        setDownloading(null)
+        return
 
       } else if (labelType.downloadType === 'avery') {
         // One-Touch (Avery 6871) — needs FoldableLabelData
@@ -468,6 +472,25 @@ function LabelGallery({
     }
   }
 
+  const handleGallerySlabDownload = async (labelTypeId: string, format: 'duplex' | 'foldover') => {
+    if (!slabData) return
+    setGalleryPrintChoice(null)
+    setDownloading(labelTypeId)
+    try {
+      const labelType = LABEL_TYPES.find(l => l.id === labelTypeId)
+      const style = labelType?.style || 'modern'
+      if (format === 'foldover') {
+        await downloadFoldOverSlabLabelStandard(slabData, style)
+      } else {
+        await downloadSlabLabel(slabData, style)
+      }
+    } catch (err) {
+      console.error('Download failed:', err)
+    } finally {
+      setDownloading(null)
+    }
+  }
+
   return (
     <section className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
       <div className="flex items-center justify-between mb-4">
@@ -528,15 +551,29 @@ function LabelGallery({
 
               {/* Quick download */}
               {selectedCard && (
-                <button
-                  onClick={() => handleQuickDownload(lt)}
-                  disabled={downloading === lt.id}
-                  className="mt-2 w-full text-xs px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 transition-colors font-medium"
-                >
-                  {downloading === lt.id ? 'Generating...' : (
-                    lt.downloadType === 'card-images' ? 'Download Images' : 'Download PDF'
+                <div className="relative mt-2">
+                  <button
+                    onClick={() => handleQuickDownload(lt)}
+                    disabled={downloading === lt.id}
+                    className="w-full text-xs px-3 py-1.5 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-400 transition-colors font-medium"
+                  >
+                    {downloading === lt.id ? 'Generating...' : (
+                      lt.downloadType === 'card-images' ? 'Download Images' : 'Download PDF'
+                    )}
+                  </button>
+                  {galleryPrintChoice === lt.id && lt.downloadType === 'slab' && (
+                    <div className="absolute bottom-full left-0 right-0 mb-1 bg-white rounded-lg shadow-xl border border-gray-200 p-2 z-20">
+                      <p className="text-[10px] font-semibold text-gray-600 mb-1 px-1">Print Format</p>
+                      <button onClick={() => handleGallerySlabDownload(lt.id, 'duplex')} className="w-full text-left px-2 py-1.5 rounded hover:bg-purple-50 text-[11px]">
+                        <span className="font-medium text-gray-900">Duplex (2-page)</span>
+                      </button>
+                      <button onClick={() => handleGallerySlabDownload(lt.id, 'foldover')} className="w-full text-left px-2 py-1.5 rounded hover:bg-purple-50 text-[11px]">
+                        <span className="font-medium text-gray-900">Fold-Over (1-page)</span>
+                      </button>
+                      <button onClick={() => setGalleryPrintChoice(null)} className="w-full text-center text-[10px] text-gray-400 mt-1">Cancel</button>
+                    </div>
                   )}
-                </button>
+                </div>
               )}
             </div>
           </div>
@@ -821,28 +858,22 @@ function CustomDesigner({
     })
   }
 
-  const handleDownload = async () => {
+  const [showCustomPrintChoice, setShowCustomPrintChoice] = useState(false)
+
+  const handleDownload = async (format: 'duplex' | 'foldover' = 'duplex') => {
     if (!previewData) return
+    setShowCustomPrintChoice(false)
     setIsDownloading(true)
     try {
-      await downloadCustomSlabLabel(previewData, config)
+      if (format === 'foldover') {
+        await downloadFoldOverSlabLabel(previewData, config)
+      } else {
+        await downloadCustomSlabLabel(previewData, config)
+      }
     } catch (err) {
       console.error('Custom label download failed:', err)
     } finally {
       setIsDownloading(false)
-    }
-  }
-
-  const [isDownloadingFoldOver, setIsDownloadingFoldOver] = useState(false)
-  const handleDownloadFoldOver = async () => {
-    if (!previewData) return
-    setIsDownloadingFoldOver(true)
-    try {
-      await downloadFoldOverSlabLabel(previewData, config)
-    } catch (err) {
-      console.error('Fold-over label download failed:', err)
-    } finally {
-      setIsDownloadingFoldOver(false)
     }
   }
 
@@ -1319,22 +1350,28 @@ function CustomDesigner({
               </div>
             </div>
 
-            {/* Download buttons */}
-            <div className="space-y-2">
+            {/* Download */}
+            <div className="relative">
               <button
-                onClick={handleDownload}
+                onClick={() => setShowCustomPrintChoice(!showCustomPrintChoice)}
                 disabled={isDownloading || !previewData}
                 className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold text-sm hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow"
               >
-                {isDownloading ? 'Generating PDF...' : 'Download Label (Front + Back PDF)'}
+                {isDownloading ? 'Generating PDF...' : 'Download Custom Label (PDF)'}
               </button>
-              <button
-                onClick={handleDownloadFoldOver}
-                disabled={isDownloadingFoldOver || !previewData}
-                className="w-full py-2 bg-white border-2 border-purple-300 text-purple-700 rounded-lg font-medium text-xs hover:bg-purple-50 hover:border-purple-400 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
-              >
-                {isDownloadingFoldOver ? 'Generating...' : 'Download Fold-Over Label (No Duplex Needed)'}
-              </button>
+              {showCustomPrintChoice && (
+                <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl border border-gray-200 p-3 z-20">
+                  <p className="text-xs font-semibold text-gray-700 mb-2">Print Format</p>
+                  <button onClick={() => handleDownload('duplex')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm">
+                    <span className="font-medium text-gray-900">Front + Back (Duplex)</span>
+                    <span className="block text-xs text-gray-500">2-page PDF — requires double-sided printing</span>
+                  </button>
+                  <button onClick={() => handleDownload('foldover')} className="w-full text-left px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors text-sm">
+                    <span className="font-medium text-gray-900">Fold-Over (Single-Sided)</span>
+                    <span className="block text-xs text-gray-500">1-page PDF — cut and fold, no duplex needed</span>
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Mobile bottom preview */}
