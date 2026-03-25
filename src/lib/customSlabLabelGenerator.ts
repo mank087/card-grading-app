@@ -224,7 +224,7 @@ function drawBorder(
   dpi: number
 ) {
   if (!config.borderEnabled || !config.borderWidth) return 0;
-  const TRIM_INSET = 0.02;
+  const TRIM_INSET = 0.005;
   const trim = Math.round(TRIM_INSET * dpi);
   const bw = Math.round(config.borderWidth * dpi);
   ctx.fillStyle = config.borderColor;
@@ -643,7 +643,7 @@ export async function generateCustomSlabLabel(
   );
 
   // Cut guides
-  const trimInset = 0.02 * INCH;
+  const trimInset = 0.005 * INCH;
   const cutX = singleX + trimInset;
   const cutY = singleY + trimInset;
   const cutW = labelWidthPt - trimInset * 2;
@@ -726,6 +726,142 @@ export async function downloadCustomSlabLabel(
 }
 
 // ============================================================================
+// FOLD-OVER LABEL GENERATOR
+// ============================================================================
+
+/**
+ * Generate a fold-over slab label PDF (single-sided print, fold in half).
+ * Front and back are stacked vertically with a dashed fold line between them.
+ * Total size: width × (height × 2), e.g. 2.8" × 1.6" for standard slab labels.
+ * User prints single-sided, cuts along outer guides, folds at the dashed line.
+ */
+export async function generateFoldOverSlabLabel(
+  data: SlabLabelData,
+  config: CustomLabelConfig
+): Promise<Blob> {
+  const BLEED_IN = 0.08;
+  const labelWidthPt = config.width * INCH;
+  const labelHeightPt = config.height * INCH;
+  const bleedPt = BLEED_IN * INCH;
+  const totalHeightPt = labelHeightPt * 2; // front + back stacked
+
+  const PAGE_W = 8.5 * INCH;
+  const PAGE_H = 11 * INCH;
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
+
+  // Center the combined label on page
+  const startX = (PAGE_W - labelWidthPt) / 2;
+  const startY = (PAGE_H - totalHeightPt) / 2;
+
+  // Render both sides at 300 DPI
+  const [frontCanvas, backCanvas] = await Promise.all([
+    renderFrontCanvas(data, config, PRINT_DPI),
+    renderBackCanvas(data, config, PRINT_DPI),
+  ]);
+  const frontImg = frontCanvas.toDataURL('image/png');
+  const backImg = backCanvas.toDataURL('image/png');
+
+  // Page header
+  doc.setFontSize(7);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor('#9ca3af');
+  doc.text('FOLD-OVER LABEL — Print single-sided, cut, fold at dashed line', 50, 40);
+  doc.text(`${config.width}" × ${config.height}" (each panel)`, PAGE_W - 50, 40, { align: 'right' });
+
+  // Place FRONT label (top panel) — this will be the outside when folded,
+  // but we render it upside-down so when folded it reads correctly
+  // Actually, for a fold-over that wraps around a slab opening:
+  // Top panel = BACK (faces up when folded), Bottom panel = FRONT (faces down/inside when folded)
+  // When the user folds the bottom panel up and over, the front shows on one side and back on the other.
+
+  // Top panel: BACK
+  doc.addImage(backImg, 'PNG',
+    startX - bleedPt, startY - bleedPt,
+    labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2
+  );
+
+  // Bottom panel: FRONT
+  doc.addImage(frontImg, 'PNG',
+    startX - bleedPt, startY + labelHeightPt - bleedPt,
+    labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2
+  );
+
+  // Outer cut guides (around the full 2.8" × 1.6" area)
+  const trimInset = 0.005 * INCH;
+  const cutX = startX + trimInset;
+  const cutY = startY + trimInset;
+  const cutW = labelWidthPt - trimInset * 2;
+  const cutH = totalHeightPt - trimInset * 2;
+
+  const guideColor = config.style === 'modern' ? '#999999' : '#000000';
+  doc.setDrawColor(guideColor);
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([3, 3], 0);
+  doc.rect(cutX, cutY, cutW, cutH, 'S');
+  doc.setLineDashPattern([], 0);
+
+  // Corner marks
+  const markLen = 8;
+  doc.setDrawColor(guideColor);
+  doc.setLineWidth(0.5);
+  doc.line(cutX - markLen, cutY, cutX, cutY);
+  doc.line(cutX, cutY - markLen, cutX, cutY);
+  doc.line(cutX + cutW, cutY, cutX + cutW + markLen, cutY);
+  doc.line(cutX + cutW, cutY - markLen, cutX + cutW, cutY);
+  doc.line(cutX - markLen, cutY + cutH, cutX, cutY + cutH);
+  doc.line(cutX, cutY + cutH, cutX, cutY + cutH + markLen);
+  doc.line(cutX + cutW, cutY + cutH, cutX + cutW + markLen, cutY + cutH);
+  doc.line(cutX + cutW, cutY + cutH, cutX + cutW, cutY + cutH + markLen);
+
+  // Fold line (dashed, at the midpoint between front and back)
+  const foldY = startY + labelHeightPt;
+  doc.setDrawColor('#aaaaaa');
+  doc.setLineWidth(0.5);
+  doc.setLineDashPattern([4, 2], 0);
+  doc.line(cutX, foldY, cutX + cutW, foldY);
+  doc.setLineDashPattern([], 0);
+
+  // Fold line label
+  doc.setFontSize(5);
+  doc.setTextColor('#aaaaaa');
+  doc.text('FOLD HERE', startX + labelWidthPt / 2, foldY - 3, { align: 'center' });
+
+  // Panel labels
+  doc.setFontSize(6);
+  doc.setTextColor('#9ca3af');
+  doc.text('BACK', startX - 15, startY + labelHeightPt / 2, { angle: 90 });
+  doc.text('FRONT', startX - 15, startY + labelHeightPt + labelHeightPt / 2, { angle: 90 });
+
+  // Dimension annotation
+  doc.setFontSize(8);
+  doc.setTextColor('#6b7280');
+  doc.text(
+    `${config.width}" × ${(config.height * 2).toFixed(1)}" total — fold at center`,
+    PAGE_W / 2, startY + totalHeightPt + 30, { align: 'center' }
+  );
+
+  return doc.output('blob');
+}
+
+/** Download a fold-over label as PDF */
+export async function downloadFoldOverSlabLabel(
+  data: SlabLabelData,
+  config: CustomLabelConfig,
+  filename: string = 'DCM-FoldOver-Label.pdf'
+): Promise<void> {
+  const blob = await generateFoldOverSlabLabel(data, config);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================================
 // BATCH CUSTOM LABEL GENERATOR (multi-up grid, same layout as standard batch)
 // ============================================================================
 
@@ -763,7 +899,7 @@ const BATCH_GRID_START_X = (BATCH_PAGE_WIDTH - BATCH_GRID_WIDTH) / 2;
 const BATCH_GRID_START_Y = (BATCH_PAGE_HEIGHT - BATCH_GRID_HEIGHT) / 2;
 
 // Trim inset for cut guides
-const BATCH_TRIM_INSET_IN = 0.02;
+const BATCH_TRIM_INSET_IN = 0.005;
 const BATCH_TRIM_INSET_PT = BATCH_TRIM_INSET_IN * BATCH_INCH;
 const BATCH_CUT_WIDTH = BATCH_LABEL_WIDTH - BATCH_TRIM_INSET_PT * 2;
 const BATCH_CUT_HEIGHT = BATCH_LABEL_HEIGHT - BATCH_TRIM_INSET_PT * 2;

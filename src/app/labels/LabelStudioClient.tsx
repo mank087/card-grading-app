@@ -9,7 +9,7 @@ import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG } 
 import type { CustomLabelConfig, DimensionPreset, ColorPreset } from '@/lib/labelPresets'
 import { LabelMockup } from '@/components/labels/LabelMockup'
 import { useLabelPreview } from '@/hooks/useLabelPreview'
-import { downloadCustomSlabLabel } from '@/lib/customSlabLabelGenerator'
+import { downloadCustomSlabLabel, downloadFoldOverSlabLabel } from '@/lib/customSlabLabelGenerator'
 import { downloadSlabLabel } from '@/lib/slabLabelGenerator'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
 import { generateQRCodePlain, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '@/lib/foldableLabelGenerator'
@@ -833,6 +833,19 @@ function CustomDesigner({
     }
   }
 
+  const [isDownloadingFoldOver, setIsDownloadingFoldOver] = useState(false)
+  const handleDownloadFoldOver = async () => {
+    if (!previewData) return
+    setIsDownloadingFoldOver(true)
+    try {
+      await downloadFoldOverSlabLabel(previewData, config)
+    } catch (err) {
+      console.error('Fold-over label download failed:', err)
+    } finally {
+      setIsDownloadingFoldOver(false)
+    }
+  }
+
   const handleSaveToCard = async () => {
     if (!selectedCard) return
     setIsSaving(true)
@@ -1306,14 +1319,23 @@ function CustomDesigner({
               </div>
             </div>
 
-            {/* Download */}
-            <button
-              onClick={handleDownload}
-              disabled={isDownloading || !previewData}
-              className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold text-sm hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow"
-            >
-              {isDownloading ? 'Generating PDF...' : 'Download Custom Label (PDF)'}
-            </button>
+            {/* Download buttons */}
+            <div className="space-y-2">
+              <button
+                onClick={handleDownload}
+                disabled={isDownloading || !previewData}
+                className="w-full py-2.5 bg-gradient-to-r from-purple-600 to-purple-700 text-white rounded-lg font-semibold text-sm hover:from-purple-700 hover:to-purple-800 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all shadow"
+              >
+                {isDownloading ? 'Generating PDF...' : 'Download Label (Front + Back PDF)'}
+              </button>
+              <button
+                onClick={handleDownloadFoldOver}
+                disabled={isDownloadingFoldOver || !previewData}
+                className="w-full py-2 bg-white border-2 border-purple-300 text-purple-700 rounded-lg font-medium text-xs hover:bg-purple-50 hover:border-purple-400 disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed transition-all"
+              >
+                {isDownloadingFoldOver ? 'Generating...' : 'Download Fold-Over Label (No Duplex Needed)'}
+              </button>
+            </div>
 
             {/* Mobile bottom preview */}
             {mobilePreviewUrl && (

@@ -650,10 +650,10 @@ function getMirroredLabelPosition(index: number) {
 
 // Trim inset: cut guides are slightly inside the full label dimensions
 // so that imprecise cutting still produces a label that fits the holder.
-const TRIM_INSET_IN = 0.02; // 0.02" per side
+const TRIM_INSET_IN = 0.005; // 0.005" per side — minimal inset so cut lines don't shrink the label
 const TRIM_INSET_PT = TRIM_INSET_IN * INCH;
-const CUT_WIDTH = LABEL_WIDTH - TRIM_INSET_PT * 2;   // ~2.76" cut area
-const CUT_HEIGHT = LABEL_HEIGHT - TRIM_INSET_PT * 2;  // ~0.76" cut area
+const CUT_WIDTH = LABEL_WIDTH - TRIM_INSET_PT * 2;   // ~2.79" cut area
+const CUT_HEIGHT = LABEL_HEIGHT - TRIM_INSET_PT * 2;  // ~0.79" cut area
 
 /**
  * Draw L-shaped corner crop marks at the four corners of the cut area.
