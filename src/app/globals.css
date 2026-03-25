@@ -124,3 +124,42 @@ body {
 .animate-float-slow { animation: floatSlow 6s ease-in-out infinite; }
 .animate-float-medium { animation: floatMedium 4s ease-in-out infinite; }
 .animate-float-fast { animation: floatFast 3s ease-in-out infinite; }
+
+/* Card analysis annotation animations */
+@keyframes fadeInSlide {
+  from { opacity: 0; transform: translateX(-10px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes pingSlow {
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.4); opacity: 0.3; }
+}
+@keyframes pulseSlow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+.animate-fade-in-delay-1 { animation: fadeInSlide 0.6s ease-out 0.3s both; }
+.animate-fade-in-delay-2 { animation: fadeInSlide 0.6s ease-out 0.6s both; }
+.animate-fade-in-delay-3 { animation: fadeInSlide 0.6s ease-out 0.9s both; }
+.animate-fade-in-delay-4 { animation: fadeInSlide 0.6s ease-out 1.2s both; }
+.animate-ping-slow { animation: pingSlow 2.5s ease-in-out infinite; }
+.animate-pulse-slow { animation: pulseSlow 2s ease-in-out infinite; }
+
+/* Push HelpBot above floating CTA bar on why-dcm page */
+body.has-floating-cta [class*="fixed"][class*="bottom-6"][class*="right-6"] {
+  bottom: 4.5rem !important;
+}
+
+/* Card analysis scanning effects */
+@keyframes scanLine {
+  0% { top: 15%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 85%; opacity: 0; }
+}
+@keyframes analysisPing {
+  0%, 100% { transform: scale(0); opacity: 0; }
+  15% { transform: scale(1); opacity: 0.8; }
+  30% { transform: scale(1.8); opacity: 0; }
+  31%, 99% { transform: scale(0); opacity: 0; }
+}

@@ -212,10 +212,10 @@ function FloatingCtaBar({
 
   // Rotating CTA messages
   const ctaMessages = [
-    { main: 'First grade free + bonus credits', sub: 'Sign up now and start grading instantly' },
-    { main: 'Grade your cards in minutes, not weeks', sub: 'No mailing required — keep your cards safe' },
-    { main: 'Custom labels, market pricing & more', sub: 'Everything you need to grade, display, and sell' },
-    { main: 'From $0.50 per card — credits never expire', sub: 'Buy what you need, grade when you\'re ready' },
+    { main: 'First grade free + bonus credits' },
+    { main: 'Grade cards in minutes, not weeks' },
+    { main: 'Labels, pricing & eBay listing' },
+    { main: 'From $0.50/card — credits never expire' },
   ]
   const [ctaIndex, setCtaIndex] = useState(0)
   const ctaIntervalRef = useRef<NodeJS.Timeout | null>(null)
@@ -225,6 +225,12 @@ function FloatingCtaBar({
       setCtaIndex((prev) => (prev + 1) % ctaMessages.length)
     }, 4000)
     return () => { if (ctaIntervalRef.current) clearInterval(ctaIntervalRef.current) }
+  }, [])
+
+  // Push the HelpBot icon above the floating CTA bar
+  useEffect(() => {
+    document.body.classList.add('has-floating-cta')
+    return () => { document.body.classList.remove('has-floating-cta') }
   }, [])
 
   if (isAuthenticated || !isVisible) return null
@@ -373,8 +379,7 @@ function FloatingCtaBar({
         <div className="bg-gray-900/95 backdrop-blur-lg border-t border-purple-500/30 shadow-2xl">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-semibold truncate transition-opacity duration-300">{ctaMessages[ctaIndex].main}</p>
-              <p className="text-purple-300 text-xs hidden sm:block transition-opacity duration-300">{ctaMessages[ctaIndex].sub}</p>
+              <p className="text-white text-sm font-semibold leading-snug">{ctaMessages[ctaIndex].main}</p>
             </div>
             <button
               onClick={onExpand}
@@ -578,9 +583,12 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       {/* HERO */}
       {/* ================================================================ */}
-      <section ref={heroRef} className="relative overflow-hidden bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900">
+      <section ref={heroRef} className="relative overflow-hidden bg-gradient-to-b from-gray-950 via-gray-900 to-slate-900">
+        {/* Subtle gradient overlay for depth */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.08),transparent_60%)]" />
+
         {/* Animated card backgrounds */}
-        <div className="absolute inset-0 opacity-15 hidden md:block">
+        <div className="absolute inset-0 opacity-[0.06] md:opacity-10">
           <div className="absolute top-16 left-[3%] w-28 h-40 animate-float-slow">
             <Image src="/promo-charizard.png" alt="" fill className="object-contain rotate-[-12deg]" loading="lazy" sizes="112px" />
           </div>
@@ -598,38 +606,38 @@ export default function WhyDcmPage() {
           </div>
         </div>
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-          <div className="flex flex-col xl:flex-row items-center gap-12">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-14 sm:py-24">
+          <div className="flex flex-col xl:flex-row items-center gap-10 xl:gap-12">
             {/* Hero text */}
             <div className="flex-1 text-center xl:text-left">
-              <div className="inline-flex items-center gap-2 bg-purple-800/40 border border-purple-500/30 rounded-full px-4 py-1.5 mb-6">
-                <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-                <span className="text-purple-200 text-sm font-medium">First Grade Free</span>
+              <div className="inline-flex items-center gap-2 bg-emerald-900/30 border border-emerald-500/25 rounded-full px-4 py-1.5 mb-6">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-300 text-sm font-medium">First Grade Free</span>
               </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold text-white leading-tight mb-6">
                 Card Grading,<br />
-                <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">In Your Hands</span>
+                <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">In Your Hands</span>
               </h1>
-              <p className="text-lg sm:text-xl text-gray-300 mb-8 max-w-xl mx-auto xl:mx-0">
+              <p className="text-base sm:text-lg text-gray-400 mb-8 max-w-xl mx-auto xl:mx-0 leading-relaxed">
                 DCM Grading puts the power of card grading in the hands of collectors. Instant results, detailed reports, market pricing, and custom labels — no mailing your cards, no waiting weeks.
               </p>
 
               {/* Trust signals */}
-              <div className="flex flex-wrap justify-center xl:justify-start gap-x-6 gap-y-2 text-sm text-purple-200">
+              <div className="flex flex-wrap justify-center xl:justify-start gap-x-5 gap-y-2 text-sm text-gray-400">
                 <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                  10-Point Grading Scale
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  10-Point Scale
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                   Instant Results
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                   From $0.50/Card
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                  <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                   Keep Your Cards
                 </span>
               </div>
@@ -638,19 +646,19 @@ export default function WhyDcmPage() {
             {/* Signup card */}
             {!isAuthenticated && !isLoading && (
               <div className="w-full max-w-md flex-shrink-0">
-                <div className="bg-gray-800/80 backdrop-blur-xl rounded-2xl border border-gray-700 overflow-hidden shadow-2xl">
-                  <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+                <div className="bg-white rounded-2xl overflow-hidden shadow-2xl shadow-black/30">
+                  <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
                     <h2 className="text-white font-bold text-lg">Start Grading for Free</h2>
-                    <p className="text-purple-200 text-sm">Your first grade is on us + bonus credits with first purchase</p>
+                    <p className="text-emerald-100 text-sm">Your first grade is on us + bonus credits with first purchase</p>
                   </div>
                   <div className="p-6">
                     {heroSuccess ? (
-                      <div className="bg-green-900/40 border border-green-500/30 text-green-300 px-4 py-3 rounded-xl text-sm text-center">{heroSuccess}</div>
+                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm text-center">{heroSuccess}</div>
                     ) : (
                       <>
                         <div className="space-y-2 mb-4">
                           <button onClick={() => handleHeroOAuth('google')} disabled={heroOauthLoading || heroLoading}
-                            className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 py-3 px-4 rounded-xl hover:bg-gray-100 disabled:opacity-50 transition-all font-medium text-sm">
+                            className="w-full flex items-center justify-center gap-3 bg-white text-gray-700 py-3 px-4 rounded-xl border-2 border-gray-200 hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-all font-medium text-sm">
                             <svg className="w-5 h-5" viewBox="0 0 24 24">
                               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
                               <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -668,22 +676,22 @@ export default function WhyDcmPage() {
                           </button>
                         </div>
                         <div className="relative mb-4">
-                          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-700" /></div>
-                          <div className="relative flex justify-center text-xs"><span className="px-3 bg-gray-800/80 text-gray-500">or email</span></div>
+                          <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+                          <div className="relative flex justify-center text-xs"><span className="px-3 bg-white text-gray-400">or email</span></div>
                         </div>
                         <form onSubmit={handleHeroEmail} className="space-y-3">
                           <input type="email" value={heroEmail} onChange={(e) => setHeroEmail(e.target.value)} placeholder="you@example.com" required
-                            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm" />
+                            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm" />
                           <input type="password" value={heroPassword} onChange={(e) => setHeroPassword(e.target.value)} placeholder="Password (6+ chars)" required minLength={6}
-                            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm" />
-                          {heroError && <p className="text-red-400 text-xs">{heroError}</p>}
+                            className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm" />
+                          {heroError && <p className="text-red-500 text-xs">{heroError}</p>}
                           <button type="submit" disabled={heroLoading}
-                            className="w-full bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-semibold text-sm hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 transition-all shadow-lg shadow-purple-500/25">
+                            className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 text-white py-3 rounded-xl font-semibold text-sm hover:from-emerald-700 hover:to-teal-700 disabled:opacity-50 transition-all shadow-lg shadow-emerald-500/25">
                             {heroLoading ? 'Creating Account...' : 'Create Free Account'}
                           </button>
                         </form>
-                        <p className="text-gray-500 text-[10px] text-center mt-3">
-                          By signing up you agree to our <Link href="/terms" className="text-purple-400">Terms</Link> and <Link href="/privacy" className="text-purple-400">Privacy Policy</Link>
+                        <p className="text-gray-400 text-[10px] text-center mt-3">
+                          By signing up you agree to our <Link href="/terms" className="text-emerald-600 hover:text-emerald-700">Terms</Link> and <Link href="/privacy" className="text-emerald-600 hover:text-emerald-700">Privacy Policy</Link>
                         </p>
                       </>
                     )}
@@ -695,11 +703,133 @@ export default function WhyDcmPage() {
             {/* Authenticated: show CTA to collection */}
             {isAuthenticated && !isLoading && (
               <div className="w-full max-w-md flex-shrink-0 text-center">
-                <Link href="/collection" className="inline-block bg-gradient-to-r from-purple-600 to-indigo-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:from-purple-700 hover:to-indigo-700 transition-all shadow-lg shadow-purple-500/25">
+                <Link href="/collection" className="inline-block bg-gradient-to-r from-emerald-600 to-teal-600 text-white px-8 py-4 rounded-2xl font-bold text-lg hover:from-emerald-700 hover:to-teal-700 transition-all shadow-lg shadow-emerald-500/25">
                   Go to My Collection
                 </Link>
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* CARD ANALYSIS VISUAL */}
+      {/* ================================================================ */}
+      <section className="py-12 sm:py-20 bg-white overflow-hidden">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="What DCM Optic™ Analyzes" subtitle="Every card is evaluated across four key categories for both front and back" />
+          {/* Desktop: card with side annotations */}
+          <div className="hidden md:block">
+            <div className="relative max-w-[400px] mx-auto">
+              <Image
+                src="/why-dcm/judge-graded-card.png"
+                alt="Aaron Judge graded card with DCM analysis points"
+                width={400}
+                height={580}
+                className="w-full h-auto rounded-xl shadow-2xl"
+                priority
+              />
+
+              {/* Corners — top-left corner of the actual card (inside slab) */}
+              <div className="absolute top-[30%] left-[-42%] flex items-center animate-fade-in-delay-1">
+                <div className="text-right mr-3 max-w-[150px]">
+                  <p className="text-sm font-bold text-purple-700">Corners</p>
+                  <p className="text-xs text-gray-500 leading-tight">Sharpness, wear, and rounding at all four corner points.</p>
+                </div>
+                <div className="w-16 h-[2px] bg-gradient-to-r from-purple-400 to-purple-600 animate-pulse-slow" />
+                <div className="w-6 h-6 rounded-full border-2 border-purple-500 bg-purple-500/20 animate-ping-slow flex-shrink-0" />
+                <div className="w-10 h-[2px] bg-purple-500/40" />
+              </div>
+
+              {/* Edges — right edge of the card, mid-height */}
+              <div className="absolute top-[45%] right-[-42%] flex items-center animate-fade-in-delay-2">
+                <div className="w-10 h-[2px] bg-blue-500/40" />
+                <div className="w-6 h-6 rounded-full border-2 border-blue-500 bg-blue-500/20 animate-ping-slow flex-shrink-0" />
+                <div className="w-16 h-[2px] bg-gradient-to-r from-blue-600 to-blue-400 animate-pulse-slow" />
+                <div className="ml-3 max-w-[150px]">
+                  <p className="text-sm font-bold text-blue-700">Edges</p>
+                  <p className="text-xs text-gray-500 leading-tight">Chipping, nicks, and border integrity along all four edges.</p>
+                </div>
+              </div>
+
+              {/* Surface — center of the card face */}
+              <div className="absolute top-[58%] left-[-42%] flex items-center animate-fade-in-delay-3">
+                <div className="text-right mr-3 max-w-[150px]">
+                  <p className="text-sm font-bold text-emerald-700">Surface</p>
+                  <p className="text-xs text-gray-500 leading-tight">Scratches, print lines, stains, and blemishes across the card face.</p>
+                </div>
+                <div className="w-16 h-[2px] bg-gradient-to-r from-emerald-400 to-emerald-600 animate-pulse-slow" />
+                <div className="w-6 h-6 rounded-full border-2 border-emerald-500 bg-emerald-500/20 animate-ping-slow flex-shrink-0" />
+                <div className="w-16 h-[2px] bg-emerald-500/40" />
+              </div>
+
+              {/* Centering — bottom border of the card */}
+              <div className="absolute bottom-[14%] right-[-42%] flex items-center animate-fade-in-delay-4">
+                <div className="w-6 h-[2px] bg-amber-500/40" />
+                <div className="w-6 h-6 rounded-full border-2 border-amber-500 bg-amber-500/20 animate-ping-slow flex-shrink-0" />
+                <div className="w-16 h-[2px] bg-gradient-to-r from-amber-600 to-amber-400 animate-pulse-slow" />
+                <div className="ml-3 max-w-[150px]">
+                  <p className="text-sm font-bold text-amber-700">Centering</p>
+                  <p className="text-xs text-gray-500 leading-tight">Left-right and top-bottom border symmetry measured on both sides.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Mobile: card image with scanning pings + category cards below */}
+          <div className="md:hidden">
+            <div className="max-w-[280px] mx-auto mb-6 relative">
+              <Image
+                src="/why-dcm/judge-graded-card.png"
+                alt="Aaron Judge graded card analyzed by DCM"
+                width={280}
+                height={400}
+                className="w-full h-auto rounded-xl shadow-2xl"
+                priority
+              />
+              {/* Scanning overlay with random analysis pings */}
+              <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+                {/* Scanning line */}
+                <div className="absolute left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-emerald-400/60 to-transparent" style={{ animation: 'scanLine 3s linear infinite' }} />
+                {/* Analysis pings at key card areas */}
+                <div className="absolute top-[25%] left-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 0s' }} />
+                <div className="absolute top-[25%] right-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 0.8s' }} />
+                <div className="absolute bottom-[22%] left-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 1.6s' }} />
+                <div className="absolute bottom-[22%] right-[15%] w-3 h-3 rounded-full bg-purple-400/50 border border-purple-400/80" style={{ animation: 'analysisPing 4s ease-in-out infinite 2.4s' }} />
+                <div className="absolute top-[50%] right-[12%] w-2.5 h-2.5 rounded-full bg-blue-400/50 border border-blue-400/80" style={{ animation: 'analysisPing 3.5s ease-in-out infinite 0.5s' }} />
+                <div className="absolute top-[40%] left-[12%] w-2.5 h-2.5 rounded-full bg-blue-400/50 border border-blue-400/80" style={{ animation: 'analysisPing 3.5s ease-in-out infinite 1.8s' }} />
+                <div className="absolute top-[45%] left-[35%] w-2 h-2 rounded-full bg-emerald-400/40 border border-emerald-400/70" style={{ animation: 'analysisPing 5s ease-in-out infinite 0.3s' }} />
+                <div className="absolute top-[55%] right-[30%] w-2 h-2 rounded-full bg-emerald-400/40 border border-emerald-400/70" style={{ animation: 'analysisPing 5s ease-in-out infinite 2s' }} />
+                <div className="absolute top-[35%] left-[50%] w-2 h-2 rounded-full bg-emerald-400/40 border border-emerald-400/70" style={{ animation: 'analysisPing 4.5s ease-in-out infinite 3s' }} />
+                <div className="absolute bottom-[35%] left-[25%] w-2.5 h-2.5 rounded-full bg-amber-400/40 border border-amber-400/70" style={{ animation: 'analysisPing 4s ease-in-out infinite 1s' }} />
+                <div className="absolute bottom-[30%] right-[20%] w-2.5 h-2.5 rounded-full bg-amber-400/40 border border-amber-400/70" style={{ animation: 'analysisPing 4s ease-in-out infinite 2.5s' }} />
+              </div>
+              {/* DCM Optic badge */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2">
+                <span className="inline-flex items-center gap-1.5 bg-gray-900/80 backdrop-blur-sm border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] text-emerald-300 font-medium">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                  DCM Optic™ Analyzing
+                </span>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { name: 'Corners', desc: 'Sharpness, wear, and rounding at all four corner points.', color: 'purple', icon: '◢' },
+                { name: 'Edges', desc: 'Chipping, nicks, and border integrity along all four edges.', color: 'blue', icon: '▬' },
+                { name: 'Surface', desc: 'Scratches, print lines, stains, and blemishes on the card face.', color: 'emerald', icon: '◻' },
+                { name: 'Centering', desc: 'Left-right and top-bottom border symmetry on both sides.', color: 'amber', icon: '⊞' },
+              ].map((cat, i) => (
+                <div key={cat.name} className={`bg-gray-50 border border-gray-200 rounded-xl p-3 animate-fade-in-delay-${i + 1}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-7 h-7 rounded-lg bg-${cat.color}-100 flex items-center justify-center flex-shrink-0`}>
+                      <span className={`text-${cat.color}-600 text-xs font-bold`}>{cat.icon}</span>
+                    </div>
+                    <h4 className={`text-sm font-bold text-${cat.color}-700`}>{cat.name}</h4>
+                  </div>
+                  <p className="text-[11px] text-gray-600 leading-snug">{cat.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -1109,36 +1239,6 @@ export default function WhyDcmPage() {
       </section>
 
       {/* ================================================================ */}
-      {/* EBAY INSTALIST */}
-      {/* ================================================================ */}
-      <section className="py-16 sm:py-24 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="List to eBay in Seconds" subtitle="Professional listings created automatically — connect your account and sell with one click" />
-          <div className="grid md:grid-cols-2 gap-10 items-center">
-            <div className="space-y-4">
-              {[
-                'Professional HTML description auto-generated with grade details',
-                '5 images auto-created: labeled front/back, raw front/back, and mini-report',
-                'Grade automatically mapped to eBay\'s condition system',
-                'Built-in shipping calculator with domestic and international options',
-                'Supports fixed price and auction formats',
-              ].map((item, i) => (
-                <div key={i} className="flex gap-3">
-                  <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  <p className="text-gray-700 text-sm">{item}</p>
-                </div>
-              ))}
-            </div>
-            <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-200">
-              <Image src="/why-dcm/insta-list-to-ebay-DCM.png" alt="DCM InstaList to eBay — listing details view" width={600} height={800} className="w-full h-auto" />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ================================================================ */}
       {/* LABEL STUDIO */}
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-gradient-to-br from-purple-900 via-indigo-900 to-violet-900 text-white">
@@ -1191,6 +1291,36 @@ export default function WhyDcmPage() {
 
       {/* ================================================================ */}
       {/* FEATURED CARDS GALLERY */}
+      {/* EBAY INSTALIST */}
+      {/* ================================================================ */}
+      <section className="py-16 sm:py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <SectionHeading title="List to eBay in Seconds" subtitle="Professional listings created automatically — connect your account and sell with one click" />
+          <div className="grid md:grid-cols-2 gap-10 items-center">
+            <div className="space-y-4">
+              {[
+                'Professional HTML description auto-generated with grade details',
+                '5 images auto-created: labeled front/back, raw front/back, and mini-report',
+                'Grade automatically mapped to eBay\'s condition system',
+                'Built-in shipping calculator with domestic and international options',
+                'Supports fixed price and auction formats',
+              ].map((item, i) => (
+                <div key={i} className="flex gap-3">
+                  <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <p className="text-gray-700 text-sm">{item}</p>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-2xl overflow-hidden shadow-lg border border-gray-200">
+              <Image src="/why-dcm/insta-list-to-ebay-DCM.png" alt="DCM InstaList to eBay — listing details view" width={600} height={800} className="w-full h-auto" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
       {/* ================================================================ */}
       {featuredCards.length > 0 && (
         <section className="py-16 sm:py-24 bg-white">
