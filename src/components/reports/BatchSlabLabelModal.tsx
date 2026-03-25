@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import { generateBatchSlabLabels, generateFoldOverSlabLabel, getSlabLabelConfig, SlabLabelData } from '../../lib/slabLabelGenerator';
-import { generateBatchCustomSlabLabels, generateFoldOverSlabLabel as generateFoldOverCustom } from '../../lib/customSlabLabelGenerator';
+import { generateBatchSlabLabels, generateBatchFoldOverSlabLabels, getSlabLabelConfig, SlabLabelData } from '../../lib/slabLabelGenerator';
+import { generateBatchCustomSlabLabels, generateBatchFoldOverCustomLabels } from '../../lib/customSlabLabelGenerator';
 import { generateQRCodePlain, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '../../lib/foldableLabelGenerator';
 import { getCardLabelData } from '../../lib/useLabelData';
 import { useCustomLabelStyle, type LabelStyleId } from '@/hooks/useCustomLabelStyle';
@@ -160,29 +160,13 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
       let blob: Blob;
 
       if (printFormat === 'foldover') {
-        // Fold-over batch: download individual fold-over PDFs (one per card)
-        for (let i = 0; i < labelDataArray.length; i++) {
-          let fBlob: Blob;
-          if (localActiveConfig) {
-            fBlob = await generateFoldOverCustom(labelDataArray[i], localActiveConfig);
-          } else {
-            const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
-            fBlob = await generateFoldOverSlabLabel(labelDataArray[i], builtInStyle);
-          }
-          const url = URL.createObjectURL(fBlob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `DCM-FoldOver-Label-${i + 1}-of-${labelDataArray.length}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          setProgress(85 + Math.round((i / labelDataArray.length) * 15));
-          if (i < labelDataArray.length - 1) await new Promise(r => setTimeout(r, 300));
+        // Fold-over batch: multiple fold-over labels per page in a single PDF
+        if (localActiveConfig) {
+          blob = await generateBatchFoldOverCustomLabels(labelDataArray, localActiveConfig);
+        } else {
+          const builtInStyle: 'modern' | 'traditional' = localStyle === 'traditional' ? 'traditional' : 'modern';
+          blob = await generateBatchFoldOverSlabLabels(labelDataArray, builtInStyle);
         }
-        setProgress(100);
-        setTimeout(() => onClose(), 500);
-        return;
       } else if (localActiveConfig) {
         // Custom style — use batch generator with same multi-up grid layout as standard
         blob = await generateBatchCustomSlabLabels(labelDataArray, localActiveConfig);
@@ -216,10 +200,14 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
     } finally {
       setIsGenerating(false);
     }
-  }, [selectedCards, localStyle, localActiveConfig, buildSlabLabelData, onClose]);
+  }, [selectedCards, localStyle, localActiveConfig, printFormat, buildSlabLabelData, onClose]);
 
-  const totalPages = Math.ceil(selectedCards.length / LABELS_PER_PAGE);
-  const totalSheets = totalPages; // Each sheet = 1 front page + 1 back page
+  // Fold-over: ~10 labels per page (single-sided), Duplex: LABELS_PER_PAGE per sheet (front+back)
+  const FOLDOVER_ROWS_PER_PAGE = 10;
+  const totalPages = printFormat === 'foldover'
+    ? Math.ceil(selectedCards.length / FOLDOVER_ROWS_PER_PAGE)
+    : Math.ceil(selectedCards.length / LABELS_PER_PAGE);
+  const totalSheets = totalPages;
 
   if (!isOpen) return null;
 
@@ -231,7 +219,11 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-white">Graded Slab Labels</h2>
-              <p className="text-purple-200 text-sm">2.8&quot; × 0.8&quot; — Duplex printing with cut guides</p>
+              <p className="text-purple-200 text-sm">
+                {printFormat === 'foldover'
+                  ? '5.6\u201d × 0.8\u201d — Single-sided fold-over with cut guides'
+                  : '2.8\u201d × 0.8\u201d — Duplex printing with cut guides'}
+              </p>
             </div>
             <button
               onClick={onClose}
@@ -256,11 +248,19 @@ export const BatchSlabLabelModal: React.FC<BatchSlabLabelModalProps> = ({
               </div>
               <div>
                 <div className="text-2xl font-bold text-indigo-600">{totalSheets}</div>
-                <div className="text-xs text-gray-500">{totalSheets === 1 ? 'Sheet' : 'Sheets'} (duplex)</div>
+                <div className="text-xs text-gray-500">
+                  {printFormat === 'foldover'
+                    ? (totalSheets === 1 ? 'Page' : 'Pages')
+                    : (totalSheets === 1 ? 'Sheet' : 'Sheets') + ' (duplex)'}
+                </div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-gray-700">{totalPages * 2}</div>
-                <div className="text-xs text-gray-500">Pages total</div>
+                <div className="text-2xl font-bold text-gray-700">
+                  {printFormat === 'foldover' ? totalPages : totalPages * 2}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {printFormat === 'foldover' ? 'Pages (single-sided)' : 'Pages total'}
+                </div>
               </div>
             </div>
           </div>
