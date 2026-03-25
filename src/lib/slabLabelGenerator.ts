@@ -390,9 +390,15 @@ async function renderFrontLabelCanvas(
     ctx.stroke();
   }
 
-  // Condition text — colors match back label
+  // Condition text — auto-size to fit within the grade area
   ctx.fillStyle = isModern ? 'rgba(255, 255, 255, 0.8)' : COLORS.purpleDark;
-  ctx.font = `bold ${condFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+  const maxCondWidth = gradeAreaWidth + 20; // allow slight overflow past grade circle but not to cut line
+  let actualCondFontSize = condFontSize;
+  ctx.font = `bold ${actualCondFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+  while (actualCondFontSize > 12 && ctx.measureText(conditionText).width > maxCondWidth) {
+    actualCondFontSize -= 1;
+    ctx.font = `bold ${actualCondFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+  }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap);
@@ -595,7 +601,13 @@ async function renderBackLabelCanvas(
 
   if (conditionText) {
     ctx.fillStyle = isModern ? 'rgba(255, 255, 255, 0.8)' : COLORS.purpleDark;
-    ctx.font = `bold ${condFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+    const maxCondWidthBack = CW - padding * 2 - 40; // stay within content area
+    let backCondSize = condFontSize;
+    ctx.font = `bold ${backCondSize}px 'Helvetica Neue', Arial, sans-serif`;
+    while (backCondSize > 12 && ctx.measureText(conditionText).width > maxCondWidthBack) {
+      backCondSize -= 1;
+      ctx.font = `bold ${backCondSize}px 'Helvetica Neue', Arial, sans-serif`;
+    }
     ctx.fillText(conditionText, centerX, centerStartY + gradeFontSize + condGapBack);
   }
 

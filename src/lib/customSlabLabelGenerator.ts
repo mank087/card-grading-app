@@ -340,7 +340,13 @@ export async function renderFrontCanvas(
   }
 
   ctx.fillStyle = light ? TRAD_COLORS.purpleDark : 'rgba(255, 255, 255, 0.8)';
-  ctx.font = `bold ${condFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+  const maxCondW = gradeAreaWidth + Math.round(20 * scale);
+  let actualCondSize = condFontSize;
+  ctx.font = `bold ${actualCondSize}px 'Helvetica Neue', Arial, sans-serif`;
+  while (actualCondSize > Math.round(12 * scale) && ctx.measureText(conditionText).width > maxCondW) {
+    actualCondSize -= 1;
+    ctx.font = `bold ${actualCondSize}px 'Helvetica Neue', Arial, sans-serif`;
+  }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText(conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap);
@@ -534,7 +540,13 @@ export async function renderBackCanvas(
 
   if (conditionText) {
     ctx.fillStyle = light ? TRAD_COLORS.purpleDark : 'rgba(255, 255, 255, 0.8)';
-    ctx.font = `bold ${condFontSize}px 'Helvetica Neue', Arial, sans-serif`;
+    const maxBackCondW = ECW - padding * 2 - Math.round(40 * scale);
+    let backCondSize = condFontSize;
+    ctx.font = `bold ${backCondSize}px 'Helvetica Neue', Arial, sans-serif`;
+    while (backCondSize > Math.round(12 * scale) && ctx.measureText(conditionText).width > maxBackCondW) {
+      backCondSize -= 1;
+      ctx.font = `bold ${backCondSize}px 'Helvetica Neue', Arial, sans-serif`;
+    }
     ctx.fillText(conditionText, centerX, centerStartY + gradeFontSize + condGap);
   }
 
