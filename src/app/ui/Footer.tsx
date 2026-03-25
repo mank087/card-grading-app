@@ -10,7 +10,7 @@ export default function Footer() {
     <footer className="bg-gray-900 text-white relative z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
-        <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
+        <div className="py-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
 
           {/* Company Info & Logo */}
           <div className="lg:col-span-1">
@@ -142,6 +142,11 @@ export default function Footer() {
             <h3 className="text-lg font-semibold mb-4">Resources</h3>
             <ul className="space-y-3 text-sm">
               <li>
+                <Link href="/why-dcm" className="text-gray-400 hover:text-white transition-colors">
+                  Why DCM
+                </Link>
+              </li>
+              <li>
                 <Link href="/blog" className="text-gray-400 hover:text-white transition-colors">
                   Blog
                 </Link>
@@ -181,29 +186,41 @@ export default function Footer() {
                   Pop Report
                 </Link>
               </li>
+            </ul>
+          </div>
+
+          {/* Card Databases */}
+          <div>
+            <h3 className="text-lg font-semibold mb-4">Card Databases</h3>
+            <ul className="space-y-3 text-sm">
               <li>
                 <Link href="/pokemon-database" className="text-gray-400 hover:text-white transition-colors">
-                  Pokémon Database
-                </Link>
-              </li>
-              <li>
-                <Link href="/onepiece-database" className="text-gray-400 hover:text-white transition-colors">
-                  One Piece Database
-                </Link>
-              </li>
-              <li>
-                <Link href="/lorcana-database" className="text-gray-400 hover:text-white transition-colors">
-                  Lorcana Database
+                  Pokémon
                 </Link>
               </li>
               <li>
                 <Link href="/mtg-database" className="text-gray-400 hover:text-white transition-colors">
-                  MTG Database
+                  Magic: The Gathering
+                </Link>
+              </li>
+              <li>
+                <Link href="/lorcana-database" className="text-gray-400 hover:text-white transition-colors">
+                  Disney Lorcana
+                </Link>
+              </li>
+              <li>
+                <Link href="/onepiece-database" className="text-gray-400 hover:text-white transition-colors">
+                  One Piece
                 </Link>
               </li>
               <li>
                 <Link href="/yugioh-database" className="text-gray-400 hover:text-white transition-colors">
-                  Yu-Gi-Oh! Database
+                  Yu-Gi-Oh!
+                </Link>
+              </li>
+              <li>
+                <Link href="/starwars-database" className="text-gray-400 hover:text-white transition-colors">
+                  Star Wars
                 </Link>
               </li>
             </ul>
