@@ -742,10 +742,10 @@ export async function downloadCustomSlabLabel(
 // ============================================================================
 
 /**
- * Generate a fold-over slab label PDF (single-sided print, fold along right edge).
- * Front on the LEFT, back on the RIGHT — fold the right panel behind the front.
- * Total size: (width × 2) × height, e.g. 5.6" × 0.8" for standard slab labels.
- * User prints single-sided, cuts along outer guides, folds at the dashed line.
+ * Generate a fold-over slab label PDF (single-sided print, fold along top edge).
+ * Back (upside-down) on TOP, front on BOTTOM.
+ * Fold the top panel down behind the front — the back label flips right-side up.
+ * Total size: width × (height × 2), e.g. 2.8" × 1.6" for standard slab labels.
  */
 export async function generateFoldOverSlabLabel(
   data: SlabLabelData,
@@ -755,41 +755,51 @@ export async function generateFoldOverSlabLabel(
   const labelWidthPt = config.width * INCH;
   const labelHeightPt = config.height * INCH;
   const bleedPt = BLEED_IN * INCH;
-  const totalWidthPt = labelWidthPt * 2; // front + back side by side
+  const totalHeightPt = labelHeightPt * 2; // back + front stacked
 
-  const PAGE_W = 11 * INCH;  // landscape letter
-  const PAGE_H = 8.5 * INCH;
+  const PAGE_W = 8.5 * INCH;
+  const PAGE_H = 11 * INCH;
 
-  const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'letter' });
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
   // Center the combined label on page
-  const startX = (PAGE_W - totalWidthPt) / 2;
-  const startY = (PAGE_H - labelHeightPt) / 2;
+  const startX = (PAGE_W - labelWidthPt) / 2;
+  const startY = (PAGE_H - totalHeightPt) / 2;
 
   // Render both sides at 300 DPI
   const [frontCanvas, backCanvas] = await Promise.all([
     renderFrontCanvas(data, config, PRINT_DPI),
     renderBackCanvas(data, config, PRINT_DPI),
   ]);
+
+  // Flip the back canvas 180° so it appears upside-down on the page
+  const flippedCanvas = document.createElement('canvas');
+  flippedCanvas.width = backCanvas.width;
+  flippedCanvas.height = backCanvas.height;
+  const fCtx = flippedCanvas.getContext('2d')!;
+  fCtx.translate(flippedCanvas.width, flippedCanvas.height);
+  fCtx.rotate(Math.PI);
+  fCtx.drawImage(backCanvas, 0, 0);
+  const flippedBackImg = flippedCanvas.toDataURL('image/png');
+
   const frontImg = frontCanvas.toDataURL('image/png');
-  const backImg = backCanvas.toDataURL('image/png');
 
   // Page header
   doc.setFontSize(7);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor('#9ca3af');
-  doc.text('FOLD-OVER LABEL — Print single-sided, cut, fold right panel behind front', 50, 30);
-  doc.text(`${config.width}" × ${config.height}" (each panel)`, PAGE_W - 50, 30, { align: 'right' });
+  doc.text('FOLD-OVER LABEL — Print single-sided, cut, fold top panel behind front', 50, startY - 30);
+  doc.text(`${config.width}" × ${config.height}" (each panel)`, PAGE_W - 50, startY - 30, { align: 'right' });
 
-  // Left panel: FRONT
-  doc.addImage(frontImg, 'PNG',
+  // Top panel: BACK (flipped 180°)
+  doc.addImage(flippedBackImg, 'PNG',
     startX - bleedPt, startY - bleedPt,
     labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2
   );
 
-  // Right panel: BACK
-  doc.addImage(backImg, 'PNG',
-    startX + labelWidthPt - bleedPt, startY - bleedPt,
+  // Bottom panel: FRONT (right-side up)
+  doc.addImage(frontImg, 'PNG',
+    startX - bleedPt, startY + labelHeightPt - bleedPt,
     labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2
   );
 
@@ -797,8 +807,8 @@ export async function generateFoldOverSlabLabel(
   const trimInset = 0.005 * INCH;
   const cx = startX + trimInset;
   const cy = startY + trimInset;
-  const cw = totalWidthPt - trimInset * 2;
-  const ch = labelHeightPt - trimInset * 2;
+  const cw = labelWidthPt - trimInset * 2;
+  const ch = totalHeightPt - trimInset * 2;
 
   const guideColor = config.style === 'modern' ? '#999999' : '#000000';
   doc.setDrawColor(guideColor);
@@ -820,31 +830,12 @@ export async function generateFoldOverSlabLabel(
   doc.line(cx + cw, cy + ch, cx + cw + markLen, cy + ch);
   doc.line(cx + cw, cy + ch, cx + cw, cy + ch + markLen);
 
-  // Vertical fold line at the right edge of the front label
-  const foldX = startX + labelWidthPt;
-  doc.setDrawColor('#aaaaaa');
-  doc.setLineWidth(0.5);
-  doc.setLineDashPattern([4, 2], 0);
-  doc.line(foldX, cy, foldX, cy + ch);
-  doc.setLineDashPattern([], 0);
-
-  // Fold line label
-  doc.setFontSize(5);
-  doc.setTextColor('#aaaaaa');
-  doc.text('FOLD', foldX, startY - 8, { align: 'center' });
-
-  // Panel labels above each panel
-  doc.setFontSize(6);
-  doc.setTextColor('#9ca3af');
-  doc.text('FRONT', startX + labelWidthPt / 2, startY - 15, { align: 'center' });
-  doc.text('BACK', startX + labelWidthPt + labelWidthPt / 2, startY - 15, { align: 'center' });
-
   // Dimension annotation below
   doc.setFontSize(8);
   doc.setTextColor('#6b7280');
   doc.text(
-    `${(config.width * 2).toFixed(1)}" × ${config.height}" total — fold right panel behind front`,
-    PAGE_W / 2, startY + labelHeightPt + 30, { align: 'center' }
+    `${config.width}" × ${(config.height * 2).toFixed(1)}" total — fold top panel behind front`,
+    PAGE_W / 2, startY + totalHeightPt + 25, { align: 'center' }
   );
 
   return doc.output('blob');
@@ -869,8 +860,8 @@ export async function downloadFoldOverSlabLabel(
 
 /**
  * Generate batch fold-over custom labels — multiple per page.
- * Each fold-over: front (left) + back (right) side by side.
- * Layout: 1 column × ~10 rows on portrait letter.
+ * Each fold-over: back (upside-down) on top, front on bottom, fold along top edge.
+ * Layout: 2 columns × ~5 rows on portrait letter.
  */
 export async function generateBatchFoldOverCustomLabels(
   dataArray: SlabLabelData[],
@@ -883,25 +874,29 @@ export async function generateBatchFoldOverCustomLabels(
   const labelWidthPt = config.width * INCH;
   const labelHeightPt = config.height * INCH;
   const bleedPt = BLEED_IN * INCH;
-  const foldWidthPt = labelWidthPt * 2;
+  const foldHeightPt = labelHeightPt * 2;
 
   const PAGE_W = 8.5 * INCH;
   const PAGE_H = 11 * INCH;
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
-  const rowMargin = 0.12 * INCH;
-  const cellH = labelHeightPt + rowMargin;
-  const rowsPerPage = Math.floor((PAGE_H - 1 * INCH) / cellH);
-  const gridStartX = (PAGE_W - foldWidthPt) / 2;
-  const gridStartY = (PAGE_H - rowsPerPage * cellH + rowMargin) / 2;
+  const rowMargin = 0.15 * INCH;
+  const colMargin = 0.2 * INCH;
+  const cellW = labelWidthPt + colMargin;
+  const cellH = foldHeightPt + rowMargin;
+  const COLS = 2;
+  const ROWS = Math.floor((PAGE_H - 1 * INCH) / cellH);
+  const labelsPerPage = COLS * ROWS;
+  const gridStartX = (PAGE_W - COLS * cellW + colMargin) / 2;
+  const gridStartY = (PAGE_H - ROWS * cellH + rowMargin) / 2;
 
-  const totalPages = Math.ceil(dataArray.length / rowsPerPage);
+  const totalPages = Math.ceil(dataArray.length / labelsPerPage);
 
   for (let page = 0; page < totalPages; page++) {
     if (page > 0) doc.addPage('letter', 'portrait');
-    const startIdx = page * rowsPerPage;
-    const endIdx = Math.min(startIdx + rowsPerPage, dataArray.length);
+    const startIdx = page * labelsPerPage;
+    const endIdx = Math.min(startIdx + labelsPerPage, dataArray.length);
 
     doc.setFontSize(7);
     doc.setFont('helvetica', 'normal');
@@ -909,8 +904,10 @@ export async function generateBatchFoldOverCustomLabels(
     doc.text(`FOLD-OVER LABELS — Page ${page + 1} of ${totalPages}`, 50, gridStartY - 15);
 
     for (let i = startIdx; i < endIdx; i++) {
-      const row = i - startIdx;
-      const x = gridStartX;
+      const idx = i - startIdx;
+      const col = idx % COLS;
+      const row = Math.floor(idx / COLS);
+      const x = gridStartX + col * cellW;
       const y = gridStartY + row * cellH;
 
       const [frontCanvas, backCanvas] = await Promise.all([
@@ -918,14 +915,23 @@ export async function generateBatchFoldOverCustomLabels(
         renderBackCanvas(dataArray[i], config, PRINT_DPI),
       ]);
 
-      // Place front (left)
-      doc.addImage(frontCanvas.toDataURL('image/png'), 'PNG',
+      // Flip back canvas 180°
+      const flipped = document.createElement('canvas');
+      flipped.width = backCanvas.width;
+      flipped.height = backCanvas.height;
+      const fCtx = flipped.getContext('2d')!;
+      fCtx.translate(flipped.width, flipped.height);
+      fCtx.rotate(Math.PI);
+      fCtx.drawImage(backCanvas, 0, 0);
+
+      // Top: BACK (flipped)
+      doc.addImage(flipped.toDataURL('image/png'), 'PNG',
         x - bleedPt, y - bleedPt,
         labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2);
 
-      // Place back (right)
-      doc.addImage(backCanvas.toDataURL('image/png'), 'PNG',
-        x + labelWidthPt - bleedPt, y - bleedPt,
+      // Bottom: FRONT
+      doc.addImage(frontCanvas.toDataURL('image/png'), 'PNG',
+        x - bleedPt, y + labelHeightPt - bleedPt,
         labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2);
 
       // Cut guides
@@ -935,15 +941,9 @@ export async function generateBatchFoldOverCustomLabels(
       doc.setLineWidth(0.3);
       doc.setLineDashPattern([2, 2], 0);
       doc.rect(x + trimInset, y + trimInset,
-        foldWidthPt - trimInset * 2, labelHeightPt - trimInset * 2, 'S');
+        labelWidthPt - trimInset * 2, foldHeightPt - trimInset * 2, 'S');
       doc.setLineDashPattern([], 0);
 
-      // Vertical fold line
-      doc.setDrawColor('#bbbbbb');
-      doc.setLineWidth(0.3);
-      doc.setLineDashPattern([3, 1.5], 0);
-      doc.line(x + labelWidthPt, y + trimInset, x + labelWidthPt, y + labelHeightPt - trimInset);
-      doc.setLineDashPattern([], 0);
     }
   }
 

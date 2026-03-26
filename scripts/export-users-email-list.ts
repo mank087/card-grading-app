@@ -1,14 +1,19 @@
 /**
- * Export Users for Email Advertising
+ * Export Users for Email Marketing (EmailOctopus format)
  *
  * Run with: npx tsx scripts/export-users-email-list.ts
  *
- * Outputs a CSV file with:
+ * Outputs a CSV file matching EmailOctopus import format:
+ * - Identifier (UUID)
  * - Email address
- * - Credits purchased (total_purchased)
- * - Credit balance (current)
- * - Paying customer (Yes/No)
- * - User status: "Paying Customer" | "Free Grader" | "Signed Up Only"
+ * - First name / Last name (from OAuth metadata)
+ * - User Status: purchased_credits | only_used_free_credit | didnt_use_free_credit_yet
+ * - Founder/VIP Status
+ * - Credits Purchased / Used / Balance
+ * - Paying Customer (Yes/No)
+ * - Tags (empty)
+ *
+ * Uses paginated fetches to handle any number of users (no 1000-row limit).
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -30,103 +35,210 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey, {
   auth: { autoRefreshToken: false, persistSession: false }
 })
 
+/**
+ * Paginated fetch — pulls all rows from a table, 1000 at a time.
+ */
+async function fetchAll(table: string, select: string, filters?: { column: string; op: string; value: any }[]) {
+  const PAGE_SIZE = 1000
+  let allData: any[] = []
+  let from = 0
+  let hasMore = true
+
+  while (hasMore) {
+    let query = supabase.from(table).select(select).range(from, from + PAGE_SIZE - 1)
+    if (filters) {
+      for (const f of filters) {
+        if (f.op === 'in') query = query.in(f.column, f.value)
+      }
+    }
+    const { data, error } = await query
+    if (error) throw new Error(`Error fetching ${table}: ${error.message}`)
+    if (!data || data.length === 0) {
+      hasMore = false
+    } else {
+      allData = allData.concat(data)
+      from += PAGE_SIZE
+      if (data.length < PAGE_SIZE) hasMore = false
+    }
+  }
+  return allData
+}
+
+/**
+ * Fetch all auth users via the admin API (paginated, 1000 per page).
+ */
+async function fetchAllAuthUsers() {
+  const allUsers: any[] = []
+  let page = 1
+  let hasMore = true
+
+  while (hasMore) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 })
+    if (error) throw new Error(`Error fetching auth users: ${error.message}`)
+    if (!data?.users || data.users.length === 0) {
+      hasMore = false
+    } else {
+      allUsers.push(...data.users)
+      if (data.users.length < 1000) {
+        hasMore = false
+      } else {
+        page++
+      }
+    }
+  }
+  return allUsers
+}
+
 async function exportUsers() {
-  console.log('\nFetching user data...\n')
+  console.log('\nFetching user data (paginated)...\n')
 
-  // 1. Get all users with emails
-  const { data: users, error: usersError } = await supabase
-    .from('users')
-    .select('id, email, created_at')
-
-  if (usersError) { console.error('Error fetching users:', usersError); return }
-  if (!users || users.length === 0) { console.log('No users found.'); return }
+  // 1. Get all auth users (includes metadata for names)
+  const authUsers = await fetchAllAuthUsers()
+  console.log(`  Auth users fetched: ${authUsers.length}`)
 
   // 2. Get all credit records
-  const { data: credits, error: creditsError } = await supabase
-    .from('user_credits')
-    .select('user_id, balance, total_purchased, total_used')
-
-  if (creditsError) { console.error('Error fetching credits:', creditsError); return }
+  const credits = await fetchAll('user_credits', 'user_id, balance, total_purchased, total_used, is_founder, is_vip')
+  console.log(`  Credit records fetched: ${credits.length}`)
 
   // 3. Get grade transactions to identify who has graded
-  const { data: gradeTransactions, error: txError } = await supabase
-    .from('credit_transactions')
-    .select('user_id, type')
-    .in('type', ['grade', 'regrade'])
-
-  if (txError) { console.error('Error fetching transactions:', txError); return }
+  const gradeTransactions = await fetchAll('credit_transactions', 'user_id, type', [
+    { column: 'type', op: 'in', value: ['grade', 'regrade'] }
+  ])
+  console.log(`  Grade transactions fetched: ${gradeTransactions.length}`)
 
   // Build lookup maps
-  const creditsByUser = new Map<string, { balance: number; total_purchased: number; total_used: number }>()
-  credits?.forEach(c => {
+  const creditsByUser = new Map<string, {
+    balance: number; total_purchased: number; total_used: number;
+    is_founder: boolean; is_vip: boolean;
+  }>()
+  credits.forEach((c: any) => {
     creditsByUser.set(c.user_id, {
-      balance: c.balance,
-      total_purchased: c.total_purchased,
-      total_used: c.total_used,
+      balance: c.balance ?? 0,
+      total_purchased: c.total_purchased ?? 0,
+      total_used: c.total_used ?? 0,
+      is_founder: c.is_founder ?? false,
+      is_vip: c.is_vip ?? false,
     })
   })
 
   const usersWhoGraded = new Set<string>()
-  gradeTransactions?.forEach(tx => {
+  gradeTransactions.forEach((tx: any) => {
     usersWhoGraded.add(tx.user_id)
   })
 
   // 4. Build rows
-  const rows: {
+  interface ExportRow {
+    identifier: string
     email: string
-    credits_purchased: number
-    credit_balance: number
-    paying_customer: string
+    first_name: string
+    last_name: string
     user_status: string
-    signup_date: string
-  }[] = []
+    founder_vip_status: string
+    credits_purchased: number
+    credits_used: number
+    credits_balance: number
+    paying_customer: string
+    tags: string
+  }
 
-  for (const user of users) {
+  const rows: ExportRow[] = []
+
+  for (const user of authUsers) {
     const credit = creditsByUser.get(user.id)
     const totalPurchased = credit?.total_purchased ?? 0
+    const totalUsed = credit?.total_used ?? 0
     const balance = credit?.balance ?? 0
-    const hasGraded = usersWhoGraded.has(user.id)
-    const isPaying = totalPurchased > 0
+    const isFounder = credit?.is_founder ?? false
+    const isVip = credit?.is_vip ?? false
 
+    // Parse names from OAuth metadata
+    const meta = user.user_metadata || {}
+    const fullName = meta.full_name || meta.name || ''
+    const nameParts = fullName.trim().split(/\s+/)
+    const firstName = nameParts[0] || ''
+    const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : ''
+
+    // User status
     let userStatus: string
-    if (isPaying) {
-      userStatus = 'Paying Customer'
-    } else if (hasGraded) {
-      userStatus = 'Free Grader'
+    if (totalPurchased > 0) {
+      userStatus = 'purchased_credits'
+    } else if (totalUsed > 0 || usersWhoGraded.has(user.id)) {
+      userStatus = 'only_used_free_credit'
+    } else if (balance > 0) {
+      userStatus = 'didnt_use_free_credit_yet'
     } else {
-      userStatus = 'Signed Up Only'
+      userStatus = 'didnt_use_free_credit_yet'
+    }
+
+    // Founder/VIP status
+    let founderVipStatus: string
+    if (isFounder && isVip) {
+      founderVipStatus = 'TRUE'
+    } else if (isFounder) {
+      founderVipStatus = 'TRUE'
+    } else if (isVip) {
+      founderVipStatus = 'TRUE'
+    } else {
+      founderVipStatus = 'FALSE'
     }
 
     rows.push({
-      email: user.email,
-      credits_purchased: totalPurchased,
-      credit_balance: balance,
-      paying_customer: isPaying ? 'Yes' : 'No',
+      identifier: user.id,
+      email: user.email || '',
+      first_name: firstName,
+      last_name: lastName,
       user_status: userStatus,
-      signup_date: new Date(user.created_at).toISOString().split('T')[0],
+      founder_vip_status: founderVipStatus,
+      credits_purchased: totalPurchased,
+      credits_used: totalUsed,
+      credits_balance: balance,
+      paying_customer: totalPurchased > 0 ? 'Yes' : 'No',
+      tags: '',
     })
   }
 
-  // Sort: paying customers first, then free graders, then signed up only
-  const statusOrder: Record<string, number> = { 'Paying Customer': 0, 'Free Grader': 1, 'Signed Up Only': 2 }
-  rows.sort((a, b) => statusOrder[a.user_status] - statusOrder[b.user_status])
+  // Sort: paying first (by credits desc), then free graders, then unused
+  const statusOrder: Record<string, number> = {
+    'purchased_credits': 0,
+    'only_used_free_credit': 1,
+    'didnt_use_free_credit_yet': 2,
+  }
+  rows.sort((a, b) => {
+    const orderDiff = (statusOrder[a.user_status] ?? 3) - (statusOrder[b.user_status] ?? 3)
+    if (orderDiff !== 0) return orderDiff
+    return b.credits_purchased - a.credits_purchased
+  })
 
   // 5. Summary
-  const paying = rows.filter(r => r.user_status === 'Paying Customer').length
-  const freeGraders = rows.filter(r => r.user_status === 'Free Grader').length
-  const signedUpOnly = rows.filter(r => r.user_status === 'Signed Up Only').length
+  const purchased = rows.filter(r => r.user_status === 'purchased_credits').length
+  const freeGraders = rows.filter(r => r.user_status === 'only_used_free_credit').length
+  const didntUse = rows.filter(r => r.user_status === 'didnt_use_free_credit_yet').length
+  const founders = rows.filter(r => r.founder_vip_status === 'TRUE').length
 
-  console.log('--- USER SUMMARY ---')
-  console.log(`Total users:       ${rows.length}`)
-  console.log(`Paying Customers:  ${paying}`)
-  console.log(`Free Graders:      ${freeGraders}`)
-  console.log(`Signed Up Only:    ${signedUpOnly}`)
+  console.log('\n--- USER SUMMARY ---')
+  console.log(`Total users:            ${rows.length}`)
+  console.log(`Purchased Credits:      ${purchased}`)
+  console.log(`Only Used Free Credit:  ${freeGraders}`)
+  console.log(`Didn't Use Free Credit: ${didntUse}`)
+  console.log(`Founders/VIPs:          ${founders}`)
   console.log()
 
   // 6. Write CSV
-  const header = 'Email,Credits Purchased,Credit Balance,Paying Customer,User Status,Signup Date'
+  const header = 'Identifier,Email address,First name,Last name,User Status,Founder/VIP Status,Credits Purchased,Credits Used,Credits Balance,Paying Customer,Tags'
   const csvLines = rows.map(r =>
-    `${escapeCsv(r.email)},${r.credits_purchased},${r.credit_balance},${r.paying_customer},${r.user_status},${r.signup_date}`
+    [
+      escapeCsv(r.identifier),
+      escapeCsv(r.email),
+      escapeCsv(r.first_name),
+      escapeCsv(r.last_name),
+      r.user_status,
+      r.founder_vip_status,
+      r.credits_purchased,
+      r.credits_used,
+      r.credits_balance,
+      r.paying_customer,
+      r.tags,
+    ].join(',')
   )
 
   const csv = [header, ...csvLines].join('\n')
@@ -139,6 +251,7 @@ async function exportUsers() {
 }
 
 function escapeCsv(value: string): string {
+  if (!value) return ''
   if (value.includes(',') || value.includes('"') || value.includes('\n')) {
     return `"${value.replace(/"/g, '""')}"`
   }
