@@ -662,10 +662,10 @@ function getMirroredLabelPosition(index: number) {
 
 // Trim inset: cut guides are slightly inside the full label dimensions
 // so that imprecise cutting still produces a label that fits the holder.
-const TRIM_INSET_IN = 0.005; // 0.005" per side — minimal inset so cut lines don't shrink the label
+const TRIM_INSET_IN = 0; // No inset — cut lines at exact label dimensions (2.8" × 0.8")
 const TRIM_INSET_PT = TRIM_INSET_IN * INCH;
-const CUT_WIDTH = LABEL_WIDTH - TRIM_INSET_PT * 2;   // ~2.79" cut area
-const CUT_HEIGHT = LABEL_HEIGHT - TRIM_INSET_PT * 2;  // ~0.79" cut area
+const CUT_WIDTH = LABEL_WIDTH - TRIM_INSET_PT * 2;   // 2.8" cut area
+const CUT_HEIGHT = LABEL_HEIGHT - TRIM_INSET_PT * 2;  // 0.8" cut area
 
 /**
  * Draw L-shaped corner crop marks at the four corners of the cut area.
@@ -944,6 +944,14 @@ export async function generateFoldOverSlabLabel(
   doc.line(cx + cw, cy + ch, cx + cw + markLen, cy + ch);
   doc.line(cx + cw, cy + ch, cx + cw, cy + ch + markLen);
 
+
+  // Fold alignment marks — small grey ticks outside the label at the fold point
+  const foldY = startY + LABEL_HEIGHT;
+  const foldMarkLen = 12;
+  doc.setDrawColor('#bbbbbb');
+  doc.setLineWidth(0.5);
+  doc.line(startX - foldMarkLen - 4, foldY, startX - 4, foldY); // left tick
+  doc.line(startX + LABEL_WIDTH + 4, foldY, startX + LABEL_WIDTH + foldMarkLen + 4, foldY); // right tick
 
   // Dimension annotation below
   doc.setFontSize(8);

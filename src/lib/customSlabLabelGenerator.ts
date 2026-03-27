@@ -213,7 +213,7 @@ function isLightTheme(config: CustomLabelConfig): boolean {
 
 /**
  * Draw a border inside the cut lines so it is fully visible after trimming.
- * The cut lines sit at TRIM_INSET (0.02") inside the content area.
+ * The cut lines sit at the exact label boundary (no inset).
  * The border is drawn from the cut line inward by borderWidth.
  */
 function drawBorder(
@@ -224,7 +224,7 @@ function drawBorder(
   dpi: number
 ) {
   if (!config.borderEnabled || !config.borderWidth) return 0;
-  const TRIM_INSET = 0.005;
+  const TRIM_INSET = 0;
   const trim = Math.round(TRIM_INSET * dpi);
   const bw = Math.round(config.borderWidth * dpi);
   ctx.fillStyle = config.borderColor;
@@ -655,7 +655,7 @@ export async function generateCustomSlabLabel(
   );
 
   // Cut guides
-  const trimInset = 0.005 * INCH;
+  const trimInset = 0;
   const cutX = singleX + trimInset;
   const cutY = singleY + trimInset;
   const cutW = labelWidthPt - trimInset * 2;
@@ -804,7 +804,7 @@ export async function generateFoldOverSlabLabel(
   );
 
   // Outer cut guides around the full combined area
-  const trimInset = 0.005 * INCH;
+  const trimInset = 0;
   const cx = startX + trimInset;
   const cy = startY + trimInset;
   const cw = labelWidthPt - trimInset * 2;
@@ -829,6 +829,14 @@ export async function generateFoldOverSlabLabel(
   doc.line(cx, cy + ch, cx, cy + ch + markLen);
   doc.line(cx + cw, cy + ch, cx + cw + markLen, cy + ch);
   doc.line(cx + cw, cy + ch, cx + cw, cy + ch + markLen);
+
+  // Fold alignment marks — small grey ticks outside the label at the fold point
+  const foldY = startY + labelHeightPt;
+  const foldMarkLen = 12;
+  doc.setDrawColor('#bbbbbb');
+  doc.setLineWidth(0.5);
+  doc.line(startX - foldMarkLen - 4, foldY, startX - 4, foldY);
+  doc.line(startX + labelWidthPt + 4, foldY, startX + labelWidthPt + foldMarkLen + 4, foldY);
 
   // Dimension annotation below
   doc.setFontSize(8);
@@ -935,7 +943,7 @@ export async function generateBatchFoldOverCustomLabels(
         labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2);
 
       // Cut guides
-      const trimInset = 0.005 * INCH;
+      const trimInset = 0;
       const guideColor = config.style === 'modern' ? '#999999' : '#000000';
       doc.setDrawColor(guideColor);
       doc.setLineWidth(0.3);
@@ -988,7 +996,7 @@ const BATCH_GRID_START_X = (BATCH_PAGE_WIDTH - BATCH_GRID_WIDTH) / 2;
 const BATCH_GRID_START_Y = (BATCH_PAGE_HEIGHT - BATCH_GRID_HEIGHT) / 2;
 
 // Trim inset for cut guides
-const BATCH_TRIM_INSET_IN = 0.005;
+const BATCH_TRIM_INSET_IN = 0;
 const BATCH_TRIM_INSET_PT = BATCH_TRIM_INSET_IN * BATCH_INCH;
 const BATCH_CUT_WIDTH = BATCH_LABEL_WIDTH - BATCH_TRIM_INSET_PT * 2;
 const BATCH_CUT_HEIGHT = BATCH_LABEL_HEIGHT - BATCH_TRIM_INSET_PT * 2;
