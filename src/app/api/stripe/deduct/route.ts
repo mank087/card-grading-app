@@ -50,6 +50,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       newBalance: result.newBalance,
+      totalUsed: result.totalUsed,
+      totalPurchased: result.totalPurchased,
     });
   } catch (error) {
     console.error('Credit deduction error:', error);

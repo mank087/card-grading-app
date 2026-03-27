@@ -121,6 +121,35 @@ export default function AuthCallbackPage() {
                 console.log('[Auth Callback] Signup source:', signupSource)
               }
 
+              // Track OAuth signup conversion events
+              if (typeof window !== 'undefined') {
+                const provider = storedSession.user.app_metadata?.provider || 'oauth'
+                const signupId = `signup_${Date.now()}_${storedSession.user.id.slice(0, 8)}`
+
+                if ((window as any).gtag) {
+                  (window as any).gtag('event', 'sign_up', {
+                    method: provider,
+                    signup_source: signupSource || 'direct',
+                  });
+                  (window as any).gtag('event', 'conversion', {
+                    send_to: 'G-YLC2FKKBGC',
+                    event_category: 'signup',
+                    event_label: `oauth_${provider}_${signupSource || 'direct'}`,
+                  });
+                }
+                if ((window as any).fbq) {
+                  (window as any).fbq('track', 'CompleteRegistration', {
+                    content_name: `OAuth Signup - ${provider}`,
+                    status: true,
+                    signup_source: signupSource || 'direct',
+                  });
+                }
+                if ((window as any).rdt) {
+                  (window as any).rdt('track', 'SignUp', { conversionId: signupId });
+                }
+                console.log('[Auth Callback] Signup conversion events tracked:', provider)
+              }
+
               // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
               fetch('/api/email/welcome', {
                 method: 'POST',
@@ -159,6 +188,22 @@ export default function AuthCallbackPage() {
               localStorage.removeItem('signup_source')
 
               if (isNewUser) {
+                // Track OAuth signup conversion events (retry path)
+                if (typeof window !== 'undefined') {
+                  const provider = retrySession.user.app_metadata?.provider || 'oauth'
+                  const signupId = `signup_${Date.now()}_${retrySession.user.id.slice(0, 8)}`
+                  if ((window as any).gtag) {
+                    (window as any).gtag('event', 'sign_up', { method: provider });
+                    (window as any).gtag('event', 'conversion', { send_to: 'G-YLC2FKKBGC', event_category: 'signup', event_label: `oauth_${provider}` });
+                  }
+                  if ((window as any).fbq) {
+                    (window as any).fbq('track', 'CompleteRegistration', { content_name: `OAuth Signup - ${provider}`, status: true });
+                  }
+                  if ((window as any).rdt) {
+                    (window as any).rdt('track', 'SignUp', { conversionId: signupId });
+                  }
+                }
+
                 // Send welcome email and schedule follow-up (fire-and-forget, don't block redirect)
                 fetch('/api/email/welcome', {
                   method: 'POST',

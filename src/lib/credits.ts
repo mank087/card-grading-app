@@ -221,17 +221,17 @@ export async function deductCredit(
     isRegrade?: boolean;
     description?: string;
   } = {}
-): Promise<{ success: boolean; newBalance: number; error?: string }> {
+): Promise<{ success: boolean; newBalance: number; error?: string; totalUsed?: number; totalPurchased?: number }> {
   const supabase = getServiceClient();
 
   // Get current credits
   const credits = await getUserCredits(userId);
   if (!credits) {
-    return { success: false, newBalance: 0, error: 'User credits not found' };
+    return { success: false, newBalance: 0, error: 'User credits not found', totalUsed: 0, totalPurchased: 0 };
   }
 
   if (credits.balance < 1) {
-    return { success: false, newBalance: credits.balance, error: 'Insufficient credits' };
+    return { success: false, newBalance: credits.balance, error: 'Insufficient credits', totalUsed: credits.total_used, totalPurchased: credits.total_purchased };
   }
 
   const newBalance = credits.balance - 1;
@@ -247,7 +247,7 @@ export async function deductCredit(
 
   if (updateError) {
     console.error('Error deducting credit:', updateError);
-    return { success: false, newBalance: credits.balance, error: 'Database error' };
+    return { success: false, newBalance: credits.balance, error: 'Database error', totalUsed: credits.total_used, totalPurchased: credits.total_purchased };
   }
 
   // Record the transaction
@@ -270,7 +270,12 @@ export async function deductCredit(
     // Don't fail - credit was deducted, just audit log is incomplete
   }
 
-  return { success: true, newBalance };
+  return {
+    success: true,
+    newBalance,
+    totalUsed: credits.total_used + 1,
+    totalPurchased: credits.total_purchased,
+  };
 }
 
 /**

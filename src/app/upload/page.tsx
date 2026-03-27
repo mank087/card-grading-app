@@ -621,6 +621,65 @@ function UniversalUploadPageContent() {
         if (creditResponse.ok) {
           deductLocalCredit() // Update local state optimistically
           console.log('[Upload] Credit deducted successfully')
+
+          // Track free credit usage and first grade events
+          try {
+            const creditData = await creditResponse.json()
+            const isFirstGrade = creditData.totalUsed === 1
+            const isFreeUser = creditData.totalPurchased === 0
+
+            if (isFirstGrade) {
+              // First grade completed — key conversion event
+              if (typeof window !== 'undefined') {
+                if ((window as any).gtag) {
+                  (window as any).gtag('event', 'first_grade_completed', {
+                    event_category: 'conversion',
+                    is_free_credit: isFreeUser,
+                    card_type: config.category,
+                  });
+                  (window as any).gtag('event', 'conversion', {
+                    send_to: 'G-YLC2FKKBGC',
+                    event_category: 'first_grade',
+                    event_label: isFreeUser ? 'free_credit' : 'purchased_credit',
+                  });
+                }
+                if ((window as any).fbq) {
+                  (window as any).fbq('track', 'StartTrial', {
+                    content_name: 'First Grade Completed',
+                    content_category: config.category,
+                    value: 0,
+                    currency: 'USD',
+                  });
+                }
+                if ((window as any).rdt) {
+                  (window as any).rdt('track', 'Lead', {
+                    conversionId: `first_grade_${Date.now()}_${cardId}`,
+                  });
+                }
+                console.log('[Upload] First grade conversion tracked:', { isFreeUser, cardType: config.category })
+              }
+            }
+
+            if (isFreeUser) {
+              // Free credit used — track separately for ad optimization
+              if (typeof window !== 'undefined') {
+                if ((window as any).gtag) {
+                  (window as any).gtag('event', 'free_credit_used', {
+                    event_category: 'engagement',
+                    card_type: config.category,
+                  });
+                }
+                if ((window as any).fbq) {
+                  (window as any).fbq('trackCustom', 'FreeCreditUsed', {
+                    content_category: config.category,
+                  });
+                }
+              }
+            }
+          } catch (trackErr) {
+            // Don't fail upload if tracking fails
+            console.error('[Upload] Tracking error:', trackErr)
+          }
         } else {
           console.error('[Upload] Failed to deduct credit:', await creditResponse.text())
         }
