@@ -246,6 +246,27 @@ function drawBorder(
   return bw + trim;
 }
 
+/** Draw text with a subtle dark stroke for legibility on dark/gradient backgrounds */
+function strokeText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  isDark: boolean,
+  strokeWidth: number = 3
+) {
+  if (isDark) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(text, x, y);
+    ctx.restore();
+  }
+  ctx.fillText(text, x, y);
+}
+
 // ============================================================================
 // FRONT LABEL RENDERER
 // ============================================================================
@@ -325,7 +346,7 @@ export async function renderFrontCanvas(
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(gradeText, gradeCenterX, gradeStartY);
+  strokeText(ctx, gradeText, gradeCenterX, gradeStartY, !light, 4);
 
   if (!light) {
     // No divider for modern
@@ -349,7 +370,7 @@ export async function renderFrontCanvas(
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap);
+  strokeText(ctx, conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap, !light, 3);
 
   // Center: Card Info
   const infoX = logoX + logoSize + Math.round(16 * scale);
@@ -388,14 +409,14 @@ export async function renderFrontCanvas(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.font = `bold ${fs.name}px 'Helvetica Neue', Arial, sans-serif`;
-  ctx.fillText(safeCardName, infoX, currentY);
+  strokeText(ctx, safeCardName, infoX, currentY, !light, 3);
   currentY += fs.name + fs.afterName;
 
   if (ctxLines.length > 0) {
     ctx.fillStyle = light ? TRAD_COLORS.textMedium : 'rgba(255, 255, 255, 0.7)';
     ctx.font = `${fs.context}px 'Helvetica Neue', Arial, sans-serif`;
     for (const line of ctxLines) {
-      ctx.fillText(line, infoX, currentY);
+      strokeText(ctx, line, infoX, currentY, !light, 2);
       currentY += fs.context + fs.contextLineGap;
     }
   }
@@ -404,7 +425,7 @@ export async function renderFrontCanvas(
     currentY += fs.afterContext - fs.contextLineGap;
     ctx.fillStyle = light ? TRAD_COLORS.featureBlue : 'rgba(34, 197, 94, 0.9)';
     ctx.font = `bold ${fs.features}px 'Helvetica Neue', Arial, sans-serif`;
-    ctx.fillText(safeFeatures, infoX, currentY);
+    strokeText(ctx, safeFeatures, infoX, currentY, !light, 2);
     currentY += fs.features + fs.afterFeatures;
   } else {
     currentY += fs.afterFeatures;
@@ -412,7 +433,7 @@ export async function renderFrontCanvas(
 
   ctx.fillStyle = light ? TRAD_COLORS.textMedium : 'rgba(255, 255, 255, 0.7)';
   ctx.font = `${fs.serial}px 'Helvetica Neue', Arial, sans-serif`;
-  ctx.fillText(data.serial, infoX, currentY);
+  strokeText(ctx, data.serial, infoX, currentY, !light, 2);
 
   return canvas;
 }
@@ -536,7 +557,7 @@ export async function renderBackCanvas(
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(gradeText, centerX, centerStartY);
+  strokeText(ctx, gradeText, centerX, centerStartY, !light, 4);
 
   if (conditionText) {
     ctx.fillStyle = light ? TRAD_COLORS.purpleDark : 'rgba(255, 255, 255, 0.8)';
@@ -547,7 +568,7 @@ export async function renderBackCanvas(
       backCondSize -= 1;
       ctx.font = `bold ${backCondSize}px 'Helvetica Neue', Arial, sans-serif`;
     }
-    ctx.fillText(conditionText, centerX, centerStartY + gradeFontSize + condGap);
+    strokeText(ctx, conditionText, centerX, centerStartY + gradeFontSize + condGap, !light, 3);
   }
 
   // Right: Sub-scores
@@ -566,7 +587,7 @@ export async function renderBackCanvas(
       ctx.font = `${subFontSize}px 'Helvetica Neue', Arial, sans-serif`;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(scoreText, rightEdge, y);
+      strokeText(ctx, scoreText, rightEdge, y, !light, 2);
     };
 
     drawSubScore('Centering', data.subScores.centering, 0);
@@ -791,16 +812,21 @@ export async function generateFoldOverSlabLabel(
   doc.text('FOLD-OVER LABEL — Print single-sided, cut, fold top panel behind front', 50, startY - 30);
   doc.text(`${config.width}" × ${config.height}" (each panel)`, PAGE_W - 50, startY - 30, { align: 'right' });
 
+  // For fold-over: render without bleed overlap at the fold line.
+  // Top/bottom edges get bleed, but the inner edges (at the fold) are flush.
+
   // Top panel: BACK (flipped 180°)
+  // Bleed on top and sides only, flush at bottom (fold line)
   doc.addImage(flippedBackImg, 'PNG',
     startX - bleedPt, startY - bleedPt,
-    labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2
+    labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt  // only bleedPt on top, flush at bottom
   );
 
   // Bottom panel: FRONT (right-side up)
+  // Flush at top (fold line), bleed on bottom and sides
   doc.addImage(frontImg, 'PNG',
-    startX - bleedPt, startY + labelHeightPt - bleedPt,
-    labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2
+    startX - bleedPt, startY + labelHeightPt,
+    labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt  // flush at top, bleedPt on bottom
   );
 
   // Outer cut guides around the full combined area
@@ -932,15 +958,15 @@ export async function generateBatchFoldOverCustomLabels(
       fCtx.rotate(Math.PI);
       fCtx.drawImage(backCanvas, 0, 0);
 
-      // Top: BACK (flipped)
+      // Top: BACK (flipped) — flush at fold, bleed top
       doc.addImage(flipped.toDataURL('image/png'), 'PNG',
         x - bleedPt, y - bleedPt,
-        labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2);
+        labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt);
 
-      // Bottom: FRONT
+      // Bottom: FRONT — flush at fold, bleed bottom
       doc.addImage(frontCanvas.toDataURL('image/png'), 'PNG',
-        x - bleedPt, y + labelHeightPt - bleedPt,
-        labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt * 2);
+        x - bleedPt, y + labelHeightPt,
+        labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt);
 
       // Cut guides
       const trimInset = 0;

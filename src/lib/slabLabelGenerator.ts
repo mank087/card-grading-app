@@ -307,6 +307,30 @@ function drawBackground(ctx: CanvasRenderingContext2D, W: number, H: number, isM
   }
 }
 
+/**
+ * Draw text with a subtle dark stroke behind it for legibility on gradient backgrounds.
+ * Only applied to modern (dark) label style.
+ */
+function strokeText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  isModern: boolean,
+  strokeWidth: number = 3
+) {
+  if (isModern) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = strokeWidth;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    ctx.strokeText(text, x, y);
+    ctx.restore();
+  }
+  ctx.fillText(text, x, y);
+}
+
 // ============================================================================
 // FRONT LABEL — Canvas renderer
 // ============================================================================
@@ -377,7 +401,7 @@ async function renderFrontLabelCanvas(
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(gradeText, gradeCenterX, gradeStartY);
+  strokeText(ctx, gradeText, gradeCenterX, gradeStartY, isModern, 3);
 
   // Divider line (traditional only)
   if (!isModern) {
@@ -401,7 +425,7 @@ async function renderFrontLabelCanvas(
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap);
+  strokeText(ctx, conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap, isModern, 2);
 
   // ── Center: Card Information (dynamically sized, vertically centered) ──
   const infoX = logoX + logoSize + 16;
@@ -442,7 +466,7 @@ async function renderFrontLabelCanvas(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.font = `bold ${fs.name}px 'Helvetica Neue', Arial, sans-serif`;
-  ctx.fillText(safeCardName, infoX, currentY);
+  strokeText(ctx, safeCardName, infoX, currentY, isModern, 3);
   currentY += fs.name + fs.afterName;
 
   // Line 2: Context line
@@ -450,7 +474,7 @@ async function renderFrontLabelCanvas(
     ctx.fillStyle = isModern ? MODERN_COLORS.textWhiteMuted : COLORS.textMedium;
     ctx.font = `${fs.context}px 'Helvetica Neue', Arial, sans-serif`;
     for (const line of ctxLines) {
-      ctx.fillText(line, infoX, currentY);
+      strokeText(ctx, line, infoX, currentY, isModern, 2);
       currentY += fs.context + fs.contextLineGap;
     }
   }
@@ -460,7 +484,7 @@ async function renderFrontLabelCanvas(
     currentY += fs.afterContext - fs.contextLineGap; // adjust for last contextLineGap
     ctx.fillStyle = isModern ? MODERN_COLORS.textGreen : COLORS.featureBlue;
     ctx.font = `bold ${fs.features}px 'Helvetica Neue', Arial, sans-serif`;
-    ctx.fillText(safeFeatures, infoX, currentY);
+    strokeText(ctx, safeFeatures, infoX, currentY, isModern, 2);
     currentY += fs.features + fs.afterFeatures;
   } else {
     currentY += fs.afterFeatures;
@@ -469,7 +493,7 @@ async function renderFrontLabelCanvas(
   // Line 4: Serial — match line 2 color for print readability
   ctx.fillStyle = isModern ? MODERN_COLORS.textWhiteMuted : COLORS.textMedium;
   ctx.font = `${fs.serial}px 'Helvetica Neue', Arial, sans-serif`;
-  ctx.fillText(data.serial, infoX, currentY);
+  strokeText(ctx, data.serial, infoX, currentY, isModern, 2);
 
   return canvas.toDataURL('image/jpeg', 0.92);
 }
@@ -597,7 +621,7 @@ async function renderBackLabelCanvas(
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(gradeText, centerX, centerStartY);
+  strokeText(ctx, gradeText, centerX, centerStartY, isModern, 3);
 
   if (conditionText) {
     ctx.fillStyle = isModern ? 'rgba(255, 255, 255, 0.8)' : COLORS.purpleDark;
@@ -608,7 +632,7 @@ async function renderBackLabelCanvas(
       backCondSize -= 1;
       ctx.font = `bold ${backCondSize}px 'Helvetica Neue', Arial, sans-serif`;
     }
-    ctx.fillText(conditionText, centerX, centerStartY + gradeFontSize + condGapBack);
+    strokeText(ctx, conditionText, centerX, centerStartY + gradeFontSize + condGapBack, isModern, 2);
   }
 
   // ── RIGHT: Sub-scores (vertically centered, inset from cut line) ──
@@ -627,7 +651,7 @@ async function renderBackLabelCanvas(
       ctx.font = `${subFontSize}px 'Helvetica Neue', Arial, sans-serif`;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      ctx.fillText(scoreText, rightEdge, y);
+      strokeText(ctx, scoreText, rightEdge, y, isModern, 2);
     };
 
     drawSubScore('Centering', data.subScores.centering, 0);
@@ -913,11 +937,19 @@ export async function generateFoldOverSlabLabel(
   doc.text(`${LABEL_WIDTH_IN}" × ${LABEL_HEIGHT_IN}" (each panel)`, PAGE_WIDTH - 50, startY - 30, { align: 'right' });
 
   // Top panel: BACK (rotated 180°)
+  // Bleed on top and sides only — flush at fold line (bottom of back panel)
   const flippedBackImg = await flipImage180(backImg);
-  placeLabelImage(doc, flippedBackImg, startX, startY);
+  doc.addImage(flippedBackImg, 'JPEG',
+    startX - BLEED_PT, startY - BLEED_PT,
+    LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT  // bleed top only, flush at fold
+  );
 
   // Bottom panel: FRONT (right-side up)
-  placeLabelImage(doc, frontImg, startX, startY + LABEL_HEIGHT);
+  // Flush at fold line (top of front panel) — bleed on bottom and sides
+  doc.addImage(frontImg, 'JPEG',
+    startX - BLEED_PT, startY + LABEL_HEIGHT,
+    LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT  // flush at fold, bleed bottom
+  );
 
   // Outer cut guides around the full combined area
   const guideColor = style === 'modern' ? '#999999' : '#000000';
@@ -1035,9 +1067,16 @@ export async function generateBatchFoldOverSlabLabels(
       // Flip back 180°
       const flippedBack = await flipImage180(backImg);
 
-      // Top: BACK (flipped), Bottom: FRONT
-      placeLabelImage(doc, flippedBack, x, y);
-      placeLabelImage(doc, frontImg, x, y + LABEL_HEIGHT);
+      // Top: BACK (flipped) — flush at fold, bleed top
+      doc.addImage(flippedBack, 'JPEG',
+        x - BLEED_PT, y - BLEED_PT,
+        LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT
+      );
+      // Bottom: FRONT — flush at fold, bleed bottom
+      doc.addImage(frontImg, 'JPEG',
+        x - BLEED_PT, y + LABEL_HEIGHT,
+        LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT
+      );
 
       // Cut guides
       const guideColor = style === 'modern' ? '#999999' : '#000000';
