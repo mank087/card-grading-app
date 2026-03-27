@@ -626,6 +626,61 @@ function getYugiohName(cardInfo: ConversationalCardInfo, card: CardForLabel): st
 }
 
 /**
+ * Get the primary name for Star Wars cards
+ * Prioritize card_name (the actual card title) over player_or_character
+ */
+function getStarWarsName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
+  const cardName = stripMarkdown(cardInfo.card_name);
+  if (isValidValue(cardName)) return cardName!;
+  const characterName = stripMarkdown(cardInfo.player_or_character);
+  if (isValidValue(characterName)) return characterName!;
+  if (isValidValue(card.card_name)) return card.card_name!;
+  if (isValidValue(card.featured)) return card.featured!;
+  return 'Card';
+}
+
+/**
+ * Get subset for Star Wars cards
+ * Uses subset, rarity_or_variant, or card_type as subset
+ */
+function getStarWarsSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): string | null {
+  const subset = stripMarkdown(cardInfo.subset);
+  if (isValidValue(subset)) return subset;
+  // Check rarity as subset (e.g., "Rare", "Legendary")
+  const rarity = stripMarkdown(cardInfo.rarity_tier) || stripMarkdown((cardInfo as any).rarity_or_variant);
+  if (isValidValue(rarity)) return rarity;
+  if (isValidValue(card.rarity_description)) return card.rarity_description!;
+  return null;
+}
+
+/**
+ * Get features for Star Wars cards
+ * Detects foil, parallel, autograph, rarity from available data
+ */
+function getStarWarsFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel): string[] {
+  const features: string[] = [];
+  // Foil/Parallel
+  if (cardInfo.is_foil || (card as any).is_foil) features.push('Foil');
+  if (cardInfo.holofoil && isValidValue(cardInfo.holofoil) && cardInfo.holofoil !== 'None') features.push(cardInfo.holofoil);
+  // Autograph
+  if (cardInfo.autographed) features.push('Auto');
+  // Serial numbering
+  if (cardInfo.serial_number || card.serial_numbering) {
+    const sn = cardInfo.serial_number || card.serial_numbering;
+    if (sn && isValidValue(sn)) features.push(sn);
+  }
+  // Rarity (only if not already used as subset)
+  const specialFeatures = stripMarkdown(cardInfo.special_features);
+  if (isValidValue(specialFeatures)) {
+    specialFeatures!.split(/[,;]/).forEach(f => {
+      const trimmed = f.trim();
+      if (trimmed && !features.includes(trimmed)) features.push(trimmed);
+    });
+  }
+  return features;
+}
+
+/**
  * Get the primary name for Other cards
  */
 function getOtherName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
@@ -1009,7 +1064,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
         rawPrimaryName = getYugiohName(cardInfo, card);
         break;
       case 'Star Wars':
-        rawPrimaryName = getOtherName(cardInfo, card);
+        rawPrimaryName = getStarWarsName(cardInfo, card);
         break;
       default:
         rawPrimaryName = getOtherName(cardInfo, card);
@@ -1060,7 +1115,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
         rawSubset = getYugiohSubset(cardInfo, card);
         break;
       case 'Star Wars':
-        rawSubset = stripMarkdown(cardInfo.subset);
+        rawSubset = getStarWarsSubset(cardInfo, card);
         break;
       default:
         rawSubset = stripMarkdown(cardInfo.subset);
@@ -1185,7 +1240,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
         features = getYugiohFeatures(cardInfo, card);
         break;
       case 'Star Wars':
-        features = getOtherFeatures(cardInfo, card);
+        features = getStarWarsFeatures(cardInfo, card);
         break;
       default:
         features = getOtherFeatures(cardInfo, card);
