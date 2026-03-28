@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
     // Upload images in parallel
     const uploadPromises: Promise<void>[] = [];
 
-    if (images.front) {
+    if (images?.front) {
       uploadPromises.push(
         uploadImage(images.front, 'front').then(url => {
           if (url) urls.front = url;
@@ -203,7 +203,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (images.back) {
+    if (images?.back) {
       uploadPromises.push(
         uploadImage(images.back, 'back').then(url => {
           if (url) urls.back = url;
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (images.miniReport) {
+    if (images?.miniReport) {
       uploadPromises.push(
         uploadImage(images.miniReport, 'mini-report').then(url => {
           if (url) urls.miniReport = url;
@@ -219,7 +219,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (images.rawFront) {
+    if (images?.rawFront) {
       uploadPromises.push(
         uploadImage(images.rawFront, 'raw-front').then(url => {
           if (url) urls.rawFront = url;
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (images.rawBack) {
+    if (images?.rawBack) {
       uploadPromises.push(
         uploadImage(images.rawBack, 'raw-back').then(url => {
           if (url) urls.rawBack = url;
