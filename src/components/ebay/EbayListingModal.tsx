@@ -797,57 +797,71 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       });
     };
 
-    const images: { front?: string; back?: string; miniReport?: string } = {};
+    // Upload images individually to avoid exceeding request size limits
+    // Each image is sent in a separate request (~200-400KB each)
+    const uploadSingleImage = async (imageKey: string, blob: Blob): Promise<string | null> => {
+      const base64 = await toBase64(blob);
+      const response = await fetch('/api/ebay/images', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session!.access_token}`,
+        },
+        body: JSON.stringify({
+          cardId: card.id,
+          images: { [imageKey]: base64 },
+        }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || `Failed to upload ${imageKey}`);
+      }
+      const data = await response.json();
+      return data.urls[imageKey] || null;
+    };
 
+    const urls: string[] = [];
+
+    // Upload system images sequentially
     if (selectedImages.front && imageBlobs.front) {
-      images.front = await toBase64(imageBlobs.front);
+      const url = await uploadSingleImage('front', imageBlobs.front);
+      if (url) urls.push(url);
     }
     if (selectedImages.back && imageBlobs.back) {
-      images.back = await toBase64(imageBlobs.back);
+      const url = await uploadSingleImage('back', imageBlobs.back);
+      if (url) urls.push(url);
     }
     if (selectedImages.miniReport && imageBlobs.miniReport) {
-      images.miniReport = await toBase64(imageBlobs.miniReport);
+      const url = await uploadSingleImage('miniReport', imageBlobs.miniReport);
+      if (url) urls.push(url);
     }
     if (selectedImages.rawFront && imageBlobs.rawFront) {
-      (images as any).rawFront = await toBase64(imageBlobs.rawFront);
+      const url = await uploadSingleImage('rawFront', imageBlobs.rawFront);
+      if (url) urls.push(url);
     }
     if (selectedImages.rawBack && imageBlobs.rawBack) {
-      (images as any).rawBack = await toBase64(imageBlobs.rawBack);
+      const url = await uploadSingleImage('rawBack', imageBlobs.rawBack);
+      if (url) urls.push(url);
     }
 
-    // Convert additional user-uploaded images to base64
-    const additionalImagesBase64: string[] = [];
+    // Upload additional user images
     for (const img of additionalImages.filter(i => i.selected)) {
-      additionalImagesBase64.push(await toBase64(img.blob));
-    }
-
-    const response = await fetch('/api/ebay/images', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: JSON.stringify({
-        cardId: card.id,
-        images,
-        additionalImages: additionalImagesBase64.length > 0 ? additionalImagesBase64 : undefined,
-      }),
-    });
-
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Failed to upload images');
-    }
-
-    const data = await response.json();
-    const urls: string[] = [];
-    if (data.urls.front) urls.push(data.urls.front);
-    if (data.urls.back) urls.push(data.urls.back);
-    if (data.urls.miniReport) urls.push(data.urls.miniReport);
-    if (data.urls.rawFront) urls.push(data.urls.rawFront);
-    if (data.urls.rawBack) urls.push(data.urls.rawBack);
-    if (data.urls.additional) {
-      urls.push(...data.urls.additional);
+      const base64 = await toBase64(img.blob);
+      const response = await fetch('/api/ebay/images', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session!.access_token}`,
+        },
+        body: JSON.stringify({
+          cardId: card.id,
+          additionalImages: [base64],
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.urls.additional?.length) urls.push(...data.urls.additional);
+      }
     }
 
     return urls;
