@@ -844,23 +844,61 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       if (url) urls.push(url);
     }
 
-    // Upload additional user images
-    for (const img of additionalImages.filter(i => i.selected)) {
-      const base64 = await toBase64(img.blob);
-      const response = await fetch('/api/ebay/images', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session!.access_token}`,
-        },
-        body: JSON.stringify({
-          cardId: card.id,
-          additionalImages: [base64],
-        }),
+    // Upload additional user images (compress large photos first)
+    const compressImage = (blob: Blob, maxSizeKB: number = 800): Promise<Blob> => {
+      return new Promise((resolve) => {
+        // If already small enough, use as-is
+        if (blob.size <= maxSizeKB * 1024) {
+          resolve(blob);
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          // Scale down large images
+          const maxDim = 1600;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            const scale = maxDim / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob((result) => {
+            resolve(result || blob);
+          }, 'image/jpeg', 0.85);
+        };
+        img.onerror = () => resolve(blob);
+        img.src = URL.createObjectURL(blob);
       });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.urls.additional?.length) urls.push(...data.urls.additional);
+    };
+
+    for (const img of additionalImages.filter(i => i.selected)) {
+      try {
+        const compressed = await compressImage(img.blob);
+        const base64 = await toBase64(compressed);
+        const response = await fetch('/api/ebay/images', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session!.access_token}`,
+          },
+          body: JSON.stringify({
+            cardId: card.id,
+            additionalImages: [base64],
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.urls.additional?.length) urls.push(...data.urls.additional);
+        } else {
+          console.error('[eBay Images] Failed to upload additional image:', await response.text());
+        }
+      } catch (err) {
+        console.error('[eBay Images] Error uploading additional image:', err);
       }
     }
 
