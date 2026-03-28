@@ -797,10 +797,34 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       });
     };
 
+    // Compress any image blob to keep requests under payload limits
+    const compressBlob = (blob: Blob, maxKB: number = 600): Promise<Blob> => {
+      return new Promise((resolve) => {
+        if (blob.size <= maxKB * 1024) { resolve(blob); return; }
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxDim = 1200;
+          let w = img.width, h = img.height;
+          if (w > maxDim || h > maxDim) {
+            const scale = maxDim / Math.max(w, h);
+            w = Math.round(w * scale);
+            h = Math.round(h * scale);
+          }
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+          canvas.toBlob((result) => resolve(result || blob), 'image/jpeg', 0.82);
+        };
+        img.onerror = () => resolve(blob);
+        img.src = URL.createObjectURL(blob);
+      });
+    };
+
     // Upload images individually to avoid exceeding request size limits
-    // Each image is sent in a separate request (~200-400KB each)
     const uploadSingleImage = async (imageKey: string, blob: Blob): Promise<string | null> => {
-      const base64 = await toBase64(blob);
+      const compressed = await compressBlob(blob);
+      const base64 = await toBase64(compressed);
       const response = await fetch('/api/ebay/images', {
         method: 'POST',
         headers: {
@@ -844,41 +868,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       if (url) urls.push(url);
     }
 
-    // Upload additional user images (compress large photos first)
-    const compressImage = (blob: Blob, maxSizeKB: number = 800): Promise<Blob> => {
-      return new Promise((resolve) => {
-        // If already small enough, use as-is
-        if (blob.size <= maxSizeKB * 1024) {
-          resolve(blob);
-          return;
-        }
-        const img = new Image();
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          // Scale down large images
-          const maxDim = 1600;
-          let w = img.width, h = img.height;
-          if (w > maxDim || h > maxDim) {
-            const scale = maxDim / Math.max(w, h);
-            w = Math.round(w * scale);
-            h = Math.round(h * scale);
-          }
-          canvas.width = w;
-          canvas.height = h;
-          const ctx = canvas.getContext('2d')!;
-          ctx.drawImage(img, 0, 0, w, h);
-          canvas.toBlob((result) => {
-            resolve(result || blob);
-          }, 'image/jpeg', 0.85);
-        };
-        img.onerror = () => resolve(blob);
-        img.src = URL.createObjectURL(blob);
-      });
-    };
-
+    // Upload additional user images
     for (const img of additionalImages.filter(i => i.selected)) {
       try {
-        const compressed = await compressImage(img.blob);
+        const compressed = await compressBlob(img.blob);
         const base64 = await toBase64(compressed);
         const response = await fetch('/api/ebay/images', {
           method: 'POST',
