@@ -1316,7 +1316,7 @@ function UniversalUploadPageContent() {
                 {selectedType === 'Other' && (
                   <div className="bg-white rounded-xl border border-gray-200 p-4 mt-4">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Card Sub-Category:
+                      Card Sub-Category: <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={subCategory}
@@ -1335,7 +1335,7 @@ function UniversalUploadPageContent() {
                       ))}
                     </select>
                     <p className="text-xs text-gray-500 mt-1.5">
-                      Selecting a sub-category helps improve grading accuracy for your card type.
+                      Required — helps categorize your card for population reports and collection organization.
                     </p>
                   </div>
                 )}
@@ -1350,8 +1350,31 @@ function UniversalUploadPageContent() {
                 {/* Category Badge */}
                 <div className="flex items-center justify-center gap-2 mb-4 bg-white rounded-full py-2 px-4 shadow-sm border border-gray-200 w-fit mx-auto">
                   <span className="text-lg">{getCategoryIcon(selectedType)}</span>
-                  <span className="font-medium text-gray-700">{config.label}</span>
+                  <span className="font-medium text-gray-700">
+                    {config.label}{subCategory && selectedType === 'Other' ? ` — ${subCategory}` : ''}
+                  </span>
                 </div>
+
+                {/* Sub-category selector for Other on step 2 */}
+                {selectedType === 'Other' && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-3 mb-4 max-w-xs mx-auto">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Sub-Category:</label>
+                    <select
+                      value={subCategory}
+                      onChange={(e) => setSubCategory(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-200"
+                    >
+                      <option value="">Select...</option>
+                      {Object.entries(OTHER_SUB_CATEGORIES).map(([group, items]) => (
+                        <optgroup key={group} label={group}>
+                          {items.map((item) => (
+                            <option key={item} value={item}>{item}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="text-center mb-4">
                   <p className="text-gray-600 text-sm">
@@ -1683,9 +1706,14 @@ function UniversalUploadPageContent() {
               <>
                 <button
                   onClick={() => setWizardStep(2)}
-                  className="w-full px-4 py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-semibold text-lg hover:from-indigo-700 hover:to-purple-700 transition-all shadow-lg flex items-center justify-center gap-2"
+                  disabled={selectedType === 'Other' && !subCategory}
+                  className={`w-full px-4 py-4 rounded-lg font-semibold text-lg transition-all shadow-lg flex items-center justify-center gap-2 ${
+                    selectedType === 'Other' && !subCategory
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700'
+                  }`}
                 >
-                  <span>Continue to Photos</span>
+                  <span>{selectedType === 'Other' && !subCategory ? 'Select a Sub-Category First' : 'Continue to Photos'}</span>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
