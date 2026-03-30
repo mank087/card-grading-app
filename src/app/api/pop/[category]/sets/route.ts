@@ -18,29 +18,18 @@ export async function GET(
 
     // If this is a sub-category pop report, use direct query with sub_category filter
     if (dbSubCategory) {
+      let cardsQuery = supabaseAdmin
+        .from('cards')
+        .select('card_name, card_number, featured, card_set, front_path, conversational_whole_grade')
+        .eq('category', dbCategory)
+        .eq('sub_category', dbSubCategory)
+        .not('conversational_whole_grade', 'is', null);
+      if (search) {
+        cardsQuery = cardsQuery.or(`card_name.ilike.%${search}%,featured.ilike.%${search}%,card_set.ilike.%${search}%`);
+      }
+
       const [cardsResult, countResult] = await Promise.all([
-        supabaseAdmin.rpc('get_pop_cards_subcategory', {
-          p_category: dbCategory,
-          p_sub_category: dbSubCategory,
-          p_search: search,
-          p_limit: limit,
-          p_offset: offset,
-        }).then(res => {
-          // Fallback: if RPC doesn't exist, use direct query
-          if (res.error?.code === '42883') {
-            let query = supabaseAdmin
-              .from('cards')
-              .select('card_name, card_number, featured, card_set, front_path, conversational_whole_grade, sub_category')
-              .eq('category', dbCategory)
-              .eq('sub_category', dbSubCategory)
-              .not('conversational_whole_grade', 'is', null);
-            if (search) {
-              query = query.or(`card_name.ilike.%${search}%,featured.ilike.%${search}%,card_set.ilike.%${search}%`);
-            }
-            return query;
-          }
-          return res;
-        }),
+        cardsQuery,
         supabaseAdmin
           .from('cards')
           .select('id', { count: 'exact', head: true })
