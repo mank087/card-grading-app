@@ -10,11 +10,116 @@ export async function GET(
     const { category: slug } = await params;
     const dbCategory = getCategoryFromSlug(slug);
     const meta = getCategoryMeta(slug);
+    const dbSubCategory = meta?.dbSubCategory || null;
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get('search') || null;
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
+    // If this is a sub-category pop report, use direct query with sub_category filter
+    if (dbSubCategory) {
+      const [cardsResult, countResult] = await Promise.all([
+        supabaseAdmin.rpc('get_pop_cards_subcategory', {
+          p_category: dbCategory,
+          p_sub_category: dbSubCategory,
+          p_search: search,
+          p_limit: limit,
+          p_offset: offset,
+        }).then(res => {
+          // Fallback: if RPC doesn't exist, use direct query
+          if (res.error?.code === '42883') {
+            let query = supabaseAdmin
+              .from('cards')
+              .select('card_name, card_number, featured, card_set, front_path, conversational_whole_grade, sub_category')
+              .eq('category', dbCategory)
+              .eq('sub_category', dbSubCategory)
+              .not('conversational_whole_grade', 'is', null);
+            if (search) {
+              query = query.or(`card_name.ilike.%${search}%,featured.ilike.%${search}%,card_set.ilike.%${search}%`);
+            }
+            return query;
+          }
+          return res;
+        }),
+        supabaseAdmin
+          .from('cards')
+          .select('id', { count: 'exact', head: true })
+          .eq('category', dbCategory)
+          .eq('sub_category', dbSubCategory)
+          .not('conversational_whole_grade', 'is', null),
+      ]);
+
+      // Build pop data from direct query results
+      const rawCards = cardsResult.data || [];
+      const cardMap = new Map<string, any>();
+      for (const card of rawCards) {
+        const key = `${card.card_name || card.featured || 'Unknown'}__${card.card_set || ''}__${card.card_number || ''}`;
+        if (!cardMap.has(key)) {
+          cardMap.set(key, {
+            card_name: card.card_name || card.featured || 'Unknown',
+            card_number: card.card_number || '',
+            featured: card.featured,
+            card_set: card.card_set,
+            front_path: card.front_path,
+            total: 0,
+            grades: {} as Record<number, number>,
+          });
+        }
+        const entry = cardMap.get(key)!;
+        entry.total++;
+        const grade = card.conversational_whole_grade;
+        if (grade) entry.grades[grade] = (entry.grades[grade] || 0) + 1;
+        if (!entry.front_path && card.front_path) entry.front_path = card.front_path;
+      }
+
+      const sortedCards = Array.from(cardMap.values())
+        .sort((a, b) => b.total - a.total)
+        .slice(offset, offset + limit);
+
+      // Generate signed URLs for thumbnails
+      const cards = await Promise.all(
+        sortedCards.map(async (row: any) => {
+          let thumbnailUrl: string | null = null;
+          if (row.front_path) {
+            const { data: signedData } = await supabaseAdmin.storage
+              .from('cards')
+              .createSignedUrl(row.front_path, 3600);
+            thumbnailUrl = signedData?.signedUrl || null;
+          }
+          const grades: Record<number, number> = {};
+          for (let g = 1; g <= 10; g++) grades[g] = row.grades[g] || 0;
+          return {
+            cardName: row.card_name,
+            cardNumber: row.card_number,
+            featured: row.featured,
+            cardSet: row.card_set,
+            thumbnailUrl,
+            total: row.total,
+            grades,
+          };
+        })
+      );
+
+      return NextResponse.json({
+        categoryInfo: {
+          slug,
+          dbCategory,
+          displayName: meta?.displayName || dbSubCategory,
+          icon: meta?.icon || '\uD83C\uDCCF',
+        },
+        cards,
+        pagination: {
+          total: countResult.count || rawCards.length,
+          limit,
+          offset,
+          hasMore: offset + limit < (countResult.count || rawCards.length),
+        },
+      }, {
+        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600' },
+      });
+    }
+
+    // Standard category pop report (no sub-category)
     // Fetch cards, count, and categories in parallel
     const [cardsResult, countResult, categoriesResult] = await Promise.all([
       supabaseAdmin.rpc('get_pop_cards', {
@@ -27,7 +132,6 @@ export async function GET(
         p_category: dbCategory,
         p_search: search,
       }),
-      // Fetch actual category names from DB to get correct casing (e.g. "MMA" not "Mma")
       supabaseAdmin.rpc('get_pop_categories'),
     ]);
 

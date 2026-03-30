@@ -3,6 +3,7 @@
 export interface PopCategory {
   slug: string;
   dbCategory: string;
+  dbSubCategory?: string; // Optional sub-category filter within a category
   displayName: string;
   icon: string;
 }
@@ -20,6 +21,13 @@ export const POP_CATEGORIES: PopCategory[] = [
   { slug: 'soccer', dbCategory: 'Soccer', displayName: 'Soccer', icon: '\u26BD' },
   { slug: 'wrestling', dbCategory: 'Wrestling', displayName: 'Wrestling', icon: '\uD83E\uDD3C' },
   { slug: 'sports', dbCategory: 'Sports', displayName: 'Sports (Other)', icon: '\uD83C\uDFC6' },
+  // Sub-category entries (category = 'Other' with sub_category filter)
+  { slug: 'star-wars', dbCategory: 'Other', dbSubCategory: 'Star Wars', displayName: 'Star Wars', icon: '\u2B50' },
+  { slug: 'digimon', dbCategory: 'Other', dbSubCategory: 'Digimon', displayName: 'Digimon', icon: '\uD83D\uDC32' },
+  { slug: 'dragon-ball', dbCategory: 'Other', dbSubCategory: 'Dragon Ball', displayName: 'Dragon Ball', icon: '\uD83D\uDD25' },
+  { slug: 'marvel', dbCategory: 'Other', dbSubCategory: 'Marvel', displayName: 'Marvel', icon: '\uD83E\uDDB8' },
+  { slug: 'garbage-pail-kids', dbCategory: 'Other', dbSubCategory: 'Garbage Pail Kids', displayName: 'Garbage Pail Kids', icon: '\uD83D\uDDD1\uFE0F' },
+  { slug: 'flesh-and-blood', dbCategory: 'Other', dbSubCategory: 'Flesh and Blood', displayName: 'Flesh and Blood', icon: '\u2694\uFE0F' },
   { slug: 'other', dbCategory: 'Other', displayName: 'Other', icon: '\uD83C\uDCCF' },
 ];
 
