@@ -69,7 +69,7 @@ export default function YuGiOhDatabasePage() {
   // Results state
   const [cards, setCards] = useState<YuGiOhCard[]>([])
   const [sets, setSets] = useState<YuGiOhSet[]>([])
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 0 })
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 24, total: 0, totalPages: 0 })
   const [isLoading, setIsLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
@@ -171,7 +171,7 @@ export default function YuGiOhDatabasePage() {
       const data = await res.json()
 
       setCards(data.cards || [])
-      setPagination(data.pagination || { page: 1, limit: 50, total: 0, totalPages: 0 })
+      setPagination(data.pagination || { page: 1, limit: 24, total: 0, totalPages: 0 })
     } catch (err) {
       console.error('Search failed:', err)
       setCards([])

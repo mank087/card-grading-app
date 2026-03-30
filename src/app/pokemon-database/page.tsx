@@ -71,7 +71,7 @@ export default function PokemonDatabasePage() {
   const [cards, setCards] = useState<PokemonCard[]>([])
   const [sets, setSets] = useState<PokemonSet[]>([])
   const [setsBySeries, setSetsBySeries] = useState<Record<string, PokemonSet[]>>({})
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 0 })
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 24, total: 0, totalPages: 0 })
   const [isLoading, setIsLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
@@ -234,7 +234,7 @@ export default function PokemonDatabasePage() {
       const data = await res.json()
 
       setCards(data.cards || [])
-      setPagination(data.pagination || { page: 1, limit: 50, total: 0, totalPages: 0 })
+      setPagination(data.pagination || { page: 1, limit: 24, total: 0, totalPages: 0 })
     } catch (err) {
       console.error('Search failed:', err)
       setCards([])

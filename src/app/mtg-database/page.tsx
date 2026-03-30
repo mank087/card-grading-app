@@ -83,7 +83,7 @@ export default function MtgDatabasePage() {
   const [cards, setCards] = useState<MtgCard[]>([])
   const [sets, setSets] = useState<MtgSet[]>([])
   const [setsByType, setSetsByType] = useState<Record<string, MtgSet[]>>({})
-  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 50, total: 0, totalPages: 0 })
+  const [pagination, setPagination] = useState<Pagination>({ page: 1, limit: 24, total: 0, totalPages: 0 })
   const [isLoading, setIsLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
 
@@ -186,7 +186,7 @@ export default function MtgDatabasePage() {
       const data = await res.json()
 
       setCards(data.cards || [])
-      setPagination(data.pagination || { page: 1, limit: 50, total: 0, totalPages: 0 })
+      setPagination(data.pagination || { page: 1, limit: 24, total: 0, totalPages: 0 })
     } catch (err) {
       console.error('Search failed:', err)
       setCards([])
