@@ -154,12 +154,16 @@ async function scryfallFetch<T>(url: string): Promise<T | null> {
   lastRequestTime = Date.now();
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout per request
     const response = await fetch(url, {
       headers: {
         'Accept': 'application/json',
         'User-Agent': 'DCMCardGrading/1.0'
-      }
+      },
+      signal: controller.signal,
     });
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       if (response.status === 404) {

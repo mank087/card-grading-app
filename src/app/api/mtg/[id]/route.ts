@@ -24,10 +24,10 @@ export const maxDuration = 300;
 // Track MTG cards currently being processed with timestamps
 const processingMTGCards = new Map<string, number>();
 
-// Clean up stuck processing cards (older than 2 minutes - reduced from 5 to prevent long lock-outs)
+// Clean up stuck processing cards (older than 4 minutes — allows time for retries + verification)
 const cleanupStuckCards = () => {
   const now = Date.now();
-  const twoMinutesAgo = now - (2 * 60 * 1000);
+  const twoMinutesAgo = now - (4 * 60 * 1000);
 
   for (const [cardId, timestamp] of processingMTGCards.entries()) {
     if (timestamp < twoMinutesAgo) {
@@ -1171,132 +1171,9 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       return NextResponse.json({ error: "Failed to save MTG card grading results" }, { status: 500 });
     }
 
-    // 🃏 MTG Scryfall API Verification (Post-Grading)
-    // Verify card details against Scryfall API and update with accurate data
-    let mtgApiVerification = null;
-    try {
-      console.log(`[GET /api/mtg/${cardId}] 🔍 Starting Scryfall API verification...`);
-
-      // Always force verification to ensure we get fresh metadata for merge
-      // This ensures conversational_card_info always gets updated with API data
-      const verifyResponse = await fetch(`${request.nextUrl.origin}/api/mtg/verify?force=true`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          card_id: cardId,
-          card_info: conversationalGradingData?.card_info || null
-        })
-      });
-
-      if (verifyResponse.ok) {
-        mtgApiVerification = await verifyResponse.json();
-        console.log(`[GET /api/mtg/${cardId}] ✅ Scryfall verification complete:`, {
-          verified: mtgApiVerification.verified,
-          mtg_api_id: mtgApiVerification.mtg_api_id,
-          confidence: mtgApiVerification.confidence,
-          corrections: mtgApiVerification.corrections?.length || 0
-        });
-
-        // 🔧 KEY FIX: Merge Scryfall API data INTO conversationalGradingData.card_info
-        // This matches the Pokemon pattern - frontend reads conversational_card_info
-        if (mtgApiVerification.verified && mtgApiVerification.metadata && conversationalGradingData?.card_info) {
-          const m = mtgApiVerification.metadata;
-
-          // Format power/toughness from Scryfall data
-          const powerToughness = (m.power && m.toughness)
-            ? `${m.power}/${m.toughness}`
-            : null;
-
-          // Merge API data into card_info (following Pokemon pattern)
-          conversationalGradingData.card_info.set_name = m.set_name;
-          conversationalGradingData.card_info.card_name = m.card_name || conversationalGradingData.card_info.card_name;
-          // Populate flavor_name from Scryfall (crossover name for Universes Beyond, Secret Lair)
-          if (m.flavor_name) {
-            conversationalGradingData.card_info.flavor_name = m.flavor_name;
-          }
-          conversationalGradingData.card_info.scryfall_collector_number = m.collector_number;
-
-          // 🔧 FIX: Handle card_number with "???" (when AI couldn't read set total)
-          // Use Scryfall collector_number + set card_count for proper "X/Y" format
-          const aiCardNumber = conversationalGradingData.card_info.card_number || conversationalGradingData.card_info.collector_number;
-          const setCardCount = mtgApiVerification.set_card_count;
-
-          if (aiCardNumber && aiCardNumber.includes('???')) {
-            // AI detected partial number (e.g., "0061/???"), replace with API data
-            if (m.collector_number && setCardCount) {
-              conversationalGradingData.card_info.card_number = `${m.collector_number}/${setCardCount}`;
-            } else if (m.collector_number) {
-              conversationalGradingData.card_info.card_number = m.collector_number;
-            }
-            console.log(`[GET /api/mtg/${cardId}] 🔧 Fixed card_number: ${aiCardNumber} → ${conversationalGradingData.card_info.card_number}`);
-          } else if (!aiCardNumber) {
-            // No AI-detected number, use Scryfall as fallback
-            if (m.collector_number && setCardCount) {
-              conversationalGradingData.card_info.card_number = `${m.collector_number}/${setCardCount}`;
-            } else if (m.collector_number) {
-              conversationalGradingData.card_info.card_number = m.collector_number;
-            }
-          }
-          // Otherwise, keep the AI-detected value (it's complete)
-          conversationalGradingData.card_info.mana_cost = m.mana_cost;
-          conversationalGradingData.card_info.mtg_card_type = m.type_line;
-          conversationalGradingData.card_info.creature_type = m.creature_type;  // Now from metadata
-          conversationalGradingData.card_info.power_toughness = powerToughness;
-          conversationalGradingData.card_info.color_identity = m.color_identity?.join('') || null;
-          conversationalGradingData.card_info.expansion_code = m.set_code;
-          conversationalGradingData.card_info.rarity_or_variant = m.rarity;
-          conversationalGradingData.card_info.artist_name = m.artist;
-          // IMPORTANT: Don't override AI's foil determination with Scryfall's foil field.
-          // Scryfall's `foil` means "a foil printing exists", NOT "this card is foil".
-          // The AI actually examines the physical card to determine foil status.
-          // Only use Scryfall foil data if AI didn't make a determination.
-          if (conversationalGradingData.card_info.is_foil === undefined || conversationalGradingData.card_info.is_foil === null) {
-            conversationalGradingData.card_info.is_foil = m.is_foil || false;
-          }
-          conversationalGradingData.card_info.language = m.language || 'English';
-          conversationalGradingData.card_info.is_double_faced = m.is_double_faced || false;
-
-          // Mark as API verified
-          conversationalGradingData.card_info.mtg_api_verified = true;
-          conversationalGradingData.card_info.mtg_api_id = mtgApiVerification.mtg_api_id;
-          conversationalGradingData.card_info.scryfall_price_usd = m.price_usd;
-          conversationalGradingData.card_info.scryfall_price_usd_foil = m.price_usd_foil;
-
-          // TCGPlayer direct product URL from Scryfall
-          conversationalGradingData.card_info.tcgplayer_url = m.purchase_uris?.tcgplayer || null;
-
-          console.log(`[GET /api/mtg/${cardId}] 📝 Merged Scryfall data into conversational_card_info:`, {
-            set_name: conversationalGradingData.card_info.set_name,
-            mana_cost: conversationalGradingData.card_info.mana_cost,
-            mtg_card_type: conversationalGradingData.card_info.mtg_card_type,
-            rarity: conversationalGradingData.card_info.rarity_or_variant
-          });
-
-          // Update database with merged conversational_card_info
-          const { error: mergeUpdateError } = await supabase
-            .from("cards")
-            .update({
-              conversational_card_info: conversationalGradingData.card_info,
-              mtg_api_verified: true
-            })
-            .eq("id", cardId);
-
-          if (mergeUpdateError) {
-            console.error(`[GET /api/mtg/${cardId}] ⚠️ Failed to update merged card_info:`, mergeUpdateError);
-          }
-        }
-
-        // If corrections were made, log them
-        if (mtgApiVerification.corrections?.length > 0) {
-          console.log(`[GET /api/mtg/${cardId}] 📝 Scryfall corrections applied:`, mtgApiVerification.corrections);
-        }
-      } else {
-        console.warn(`[GET /api/mtg/${cardId}] ⚠️ Scryfall verification request failed:`, verifyResponse.status);
-      }
-    } catch (verifyError: any) {
-      console.error(`[GET /api/mtg/${cardId}] ⚠️ Scryfall verification error:`, verifyError.message);
-      // Don't fail grading - Scryfall verification is optional enhancement
-    }
+    // Card identification handled by internal MTG database lookup above (line ~903)
+    // No external Scryfall API calls needed — mtg_cards table contains all Scryfall data
+    // Internal database lookup at line ~903 already enhances card_info with verified data
 
     console.log(`[GET /api/mtg/${cardId}] MTG card request completed in ${Date.now() - startTime}ms`);
 
@@ -1338,8 +1215,8 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       back_url: backUrl,
       processing_time: Date.now() - startTime,
       // 🃏 Scryfall API verification results
-      mtg_api_verification: mtgApiVerification || null,
-      mtg_api_verified: mtgApiVerification?.verified === true,
+      mtg_api_verification: null,
+      mtg_api_verified: !!conversationalGradingData?.card_info?.mtg_database_id,
       // ⭐ Card owner's founder/Card Lovers status (for emblems on public card labels)
       owner_is_founder: ownerIsFounder,
       owner_show_founder_badge: ownerShowFounderBadge,
