@@ -154,7 +154,7 @@ export default function LorcanaDatabasePage() {
       if (selectedInk) params.set('ink', selectedInk)
       if (selectedRarity) params.set('rarity', selectedRarity)
       params.set('page', page.toString())
-      params.set('limit', '20')
+      params.set('limit', '24')
 
       const res = await fetch(`/api/lorcana-database/search?${params}`)
       const data = await res.json()

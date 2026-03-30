@@ -165,7 +165,7 @@ export default function YuGiOhDatabasePage() {
       if (selectedAttribute) params.set('attribute', selectedAttribute)
       if (selectedFrameType) params.set('frame_type', selectedFrameType)
       params.set('page', page.toString())
-      params.set('limit', '20')
+      params.set('limit', '24')
 
       const res = await fetch(`/api/yugioh-database/search?${params}`)
       const data = await res.json()

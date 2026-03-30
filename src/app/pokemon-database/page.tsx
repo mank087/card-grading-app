@@ -228,7 +228,7 @@ export default function PokemonDatabasePage() {
       if (searchSetTotal) params.set('set_total', searchSetTotal)
       params.set('language', searchLanguage)
       params.set('page', page.toString())
-      params.set('limit', '20')
+      params.set('limit', '24')
 
       const res = await fetch(`/api/pokemon-database/search?${params}`)
       const data = await res.json()

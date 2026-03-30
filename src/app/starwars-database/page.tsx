@@ -130,7 +130,7 @@ export default function StarWarsDatabasePage() {
       if (selectedSetId) params.set('set_id', selectedSetId)
       if (searchNumber) params.set('card_number', searchNumber)
       params.set('page', page.toString())
-      params.set('limit', '20')
+      params.set('limit', '24')
 
       const res = await fetch(`/api/starwars-database/search?${params}`)
       const data = await res.json()

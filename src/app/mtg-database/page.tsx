@@ -180,7 +180,7 @@ export default function MtgDatabasePage() {
       if (selectedRarity) params.set('rarity', selectedRarity)
       if (selectedTypeLine) params.set('type_line', selectedTypeLine)
       params.set('page', page.toString())
-      params.set('limit', '20')
+      params.set('limit', '24')
 
       const res = await fetch(`/api/mtg-database/search?${params}`)
       const data = await res.json()

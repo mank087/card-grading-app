@@ -149,7 +149,7 @@ export default function OnePieceDatabasePage() {
       if (selectedColor) params.set('card_color', selectedColor)
       if (selectedType) params.set('card_type', selectedType)
       params.set('page', page.toString())
-      params.set('limit', '20')
+      params.set('limit', '24')
 
       const res = await fetch(`/api/onepiece-database/search?${params}`)
       const data = await res.json()
