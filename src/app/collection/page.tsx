@@ -397,11 +397,6 @@ const getCardLink = (card: Card) => {
     return `/yugioh/${card.id}`;
   }
 
-  // Star Wars cards → /starwars/[id]
-  if (card.category === 'Star Wars') {
-    return `/starwars/${card.id}`;
-  }
-
   // Other cards → /other/[id]
   if (card.category === 'Other') {
     return `/other/${card.id}`;
@@ -1837,7 +1832,6 @@ function CollectionPageContent() {
             { id: 'Lorcana', label: 'Lorcana', icon: '✨' },
             { id: 'One Piece', label: 'One Piece', icon: '🏴‍☠️' },
             { id: 'Yu-Gi-Oh', label: 'Yu-Gi-Oh', icon: '🔮' },
-            { id: 'Star Wars', label: 'Star Wars', icon: '⭐' },
             { id: 'Other', label: 'Other', icon: '🃏' }
           ].map((category) => (
             <button

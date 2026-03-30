@@ -267,6 +267,7 @@ export interface ConversationalCardInfo {
 export interface CardForLabel {
   id: string;
   category?: string | null;
+  sub_category?: string | null;
   serial?: string | null;
 
   // Grade fields
@@ -1063,11 +1064,10 @@ export function generateLabelData(card: CardForLabel): LabelData {
       case 'Yu-Gi-Oh':
         rawPrimaryName = getYugiohName(cardInfo, card);
         break;
-      case 'Star Wars':
-        rawPrimaryName = getStarWarsName(cardInfo, card);
-        break;
       default:
-        rawPrimaryName = getOtherName(cardInfo, card);
+        rawPrimaryName = card.sub_category === 'Star Wars'
+          ? getStarWarsName(cardInfo, card)
+          : getOtherName(cardInfo, card);
     }
   }
 
@@ -1114,11 +1114,10 @@ export function generateLabelData(card: CardForLabel): LabelData {
       case 'Yu-Gi-Oh':
         rawSubset = getYugiohSubset(cardInfo, card);
         break;
-      case 'Star Wars':
-        rawSubset = getStarWarsSubset(cardInfo, card);
-        break;
       default:
-        rawSubset = stripMarkdown(cardInfo.subset);
+        rawSubset = card.sub_category === 'Star Wars'
+          ? getStarWarsSubset(cardInfo, card)
+          : stripMarkdown(cardInfo.subset);
     }
   }
   const subset = getCleanValue(rawSubset);
@@ -1239,11 +1238,10 @@ export function generateLabelData(card: CardForLabel): LabelData {
       case 'Yu-Gi-Oh':
         features = getYugiohFeatures(cardInfo, card);
         break;
-      case 'Star Wars':
-        features = getStarWarsFeatures(cardInfo, card);
-        break;
       default:
-        features = getOtherFeatures(cardInfo, card);
+        features = card.sub_category === 'Star Wars'
+          ? getStarWarsFeatures(cardInfo, card)
+          : getOtherFeatures(cardInfo, card);
     }
   }
 

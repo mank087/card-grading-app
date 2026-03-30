@@ -733,6 +733,9 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       serial_numbering: parsedCardInfo?.serial_number || card.serial_numbering,
       autographed: parsedCardInfo?.autographed || card.autographed,
     };
+
+    // Preserve the sub_category from the card record
+    const subCategory = card.sub_category || null;
     const labelData = generateLabelData(cardForLabel);
 
     console.log(`[GET /api/other/${cardId}] Generated label data:`, {
@@ -751,6 +754,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         conversational_card_info: parsedCardInfo,
         processing_time: processingTime,
         label_data: labelData,
+        ...(subCategory ? { sub_category: subCategory } : {}),
         ...gradingData,
         ...otherFields
       })
@@ -773,6 +777,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
       ...(updatedCard || card),
       front_url: frontUrl,
       back_url: backUrl,
+      sub_category: subCategory,
       // ⭐ Card owner's founder/Card Lovers status (for emblems on public card labels)
       owner_is_founder: ownerIsFounder,
       owner_show_founder_badge: ownerShowFounderBadge,

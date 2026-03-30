@@ -133,22 +133,6 @@ const CARD_TYPES = {
       ]
     }
   },
-  'Star Wars': {
-    label: 'Star Wars Card',
-    icon: '',
-    category: 'Star Wars',
-    apiEndpoint: '/api/starwars',
-    route: '/starwars',
-    description: {
-      title: 'Star Wars TCG',
-      items: [
-        'Topps, Panini, Decipher, and FFG cards',
-        'Chrome, Refractor, and vintage cards',
-        'Autograph and relic cards',
-        'All eras from 1977 to present'
-      ]
-    }
-  },
   Other: {
     label: 'Other Collectible Card',
     icon: '',
@@ -165,6 +149,25 @@ const CARD_TYPES = {
       ]
     }
   }
+} as const;
+
+// Sub-categories for "Other" card type, grouped by theme
+const OTHER_SUB_CATEGORIES = {
+  TCG: [
+    'Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard',
+    'Weiss Schwarz', 'MetaZoo', 'Force of Will', 'Final Fantasy TCG',
+    'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena'
+  ],
+  Entertainment: [
+    'Star Wars', 'Marvel', 'DC Comics', 'Disney', 'Garbage Pail Kids',
+    'Wacky Packages', 'WWE / Wrestling', 'Movie / TV', 'Music', 'Anime'
+  ],
+  Vintage: [
+    'Non-Sport Vintage', 'Art Cards', 'Promotional', 'Racing', 'Historical'
+  ],
+  Other: [
+    'Other'
+  ]
 } as const;
 
 type CardType = keyof typeof CARD_TYPES;
@@ -197,6 +200,9 @@ function UniversalUploadPageContent() {
   const [selectedType, setSelectedType] = useState<CardType>(
     categoryParam in CARD_TYPES ? categoryParam as CardType : 'Sports'
   );
+
+  // Sub-category for "Other" card type
+  const [subCategory, setSubCategory] = useState<string>('');
 
   const [frontFile, setFrontFile] = useState<File | null>(null)
   const [backFile, setBackFile] = useState<File | null>(null)
@@ -275,6 +281,7 @@ function UniversalUploadPageContent() {
         setWizardStep(1);
         setNoDefectsConfirmed(false);
         setConditionReport(EMPTY_CONDITION_REPORT);
+        setSubCategory('');
       }
       setLastNavTimestamp(navTimestamp || null);
       setSelectedType(categoryParam as CardType);
@@ -594,6 +601,7 @@ function UniversalUploadPageContent() {
         front_path: frontPath,
         back_path: backPath,
         category: config.category,
+        ...(config.category === 'Other' && subCategory ? { sub_category: subCategory } : {}),
         visibility: 'public', // Cards are public by default so grading API can access them
         // User condition report fields
         user_condition_report: (hasConditionData || hasCardDescription) ? reportWithDescription : null,
@@ -1060,6 +1068,27 @@ function UniversalUploadPageContent() {
                 ))}
               </select>
             </div>
+            {selectedType === 'Other' && (
+              <div className="flex items-center justify-between gap-3 mt-2">
+                <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Sub-Category:</label>
+                <select
+                  value={subCategory}
+                  onChange={(e) => setSubCategory(e.target.value)}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-900 bg-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+                >
+                  <option value="">Select...</option>
+                  {Object.entries(OTHER_SUB_CATEGORIES).map(([group, items]) => (
+                    <optgroup key={group} label={group}>
+                      {items.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+            )}
             <p className="text-xs text-gray-500 mt-1.5 text-center">
               Make sure this matches your card type for accurate grading
             </p>
@@ -1282,6 +1311,34 @@ function UniversalUploadPageContent() {
                     ))}
                   </select>
                 </div>
+
+                {/* Sub-Category Selector for "Other" cards */}
+                {selectedType === 'Other' && (
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 mt-4">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Card Sub-Category:
+                    </label>
+                    <select
+                      value={subCategory}
+                      onChange={(e) => setSubCategory(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-base font-medium text-gray-900 bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 transition-all"
+                    >
+                      <option value="">Select a sub-category...</option>
+                      {Object.entries(OTHER_SUB_CATEGORIES).map(([group, items]) => (
+                        <optgroup key={group} label={group}>
+                          {items.map((item) => (
+                            <option key={item} value={item}>
+                              {item}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      Selecting a sub-category helps improve grading accuracy for your card type.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

@@ -13,7 +13,6 @@ export const POP_CATEGORIES: PopCategory[] = [
   { slug: 'lorcana', dbCategory: 'Lorcana', displayName: 'Lorcana', icon: '\u2728' },
   { slug: 'one-piece', dbCategory: 'One Piece', displayName: 'One Piece', icon: '\uD83C\uDFF4\u200D\u2620\uFE0F' },
   { slug: 'yugioh', dbCategory: 'Yu-Gi-Oh', displayName: 'Yu-Gi-Oh!', icon: '\uD83D\uDD2E' },
-  { slug: 'star-wars', dbCategory: 'Star Wars', displayName: 'Star Wars', icon: '\u2B50' },
   { slug: 'football', dbCategory: 'Football', displayName: 'Football', icon: '\uD83C\uDFC8' },
   { slug: 'baseball', dbCategory: 'Baseball', displayName: 'Baseball', icon: '\u26BE' },
   { slug: 'basketball', dbCategory: 'Basketball', displayName: 'Basketball', icon: '\uD83C\uDFC0' },

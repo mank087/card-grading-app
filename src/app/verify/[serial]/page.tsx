@@ -15,7 +15,6 @@ function getCardRoute(category: string | null, id: string): string {
   if (category === 'Lorcana') return `/lorcana/${id}`;
   if (category === 'One Piece') return `/onepiece/${id}`;
   if (category === 'Yu-Gi-Oh') return `/yugioh/${id}`;
-  if (category === 'Star Wars') return `/starwars/${id}`;
   if (category === 'Other') return `/other/${id}`;
   // Fallback — try sports as default since it was the original card type
   return `/sports/${id}`;

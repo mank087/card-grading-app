@@ -58,6 +58,7 @@ export function getCardLabelData(card: any): LabelData {
   const cardForLabel: CardForLabel = {
     id: card.id,
     category: card.category,
+    sub_category: card.sub_category,
     serial: card.serial,
     conversational_decimal_grade: card.conversational_decimal_grade,
     conversational_whole_grade: card.conversational_whole_grade,
