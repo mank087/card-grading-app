@@ -162,6 +162,54 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, 
           </div>
         )}
 
+        {/* Benefit Carousel (free users) or Static Box (paid users) — above card */}
+        {showCarousel ? (
+          <div className="mb-6">
+            <div className="bg-gradient-to-r from-red-900/40 to-yellow-900/40 border border-yellow-500/30 rounded-lg p-4 min-h-[100px] flex flex-col justify-center">
+              <div
+                className="transition-opacity duration-400"
+                style={{ opacity: slideVisible ? 1 : 0 }}
+              >
+                <div className="text-2xl mb-1">{BENEFIT_SLIDES[currentSlide].icon}</div>
+                <p className="text-sm font-semibold text-white mb-1">
+                  {BENEFIT_SLIDES[currentSlide].title}
+                </p>
+                <p className="text-xs text-gray-300">
+                  {BENEFIT_SLIDES[currentSlide].description}
+                </p>
+                {BENEFIT_SLIDES[currentSlide].isCta && (
+                  <Link
+                    href="/credits"
+                    className="inline-block mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-all"
+                  >
+                    View Credit Packs
+                  </Link>
+                )}
+              </div>
+            </div>
+            {/* Dot indicators */}
+            <div className="flex justify-center gap-1.5 mt-2">
+              {BENEFIT_SLIDES.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setSlideVisible(false); setTimeout(() => { setCurrentSlide(i); setSlideVisible(true) }, 400) }}
+                  className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                    i === currentSlide ? 'bg-yellow-400 w-3' : 'bg-gray-600 hover:bg-gray-500'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 mb-6">
+            <p className="text-sm text-red-300">
+              <strong>DCM Optic™ Analysis</strong>
+              <br />
+              Advanced algorithms examining every detail of your Pokemon card
+            </p>
+          </div>
+        )}
+
         {/* Animated Card Container */}
         <div className="relative w-72 h-96 mx-auto mb-8 overflow-hidden rounded-lg shadow-2xl">
           {/* Card Border with Glow */}
@@ -248,54 +296,6 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, 
               )
             })}
           </div>
-
-          {/* Benefit Carousel (free users) or Static Box (paid users) */}
-          {showCarousel ? (
-            <div className="mb-4">
-              <div className="bg-gradient-to-r from-red-900/40 to-yellow-900/40 border border-yellow-500/30 rounded-lg p-4 min-h-[100px] flex flex-col justify-center">
-                <div
-                  className="transition-opacity duration-400"
-                  style={{ opacity: slideVisible ? 1 : 0 }}
-                >
-                  <div className="text-2xl mb-1">{BENEFIT_SLIDES[currentSlide].icon}</div>
-                  <p className="text-sm font-semibold text-white mb-1">
-                    {BENEFIT_SLIDES[currentSlide].title}
-                  </p>
-                  <p className="text-xs text-gray-300">
-                    {BENEFIT_SLIDES[currentSlide].description}
-                  </p>
-                  {BENEFIT_SLIDES[currentSlide].isCta && (
-                    <Link
-                      href="/credits"
-                      className="inline-block mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-all"
-                    >
-                      View Credit Packs
-                    </Link>
-                  )}
-                </div>
-              </div>
-              {/* Dot indicators */}
-              <div className="flex justify-center gap-1.5 mt-2">
-                {BENEFIT_SLIDES.map((_, i) => (
-                  <button
-                    key={i}
-                    onClick={() => { setSlideVisible(false); setTimeout(() => { setCurrentSlide(i); setSlideVisible(true) }, 400) }}
-                    className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
-                      i === currentSlide ? 'bg-yellow-400 w-3' : 'bg-gray-600 hover:bg-gray-500'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 mb-4">
-              <p className="text-sm text-red-300">
-                <strong>DCM Optic™ Analysis</strong>
-                <br />
-                Advanced algorithms examining every detail of your Pokemon card
-              </p>
-            </div>
-          )}
 
           <p className="text-xs text-gray-400">
             Professional grading in progress
