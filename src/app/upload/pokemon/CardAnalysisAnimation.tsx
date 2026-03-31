@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
+import { useCredits } from '@/contexts/CreditsContext'
 
 const CARD_TYPES_CONFIG = {
   Sports: { route: '/sports' },
@@ -11,6 +13,50 @@ const CARD_TYPES_CONFIG = {
   Lorcana: { route: '/lorcana' },
   Other: { route: '/other' }
 }
+
+const BENEFIT_SLIDES = [
+  {
+    icon: '🔬',
+    title: 'Multi-Pass Grading',
+    description: 'Your card is being graded 3 independent times and averaged for maximum accuracy.',
+  },
+  {
+    icon: '📊',
+    title: 'Sub-Grade Breakdown',
+    description: 'You\'ll get Centering, Corners, Edges & Surface scores for both front and back.',
+  },
+  {
+    icon: '💰',
+    title: 'Market Pricing',
+    description: 'We\'ll show you what your card is worth based on its grade — powered by eBay, PriceCharting & more.',
+  },
+  {
+    icon: '🏷️',
+    title: 'Label Studio',
+    description: 'Design & print custom labels for your slabs, magnetic one-touch holders, and toploaders.',
+  },
+  {
+    icon: '🛒',
+    title: 'eBay InstaList',
+    description: 'List graded cards to eBay in seconds with auto-generated photos and descriptions.',
+  },
+  {
+    icon: '📚',
+    title: 'Collection Tracking',
+    description: 'Build and track your graded card portfolio — watch your collection value grow over time.',
+  },
+  {
+    icon: '🃏',
+    title: '8 Card Types Supported',
+    description: 'We grade Pokemon, MTG, Sports, Lorcana, One Piece, Yu-Gi-Oh, Star Wars & more.',
+  },
+  {
+    icon: '🔥',
+    title: 'Get Bonus Credits',
+    description: 'Get up to 5 bonus credits on your first purchase — grades start at just $0.50/card.',
+    isCta: true,
+  },
+]
 
 interface CardAnalysisAnimationProps {
   frontImageUrl: string
@@ -23,8 +69,13 @@ interface CardAnalysisAnimationProps {
 
 export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, cardId, category, allowNavigation = true, onGradeAnother }: CardAnalysisAnimationProps) {
   const [currentStep, setCurrentStep] = useState(0)
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const [slideVisible, setSlideVisible] = useState(true)
   const router = useRouter()
   const { queue } = useGradingQueue()
+  const { balance, isFirstPurchase } = useCredits()
+
+  const showCarousel = balance <= 1 && isFirstPurchase
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -40,6 +91,21 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, 
 
     return () => clearInterval(interval)
   }, [])
+
+  // Carousel auto-rotation
+  useEffect(() => {
+    if (!showCarousel) return
+
+    const interval = setInterval(() => {
+      setSlideVisible(false)
+      setTimeout(() => {
+        setCurrentSlide(prev => (prev + 1) % BENEFIT_SLIDES.length)
+        setSlideVisible(true)
+      }, 400)
+    }, 8000)
+
+    return () => clearInterval(interval)
+  }, [showCarousel])
 
   // Auto-redirect when the uploaded card completes grading
   useEffect(() => {
@@ -183,13 +249,53 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, 
             })}
           </div>
 
-          <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 mb-4">
-            <p className="text-sm text-red-300">
-              <strong>DCM Optic™ Analysis</strong>
-              <br />
-              Advanced algorithms examining every detail of your Pokemon card
-            </p>
-          </div>
+          {/* Benefit Carousel (free users) or Static Box (paid users) */}
+          {showCarousel ? (
+            <div className="mb-4">
+              <div className="bg-gradient-to-r from-red-900/40 to-yellow-900/40 border border-yellow-500/30 rounded-lg p-4 min-h-[100px] flex flex-col justify-center">
+                <div
+                  className="transition-opacity duration-400"
+                  style={{ opacity: slideVisible ? 1 : 0 }}
+                >
+                  <div className="text-2xl mb-1">{BENEFIT_SLIDES[currentSlide].icon}</div>
+                  <p className="text-sm font-semibold text-white mb-1">
+                    {BENEFIT_SLIDES[currentSlide].title}
+                  </p>
+                  <p className="text-xs text-gray-300">
+                    {BENEFIT_SLIDES[currentSlide].description}
+                  </p>
+                  {BENEFIT_SLIDES[currentSlide].isCta && (
+                    <Link
+                      href="/credits"
+                      className="inline-block mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-xs font-semibold px-4 py-1.5 rounded-lg transition-all"
+                    >
+                      View Credit Packs
+                    </Link>
+                  )}
+                </div>
+              </div>
+              {/* Dot indicators */}
+              <div className="flex justify-center gap-1.5 mt-2">
+                {BENEFIT_SLIDES.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setSlideVisible(false); setTimeout(() => { setCurrentSlide(i); setSlideVisible(true) }, 400) }}
+                    className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${
+                      i === currentSlide ? 'bg-yellow-400 w-3' : 'bg-gray-600 hover:bg-gray-500'
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="bg-red-900/30 border border-red-500/30 rounded-lg p-4 mb-4">
+              <p className="text-sm text-red-300">
+                <strong>DCM Optic™ Analysis</strong>
+                <br />
+                Advanced algorithms examining every detail of your Pokemon card
+              </p>
+            </div>
+          )}
 
           <p className="text-xs text-gray-400">
             Professional grading in progress
