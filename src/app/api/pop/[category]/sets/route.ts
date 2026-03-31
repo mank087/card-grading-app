@@ -8,9 +8,31 @@ export async function GET(
 ) {
   try {
     const { category: slug } = await params;
-    const dbCategory = getCategoryFromSlug(slug);
     const meta = getCategoryMeta(slug);
-    const dbSubCategory = meta?.dbSubCategory || null;
+    let dbCategory = getCategoryFromSlug(slug);
+    let dbSubCategory = meta?.dbSubCategory || null;
+
+    // If no meta found, check if this slug maps to an Other sub-category in the DB
+    if (!meta) {
+      // Find a sub_category whose slugified form matches this slug
+      const { data: subCatRows } = await supabaseAdmin
+        .from('cards')
+        .select('sub_category')
+        .eq('category', 'Other')
+        .not('sub_category', 'is', null)
+        .not('conversational_whole_grade', 'is', null)
+        .limit(1000);
+      if (subCatRows) {
+        const match = subCatRows.find((r: { sub_category: string }) => {
+          const s = r.sub_category.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+          return s === slug;
+        });
+        if (match) {
+          dbCategory = 'Other';
+          dbSubCategory = match.sub_category; // exact DB value preserves casing
+        }
+      }
+    }
     const searchParams = request.nextUrl.searchParams;
     const search = searchParams.get('search') || null;
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);

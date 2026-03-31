@@ -26,6 +26,7 @@ export const POP_CATEGORIES: PopCategory[] = [
   { slug: 'digimon', dbCategory: 'Other', dbSubCategory: 'Digimon', displayName: 'Digimon', icon: '\uD83D\uDC32' },
   { slug: 'dragon-ball', dbCategory: 'Other', dbSubCategory: 'Dragon Ball', displayName: 'Dragon Ball', icon: '\uD83D\uDD25' },
   { slug: 'marvel', dbCategory: 'Other', dbSubCategory: 'Marvel', displayName: 'Marvel', icon: '\uD83E\uDDB8' },
+  { slug: 'dc-comics', dbCategory: 'Other', dbSubCategory: 'DC Comics', displayName: 'DC Comics', icon: '\uD83E\uDDB8' },
   { slug: 'garbage-pail-kids', dbCategory: 'Other', dbSubCategory: 'Garbage Pail Kids', displayName: 'Garbage Pail Kids', icon: '\uD83D\uDDD1\uFE0F' },
   { slug: 'flesh-and-blood', dbCategory: 'Other', dbSubCategory: 'Flesh and Blood', displayName: 'Flesh and Blood', icon: '\u2694\uFE0F' },
   { slug: 'other', dbCategory: 'Other', displayName: 'Other', icon: '\uD83C\uDCCF' },
@@ -48,7 +49,7 @@ export function getCategoryFromSlug(slug: string): string {
 
 /** Map a database category name to a URL slug */
 export function getSlugFromCategory(category: string): string {
-  const cat = POP_CATEGORIES.find((c) => c.dbCategory === category);
+  const cat = POP_CATEGORIES.find((c) => c.dbCategory === category && !c.dbSubCategory);
   return cat ? cat.slug : category.toLowerCase().replace(/\s+/g, '-');
 }
 

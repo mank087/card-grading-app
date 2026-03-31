@@ -3201,7 +3201,12 @@ export function MTGCardDetails() {
                       className="text-emerald-700 font-medium hover:text-emerald-800 underline"
                       onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById('tour-market-value')?.scrollIntoView({ behavior: 'smooth' });
+                        const section = document.getElementById('tour-market-value');
+                        if (section) {
+                          const content = section.querySelector('.hidden');
+                          if (content) { const btn = section.querySelector('button'); btn?.click(); }
+                          setTimeout(() => section.scrollIntoView({ behavior: 'smooth' }), 100);
+                        }
                       }}
                     >
                       Market Pricing Section

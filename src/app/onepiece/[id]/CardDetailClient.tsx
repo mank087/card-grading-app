@@ -3196,11 +3196,16 @@ export function OnePieceCardDetails() {
                   <p className="text-xs text-gray-600 mt-3 leading-relaxed">
                     Card variant may differ from the matched listing. Review and adjust in the{' '}
                     <a
-                      href="#tour-live-market-pricing"
+                      href="#tour-market-value"
                       className="text-emerald-700 font-medium hover:text-emerald-800 underline"
                       onClick={(e) => {
                         e.preventDefault();
-                        document.getElementById('tour-live-market-pricing')?.scrollIntoView({ behavior: 'smooth' });
+                        const section = document.getElementById('tour-market-value');
+                        if (section) {
+                          const content = section.querySelector('.hidden');
+                          if (content) { const btn = section.querySelector('button'); btn?.click(); }
+                          setTimeout(() => section.scrollIntoView({ behavior: 'smooth' }), 100);
+                        }
                       }}
                     >
                       Market Pricing Section

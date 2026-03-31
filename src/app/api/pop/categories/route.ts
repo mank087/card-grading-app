@@ -50,17 +50,17 @@ export async function GET() {
       })
       .filter((c: { totalGraded: number; dbCategory: string }) => c.totalGraded >= 3);
 
-    // Add sub-category entries from POP_CATEGORIES that have data
-    for (const popCat of POP_CATEGORIES) {
-      if (!popCat.dbSubCategory) continue;
-      const counts = subCatCounts.get(popCat.dbSubCategory);
-      if (!counts || counts.total < 1) continue; // show sub-categories with at least 1 card
+    // Add entries for ALL sub-categories found in the DB (1+ graded cards)
+    for (const [subCat, counts] of subCatCounts) {
+      if (counts.total < 1) continue;
+      const meta = POP_CATEGORIES.find((c) => c.dbSubCategory === subCat);
+      const slug = meta?.slug || subCat.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
       categories.push({
-        slug: popCat.slug,
-        dbCategory: popCat.dbCategory,
-        displayName: popCat.displayName,
-        icon: popCat.icon,
-        uniqueCards: counts.total, // approximate
+        slug,
+        dbCategory: 'Other',
+        displayName: meta?.displayName || subCat,
+        icon: meta?.icon || '\uD83C\uDCCF',
+        uniqueCards: counts.total,
         totalGraded: counts.total,
       });
     }
