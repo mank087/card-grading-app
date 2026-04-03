@@ -1,51 +1,3 @@
-/**
- * Welcome Email API
- * Sends welcome email to new users after successful signup/email confirmation
- * Also schedules 24-hour follow-up email
- *
- * NOTE: Email HTML must use basic styling for Outlook/Gmail compatibility:
- * - No CSS gradients (use solid bgcolor)
- * - No divs (use tables)
- * - No border-radius on containers
- * - Use bgcolor attribute, not background-color style
- * - Use HTML entities for checkmarks
- */
-
-import { NextRequest, NextResponse } from 'next/server';
-import { Resend } from 'resend';
-import { scheduleFollowUpEmail } from '@/lib/emailScheduler';
-
-const resend = new Resend(process.env.RESEND_API_KEY);
-
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { email, userId } = body;
-
-    // Validate required fields
-    if (!email) {
-      return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
-      );
-    }
-
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json(
-        { error: 'Invalid email format' },
-        { status: 400 }
-      );
-    }
-
-    // Send welcome email via Resend
-    // Using email-safe HTML (no gradients, no divs, table-based layout)
-    const { data, error } = await resend.emails.send({
-      from: 'DCM Grading <noreply@dcmgrading.com>',
-      to: [email],
-      subject: 'Welcome to DCM Grading!',
-      html: `
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
 <head>
@@ -258,7 +210,6 @@ export async function POST(request: NextRequest) {
                     <p style="color: #9ca3af; font-size: 13px; text-align: center; margin: 0 0 22px 0;">A structured, repeatable grading methodology you can trust</p>
 
                     <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                      <!-- Multi-Pass -->
                       <tr>
                         <td style="padding: 10px 0; border-bottom: 1px solid #1f2937;">
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -276,7 +227,6 @@ export async function POST(request: NextRequest) {
                           </table>
                         </td>
                       </tr>
-                      <!-- Sub-Grades -->
                       <tr>
                         <td style="padding: 10px 0; border-bottom: 1px solid #1f2937;">
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -294,7 +244,6 @@ export async function POST(request: NextRequest) {
                           </table>
                         </td>
                       </tr>
-                      <!-- Server Verified -->
                       <tr>
                         <td style="padding: 10px 0; border-bottom: 1px solid #1f2937;">
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -312,7 +261,6 @@ export async function POST(request: NextRequest) {
                           </table>
                         </td>
                       </tr>
-                      <!-- No Mailing -->
                       <tr>
                         <td style="padding: 10px 0;">
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
@@ -694,41 +642,3 @@ export async function POST(request: NextRequest) {
   </table>
 </body>
 </html>
-      `,
-    });
-
-    if (error) {
-      console.error('[Welcome Email] Resend error:', error);
-      return NextResponse.json(
-        { error: 'Failed to send welcome email' },
-        { status: 500 }
-      );
-    }
-
-    console.log('[Welcome Email] Sent successfully to:', email, 'ID:', data?.id);
-
-    // Schedule 24-hour follow-up email if userId is provided
-    if (userId) {
-      const scheduleResult = await scheduleFollowUpEmail(userId, email, 24);
-      if (scheduleResult.success) {
-        console.log('[Welcome Email] Follow-up email scheduled for:', email);
-      } else {
-        console.warn('[Welcome Email] Failed to schedule follow-up:', scheduleResult.error);
-      }
-    } else {
-      console.warn('[Welcome Email] No userId provided, skipping follow-up scheduling');
-    }
-
-    return NextResponse.json({
-      success: true,
-      message: 'Welcome email sent',
-      followUpScheduled: !!userId,
-    });
-  } catch (error: any) {
-    console.error('[Welcome Email] Error:', error);
-    return NextResponse.json(
-      { error: 'Failed to send welcome email' },
-      { status: 500 }
-    );
-  }
-}
