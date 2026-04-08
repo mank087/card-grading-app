@@ -183,6 +183,31 @@ export async function POST(request: NextRequest) {
           </tr>
 
           <!-- ============================================ -->
+          <!-- PROMO CODE BANNER                            -->
+          <!-- ============================================ -->
+          <tr>
+            <td class="pad-mobile-sm" style="padding: 25px 30px 5px 30px;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 2px dashed #34d399; border-radius: 12px; overflow: hidden;">
+                <tr>
+                  <td bgcolor="#f0fdf4" style="padding: 22px 24px;" align="center">
+                    <p style="color: #059669; font-size: 12px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700; margin: 0 0 6px 0;">&#127873; Welcome Gift &#127873;</p>
+                    <p style="color: #065f46; font-size: 22px; font-weight: 800; margin: 0 0 8px 0;">Save 10% on Your First Purchase</p>
+                    <p style="color: #374151; font-size: 14px; margin: 0 0 14px 0; line-height: 1.5;">Apply code below at checkout for <strong>10% off any credit pack</strong> or Card Lovers subscription.</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
+                      <tr>
+                        <td bgcolor="#065f46" style="padding: 12px 28px; border-radius: 8px;">
+                          <p style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace;">Grade10</p>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="color: #6b7280; font-size: 12px; margin: 12px 0 0 0;">Plus, first-time graders get up to <strong style="color: #059669;">5 bonus credits FREE</strong> on their first purchase!</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- ============================================ -->
           <!-- TRUST STRIP                                  -->
           <!-- ============================================ -->
           <tr>
@@ -570,43 +595,6 @@ export async function POST(request: NextRequest) {
           </tr>
 
           <!-- ============================================ -->
-          <!-- BLOG SECTION                                 -->
-          <!-- ============================================ -->
-          <tr>
-            <td class="pad-mobile-sm" style="padding: 5px 30px 25px 30px;">
-              <h2 style="color: #1f2937; font-size: 18px; margin: 0 0 5px 0; text-align: center; font-weight: 600;">&#128218; Learn More</h2>
-              <p style="color: #6b7280; font-size: 13px; text-align: center; margin: 0 0 18px 0;">Guides to help you get the most out of DCM Grading</p>
-
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td class="blog-card-wrap" width="50%" valign="top" style="padding: 0 6px 12px 0;">
-                    <a href="https://www.dcmgrading.com/blog/sports-card-grading-101-guide?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=blog-sports-101" style="text-decoration: none;">
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-                        <tr><td><img src="https://zyxtqcvwkbpvsjsszbzg.supabase.co/storage/v1/object/public/blog-images/blog/1769637999039-a0oy9n.jpg" alt="Sports Card Grading 101" class="blog-img" width="264" style="display: block; width: 100%; height: auto;"></td></tr>
-                        <tr><td style="padding: 10px 12px 12px 12px;">
-                          <p style="color: #059669; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 4px 0; font-weight: 700;">Grading Guide</p>
-                          <p style="color: #1f2937; font-size: 13px; font-weight: 700; margin: 0; line-height: 1.3;">Sports Card Grading 101: What Every Collector Needs to Know</p>
-                        </td></tr>
-                      </table>
-                    </a>
-                  </td>
-                  <td class="blog-card-wrap" width="50%" valign="top" style="padding: 0 0 12px 6px;">
-                    <a href="https://www.dcmgrading.com/blog/grading-pokemon-cards-at-home-dcm-guide?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=blog-pokemon-guide" style="text-decoration: none;">
-                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
-                        <tr><td><img src="https://zyxtqcvwkbpvsjsszbzg.supabase.co/storage/v1/object/public/blog-images/blog/1769617050807-1rhobu.jpg" alt="Grading Pokemon Cards at Home" class="blog-img" width="264" style="display: block; width: 100%; height: auto;"></td></tr>
-                        <tr><td style="padding: 10px 12px 12px 12px;">
-                          <p style="color: #059669; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 4px 0; font-weight: 700;">Grading Guide</p>
-                          <p style="color: #1f2937; font-size: 13px; font-weight: 700; margin: 0; line-height: 1.3;">Grading Your Pok&eacute;mon Cards at Home with DCM</p>
-                        </td></tr>
-                      </table>
-                    </a>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-
-          <!-- ============================================ -->
           <!-- BOTTOM CTA                                   -->
           <!-- ============================================ -->
           <tr>
@@ -646,26 +634,14 @@ export async function POST(request: NextRequest) {
           <!-- ============================================ -->
           <tr>
             <td bgcolor="#f9fafb" style="padding: 20px 40px; border-top: 1px solid #e5e7eb;">
-              <p style="text-align: center; color: #6b7280; font-size: 14px; margin: 0 0 15px 0; font-weight: 600;">Follow Us</p>
-              <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                  <td align="center" style="padding: 0 12px;">
-                    <a href="https://www.facebook.com/dcmgrading" style="text-decoration: none;">
-                      <img src="https://cdn-icons-png.flaticon.com/512/124/124010.png" alt="Facebook" width="32" height="32" style="display: block; width: 32px; height: 32px;">
-                    </a>
-                  </td>
-                  <td align="center" style="padding: 0 12px;">
-                    <a href="https://www.instagram.com/dcm_grading/" style="text-decoration: none;">
-                      <img src="https://cdn-icons-png.flaticon.com/512/174/174855.png" alt="Instagram" width="32" height="32" style="display: block; width: 32px; height: 32px;">
-                    </a>
-                  </td>
-                  <td align="center" style="padding: 0 12px;">
-                    <a href="https://x.com/DCM_Grading" style="text-decoration: none;">
-                      <img src="https://cdn-icons-png.flaticon.com/512/5969/5969020.png" alt="X" width="32" height="32" style="display: block; width: 32px; height: 32px;">
-                    </a>
-                  </td>
-                </tr>
-              </table>
+              <p style="text-align: center; color: #6b7280; font-size: 14px; margin: 0 0 12px 0; font-weight: 600;">Follow Us</p>
+              <p style="text-align: center; margin: 0;">
+                <a href="https://www.facebook.com/dcmgrading" style="color: #059669; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">Facebook</a>
+                <span style="color: #d1d5db;">&bull;</span>
+                <a href="https://www.instagram.com/dcm_grading/" style="color: #059669; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">Instagram</a>
+                <span style="color: #d1d5db;">&bull;</span>
+                <a href="https://x.com/DCM_Grading" style="color: #059669; font-size: 13px; text-decoration: none; font-weight: 600; padding: 0 10px;">X / Twitter</a>
+              </p>
             </td>
           </tr>
 
