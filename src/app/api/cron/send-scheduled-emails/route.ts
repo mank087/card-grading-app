@@ -140,7 +140,7 @@ async function processScheduledEmail(
 
   // Send email via Resend
   const { data, error } = await resend.emails.send({
-    from: 'DCM Grading <noreply@dcmgrading.com>',
+    from: 'DCM Grading <admin@dcmgrading.com>',
     to: [email.user_email],
     subject: subject,
     html: html,

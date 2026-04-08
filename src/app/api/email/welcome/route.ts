@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
     // Send welcome email via Resend
     // Using email-safe HTML (no gradients, no divs, table-based layout)
     const { data, error } = await resend.emails.send({
-      from: 'DCM Grading <noreply@dcmgrading.com>',
+      from: 'DCM Grading <admin@dcmgrading.com>',
       to: [email],
       subject: 'Welcome to DCM Grading!',
       html: `
