@@ -6,16 +6,24 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { getStoredSession } from '@/lib/directAuth'
 import { useCredits } from '@/contexts/CreditsContext'
+import { FirstGradeCongratsModal } from '@/components/conversion/FirstGradeCongratsModal'
 
 export default function GradeYourFirstCardPage() {
   const router = useRouter()
   const { balance, isLoading } = useCredits()
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null)
   const [activeStep, setActiveStep] = useState(1)
+  const [showWelcomePromo, setShowWelcomePromo] = useState(false)
 
   useEffect(() => {
     const session = getStoredSession()
     setIsAuthenticated(!!session?.access_token)
+
+    // Show the welcome promo modal if this is a brand-new signup
+    if (typeof window !== 'undefined' && localStorage.getItem('dcm_show_welcome_promo') === 'true') {
+      localStorage.removeItem('dcm_show_welcome_promo')
+      setShowWelcomePromo(true)
+    }
   }, [])
 
   const steps = [
@@ -27,6 +35,13 @@ export default function GradeYourFirstCardPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-purple-50">
+      {showWelcomePromo && (
+        <FirstGradeCongratsModal
+          isFirstPurchase={true}
+          variant="signup"
+          onDismiss={() => setShowWelcomePromo(false)}
+        />
+      )}
       {/* Hero Section */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
         <div className="max-w-5xl mx-auto px-4 py-12 sm:py-16">

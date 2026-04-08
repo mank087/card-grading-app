@@ -161,6 +161,9 @@ export default function AuthCallbackPage() {
                 })
               }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
 
+              // Flag this user as a brand-new signup so the welcome promo modal shows on the next page
+              localStorage.setItem('dcm_show_welcome_promo', 'true')
+
               router.replace('/grade-your-first-card')
             } else if (customRedirect) {
               console.log('[Auth Callback] Existing user with custom redirect:', customRedirect)
@@ -214,6 +217,9 @@ export default function AuthCallbackPage() {
                     name: retrySession.user.user_metadata?.full_name || retrySession.user.user_metadata?.name
                   })
                 }).catch(err => console.error('[Auth Callback] Failed to send welcome email:', err))
+
+                // Flag this user as a brand-new signup so the welcome promo modal shows on the next page
+                localStorage.setItem('dcm_show_welcome_promo', 'true')
 
                 router.replace('/grade-your-first-card')
               } else if (customRedirect) {

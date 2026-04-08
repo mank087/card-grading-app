@@ -54,11 +54,12 @@ export function LowCreditsBottomBanner({ balance, isFirstPurchase = false }: Low
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-white font-medium text-sm sm:text-base truncate">
-                  You have <span className="font-bold">0 credits</span> remaining
+                  You have <span className="font-bold">0 credits</span> &mdash; save 10% with code{' '}
+                  <span className="font-mono font-bold bg-white/20 px-1.5 py-0.5 rounded">Grade10</span>
                 </p>
                 {isFirstPurchase && (
                   <p className="text-purple-100 text-xs sm:text-sm hidden sm:block">
-                    Get bonus credits on your first purchase!
+                    First-time graders also get bonus credits on their first purchase!
                   </p>
                 )}
               </div>
