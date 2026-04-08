@@ -195,8 +195,8 @@ export async function POST(request: NextRequest) {
                     <p style="color: #374151; font-size: 14px; margin: 0 0 14px 0; line-height: 1.5;">Apply code below at checkout for <strong>10% off any credit pack</strong> or Card Lovers subscription.</p>
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr>
-                        <td bgcolor="#065f46" style="padding: 12px 28px; border-radius: 8px;">
-                          <p style="color: #ffffff; font-size: 24px; font-weight: 800; margin: 0; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace;">Grade10</p>
+                        <td bgcolor="#065f46" style="padding: 0; border-radius: 8px;">
+                          <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=promo-code-button" style="display: inline-block; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace; text-decoration: none; padding: 12px 28px;">Grade10</a>
                         </td>
                       </tr>
                     </table>
