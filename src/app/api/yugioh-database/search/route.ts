@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     // Build query on yugioh_cards
     let query = supabase
       .from('yugioh_cards')
-      .select('*', { count: 'exact' });
+      .select('*', { count: 'estimated' });
 
     // Filter by card IDs from set lookup
     if (setFilterCardIds) {

@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabase
       .from('lorcana_cards')
-      .select('*', { count: 'exact' });
+      .select('*', { count: 'estimated' });
 
     // Apply filters
     if (name) {

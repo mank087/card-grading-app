@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     function buildEnglishQuery() {
       let query = supabase
         .from('pokemon_cards')
-        .select('*', { count: 'exact' });
+        .select('*', { count: 'estimated' });
 
       if (name) {
         query = query.ilike('name', `%${name}%`);
@@ -64,7 +64,7 @@ export async function GET(request: NextRequest) {
     function buildJapaneseQuery() {
       let query = supabase
         .from('pokemon_cards_ja')
-        .select('*', { count: 'exact' });
+        .select('*', { count: 'estimated' });
 
       if (name) {
         // Search both Japanese name and English name fields

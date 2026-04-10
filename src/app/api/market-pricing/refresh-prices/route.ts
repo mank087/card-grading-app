@@ -392,7 +392,7 @@ export async function POST(request: NextRequest) {
       .from('cards')
       .select(`
         id, category,
-        conversational_card_info, conversational_grading, ai_grading,
+        conversational_card_info,
         conversational_decimal_grade,
         card_name, featured, pokemon_featured, card_set, card_number, release_date,
         manufacturer_name, is_foil, foil_type, mtg_rarity,

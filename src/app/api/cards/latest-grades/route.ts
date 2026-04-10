@@ -21,7 +21,7 @@ export async function GET(request: Request) {
         id, serial, card_name, category, front_path, back_path, created_at,
         featured, pokemon_featured, card_set, release_date, manufacturer_name, card_number,
         conversational_decimal_grade, conversational_whole_grade,
-        conversational_condition_label, conversational_card_info, conversational_grading,
+        conversational_condition_label, conversational_card_info,
         dvg_decimal_grade,
         is_foil, foil_type, is_double_faced, mtg_rarity, holofoil,
         serial_numbering, rarity_tier, rarity_description,
@@ -72,42 +72,6 @@ export async function GET(request: Request) {
         front_url: card.front_path ? urlMap.get(card.front_path) || null : null,
         back_url: card.back_path ? urlMap.get(card.back_path) || null : null
       }
-
-      // If conversational_card_info is missing but conversational_grading exists, parse it
-      if (!card.conversational_card_info && card.conversational_grading) {
-        try {
-          const parsed = typeof card.conversational_grading === 'string'
-            ? JSON.parse(card.conversational_grading)
-            : card.conversational_grading
-
-          if (parsed.card_info) {
-            enrichedCard.conversational_card_info = parsed.card_info
-            if (!card.featured && parsed.card_info.player_or_character) {
-              enrichedCard.featured = parsed.card_info.player_or_character
-            }
-            if (!card.card_name && parsed.card_info.card_name) {
-              enrichedCard.card_name = parsed.card_info.card_name
-            }
-            if (!card.card_set && parsed.card_info.set_name) {
-              enrichedCard.card_set = parsed.card_info.set_name
-            }
-            if (!card.card_number && parsed.card_info.card_number) {
-              enrichedCard.card_number = parsed.card_info.card_number
-            }
-            if (!card.release_date && parsed.card_info.year) {
-              enrichedCard.release_date = parsed.card_info.year
-            }
-          }
-          if (!card.conversational_condition_label && parsed.final_grade?.condition_label) {
-            enrichedCard.conversational_condition_label = parsed.final_grade.condition_label
-          }
-        } catch (e) {
-          // Parsing failed, continue with original data
-        }
-      }
-
-      // Remove the large JSON from response
-      delete enrichedCard.conversational_grading
 
       return enrichedCard
     })

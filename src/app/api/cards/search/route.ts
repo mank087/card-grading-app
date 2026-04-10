@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
         id, serial, category, visibility, front_path, featured, pokemon_featured,
         card_name, release_date, manufacturer_name, card_set, card_number,
         dvg_decimal_grade, conversational_decimal_grade,
-        conversational_whole_grade, conversational_card_info, conversational_condition_label, conversational_grading,
+        conversational_whole_grade, conversational_card_info, conversational_condition_label,
         user_id, created_at,
         is_foil, foil_type, is_double_faced, mtg_rarity, holofoil,
         serial_numbering, rarity_tier, rarity_description,
@@ -118,46 +118,7 @@ export async function GET(request: NextRequest) {
 
     // Map database fields to frontend - include all raw fields for label generation
     const sanitizedCards = cards?.map(card => {
-      // Parse conversational_grading JSON if conversational_card_info is missing
       const enrichedCard = { ...card };
-      if (!card.conversational_card_info && card.conversational_grading) {
-        try {
-          const parsed = typeof card.conversational_grading === 'string'
-            ? JSON.parse(card.conversational_grading)
-            : card.conversational_grading;
-
-          if (parsed.card_info) {
-            enrichedCard.conversational_card_info = parsed.card_info;
-            if (!card.featured && parsed.card_info.player_or_character) {
-              enrichedCard.featured = parsed.card_info.player_or_character;
-            }
-            if (!card.card_name && parsed.card_info.card_name) {
-              enrichedCard.card_name = parsed.card_info.card_name;
-            }
-            if (!card.card_set && parsed.card_info.set_name) {
-              enrichedCard.card_set = parsed.card_info.set_name;
-            }
-            if (!card.card_number && parsed.card_info.card_number) {
-              enrichedCard.card_number = parsed.card_info.card_number;
-            }
-            if (!card.release_date && parsed.card_info.year) {
-              enrichedCard.release_date = parsed.card_info.year;
-            }
-          }
-          if (!card.conversational_decimal_grade) {
-            const grade = parsed.grading_passes?.averaged_rounded?.final ?? parsed.final_grade?.decimal_grade;
-            if (grade !== undefined && grade !== null) {
-              enrichedCard.conversational_decimal_grade = grade;
-              enrichedCard.conversational_whole_grade = Math.floor(grade);
-            }
-          }
-          if (!card.conversational_condition_label && parsed.final_grade?.condition_label) {
-            enrichedCard.conversational_condition_label = parsed.final_grade.condition_label;
-          }
-        } catch (e) {
-          // Parsing failed, continue with original data
-        }
-      }
 
       const convInfo = enrichedCard.conversational_card_info as any;
       const playerOrCharacter = convInfo?.player_or_character || enrichedCard.featured || enrichedCard.card_name || 'Unknown';

@@ -102,12 +102,12 @@ export async function GET(request: NextRequest) {
     const { data: allCards, error } = await supabase
       .from('cards')
       .select(`
-        id, card_name, featured, pokemon_featured, conversational_card_info, conversational_grading, dvg_grading,
+        id, card_name, featured, pokemon_featured, conversational_card_info,
         category, card_set, card_number, front_path, is_foil,
         conversational_decimal_grade, conversational_whole_grade, conversational_condition_label,
         ebay_price_lowest, ebay_price_median, ebay_price_average, ebay_price_highest,
         dcm_price_estimate, dcm_price_raw, dcm_price_graded_high, dcm_price_median, dcm_price_average,
-        dcm_price_updated_at, dcm_price_match_confidence, dcm_cached_prices,
+        dcm_price_updated_at, dcm_price_match_confidence,
         dcm_price_at_grading, dcm_price_at_grading_date,
         scryfall_price_usd, scryfall_price_usd_foil
       `)
