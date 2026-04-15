@@ -580,11 +580,11 @@ export default function GetStartedPage() {
             {[
               {
                 q: "Is DCM grading the same as PSA, BGS, or CGC grading?",
-                a: "DCM provides AI-powered grading analysis that evaluates the same factors as traditional grading companies. While we're not a replacement for encapsulated slabs, DCM helps you understand your card's condition before deciding whether to submit to professional graders."
+                a: "DCM provides a fast, professional alternative to traditional mail-away grading — delivering accurate condition assessments in seconds instead of weeks. Our DCM Optic™ AI evaluates the same factors as traditional grading companies, giving you a professional grade without shipping your cards."
               },
               {
                 q: "How accurate is DCM's AI grading?",
-                a: "DCM Optic™ analyzes 30+ condition factors using advanced computer vision. Our grade estimates are designed to align with industry standards. We recommend using DCM to pre-screen cards before submitting to traditional grading services."
+                a: "DCM Optic™ analyzes 30+ condition factors using advanced computer vision. Whether you're grading for your collection, preparing listings for sale, or simply curious about your card's condition, DCM delivers professional results instantly."
               },
               {
                 q: "Do I need to ship my cards?",
@@ -596,7 +596,7 @@ export default function GetStartedPage() {
               },
               {
                 q: "Can I use DCM grades to sell my cards?",
-                a: "Yes! Many collectors use DCM grades and reports to inform buyers about card condition. Our downloadable labels and slab images are perfect for listings. However, buyers typically pay premium prices for professionally encapsulated cards."
+                a: "Yes! Many collectors use DCM grades and reports to inform buyers about card condition. Our downloadable labels and slab images are perfect for listings. For maximum resale value, some buyers prefer physically encapsulated cards, but DCM grades are increasingly recognized as a trusted condition reference in the marketplace."
               },
               {
                 q: "How long does grading take?",

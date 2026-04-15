@@ -259,10 +259,10 @@ export default function Footer() {
         {/* Professional Disclaimer */}
         <div className="border-t border-gray-800 py-4">
           <p className="text-xs text-gray-500 text-center max-w-4xl mx-auto">
-            DCM grading assessments are provided for informational and hobby purposes only. Our grades are independent evaluations
-            and should not be considered as an indication of grades that may be assigned by third-party professional grading services
-            such as PSA, BGS, CGC, or SGC. For official authentication, certification, or resale purposes, please consult with
-            established third-party grading companies.
+            DCM Grading is an independent card grading service. Our grades are based on DCM Grading&apos;s proprietary standards
+            and methodology and are not intended to replicate or predict grades from other grading companies such as PSA, BGS, CGC,
+            or SGC. Grading involves professional judgment, and users should exercise their own discretion when making decisions
+            based on any grading service&apos;s assessments.
           </p>
         </div>
       </div>

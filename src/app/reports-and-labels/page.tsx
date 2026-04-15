@@ -5,8 +5,8 @@ import Image from 'next/image';
 
 export const metadata: Metadata = {
   title: 'Reports & Labels',
-  description: 'Download professional grading labels and reports for your DCM-graded cards. Foldable slab labels for magnetic one-touch holders, full grading reports, and mini reports for online sales.',
-  keywords: 'card grading labels, grading reports, slab labels, Avery 6871, card authentication, downloadable labels, grading certificate',
+  description: 'Download professional grading labels and reports for your DCM-graded cards. Graded slab images, foldable labels for magnetic one-touch holders and top loaders, full grading reports, and mini reports for online sales. Customize with Label Studio.',
+  keywords: 'card grading labels, grading reports, slab labels, top loader labels, graded card slab, label studio, Avery 6871, card authentication, downloadable labels, grading certificate',
   openGraph: {
     title: 'DCM Reports & Labels - Professional Card Documentation',
     description: 'Professional grading labels and reports for your trading cards. Display, share, and sell with confidence.',
@@ -115,15 +115,248 @@ export default function ReportsAndLabelsPage() {
               <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center">
                 <div className="text-center">
                   <Image
-                    src="/DCM-Label-Mag-OneTouch.png"
-                    alt="DCM Foldable Slab Label Example - Umbreon ex Gem Mint 10"
+                    src="/labels/charizard-mag-one-touch.png"
+                    alt="DCM Foldable Slab Label Example - Mega Charizard X EX"
                     width={400}
-                    height={300}
+                    height={500}
                     className="rounded-lg shadow-lg mx-auto"
                   />
                   <p className="text-sm text-gray-500 mt-4">Actual DCM label on magnetic one-touch slab</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Graded Card Slab Section */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-10">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-8 py-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Graded Card Slab</h2>
+                <p className="text-emerald-100">Digital Slab Image</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Professional Slab-Style Presentation</h3>
+                <p className="text-gray-600 mb-4">
+                  The graded card slab generates a high-resolution digital image of your card enclosed in a professional
+                  DCM slab design. Use it for online listings, social media, or anywhere you want to showcase your
+                  card with its authenticated grade.
+                </p>
+
+                <h4 className="font-semibold text-gray-900 mb-2">Slab Features:</h4>
+                <ul className="space-y-2 text-gray-600 mb-6">
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>Modern slab design:</strong> Clean, professional aesthetic that rivals traditional grading companies</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>Card details header:</strong> Name, set, attributes, year, and serial number</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>Prominent grade badge:</strong> Large, color-coded grade with condition label</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>High-resolution download:</strong> Perfect for marketplace listings and social sharing</span>
+                  </li>
+                </ul>
+
+                <h4 className="font-semibold text-gray-900 mb-2">Ideal Uses:</h4>
+                <ul className="space-y-1 text-gray-600 text-sm">
+                  <li>• Upload to eBay, Mercari, or marketplace listings as a product image</li>
+                  <li>• Share on social media to showcase your collection</li>
+                  <li>• Use as a visual reference when selling or trading cards</li>
+                  <li>• Present a professional graded appearance without physical encapsulation</li>
+                </ul>
+              </div>
+
+              <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center">
+                <div className="text-center">
+                  <Image
+                    src="/labels/dart-graded-slab-label.png"
+                    alt="DCM Graded Card Slab Example - Jaxson Dart Rookie Mint 9"
+                    width={350}
+                    height={500}
+                    className="rounded-lg shadow-lg mx-auto"
+                  />
+                  <p className="text-sm text-gray-500 mt-4">DCM graded card slab - modern design</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Top Loader Label Section */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-10">
+          <div className="bg-gradient-to-r from-rose-600 to-pink-600 px-8 py-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Top Loader Label</h2>
+                <p className="text-rose-100">Printable Front & Back Labels</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Grade Your Top Loaders</h3>
+                <p className="text-gray-600 mb-4">
+                  Turn any standard top loader into a professionally labeled graded card. Our top loader labels attach
+                  to the top edge of your top loader, displaying your DCM grade and card details in a clean,
+                  compact format.
+                </p>
+
+                <h4 className="font-semibold text-gray-900 mb-2">Label Features:</h4>
+                <ul className="space-y-2 text-gray-600 mb-6">
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-rose-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>Front & back labels:</strong> Complete labeling for both sides of the top loader</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-rose-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>Card identification:</strong> Name, set, year, and card number</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-rose-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>Grade display:</strong> Clear numerical grade with color-coded badge</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <svg className="w-5 h-5 text-rose-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span><strong>DCM serial number:</strong> Unique identifier for verification</span>
+                  </li>
+                </ul>
+
+                <div className="bg-rose-50 border border-rose-200 rounded-lg p-4">
+                  <p className="text-sm text-rose-800">
+                    <strong>Pro Tip:</strong> Top loader labels are a cost-effective way to give your cards a graded appearance
+                    for display, card shows, or sales. They work with any standard 3&quot; x 4&quot; top loader.
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-100 rounded-xl p-4 flex items-center justify-center">
+                <div className="text-center">
+                  <Image
+                    src="/labels/ohtani-top-loader.png"
+                    alt="DCM Top Loader Label Example - Shohei Ohtani Gem Mint 10"
+                    width={350}
+                    height={450}
+                    className="rounded-lg shadow-lg mx-auto"
+                  />
+                  <p className="text-sm text-gray-500 mt-4">DCM label on standard top loader</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Label Studio Section */}
+        <div className="bg-white rounded-2xl shadow-lg overflow-hidden mb-10">
+          <div className="bg-gradient-to-r from-violet-600 to-fuchsia-600 px-8 py-6">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-lg flex items-center justify-center">
+                <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-white">Label Studio</h2>
+                <p className="text-violet-100">Customize Your Labels</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Make Your Labels Your Own</h3>
+            <p className="text-gray-600 mb-6">
+              Label Studio gives you full control over how your graded card labels look. Accessible from any card&apos;s
+              detail page, Label Studio lets you preview and customize your labels in real time before downloading.
+            </p>
+
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
+                <h4 className="font-semibold text-violet-900 mb-2">Label Type Selection</h4>
+                <p className="text-sm text-violet-700">
+                  Switch between Graded Card Slab, Magnetic One-Touch, and Top Loader formats to find the perfect fit for your holder.
+                </p>
+              </div>
+
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
+                <h4 className="font-semibold text-violet-900 mb-2">Card Details Editing</h4>
+                <p className="text-sm text-violet-700">
+                  Edit the card name, set, year, card number, and other details displayed on the label to ensure accuracy.
+                </p>
+              </div>
+
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
+                <h4 className="font-semibold text-violet-900 mb-2">Style Customization</h4>
+                <p className="text-sm text-violet-700">
+                  Choose from different label styles, color schemes, and emblem preferences to match your personal brand.
+                </p>
+              </div>
+
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
+                <h4 className="font-semibold text-violet-900 mb-2">Live Preview</h4>
+                <p className="text-sm text-violet-700">
+                  See exactly how your label will look as you make changes — what you see is what you get.
+                </p>
+              </div>
+
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
+                <h4 className="font-semibold text-violet-900 mb-2">Instant Download</h4>
+                <p className="text-sm text-violet-700">
+                  Download your customized label as a high-resolution image, ready to print or share online.
+                </p>
+              </div>
+
+              <div className="bg-violet-50 border border-violet-200 rounded-lg p-5">
+                <h4 className="font-semibold text-violet-900 mb-2">Batch Labels</h4>
+                <p className="text-sm text-violet-700">
+                  Generate labels for multiple cards at once from your collection page using batch download.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-r from-violet-50 to-fuchsia-50 border border-violet-200 rounded-lg p-4">
+              <p className="text-sm text-violet-800">
+                <strong>How to access:</strong> Open any graded card from your collection and look for the Label Studio
+                button in the Reports & Labels section. Customize, preview, and download — all in one place.
+              </p>
             </div>
           </div>
         </div>

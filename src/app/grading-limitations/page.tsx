@@ -412,15 +412,16 @@ export default function GradingLimitationsPage() {
             Important Disclaimer
           </h2>
           <p className="text-gray-700 text-sm mb-4">
-            DCM Grading provides condition assessments for informational and entertainment purposes.
-            Our grades are generated through automated analysis of submitted photographs and should
-            be considered estimates based on visible characteristics.
+            DCM Grading provides professional condition assessments generated through proprietary
+            AI analysis of submitted photographs. Our grades are based on visible characteristics
+            and DCM Grading&apos;s independent standards and methodology.
           </p>
           <p className="text-gray-700 text-sm mb-4">
-            DCM grades are not equivalent to, and should not be represented as, grades from
-            PSA, BGS, CGC, SGC, or any other professional grading service. For authentication,
-            insurance valuation, or high-stakes transactions, we recommend submitting cards to
-            an established physical grading service.
+            DCM grades are based on DCM Grading&apos;s own proprietary standards and are not intended
+            to replicate or predict grades from other grading companies such as PSA, BGS, CGC, or
+            SGC. Each grading service applies its own criteria and methodology. Grading involves
+            professional judgment, and users should exercise their own discretion when making
+            decisions based on any grading service&apos;s assessments.
           </p>
           <p className="text-gray-700 text-sm">
             By using DCM Grading, you acknowledge these limitations and agree that grades are

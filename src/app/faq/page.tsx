@@ -70,7 +70,7 @@ const faqs: FAQItem[] = [
         <p className="mb-3"><strong>Cost:</strong> Grade cards for a fraction of the cost of traditional services.</p>
         <p className="mb-3"><strong>Convenience:</strong> Grade from anywhere, anytime — no shipping required.</p>
         <p className="mb-3"><strong>Accuracy:</strong> Our three-pass consensus system delivers highly accurate, consistent grades.</p>
-        <p className="mb-3"><strong>Pre-Screening:</strong> Use DCM to evaluate cards before deciding which ones are worth submitting to PSA, BGS, or CGC.</p>
+        <p className="mb-3"><strong>Card Evaluation:</strong> Use DCM to get a fast, professional grade on any card in your collection — no mailing required, no weeks of waiting.</p>
         <p><strong>Transparency:</strong> See exactly why your card received its grade with detailed defect documentation.</p>
       </>
     ),
@@ -298,9 +298,9 @@ const faqs: FAQItem[] = [
           <li>DCM grades are based on photo analysis, not physical inspection</li>
           <li>DCM is instant; traditional services take weeks/months</li>
           <li>DCM costs a fraction of traditional grading fees</li>
-          <li>DCM grades are for informational purposes</li>
+          <li>DCM grades are professional condition assessments</li>
         </ul>
-        <p><strong>Important:</strong> DCM grades don't replace official third-party grading for authentication or resale value certification. We're ideal for pre-screening cards before submission or for personal collection management.</p>
+        <p><strong>Important:</strong> DCM grades are an independent evaluation of your card&apos;s condition based on our proprietary standards. Many collectors use DCM for collection management, marketplace listings, and as an alternative to traditional mail-away grading.</p>
       </>
     ),
     category: 'Accuracy & Comparison',

@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
               service available at dcmgrading.com (the "Service").
             </p>
             <p>
-              Our Service uses advanced AI technology to analyze and grade trading cards, providing estimated condition assessments and valuations.
+              Our Service uses proprietary AI technology to analyze and grade trading cards, providing professional condition assessments and market valuations.
               By using the Service, you agree to the collection and use of information in accordance with this policy. If you do not agree with
               our policies and practices, please do not use our Service.
             </p>
@@ -65,7 +65,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">3. How We Use Your Information</h2>
             <p>We use the information we collect for the following purposes:</p>
             <ul className="list-disc list-inside ml-4 space-y-2">
-              <li><strong>AI Grading Services:</strong> Process and analyze uploaded card images using our AI technology to generate grading reports and condition assessments</li>
+              <li><strong>AI Grading Services:</strong> Process and analyze uploaded card images using our proprietary DCM Optic™ AI technology to generate professional grading reports and condition assessments</li>
               <li><strong>Account Management:</strong> Create, maintain, and secure your user account</li>
               <li><strong>Payment Processing:</strong> Process subscription payments and manage billing through secure third-party payment processors</li>
               <li><strong>Service Improvement:</strong> Analyze usage patterns to enhance our AI models and improve grading accuracy</li>

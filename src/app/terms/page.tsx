@@ -34,19 +34,21 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">2. Description of Service</h2>
             <p>
-              DCM Grading provides an AI-powered pre-grading service for trading cards, including Pokémon, Magic: The Gathering,
-              Lorcana, and other collectible card games. Our Service analyzes images of trading cards and provides estimated
-              condition grades and valuations using advanced AI technology.
+              DCM Grading provides an AI-powered card grading and condition assessment service for trading cards, including Pokémon, Magic: The Gathering,
+              Lorcana, and other collectible card games. Our Service analyzes images of trading cards and provides professional
+              condition grades and valuations using proprietary AI technology.
             </p>
             <p className="mt-4">
-              <strong>IMPORTANT DISCLAIMER:</strong> The grading results provided by DCM Grading are estimates based on AI analysis
-              and are not guaranteed to align with official third-party professional grading services such as PSA, BGS, CGC, or others.
-              Our assessments should be used for informational and educational purposes only. <strong>DCM Grading is not responsible
-              for any discrepancies between our AI grading results and those of professional grading companies.</strong>
+              <strong>IMPORTANT DISCLAIMER:</strong> DCM Grading is an independent grading service that uses proprietary AI technology
+              to assess card condition. Our grades represent DCM Grading&apos;s own standard and methodology — they are not intended to
+              replicate or predict the results of other grading companies such as PSA, BGS, CGC, or SGC. Differences between DCM grades
+              and those of other grading services do not indicate an error by either party, as each company applies its own standards
+              and criteria.
             </p>
             <p className="mt-4">
-              We do not guarantee the accuracy, completeness, or reliability of our grading assessments. Results should not be solely
-              relied upon for buying, selling, insurance, or any financial decisions regarding trading cards.
+              While DCM Grading strives for accuracy and consistency in all assessments, grading inherently involves professional
+              judgment. We do not guarantee that our grades will match those of any other grading service, nor do we guarantee specific
+              market values. Users should exercise their own judgment when making financial decisions regarding trading cards.
             </p>
           </section>
 
@@ -261,14 +263,14 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">7.2 Accuracy of AI Grading</h3>
             <p>
-              <strong>WE DO NOT GUARANTEE THE ACCURACY, COMPLETENESS, OR RELIABILITY OF OUR AI-POWERED CARD GRADING ASSESSMENTS.</strong>
-              Our AI technology provides estimates that:
+              <strong>CARD GRADING INVOLVES PROFESSIONAL JUDGMENT AND NO GRADING SERVICE — WHETHER AI-POWERED OR MANUAL — CAN
+              GUARANTEE ABSOLUTE ACCURACY OR CONSISTENCY.</strong> Our assessments:
             </p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
-              <li>Are not guaranteed to match professional grading service results</li>
-              <li>May vary from actual card condition or market value</li>
-              <li>Should not be relied upon as the sole basis for financial decisions</li>
-              <li>Are subject to limitations inherent in AI analysis and image quality</li>
+              <li>Represent DCM Grading&apos;s independent assessment based on our proprietary methodology and standards</li>
+              <li>May differ from grades issued by other grading companies, as each service applies its own criteria</li>
+              <li>Are based on analysis of user-submitted images and may be affected by image quality, lighting, or obstructions</li>
+              <li>Should be considered alongside other factors when making financial decisions regarding trading cards</li>
             </ul>
             <p className="mt-4">
               YOU ASSUME ALL RISK ASSOCIATED WITH RELYING ON OUR GRADING ASSESSMENTS. WE ARE NOT LIABLE FOR ANY LOSSES OR DAMAGES
@@ -447,10 +449,12 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.3 Grading Opinions in the Context of Sales</h3>
             <p>
-              DCM grades represent our professional assessment of card condition at the time of grading. <strong>Grades are opinions
-              and are not guarantees of value, authenticity, future market performance, or buyer satisfaction.</strong> Buyers may have
-              different opinions regarding condition, and you are solely responsible for handling any disputes that may arise from
-              differences in condition perception. DCM Grading will not intervene in buyer-seller disputes regarding grading accuracy.
+              DCM grades represent our professional assessment of card condition at the time of grading based on DCM Grading&apos;s
+              proprietary standards and methodology. <strong>Grades are professional assessments and are not guarantees of market value,
+              future market performance, or buyer satisfaction.</strong> Card condition may change after grading due to handling, storage,
+              or environmental factors. Buyers may have different assessments regarding condition, and you are solely responsible for
+              handling any disputes that may arise from differences in condition perception. DCM Grading will not intervene in
+              buyer-seller disputes regarding grading accuracy.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.4 Your Responsibilities When Using Marketplace Integrations</h3>
