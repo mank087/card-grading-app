@@ -221,7 +221,7 @@ function CustomLabelTile({
     prevSerialRef.current = currentSerial
   }, [slabData?.serial])
 
-  const { isRendering } = useLabelPreview({
+  const { isRendering, previewDataUrl: tilePreviewUrl } = useLabelPreview({
     config: tileConfig,
     data: tileData,
     canvasRef,
@@ -245,19 +245,21 @@ function CustomLabelTile({
             className="absolute inset-0 w-full h-full object-contain"
           />
 
-          {/* Custom label canvas in the label slot */}
+          {/* Custom label in the label slot — use img from data URL for reliable rendering */}
           <div className="absolute overflow-hidden" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
             {isRendering && (
               <div className="absolute inset-0 z-10 flex items-center justify-center">
                 <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
               </div>
             )}
-            <canvas
-              ref={canvasRef}
-              className="w-full h-auto"
-              style={{ display: slabData ? 'block' : 'none' }}
-            />
-            {!slabData && (
+            {tilePreviewUrl ? (
+              <img src={tilePreviewUrl} alt="Custom label preview" className="w-full h-auto" />
+            ) : slabData ? (
+              <canvas
+                ref={canvasRef}
+                className="w-full h-auto"
+              />
+            ) : (
               <div className="w-full bg-gray-200 rounded" style={{ aspectRatio: '3.5 / 1' }} />
             )}
           </div>
@@ -607,7 +609,6 @@ function CustomDesigner({
   const [isDownloading, setIsDownloading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [mobilePreviewUrl, setMobilePreviewUrl] = useState<string | null>(null)
 
   const updateConfig = useCallback((partial: Partial<CustomLabelConfig>) => {
     setConfig((prev) => ({ ...prev, ...partial }))
@@ -734,7 +735,6 @@ function CustomDesigner({
     if (selectedCard?.id !== prevCardIdRef.current) {
       prevCardIdRef.current = selectedCard?.id || null
       setFieldsInitialized(null)
-      setMobilePreviewUrl(null)
       // Clear canvas so old card label doesn't linger
       const canvas = canvasRef.current
       if (canvas) {
@@ -793,21 +793,11 @@ function CustomDesigner({
     } catch { /* ignore */ }
   }, [config])
 
-  const { isRendering } = useLabelPreview({
+  const { isRendering, previewDataUrl } = useLabelPreview({
     config,
     data: previewData,
     canvasRef,
   })
-
-  // Capture canvas to data URL for mobile preview mirrors
-  useEffect(() => {
-    if (isRendering) return
-    const canvas = canvasRef.current
-    if (!canvas || !canvas.width || !canvas.height) return
-    try {
-      setMobilePreviewUrl(canvas.toDataURL('image/png'))
-    } catch { /* ignore tainted canvas */ }
-  }, [isRendering])
 
   const handleDimensionPreset = (preset: DimensionPreset) => {
     const base: Partial<CustomLabelConfig> = {
@@ -924,7 +914,7 @@ function CustomDesigner({
       {selectedCard && (
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Mobile top preview */}
-          {mobilePreviewUrl && (
+          {previewDataUrl && (
             <div className="lg:hidden flex flex-col items-center">
               <div className="relative bg-gray-100 rounded-lg p-3 w-full flex items-center justify-center">
                 {isRendering && (
@@ -932,7 +922,7 @@ function CustomDesigner({
                     <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
-                <img src={mobilePreviewUrl} alt="Label preview" className="max-w-full h-auto shadow-lg rounded" />
+                <img src={previewDataUrl} alt="Label preview" className="max-w-full h-auto shadow-lg rounded" />
               </div>
               <p className="text-xs text-gray-500 mt-1 text-center">
                 {config.width}" × {config.height}"
@@ -1375,7 +1365,7 @@ function CustomDesigner({
             </div>
 
             {/* Mobile bottom preview */}
-            {mobilePreviewUrl && (
+            {previewDataUrl && (
               <div className="lg:hidden flex flex-col items-center mt-2">
                 <div className="relative bg-gray-100 rounded-lg p-3 w-full flex items-center justify-center">
                   {isRendering && (
@@ -1383,7 +1373,7 @@ function CustomDesigner({
                       <div className="w-4 h-4 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
                     </div>
                   )}
-                  <img src={mobilePreviewUrl} alt="Label preview" className="max-w-full h-auto shadow-lg rounded" />
+                  <img src={previewDataUrl} alt="Label preview" className="max-w-full h-auto shadow-lg rounded" />
                 </div>
                 <p className="text-xs text-gray-500 mt-1 text-center">
                   {config.width}" × {config.height}"

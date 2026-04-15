@@ -1,14 +1,20 @@
 /**
  * useLabelPreview — Custom hook for debounced canvas rendering
  *
- * Accepts a CustomLabelConfig + SlabLabelData, renders to a canvas ref
+ * Accepts a CustomLabelConfig + SlabLabelData, renders to an OFFSCREEN canvas
  * with 300ms debounce for smooth live preview in the Label Studio designer.
+ *
+ * Returns a previewDataUrl (base64 PNG) that works reliably on all platforms,
+ * including mobile where the target canvas may be hidden (display:none).
+ * Also copies the rendered result to the target canvas ref for desktop display.
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { renderCustomFrontPreview, renderCustomBackPreview } from '@/lib/customSlabLabelGenerator';
+import { renderFrontCanvas, renderBackCanvas } from '@/lib/customSlabLabelGenerator';
 import type { SlabLabelData } from '@/lib/slabLabelGenerator';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
+
+const PREVIEW_DPI = 96;
 
 interface UseLabelPreviewOptions {
   config: CustomLabelConfig;
@@ -19,6 +25,8 @@ interface UseLabelPreviewOptions {
 
 interface UseLabelPreviewReturn {
   isRendering: boolean;
+  /** Base64 data URL of the rendered label — always available after first render */
+  previewDataUrl: string | null;
 }
 
 export function useLabelPreview({
@@ -28,20 +36,38 @@ export function useLabelPreview({
   debounceMs = 300,
 }: UseLabelPreviewOptions): UseLabelPreviewReturn {
   const [isRendering, setIsRendering] = useState(false);
+  const [previewDataUrl, setPreviewDataUrl] = useState<string | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderIdRef = useRef(0);
 
   const render = useCallback(async () => {
-    if (!data || !canvasRef.current) return;
+    if (!data) return;
 
     const renderId = ++renderIdRef.current;
     setIsRendering(true);
 
     try {
-      if (config.side === 'front') {
-        await renderCustomFrontPreview(canvasRef.current, data, config);
-      } else {
-        await renderCustomBackPreview(canvasRef.current, data, config);
+      // Render to a fresh offscreen canvas (always works, no DOM dependency)
+      const offscreen = config.side === 'front'
+        ? await renderFrontCanvas(data, config, PREVIEW_DPI)
+        : await renderBackCanvas(data, config, PREVIEW_DPI);
+
+      // Capture data URL from the offscreen canvas (guaranteed untainted)
+      try {
+        setPreviewDataUrl(offscreen.toDataURL('image/png'));
+      } catch {
+        // Extremely unlikely for an offscreen canvas, but handle gracefully
+      }
+
+      // Copy to the target canvas element if available (for desktop display)
+      const target = canvasRef.current;
+      if (target) {
+        target.width = offscreen.width;
+        target.height = offscreen.height;
+        const ctx = target.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(offscreen, 0, 0);
+        }
       }
     } catch (err) {
       console.error('Label preview render error:', err);
@@ -65,5 +91,5 @@ export function useLabelPreview({
     };
   }, [render, debounceMs]);
 
-  return { isRendering };
+  return { isRendering, previewDataUrl };
 }
