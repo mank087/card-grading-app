@@ -3,7 +3,7 @@ import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
 export const metadata: Metadata = {
   title: 'Terms and Conditions',
-  description: 'DCM Grading Terms and Conditions. Review our terms of service for using the AI-powered card grading platform.',
+  description: 'DCM Terms and Conditions. Review our terms of service for using the AI-powered card grading platform.',
   robots: {
     index: true,
     follow: true,
@@ -22,9 +22,8 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">1. Acceptance of Terms</h2>
             <p>
-              Welcome to DCM Grading. These Terms and Conditions (&quot;Terms&quot;) constitute a binding agreement between you and
-              Dynamic Collectibles Management LLC, a limited liability company doing business as &quot;DCM Grading&quot;
-              (&quot;DCM Grading,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;).
+              These Terms and Conditions (&quot;Terms&quot;) constitute a binding agreement between you and
+              Dynamic Collectibles Management LLC (&quot;DCM,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;).
               By accessing or using our card grading service at dcmgrading.com (the &quot;Service&quot;), you agree to be bound by
               these Terms. If you do not agree to these Terms, please do not use the Service.
             </p>
@@ -37,19 +36,19 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">2. Description of Service</h2>
             <p>
-              DCM Grading provides an AI-powered card grading and condition assessment service for trading cards, including Pokémon, Magic: The Gathering,
+              DCM provides an AI-powered card grading and condition assessment service for trading cards, including Pokémon, Magic: The Gathering,
               Lorcana, and other collectible card games. Our Service analyzes images of trading cards and provides professional
               condition grades and valuations using proprietary AI technology.
             </p>
             <p className="mt-4">
-              <strong>IMPORTANT DISCLAIMER:</strong> DCM Grading is an independent grading service that uses proprietary AI technology
-              to assess card condition. Our grades represent DCM Grading&apos;s own standard and methodology — they are not intended to
+              <strong>IMPORTANT DISCLAIMER:</strong> DCM is an independent grading service that uses proprietary AI technology
+              to assess card condition. Our grades represent DCM&apos;s own standard and methodology — they are not intended to
               replicate or predict the results of other grading companies such as PSA, BGS, CGC, or SGC. Differences between DCM grades
               and those of other grading services do not indicate an error by either party, as each company applies its own standards
               and criteria.
             </p>
             <p className="mt-4">
-              While DCM Grading strives for accuracy and consistency in all assessments, grading inherently involves professional
+              While DCM strives for accuracy and consistency in all assessments, grading inherently involves professional
               judgment. We do not guarantee that our grades will match those of any other grading service, nor do we guarantee specific
               market values. Users should exercise their own judgment when making financial decisions regarding trading cards.
             </p>
@@ -113,7 +112,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.1 Our Intellectual Property</h3>
             <p>
-              The Service, including its design, functionality, text, graphics, logos, and software, is owned by DCM Grading and
+              The Service, including its design, functionality, text, graphics, logos, and software, is owned by DCM and
               protected by copyright, trademark, and other intellectual property laws. You may not copy, modify, distribute, or
               create derivative works without our express written permission.
             </p>
@@ -121,7 +120,7 @@ export default function TermsPage() {
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.2 Your Content and License Grant</h3>
             <p>
               You retain ownership of the images and content you upload to the Service. However, by uploading content, you grant
-              DCM Grading a worldwide, non-exclusive, royalty-free, transferable license to use, store, process, reproduce, modify,
+              DCM a worldwide, non-exclusive, royalty-free, transferable license to use, store, process, reproduce, modify,
               and display your content for the following purposes:
             </p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
@@ -150,19 +149,19 @@ export default function TermsPage() {
               <li><strong>Other TCGs and CCGs:</strong> Their respective publishers and rights holders</li>
             </ul>
             <p className="mt-4">
-              <strong>DCM Grading makes no claim of ownership</strong> over any card imagery, artwork, designs, or branding depicted
+              <strong>DCM makes no claim of ownership</strong> over any card imagery, artwork, designs, or branding depicted
               in user-uploaded photographs. The display of trademarked card images on our platform is solely for the purpose of
               providing our grading analysis service. All trademarks and copyrights remain the property of their respective owners.
             </p>
             <p className="mt-4">
               Users are solely responsible for ensuring they have the legal right to photograph and upload images of cards they submit
-              for grading. DCM Grading is not responsible for any intellectual property violations arising from user-uploaded content.
+              for grading. DCM is not responsible for any intellectual property violations arising from user-uploaded content.
             </p>
 
-            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.4 DCM Grading Outputs and Ownership</h3>
+            <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.4 DCM Outputs and Ownership</h3>
             <p>
-              <strong>All grading outputs, analyses, and assessments generated by DCM Grading are the exclusive intellectual property
-              of DCM Grading.</strong> This includes, but is not limited to:
+              <strong>All grading outputs, analyses, and assessments generated by DCM are the exclusive intellectual property
+              of DCM.</strong> This includes, but is not limited to:
             </p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
               <li>All grades, scores, and numerical assessments produced by our DCM Optic™ AI technology</li>
@@ -174,14 +173,14 @@ export default function TermsPage() {
             </ul>
             <p className="mt-4">
               While you may view and share your grading results for personal, non-commercial purposes, you may not reproduce,
-              distribute, modify, or create derivative works from DCM Grading outputs without our express written permission.
+              distribute, modify, or create derivative works from DCM outputs without our express written permission.
               The methodologies, algorithms, and processes used to generate grading results are proprietary trade secrets of
-              DCM Grading.
+              DCM.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">5.5 Use in Marketing and Promotional Materials</h3>
             <p>
-              By using the Service and setting your graded cards to "Public" visibility, you grant DCM Grading the right to use,
+              By using the Service and setting your graded cards to "Public" visibility, you grant DCM the right to use,
               display, reproduce, and distribute images of your graded cards and associated grading results for marketing,
               promotional, educational, and demonstration purposes. This includes, but is not limited to:
             </p>
@@ -200,7 +199,7 @@ export default function TermsPage() {
               service improvement, and general statistical purposes.
             </p>
             <p className="mt-4">
-              DCM Grading will not sell your uploaded card images to third parties. Marketing use is limited to promoting DCM
+              DCM will not sell your uploaded card images to third parties. Marketing use is limited to promoting DCM
               Grading services and demonstrating our grading capabilities.
             </p>
           </section>
@@ -208,7 +207,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">6. Payment and Fees</h2>
             <p>
-              DCM Grading operates on a pay-per-use and/or subscription-based model. Certain features may be offered free of charge,
+              DCM operates on a pay-per-use and/or subscription-based model. Certain features may be offered free of charge,
               while premium features require payment.
             </p>
 
@@ -270,7 +269,7 @@ export default function TermsPage() {
               GUARANTEE ABSOLUTE ACCURACY OR CONSISTENCY.</strong> Our assessments:
             </p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
-              <li>Represent DCM Grading&apos;s independent assessment based on our proprietary methodology and standards</li>
+              <li>Represent DCM&apos;s independent assessment based on our proprietary methodology and standards</li>
               <li>May differ from grades issued by other grading companies, as each service applies its own criteria</li>
               <li>Are based on analysis of user-submitted images and may be affected by image quality, lighting, or obstructions</li>
               <li>Should be considered alongside other factors when making financial decisions regarding trading cards</li>
@@ -303,7 +302,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">8. Indemnification</h2>
             <p>
-              You agree to indemnify, defend, and hold harmless DCM Grading, its officers, directors, employees, and agents from and
+              You agree to indemnify, defend, and hold harmless DCM, its officers, directors, employees, and agents from and
               against any claims, liabilities, damages, losses, and expenses, including reasonable attorneys' fees, arising out of or
               in any way connected with:
             </p>
@@ -385,7 +384,7 @@ export default function TermsPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Miscellaneous</h2>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">12.1 Entire Agreement</h3>
-            <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and DCM Grading.</p>
+            <p>These Terms, together with our Privacy Policy, constitute the entire agreement between you and DCM.</p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">12.2 Severability</h3>
             <p>
@@ -407,7 +406,6 @@ export default function TermsPage() {
             <p>For questions about these Terms, please contact us at:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
               <li>Dynamic Collectibles Management LLC</li>
-              <li>d/b/a DCM Grading</li>
               <li>Email: admin@dcmgrading.com</li>
               <li>Website: https://dcmgrading.com</li>
             </ul>
@@ -424,16 +422,16 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">14. Third-Party Marketplace Integrations</h2>
             <p>
-              DCM Grading may offer features that allow you to list your DCM-graded cards on third-party marketplaces such as eBay.
+              DCM may offer features that allow you to list your DCM-graded cards on third-party marketplaces such as eBay.
               By using these integration features, you agree to the following additional terms:
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.1 DCM Is Not a Party to Marketplace Transactions</h3>
             <p>
-              DCM Grading provides marketplace listing tools solely as a convenience feature to help you list your DCM-graded cards.
-              <strong> DCM Grading is not a party to any transaction that occurs on third-party marketplaces.</strong> All sales,
+              DCM provides marketplace listing tools solely as a convenience feature to help you list your DCM-graded cards.
+              <strong> DCM is not a party to any transaction that occurs on third-party marketplaces.</strong> All sales,
               purchases, and related activities are conducted exclusively between you and the buyer through the respective marketplace
-              platform. DCM Grading does not participate in, facilitate, mediate, or guarantee any aspect of these transactions.
+              platform. DCM does not participate in, facilitate, mediate, or guarantee any aspect of these transactions.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.2 No Liability for Marketplace Transactions</h3>
@@ -454,16 +452,16 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.3 Grading Opinions in the Context of Sales</h3>
             <p>
-              DCM grades represent our professional assessment of card condition at the time of grading based on DCM Grading&apos;s
+              DCM grades represent our professional assessment of card condition at the time of grading based on DCM&apos;s
               proprietary standards and methodology. <strong>Grades are professional assessments and are not guarantees of market value,
               future market performance, or buyer satisfaction.</strong> Card condition may change after grading due to handling, storage,
               or environmental factors. Buyers may have different assessments regarding condition, and you are solely responsible for
-              handling any disputes that may arise from differences in condition perception. DCM Grading will not intervene in
+              handling any disputes that may arise from differences in condition perception. DCM will not intervene in
               buyer-seller disputes regarding grading accuracy.
             </p>
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.4 Your Responsibilities When Using Marketplace Integrations</h3>
-            <p>When using DCM Grading&apos;s marketplace integration features, you are solely responsible for:</p>
+            <p>When using DCM&apos;s marketplace integration features, you are solely responsible for:</p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
               <li><strong>Listing Accuracy:</strong> The accuracy of all listing information, including titles, descriptions, prices,
                 images, condition descriptions, and shipping terms</li>
@@ -482,7 +480,7 @@ export default function TermsPage() {
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.5 Indemnification for Marketplace Activities</h3>
             <p>
               In addition to the general indemnification provisions in Section 8, you specifically agree to indemnify, defend, and
-              hold harmless DCM Grading, its officers, directors, employees, and agents from and against any claims, liabilities,
+              hold harmless DCM, its officers, directors, employees, and agents from and against any claims, liabilities,
               damages, losses, costs, or expenses (including reasonable attorneys&apos; fees) arising from or related to:
             </p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
@@ -496,7 +494,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.6 Marketplace Account Responsibility</h3>
             <p>
-              You are responsible for maintaining your marketplace accounts (such as eBay) in good standing. DCM Grading is not
+              You are responsible for maintaining your marketplace accounts (such as eBay) in good standing. DCM is not
               responsible for any actions the marketplace may take against your account, including but not limited to listing removals,
               selling restrictions, fee assessments, fund holds, or account suspensions. Any consequences resulting from your use of
               marketplace integration features are your sole responsibility.
@@ -504,7 +502,7 @@ export default function TermsPage() {
 
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">14.7 Integration Service Availability</h3>
             <p>
-              DCM Grading provides marketplace integration features &quot;as is&quot; and makes no guarantees regarding their availability,
+              DCM provides marketplace integration features &quot;as is&quot; and makes no guarantees regarding their availability,
               accuracy, or functionality. We may modify, suspend, or discontinue marketplace integration features at any time without
               notice. We are not responsible for any losses resulting from integration service interruptions, errors, or discontinuation.
             </p>
@@ -513,7 +511,7 @@ export default function TermsPage() {
             <p>
               Your use of third-party marketplaces is also subject to those platforms&apos; terms of service, policies, and user agreements.
               It is your responsibility to review and comply with all applicable third-party terms. In the event of any conflict between
-              these Terms and third-party marketplace terms, the more restrictive provision shall apply to your use of DCM Grading&apos;s
+              these Terms and third-party marketplace terms, the more restrictive provision shall apply to your use of DCM&apos;s
               integration features.
             </p>
           </section>

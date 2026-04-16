@@ -3,7 +3,7 @@ import FloatingCardsBackground from '../ui/FloatingCardsBackground';
 
 export const metadata: Metadata = {
   title: 'Privacy Policy',
-  description: 'DCM Grading Privacy Policy. Learn how we collect, use, and protect your personal information when using our AI card grading service.',
+  description: 'DCM Privacy Policy. Learn how we collect, use, and protect your personal information when using our AI card grading service.',
   robots: {
     index: true,
     follow: true,
@@ -22,10 +22,10 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">1. Introduction</h2>
             <p>
-              Welcome to DCM Grading. This Privacy Policy describes how Dynamic Collectibles Management LLC, a limited liability
-              company doing business as &quot;DCM Grading&quot; (&quot;DCM Grading,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;),
-              collects, uses, discloses, and safeguards your information when you use our AI-powered card grading service available
-              at dcmgrading.com (the &quot;Service&quot;). We are committed to protecting your personal information and your right to privacy.
+              This Privacy Policy describes how Dynamic Collectibles Management LLC (&quot;DCM,&quot; &quot;we,&quot; &quot;our,&quot;
+              or &quot;us&quot;) collects, uses, discloses, and safeguards your information when you use our AI-powered card grading
+              service available at dcmgrading.com (the &quot;Service&quot;). We are committed to protecting your personal information
+              and your right to privacy.
             </p>
             <p>
               Our Service uses proprietary AI technology to analyze and grade trading cards, providing professional condition assessments and market valuations.
@@ -179,7 +179,7 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">10. International Data Transfers</h2>
             <p>
-              DCM Grading is based in Georgia, United States. Your information may be transferred to and maintained on computers located outside of your state, province, country,
+              DCM is based in Georgia, United States. Your information may be transferred to and maintained on computers located outside of your state, province, country,
               or other governmental jurisdiction where data protection laws may differ. By using our Service, you consent to such transfers to Georgia, United States and other locations where our service providers operate.
             </p>
           </section>
@@ -194,17 +194,17 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Affiliate Links and Advertising Disclosure</h2>
             <p>
-              DCM Grading participates in the Amazon Services LLC Associates Program, an affiliate advertising program
+              DCM participates in the Amazon Services LLC Associates Program, an affiliate advertising program
               designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com.
-              As an Amazon Associate, DCM Grading earns from qualifying purchases.
+              As an Amazon Associate, DCM earns from qualifying purchases.
             </p>
             <p className="mt-4">
               Our Service may contain links to third-party products, services, or websites (&quot;affiliate links&quot;). When you
-              click on an affiliate link and make a purchase, DCM Grading may receive a commission from the third-party
+              click on an affiliate link and make a purchase, DCM may receive a commission from the third-party
               retailer at no additional cost to you. These commissions help support the operation and improvement of our Service.
             </p>
             <p className="mt-4">
-              We only recommend products and services that we believe may be useful to our users. However, DCM Grading does
+              We only recommend products and services that we believe may be useful to our users. However, DCM does
               not control third-party websites and is not responsible for their content, privacy practices, or the transactions
               conducted through them. We encourage you to review the privacy policies of any third-party sites you visit through
               our affiliate links.
@@ -229,7 +229,6 @@ export default function PrivacyPolicyPage() {
             <p>If you have any questions about this Privacy Policy, please contact us:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
               <li>Dynamic Collectibles Management LLC</li>
-              <li>d/b/a DCM Grading</li>
               <li>Email: admin@dcmgrading.com</li>
               <li>Website: https://dcmgrading.com</li>
             </ul>

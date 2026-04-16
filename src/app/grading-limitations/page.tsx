@@ -412,19 +412,19 @@ export default function GradingLimitationsPage() {
             Important Disclaimer
           </h2>
           <p className="text-gray-700 text-sm mb-4">
-            DCM Grading provides professional condition assessments generated through proprietary
-            AI analysis of submitted photographs. Our grades are based on visible characteristics
-            and DCM Grading&apos;s independent standards and methodology.
+            Dynamic Collectibles Management LLC (&quot;DCM&quot;) provides professional condition assessments
+            generated through proprietary AI analysis of submitted photographs. Our grades are based on
+            visible characteristics and DCM&apos;s independent standards and methodology.
           </p>
           <p className="text-gray-700 text-sm mb-4">
-            DCM grades are based on DCM Grading&apos;s own proprietary standards and are not intended
+            DCM grades are based on DCM&apos;s own proprietary standards and are not intended
             to replicate or predict grades from other grading companies such as PSA, BGS, CGC, or
             SGC. Each grading service applies its own criteria and methodology. Grading involves
             professional judgment, and users should exercise their own discretion when making
             decisions based on any grading service&apos;s assessments.
           </p>
           <p className="text-gray-700 text-sm">
-            By using DCM Grading, you acknowledge these limitations and agree that grades are
+            By using our Service, you acknowledge these limitations and agree that grades are
             provided as-is without warranty of accuracy for any specific purpose.
           </p>
         </section>

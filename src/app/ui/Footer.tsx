@@ -259,13 +259,13 @@ export default function Footer() {
         {/* Professional Disclaimer */}
         <div className="border-t border-gray-800 py-4">
           <p className="text-xs text-gray-500 text-center max-w-4xl mx-auto">
-            DCM Grading is an independent card grading service. Our grades are based on DCM Grading&apos;s proprietary standards
-            and methodology and are not intended to replicate or predict grades from other grading companies such as PSA, BGS, CGC,
-            or SGC. Grading involves professional judgment, and users should exercise their own discretion when making decisions
-            based on any grading service&apos;s assessments.
+            Dynamic Collectibles Management LLC (&quot;DCM&quot;) is an independent card grading service. Our grades are based on
+            DCM&apos;s proprietary standards and methodology and are not intended to replicate or predict grades from other
+            grading companies such as PSA, BGS, CGC, or SGC. Grading involves professional judgment, and users should
+            exercise their own discretion when making decisions based on any grading service&apos;s assessments.
           </p>
           <p className="text-xs text-gray-500 text-center max-w-4xl mx-auto mt-3">
-            As an Amazon Associate, DCM Grading earns from qualifying purchases.
+            As an Amazon Associate, DCM earns from qualifying purchases.
           </p>
         </div>
       </div>
