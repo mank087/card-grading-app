@@ -2033,6 +2033,49 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         {/* Section 3: Custom Designer */}
         <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} />
 
+        {/* Affiliate: Amazon Graded Card Slabs */}
+        <section className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl shadow-sm p-5 sm:p-6">
+          <div className="flex flex-col sm:flex-row gap-5 items-center">
+            <a
+              href="https://amzn.to/42gedyc"
+              target="_blank"
+              rel="noopener noreferrer sponsored"
+              className="flex-shrink-0 w-32 h-32 bg-white rounded-lg shadow-md overflow-hidden flex items-center justify-center hover:shadow-lg transition-shadow"
+              aria-label="Graded card slabs on Amazon"
+            >
+              <img
+                src="/labels/graded-card-slab.png"
+                alt="Graded Card Slabs"
+                className="w-full h-full object-contain p-2"
+              />
+            </a>
+            <div className="flex-1 text-center sm:text-left">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">
+                Purchase Graded Card Slabs for your DCM Graded Cards and Labels
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Get high-quality graded card slabs to professionally display your DCM-graded cards with custom labels.
+              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <a
+                  href="https://amzn.to/42gedyc"
+                  target="_blank"
+                  rel="noopener noreferrer sponsored"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-semibold shadow-md hover:from-amber-600 hover:to-orange-600 transition-all text-sm"
+                >
+                  Shop on Amazon
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+                <p className="text-[11px] text-gray-500 italic">
+                  As an Amazon Associate, DCM Grading earns from qualifying purchases.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
         {/* Section 4: Save & Manage Custom Styles */}
         {isAuthenticated && (
           <SavedStylesManager
