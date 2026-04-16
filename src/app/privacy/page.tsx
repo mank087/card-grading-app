@@ -191,7 +191,32 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Changes to This Privacy Policy</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">12. Affiliate Links and Advertising Disclosure</h2>
+            <p>
+              DCM Grading participates in the Amazon Services LLC Associates Program, an affiliate advertising program
+              designed to provide a means for sites to earn advertising fees by advertising and linking to Amazon.com.
+              As an Amazon Associate, DCM Grading earns from qualifying purchases.
+            </p>
+            <p className="mt-4">
+              Our Service may contain links to third-party products, services, or websites (&quot;affiliate links&quot;). When you
+              click on an affiliate link and make a purchase, DCM Grading may receive a commission from the third-party
+              retailer at no additional cost to you. These commissions help support the operation and improvement of our Service.
+            </p>
+            <p className="mt-4">
+              We only recommend products and services that we believe may be useful to our users. However, DCM Grading does
+              not control third-party websites and is not responsible for their content, privacy practices, or the transactions
+              conducted through them. We encourage you to review the privacy policies of any third-party sites you visit through
+              our affiliate links.
+            </p>
+            <p className="mt-4">
+              We may use cookies and tracking technologies provided by affiliate networks to track clicks and commissions.
+              These cookies may collect information about your activity on third-party sites after clicking our affiliate links.
+              Please refer to the privacy policies of those affiliate networks for more information on their data practices.
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">13. Changes to This Privacy Policy</h2>
             <p>
               We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy
               on this page and updating the "Last Updated" date. You are advised to review this Privacy Policy periodically for any changes.
@@ -199,7 +224,7 @@ export default function PrivacyPolicyPage() {
           </section>
 
           <section>
-            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">13. Contact Us</h2>
+            <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">14. Contact Us</h2>
             <p>If you have any questions about this Privacy Policy, please contact us:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
               <li>Email: admin@dcmgrading.com</li>

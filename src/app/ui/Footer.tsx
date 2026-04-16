@@ -264,6 +264,9 @@ export default function Footer() {
             or SGC. Grading involves professional judgment, and users should exercise their own discretion when making decisions
             based on any grading service&apos;s assessments.
           </p>
+          <p className="text-xs text-gray-500 text-center max-w-4xl mx-auto mt-3">
+            As an Amazon Associate, DCM Grading earns from qualifying purchases.
+          </p>
         </div>
       </div>
     </footer>
