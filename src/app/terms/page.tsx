@@ -22,8 +22,11 @@ export default function TermsPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">1. Acceptance of Terms</h2>
             <p>
-              Welcome to DCM Grading. By accessing or using our card grading service at dcmgrading.com (the "Service"),
-              you agree to be bound by these Terms and Conditions ("Terms"). If you do not agree to these Terms, please do not use the Service.
+              Welcome to DCM Grading. These Terms and Conditions (&quot;Terms&quot;) constitute a binding agreement between you and
+              Dynamic Collectibles Management LLC, a limited liability company doing business as &quot;DCM Grading&quot;
+              (&quot;DCM Grading,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;).
+              By accessing or using our card grading service at dcmgrading.com (the &quot;Service&quot;), you agree to be bound by
+              these Terms. If you do not agree to these Terms, please do not use the Service.
             </p>
             <p>
               We reserve the right to modify these Terms at any time. We will notify you of any changes by posting the updated Terms
@@ -403,6 +406,8 @@ export default function TermsPage() {
             <h3 className="text-xl font-semibold text-gray-800 mt-6 mb-3">12.5 Contact Information</h3>
             <p>For questions about these Terms, please contact us at:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
+              <li>Dynamic Collectibles Management LLC</li>
+              <li>d/b/a DCM Grading</li>
               <li>Email: admin@dcmgrading.com</li>
               <li>Website: https://dcmgrading.com</li>
             </ul>

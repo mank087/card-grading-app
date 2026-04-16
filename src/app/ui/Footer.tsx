@@ -24,7 +24,7 @@ export default function Footer() {
               />
               <div>
                 <h3 className="text-lg font-bold">DCM</h3>
-                <p className="text-sm text-gray-400">Dynamic Collectibles Management</p>
+                <p className="text-sm text-gray-400">Dynamic Collectibles Management LLC</p>
               </div>
             </div>
             <p className="text-gray-400 text-sm mb-4">
@@ -252,7 +252,7 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 py-6">
           <div className="text-center text-sm text-gray-400">
-            © {currentYear} Dynamic Collectibles Management. All rights reserved.
+            © {currentYear} Dynamic Collectibles Management LLC. All rights reserved.
           </div>
         </div>
 

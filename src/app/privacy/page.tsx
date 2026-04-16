@@ -22,9 +22,10 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">1. Introduction</h2>
             <p>
-              Welcome to DCM Grading ("we," "our," or "us"). We are committed to protecting your personal information and your right to privacy.
-              This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our AI-powered card grading
-              service available at dcmgrading.com (the "Service").
+              Welcome to DCM Grading. This Privacy Policy describes how Dynamic Collectibles Management LLC, a limited liability
+              company doing business as &quot;DCM Grading&quot; (&quot;DCM Grading,&quot; &quot;we,&quot; &quot;our,&quot; or &quot;us&quot;),
+              collects, uses, discloses, and safeguards your information when you use our AI-powered card grading service available
+              at dcmgrading.com (the &quot;Service&quot;). We are committed to protecting your personal information and your right to privacy.
             </p>
             <p>
               Our Service uses proprietary AI technology to analyze and grade trading cards, providing professional condition assessments and market valuations.
@@ -227,6 +228,8 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mt-8 mb-4">14. Contact Us</h2>
             <p>If you have any questions about this Privacy Policy, please contact us:</p>
             <ul className="list-none ml-4 mt-4 space-y-2">
+              <li>Dynamic Collectibles Management LLC</li>
+              <li>d/b/a DCM Grading</li>
               <li>Email: admin@dcmgrading.com</li>
               <li>Website: https://dcmgrading.com</li>
             </ul>
