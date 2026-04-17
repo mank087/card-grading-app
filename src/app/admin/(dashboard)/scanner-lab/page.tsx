@@ -366,8 +366,8 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
 
-      <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
-        <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+      <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
+        <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
         <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
         {isActive && (
           <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2 flex items-center justify-between">
@@ -560,8 +560,8 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
 
-      <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
-        <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+      <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
+        <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
 
         {/* Guide overlay */}
         {isActive && (
@@ -688,8 +688,8 @@ function CurrentSystemCapture({ onCapture }: { onCapture: (result: CaptureResult
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
 
-      <div className="relative bg-black rounded-lg overflow-hidden" style={{ aspectRatio: '4/3' }}>
-        <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+      <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
+        <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
 
         {/* Guide overlay (same as production) */}
         {isActive && (
