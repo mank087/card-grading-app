@@ -183,36 +183,53 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
   const frameCountRef = useRef(0)
   const validDetectionCountRef = useRef(0)
 
+  const [scannerReady, setScannerReady] = useState(false)
+  const [scannerError, setScannerError] = useState<string | null>(null)
+
   // Initialize Scanic (loaded via script tag to avoid WASM/webpack issues)
   useEffect(() => {
     let mounted = true
     async function init() {
       try {
+        setStatus('Loading scanner engine...')
         await loadScanicScript()
-        if (!window.scanic) throw new Error('Scanic not available on window')
+        if (!window.scanic) throw new Error('Scanic not available on window after script load')
         const scanner = new window.scanic.Scanner({
           mode: 'detect',
           maxProcessingDimension: 480,
-          lowThreshold: 15,
-          highThreshold: 50,
-          minArea: 0.30,
-          epsilon: 0.03,
+          lowThreshold: 10,
+          highThreshold: 40,
+          minArea: 0.08,
+          epsilon: 0.04,
         })
         await scanner.initialize()
-        if (mounted) scannerRef.current = scanner
-      } catch (err) {
+        if (mounted) {
+          scannerRef.current = scanner
+          setScannerReady(true)
+          setStatus('Scanner ready - start camera')
+        }
+      } catch (err: any) {
         console.error('Scanic init error:', err)
+        if (mounted) {
+          setScannerError(err.message || 'Failed to load scanner')
+          setStatus('Scanner failed to load')
+        }
       }
     }
     init()
     return () => { mounted = false }
   }, [])
 
-  // Detection loop — runs every 3rd frame and smooths corners
+  // Detection loop — runs every 5th frame with diagnostics
   useEffect(() => {
     if (!isActive || !scannerRef.current || preview) return
 
+    setStatus('Detection active...')
     let running = true
+    let detectCount = 0
+    let successCount = 0
+    let validCount = 0
+
     const detect = async () => {
       if (!running) return
       const video = videoRef.current
@@ -225,17 +242,18 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
       frameCountRef.current++
 
       const rect = video.getBoundingClientRect()
-      overlay.width = rect.width
-      overlay.height = rect.height
+      if (overlay.width !== Math.round(rect.width)) overlay.width = Math.round(rect.width)
+      if (overlay.height !== Math.round(rect.height)) overlay.height = Math.round(rect.height)
       const octx = overlay.getContext('2d')!
       octx.clearRect(0, 0, overlay.width, overlay.height)
 
-      // Only run detection every 3rd frame to reduce noise
-      if (frameCountRef.current % 3 === 0) {
+      // Run detection every 5th frame
+      if (frameCountRef.current % 5 === 0) {
+        detectCount++
         try {
           const smallCanvas = document.createElement('canvas')
-          const scale = 320 / video.videoWidth
-          smallCanvas.width = 320
+          const scale = 400 / video.videoWidth
+          smallCanvas.width = 400
           smallCanvas.height = Math.round(video.videoHeight * scale)
           const sctx = smallCanvas.getContext('2d')!
           sctx.drawImage(video, 0, 0, smallCanvas.width, smallCanvas.height)
@@ -243,6 +261,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
           const result = await scannerRef.current.scan(smallCanvas, { mode: 'detect' })
 
           if (result.success && result.corners) {
+            successCount++
             const corners = result.corners
             const sx = overlay.width / smallCanvas.width
             const sy = overlay.height / smallCanvas.height
@@ -253,88 +272,61 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
               { x: corners.bottomLeft.x * sx, y: corners.bottomLeft.y * sy },
             ]
 
-            // Validate: area and aspect ratio
-            const detectedArea = Math.abs(
-              (rawPts[0].x * rawPts[1].y - rawPts[1].x * rawPts[0].y) +
-              (rawPts[1].x * rawPts[2].y - rawPts[2].x * rawPts[1].y) +
-              (rawPts[2].x * rawPts[3].y - rawPts[3].x * rawPts[2].y) +
-              (rawPts[3].x * rawPts[0].y - rawPts[0].x * rawPts[3].y)
-            ) / 2
-            const frameArea = overlay.width * overlay.height
-            const coverageRatio = detectedArea / frameArea
-            const detectedWidth = Math.max(
-              Math.hypot(rawPts[1].x - rawPts[0].x, rawPts[1].y - rawPts[0].y),
-              Math.hypot(rawPts[2].x - rawPts[3].x, rawPts[2].y - rawPts[3].y)
-            )
-            const detectedHeight = Math.max(
-              Math.hypot(rawPts[3].x - rawPts[0].x, rawPts[3].y - rawPts[0].y),
-              Math.hypot(rawPts[2].x - rawPts[1].x, rawPts[2].y - rawPts[1].y)
-            )
-            const detectedAspect = Math.min(detectedWidth, detectedHeight) / Math.max(detectedWidth, detectedHeight)
-            const isValid = coverageRatio >= 0.10 && detectedAspect > 0.50 && detectedAspect < 0.90
+            // Always draw what was found (green if valid, orange if not)
+            // Smooth corners
+            if (smoothedCornersRef.current) {
+              smoothedCornersRef.current = smoothedCornersRef.current.map((prev, i) => ({
+                x: prev.x * 0.6 + rawPts[i].x * 0.4,
+                y: prev.y * 0.6 + rawPts[i].y * 0.4,
+              }))
+            } else {
+              smoothedCornersRef.current = rawPts.map(p => ({ ...p }))
+            }
 
-            if (isValid) {
-              validDetectionCountRef.current++
-
-              // Smooth corners — blend 70% previous + 30% new to reduce jitter
-              if (smoothedCornersRef.current) {
-                smoothedCornersRef.current = smoothedCornersRef.current.map((prev, i) => ({
-                  x: prev.x * 0.7 + rawPts[i].x * 0.3,
-                  y: prev.y * 0.7 + rawPts[i].y * 0.3,
-                }))
+            // Stability check
+            if (lastCornersRef.current) {
+              const last = lastCornersRef.current
+              const moved = smoothedCornersRef.current.reduce((sum, p, i) =>
+                sum + Math.abs(p.x - last[i].x) + Math.abs(p.y - last[i].y), 0)
+              if (moved < 50) {
+                stableCountRef.current++
               } else {
-                smoothedCornersRef.current = rawPts
-              }
-
-              // Check stability against smoothed corners
-              if (lastCornersRef.current) {
-                const last = lastCornersRef.current
-                const moved = smoothedCornersRef.current.reduce((sum, p, i) =>
-                  sum + Math.abs(p.x - last[i].x) + Math.abs(p.y - last[i].y), 0)
-                if (moved < 40) {
-                  stableCountRef.current++
-                } else {
-                  stableCountRef.current = Math.max(0, stableCountRef.current - 1)
-                }
-              } else {
-                stableCountRef.current = 1
-              }
-              lastCornersRef.current = smoothedCornersRef.current.map(p => ({ ...p }))
-
-              // Auto-capture after 6 stable detections (~1 second at every-3rd-frame rate)
-              if (stableCountRef.current >= 6 && !isProcessing) {
-                setStatus('Auto-capturing...')
-                handleCapture()
-                stableCountRef.current = 0
-              } else if (stableCountRef.current >= 2) {
-                setStatus(`Card locked - hold still (${stableCountRef.current}/6)`)
-              } else {
-                setStatus('Card detected - hold still')
+                stableCountRef.current = Math.max(0, stableCountRef.current - 1)
               }
             } else {
-              // Invalid detection — don't reset everything, just decrement stability
-              validDetectionCountRef.current = 0
-              stableCountRef.current = Math.max(0, stableCountRef.current - 1)
-              if (stableCountRef.current === 0) {
-                smoothedCornersRef.current = null
-                lastCornersRef.current = null
-              }
-              setStatus('Scanning for card...')
+              stableCountRef.current = 1
+            }
+            lastCornersRef.current = smoothedCornersRef.current.map(p => ({ ...p }))
+            validCount++
+
+            // Auto-capture after 5 stable detections
+            if (stableCountRef.current >= 5 && !isProcessing) {
+              setStatus('Auto-capturing...')
+              handleCapture()
+              stableCountRef.current = 0
+              smoothedCornersRef.current = null
+              lastCornersRef.current = null
+            } else if (stableCountRef.current >= 2) {
+              setStatus(`Card locked (${stableCountRef.current}/5) | ${successCount}/${detectCount} detections`)
+            } else {
+              setStatus(`Card found - hold still | ${successCount}/${detectCount} detections`)
             }
           } else {
-            validDetectionCountRef.current = 0
+            // No corners found
             stableCountRef.current = Math.max(0, stableCountRef.current - 1)
             if (stableCountRef.current === 0) {
               smoothedCornersRef.current = null
               lastCornersRef.current = null
             }
-            setStatus('Scanning for card...')
+            setStatus(`No card detected | ${successCount}/${detectCount} scans found corners`)
           }
-        } catch { /* continue */ }
+        } catch (err: any) {
+          setStatus(`Detection error: ${err.message?.slice(0, 40) || 'unknown'}`)
+        }
       }
 
-      // Draw smoothed outline (persists between detection frames for smooth display)
-      if (smoothedCornersRef.current && stableCountRef.current > 0) {
+      // Draw smoothed outline (persists between detection frames)
+      if (smoothedCornersRef.current) {
         const pts = smoothedCornersRef.current
         const color = stableCountRef.current >= 4 ? '#22c55e' : stableCountRef.current >= 2 ? '#eab308' : '#f97316'
         octx.beginPath()
@@ -350,6 +342,10 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
           octx.fillStyle = color
           octx.fill()
         })
+        // Debug: show stability count
+        octx.fillStyle = 'rgba(255,255,255,0.9)'
+        octx.font = 'bold 12px monospace'
+        octx.fillText(`Stable: ${stableCountRef.current}/5`, 8, 16)
       }
 
       if (running) animFrameRef.current = requestAnimationFrame(detect)
@@ -429,6 +425,8 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
       </div>
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
+      {scannerError && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">Scanner: {scannerError}</p>}
+      {!scannerReady && !scannerError && <p className="text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">Loading scanner engine...</p>}
 
       {/* Preview mode — shows captured image */}
       {preview ? (
