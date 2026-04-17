@@ -190,10 +190,10 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
         const scanner = new window.scanic.Scanner({
           mode: 'detect',
           maxProcessingDimension: 480,
-          lowThreshold: 30,
-          highThreshold: 90,
-          minArea: 0.05,
-          epsilon: 0.02,
+          lowThreshold: 15,
+          highThreshold: 50,
+          minArea: 0.30,
+          epsilon: 0.03,
         })
         await scanner.initialize()
         if (mounted) scannerRef.current = scanner
@@ -246,19 +246,72 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
             { x: corners.bottomLeft.x * sx, y: corners.bottomLeft.y * sy },
           ]
 
-          octx.beginPath()
-          octx.moveTo(pts[0].x, pts[0].y)
-          pts.forEach(p => octx.lineTo(p.x, p.y))
-          octx.closePath()
-          octx.strokeStyle = '#22c55e'
-          octx.lineWidth = 3
-          octx.stroke()
-          pts.forEach(p => {
+          // Validate detected area is large enough (skip inner artwork borders)
+          // Calculate detected quadrilateral area using shoelace formula
+          const detectedArea = Math.abs(
+            (pts[0].x * pts[1].y - pts[1].x * pts[0].y) +
+            (pts[1].x * pts[2].y - pts[2].x * pts[1].y) +
+            (pts[2].x * pts[3].y - pts[3].x * pts[2].y) +
+            (pts[3].x * pts[0].y - pts[0].x * pts[3].y)
+          ) / 2
+          const frameArea = overlay.width * overlay.height
+          const coverageRatio = detectedArea / frameArea
+
+          // Also check aspect ratio is roughly card-shaped (2.5:3.5 = 0.71 portrait or 1.4 landscape)
+          const detectedWidth = Math.max(
+            Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
+            Math.hypot(pts[2].x - pts[3].x, pts[2].y - pts[3].y)
+          )
+          const detectedHeight = Math.max(
+            Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y),
+            Math.hypot(pts[2].x - pts[1].x, pts[2].y - pts[1].y)
+          )
+          const detectedAspect = Math.min(detectedWidth, detectedHeight) / Math.max(detectedWidth, detectedHeight)
+          const isCardShaped = detectedAspect > 0.55 && detectedAspect < 0.85 // card is ~0.71
+
+          // Must cover at least 15% of frame and be card-shaped
+          if (coverageRatio >= 0.15 && isCardShaped) {
+            // Draw green outline — valid card boundary
             octx.beginPath()
-            octx.arc(p.x, p.y, 6, 0, Math.PI * 2)
-            octx.fillStyle = '#22c55e'
-            octx.fill()
-          })
+            octx.moveTo(pts[0].x, pts[0].y)
+            pts.forEach(p => octx.lineTo(p.x, p.y))
+            octx.closePath()
+            octx.strokeStyle = '#22c55e'
+            octx.lineWidth = 3
+            octx.stroke()
+            pts.forEach(p => {
+              octx.beginPath()
+              octx.arc(p.x, p.y, 6, 0, Math.PI * 2)
+              octx.fillStyle = '#22c55e'
+              octx.fill()
+            })
+
+            // Show coverage info
+            octx.fillStyle = 'rgba(34, 197, 94, 0.8)'
+            octx.font = '11px monospace'
+            octx.fillText(`${Math.round(coverageRatio * 100)}% | AR ${detectedAspect.toFixed(2)}`, 8, overlay.height - 8)
+          } else {
+            // Detected contour is too small or wrong shape — likely inner border
+            octx.beginPath()
+            octx.moveTo(pts[0].x, pts[0].y)
+            pts.forEach(p => octx.lineTo(p.x, p.y))
+            octx.closePath()
+            octx.strokeStyle = '#ef4444'
+            octx.lineWidth = 2
+            octx.setLineDash([4, 4])
+            octx.stroke()
+            octx.setLineDash([])
+
+            octx.fillStyle = 'rgba(239, 68, 68, 0.8)'
+            octx.font = '11px monospace'
+            octx.fillText(`Inner border? ${Math.round(coverageRatio * 100)}% | AR ${detectedAspect.toFixed(2)}`, 8, overlay.height - 8)
+
+            stableCountRef.current = 0
+            lastCornersRef.current = null
+            setStatus('Inner border detected - move camera back to show full card')
+            if (running) animFrameRef.current = requestAnimationFrame(detect)
+            return
+          }
 
           if (lastCornersRef.current) {
             const last = lastCornersRef.current
@@ -507,17 +560,36 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
         await loadScanicScript()
         if (window.scanic) {
           const scanner = new window.scanic.Scanner({
-            mode: 'extract',
             maxProcessingDimension: 800,
-            minArea: 0.1,
-            epsilon: 0.02,
+            lowThreshold: 15,
+            highThreshold: 50,
+            minArea: 0.30,
+            epsilon: 0.03,
           })
           await scanner.initialize()
-          const scanResult = await scanner.scan(croppedCanvas, { mode: 'extract', output: 'canvas' })
-          if (scanResult.success && scanResult.output instanceof HTMLCanvasElement) {
-            resultCanvas = scanResult.output
-            corrected = true
-            cornersFound = true
+          // First detect to validate corners, then extract if valid
+          const detectResult = await scanner.scan(croppedCanvas, { mode: 'detect' })
+          if (detectResult.success && detectResult.corners) {
+            const c = detectResult.corners
+            // Validate detected area covers enough of the cropped image (skip inner borders)
+            const w = croppedCanvas.width, h = croppedCanvas.height
+            const detW = Math.max(
+              Math.hypot(c.topRight.x - c.topLeft.x, c.topRight.y - c.topLeft.y),
+              Math.hypot(c.bottomRight.x - c.bottomLeft.x, c.bottomRight.y - c.bottomLeft.y)
+            )
+            const detH = Math.max(
+              Math.hypot(c.bottomLeft.x - c.topLeft.x, c.bottomLeft.y - c.topLeft.y),
+              Math.hypot(c.bottomRight.x - c.topRight.x, c.bottomRight.y - c.topRight.y)
+            )
+            const coverageRatio = (detW * detH) / (w * h)
+            if (coverageRatio >= 0.5) {
+              const extractResult = await scanner.scan(croppedCanvas, { mode: 'extract', output: 'canvas' })
+              if (extractResult.success && extractResult.output instanceof HTMLCanvasElement) {
+                resultCanvas = extractResult.output
+                corrected = true
+                cornersFound = true
+              }
+            }
           }
         }
       } catch { /* Fall back to guide-cropped image */ }
