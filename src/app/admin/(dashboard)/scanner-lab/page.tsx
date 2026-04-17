@@ -176,6 +176,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
   const animFrameRef = useRef<number>(0)
   const [status, setStatus] = useState<string>('Idle')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [preview, setPreview] = useState<CaptureResult | null>(null)
   const stableCountRef = useRef(0)
   const lastCornersRef = useRef<any>(null)
 
@@ -206,7 +207,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
 
   // Detection loop
   useEffect(() => {
-    if (!isActive || !scannerRef.current) return
+    if (!isActive || !scannerRef.current || preview) return
 
     let running = true
     const detect = async () => {
@@ -218,7 +219,6 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
         return
       }
 
-      // Size overlay to match video display size
       const rect = video.getBoundingClientRect()
       overlay.width = rect.width
       overlay.height = rect.height
@@ -226,7 +226,6 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
       octx.clearRect(0, 0, overlay.width, overlay.height)
 
       try {
-        // Downsample for detection
         const smallCanvas = document.createElement('canvas')
         const scale = 320 / video.videoWidth
         smallCanvas.width = 320
@@ -238,10 +237,8 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
 
         if (result.success && result.corners) {
           const corners = result.corners
-          // Scale corners to overlay dimensions
           const sx = overlay.width / smallCanvas.width
           const sy = overlay.height / smallCanvas.height
-
           const pts = [
             { x: corners.topLeft.x * sx, y: corners.topLeft.y * sy },
             { x: corners.topRight.x * sx, y: corners.topRight.y * sy },
@@ -249,7 +246,6 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
             { x: corners.bottomLeft.x * sx, y: corners.bottomLeft.y * sy },
           ]
 
-          // Draw detection outline
           octx.beginPath()
           octx.moveTo(pts[0].x, pts[0].y)
           pts.forEach(p => octx.lineTo(p.x, p.y))
@@ -257,8 +253,6 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
           octx.strokeStyle = '#22c55e'
           octx.lineWidth = 3
           octx.stroke()
-
-          // Draw corner dots
           pts.forEach(p => {
             octx.beginPath()
             octx.arc(p.x, p.y, 6, 0, Math.PI * 2)
@@ -266,7 +260,6 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
             octx.fill()
           })
 
-          // Check stability (corners haven't moved much)
           if (lastCornersRef.current) {
             const last = lastCornersRef.current
             const moved = pts.reduce((sum, p, i) =>
@@ -275,8 +268,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
               stableCountRef.current++
               setStatus(`Card detected - stabilizing (${Math.min(stableCountRef.current, 10)}/10)`)
               if (stableCountRef.current >= 10 && !isProcessing) {
-                // Auto-capture
-                handleCapture(corners)
+                handleCapture()
                 stableCountRef.current = 0
               }
             } else {
@@ -290,9 +282,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
           lastCornersRef.current = null
           setStatus('Scanning for card...')
         }
-      } catch {
-        // Detection failed, continue
-      }
+      } catch { /* continue */ }
 
       if (running) animFrameRef.current = requestAnimationFrame(detect)
     }
@@ -302,9 +292,9 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
       running = false
       cancelAnimationFrame(animFrameRef.current)
     }
-  }, [isActive])
+  }, [isActive, preview])
 
-  const handleCapture = async (detectedCorners?: any) => {
+  const handleCapture = async () => {
     setIsProcessing(true)
     try {
       const frame = captureFrame()
@@ -314,7 +304,6 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
       let corrected = false
       let cornersFound = false
 
-      // Try perspective correction via Scanic extract
       if (scannerRef.current) {
         try {
           const scanResult = await scannerRef.current.scan(frame, { mode: 'extract', output: 'canvas' })
@@ -329,7 +318,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
       const quality = analyzeQuality(resultCanvas)
       const dataUrl = resultCanvas.toDataURL('image/jpeg', 0.92)
 
-      onCapture({
+      const result: CaptureResult = {
         dataUrl,
         width: resultCanvas.width,
         height: resultCanvas.height,
@@ -338,12 +327,19 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
         cornersDetected: cornersFound,
         timestamp: Date.now(),
         qualityMetrics: quality,
-      })
-      setStatus('Captured!')
-      setTimeout(() => setStatus(isActive ? 'Scanning for card...' : 'Idle'), 1500)
+      }
+      setPreview(result)
+      onCapture(result)
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handleRetake = () => {
+    setPreview(null)
+    stableCountRef.current = 0
+    lastCornersRef.current = null
+    setStatus('Scanning for card...')
   }
 
   return (
@@ -354,7 +350,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
           <p className="text-xs text-gray-500">Scanic edge detection + auto-capture + perspective correction</p>
         </div>
         {!isActive ? (
-          <button onClick={start} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
+          <button onClick={() => { setPreview(null); start() }} className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700">
             Start Camera
           </button>
         ) : (
@@ -366,27 +362,43 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
 
-      <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
-        <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
-        <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-        {isActive && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2 flex items-center justify-between">
-            <span className="text-xs text-green-400 font-mono">{status}</span>
-            <button
-              onClick={() => handleCapture()}
-              disabled={isProcessing}
-              className="px-3 py-1 bg-white text-gray-900 text-xs rounded font-medium hover:bg-gray-200 disabled:opacity-50"
-            >
-              {isProcessing ? 'Processing...' : 'Manual Capture'}
+      {/* Preview mode — shows captured image */}
+      {preview ? (
+        <div className="space-y-3">
+          <div className="bg-gray-100 rounded-lg p-3">
+            <img src={preview.dataUrl} alt="Captured card" className="w-full rounded border border-gray-200" />
+          </div>
+          <InlineQuality result={preview} />
+          <div className="flex gap-2">
+            <button onClick={handleRetake} className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300 font-medium">
+              Retake
             </button>
           </div>
-        )}
-        {!isActive && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-            Camera inactive
-          </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        /* Camera mode */
+        <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
+          <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
+          <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+          {isActive && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2 flex items-center justify-between">
+              <span className="text-xs text-green-400 font-mono">{status}</span>
+              <button
+                onClick={() => handleCapture()}
+                disabled={isProcessing}
+                className="px-4 py-2 bg-white text-gray-900 text-sm rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50"
+              >
+                {isProcessing ? 'Processing...' : 'Capture'}
+              </button>
+            </div>
+          )}
+          {!isActive && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+              Tap &quot;Start Camera&quot; above
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -399,6 +411,7 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
   const { videoRef, isActive, error, start, stop, captureFrame } = useLabCamera()
   const [status, setStatus] = useState<string>('Idle')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [preview, setPreview] = useState<CaptureResult | null>(null)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
   const prevFrameRef = useRef<ImageData | null>(null)
   const stableCountRef = useRef(0)
@@ -406,7 +419,7 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
 
   // Stability detection loop (frame differencing)
   useEffect(() => {
-    if (!isActive) return
+    if (!isActive || preview) return
 
     let running = true
     const checkStability = () => {
@@ -417,7 +430,6 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
         return
       }
 
-      // Downsample for comparison
       const w = 160, h = 120
       const smallCanvas = document.createElement('canvas')
       smallCanvas.width = w
@@ -430,7 +442,6 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
         const prev = prevFrameRef.current.data
         const curr = currentFrame.data
         let diff = 0
-        // Sample every 4th pixel for speed
         for (let i = 0; i < curr.length; i += 16) {
           diff += Math.abs(curr[i] - prev[i]) + Math.abs(curr[i + 1] - prev[i + 1]) + Math.abs(curr[i + 2] - prev[i + 2])
         }
@@ -460,7 +471,7 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
       running = false
       cancelAnimationFrame(animFrameRef.current)
     }
-  }, [isActive])
+  }, [isActive, preview])
 
   const handleCapture = async () => {
     setIsProcessing(true)
@@ -468,7 +479,6 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
       const frame = captureFrame()
       if (!frame) return
 
-      // Guide-crop: crop to card aspect ratio from center
       const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
       const frameAspect = frame.width / frame.height
       let cropW: number, cropH: number, cropX: number, cropY: number
@@ -489,7 +499,6 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
       const cctx = croppedCanvas.getContext('2d')!
       cctx.drawImage(frame, cropX, cropY, cropW, cropH, 0, 0, croppedCanvas.width, croppedCanvas.height)
 
-      // Post-capture: try Scanic edge detection + perspective correction
       let resultCanvas = croppedCanvas
       let corrected = false
       let cornersFound = false
@@ -511,14 +520,12 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
             cornersFound = true
           }
         }
-      } catch {
-        // Fall back to guide-cropped image
-      }
+      } catch { /* Fall back to guide-cropped image */ }
 
       const quality = analyzeQuality(resultCanvas)
       const dataUrl = resultCanvas.toDataURL('image/jpeg', 0.92)
 
-      onCapture({
+      const result: CaptureResult = {
         dataUrl,
         width: resultCanvas.width,
         height: resultCanvas.height,
@@ -527,17 +534,21 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
         cornersDetected: cornersFound,
         timestamp: Date.now(),
         qualityMetrics: quality,
-      })
-      setStatus('Captured!')
-      stableCountRef.current = 0
-      prevFrameRef.current = null
-      setTimeout(() => setStatus(isActive ? 'Position card in guide frame' : 'Idle'), 1500)
+      }
+      setPreview(result)
+      onCapture(result)
     } finally {
       setIsProcessing(false)
     }
   }
 
-  // Card guide overlay dimensions
+  const handleRetake = () => {
+    setPreview(null)
+    stableCountRef.current = 0
+    prevFrameRef.current = null
+    setStatus('Position card in guide frame')
+  }
+
   const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
 
   return (
@@ -548,7 +559,7 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
           <p className="text-xs text-gray-500">Guide overlay + stability auto-capture + post-capture correction</p>
         </div>
         {!isActive ? (
-          <button onClick={start} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+          <button onClick={() => { setPreview(null); start() }} className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
             Start Camera
           </button>
         ) : (
@@ -560,54 +571,53 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
 
-      <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
-        <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
+      {preview ? (
+        <div className="space-y-3">
+          <div className="bg-gray-100 rounded-lg p-3">
+            <img src={preview.dataUrl} alt="Captured card" className="w-full rounded border border-gray-200" />
+          </div>
+          <InlineQuality result={preview} />
+          <div className="flex gap-2">
+            <button onClick={handleRetake} className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300 font-medium">
+              Retake
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
+          <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
 
-        {/* Guide overlay */}
-        {isActive && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="border-2 border-white/70 rounded"
-              style={{
-                width: orientation === 'portrait' ? '60%' : '75%',
-                aspectRatio: cardAspect,
-              }}
-            >
-              {/* Corner markers */}
-              <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white" />
-              <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white" />
-              <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white" />
-              <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white" />
+          {isActive && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-white/70 rounded relative" style={{ width: orientation === 'portrait' ? '60%' : '75%', aspectRatio: cardAspect }}>
+                <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white" />
+                <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white" />
+                <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white" />
+                <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white" />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {isActive && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2 flex items-center justify-between">
-            <span className="text-xs text-blue-400 font-mono">{status}</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
-                className="px-2 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600"
-              >
-                {orientation === 'portrait' ? 'Landscape' : 'Portrait'}
-              </button>
-              <button
-                onClick={handleCapture}
-                disabled={isProcessing}
-                className="px-3 py-1 bg-white text-gray-900 text-xs rounded font-medium hover:bg-gray-200 disabled:opacity-50"
-              >
-                {isProcessing ? 'Processing...' : 'Manual Capture'}
-              </button>
+          {isActive && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2 flex items-center justify-between">
+              <span className="text-xs text-blue-400 font-mono">{status}</span>
+              <div className="flex gap-2">
+                <button onClick={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')} className="px-2 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600">
+                  {orientation === 'portrait' ? 'Landscape' : 'Portrait'}
+                </button>
+                <button onClick={handleCapture} disabled={isProcessing} className="px-4 py-2 bg-white text-gray-900 text-sm rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50">
+                  {isProcessing ? 'Processing...' : 'Capture'}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-        {!isActive && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-            Camera inactive
-          </div>
-        )}
-      </div>
+          )}
+          {!isActive && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+              Tap &quot;Start Camera&quot; above
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -619,6 +629,7 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
 function CurrentSystemCapture({ onCapture }: { onCapture: (result: CaptureResult) => void }) {
   const { videoRef, isActive, error, start, stop, captureFrame } = useLabCamera()
   const [isProcessing, setIsProcessing] = useState(false)
+  const [preview, setPreview] = useState<CaptureResult | null>(null)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
 
   const handleCapture = async () => {
@@ -627,7 +638,6 @@ function CurrentSystemCapture({ onCapture }: { onCapture: (result: CaptureResult
       const frame = captureFrame()
       if (!frame) return
 
-      // Guide-crop to card aspect ratio (mirrors existing guideCrop.ts logic)
       const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
       const frameAspect = frame.width / frame.height
       let cropW: number, cropH: number, cropX: number, cropY: number
@@ -651,7 +661,7 @@ function CurrentSystemCapture({ onCapture }: { onCapture: (result: CaptureResult
       const quality = analyzeQuality(croppedCanvas)
       const dataUrl = croppedCanvas.toDataURL('image/jpeg', 0.92)
 
-      onCapture({
+      const result: CaptureResult = {
         dataUrl,
         width: croppedCanvas.width,
         height: croppedCanvas.height,
@@ -660,10 +670,16 @@ function CurrentSystemCapture({ onCapture }: { onCapture: (result: CaptureResult
         cornersDetected: false,
         timestamp: Date.now(),
         qualityMetrics: quality,
-      })
+      }
+      setPreview(result)
+      onCapture(result)
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  const handleRetake = () => {
+    setPreview(null)
   }
 
   const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
@@ -676,7 +692,7 @@ function CurrentSystemCapture({ onCapture }: { onCapture: (result: CaptureResult
           <p className="text-xs text-gray-500">Guide overlay + manual capture + guide-crop (production baseline)</p>
         </div>
         {!isActive ? (
-          <button onClick={start} className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700">
+          <button onClick={() => { setPreview(null); start() }} className="px-4 py-2 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700">
             Start Camera
           </button>
         ) : (
@@ -688,62 +704,108 @@ function CurrentSystemCapture({ onCapture }: { onCapture: (result: CaptureResult
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
 
-      <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
-        <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
+      {preview ? (
+        <div className="space-y-3">
+          <div className="bg-gray-100 rounded-lg p-3">
+            <img src={preview.dataUrl} alt="Captured card" className="w-full rounded border border-gray-200" />
+          </div>
+          <InlineQuality result={preview} />
+          <div className="flex gap-2">
+            <button onClick={handleRetake} className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 text-sm rounded-lg hover:bg-gray-300 font-medium">
+              Retake
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="relative bg-black rounded-lg overflow-hidden aspect-[3/4] sm:aspect-[4/3]">
+          <video ref={videoRef} className="w-full h-full object-contain" playsInline muted autoPlay />
 
-        {/* Guide overlay (same as production) */}
-        {isActive && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              className="border-2 border-white/70 rounded"
-              style={{
-                width: orientation === 'portrait' ? '60%' : '75%',
-                aspectRatio: cardAspect,
-              }}
-            >
-              <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white" />
-              <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white" />
-              <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white" />
-              <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white" />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-white/50 text-xs font-medium uppercase tracking-widest">FRONT</span>
+          {isActive && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="border-2 border-white/70 rounded relative" style={{ width: orientation === 'portrait' ? '60%' : '75%', aspectRatio: cardAspect }}>
+                <div className="absolute top-0 left-0 w-5 h-5 border-t-2 border-l-2 border-white" />
+                <div className="absolute top-0 right-0 w-5 h-5 border-t-2 border-r-2 border-white" />
+                <div className="absolute bottom-0 left-0 w-5 h-5 border-b-2 border-l-2 border-white" />
+                <div className="absolute bottom-0 right-0 w-5 h-5 border-b-2 border-r-2 border-white" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-white/50 text-xs font-medium uppercase tracking-widest">FRONT</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {isActive && (
-          <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2 flex items-center justify-between">
-            <span className="text-xs text-purple-400 font-mono">Tap to capture</span>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
-                className="px-2 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600"
-              >
-                {orientation === 'portrait' ? 'Landscape' : 'Portrait'}
-              </button>
-              <button
-                onClick={handleCapture}
-                disabled={isProcessing}
-                className="px-3 py-1 bg-white text-gray-900 text-xs rounded font-medium hover:bg-gray-200 disabled:opacity-50"
-              >
-                {isProcessing ? 'Processing...' : 'Capture'}
-              </button>
+          {isActive && (
+            <div className="absolute bottom-0 left-0 right-0 bg-black/60 px-3 py-2 flex items-center justify-between">
+              <span className="text-xs text-purple-400 font-mono">Tap to capture</span>
+              <div className="flex gap-2">
+                <button onClick={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')} className="px-2 py-1 bg-gray-700 text-white text-xs rounded hover:bg-gray-600">
+                  {orientation === 'portrait' ? 'Landscape' : 'Portrait'}
+                </button>
+                <button onClick={handleCapture} disabled={isProcessing} className="px-4 py-2 bg-white text-gray-900 text-sm rounded-lg font-medium hover:bg-gray-200 disabled:opacity-50">
+                  {isProcessing ? 'Processing...' : 'Capture'}
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-        {!isActive && (
-          <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
-            Camera inactive
-          </div>
-        )}
+          )}
+          {!isActive && (
+            <div className="absolute inset-0 flex items-center justify-center text-gray-400 text-sm">
+              Tap &quot;Start Camera&quot; above
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================================
+// INLINE QUALITY DISPLAY (shown within each tab after capture)
+// ============================================================================
+
+function InlineQuality({ result }: { result: CaptureResult }) {
+  const q = result.qualityMetrics
+  if (!q) return null
+  const letterColor = q.confidenceLetter === 'A' ? 'bg-green-100 text-green-700 border-green-300'
+    : q.confidenceLetter === 'B' ? 'bg-blue-100 text-blue-700 border-blue-300'
+    : q.confidenceLetter === 'C' ? 'bg-yellow-100 text-yellow-700 border-yellow-300'
+    : 'bg-red-100 text-red-700 border-red-300'
+
+  return (
+    <div className="bg-gray-50 rounded-lg p-3 space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="font-medium text-gray-700">Image Quality</span>
+        <span className={`px-2 py-0.5 rounded border font-bold ${letterColor}`}>
+          {q.confidenceLetter} ({q.overallScore}/100)
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Sharpness</span>
+          <span className="text-gray-900">{q.blurScore} ({q.blurLabel})</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Brightness</span>
+          <span className="text-gray-900">{q.brightnessScore} ({q.brightnessLabel})</span>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="flex justify-between">
+          <span className="text-gray-500">Size</span>
+          <span className="font-mono text-gray-900">{result.width}x{result.height}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-gray-500">Corrected</span>
+          <span className={result.perspectiveCorrected ? 'text-green-600 font-medium' : 'text-gray-400'}>
+            {result.perspectiveCorrected ? 'Yes' : 'No'}
+          </span>
+        </div>
       </div>
     </div>
   )
 }
 
 // ============================================================================
-// QUALITY METRICS CARD
+// QUALITY METRICS CARD (comparison panel)
 // ============================================================================
 
 function QualityCard({ result }: { result: CaptureResult }) {
