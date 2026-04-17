@@ -179,6 +179,9 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
   const [preview, setPreview] = useState<CaptureResult | null>(null)
   const stableCountRef = useRef(0)
   const lastCornersRef = useRef<any>(null)
+  const smoothedCornersRef = useRef<{ x: number; y: number }[] | null>(null)
+  const frameCountRef = useRef(0)
+  const validDetectionCountRef = useRef(0)
 
   // Initialize Scanic (loaded via script tag to avoid WASM/webpack issues)
   useEffect(() => {
@@ -205,7 +208,7 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
     return () => { mounted = false }
   }, [])
 
-  // Detection loop
+  // Detection loop — runs every 3rd frame and smooths corners
   useEffect(() => {
     if (!isActive || !scannerRef.current || preview) return
 
@@ -219,123 +222,135 @@ function RealtimeScanner({ onCapture }: { onCapture: (result: CaptureResult) => 
         return
       }
 
+      frameCountRef.current++
+
       const rect = video.getBoundingClientRect()
       overlay.width = rect.width
       overlay.height = rect.height
       const octx = overlay.getContext('2d')!
       octx.clearRect(0, 0, overlay.width, overlay.height)
 
-      try {
-        const smallCanvas = document.createElement('canvas')
-        const scale = 320 / video.videoWidth
-        smallCanvas.width = 320
-        smallCanvas.height = Math.round(video.videoHeight * scale)
-        const sctx = smallCanvas.getContext('2d')!
-        sctx.drawImage(video, 0, 0, smallCanvas.width, smallCanvas.height)
+      // Only run detection every 3rd frame to reduce noise
+      if (frameCountRef.current % 3 === 0) {
+        try {
+          const smallCanvas = document.createElement('canvas')
+          const scale = 320 / video.videoWidth
+          smallCanvas.width = 320
+          smallCanvas.height = Math.round(video.videoHeight * scale)
+          const sctx = smallCanvas.getContext('2d')!
+          sctx.drawImage(video, 0, 0, smallCanvas.width, smallCanvas.height)
 
-        const result = await scannerRef.current.scan(smallCanvas, { mode: 'detect' })
+          const result = await scannerRef.current.scan(smallCanvas, { mode: 'detect' })
 
-        if (result.success && result.corners) {
-          const corners = result.corners
-          const sx = overlay.width / smallCanvas.width
-          const sy = overlay.height / smallCanvas.height
-          const pts = [
-            { x: corners.topLeft.x * sx, y: corners.topLeft.y * sy },
-            { x: corners.topRight.x * sx, y: corners.topRight.y * sy },
-            { x: corners.bottomRight.x * sx, y: corners.bottomRight.y * sy },
-            { x: corners.bottomLeft.x * sx, y: corners.bottomLeft.y * sy },
-          ]
+          if (result.success && result.corners) {
+            const corners = result.corners
+            const sx = overlay.width / smallCanvas.width
+            const sy = overlay.height / smallCanvas.height
+            const rawPts = [
+              { x: corners.topLeft.x * sx, y: corners.topLeft.y * sy },
+              { x: corners.topRight.x * sx, y: corners.topRight.y * sy },
+              { x: corners.bottomRight.x * sx, y: corners.bottomRight.y * sy },
+              { x: corners.bottomLeft.x * sx, y: corners.bottomLeft.y * sy },
+            ]
 
-          // Validate detected area is large enough (skip inner artwork borders)
-          // Calculate detected quadrilateral area using shoelace formula
-          const detectedArea = Math.abs(
-            (pts[0].x * pts[1].y - pts[1].x * pts[0].y) +
-            (pts[1].x * pts[2].y - pts[2].x * pts[1].y) +
-            (pts[2].x * pts[3].y - pts[3].x * pts[2].y) +
-            (pts[3].x * pts[0].y - pts[0].x * pts[3].y)
-          ) / 2
-          const frameArea = overlay.width * overlay.height
-          const coverageRatio = detectedArea / frameArea
+            // Validate: area and aspect ratio
+            const detectedArea = Math.abs(
+              (rawPts[0].x * rawPts[1].y - rawPts[1].x * rawPts[0].y) +
+              (rawPts[1].x * rawPts[2].y - rawPts[2].x * rawPts[1].y) +
+              (rawPts[2].x * rawPts[3].y - rawPts[3].x * rawPts[2].y) +
+              (rawPts[3].x * rawPts[0].y - rawPts[0].x * rawPts[3].y)
+            ) / 2
+            const frameArea = overlay.width * overlay.height
+            const coverageRatio = detectedArea / frameArea
+            const detectedWidth = Math.max(
+              Math.hypot(rawPts[1].x - rawPts[0].x, rawPts[1].y - rawPts[0].y),
+              Math.hypot(rawPts[2].x - rawPts[3].x, rawPts[2].y - rawPts[3].y)
+            )
+            const detectedHeight = Math.max(
+              Math.hypot(rawPts[3].x - rawPts[0].x, rawPts[3].y - rawPts[0].y),
+              Math.hypot(rawPts[2].x - rawPts[1].x, rawPts[2].y - rawPts[1].y)
+            )
+            const detectedAspect = Math.min(detectedWidth, detectedHeight) / Math.max(detectedWidth, detectedHeight)
+            const isValid = coverageRatio >= 0.10 && detectedAspect > 0.50 && detectedAspect < 0.90
 
-          // Also check aspect ratio is roughly card-shaped (2.5:3.5 = 0.71 portrait or 1.4 landscape)
-          const detectedWidth = Math.max(
-            Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y),
-            Math.hypot(pts[2].x - pts[3].x, pts[2].y - pts[3].y)
-          )
-          const detectedHeight = Math.max(
-            Math.hypot(pts[3].x - pts[0].x, pts[3].y - pts[0].y),
-            Math.hypot(pts[2].x - pts[1].x, pts[2].y - pts[1].y)
-          )
-          const detectedAspect = Math.min(detectedWidth, detectedHeight) / Math.max(detectedWidth, detectedHeight)
-          const isCardShaped = detectedAspect > 0.55 && detectedAspect < 0.85 // card is ~0.71
+            if (isValid) {
+              validDetectionCountRef.current++
 
-          // Must cover at least 15% of frame and be card-shaped
-          if (coverageRatio >= 0.15 && isCardShaped) {
-            // Draw green outline — valid card boundary
-            octx.beginPath()
-            octx.moveTo(pts[0].x, pts[0].y)
-            pts.forEach(p => octx.lineTo(p.x, p.y))
-            octx.closePath()
-            octx.strokeStyle = '#22c55e'
-            octx.lineWidth = 3
-            octx.stroke()
-            pts.forEach(p => {
-              octx.beginPath()
-              octx.arc(p.x, p.y, 6, 0, Math.PI * 2)
-              octx.fillStyle = '#22c55e'
-              octx.fill()
-            })
+              // Smooth corners — blend 70% previous + 30% new to reduce jitter
+              if (smoothedCornersRef.current) {
+                smoothedCornersRef.current = smoothedCornersRef.current.map((prev, i) => ({
+                  x: prev.x * 0.7 + rawPts[i].x * 0.3,
+                  y: prev.y * 0.7 + rawPts[i].y * 0.3,
+                }))
+              } else {
+                smoothedCornersRef.current = rawPts
+              }
 
-            // Show coverage info
-            octx.fillStyle = 'rgba(34, 197, 94, 0.8)'
-            octx.font = '11px monospace'
-            octx.fillText(`${Math.round(coverageRatio * 100)}% | AR ${detectedAspect.toFixed(2)}`, 8, overlay.height - 8)
-          } else {
-            // Detected contour is too small or wrong shape — likely inner border
-            octx.beginPath()
-            octx.moveTo(pts[0].x, pts[0].y)
-            pts.forEach(p => octx.lineTo(p.x, p.y))
-            octx.closePath()
-            octx.strokeStyle = '#ef4444'
-            octx.lineWidth = 2
-            octx.setLineDash([4, 4])
-            octx.stroke()
-            octx.setLineDash([])
+              // Check stability against smoothed corners
+              if (lastCornersRef.current) {
+                const last = lastCornersRef.current
+                const moved = smoothedCornersRef.current.reduce((sum, p, i) =>
+                  sum + Math.abs(p.x - last[i].x) + Math.abs(p.y - last[i].y), 0)
+                if (moved < 40) {
+                  stableCountRef.current++
+                } else {
+                  stableCountRef.current = Math.max(0, stableCountRef.current - 1)
+                }
+              } else {
+                stableCountRef.current = 1
+              }
+              lastCornersRef.current = smoothedCornersRef.current.map(p => ({ ...p }))
 
-            octx.fillStyle = 'rgba(239, 68, 68, 0.8)'
-            octx.font = '11px monospace'
-            octx.fillText(`Inner border? ${Math.round(coverageRatio * 100)}% | AR ${detectedAspect.toFixed(2)}`, 8, overlay.height - 8)
-
-            stableCountRef.current = 0
-            lastCornersRef.current = null
-            setStatus('Inner border detected - move camera back to show full card')
-            if (running) animFrameRef.current = requestAnimationFrame(detect)
-            return
-          }
-
-          if (lastCornersRef.current) {
-            const last = lastCornersRef.current
-            const moved = pts.reduce((sum, p, i) =>
-              sum + Math.abs(p.x - last[i].x) + Math.abs(p.y - last[i].y), 0)
-            if (moved < 15) {
-              stableCountRef.current++
-              setStatus(`Card detected - stabilizing (${Math.min(stableCountRef.current, 10)}/10)`)
-              if (stableCountRef.current >= 10 && !isProcessing) {
+              // Auto-capture after 6 stable detections (~1 second at every-3rd-frame rate)
+              if (stableCountRef.current >= 6 && !isProcessing) {
+                setStatus('Auto-capturing...')
                 handleCapture()
                 stableCountRef.current = 0
+              } else if (stableCountRef.current >= 2) {
+                setStatus(`Card locked - hold still (${stableCountRef.current}/6)`)
+              } else {
+                setStatus('Card detected - hold still')
               }
             } else {
-              stableCountRef.current = 0
-              setStatus('Card detected - hold still')
+              // Invalid detection — don't reset everything, just decrement stability
+              validDetectionCountRef.current = 0
+              stableCountRef.current = Math.max(0, stableCountRef.current - 1)
+              if (stableCountRef.current === 0) {
+                smoothedCornersRef.current = null
+                lastCornersRef.current = null
+              }
+              setStatus('Scanning for card...')
             }
+          } else {
+            validDetectionCountRef.current = 0
+            stableCountRef.current = Math.max(0, stableCountRef.current - 1)
+            if (stableCountRef.current === 0) {
+              smoothedCornersRef.current = null
+              lastCornersRef.current = null
+            }
+            setStatus('Scanning for card...')
           }
-          lastCornersRef.current = pts
-        } else {
-          stableCountRef.current = 0
-          lastCornersRef.current = null
-          setStatus('Scanning for card...')
-        }
-      } catch { /* continue */ }
+        } catch { /* continue */ }
+      }
+
+      // Draw smoothed outline (persists between detection frames for smooth display)
+      if (smoothedCornersRef.current && stableCountRef.current > 0) {
+        const pts = smoothedCornersRef.current
+        const color = stableCountRef.current >= 4 ? '#22c55e' : stableCountRef.current >= 2 ? '#eab308' : '#f97316'
+        octx.beginPath()
+        octx.moveTo(pts[0].x, pts[0].y)
+        pts.forEach(p => octx.lineTo(p.x, p.y))
+        octx.closePath()
+        octx.strokeStyle = color
+        octx.lineWidth = 3
+        octx.stroke()
+        pts.forEach(p => {
+          octx.beginPath()
+          octx.arc(p.x, p.y, 6, 0, Math.PI * 2)
+          octx.fillStyle = color
+          octx.fill()
+        })
+      }
 
       if (running) animFrameRef.current = requestAnimationFrame(detect)
     }
@@ -536,11 +551,12 @@ function SmartCapture({ onCapture }: { onCapture: (result: CaptureResult) => voi
       const frameAspect = frame.width / frame.height
       let cropW: number, cropH: number, cropX: number, cropY: number
 
+      // Use loose crop (95%) since post-capture correction will tighten if edges are found
       if (frameAspect > cardAspect) {
-        cropH = frame.height * 0.85
+        cropH = frame.height * 0.95
         cropW = cropH * cardAspect
       } else {
-        cropW = frame.width * 0.85
+        cropW = frame.width * 0.95
         cropH = cropW / cardAspect
       }
       cropX = (frame.width - cropW) / 2
