@@ -5629,13 +5629,13 @@ OUTPUT FORMAT: SCORING BREAKDOWN (WHOLE NUMBERS)
   },
   "metadata": {
     "timestamp": "2025-01-15T14:32:00Z",
-    "prompt_version": "DCM_Grading_v8.5"
+    "prompt_version": "DCM_Grading_v8.6"
   }
 }
 
 **CRITICAL:** Always include the metadata object with:
 - timestamp: Current date/time in ISO 8601 format
-- prompt_version: "DCM_Grading_v8.5"
+- prompt_version: "DCM_Grading_v8.6"
 ---
 SECTION 12: OUTPUT REQUIREMENTS & VALIDATION
 ---
@@ -5702,8 +5702,8 @@ METADATA REQUIREMENTS
 ---
 Include in metadata object:
 • timestamp: ISO 8601 format
-• model_version: "DCM_OPTIC_v8.5"
-• rubric_version: "master_v8.5"
+• model_version: "DCM_OPTIC_v8.6"
+• rubric_version: "master_v8.6"
 • delta_applied: "sports_v5" | "pokemon_v5" | "mtg_v5" | "lorcana_v5" | "other_v5"
 • processing_notes: Any special conditions or issues encountered
 ---
