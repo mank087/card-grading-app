@@ -36,6 +36,7 @@ interface CardRow {
   conversational_defects_front: any | null
   conversational_defects_back: any | null
   conversational_centering: any | null
+  conversational_grading: string | null
   conversational_image_confidence: string | null
   conversational_case_detection: any | null
   conversational_grade_uncertainty: string | null
@@ -64,7 +65,7 @@ async function fetchAllCards(): Promise<CardRow[]> {
     'conversational_condition_label', 'conversational_limiting_factor',
     'conversational_weighted_sub_scores', 'conversational_sub_scores',
     'conversational_defects_front', 'conversational_defects_back',
-    'conversational_centering',
+    'conversational_centering', 'conversational_grading',
     'conversational_image_confidence', 'conversational_case_detection',
     'conversational_grade_uncertainty', 'conversational_prompt_version',
     'category', 'rarity_tier', 'print_finish',
@@ -332,45 +333,107 @@ function analyzeDefects(cards: CardRow[]): string {
   let totalDefects = 0
   let cardsWithDefects = 0
 
+  // Extract defects from conversational_grading JSON — the actual source of truth.
+  // The structured columns (conversational_defects_front/back) often have "No data" placeholders.
+  // The real defect descriptions are in the grading JSON as flat keys like:
+  //   "front_top_left": "Corner shows rounding with white cardstock...",
+  //   "front_top_edge": "Minor whitening along edge..."
+  // And in defects_noted arrays within grading passes.
+
+  const cornerPositions = ['top_left', 'top_right', 'bottom_left', 'bottom_right']
+  const edgePositions = ['top', 'bottom', 'left', 'right']
+  const defectKeywords = ['whitening', 'rounding', 'wear', 'scratch', 'crease', 'chip', 'nick',
+    'dent', 'indent', 'stain', 'scuff', 'tear', 'bend', 'fold', 'soft', 'blunt', 'ding',
+    'fray', 'peel', 'rough', 'exposed', 'cardstock', 'fiber', 'damage', 'mark', 'dulled',
+    'abraded', 'handling', 'gloss loss']
+
+  function hasDefectLanguage(text: string): boolean {
+    if (!text) return false
+    const lower = text.toLowerCase()
+    return defectKeywords.some(kw => lower.includes(kw))
+  }
+
   for (const card of cards) {
     let hasDefect = false
+    const grading = card.conversational_grading
+    if (!grading) continue
 
-    for (const [side, defects] of [['front', card.conversational_defects_front], ['back', card.conversational_defects_back]] as const) {
-      if (!defects) continue
+    // Try to parse as JSON
+    let json: any = null
+    try {
+      json = typeof grading === 'string' ? JSON.parse(grading) : grading
+    } catch {
+      // Not JSON — might be markdown. Try to extract defects from text.
+      const lower = grading.toLowerCase()
+      for (const kw of defectKeywords) {
+        if (lower.includes(kw)) {
+          hasDefect = true
+          // Can't determine specific location from markdown — count as general
+          severityMap.set('detected', (severityMap.get('detected') || 0) + 1)
+          totalDefects++
+          break
+        }
+      }
+      if (hasDefect) cardsWithDefects++
+      continue
+    }
 
-      // Handle BOTH data formats:
-      // Format A (transformedDefects): { corners: { condition: "...", defects: [{description, severity, location}] } }
-      // Format B (SideDefects):        { corners: { top_left: { severity, description } } }
+    if (!json) continue
 
-      for (const area of ['corners', 'edges', 'surface'] as const) {
-        const areaData = defects[area]
-        if (!areaData) continue
+    // Extract from flat corner keys: front_top_left, back_top_left, etc.
+    for (const side of ['front', 'back']) {
+      for (const pos of cornerPositions) {
+        const key = `${side}_${pos}`
+        const desc = json[key] || json?.corners?.[side]?.[pos]?.description
+        if (desc && typeof desc === 'string' && hasDefectLanguage(desc)) {
+          const loc = `corner:${pos}`
+          locationMap.set(loc, (locationMap.get(loc) || 0) + 1)
+          severityMap.set('detected', (severityMap.get('detected') || 0) + 1)
+          totalDefects++
+          hasDefect = true
+        }
+      }
+      // Edges
+      for (const pos of edgePositions) {
+        const key = `${side}_${pos}_edge`
+        const altKey = `${side}_edge_${pos}`
+        const desc = json[key] || json[altKey] || json?.edges?.[side]?.[pos]?.description
+        if (desc && typeof desc === 'string' && hasDefectLanguage(desc)) {
+          const loc = `edge:${pos}`
+          locationMap.set(loc, (locationMap.get(loc) || 0) + 1)
+          severityMap.set('detected', (severityMap.get('detected') || 0) + 1)
+          totalDefects++
+          hasDefect = true
+        }
+      }
+      // Surface
+      for (const surfKey of [`${side}_surface`, `${side}_surface_description`]) {
+        const desc = json[surfKey]
+        if (desc && typeof desc === 'string' && hasDefectLanguage(desc)) {
+          locationMap.set(`surface:${side}`, (locationMap.get(`surface:${side}`) || 0) + 1)
+          severityMap.set('detected', (severityMap.get('detected') || 0) + 1)
+          totalDefects++
+          hasDefect = true
+        }
+      }
+    }
 
-        // Format A: has a 'defects' array
-        if (Array.isArray(areaData.defects)) {
-          for (const d of areaData.defects) {
-            if (d?.description && d.description !== 'N/A' && d.description !== 'none') {
-              const sev = d.severity || 'minor'
-              const loc = d.location || area
-              defectMap.set(`${side}:${loc}:${sev}`, (defectMap.get(`${side}:${loc}:${sev}`) || 0) + 1)
-              severityMap.set(sev, (severityMap.get(sev) || 0) + 1)
-              locationMap.set(loc, (locationMap.get(loc) || 0) + 1)
-              totalDefects++
-              hasDefect = true
-            }
-          }
-        } else {
-          // Format B: nested per-location objects
-          for (const [pos, data] of Object.entries(areaData) as [string, any][]) {
-            if (pos === 'condition' || pos === 'defects') continue // skip Format A fields
-            if (data?.severity && data.severity !== 'none') {
-              const key = `${side}:${area}:${pos}:${data.severity}`
-              defectMap.set(key, (defectMap.get(key) || 0) + 1)
-              severityMap.set(data.severity, (severityMap.get(data.severity) || 0) + 1)
-              locationMap.set(`${area}:${pos}`, (locationMap.get(`${area}:${pos}`) || 0) + 1)
-              totalDefects++
-              hasDefect = true
-            }
+    // Also extract from defects_noted arrays in grading passes
+    for (const passKey of ['pass_1', 'pass_2', 'pass_3']) {
+      const pass = json?.grading_passes?.[passKey] || json?.[passKey]
+      if (pass?.defects_noted && Array.isArray(pass.defects_noted)) {
+        for (const note of pass.defects_noted) {
+          if (typeof note === 'string' && hasDefectLanguage(note)) {
+            // Classify by keyword in the note
+            const lower = note.toLowerCase()
+            if (lower.includes('corner')) locationMap.set('corner:noted', (locationMap.get('corner:noted') || 0) + 1)
+            else if (lower.includes('edge')) locationMap.set('edge:noted', (locationMap.get('edge:noted') || 0) + 1)
+            else if (lower.includes('surface') || lower.includes('scratch')) locationMap.set('surface:noted', (locationMap.get('surface:noted') || 0) + 1)
+            else if (lower.includes('center')) locationMap.set('centering:noted', (locationMap.get('centering:noted') || 0) + 1)
+            else locationMap.set('other:noted', (locationMap.get('other:noted') || 0) + 1)
+            severityMap.set('pass_noted', (severityMap.get('pass_noted') || 0) + 1)
+            totalDefects++
+            hasDefect = true
           }
         }
       }
