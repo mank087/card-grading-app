@@ -10,6 +10,10 @@
  * 2. Run: npx tsx scripts/backfill_structured_data.ts
  */
 
+import * as path from 'path';
+const dotenv = require('dotenv');
+dotenv.config({ path: path.join(__dirname, '..', '.env.local') });
+
 import { createClient } from '@supabase/supabase-js';
 import {
   parseConversationalDefects,

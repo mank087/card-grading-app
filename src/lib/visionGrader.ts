@@ -1951,8 +1951,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.5-json',
-          prompt_version: 'DCM_Grading_v8.5'
+          version: 'conversational-v8.6-json',
+          prompt_version: 'DCM_Grading_v8.6'
         }
       };
 
@@ -2003,8 +2003,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.5-markdown',
-          prompt_version: 'DCM_Grading_v8.5'
+          version: 'conversational-v8.6-markdown',
+          prompt_version: 'DCM_Grading_v8.6'
         }
       };
 
