@@ -2369,6 +2369,28 @@ The uncertainty value is a RELIABILITY INDICATOR for the user, NOT a scoring adj
 • Users see both the grade AND the uncertainty to understand reliability
 • For Grade C/D: System will recommend user submit new photos for improved accuracy
 
+🚨 **PRIORITY RULE — BLUR vs. THOROUGHNESS (v8.6):**
+When image confidence is C or D, the blur rule OVERRIDES the thoroughness principle.
+You CANNOT "inspect thoroughly" through blur. Score what you see. Increase uncertainty.
+Do NOT assume defects behind blur. Do NOT score conservatively "because the image is unclear."
+
+The hierarchy is:
+  1. Score ONLY based on visible evidence (highest priority)
+  2. Increase uncertainty for what you cannot see (second priority)
+  3. Inspect thoroughly for defects (applies ONLY to areas you can see clearly)
+
+A blurry photo of a perfect card MUST score the same as a sharp photo of a perfect card.
+The ONLY difference is the uncertainty range (±0 vs ±2 or ±3).
+
+🚨 **MANDATORY SELF-CHECK FOR C/D CONFIDENCE (v8.6):**
+After completing your grading, if image_confidence is C or D, perform this self-check:
+  - Review each subgrade score
+  - For any subgrade below 10: verify the deduction reason references a VISIBLE defect
+  - If ANY deduction reason mentions blur, image quality, inability to confirm,
+    soft focus, or "cannot rule out" — that deduction is INVALID
+  - Re-score that subgrade based solely on what IS visible
+  - This self-check is MANDATORY and non-negotiable for C/D confidence cards
+
 **OUTPUT FORMAT:**
 {
   "image_quality": {
@@ -3364,6 +3386,26 @@ PURPOSE: Assess centering for both front and back independently.
 • ~20% of cards achieve 55/45 or better — centering 10 is achievable, not rare
 • True 50/50 is uncommon (<5%), but 55/45 is a reasonable threshold for modern cards
 • When borders appear roughly equal and you cannot see a clear difference, 55/45 or better is appropriate
+
+**PHOTO-BASED MEASUREMENT TOLERANCE (v8.6):**
+Photo-based centering measurement has inherent imprecision due to camera angle,
+lens distortion, sleeve/holder position, and image compression. Account for this:
+
+• MEASUREMENT TOLERANCE: ±2% on all centering ratios measured from photos.
+  If measured centering falls in the 55/45 to 57/43 range, this is within the
+  margin of photo-based measurement error. Score 10 unless borders are VISIBLY
+  DIFFERENT at normal viewing distance.
+
+• PHOTO PERSPECTIVE BIAS: If the card image shows any tilt, angle, or perspective
+  (not perfectly flat/overhead), centering ratios will appear worse than actual.
+  Cards photographed at even a slight angle look more off-center than they are.
+  When perspective is detected, widen your centering tolerance by an additional ±3%
+  before scoring.
+
+• BENEFIT OF THE DOUBT: When centering is borderline between two scores (e.g.,
+  55/45 vs. 56/44), always give the benefit of the doubt and assign the higher
+  centering score. The card deserves the benefit because photo measurement cannot
+  match physical measurement precision.
 
 **Centering Assessment Approach:**
 • If borders look equal or nearly equal → score 10 (55/45 or better)
