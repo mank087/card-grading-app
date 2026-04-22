@@ -148,21 +148,18 @@ async function createLogoCollageRotated(logoBase64: string): Promise<string> {
   const totalLogoH = rows * rowHeight
   const startY = (uprightH - totalLogoH) / 2 + gapX / 2
 
+  // Draw DCM logos rotated 180° in a 3-column grid
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
       const lx = gapX + c * (logoSize + gapX)
       const ly = startY + r * rowHeight
-      ctx.drawImage(logoImg, lx, ly, logoSize, logoSize)
+      ctx.save()
+      ctx.translate(lx + logoSize / 2, ly + logoSize / 2)
+      ctx.rotate(Math.PI) // 180°
+      ctx.drawImage(logoImg, -logoSize / 2, -logoSize / 2, logoSize, logoSize)
+      ctx.restore()
     }
   }
-
-  // Add subtle "dcmgrading.com" text at bottom
-  const textSize = Math.round(uprightW * 0.08)
-  ctx.font = `bold ${textSize}px Helvetica, Arial, sans-serif`
-  ctx.fillStyle = COLORS.purpleLight
-  ctx.textAlign = 'center'
-  ctx.textBaseline = 'bottom'
-  ctx.fillText('dcmgrading.com', uprightW / 2, uprightH - Math.round(gapX * 0.5))
 
   // Rotate 90° CCW for the label
   const rotCanvas = document.createElement('canvas')
