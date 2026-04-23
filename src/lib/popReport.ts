@@ -20,6 +20,11 @@ export const POP_CATEGORIES: PopCategory[] = [
   { slug: 'hockey', dbCategory: 'Hockey', displayName: 'Hockey', icon: '\uD83C\uDFD2' },
   { slug: 'soccer', dbCategory: 'Soccer', displayName: 'Soccer', icon: '\u26BD' },
   { slug: 'wrestling', dbCategory: 'Wrestling', displayName: 'Wrestling', icon: '\uD83E\uDD3C' },
+  { slug: 'racing', dbCategory: 'Racing', displayName: 'Racing', icon: '\uD83C\uDFCE\uFE0F' },
+  { slug: 'golf', dbCategory: 'Golf', displayName: 'Golf', icon: '\u26F3' },
+  { slug: 'mma', dbCategory: 'MMA', displayName: 'MMA', icon: '\uD83E\uDD4A' },
+  { slug: 'tennis', dbCategory: 'Tennis', displayName: 'Tennis', icon: '\uD83C\uDFBE' },
+  { slug: 'boxing', dbCategory: 'Boxing', displayName: 'Boxing', icon: '\uD83E\uDD4A' },
   { slug: 'sports', dbCategory: 'Sports', displayName: 'Sports (Other)', icon: '\uD83C\uDFC6' },
   // Sub-category entries (category = 'Other' with sub_category filter)
   { slug: 'star-wars', dbCategory: 'Other', dbSubCategory: 'Star Wars', displayName: 'Star Wars', icon: '\u2B50' },
