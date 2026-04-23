@@ -1,4 +1,4 @@
-import { View, Text, ScrollView, StyleSheet, Alert } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Alert, Linking } from 'react-native'
 import { Colors } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
@@ -37,9 +37,7 @@ export default function AccountScreen() {
         <Button
           title="Purchase Credits"
           variant="primary"
-          onPress={() => {
-            // TODO: Navigate to credit purchase or open web
-          }}
+          onPress={() => Linking.openURL('https://dcmgrading.com/credits')}
           style={{ marginTop: 12 }}
         />
       </View>

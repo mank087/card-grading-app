@@ -1,17 +1,19 @@
 import 'react-native-url-polyfill/auto'
 import { createClient } from '@supabase/supabase-js'
-import * as SecureStore from 'expo-secure-store'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
-// SecureStore adapter for Supabase auth token persistence
-const ExpoSecureStoreAdapter = {
+// Use AsyncStorage instead of SecureStore for Supabase session persistence.
+// SecureStore has a 2048 byte limit on Android which truncates the session JSON.
+// AsyncStorage has no size limit and works reliably for auth tokens.
+const AsyncStorageAdapter = {
   getItem: (key: string) => {
-    return SecureStore.getItemAsync(key)
+    return AsyncStorage.getItem(key)
   },
   setItem: (key: string, value: string) => {
-    SecureStore.setItemAsync(key, value)
+    AsyncStorage.setItem(key, value)
   },
   removeItem: (key: string) => {
-    SecureStore.deleteItemAsync(key)
+    AsyncStorage.removeItem(key)
   },
 }
 
@@ -20,7 +22,7 @@ const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: ExpoSecureStoreAdapter as any,
+    storage: AsyncStorageAdapter as any,
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,

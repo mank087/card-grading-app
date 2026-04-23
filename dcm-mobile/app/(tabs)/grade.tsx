@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, ScrollView } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, Linking } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Colors, CardCategories } from '@/lib/constants'
 import { useCredits } from '@/contexts/CreditsContext'
@@ -7,6 +7,10 @@ import Button from '@/components/ui/Button'
 export default function GradeScreen() {
   const router = useRouter()
   const { balance } = useCredits()
+
+  const openPurchaseCredits = () => {
+    Linking.openURL('https://dcmgrading.com/credits')
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -44,9 +48,7 @@ export default function GradeScreen() {
           <Button
             title="Purchase Credits"
             variant="primary"
-            onPress={() => {
-              // TODO: Navigate to credit purchase
-            }}
+            onPress={openPurchaseCredits}
           />
         </View>
       )}

@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useAuth } from './AuthContext'
-import { api } from '@/lib/api'
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
 interface CreditsContextType {
   balance: number
@@ -20,20 +21,35 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   const refresh = useCallback(async () => {
-    if (!session) {
+    if (!session?.access_token) {
       setBalance(0)
       setIsLoading(false)
       return
     }
     try {
-      const data = await api.get('/api/user/credits', session.access_token)
-      setBalance(data.balance ?? 0)
-    } catch {
-      // Silently fail — balance stays at last known value
+      console.log('[Credits] Fetching with token:', session.access_token.substring(0, 20) + '...')
+      const response = await fetch(`${API_BASE}/api/stripe/credits`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+      console.log('[Credits] Response status:', response.status)
+      if (response.ok) {
+        const data = await response.json()
+        console.log('[Credits] Balance:', data.balance)
+        setBalance(data.balance ?? 0)
+      } else {
+        const errorText = await response.text()
+        console.error('[Credits] Error response:', errorText)
+      }
+    } catch (err) {
+      console.error('[Credits] Fetch error:', err)
     } finally {
       setIsLoading(false)
     }
-  }, [session])
+  }, [session?.access_token])
 
   useEffect(() => {
     refresh()

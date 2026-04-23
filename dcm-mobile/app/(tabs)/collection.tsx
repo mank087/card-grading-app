@@ -1,21 +1,29 @@
-import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native'
+import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ActivityIndicator, TextInput } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useEffect, useState, useCallback } from 'react'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
 import { supabase } from '@/lib/supabase'
 
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+
 interface CardItem {
   id: string
   serial: string
   card_name: string | null
+  featured: string | null
   category: string
+  card_set: string | null
   conversational_whole_grade: number | null
   conversational_condition_label: string | null
+  conversational_card_info: any
   front_path: string
   front_url?: string
   created_at: string
+  ebay_price_median: number | null
+  dcm_price_estimate: number | null
 }
 
 export default function CollectionScreen() {
@@ -24,37 +32,26 @@ export default function CollectionScreen() {
   const [cards, setCards] = useState<CardItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
+  const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
 
   const fetchCollection = useCallback(async () => {
-    if (!session) return
+    if (!session?.access_token) return
     try {
-      const { data, error } = await supabase
-        .from('cards')
-        .select('id, serial, card_name, category, conversational_whole_grade, conversational_condition_label, front_path, created_at')
-        .eq('user_id', session.user.id)
-        .not('conversational_whole_grade', 'is', null)
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      if (error) throw error
-
-      // Get signed URLs for images
-      if (data && data.length > 0) {
-        const paths = data.map(c => c.front_path).filter(Boolean)
-        const { data: urls } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
-        const urlMap = new Map<string, string>()
-        urls?.forEach(u => { if (u.signedUrl && u.path) urlMap.set(u.path, u.signedUrl) })
-        data.forEach(c => { c.front_url = urlMap.get(c.front_path) || undefined })
-      }
-
-      setCards(data || [])
+      const searchParam = search ? `?search=${encodeURIComponent(search)}` : ''
+      const response = await fetch(`${API_BASE}/api/cards/my-collection${searchParam}`, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      })
+      if (!response.ok) throw new Error('Failed to fetch')
+      const data = await response.json()
+      setCards(data.cards || [])
     } catch (err) {
       console.error('Collection fetch error:', err)
     } finally {
       setIsLoading(false)
       setRefreshing(false)
     }
-  }, [session])
+  }, [session?.access_token, search])
 
   useEffect(() => { fetchCollection() }, [fetchCollection])
 
@@ -63,65 +60,137 @@ export default function CollectionScreen() {
     fetchCollection()
   }
 
-  const renderCard = ({ item }: { item: CardItem }) => (
-    <TouchableOpacity
-      style={styles.cardItem}
-      onPress={() => router.push(`/card/${item.id}`)}
-      activeOpacity={0.7}
-    >
-      {item.front_url ? (
-        <Image source={{ uri: item.front_url }} style={styles.cardImage} resizeMode="cover" />
-      ) : (
-        <View style={[styles.cardImage, styles.placeholderImage]}>
-          <Text style={styles.placeholderText}>DCM</Text>
-        </View>
-      )}
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName} numberOfLines={1}>
-          {item.card_name || `Card #${item.serial}`}
-        </Text>
-        <Text style={styles.cardCategory}>{item.category}</Text>
-      </View>
-      <GradeBadge grade={item.conversational_whole_grade} size="sm" />
-    </TouchableOpacity>
-  )
+  const renderListItem = ({ item }: { item: CardItem }) => {
+    const ci = item.conversational_card_info
+    const name = item.card_name || item.featured || ci?.card_name || `Card #${item.serial}`
+    const set = item.card_set || ci?.set_name || ''
+    const price = item.ebay_price_median || item.dcm_price_estimate
 
-  if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.purple[600]} />
-      </View>
+      <TouchableOpacity
+        style={styles.listItem}
+        onPress={() => router.push(`/card/${item.id}`)}
+        activeOpacity={0.7}
+      >
+        {item.front_url ? (
+          <Image source={{ uri: item.front_url }} style={styles.listThumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.listThumb, styles.placeholder]}>
+            <Text style={styles.placeholderText}>DCM</Text>
+          </View>
+        )}
+        <View style={styles.listInfo}>
+          <Text style={styles.listName} numberOfLines={1}>{name}</Text>
+          <Text style={styles.listSet} numberOfLines={1}>{set}</Text>
+          <View style={styles.listMeta}>
+            <Text style={styles.listCategory}>{item.category}</Text>
+            {price && <Text style={styles.listPrice}>${price.toFixed(2)}</Text>}
+          </View>
+        </View>
+        <GradeBadge grade={item.conversational_whole_grade} size="sm" />
+      </TouchableOpacity>
     )
   }
 
-  return (
-    <FlatList
-      style={styles.container}
-      contentContainerStyle={cards.length === 0 ? styles.emptyContainer : styles.listContent}
-      data={cards}
-      keyExtractor={(item) => item.id}
-      renderItem={renderCard}
-      refreshing={refreshing}
-      onRefresh={onRefresh}
-      ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No cards yet</Text>
-          <Text style={styles.emptySubtitle}>Grade your first card to start building your collection</Text>
+  const renderGridItem = ({ item }: { item: CardItem }) => {
+    const ci = item.conversational_card_info
+    const name = item.card_name || item.featured || ci?.card_name || `#${item.serial}`
+
+    return (
+      <TouchableOpacity
+        style={styles.gridItem}
+        onPress={() => router.push(`/card/${item.id}`)}
+        activeOpacity={0.7}
+      >
+        {item.front_url ? (
+          <Image source={{ uri: item.front_url }} style={styles.gridImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.gridImage, styles.placeholder]}>
+            <Text style={styles.placeholderText}>DCM</Text>
+          </View>
+        )}
+        <View style={styles.gridInfo}>
+          <Text style={styles.gridName} numberOfLines={1}>{name}</Text>
+          <GradeBadge grade={item.conversational_whole_grade} size="sm" />
         </View>
-      }
-    />
+      </TouchableOpacity>
+    )
+  }
+
+  if (isLoading) {
+    return <View style={styles.loadingContainer}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Search + View Toggle */}
+      <View style={styles.toolbar}>
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={18} color={Colors.gray[400]} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search cards..."
+            placeholderTextColor={Colors.gray[400]}
+            value={search}
+            onChangeText={setSearch}
+            onSubmitEditing={fetchCollection}
+            returnKeyType="search"
+          />
+          {search !== '' && (
+            <TouchableOpacity onPress={() => { setSearch(''); }}>
+              <Ionicons name="close-circle" size={18} color={Colors.gray[400]} />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity onPress={() => setViewMode(v => v === 'list' ? 'grid' : 'list')} style={styles.viewToggle}>
+          <Ionicons name={viewMode === 'list' ? 'grid' : 'list'} size={20} color={Colors.purple[600]} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Stats */}
+      <View style={styles.statsBar}>
+        <Text style={styles.statsText}>{cards.length} cards</Text>
+      </View>
+
+      {/* Card List */}
+      <FlatList
+        data={cards}
+        keyExtractor={(item) => item.id}
+        renderItem={viewMode === 'list' ? renderListItem : renderGridItem}
+        numColumns={viewMode === 'grid' ? 2 : 1}
+        key={viewMode} // Force re-render when switching modes
+        contentContainerStyle={viewMode === 'grid' ? styles.gridContainer : styles.listContainer}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Ionicons name="albums-outline" size={48} color={Colors.gray[300]} />
+            <Text style={styles.emptyTitle}>No cards yet</Text>
+            <Text style={styles.emptySubtitle}>Grade your first card to start building your collection</Text>
+          </View>
+        }
+      />
+    </View>
   )
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray[50] },
-  listContent: { padding: 12 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[50] },
-  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty: { alignItems: 'center', padding: 32 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.gray[800], marginBottom: 8 },
-  emptySubtitle: { fontSize: 14, color: Colors.gray[500], textAlign: 'center' },
-  cardItem: {
+
+  // Toolbar
+  toolbar: { flexDirection: 'row', padding: 12, gap: 8, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.gray[200] },
+  searchContainer: { flex: 1, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.gray[100], borderRadius: 10, paddingHorizontal: 12, gap: 8 },
+  searchInput: { flex: 1, paddingVertical: 10, fontSize: 15, color: Colors.gray[900] },
+  viewToggle: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.gray[100], borderRadius: 10 },
+
+  // Stats
+  statsBar: { paddingHorizontal: 12, paddingVertical: 8, backgroundColor: Colors.gray[50] },
+  statsText: { fontSize: 12, color: Colors.gray[500], fontWeight: '600' },
+
+  // List view
+  listContainer: { padding: 12 },
+  listItem: {
     backgroundColor: Colors.white,
     borderRadius: 12,
     padding: 12,
@@ -132,10 +201,33 @@ const styles = StyleSheet.create({
     borderColor: Colors.gray[200],
     gap: 12,
   },
-  cardImage: { width: 50, height: 70, borderRadius: 6 },
-  placeholderImage: { backgroundColor: Colors.gray[200], alignItems: 'center', justifyContent: 'center' },
+  listThumb: { width: 50, height: 70, borderRadius: 6 },
+  placeholder: { backgroundColor: Colors.gray[200], alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.gray[400], fontSize: 10, fontWeight: '700' },
-  cardInfo: { flex: 1 },
-  cardName: { fontSize: 14, fontWeight: '600', color: Colors.gray[900] },
-  cardCategory: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
+  listInfo: { flex: 1 },
+  listName: { fontSize: 14, fontWeight: '600', color: Colors.gray[900] },
+  listSet: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
+  listMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
+  listCategory: { fontSize: 11, color: Colors.purple[600], fontWeight: '500' },
+  listPrice: { fontSize: 11, color: Colors.green[600], fontWeight: '600' },
+
+  // Grid view
+  gridContainer: { padding: 8 },
+  gridItem: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    margin: 4,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+    overflow: 'hidden',
+  },
+  gridImage: { width: '100%', aspectRatio: 0.714, },
+  gridInfo: { padding: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  gridName: { fontSize: 11, fontWeight: '600', color: Colors.gray[900], flex: 1, marginRight: 4 },
+
+  // Empty state
+  empty: { alignItems: 'center', padding: 48 },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.gray[800], marginTop: 16, marginBottom: 8 },
+  emptySubtitle: { fontSize: 14, color: Colors.gray[500], textAlign: 'center' },
 })
