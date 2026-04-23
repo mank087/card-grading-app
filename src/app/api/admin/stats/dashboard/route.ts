@@ -48,14 +48,16 @@ export async function GET(request: NextRequest) {
         .eq('conversational_decimal_grade', 10)
     ])
 
-    // Get average grade
+    // Get average grade — use whole_grade (always populated) and filter out invalid values
     const { data: avgGradeData } = await supabaseAdmin
       .from('cards')
-      .select('conversational_decimal_grade')
-      .not('conversational_decimal_grade', 'is', null)
+      .select('conversational_whole_grade')
+      .not('conversational_whole_grade', 'is', null)
+      .gte('conversational_whole_grade', 1)
+      .lte('conversational_whole_grade', 10)
 
     const avgGrade = avgGradeData && avgGradeData.length > 0
-      ? avgGradeData.reduce((sum, card) => sum + (card.conversational_decimal_grade || 0), 0) / avgGradeData.length
+      ? avgGradeData.reduce((sum, card) => sum + card.conversational_whole_grade, 0) / avgGradeData.length
       : 0
 
     // Get recent activity with detailed card information (matches collection page fields)
