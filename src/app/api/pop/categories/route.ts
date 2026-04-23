@@ -34,18 +34,33 @@ export async function GET() {
       entry.unique.add(String(entry.total));
     }
 
-    // Map DB results to category metadata (exclude "Other" — it will be replaced by sub-categories)
+    // Calculate how many "Other" cards have a proper sub-category (to subtract from Other total)
+    let subCategoryTotal = 0;
+    for (const [, counts] of subCatCounts) {
+      subCategoryTotal += counts.total;
+    }
+
+    // Map DB results to category metadata
     const categories = (rpcResult.data || [])
       .map((row: { category: string; unique_cards: number; total_graded: number }) => {
         const meta = POP_CATEGORIES.find((c) => c.dbCategory === row.category && !c.dbSubCategory);
         const slug = getSlugFromCategory(row.category);
+
+        // For "Other": subtract cards that have a sub-category (they show as their own entries)
+        let uniqueCards = Number(row.unique_cards);
+        let totalGraded = Number(row.total_graded);
+        if (row.category === 'Other') {
+          uniqueCards = Math.max(0, uniqueCards - subCategoryTotal);
+          totalGraded = Math.max(0, totalGraded - subCategoryTotal);
+        }
+
         return {
           slug,
           dbCategory: row.category,
           displayName: meta?.displayName || row.category,
           icon: meta?.icon || '\uD83C\uDCCF',
-          uniqueCards: Number(row.unique_cards),
-          totalGraded: Number(row.total_graded),
+          uniqueCards,
+          totalGraded,
         };
       })
       .filter((c: { totalGraded: number; dbCategory: string }) => c.totalGraded >= 3);
