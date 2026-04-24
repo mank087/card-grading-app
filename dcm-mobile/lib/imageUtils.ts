@@ -1,5 +1,6 @@
 import * as ImageManipulator from 'expo-image-manipulator'
-import * as FileSystem from 'expo-file-system'
+import { File } from 'expo-file-system/next'
+import * as LegacyFileSystem from 'expo-file-system'
 import * as Crypto from 'expo-crypto'
 
 export interface QualityResult {
@@ -29,12 +30,19 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
     { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
   )
 
-  const info = await FileSystem.getInfoAsync(result.uri)
+  let fileSize = 0
+  try {
+    const file = new File(result.uri)
+    fileSize = file.size ?? 0
+  } catch {
+    // Fallback: estimate from dimensions
+    fileSize = result.width * result.height * 0.15
+  }
   return {
     uri: result.uri,
     width: result.width,
     height: result.height,
-    fileSize: (info as any).size || 0,
+    fileSize,
   }
 }
 
@@ -139,7 +147,7 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
  * Generate SHA-256 hash of image file for duplicate detection.
  */
 export async function hashImage(uri: string): Promise<string> {
-  const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
+  const base64 = await LegacyFileSystem.readAsStringAsync(uri, { encoding: LegacyFileSystem.EncodingType.Base64 })
   return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, base64)
 }
 

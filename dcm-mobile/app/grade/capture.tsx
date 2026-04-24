@@ -221,18 +221,17 @@ export default function CaptureScreen() {
 
       {/* Camera */}
       <View style={styles.cameraContainer}>
-        <CameraView ref={cameraRef} style={styles.camera} facing={facing}>
-          {/* Guide overlay */}
-          <View style={styles.guideContainer}>
-            <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
-              <Text style={styles.guideLabel}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
-            </View>
+        <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
+        {/* Guide overlay — positioned absolutely on top of camera (not as child) */}
+        <View style={styles.guideContainer} pointerEvents="none">
+          <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
+            <View style={[styles.corner, styles.cornerTL]} />
+            <View style={[styles.corner, styles.cornerTR]} />
+            <View style={[styles.corner, styles.cornerBL]} />
+            <View style={[styles.corner, styles.cornerBR]} />
+            <Text style={styles.guideLabel}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
           </View>
-        </CameraView>
+        </View>
       </View>
 
       {/* Status bar */}
@@ -296,8 +295,8 @@ const styles = StyleSheet.create({
   cameraContainer: { flex: 1 },
   camera: { flex: 1 },
 
-  // Guide
-  guideContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  // Guide (absolute overlay on camera)
+  guideContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
   guide: { width: '70%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 4, position: 'relative' },
   guideLabel: { position: 'absolute', alignSelf: 'center', top: '45%', color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '600', letterSpacing: 2 },
   corner: { position: 'absolute', width: 20, height: 20, borderColor: Colors.white },
