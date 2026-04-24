@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert } from 'react-native'
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, Image } from 'react-native'
 import { Link, useRouter } from 'expo-router'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
@@ -49,6 +49,7 @@ export default function RegisterScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
+          <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Create Account</Text>
           <Text style={styles.subtitle}>Start grading your cards with DCM</Text>
         </View>
@@ -115,6 +116,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray[50] },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   header: { alignItems: 'center', marginBottom: 32 },
+  logo: { width: 80, height: 80, marginBottom: 12 },
   title: { fontSize: 28, fontWeight: '800', color: Colors.gray[900] },
   subtitle: { fontSize: 15, color: Colors.gray[500], marginTop: 4 },
   form: { gap: 12 },

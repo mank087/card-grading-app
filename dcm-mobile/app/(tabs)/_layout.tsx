@@ -67,11 +67,11 @@ export default function TabLayout() {
       <Tabs.Screen
         name="account"
         options={{
-          title: 'Account',
-          headerTitle: 'My Account',
+          title: 'Menu',
+          headerTitle: 'Menu',
           tabBarIcon: ({ color, size }) => (
             <View>
-              <Ionicons name="person" size={size} color={color} />
+              <Ionicons name="menu" size={size} color={color} />
               {balance > 0 && (
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{balance}</Text>

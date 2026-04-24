@@ -7,8 +7,6 @@ import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
 import { supabase } from '@/lib/supabase'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
-
 interface CardItem {
   id: string
   serial: string
@@ -36,22 +34,45 @@ export default function CollectionScreen() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
 
   const fetchCollection = useCallback(async () => {
-    if (!session?.access_token) return
+    if (!session?.user?.id) return
     try {
-      const searchParam = search ? `?search=${encodeURIComponent(search)}` : ''
-      const response = await fetch(`${API_BASE}/api/cards/my-collection${searchParam}`, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      })
-      if (!response.ok) throw new Error('Failed to fetch')
-      const data = await response.json()
-      setCards(data.cards || [])
+      let query = supabase
+        .from('cards')
+        .select(`
+          id, serial, card_name, featured, category, card_set,
+          conversational_whole_grade, conversational_condition_label,
+          conversational_card_info, front_path,
+          ebay_price_median, dcm_price_estimate, created_at
+        `)
+        .eq('user_id', session.user.id)
+        .not('conversational_whole_grade', 'is', null)
+        .order('created_at', { ascending: false })
+        .limit(100)
+
+      if (search) {
+        query = query.or(`serial.ilike.%${search}%,card_name.ilike.%${search}%`)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+
+      // Get signed URLs for thumbnails
+      if (data && data.length > 0) {
+        const paths = data.map(c => c.front_path).filter(Boolean)
+        const { data: urls } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
+        const urlMap = new Map<string, string>()
+        urls?.forEach(u => { if (u.signedUrl && u.path) urlMap.set(u.path, u.signedUrl) })
+        data.forEach((c: any) => { c.front_url = urlMap.get(c.front_path) || null })
+      }
+
+      setCards(data || [])
     } catch (err) {
       console.error('Collection fetch error:', err)
     } finally {
       setIsLoading(false)
       setRefreshing(false)
     }
-  }, [session?.access_token, search])
+  }, [session?.user?.id, search])
 
   useEffect(() => { fetchCollection() }, [fetchCollection])
 

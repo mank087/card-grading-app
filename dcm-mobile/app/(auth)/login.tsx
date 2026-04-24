@@ -1,9 +1,15 @@
 import { useState } from 'react'
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image } from 'react-native'
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image, TouchableOpacity } from 'react-native'
 import { Link } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
+import { supabase } from '@/lib/supabase'
+import * as WebBrowser from 'expo-web-browser'
+import { makeRedirectUri } from 'expo-auth-session'
+
+WebBrowser.maybeCompleteAuthSession()
 
 export default function LoginScreen() {
   const { signIn } = useAuth()
@@ -11,6 +17,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null)
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -26,6 +33,46 @@ export default function LoginScreen() {
     }
   }
 
+  const handleOAuth = async (provider: 'google' | 'facebook') => {
+    setError(null)
+    setOauthLoading(provider)
+    try {
+      const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      })
+
+      if (error) {
+        setError(error.message)
+        setOauthLoading(null)
+        return
+      }
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
+        if (result.type === 'success' && result.url) {
+          // Extract tokens from the redirect URL
+          const url = new URL(result.url)
+          const params = new URLSearchParams(url.hash?.substring(1) || url.search?.substring(1))
+          const accessToken = params.get('access_token')
+          const refreshToken = params.get('refresh_token')
+
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          }
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'OAuth sign in failed')
+    } finally {
+      setOauthLoading(null)
+    }
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -33,7 +80,7 @@ export default function LoginScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
-          <Image source={require('@/assets/images/icon.png')} style={styles.logo} resizeMode="contain" />
+          <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>DCM Grading</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
         </View>
@@ -45,6 +92,39 @@ export default function LoginScreen() {
             </View>
           )}
 
+          {/* OAuth Buttons */}
+          <TouchableOpacity
+            style={[styles.oauthButton, styles.googleButton]}
+            onPress={() => handleOAuth('google')}
+            disabled={!!oauthLoading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="logo-google" size={20} color="#DB4437" />
+            <Text style={styles.oauthText}>
+              {oauthLoading === 'google' ? 'Signing in...' : 'Continue with Google'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.oauthButton, styles.facebookButton]}
+            onPress={() => handleOAuth('facebook')}
+            disabled={!!oauthLoading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+            <Text style={styles.oauthText}>
+              {oauthLoading === 'facebook' ? 'Signing in...' : 'Continue with Facebook'}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Divider */}
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Email/Password */}
           <Text style={styles.label}>Email</Text>
           <TextInput
             style={styles.input}
@@ -91,7 +171,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray[50] },
   scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
   header: { alignItems: 'center', marginBottom: 32 },
-  logo: { width: 64, height: 64, marginBottom: 12 },
+  logo: { width: 80, height: 80, marginBottom: 12 },
   title: { fontSize: 28, fontWeight: '800', color: Colors.gray[900] },
   subtitle: { fontSize: 15, color: Colors.gray[500], marginTop: 4 },
   form: { gap: 12 },
@@ -113,6 +193,36 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   errorText: { color: Colors.red[600], fontSize: 14 },
+
+  // OAuth
+  oauthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  googleButton: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.gray[300],
+  },
+  facebookButton: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.gray[300],
+  },
+  oauthText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.gray[800],
+  },
+
+  // Divider
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.gray[300] },
+  dividerText: { paddingHorizontal: 12, fontSize: 13, color: Colors.gray[400] },
+
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   footerText: { color: Colors.gray[500], fontSize: 14 },
   footerLink: { color: Colors.purple[600], fontWeight: '600', fontSize: 14 },

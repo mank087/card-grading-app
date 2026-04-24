@@ -1,8 +1,47 @@
-import { View, Text, ScrollView, StyleSheet, Alert, Linking } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Alert, Linking, TouchableOpacity, Image } from 'react-native'
+import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
-import Button from '@/components/ui/Button'
+
+const WEB_URL = 'https://dcmgrading.com'
+
+interface MenuItemProps {
+  icon: keyof typeof Ionicons.glyphMap
+  label: string
+  onPress: () => void
+  color?: string
+  badge?: string
+  showArrow?: boolean
+}
+
+function MenuItem({ icon, label, onPress, color = Colors.gray[700], badge, showArrow = true }: MenuItemProps) {
+  return (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.menuItemLeft}>
+        <Ionicons name={icon} size={20} color={color} />
+        <Text style={[styles.menuItemLabel, { color }]}>{label}</Text>
+      </View>
+      <View style={styles.menuItemRight}>
+        {badge && (
+          <View style={styles.menuBadge}>
+            <Text style={styles.menuBadgeText}>{badge}</Text>
+          </View>
+        )}
+        {showArrow && <Ionicons name="chevron-forward" size={16} color={Colors.gray[300]} />}
+      </View>
+    </TouchableOpacity>
+  )
+}
+
+function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={styles.menuSection}>
+      <Text style={styles.menuSectionTitle}>{title}</Text>
+      <View style={styles.menuSectionContent}>{children}</View>
+    </View>
+  )
+}
 
 export default function AccountScreen() {
   const { user, signOut } = useAuth()
@@ -15,107 +54,179 @@ export default function AccountScreen() {
     ])
   }
 
+  const openWeb = (path: string) => Linking.openURL(`${WEB_URL}${path}`)
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Profile */}
+      {/* Profile Card */}
       <View style={styles.profileCard}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {(user?.email?.[0] || 'D').toUpperCase()}
-          </Text>
-        </View>
-        <Text style={styles.email}>{user?.email}</Text>
-      </View>
-
-      {/* Credits */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Credits</Text>
-        <View style={styles.creditRow}>
-          <Text style={styles.creditLabel}>Available Balance</Text>
-          <Text style={styles.creditValue}>{balance}</Text>
-        </View>
-        <Button
-          title="Purchase Credits"
-          variant="primary"
-          onPress={() => Linking.openURL('https://dcmgrading.com/credits')}
-          style={{ marginTop: 12 }}
-        />
-      </View>
-
-      {/* Quick Links */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Links</Text>
-        <View style={styles.linkList}>
-          {[
-            { label: 'Label Studio', icon: 'tag' },
-            { label: 'Pop Report', icon: 'stats-chart' },
-            { label: 'FAQ', icon: 'help-circle' },
-            { label: 'Grading Rubric', icon: 'book' },
-          ].map((link) => (
-            <View key={link.label} style={styles.linkItem}>
-              <Text style={styles.linkText}>{link.label}</Text>
-              <Text style={styles.linkArrow}>{'>'}</Text>
+        <View style={styles.profileRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>
+              {(user?.email?.[0] || 'D').toUpperCase()}
+            </Text>
+          </View>
+          <View style={styles.profileInfo}>
+            <Text style={styles.profileEmail} numberOfLines={1}>{user?.email}</Text>
+            <View style={styles.creditRow}>
+              <Ionicons name="diamond" size={14} color={Colors.purple[600]} />
+              <Text style={styles.creditText}>{balance} credits</Text>
             </View>
-          ))}
+          </View>
         </View>
       </View>
+
+      {/* Grading */}
+      <MenuSection title="Grading">
+        <MenuItem icon="camera" label="Grade a Card" onPress={() => {}} />
+        <MenuItem icon="grid" label="My Collection" onPress={() => {}} />
+        <MenuItem icon="trending-up" label="Pop Report" onPress={() => openWeb('/pop')} />
+        <MenuItem icon="star" label="Featured Cards" onPress={() => openWeb('/featured')} />
+        <MenuItem icon="search" label="Search by Serial" onPress={() => openWeb('/search')} />
+      </MenuSection>
+
+      {/* Tools */}
+      <MenuSection title="Tools">
+        <MenuItem icon="pricetags" label="Label Studio" onPress={() => openWeb('/labels')} />
+        <MenuItem icon="cash" label="Market Pricing" onPress={() => openWeb('/market-pricing')} color={Colors.green[600]} />
+        <MenuItem icon="bag" label="Recommended Products" onPress={() => openWeb('/shop')} />
+      </MenuSection>
+
+      {/* Pricing & Plans */}
+      <MenuSection title="Pricing & Plans">
+        <MenuItem
+          icon="diamond"
+          label="Purchase Credits"
+          onPress={() => openWeb('/credits')}
+          badge={`${balance}`}
+          color={Colors.purple[600]}
+        />
+        <MenuItem icon="heart" label="Card Lovers Subscription" onPress={() => openWeb('/card-lovers')} color={Colors.purple[600]} />
+        <MenuItem icon="ribbon" label="VIP Package" onPress={() => openWeb('/vip')} color={Colors.amber[600]} />
+      </MenuSection>
+
+      {/* Information */}
+      <MenuSection title="Information">
+        <MenuItem icon="book" label="Grading Rubric" onPress={() => openWeb('/grading-rubric')} />
+        <MenuItem icon="document-text" label="Reports & Labels" onPress={() => openWeb('/reports-and-labels')} />
+        <MenuItem icon="help-circle" label="FAQ" onPress={() => openWeb('/faq')} />
+        <MenuItem icon="information-circle" label="About Us" onPress={() => openWeb('/about')} />
+        <MenuItem icon="shield-checkmark" label="Why DCM?" onPress={() => openWeb('/why-dcm')} />
+        <MenuItem icon="newspaper" label="Blog" onPress={() => openWeb('/blog')} />
+        <MenuItem icon="warning" label="Grading Limitations" onPress={() => openWeb('/grading-limitations')} />
+        <MenuItem icon="calendar" label="Card Shows" onPress={() => openWeb('/card-shows')} />
+      </MenuSection>
+
+      {/* Account */}
+      <MenuSection title="Account">
+        <MenuItem icon="person" label="My Account" onPress={() => openWeb('/account')} />
+        <MenuItem icon="lock-closed" label="Change Password" onPress={() => openWeb('/account')} />
+        <MenuItem icon="document" label="Terms & Conditions" onPress={() => openWeb('/terms')} />
+        <MenuItem icon="shield" label="Privacy Policy" onPress={() => openWeb('/privacy')} />
+      </MenuSection>
 
       {/* Sign Out */}
-      <View style={styles.section}>
-        <Button title="Sign Out" variant="danger" onPress={handleSignOut} />
+      <View style={styles.signOutSection}>
+        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} activeOpacity={0.7}>
+          <Ionicons name="log-out" size={20} color={Colors.red[600]} />
+          <Text style={styles.signOutText}>Sign Out</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Version */}
-      <Text style={styles.version}>DCM Grading v1.0.0</Text>
+      {/* Footer */}
+      <View style={styles.footer}>
+        <Image source={require('@/assets/images/dcm-logo.png')} style={styles.footerLogo} resizeMode="contain" />
+        <Text style={styles.footerText}>DCM Grading v1.0.0</Text>
+        <Text style={styles.footerCopy}>Dynamic Collectibles Management LLC</Text>
+      </View>
     </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray[50] },
-  content: { padding: 16, paddingBottom: 40 },
+  content: { paddingBottom: 40 },
+
+  // Profile
   profileCard: {
-    backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
     backgroundColor: Colors.purple[600],
+    margin: 12,
+    borderRadius: 16,
+    padding: 20,
+  },
+  profileRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  avatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.2)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
   },
-  avatarText: { color: Colors.white, fontSize: 24, fontWeight: '800' },
-  email: { fontSize: 15, color: Colors.gray[600] },
-  section: {
+  avatarText: { color: Colors.white, fontSize: 22, fontWeight: '800' },
+  profileInfo: { flex: 1 },
+  profileEmail: { fontSize: 15, fontWeight: '600', color: Colors.white },
+  creditRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  creditText: { fontSize: 13, color: Colors.purple[200] },
+
+  // Menu sections
+  menuSection: { marginTop: 16, marginHorizontal: 12 },
+  menuSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.gray[500],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+    paddingLeft: 4,
+  },
+  menuSectionContent: {
     backgroundColor: Colors.white,
     borderRadius: 12,
-    padding: 16,
     borderWidth: 1,
     borderColor: Colors.gray[200],
-    marginBottom: 12,
+    overflow: 'hidden',
   },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: Colors.gray[900], marginBottom: 12 },
-  creditRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  creditLabel: { fontSize: 14, color: Colors.gray[600] },
-  creditValue: { fontSize: 28, fontWeight: '800', color: Colors.purple[600] },
-  linkList: { gap: 1 },
-  linkItem: {
+
+  // Menu items
+  menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[100],
   },
-  linkText: { fontSize: 15, color: Colors.gray[800] },
-  linkArrow: { color: Colors.gray[400], fontSize: 16 },
-  version: { textAlign: 'center', color: Colors.gray[400], fontSize: 12, marginTop: 24 },
+  menuItemLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  menuItemLabel: { fontSize: 15, fontWeight: '500' },
+  menuItemRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  menuBadge: {
+    backgroundColor: Colors.purple[100],
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  menuBadgeText: { fontSize: 12, fontWeight: '700', color: Colors.purple[700] },
+
+  // Sign out
+  signOutSection: { marginTop: 20, marginHorizontal: 12 },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: Colors.red[50],
+    borderRadius: 12,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: Colors.red[100],
+  },
+  signOutText: { fontSize: 15, fontWeight: '600', color: Colors.red[600] },
+
+  // Footer
+  footer: { alignItems: 'center', paddingVertical: 24 },
+  footerLogo: { width: 40, height: 40, marginBottom: 8, opacity: 0.4 },
+  footerText: { fontSize: 12, color: Colors.gray[400] },
+  footerCopy: { fontSize: 11, color: Colors.gray[300], marginTop: 2 },
 })
