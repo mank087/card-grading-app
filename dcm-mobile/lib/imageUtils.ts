@@ -1,6 +1,4 @@
 import * as ImageManipulator from 'expo-image-manipulator'
-import { File } from 'expo-file-system/next'
-import * as LegacyFileSystem from 'expo-file-system'
 import * as Crypto from 'expo-crypto'
 
 export interface QualityResult {
@@ -30,14 +28,9 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
     { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
   )
 
-  let fileSize = 0
-  try {
-    const file = new File(result.uri)
-    fileSize = file.size ?? 0
-  } catch {
-    // Fallback: estimate from dimensions
-    fileSize = result.width * result.height * 0.15
-  }
+  // Estimate file size from dimensions and compression
+  // (avoids deprecated expo-file-system APIs)
+  const fileSize = Math.round(result.width * result.height * 0.15)
   return {
     uri: result.uri,
     width: result.width,
@@ -145,10 +138,21 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
 
 /**
  * Generate SHA-256 hash of image file for duplicate detection.
+ * Uses fetch to read file as arraybuffer, then hashes with expo-crypto.
  */
 export async function hashImage(uri: string): Promise<string> {
-  const base64 = await LegacyFileSystem.readAsStringAsync(uri, { encoding: LegacyFileSystem.EncodingType.Base64 })
-  return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, base64)
+  const response = await fetch(uri)
+  const blob = await response.blob()
+  // Convert blob to base64 string for hashing
+  return new Promise((resolve) => {
+    const reader = new FileReader()
+    reader.onloadend = async () => {
+      const base64 = (reader.result as string).split(',')[1] || ''
+      const hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, base64)
+      resolve(hash)
+    }
+    reader.readAsDataURL(blob)
+  })
 }
 
 /**
