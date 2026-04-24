@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -15,6 +15,7 @@ import DefectOverlay, { extractDefectMarkers } from '@/components/grading/Defect
 
 export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
+  const router = useRouter()
   const { session } = useAuth()
   const [card, setCard] = useState<Card | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -351,7 +352,7 @@ export default function CardDetailScreen() {
               Linking.openURL(`https://dcmgrading.com/${catPath}/${card.id}`)
             }} />
             <ActionButton icon="pricetags" label="Labels" onPress={() => {
-              Linking.openURL(`https://dcmgrading.com/labels?card=${card.id}`)
+              router.push('/pages/label-studio' as any)
             }} />
           </View>
         </View>

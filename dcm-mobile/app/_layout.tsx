@@ -71,6 +71,10 @@ export default function RootLayout() {
               name="grade"
               options={{ headerShown: false, presentation: 'fullScreenModal' }}
             />
+            <Stack.Screen
+              name="pages"
+              options={{ headerShown: false }}
+            />
           </Stack>
         </AuthGate>
       </CreditsProvider>
