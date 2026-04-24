@@ -38,9 +38,21 @@ export default function TabLayout() {
         name="grade"
         options={{
           title: 'Grade',
-          headerTitle: 'Grade a Card',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="camera" size={size} color={color} />
+            /* Simple slab icon — rectangle with inner card shape */
+            <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{
+                width: size * 0.65, height: size * 0.9,
+                borderRadius: 3, borderWidth: 2, borderColor: color,
+                alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 2,
+              }}>
+                <View style={{
+                  width: size * 0.45, height: size * 0.55,
+                  borderRadius: 2, borderWidth: 1.5, borderColor: color, opacity: 0.6,
+                }} />
+              </View>
+            </View>
           ),
         }}
       />
