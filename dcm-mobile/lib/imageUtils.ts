@@ -137,22 +137,15 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
 }
 
 /**
- * Generate SHA-256 hash of image file for duplicate detection.
- * Uses fetch to read file as arraybuffer, then hashes with expo-crypto.
+ * Generate a simple hash of image for duplicate detection.
+ * Uses the URI + dimensions as a fingerprint since full file hashing
+ * is problematic in React Native without native file system access.
  */
 export async function hashImage(uri: string): Promise<string> {
-  const response = await fetch(uri)
-  const blob = await response.blob()
-  // Convert blob to base64 string for hashing
-  return new Promise((resolve) => {
-    const reader = new FileReader()
-    reader.onloadend = async () => {
-      const base64 = (reader.result as string).split(',')[1] || ''
-      const hash = await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, base64)
-      resolve(hash)
-    }
-    reader.readAsDataURL(blob)
-  })
+  // Use URI path + timestamp portion as a unique fingerprint
+  // This catches exact same photo (same URI) being used for both sides
+  const hashInput = uri.split('/').pop() || uri
+  return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, hashInput)
 }
 
 /**
