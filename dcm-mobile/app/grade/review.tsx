@@ -56,7 +56,10 @@ export default function ReviewScreen() {
 
     setIsSubmitting(true)
     try {
-      const cardId = crypto.randomUUID()
+      // crypto.randomUUID() not available in React Native — use Expo Crypto
+      const randomBytes = await import('expo-crypto').then(m => m.getRandomBytes(16))
+      const hex = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')
+      const cardId = `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`
       const frontPath = `${user.id}/${cardId}/front.jpg`
       const backPath = `${user.id}/${cardId}/back.jpg`
 

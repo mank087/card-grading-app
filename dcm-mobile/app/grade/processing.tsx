@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { View, Text, StyleSheet, Image, Animated, Easing } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
@@ -25,6 +26,7 @@ export default function ProcessingScreen() {
   const params = useLocalSearchParams<{ cardId: string; category: string; frontUri: string }>()
   const [currentStep, setCurrentStep] = useState(0)
   const [isComplete, setIsComplete] = useState(false)
+  const insets = useSafeAreaInsets()
   const [grade, setGrade] = useState<number | null>(null)
   const scanAnim = useRef(new Animated.Value(0)).current
   const pulseAnim = useRef(new Animated.Value(1)).current
@@ -102,7 +104,7 @@ export default function ProcessingScreen() {
   })
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
       {/* Navigation Options */}
       <View style={styles.navButtons}>
         <Button title="Grade Another" variant="secondary" size="sm" onPress={handleGradeAnother} style={{ flex: 1 }} />
@@ -192,7 +194,7 @@ export default function ProcessingScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.gray[900], padding: 16, paddingTop: 56 },
+  container: { flex: 1, backgroundColor: Colors.gray[900], padding: 16 },
 
   // Nav
   navButtons: { flexDirection: 'row', gap: 8, marginBottom: 20 },
@@ -226,6 +228,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 8,
+    elevation: 8,
   },
   statusTitle: { fontSize: 18, fontWeight: '700', color: Colors.white, marginTop: 16 },
   statusSubtitle: { fontSize: 13, color: Colors.gray[400], marginTop: 4 },

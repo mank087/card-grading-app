@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Platform } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
@@ -29,6 +30,7 @@ export default function CaptureScreen() {
   const [backHash, setBackHash] = useState<string | null>(null)
 
   // Preview state
+  const insets = useSafeAreaInsets()
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [previewQuality, setPreviewQuality] = useState<QualityResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
@@ -156,7 +158,7 @@ export default function CaptureScreen() {
   if (previewUri && previewQuality) {
     return (
       <View style={styles.container}>
-        <View style={styles.previewHeader}>
+        <View style={[styles.previewHeader, { paddingTop: insets.top + 8 }]}>
           <Text style={styles.previewSideLabel}>{currentSide === 'front' ? 'Front' : 'Back'} Image</Text>
           <View style={[styles.qualityBadge, { backgroundColor: gradeColor }]}>
             <Text style={styles.qualityBadgeText}>{previewQuality.grade} ({previewQuality.score}/100)</Text>
@@ -182,7 +184,7 @@ export default function CaptureScreen() {
           ))}
         </View>
 
-        <View style={styles.previewActions}>
+        <View style={[styles.previewActions, { paddingBottom: insets.bottom + 12 }]}>
           <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
             <Ionicons name="refresh" size={20} color={Colors.gray[700]} />
             <Text style={styles.retakeText}>Retake</Text>
@@ -204,7 +206,7 @@ export default function CaptureScreen() {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.cameraHeader}>
+      <View style={[styles.cameraHeader, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
           <Ionicons name="close" size={28} color={Colors.white} />
         </TouchableOpacity>
@@ -246,7 +248,7 @@ export default function CaptureScreen() {
       </View>
 
       {/* Controls */}
-      <View style={styles.controls}>
+      <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity
           onPress={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
           style={styles.controlButton}
@@ -284,7 +286,7 @@ const styles = StyleSheet.create({
   permissionText: { fontSize: 14, color: Colors.gray[500], textAlign: 'center' },
 
   // Camera header
-  cameraHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingTop: 50, paddingBottom: 12, backgroundColor: 'rgba(0,0,0,0.6)' },
+  cameraHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: 'rgba(0,0,0,0.6)' },
   headerButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerLogo: { width: 28, height: 28 },
@@ -312,14 +314,14 @@ const styles = StyleSheet.create({
   indicatorText: { color: Colors.white, fontSize: 12, fontWeight: '600' },
 
   // Controls
-  controls: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 20, paddingBottom: 36, backgroundColor: 'rgba(0,0,0,0.8)' },
+  controls: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingVertical: 20, backgroundColor: 'rgba(0,0,0,0.8)' },
   captureButton: { width: 72, height: 72, borderRadius: 36, borderWidth: 4, borderColor: Colors.white, padding: 4 },
   captureInner: { flex: 1, borderRadius: 30, backgroundColor: Colors.white },
   controlButton: { alignItems: 'center', gap: 4, width: 60 },
   controlLabel: { color: Colors.gray[400], fontSize: 10, fontWeight: '500' },
 
   // Preview
-  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, paddingTop: 56, backgroundColor: Colors.gray[900] },
+  previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: Colors.gray[900] },
   previewSideLabel: { color: Colors.white, fontSize: 18, fontWeight: '700' },
   qualityBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
   qualityBadgeText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
@@ -330,7 +332,7 @@ const styles = StyleSheet.create({
   qualityLabel: { color: Colors.gray[300], fontSize: 13 },
   uncertaintyText: { color: Colors.gray[400], fontSize: 12, marginTop: 4 },
   suggestionText: { color: Colors.amber[500], fontSize: 12 },
-  previewActions: { flexDirection: 'row', gap: 12, padding: 16, paddingBottom: 36, backgroundColor: Colors.gray[900] },
+  previewActions: { flexDirection: 'row', gap: 12, padding: 16, backgroundColor: Colors.gray[900] },
   retakeButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, backgroundColor: Colors.gray[200] },
   retakeText: { fontSize: 15, fontWeight: '600', color: Colors.gray[700] },
   useButton: { flex: 2, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12 },
