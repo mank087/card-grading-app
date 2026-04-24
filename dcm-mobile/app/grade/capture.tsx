@@ -105,25 +105,28 @@ export default function CaptureScreen() {
   }
 
   const handleUseImage = () => {
-    if (currentSide === 'front' && !backUri) {
-      // Advance to back capture
+    if (currentSide === 'front') {
+      // Front just captured — advance to back camera
+      console.log('[Capture] Front captured, advancing to back')
       setCurrentSide('back')
       setPreviewUri(null)
       setPreviewQuality(null)
-    } else if (currentSide === 'back' && !frontUri) {
-      // Go back to front
-      setCurrentSide('front')
-      setPreviewUri(null)
-      setPreviewQuality(null)
     } else {
-      // Both captured — go to review
+      // Back just captured — both sides done, go to review
+      // Use previewUri for the back since state may not have flushed yet
+      const finalFrontUri = frontUri!
+      const finalBackUri = previewUri!
+      console.log('[Capture] Both captured, navigating to review')
+      console.log('[Capture] Front URI:', finalFrontUri?.substring(0, 50))
+      console.log('[Capture] Back URI:', finalBackUri?.substring(0, 50))
+
       router.push({
         pathname: '/grade/review',
         params: {
           category: params.category,
           subCategory: params.subCategory || '',
-          frontUri: frontUri || previewUri || '',
-          backUri: currentSide === 'back' ? (previewUri || backUri || '') : (backUri || ''),
+          frontUri: finalFrontUri,
+          backUri: finalBackUri,
           frontWidth: String(frontCompressed?.width || 0),
           frontHeight: String(frontCompressed?.height || 0),
           backWidth: String(backCompressed?.width || 0),
@@ -192,9 +195,7 @@ export default function CaptureScreen() {
           <TouchableOpacity style={[styles.useButton, { backgroundColor: gradeColor }]} onPress={handleUseImage}>
             <Ionicons name="checkmark" size={20} color={Colors.white} />
             <Text style={styles.useText}>
-              {(currentSide === 'front' && !backUri) ? 'Use — Capture Back' :
-               (currentSide === 'back' && !frontUri) ? 'Use — Capture Front' :
-               'Use — Review'}
+              {currentSide === 'front' ? 'Use This — Capture Back \u203A' : 'Use This — Review \u203A'}
             </Text>
           </TouchableOpacity>
         </View>
