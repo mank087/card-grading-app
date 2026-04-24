@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, StyleSheet, Alert, Linking, TouchableOpacity, Image } from 'react-native'
+import { purchaseCredits } from '@/lib/stripe'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
@@ -97,7 +98,7 @@ export default function AccountScreen() {
         <MenuItem
           icon="diamond"
           label="Purchase Credits"
-          onPress={() => openWeb('/credits')}
+          onPress={() => purchaseCredits('pro')}
           badge={`${balance}`}
           color={Colors.purple[600]}
         />

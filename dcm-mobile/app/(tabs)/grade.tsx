@@ -1,15 +1,23 @@
-import { View, Text, StyleSheet, ScrollView, Linking } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { Colors, CardCategories } from '@/lib/constants'
 import { useCredits } from '@/contexts/CreditsContext'
+import { purchaseCredits, CREDIT_TIERS } from '@/lib/stripe'
 import Button from '@/components/ui/Button'
 
 export default function GradeScreen() {
   const router = useRouter()
-  const { balance } = useCredits()
+  const { balance, refresh } = useCredits()
 
-  const openPurchaseCredits = () => {
-    Linking.openURL('https://dcmgrading.com/credits')
+  const handlePurchase = async (tierId: string) => {
+    const { error } = await purchaseCredits(tierId)
+    if (error) {
+      Alert.alert('Error', error)
+    } else {
+      // Refresh credits after returning from checkout
+      setTimeout(() => refresh(), 2000)
+    }
   }
 
   return (
@@ -42,16 +50,35 @@ export default function GradeScreen() {
         ))}
       </View>
 
+      {/* Credit Packages */}
       {balance < 1 && (
         <View style={styles.noCredits}>
-          <Text style={styles.noCreditsText}>You need credits to grade cards.</Text>
-          <Button
-            title="Purchase Credits"
-            variant="primary"
-            onPress={openPurchaseCredits}
-          />
+          <Text style={styles.noCreditsTitle}>You need credits to grade cards</Text>
+          <Text style={styles.noCreditsText}>Purchase a credit package to get started</Text>
         </View>
       )}
+
+      <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Credit Packages</Text>
+      <View style={styles.tierGrid}>
+        {CREDIT_TIERS.map((tier) => (
+          <TouchableOpacity
+            key={tier.id}
+            style={[styles.tierCard, tier.popular && styles.tierCardPopular]}
+            onPress={() => handlePurchase(tier.id)}
+            activeOpacity={0.7}
+          >
+            {tier.popular && (
+              <View style={styles.popularBadge}>
+                <Text style={styles.popularText}>Most Popular</Text>
+              </View>
+            )}
+            <Text style={styles.tierCredits}>{tier.credits}</Text>
+            <Text style={styles.tierCreditsLabel}>credit{tier.credits > 1 ? 's' : ''}</Text>
+            <Text style={styles.tierPrice}>${tier.price.toFixed(2)}</Text>
+            <Text style={styles.tierPerCredit}>{tier.perCredit}/grade</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
     </ScrollView>
   )
 }
@@ -90,7 +117,38 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',
-    gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.amber[100],
   },
-  noCreditsText: { color: Colors.amber[600], fontSize: 14, fontWeight: '500' },
+  noCreditsTitle: { color: Colors.amber[600], fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  noCreditsText: { color: Colors.amber[500], fontSize: 13 },
+
+  // Credit tiers
+  tierGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
+  tierCard: {
+    width: '48%' as any,
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: Colors.gray[200],
+  },
+  tierCardPopular: {
+    borderColor: Colors.purple[500],
+    backgroundColor: Colors.purple[50],
+  },
+  popularBadge: {
+    position: 'absolute',
+    top: -10,
+    backgroundColor: Colors.purple[600],
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  popularText: { color: Colors.white, fontSize: 10, fontWeight: '700' },
+  tierCredits: { fontSize: 28, fontWeight: '800', color: Colors.purple[600], marginTop: 4 },
+  tierCreditsLabel: { fontSize: 12, color: Colors.gray[500], marginBottom: 8 },
+  tierPrice: { fontSize: 18, fontWeight: '700', color: Colors.gray[900] },
+  tierPerCredit: { fontSize: 11, color: Colors.gray[500], marginTop: 2 },
 })

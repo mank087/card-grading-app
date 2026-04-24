@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
+import SlabCard from '@/components/grading/SlabCard'
 import { supabase } from '@/lib/supabase'
 
 interface CardItem {
@@ -116,6 +117,7 @@ export default function CollectionScreen() {
   const renderGridItem = ({ item }: { item: CardItem }) => {
     const ci = item.conversational_card_info
     const name = item.card_name || item.featured || ci?.card_name || `#${item.serial}`
+    const set = item.card_set || ci?.set_name || ''
 
     return (
       <TouchableOpacity
@@ -123,17 +125,15 @@ export default function CollectionScreen() {
         onPress={() => router.push(`/card/${item.id}`)}
         activeOpacity={0.7}
       >
-        {item.front_url ? (
-          <Image source={{ uri: item.front_url }} style={styles.gridImage} resizeMode="cover" />
-        ) : (
-          <View style={[styles.gridImage, styles.placeholder]}>
-            <Text style={styles.placeholderText}>DCM</Text>
-          </View>
-        )}
-        <View style={styles.gridInfo}>
-          <Text style={styles.gridName} numberOfLines={1}>{name}</Text>
-          <GradeBadge grade={item.conversational_whole_grade} size="sm" />
-        </View>
+        <SlabCard
+          imageUrl={item.front_url || null}
+          displayName={name}
+          contextLine={set}
+          serial={item.serial}
+          grade={item.conversational_whole_grade}
+          condition={item.conversational_condition_label || ''}
+          size="sm"
+        />
       </TouchableOpacity>
     )
   }

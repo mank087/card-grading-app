@@ -9,6 +9,9 @@ import { Card } from '@/lib/types'
 import GradeBadge from '@/components/ui/GradeBadge'
 import SubgradeBar from '@/components/grading/SubgradeBar'
 import CollapsibleSection from '@/components/ui/CollapsibleSection'
+import SlabCard from '@/components/grading/SlabCard'
+import CornerZoomGrid from '@/components/grading/CornerZoomGrid'
+import DefectOverlay, { extractDefectMarkers } from '@/components/grading/DefectOverlay'
 
 export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -129,7 +132,7 @@ export default function CardDetailScreen() {
       contentContainerStyle={styles.content}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.purple[600]} />}
     >
-      {/* ======== CARD IMAGES ======== */}
+      {/* ======== GRADED SLAB CARDS ======== */}
       <View style={styles.imageSection}>
         <View style={styles.imageToggle}>
           <TouchableOpacity
@@ -145,18 +148,30 @@ export default function CardDetailScreen() {
             <Text style={[styles.imageToggleText, activeImage === 'back' && styles.imageToggleTextActive]}>Back</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.imageContainer}>
-          {(activeImage === 'front' ? frontUrl : backUrl) ? (
-            <Image
-              source={{ uri: activeImage === 'front' ? frontUrl! : backUrl! }}
-              style={styles.cardImage}
-              resizeMode="contain"
+
+        <View style={styles.slabContainer}>
+          <View style={{ position: 'relative' }}>
+            <SlabCard
+              imageUrl={activeImage === 'front' ? frontUrl : backUrl}
+              displayName={cardName}
+              contextLine={[setName, cardNumber ? `#${cardNumber}` : null, year].filter(Boolean).join(' \u2022 ')}
+              serial={card.serial}
+              grade={grade}
+              condition={card.conversational_condition_label || ''}
+              features={ci?.rarity_or_variant ? [ci.rarity_or_variant] : []}
+              size="lg"
+              isBack={activeImage === 'back'}
+              subScores={subScores}
             />
-          ) : (
-            <View style={[styles.cardImage, styles.placeholderImage]}>
-              <Text style={styles.placeholderText}>No Image</Text>
-            </View>
-          )}
+            {/* Defect overlay on the image portion */}
+            {card.conversational_grading && (
+              <View style={styles.defectOverlayWrapper}>
+                <DefectOverlay
+                  defects={extractDefectMarkers(card.conversational_grading, activeImage)}
+                />
+              </View>
+            )}
+          </View>
         </View>
       </View>
 
@@ -251,6 +266,14 @@ export default function CardDetailScreen() {
           {card.conversational_defects_back && (
             <DefectSection side="Back" defects={card.conversational_defects_back} />
           )}
+        </CollapsibleSection>
+      )}
+
+      {/* ======== CORNER ZOOM ======== */}
+      {frontUrl && !card.slab_detected && (
+        <CollapsibleSection title="Corner Close-ups" icon="scan">
+          {frontUrl && <CornerZoomGrid imageUrl={frontUrl} side="Front" />}
+          {backUrl && <View style={{ marginTop: 12 }}><CornerZoomGrid imageUrl={backUrl} side="Back" /></View>}
         </CollapsibleSection>
       )}
 
@@ -446,8 +469,10 @@ const styles = StyleSheet.create({
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[50] },
   errorText: { color: Colors.gray[500], fontSize: 16 },
 
-  // Images
+  // Images / Slab
   imageSection: { backgroundColor: Colors.gray[900], paddingBottom: 12 },
+  slabContainer: { paddingHorizontal: 32, paddingVertical: 12 },
+  defectOverlayWrapper: { position: 'absolute', bottom: 4, left: 4, right: 4, aspectRatio: 0.714, borderBottomLeftRadius: 10, borderBottomRightRadius: 10, overflow: 'hidden' },
   imageToggle: { flexDirection: 'row', justifyContent: 'center', paddingTop: 8, gap: 4 },
   imageToggleBtn: { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 16 },
   imageToggleActive: { backgroundColor: Colors.purple[600] },
