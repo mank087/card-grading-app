@@ -19,17 +19,27 @@ export interface CompressedImage {
 
 /**
  * Compress an image for upload.
- * Max 3000x3000, JPEG at 0.85 quality.
+ * Resizes to max 3000px wide, JPEG at 0.85 quality.
+ * Handles both Android (file://) and iOS (ph://) URIs.
  */
 export async function compressImage(uri: string): Promise<CompressedImage> {
-  const result = await ImageManipulator.manipulateAsync(
-    uri,
-    [{ resize: { width: 3000 } }],
-    { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG }
-  )
+  // First get original dimensions without modifying
+  const original = await ImageManipulator.manipulateAsync(uri, [], {
+    format: ImageManipulator.SaveFormat.JPEG,
+  })
 
-  // Estimate file size from dimensions and compression
-  // (avoids deprecated expo-file-system APIs)
+  // Only resize if wider than 3000px
+  const actions: ImageManipulator.Action[] = []
+  if (original.width > 3000) {
+    actions.push({ resize: { width: 3000 } })
+  }
+
+  const result = await ImageManipulator.manipulateAsync(uri, actions, {
+    compress: 0.85,
+    format: ImageManipulator.SaveFormat.JPEG,
+  })
+
+  // Estimate file size from dimensions and compression ratio
   const fileSize = Math.round(result.width * result.height * 0.15)
   return {
     uri: result.uri,
@@ -40,33 +50,39 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
 }
 
 /**
- * Crop image to card aspect ratio (center crop with padding).
+ * Crop image to card aspect ratio (center crop with 10% margin).
  */
 export async function cropToCardAspect(
   uri: string,
   orientation: 'portrait' | 'landscape' = 'portrait'
 ): Promise<string> {
   // Get original dimensions
-  const result = await ImageManipulator.manipulateAsync(uri, [], { format: ImageManipulator.SaveFormat.JPEG })
-  const { width, height } = result
+  const original = await ImageManipulator.manipulateAsync(uri, [], {
+    format: ImageManipulator.SaveFormat.JPEG,
+  })
+  const { width, height } = original
 
   const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
   const imageAspect = width / height
 
-  let cropWidth: number, cropHeight: number, originX: number, originY: number
+  let cropWidth: number, cropHeight: number
 
   if (imageAspect > cardAspect) {
     // Image is wider — crop sides
-    cropHeight = height * 0.90
-    cropWidth = cropHeight * cardAspect
+    cropHeight = Math.round(height * 0.90)
+    cropWidth = Math.round(cropHeight * cardAspect)
   } else {
     // Image is taller — crop top/bottom
-    cropWidth = width * 0.90
-    cropHeight = cropWidth / cardAspect
+    cropWidth = Math.round(width * 0.90)
+    cropHeight = Math.round(cropWidth / cardAspect)
   }
 
-  originX = (width - cropWidth) / 2
-  originY = (height - cropHeight) / 2
+  // Ensure crop dimensions don't exceed image
+  cropWidth = Math.min(cropWidth, width)
+  cropHeight = Math.min(cropHeight, height)
+
+  const originX = Math.round((width - cropWidth) / 2)
+  const originY = Math.round((height - cropHeight) / 2)
 
   const cropped = await ImageManipulator.manipulateAsync(
     uri,
@@ -74,8 +90,8 @@ export async function cropToCardAspect(
       crop: {
         originX: Math.max(0, originX),
         originY: Math.max(0, originY),
-        width: Math.min(cropWidth, width),
-        height: Math.min(cropHeight, height),
+        width: cropWidth,
+        height: cropHeight,
       }
     }],
     { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
@@ -85,18 +101,15 @@ export async function cropToCardAspect(
 }
 
 /**
- * Basic image quality assessment.
- * Checks file size and dimensions as proxies for quality.
+ * Image quality assessment based on dimensions.
  */
 export function assessQuality(compressed: CompressedImage): QualityResult {
-  const { width, height, fileSize } = compressed
+  const { width, height } = compressed
   const megapixels = (width * height) / 1000000
-  const fileSizeMB = fileSize / (1024 * 1024)
 
   let score = 80
   const suggestions: string[] = []
 
-  // Resolution check
   if (megapixels >= 4) score += 10
   else if (megapixels >= 2) score += 5
   else {
@@ -104,14 +117,6 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
     suggestions.push('Try holding your phone closer for higher resolution')
   }
 
-  // File size as quality proxy (larger = more detail)
-  if (fileSizeMB >= 1) score += 5
-  else if (fileSizeMB < 0.3) {
-    score -= 10
-    suggestions.push('Image may be too compressed — ensure good lighting')
-  }
-
-  // Dimension check
   if (width >= 1500 && height >= 1500) score += 5
   else if (width < 800 || height < 800) {
     score -= 10
@@ -137,21 +142,19 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
 }
 
 /**
- * Generate a simple hash of image for duplicate detection.
- * Uses the URI + dimensions as a fingerprint since full file hashing
- * is problematic in React Native without native file system access.
+ * Generate a hash for duplicate detection.
+ * Uses the filename from the URI since each capture produces a unique filename.
  */
 export async function hashImage(uri: string): Promise<string> {
-  // Use URI path + timestamp portion as a unique fingerprint
-  // This catches exact same photo (same URI) being used for both sides
-  const hashInput = uri.split('/').pop() || uri
-  return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, hashInput)
+  const filename = uri.split('/').pop() || uri
+  return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, filename)
 }
 
 /**
- * Convert a local file URI to a Blob for Supabase upload.
+ * Convert a local file URI to an ArrayBuffer for Supabase upload.
+ * Works on both Android and iOS.
  */
-export async function uriToBlob(uri: string): Promise<Blob> {
+export async function uriToArrayBuffer(uri: string): Promise<ArrayBuffer> {
   const response = await fetch(uri)
-  return await response.blob()
+  return response.arrayBuffer()
 }

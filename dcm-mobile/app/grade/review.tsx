@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, TextInput, Alert, Switch } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import * as Crypto from 'expo-crypto'
 import { Colors, CardCategories } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import { supabase } from '@/lib/supabase'
-import { uriToBlob } from '@/lib/imageUtils'
+import { uriToArrayBuffer } from '@/lib/imageUtils'
 import { ConditionReportData, EMPTY_REPORT, SURFACE_LABELS, CORNER_LABELS, EDGE_LABELS, STRUCTURAL_LABELS, FACTORY_LABELS, countDefects } from '@/lib/conditionReport'
 import Button from '@/components/ui/Button'
 
@@ -24,9 +25,11 @@ const API_ENDPOINTS: Record<string, string> = {
   Lorcana: '/api/lorcana', 'One Piece': '/api/onepiece', 'Yu-Gi-Oh': '/api/yugioh', Other: '/api/other',
 }
 
-const CATEGORY_ROUTES: Record<string, string> = {
-  Sports: '/sports', Pokemon: '/pokemon', MTG: '/mtg',
-  Lorcana: '/lorcana', 'One Piece': '/onepiece', 'Yu-Gi-Oh': '/yugioh', Other: '/other',
+function generateUUID(): string {
+  const bytes = Crypto.getRandomBytes(16)
+  const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('')
+  // Set version 4 and variant bits
+  return `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-${(parseInt(hex[16], 16) & 0x3 | 0x8).toString(16)}${hex.slice(17,20)}-${hex.slice(20,32)}`
 }
 
 export default function ReviewScreen() {
@@ -56,24 +59,43 @@ export default function ReviewScreen() {
 
     setIsSubmitting(true)
     try {
-      // crypto.randomUUID() not available in React Native — use Expo Crypto
-      const randomBytes = await import('expo-crypto').then(m => m.getRandomBytes(16))
-      const hex = Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('')
-      const cardId = `${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-${hex.slice(16,20)}-${hex.slice(20,32)}`
+      const cardId = generateUUID()
       const frontPath = `${user.id}/${cardId}/front.jpg`
       const backPath = `${user.id}/${cardId}/back.jpg`
 
-      // Upload images to Supabase Storage
-      const frontBlob = await uriToBlob(params.frontUri)
-      const backBlob = await uriToBlob(params.backUri)
+      console.log('[Upload] Starting upload for card:', cardId)
+      console.log('[Upload] Front URI:', params.frontUri.substring(0, 60))
+      console.log('[Upload] Back URI:', params.backUri.substring(0, 60))
 
+      // Convert images to ArrayBuffer for Supabase upload
+      const frontBuffer = await uriToArrayBuffer(params.frontUri)
+      const backBuffer = await uriToArrayBuffer(params.backUri)
+
+      console.log('[Upload] Front buffer size:', frontBuffer.byteLength)
+      console.log('[Upload] Back buffer size:', backBuffer.byteLength)
+
+      // Upload to Supabase Storage
       const [frontUpload, backUpload] = await Promise.all([
-        supabase.storage.from('cards').upload(frontPath, frontBlob, { contentType: 'image/jpeg' }),
-        supabase.storage.from('cards').upload(backPath, backBlob, { contentType: 'image/jpeg' }),
+        supabase.storage.from('cards').upload(frontPath, frontBuffer, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        }),
+        supabase.storage.from('cards').upload(backPath, backBuffer, {
+          contentType: 'image/jpeg',
+          upsert: false,
+        }),
       ])
 
-      if (frontUpload.error) throw new Error(`Front upload failed: ${frontUpload.error.message}`)
-      if (backUpload.error) throw new Error(`Back upload failed: ${backUpload.error.message}`)
+      if (frontUpload.error) {
+        console.error('[Upload] Front upload error:', frontUpload.error)
+        throw new Error(`Front upload failed: ${frontUpload.error.message}`)
+      }
+      if (backUpload.error) {
+        console.error('[Upload] Back upload error:', backUpload.error)
+        throw new Error(`Back upload failed: ${backUpload.error.message}`)
+      }
+
+      console.log('[Upload] Images uploaded successfully')
 
       // Get serial number
       let serial = String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 10000)).padStart(4, '0')
@@ -83,7 +105,9 @@ export default function ReviewScreen() {
           const data = await res.json()
           serial = data.serial || serial
         }
-      } catch { /* use fallback */ }
+      } catch { /* use fallback serial */ }
+
+      console.log('[Upload] Serial:', serial)
 
       // Build condition report payload
       const conditionPayload = noDefects ? null : {
@@ -107,21 +131,34 @@ export default function ReviewScreen() {
         } : {}),
       })
 
-      if (dbError) throw new Error(`Database error: ${dbError.message}`)
+      if (dbError) {
+        console.error('[Upload] DB insert error:', dbError)
+        throw new Error(`Database error: ${dbError.message}`)
+      }
 
-      // Deduct credit
-      const { error: creditError } = await supabase.rpc('deduct_credit', { p_user_id: user.id })
+      console.log('[Upload] Card record created')
+
+      // Deduct credit directly (update balance - 1, total_used + 1)
+      const { error: creditError } = await supabase
+        .from('user_credits')
+        .update({
+          balance: balance - 1,
+        })
+        .eq('user_id', user.id)
+
       if (creditError) {
-        // Try direct update as fallback
-        await supabase.from('user_credits')
-          .update({ balance: balance - 1, total_used: balance })
-          .eq('user_id', user.id)
+        console.error('[Upload] Credit deduction error:', creditError)
+        // Don't throw — card is already created, grading should proceed
+      } else {
+        console.log('[Upload] Credit deducted')
       }
       refreshCredits()
 
-      // Trigger grading (fire and forget)
+      // Trigger grading API (fire and forget)
       const endpoint = API_ENDPOINTS[category] || '/api/other'
-      fetch(`${API_BASE}${endpoint}/${cardId}`).catch(() => {})
+      const gradingUrl = `${API_BASE}${endpoint}/${cardId}`
+      console.log('[Upload] Triggering grading:', gradingUrl)
+      fetch(gradingUrl).catch(err => console.warn('[Upload] Grading trigger error (non-fatal):', err))
 
       // Navigate to processing screen
       router.replace({
@@ -129,7 +166,7 @@ export default function ReviewScreen() {
         params: { cardId, category, frontUri: params.frontUri },
       })
     } catch (err: any) {
-      console.error('Submit error:', err)
+      console.error('[Upload] Submit error:', err)
       Alert.alert('Submission Failed', err.message || 'Please try again.')
     } finally {
       setIsSubmitting(false)
@@ -165,7 +202,7 @@ export default function ReviewScreen() {
       {/* Progress Steps */}
       <View style={styles.progressBar}>
         {[1, 2, 3].map(s => (
-          <TouchableOpacity key={s} style={styles.progressStep} onPress={() => setStep(s)} disabled={s > step}>
+          <TouchableOpacity key={s} style={styles.progressStep} onPress={() => s <= step && setStep(s)}>
             <View style={[styles.stepDot, step >= s && styles.stepDotActive]}>
               <Text style={[styles.stepNum, step >= s && styles.stepNumActive]}>{s}</Text>
             </View>
@@ -265,7 +302,6 @@ export default function ReviewScreen() {
           <Text style={styles.stepTitle}>Report Card Condition</Text>
           <Text style={styles.stepSubtitle}>Optional — helps the AI grade more accurately</Text>
 
-          {/* No defects toggle */}
           <View style={styles.noDefectsRow}>
             <Switch value={noDefects} onValueChange={(v) => { setNoDefects(v); if (v) setConditionReport(EMPTY_REPORT) }}
               trackColor={{ false: Colors.gray[300], true: Colors.green[500] }} />
@@ -274,7 +310,6 @@ export default function ReviewScreen() {
 
           {!noDefects && (
             <>
-              {/* Front/Back defects */}
               {(['front', 'back'] as const).map(side => (
                 <View key={side} style={styles.defectSide}>
                   <Text style={styles.defectSideTitle}>{side === 'front' ? 'Front' : 'Back'}</Text>
@@ -302,7 +337,6 @@ export default function ReviewScreen() {
                 </View>
               ))}
 
-              {/* Structural */}
               <Text style={styles.defectGroupTitle}>Structural Issues</Text>
               {Object.entries(STRUCTURAL_LABELS).map(([key, label]) => (
                 <DefectCheckbox key={`str-${key}`} label={label}
@@ -310,7 +344,6 @@ export default function ReviewScreen() {
                   onToggle={() => toggleStructural(key)} />
               ))}
 
-              {/* Factory */}
               <Text style={styles.defectGroupTitle}>Factory / Manufacturing</Text>
               {Object.entries(FACTORY_LABELS).map(([key, label]) => (
                 <DefectCheckbox key={`fac-${key}`} label={label}
@@ -318,7 +351,6 @@ export default function ReviewScreen() {
                   onToggle={() => toggleFactory(key)} />
               ))}
 
-              {/* Notes */}
               <Text style={styles.defectGroupTitle}>Additional Notes</Text>
               <TextInput
                 style={styles.notesInput}
@@ -333,11 +365,10 @@ export default function ReviewScreen() {
             </>
           )}
 
-          {/* Validation */}
           {!isConditionValid && (
             <View style={styles.validationWarning}>
               <Ionicons name="warning" size={16} color={Colors.amber[600]} />
-              <Text style={styles.validationText}>Check &apos;No visible defects&apos; or report at least one defect</Text>
+              <Text style={styles.validationText}>Check 'No visible defects' or report at least one defect</Text>
             </View>
           )}
 
@@ -350,12 +381,10 @@ export default function ReviewScreen() {
             </View>
           )}
 
-          {/* Credit info */}
           <View style={styles.creditInfo}>
             <Text style={styles.creditInfoText}>This will use 1 credit. Balance: {balance}</Text>
           </View>
 
-          {/* Submit */}
           <Button
             title={isSubmitting ? 'Submitting...' : 'Submit for Grading'}
             onPress={handleSubmit}
@@ -381,8 +410,6 @@ function DefectCheckbox({ label, checked, onToggle }: { label: string; checked: 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray[50] },
   content: { padding: 16, paddingBottom: 40 },
-
-  // Progress
   progressBar: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginBottom: 20 },
   progressStep: { alignItems: 'center', gap: 4 },
   stepDot: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.gray[200], alignItems: 'center', justifyContent: 'center' },
@@ -391,28 +418,20 @@ const styles = StyleSheet.create({
   stepNumActive: { color: Colors.white },
   stepLabel: { fontSize: 11, color: Colors.gray[400] },
   stepLabelActive: { color: Colors.purple[600], fontWeight: '600' },
-
-  // Steps
   stepContent: {},
   stepTitle: { fontSize: 20, fontWeight: '700', color: Colors.gray[900], marginBottom: 4 },
   stepSubtitle: { fontSize: 13, color: Colors.gray[500], marginBottom: 16 },
-
-  // Category
   categoryList: { gap: 6 },
   categoryOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[200], backgroundColor: Colors.white },
   categoryOptionActive: { borderColor: Colors.purple[500], backgroundColor: Colors.purple[50] },
   categoryOptionText: { fontSize: 15, fontWeight: '500', color: Colors.gray[700] },
   categoryOptionTextActive: { color: Colors.purple[700], fontWeight: '600' },
-
-  // Sub-category
   subCategorySection: { marginTop: 16, backgroundColor: Colors.white, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200] },
   subCategoryLabel: { fontSize: 14, fontWeight: '600', color: Colors.gray[700], marginBottom: 8 },
   subCategoryGroup: { fontSize: 11, fontWeight: '700', color: Colors.gray[400], textTransform: 'uppercase', marginTop: 12, marginBottom: 4 },
   subCategoryOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, paddingHorizontal: 8, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
   subCategoryOptionActive: { backgroundColor: Colors.purple[50] },
   subCategoryOptionText: { fontSize: 14, color: Colors.gray[700] },
-
-  // Photos
   photoGrid: { flexDirection: 'row', gap: 12 },
   photoCard: { flex: 1, backgroundColor: Colors.white, borderRadius: 12, padding: 8, borderWidth: 1, borderColor: Colors.gray[200], alignItems: 'center' },
   photoLabel: { fontSize: 12, fontWeight: '600', color: Colors.gray[500], marginBottom: 6 },
@@ -421,8 +440,6 @@ const styles = StyleSheet.create({
   placeholderText: { color: Colors.gray[400], fontSize: 12 },
   retakeLink: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 8 },
   retakeLinkText: { fontSize: 13, color: Colors.purple[600], fontWeight: '600' },
-
-  // Condition
   noDefectsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: Colors.white, padding: 16, borderRadius: 12, borderWidth: 1, borderColor: Colors.gray[200], marginBottom: 16 },
   noDefectsLabel: { fontSize: 15, fontWeight: '500', color: Colors.gray[800], flex: 1 },
   defectSide: { backgroundColor: Colors.white, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200], marginBottom: 12 },
@@ -433,14 +450,10 @@ const styles = StyleSheet.create({
   defectLabelChecked: { color: Colors.purple[700], fontWeight: '500' },
   notesInput: { backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.gray[300], borderRadius: 10, padding: 12, fontSize: 14, color: Colors.gray[900], minHeight: 80, textAlignVertical: 'top' },
   charCount: { fontSize: 11, color: Colors.gray[400], textAlign: 'right', marginTop: 4 },
-
-  // Validation
   validationWarning: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.amber[50], padding: 12, borderRadius: 10, marginTop: 12 },
   validationText: { fontSize: 13, color: Colors.amber[600], flex: 1 },
   validationSuccess: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.green[50], padding: 12, borderRadius: 10, marginTop: 12 },
   validationSuccessText: { fontSize: 13, color: Colors.green[600], flex: 1 },
-
-  // Credit
   creditInfo: { backgroundColor: Colors.purple[50], padding: 12, borderRadius: 10, marginTop: 12, alignItems: 'center' },
   creditInfoText: { fontSize: 13, color: Colors.purple[700], fontWeight: '500' },
 })
