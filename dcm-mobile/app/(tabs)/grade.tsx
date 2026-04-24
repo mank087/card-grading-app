@@ -41,8 +41,7 @@ export default function GradeScreen() {
               variant="primary"
               size="sm"
               onPress={() => {
-                // TODO: Navigate to camera capture with category
-                console.log('Grade', cat.key)
+                router.push({ pathname: '/grade/capture', params: { category: cat.key } })
               }}
               disabled={balance < 1}
             />

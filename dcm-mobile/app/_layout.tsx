@@ -67,6 +67,10 @@ export default function RootLayout() {
                 headerStyle: { backgroundColor: Colors.white },
               }}
             />
+            <Stack.Screen
+              name="grade"
+              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+            />
           </Stack>
         </AuthGate>
       </CreditsProvider>
