@@ -34,6 +34,9 @@ export default function GradeScreen() {
     })
   }
 
+  const [galleryStep, setGalleryStep] = useState<'idle' | 'front' | 'back' | 'processing'>('idle')
+  const [galleryFrontUri, setGalleryFrontUri] = useState<string | null>(null)
+
   const handleGallery = async () => {
     if (!canGrade) {
       if (balance < 1) Alert.alert('Insufficient Credits', 'You need at least 1 credit to grade a card.')
@@ -41,54 +44,63 @@ export default function GradeScreen() {
     }
 
     try {
+      setGalleryStep('front')
+
       // Pick front image
       const frontResult = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.92,
         allowsEditing: false,
       })
-      if (frontResult.canceled || !frontResult.assets?.[0]) return
-      const frontUri = frontResult.assets[0].uri
+      if (frontResult.canceled || !frontResult.assets?.[0]) {
+        setGalleryStep('idle')
+        return
+      }
+
+      setGalleryFrontUri(frontResult.assets[0].uri)
+      setGalleryStep('back')
 
       // Pick back image
-      Alert.alert('Back Image', 'Now select the back of the card', [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Select Back',
-          onPress: async () => {
-            const backResult = await ImagePicker.launchImageLibraryAsync({
-              mediaTypes: ['images'],
-              quality: 0.92,
-              allowsEditing: false,
-            })
-            if (backResult.canceled || !backResult.assets?.[0]) return
-            const backUri = backResult.assets[0].uri
+      const backResult = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.92,
+        allowsEditing: false,
+      })
+      if (backResult.canceled || !backResult.assets?.[0]) {
+        setGalleryStep('idle')
+        setGalleryFrontUri(null)
+        return
+      }
 
-            // Crop and compress both
-            const croppedFront = await cropToCardAspect(frontUri)
-            const croppedBack = await cropToCardAspect(backUri)
-            const compressedFront = await compressImage(croppedFront)
-            const compressedBack = await compressImage(croppedBack)
+      setGalleryStep('processing')
 
-            // Go to review
-            router.push({
-              pathname: '/grade/review',
-              params: {
-                category: selectedCategory,
-                subCategory,
-                frontUri: compressedFront.uri,
-                backUri: compressedBack.uri,
-                frontWidth: String(compressedFront.width),
-                frontHeight: String(compressedFront.height),
-                backWidth: String(compressedBack.width),
-                backHeight: String(compressedBack.height),
-              },
-            })
-          }
+      // Crop and compress both
+      const croppedFront = await cropToCardAspect(frontResult.assets[0].uri)
+      const croppedBack = await cropToCardAspect(backResult.assets[0].uri)
+      const compressedFront = await compressImage(croppedFront)
+      const compressedBack = await compressImage(croppedBack)
+
+      setGalleryStep('idle')
+      setGalleryFrontUri(null)
+
+      // Go to review
+      router.push({
+        pathname: '/grade/review',
+        params: {
+          category: selectedCategory,
+          subCategory,
+          frontUri: compressedFront.uri,
+          backUri: compressedBack.uri,
+          frontWidth: String(compressedFront.width),
+          frontHeight: String(compressedFront.height),
+          backWidth: String(compressedBack.width),
+          backHeight: String(compressedBack.height),
         },
-      ])
+      })
     } catch (err) {
       console.error('Gallery error:', err)
+      setGalleryStep('idle')
+      setGalleryFrontUri(null)
     }
   }
 
@@ -177,14 +189,24 @@ export default function GradeScreen() {
           <TouchableOpacity
             style={[styles.uploadButton, styles.galleryButton, !canGrade && styles.uploadButtonDisabled]}
             onPress={handleGallery}
-            disabled={!canGrade}
+            disabled={!canGrade || galleryStep !== 'idle'}
             activeOpacity={0.7}
           >
             <View style={styles.uploadIconContainer}>
-              <Ionicons name="images" size={32} color={canGrade ? Colors.blue[600] : Colors.gray[400]} />
+              <Ionicons
+                name={galleryStep === 'processing' ? 'hourglass' : 'images'}
+                size={32}
+                color={canGrade ? Colors.blue[600] : Colors.gray[400]}
+              />
             </View>
-            <Text style={[styles.uploadButtonTitle, !canGrade && styles.uploadButtonTitleDisabled]}>Gallery</Text>
-            <Text style={styles.uploadButtonSubtitle}>Choose from photos</Text>
+            <Text style={[styles.uploadButtonTitle, !canGrade && styles.uploadButtonTitleDisabled]}>
+              {galleryStep === 'front' ? 'Select Front...' :
+               galleryStep === 'back' ? 'Select Back...' :
+               galleryStep === 'processing' ? 'Processing...' : 'Gallery'}
+            </Text>
+            <Text style={styles.uploadButtonSubtitle}>
+              {galleryStep === 'idle' ? 'Choose from photos' : 'Selecting images'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
