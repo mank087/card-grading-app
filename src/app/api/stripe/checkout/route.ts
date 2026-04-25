@@ -74,8 +74,9 @@ export async function POST(request: NextRequest) {
 
     // Check if user is eligible for discount (20% for Card Lovers or Founders)
     // Card Lover discount takes precedence, but they're the same rate
-    // Discounts don't apply to founders or vip packages
-    const isDiscountEligibleTier = !isFoundersPackage && !isVipPackage;
+    // Discounts don't apply to the Founders Package itself (it's already discounted)
+    // Founders and Card Lovers DO get 20% off VIP, credit packages, and Card Lovers subscription
+    const isDiscountEligibleTier = !isFoundersPackage;
     const hasCardLoverDiscount = isDiscountEligibleTier && await isActiveCardLover(userId);
     const hasFounderDiscountEligible = isDiscountEligibleTier && !hasCardLoverDiscount && await hasFounderDiscount(userId);
 
