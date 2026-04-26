@@ -110,10 +110,9 @@ export default function ReviewScreen() {
       console.log('[Upload] Serial:', serial)
 
       // Build condition report payload
-      const conditionPayload = noDefects ? null : {
-        ...conditionReport,
-        notes,
-      }
+      const conditionPayload = noDefects
+        ? (notes ? { noDefectsConfirmed: true, cardDescription: notes } : null)
+        : { ...conditionReport, notes }
 
       // Insert card record
       const { error: dbError } = await supabase.from('cards').insert({
@@ -127,6 +126,7 @@ export default function ReviewScreen() {
         visibility: 'public',
         ...(conditionPayload ? {
           user_condition_report: conditionPayload,
+          user_condition_processed: conditionPayload,
           has_user_condition_report: true,
         } : {}),
       })
@@ -138,27 +138,51 @@ export default function ReviewScreen() {
 
       console.log('[Upload] Card record created')
 
-      // Deduct credit directly (update balance - 1, total_used + 1)
-      const { error: creditError } = await supabase
+      // Deduct credit — decrement balance, increment total_used
+      const { data: currentCredits } = await supabase
         .from('user_credits')
-        .update({
-          balance: balance - 1,
-        })
+        .select('balance, total_used')
         .eq('user_id', user.id)
+        .single()
 
-      if (creditError) {
-        console.error('[Upload] Credit deduction error:', creditError)
-        // Don't throw — card is already created, grading should proceed
-      } else {
-        console.log('[Upload] Credit deducted')
+      if (currentCredits) {
+        const { error: creditError } = await supabase
+          .from('user_credits')
+          .update({
+            balance: Math.max(0, currentCredits.balance - 1),
+            total_used: (currentCredits.total_used || 0) + 1,
+          })
+          .eq('user_id', user.id)
+
+        if (creditError) {
+          console.error('[Upload] Credit deduction error:', creditError)
+        } else {
+          console.log('[Upload] Credit deducted. New balance:', currentCredits.balance - 1)
+        }
       }
       refreshCredits()
 
-      // Trigger grading API (fire and forget)
+      // Trigger grading API
+      // The grading endpoints are GET requests that start the AI grading process
       const endpoint = API_ENDPOINTS[category] || '/api/other'
       const gradingUrl = `${API_BASE}${endpoint}/${cardId}`
       console.log('[Upload] Triggering grading:', gradingUrl)
-      fetch(gradingUrl).catch(err => console.warn('[Upload] Grading trigger error (non-fatal):', err))
+
+      try {
+        const gradingResponse = await fetch(gradingUrl, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+        console.log('[Upload] Grading trigger response:', gradingResponse.status)
+        if (!gradingResponse.ok) {
+          const errorText = await gradingResponse.text()
+          console.warn('[Upload] Grading trigger returned non-200:', errorText.substring(0, 200))
+        }
+      } catch (err) {
+        console.warn('[Upload] Grading trigger error (will retry via web):', err)
+      }
 
       // Navigate to processing screen
       router.replace({
@@ -307,6 +331,23 @@ export default function ReviewScreen() {
               trackColor={{ false: Colors.gray[300], true: Colors.green[500] }} />
             <Text style={styles.noDefectsLabel}>No visible defects to report</Text>
           </View>
+
+          {/* Optional description — always shown (even with no defects) */}
+          {noDefects && (
+            <View style={styles.defectSide}>
+              <Text style={styles.defectGroupTitle}>Card Details for AI Guidance (Optional)</Text>
+              <TextInput
+                style={styles.notesInput}
+                placeholder="E.g., 'This card has a textured holofoil surface', 'Vintage card from 1997'..."
+                placeholderTextColor={Colors.gray[400]}
+                value={notes}
+                onChangeText={setNotes}
+                multiline
+                maxLength={500}
+              />
+              <Text style={styles.charCount}>{notes.length}/500</Text>
+            </View>
+          )}
 
           {!noDefects && (
             <>

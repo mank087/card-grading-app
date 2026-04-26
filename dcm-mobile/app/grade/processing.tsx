@@ -64,29 +64,76 @@ export default function ProcessingScreen() {
     return () => clearInterval(timer)
   }, [])
 
+  const [pollCount, setPollCount] = useState(0)
+  const [gradingError, setGradingError] = useState(false)
+
   // Poll for grading completion
   useEffect(() => {
     if (!params.cardId || isComplete) return
 
+    console.log('[Processing] Starting poll for card:', params.cardId)
+
     pollRef.current = setInterval(async () => {
       try {
+        setPollCount(prev => prev + 1)
         const { data, error } = await supabase
           .from('cards')
-          .select('conversational_whole_grade, conversational_condition_label')
+          .select('conversational_whole_grade, conversational_condition_label, conversational_grading')
           .eq('id', params.cardId)
           .single()
 
-        if (!error && data?.conversational_whole_grade) {
+        if (error) {
+          console.log('[Processing] Poll error:', error.message)
+          return
+        }
+
+        // Check if grade is set
+        if (data?.conversational_whole_grade) {
+          console.log('[Processing] Grade found:', data.conversational_whole_grade)
           setIsComplete(true)
           setGrade(data.conversational_whole_grade)
           setCurrentStep(STEPS.length - 1)
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
           if (pollRef.current) clearInterval(pollRef.current)
+          return
         }
-      } catch { /* continue polling */ }
+
+        // Check if grading data exists but grade column not set (extraction issue)
+        if (data?.conversational_grading && !data?.conversational_whole_grade) {
+          try {
+            const json = JSON.parse(data.conversational_grading)
+            const extractedGrade = json.final_grade?.whole_grade || json.grading_passes?.averaged_rounded?.final
+            if (extractedGrade) {
+              console.log('[Processing] Grade found in JSON but not in column:', extractedGrade)
+              setIsComplete(true)
+              setGrade(Math.round(extractedGrade))
+              setCurrentStep(STEPS.length - 1)
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+              if (pollRef.current) clearInterval(pollRef.current)
+              return
+            }
+          } catch { /* JSON parse failed, continue polling */ }
+        }
+
+        console.log('[Processing] Poll #' + (pollCount + 1) + ' — no grade yet')
+      } catch (err) {
+        console.log('[Processing] Poll exception:', err)
+      }
     }, 5000)
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current) }
+    // Timeout after 5 minutes — show error state
+    const timeout = setTimeout(() => {
+      if (!isComplete) {
+        console.log('[Processing] Timeout reached — grading may have failed')
+        setGradingError(true)
+        if (pollRef.current) clearInterval(pollRef.current)
+      }
+    }, 300000)
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+      clearTimeout(timeout)
+    }
   }, [params.cardId, isComplete])
 
   const handleViewResults = () => {
@@ -184,10 +231,24 @@ export default function ProcessingScreen() {
       )}
 
       {/* Timing info */}
-      {!isComplete && (
+      {!isComplete && !gradingError && (
         <Text style={styles.timingText}>
           This typically takes 1-2 minutes. You can grade another card or view your collection while waiting.
+          {pollCount > 0 && `\n\nChecking... (${pollCount})`}
         </Text>
+      )}
+
+      {/* Timeout / Error state */}
+      {gradingError && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={32} color={Colors.amber[500]} />
+          <Text style={styles.errorTitle}>Grading is taking longer than expected</Text>
+          <Text style={styles.errorText}>
+            Your card has been submitted and may still be processing. Check your collection in a few minutes.
+          </Text>
+          <Button title="Go to Collection" onPress={() => router.replace('/(tabs)/collection')} style={{ marginTop: 12 }} />
+          <Button title="Grade Another Card" variant="secondary" onPress={handleGradeAnother} style={{ marginTop: 8 }} />
+        </View>
       )}
     </View>
   )
@@ -251,4 +312,9 @@ const styles = StyleSheet.create({
 
   // Timing
   timingText: { fontSize: 12, color: Colors.gray[500], textAlign: 'center', lineHeight: 18 },
+
+  // Error/timeout
+  errorContainer: { alignItems: 'center', backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 16, padding: 24, marginTop: 16, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
+  errorTitle: { fontSize: 16, fontWeight: '700', color: Colors.amber[500], marginTop: 8, textAlign: 'center' },
+  errorText: { fontSize: 13, color: Colors.gray[400], textAlign: 'center', marginTop: 8, lineHeight: 18 },
 })
