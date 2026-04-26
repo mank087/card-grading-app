@@ -685,12 +685,14 @@ function getStarWarsFeatures(cardInfo: ConversationalCardInfo, card: CardForLabe
  * Get the primary name for Other cards
  */
 function getOtherName(cardInfo: ConversationalCardInfo, card: CardForLabel): string {
-  const characterName = stripMarkdown(cardInfo.player_or_character);
+  // Prioritize card_name (the actual printed title) over player_or_character (AI's interpretation)
+  // This matches getStarWarsName and prevents AI character descriptions from replacing card titles
   const cardName = stripMarkdown(cardInfo.card_name);
-  if (isValidValue(characterName)) return characterName!;
   if (isValidValue(cardName)) return cardName!;
-  if (isValidValue(card.featured)) return card.featured!;
   if (isValidValue(card.card_name)) return card.card_name!;
+  const characterName = stripMarkdown(cardInfo.player_or_character);
+  if (isValidValue(characterName)) return characterName!;
+  if (isValidValue(card.featured)) return card.featured!;
   return 'Card';
 }
 
