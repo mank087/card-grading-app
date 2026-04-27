@@ -923,8 +923,9 @@ function CustomDesigner({
       borderColor: colors.accentColor,
       borderWidth: style.id === 'neon-outline' ? 0.03 : 0.04,
       topEdgeGradient: colors.topEdgeGradient || undefined,
+      customColors: cardColors?.palette.slice(0, 5),
     })
-  }, [cardColorInput, updateConfig])
+  }, [cardColorInput, cardColors, updateConfig])
 
   // Custom multi-color state
   const [customColorCount, setCustomColorCount] = useState(2)

@@ -195,16 +195,87 @@ function drawBG(ctx, W, H, cfg) {
     g3.addColorStop(0, cfg.gradientStart); g3.addColorStop(0.45, cfg.gradientStart);
     g3.addColorStop(0.55, cfg.gradientEnd); g3.addColorStop(1, cfg.gradientEnd);
     ctx.fillStyle = g3; ctx.fillRect(0, 0, W, H);
+  } else if (cfg.colorPreset === 'color-gradient') {
+    // Color gradient with angle support
+    var cAngle = (cfg.gradientAngle !== undefined ? cfg.gradientAngle : 135) * Math.PI / 180;
+    var gcx = W/2, gcy = H/2, glen = Math.max(W,H)/2;
+    var gg = ctx.createLinearGradient(gcx-Math.cos(cAngle)*glen, gcy-Math.sin(cAngle)*glen, gcx+Math.cos(cAngle)*glen, gcy+Math.sin(cAngle)*glen);
+    gg.addColorStop(0, cfg.gradientStart); gg.addColorStop(1, cfg.gradientEnd);
+    ctx.fillStyle = gg; ctx.fillRect(0, 0, W, H);
   } else if (cfg.colorPreset === 'geometric') {
-    // Geometric: diagonal split with black divider line
     var cols = cfg.customColors || [cfg.gradientStart, cfg.gradientEnd];
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,H*0.4); ctx.lineTo(0,H); ctx.closePath();
-    ctx.fillStyle = cols[0]; ctx.fill();
-    ctx.beginPath(); ctx.moveTo(0,H); ctx.lineTo(W,H*0.4); ctx.lineTo(W,H); ctx.closePath();
-    ctx.fillStyle = cols[1] || cols[0]; ctx.fill();
-    ctx.beginPath(); ctx.moveTo(0,H); ctx.lineTo(W,H*0.4); ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=4; ctx.stroke();
-    ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=2; ctx.stroke();
-    ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(0,0,W,H);
+    var pick = function(i) { return cols[i % cols.length] || cols[0]; };
+    var pat = cfg.geometricPattern || 0;
+    function strokeDiv(x1,y1,x2,y2) {
+      ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke(); ctx.restore();
+    }
+
+    if (pat === 0) {
+      // Shattered Glass: triangular shards from off-center point
+      var cx3=W*0.35, cy3=H*0.4;
+      var pts=[{x:0,y:0},{x:W*0.25,y:0},{x:W*0.5,y:0},{x:W*0.75,y:0},{x:W,y:0},
+               {x:W,y:H*0.5},{x:W,y:H},{x:W*0.7,y:H},{x:W*0.4,y:H},{x:W*0.15,y:H},{x:0,y:H},{x:0,y:H*0.5}];
+      for(var ti=0;ti<pts.length;ti++){
+        var p1=pts[ti], p2=pts[(ti+1)%pts.length];
+        ctx.beginPath(); ctx.moveTo(cx3,cy3); ctx.lineTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.closePath();
+        ctx.fillStyle=pick(ti); ctx.fill();
+      }
+      for(var ti2=0;ti2<pts.length;ti2++){
+        strokeDiv(cx3,cy3,pts[ti2].x,pts[ti2].y);
+      }
+    } else if (pat === 1) {
+      // Diagonal Stripes
+      var sc=7, sw=W/sc*1.8;
+      for(var si=0;si<sc;si++){
+        var sx=si*W/sc-W*0.3;
+        ctx.beginPath(); ctx.moveTo(sx,0); ctx.lineTo(sx+sw,0); ctx.lineTo(sx+sw-W*0.3,H); ctx.lineTo(sx-W*0.3,H); ctx.closePath();
+        ctx.fillStyle=pick(si); ctx.fill();
+      }
+      for(var si2=0;si2<=sc;si2++){
+        var sx2=si2*W/sc-W*0.3;
+        strokeDiv(sx2,0,sx2-W*0.3,H);
+      }
+    } else if (pat === 2) {
+      // Fractured: 4 edge-to-edge lines creating irregular regions
+      var d=[{x1:W*0.15,y1:0,x2:W*0.55,y2:H},{x1:0,y1:H*0.3,x2:W,y2:H*0.65},
+             {x1:W*0.40,y1:0,x2:W*0.85,y2:H},{x1:0,y1:H*0.7,x2:W*0.70,y2:0}];
+      ctx.fillStyle=pick(0); ctx.fillRect(0,0,W,H);
+      // Region left of line 0
+      ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(d[0].x1,0); ctx.lineTo(d[0].x2,H); ctx.lineTo(0,H); ctx.closePath();
+      ctx.fillStyle=pick(1); ctx.fill(); ctx.restore();
+      // Region between lines 0 and 2
+      ctx.save(); ctx.beginPath(); ctx.moveTo(d[0].x1,0); ctx.lineTo(d[2].x1,0); ctx.lineTo(d[2].x2,H); ctx.lineTo(d[0].x2,H); ctx.closePath();
+      ctx.fillStyle=pick(2); ctx.fill(); ctx.restore();
+      // Region right of line 2
+      ctx.save(); ctx.beginPath(); ctx.moveTo(d[2].x1,0); ctx.lineTo(W,0); ctx.lineTo(W,H); ctx.lineTo(d[2].x2,H); ctx.closePath();
+      ctx.fillStyle=pick(3); ctx.fill(); ctx.restore();
+      // Overlay from horizontal line
+      ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(d[1].x2,d[1].y2); ctx.lineTo(d[1].x1,d[1].y1); ctx.closePath();
+      ctx.fillStyle=pick(4)+'60'; ctx.fill(); ctx.restore();
+      for(var di=0;di<d.length;di++) strokeDiv(d[di].x1,d[di].y1,d[di].x2,d[di].y2);
+    } else if (pat === 3) {
+      // Mosaic Grid: 5x2
+      var gc=5, gr=2, tw=W/gc, th=H/gr;
+      for(var r=0;r<gr;r++) for(var c=0;c<gc;c++) {
+        ctx.fillStyle=pick(r*gc+c); ctx.fillRect(c*tw,r*th,tw,th);
+      }
+      for(var c2=1;c2<gc;c2++) strokeDiv(c2*tw,0,c2*tw,H);
+      strokeDiv(0,th,W,th);
+    } else {
+      // Lightning Bolt
+      var zy1=H*0.3,zy2=H*0.5,zy3=H*0.7;
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W*0.6,0); ctx.lineTo(W*0.4,zy1); ctx.lineTo(W*0.7,zy2);
+      ctx.lineTo(W*0.3,zy3); ctx.lineTo(W*0.5,H); ctx.lineTo(0,H); ctx.closePath();
+      ctx.fillStyle=pick(0); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(W*0.6,0); ctx.lineTo(W,0); ctx.lineTo(W,H); ctx.lineTo(W*0.5,H);
+      ctx.lineTo(W*0.3,zy3); ctx.lineTo(W*0.7,zy2); ctx.lineTo(W*0.4,zy1); ctx.closePath();
+      ctx.fillStyle=pick(1); ctx.fill();
+      ctx.save(); ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=2.5;
+      ctx.beginPath(); ctx.moveTo(W*0.6,0); ctx.lineTo(W*0.4,zy1); ctx.lineTo(W*0.7,zy2);
+      ctx.lineTo(W*0.3,zy3); ctx.lineTo(W*0.5,H); ctx.stroke(); ctx.restore();
+    }
+    ctx.fillStyle='rgba(0,0,0,0.1)'; ctx.fillRect(0,0,W,H);
   } else {
     var angle = (cfg.gradientAngle !== undefined ? cfg.gradientAngle : 135) * Math.PI / 180;
     var cx2 = W/2, cy2 = H/2, len = Math.max(W,H)/2;

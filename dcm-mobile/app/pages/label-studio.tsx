@@ -218,7 +218,7 @@ export default function LabelStudioScreen() {
       borderColor: colors.accentColor,
       borderWidth: styleId === 'neon-outline' ? 0.03 : 0.04,
       topEdgeGradient: colors.topEdgeGradient,
-      customColors: undefined,
+      customColors: cardColors.palette.slice(0, 5),
       layoutStyle: undefined,
     })
   }, [cardColors, updateConfig])
