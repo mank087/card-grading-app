@@ -181,6 +181,7 @@ export interface CustomLabelConfig {
   borderEnabled: boolean;
   borderColor: string;
   borderWidth: number;     // inches (e.g. 0.04)
+  topEdgeGradient?: string[];  // Multi-stop gradient for Card Extension style
 }
 
 export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {
@@ -215,6 +216,8 @@ export interface LabelColorOverrides {
   borderWidth: number;  // inches, converted to px by consumer
   isRainbow?: boolean;  // true when colorPreset === 'rainbow'
   isNeonOutline?: boolean;  // true when using neon-outline card color style
+  isCardExtension?: boolean;  // true when using card-extension style
+  topEdgeGradient?: string[];  // Multi-stop gradient for card-extension slab wrapper
 }
 
 /** Rainbow CSS gradient string for reuse across components */
@@ -230,6 +233,16 @@ export function getSlabWrapperStyle(overrides: LabelColorOverrides | undefined):
       background: 'linear-gradient(145deg, #ff0000 0%, #ff8800 17%, #ffff00 33%, #00cc00 50%, #0066ff 67%, #8800ff 83%, #ff00ff 100%)',
       boxShadow: '0 0 20px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
       border: '1px solid rgba(255, 255, 255, 0.3)',
+    };
+  }
+  if (overrides?.isCardExtension && overrides.topEdgeGradient && overrides.topEdgeGradient.length >= 3) {
+    const stops = overrides.topEdgeGradient.map((c, i, arr) =>
+      `${c} ${Math.round((i / (arr.length - 1)) * 100)}%`
+    ).join(', ');
+    return {
+      background: `linear-gradient(90deg, ${stops})`,
+      boxShadow: `0 0 20px ${overrides.gradientStart}66, inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.3)`,
+      border: `1px solid ${overrides.gradientStart}66`,
     };
   }
   if (overrides?.isNeonOutline) {
@@ -268,6 +281,8 @@ export function extractColorOverrides(config: CustomLabelConfig | null | undefin
     borderWidth: config.borderWidth,
     isRainbow: config.colorPreset === 'rainbow',
     isNeonOutline: config.colorPreset === 'neon-outline',
+    isCardExtension: config.colorPreset === 'card-extension',
+    topEdgeGradient: config.topEdgeGradient,
   };
 }
 

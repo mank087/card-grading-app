@@ -187,19 +187,24 @@ function drawCustomBackground(
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
   } else if (config.colorPreset === 'card-extension') {
-    // Card Extension: horizontal gradient across the label using the top-edge colors.
-    // The config stores gradientStart/End from the first/last top-edge samples,
-    // but we also blend through the midpoint for a richer effect.
+    // Card Extension: horizontal multi-stop gradient using the card's top-edge colors.
     const grad = ctx.createLinearGradient(0, 0, W, 0);
-    grad.addColorStop(0, config.gradientStart);
-    grad.addColorStop(0.5, config.gradientEnd);
-    grad.addColorStop(1, config.gradientStart);
+    if (config.topEdgeGradient && config.topEdgeGradient.length >= 3) {
+      // Use the full top-edge color samples for a faithful card-matching gradient
+      config.topEdgeGradient.forEach((color, i) => {
+        grad.addColorStop(i / (config.topEdgeGradient!.length - 1), color);
+      });
+    } else {
+      // Fallback: simple two-color gradient
+      grad.addColorStop(0, config.gradientStart);
+      grad.addColorStop(1, config.gradientEnd);
+    }
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
-    // Slight darkening at the bottom to add depth
+    // Slight darkening at the bottom for depth
     const fade = ctx.createLinearGradient(0, 0, 0, H);
     fade.addColorStop(0, 'rgba(0,0,0,0)');
-    fade.addColorStop(1, 'rgba(0,0,0,0.3)');
+    fade.addColorStop(1, 'rgba(0,0,0,0.25)');
     ctx.fillStyle = fade;
     ctx.fillRect(0, 0, W, H);
   } else if (config.colorPreset === 'team-colors') {

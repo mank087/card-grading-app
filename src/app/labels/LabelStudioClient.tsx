@@ -675,6 +675,7 @@ function CustomDesigner({
       borderEnabled: style.id === 'neon-outline',
       borderColor: colors.accentColor,
       borderWidth: style.id === 'neon-outline' ? 0.03 : 0.04,
+      topEdgeGradient: colors.topEdgeGradient || undefined,
     })
   }, [cardColorInput, updateConfig])
 
