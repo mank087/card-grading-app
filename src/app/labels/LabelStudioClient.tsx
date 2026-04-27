@@ -1293,16 +1293,15 @@ function CustomDesigner({
 
           {/* Controls */}
           <div className="lg:w-[340px] flex-shrink-0 space-y-5">
-            {/* Live slab preview with card image — always visible for eyedropper reference */}
+            {/* Mobile-only slab preview (desktop has sticky preview on right) */}
             {selectedCard && (
-              <div className="flex justify-center">
+              <div className="lg:hidden flex justify-center">
                 <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '280 / 460' }}>
                   <img
                     src="/labels/graded-card-slab.png"
                     alt="Graded Card Slab"
                     className="absolute inset-0 w-full h-full object-contain"
                   />
-                  {/* Label in slab slot */}
                   <div className="absolute overflow-hidden" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
                     {previewDataUrl ? (
                       <img src={previewDataUrl} alt="Label preview" className="w-full h-auto" />
@@ -1310,7 +1309,6 @@ function CustomDesigner({
                       <div className="w-full bg-gray-200 rounded" style={{ aspectRatio: '3.5 / 1' }} />
                     )}
                   </div>
-                  {/* Card image */}
                   <div className="absolute overflow-hidden" style={{ top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }}>
                     {selectedCard.front_url ? (
                       <img src={selectedCard.front_url} alt={selectedCard.card_name || 'Card'}
@@ -1319,7 +1317,6 @@ function CustomDesigner({
                       <div className="w-full h-full" />
                     )}
                   </div>
-                  {/* Gloss */}
                   <div className="absolute inset-0 pointer-events-none"
                     style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.03) 100%)' }} />
                 </div>
@@ -1445,9 +1442,9 @@ function CustomDesigner({
                 <div className="mt-2 space-y-3">
                   <div>
                     {(() => {
-                      const isExtension = config.layoutStyle === 'card-extension'
+                      const showAllSlots = config.layoutStyle === 'card-extension' || config.layoutStyle === 'geometric'
                       const colors = config.customColors || [config.gradientStart, config.gradientEnd]
-                      const visibleCount = isExtension ? 5 : 2
+                      const visibleCount = showAllSlots ? 5 : 2
                       return (
                         <>
                           <div className="flex items-center justify-between mb-1.5">
@@ -1482,8 +1479,8 @@ function CustomDesigner({
                               )
                             })}
                           </div>
-                          {isExtension && (
-                            <p className="text-[9px] text-gray-400 mt-1">Select up to 5 colors for the extension gradient</p>
+                          {showAllSlots && (
+                            <p className="text-[9px] text-gray-400 mt-1">Select up to 5 colors for the {config.layoutStyle === 'card-extension' ? 'extension gradient' : 'geometric pattern'}</p>
                           )}
                           <p className="text-[9px] text-gray-400 mt-0.5">Tap a color to open the picker</p>
 
@@ -1971,26 +1968,53 @@ function CustomDesigner({
             )}
           </div>
 
-          {/* Desktop Preview (canvas) — visually hidden on mobile, img mirrors shown instead */}
-          <div className="flex-1 flex-col items-center hidden lg:flex">
-            <div className="relative bg-gray-100 rounded-lg p-4 w-full flex items-center justify-center min-h-[200px]">
-              {isRendering && (
-                <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded-lg z-10">
-                  <div className="w-5 h-5 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+          {/* Desktop Preview — sticky slab with card + label, stays visible while scrolling */}
+          <div className="flex-1 hidden lg:block">
+            <div className="sticky top-4">
+              {/* Slab preview with card image + label */}
+              <div className="flex flex-col items-center">
+                <div className="w-full max-w-[240px] relative mx-auto" style={{ aspectRatio: '280 / 460' }}>
+                  <img
+                    src="/labels/graded-card-slab.png"
+                    alt="Graded Card Slab"
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                  {/* Label in slab slot */}
+                  <div className="absolute overflow-hidden" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
+                    {isRendering && (
+                      <div className="absolute inset-0 z-10 flex items-center justify-center">
+                        <div className="w-3 h-3 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+                      </div>
+                    )}
+                    {previewDataUrl ? (
+                      <img src={previewDataUrl} alt="Label preview" className="w-full h-auto" />
+                    ) : (
+                      <div className="w-full bg-gray-200 rounded" style={{ aspectRatio: '3.5 / 1' }} />
+                    )}
+                  </div>
+                  {/* Card image */}
+                  <div className="absolute overflow-hidden" style={{ top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }}>
+                    {selectedCard?.front_url ? (
+                      <img src={selectedCard.front_url} alt={selectedCard.card_name || 'Card'}
+                        className="w-full h-full object-contain" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full" />
+                    )}
+                  </div>
+                  {/* Gloss */}
+                  <div className="absolute inset-0 pointer-events-none"
+                    style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.03) 100%)' }} />
                 </div>
-              )}
-              <canvas
-                ref={canvasRef}
-                className="max-w-full h-auto shadow-lg rounded"
-                style={{ imageRendering: 'auto' }}
-              />
-            </div>
 
-            {/* Dimension annotation */}
-            <p className="text-xs text-gray-500 mt-2 text-center">
-              {config.width}" × {config.height}"
-              {currentDimPreset && config.preset !== 'custom' && ` — ${currentDimPreset.name}`}
-            </p>
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  {config.width}" × {config.height}"
+                  {currentDimPreset && config.preset !== 'custom' && ` — ${currentDimPreset.name}`}
+                </p>
+              </div>
+
+              {/* Hidden canvas for rendering */}
+              <canvas ref={canvasRef} className="hidden" />
+            </div>
           </div>
         </div>
       )}

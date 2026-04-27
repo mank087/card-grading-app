@@ -513,9 +513,9 @@ export default function LabelStudioScreen() {
                     <Text style={s.subLabel}>Your Colors</Text>
                   </View>
                   {(() => {
-                    const isExtension = config.layoutStyle === 'card-extension'
+                    const showAllSlots = config.layoutStyle === 'card-extension' || config.layoutStyle === 'geometric'
                     const colors = config.customColors || [config.gradientStart, config.gradientEnd]
-                    const visibleCount = isExtension ? 5 : 2
+                    const visibleCount = showAllSlots ? 5 : 2
                     return (
                       <View style={s.customSwatches}>
                         {Array.from({ length: visibleCount }).map((_, i) => {
