@@ -255,7 +255,7 @@ export const DEFAULT_LAYOUT = 'color-gradient';
 export const GEOMETRIC_PATTERNS = [
   { id: 0, name: 'Shattered Glass' },
   { id: 1, name: 'Diagonal Stripes' },
-  { id: 2, name: 'Scattered Lines' },
+  { id: 2, name: 'Fractured' },
   { id: 3, name: 'Mosaic Grid' },
   { id: 4, name: 'Lightning Bolt' },
 ] as const;

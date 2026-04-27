@@ -289,40 +289,83 @@ function drawCustomBackground(
         strokeDivider(ctx, p, scale);
       }
     } else if (patternIdx === 2) {
-      // Scattered Lines: 4 diagonal lines of varying lengths scattered across the label
-      // Some perpendicular to others, creating an abstract geometric accent
-      // These are decorative lines over a color background — not region dividers
+      // Fractured: 4 edge-to-edge diagonal lines at varied angles that divide
+      // the label into irregular regions, each filled with a color. Like
+      // shattered glass but without a central origin — lines cross randomly.
 
-      // Fill background with gradient of first two colors
-      const bg = ctx.createLinearGradient(0, 0, W, H);
-      bg.addColorStop(0, pick(0));
-      bg.addColorStop(1, pick(1));
-      ctx.fillStyle = bg;
-      ctx.fillRect(0, 0, W, H);
-
-      // 4 fixed diagonal lines at varying positions, lengths, and angles
-      // Line 1: long diagonal from upper-left area (angle ~30°)
-      // Line 2: medium, perpendicular to line 1 (~120°), lower-center
-      // Line 3: short, same angle as line 1 (~30°), right side
-      // Line 4: medium, perpendicular (~120°), upper-right area
-      const lines = [
-        { x1: W * 0.05, y1: H * 0.15, x2: W * 0.45, y2: H * 0.85 },  // long, ~60°
-        { x1: W * 0.25, y1: H * 0.80, x2: W * 0.60, y2: H * 0.20 },  // medium, ~-60° (perpendicular)
-        { x1: W * 0.55, y1: H * 0.10, x2: W * 0.75, y2: H * 0.65 },  // short-medium, ~60°
-        { x1: W * 0.65, y1: H * 0.70, x2: W * 0.90, y2: H * 0.15 },  // medium, ~-60° (perpendicular)
+      // 4 lines, each from one edge to another at different angles/positions
+      // Defined as fractions along each edge (0-1)
+      const dividers = [
+        { x1: W * 0.15, y1: 0,     x2: W * 0.55, y2: H },        // top→bottom, slight angle
+        { x1: 0,        y1: H*0.3,  x2: W,        y2: H * 0.65 }, // left→right, gentle slope
+        { x1: W * 0.40, y1: 0,     x2: W * 0.85, y2: H },        // top→bottom, steeper
+        { x1: 0,        y1: H*0.7,  x2: W * 0.70, y2: 0 },       // left→top, crossing back
       ];
 
+      // Build polygon regions by using the divider lines as boundaries.
+      // Approximate approach: fill vertical slices colored by which "side"
+      // of each line they fall on, creating a region map.
+      // Simpler and more reliable: use the lines to clip triangular/quad regions.
+
+      // Fill base color
+      ctx.fillStyle = pick(0);
+      ctx.fillRect(0, 0, W, H);
+
+      // Region 1: above line 0 and left of line 2
       ctx.save();
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-      ctx.lineWidth = 2.5 * scale;
-      ctx.lineCap = 'round';
-      for (const l of lines) {
-        ctx.beginPath();
-        ctx.moveTo(l.x1, l.y1);
-        ctx.lineTo(l.x2, l.y2);
-        ctx.stroke();
-      }
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(dividers[0].x1, 0);
+      ctx.lineTo(dividers[0].x2, H);
+      ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fillStyle = pick(1);
+      ctx.fill();
       ctx.restore();
+
+      // Region 2: between lines 0 and 2
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(dividers[0].x1, 0);
+      ctx.lineTo(dividers[2].x1, 0);
+      ctx.lineTo(dividers[2].x2, H);
+      ctx.lineTo(dividers[0].x2, H);
+      ctx.closePath();
+      ctx.fillStyle = pick(2);
+      ctx.fill();
+      ctx.restore();
+
+      // Region 3: right of line 2
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(dividers[2].x1, 0);
+      ctx.lineTo(W, 0);
+      ctx.lineTo(W, H);
+      ctx.lineTo(dividers[2].x2, H);
+      ctx.closePath();
+      ctx.fillStyle = pick(3);
+      ctx.fill();
+      ctx.restore();
+
+      // Region 4: clip by horizontal line 1 — upper portion gets an overlay
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(W, 0);
+      ctx.lineTo(dividers[1].x2, dividers[1].y2);
+      ctx.lineTo(dividers[1].x1, dividers[1].y1);
+      ctx.closePath();
+      ctx.fillStyle = pick(4) + '60'; // semi-transparent overlay
+      ctx.fill();
+      ctx.restore();
+
+      // Stroke all 4 divider lines
+      for (const d of dividers) {
+        const p = new Path2D();
+        p.moveTo(d.x1, d.y1);
+        p.lineTo(d.x2, d.y2);
+        strokeDivider(ctx, p, scale);
+      }
     } else if (patternIdx === 3) {
       // Mosaic Grid: 5x2 rectangular tiles
       const cols = 5, rows = 2;
