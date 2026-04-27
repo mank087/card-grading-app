@@ -1,4 +1,5 @@
-import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity, Linking } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Image, TouchableOpacity } from 'react-native'
+import * as WebBrowser from 'expo-web-browser'
 import { Colors } from '@/lib/constants'
 
 const products = [
@@ -34,7 +35,7 @@ export default function ShopScreen() {
         <TouchableOpacity
           key={product.name}
           style={styles.productCard}
-          onPress={() => Linking.openURL(product.link)}
+          onPress={() => WebBrowser.openBrowserAsync(product.link)}
           activeOpacity={0.7}
         >
           <View style={styles.imageContainer}>

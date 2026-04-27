@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl } from 'react-native'
+import * as Clipboard from 'expo-clipboard'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
@@ -157,12 +158,18 @@ export default function CardDetailScreen() {
           <Ionicons name="share-social" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Share</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => {
+        <TouchableOpacity style={s.shareBtn} onPress={async () => {
           const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-          Linking.openURL(`https://dcmgrading.com/${catPath}/${card.id}`)
+          const url = `https://dcmgrading.com/${catPath}/${card.id}`
+          await Clipboard.setStringAsync(url)
+          Alert.alert('Link Copied', url)
         }}>
-          <Ionicons name="link" size={16} color={Colors.purple[600]} />
+          <Ionicons name="copy" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Copy Link</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.shareBtn} onPress={() => router.push('/pages/label-studio' as any)}>
+          <Ionicons name="pricetags" size={16} color={Colors.purple[600]} />
+          <Text style={s.shareBtnText}>Labels</Text>
         </TouchableOpacity>
       </View>
 
@@ -314,8 +321,10 @@ export default function CardDetailScreen() {
           <CollapsibleSection title="Insta-List on eBay" icon="pricetag">
             <Text style={s.ebayInfo}>Automatically includes front & back card images with DCM grade labels, mini grading report, and pre-filled title.</Text>
             <TouchableOpacity style={s.ebayButton} onPress={() => {
+              // eBay listing requires the web interface for OAuth + listing creation
+              // Opens in in-app WebView via the pages route
               const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-              Linking.openURL(`https://dcmgrading.com/${catPath}/${card.id}`)
+              router.push({ pathname: '/pages/ebay-list' as any, params: { cardPath: `/${catPath}/${card.id}` } })
             }}>
               <Ionicons name="cart" size={18} color={Colors.white} />
               <Text style={s.ebayButtonText}>List on eBay</Text>
