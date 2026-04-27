@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
 import { buildContextLine, buildFeaturesLine } from '@/lib/labelDataGenerator'
-import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES } from '@/lib/labelPresets'
+import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, applyLayoutToColors } from '@/lib/labelPresets'
 import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle, CardColorInput } from '@/lib/labelPresets'
 import { extractCardColors, type CardColors } from '@/lib/colorExtractor'
 import { LabelMockup } from '@/components/labels/LabelMockup'
@@ -679,6 +679,10 @@ function CustomDesigner({
     })
   }, [cardColorInput, updateConfig])
 
+  // Custom multi-color state
+  const [customColorCount, setCustomColorCount] = useState(2)
+  const isCustomLayout = !!(config.layoutStyle && config.customColors && config.customColors.length > 0)
+
   // Eyedropper state
   const [eyedropperTarget, setEyedropperTarget] = useState<'start' | 'end' | 'border' | null>(null)
   const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null)
@@ -905,13 +909,28 @@ function CustomDesigner({
 
   const handleColorPreset = (color: ColorPreset) => {
     setActiveCardColorStyle(null)
-    updateConfig({
-      colorPreset: color.id,
-      gradientStart: color.gradientStart,
-      gradientEnd: color.gradientEnd,
-      // Switch style based on color
-      style: color.id === 'traditional' ? 'traditional' : 'modern',
-    })
+    if (color.id === 'custom') {
+      // Initialize custom colors from current gradient
+      const cols = config.customColors || [config.gradientStart, config.gradientEnd]
+      setCustomColorCount(cols.length)
+      updateConfig({
+        colorPreset: 'custom',
+        customColors: cols,
+        layoutStyle: config.layoutStyle || 'color-gradient',
+        gradientStart: cols[0],
+        gradientEnd: cols[1] || cols[0],
+        style: 'modern',
+      })
+    } else {
+      updateConfig({
+        colorPreset: color.id,
+        gradientStart: color.gradientStart,
+        gradientEnd: color.gradientEnd,
+        style: color.id === 'traditional' ? 'traditional' : 'modern',
+        customColors: undefined,
+        layoutStyle: undefined,
+      })
+    }
   }
 
   const [showCustomPrintChoice, setShowCustomPrintChoice] = useState(false)
@@ -1084,67 +1103,148 @@ function CustomDesigner({
                 ))}
               </div>
 
-              {/* Custom color pickers */}
-              {config.colorPreset === 'custom' && (
-                <div className="mt-2 space-y-2">
-                  <div className="flex gap-3">
-                    <div className="flex-1">
-                      <label className="text-[10px] text-gray-500">Start</label>
-                      <div className="flex gap-1 items-center">
-                        <input
-                          type="color"
-                          value={config.gradientStart}
-                          onChange={(e) => updateConfig({ gradientStart: e.target.value })}
-                          className="flex-1 h-7 rounded border border-gray-300 cursor-pointer"
-                        />
-                        {selectedCard?.front_url && (
+              {/* Custom color pickers — 2-5 user colors + layout style */}
+              {config.colorPreset === 'custom' || (config.customColors && config.customColors.length > 0 && isCustomLayout) ? (
+                <div className="mt-2 space-y-3">
+                  {/* Color swatches */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] text-gray-500 font-medium">Your Colors ({customColorCount})</label>
+                      <div className="flex items-center gap-1.5">
+                        {cardColors && (
                           <button
-                            onClick={() => setEyedropperTarget(eyedropperTarget === 'start' ? null : 'start')}
-                            className={`w-7 h-7 rounded border flex items-center justify-center transition-colors ${
-                              eyedropperTarget === 'start'
-                                ? 'border-purple-500 bg-purple-100 text-purple-700'
-                                : 'border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600'
-                            }`}
-                            title="Pick from card"
+                            onClick={() => {
+                              const pulled = cardColors.palette.slice(0, 5)
+                              setCustomColorCount(pulled.length)
+                              const layout = config.layoutStyle || 'color-gradient'
+                              updateConfig({
+                                customColors: pulled,
+                                ...applyLayoutToColors(layout, pulled),
+                                layoutStyle: layout,
+                              })
+                            }}
+                            className="text-[9px] text-purple-600 hover:text-purple-800 underline"
                           >
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              <circle cx="12" cy="12" r="3" fill="currentColor" />
-                            </svg>
+                            Pull from card
+                          </button>
+                        )}
+                        {customColorCount < 5 && (
+                          <button
+                            onClick={() => {
+                              const next = customColorCount + 1
+                              setCustomColorCount(next)
+                              const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+                              while (cols.length < next) cols.push('#7c3aed')
+                              updateConfig({ customColors: cols })
+                            }}
+                            className="text-[9px] text-gray-500 hover:text-purple-600 underline"
+                          >
+                            + Add
+                          </button>
+                        )}
+                        {customColorCount > 2 && (
+                          <button
+                            onClick={() => {
+                              const next = customColorCount - 1
+                              setCustomColorCount(next)
+                              const cols = (config.customColors || []).slice(0, next)
+                              const layout = config.layoutStyle || 'color-gradient'
+                              updateConfig({
+                                customColors: cols,
+                                ...applyLayoutToColors(layout, cols),
+                              })
+                            }}
+                            className="text-[9px] text-gray-500 hover:text-red-500 underline"
+                          >
+                            Remove
                           </button>
                         )}
                       </div>
                     </div>
-                    <div className="flex-1">
-                      <label className="text-[10px] text-gray-500">End</label>
-                      <div className="flex gap-1 items-center">
-                        <input
-                          type="color"
-                          value={config.gradientEnd}
-                          onChange={(e) => updateConfig({ gradientEnd: e.target.value })}
-                          className="flex-1 h-7 rounded border border-gray-300 cursor-pointer"
-                        />
-                        {selectedCard?.front_url && (
+                    <div className="flex gap-1.5">
+                      {Array.from({ length: customColorCount }).map((_, i) => {
+                        const colors = config.customColors || [config.gradientStart, config.gradientEnd]
+                        const color = colors[i] || '#7c3aed'
+                        return (
+                          <div key={i} className="flex-1">
+                            <input
+                              type="color"
+                              value={color}
+                              onChange={(e) => {
+                                const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+                                while (cols.length <= i) cols.push('#7c3aed')
+                                cols[i] = e.target.value
+                                const layout = config.layoutStyle || 'color-gradient'
+                                updateConfig({
+                                  customColors: cols,
+                                  ...applyLayoutToColors(layout, cols),
+                                  layoutStyle: layout,
+                                })
+                              }}
+                              className="w-full h-8 rounded border border-gray-300 cursor-pointer"
+                            />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Layout style buttons */}
+                  <div>
+                    <label className="text-[10px] text-gray-500 font-medium mb-1 block">Layout Style</label>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {LAYOUT_STYLES.map((ls) => {
+                        const isActive = config.layoutStyle === ls.id
+                        const previewColors = config.customColors || [config.gradientStart, config.gradientEnd]
+                        const c1 = previewColors[0] || '#7c3aed'
+                        const c2 = previewColors[1] || previewColors[0] || '#4c1d95'
+
+                        let bg: React.CSSProperties
+                        if (ls.id === 'neon-outline') {
+                          bg = { background: '#0a0a0a', boxShadow: `inset 0 0 6px ${c1}88` }
+                        } else if (ls.id === 'card-extension') {
+                          const stops = previewColors.map((c, i, arr) =>
+                            `${c} ${Math.round((i / Math.max(arr.length - 1, 1)) * 100)}%`
+                          ).join(', ')
+                          bg = { background: `linear-gradient(90deg, ${stops})` }
+                        } else if (ls.id === 'team-colors') {
+                          bg = { background: `linear-gradient(90deg, ${c1} 45%, ${c2} 55%)` }
+                        } else if (ls.id === 'frosted-glass') {
+                          bg = { background: `linear-gradient(135deg, ${c1}30, ${c2}30)`, border: '1px solid #e5e7eb' }
+                        } else {
+                          bg = { background: `linear-gradient(135deg, ${c1}, ${c2})` }
+                        }
+
+                        return (
                           <button
-                            onClick={() => setEyedropperTarget(eyedropperTarget === 'end' ? null : 'end')}
-                            className={`w-7 h-7 rounded border flex items-center justify-center transition-colors ${
-                              eyedropperTarget === 'end'
-                                ? 'border-purple-500 bg-purple-100 text-purple-700'
-                                : 'border-gray-300 text-gray-500 hover:border-purple-400 hover:text-purple-600'
+                            key={ls.id}
+                            onClick={() => {
+                              const cols = config.customColors || [config.gradientStart, config.gradientEnd]
+                              updateConfig({
+                                ...applyLayoutToColors(ls.id, cols),
+                                customColors: cols,
+                                layoutStyle: ls.id,
+                              })
+                              setActiveCardColorStyle(null)
+                            }}
+                            className={`rounded-lg overflow-hidden border-2 transition-all ${
+                              isActive
+                                ? 'border-purple-600 ring-2 ring-purple-300'
+                                : 'border-gray-200 hover:border-purple-300'
                             }`}
-                            title="Pick from card"
+                            title={ls.name}
                           >
-                            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              <circle cx="12" cy="12" r="3" fill="currentColor" />
-                            </svg>
+                            <div className="w-full aspect-square" style={bg} />
+                            <div className="text-[8px] text-gray-600 text-center py-0.5 bg-white truncate">
+                              {ls.name}
+                            </div>
                           </button>
-                        )}
-                      </div>
+                        )
+                      })}
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Eyedropper card image sampler */}
               {eyedropperTarget && selectedCard && (

@@ -165,6 +165,88 @@ function mixHex(hex1: string, hex2: string, ratio: number): string {
   return `#${mix(0)}${mix(1)}${mix(2)}`;
 }
 
+/**
+ * Apply a layout style to user-chosen custom colors.
+ * Returns partial config values to merge into CustomLabelConfig.
+ */
+export function applyLayoutToColors(
+  layoutId: string,
+  colors: string[]
+): Partial<CustomLabelConfig> {
+  const c1 = colors[0] || '#7c3aed';
+  const c2 = colors[1] || colors[0] || '#4c1d95';
+  const c3 = colors[2];
+  const c4 = colors[3];
+  const c5 = colors[4];
+
+  switch (layoutId) {
+    case 'color-gradient':
+      return {
+        colorPreset: 'color-gradient',
+        gradientStart: c1,
+        gradientEnd: c2,
+        style: 'modern',
+        borderEnabled: false,
+      };
+    case 'card-extension': {
+      // Build multi-stop gradient from all available colors
+      const gradient = colors.length >= 3
+        ? colors
+        : [c1, mixHex(c1, c2, 0.5), c2];
+      return {
+        colorPreset: 'card-extension',
+        gradientStart: gradient[0],
+        gradientEnd: gradient[gradient.length - 1],
+        topEdgeGradient: gradient,
+        style: 'modern',
+        borderEnabled: false,
+      };
+    }
+    case 'neon-outline':
+      return {
+        colorPreset: 'neon-outline',
+        gradientStart: '#0a0a0a',
+        gradientEnd: '#1a1a2e',
+        borderEnabled: true,
+        borderColor: c1,
+        borderWidth: 0.03,
+        style: 'modern',
+      };
+    case 'frosted-glass':
+      return {
+        colorPreset: 'frosted-glass',
+        gradientStart: mixHex(c1, '#ffffff', 0.85),
+        gradientEnd: mixHex(c2, '#ffffff', 0.85),
+        style: 'modern',
+        borderEnabled: false,
+      };
+    case 'team-colors':
+      return {
+        colorPreset: 'team-colors',
+        gradientStart: mixHex(c1, '#000000', 0.2),
+        gradientEnd: mixHex(c2, '#000000', 0.2),
+        style: 'modern',
+        borderEnabled: false,
+      };
+    default: // simple gradient fallback
+      return {
+        colorPreset: 'custom',
+        gradientStart: c1,
+        gradientEnd: c2,
+        style: 'modern',
+      };
+  }
+}
+
+/** Layout style definitions for the UI (labels + ids for buttons) */
+export const LAYOUT_STYLES = [
+  { id: 'color-gradient', name: 'Gradient', icon: '↗' },
+  { id: 'card-extension', name: 'Extension', icon: '═' },
+  { id: 'neon-outline', name: 'Neon', icon: '◇' },
+  { id: 'frosted-glass', name: 'Frosted', icon: '◻' },
+  { id: 'team-colors', name: 'Split', icon: '◧' },
+] as const;
+
 // ============================================================================
 // CUSTOM LABEL CONFIG
 // ============================================================================
@@ -182,6 +264,8 @@ export interface CustomLabelConfig {
   borderColor: string;
   borderWidth: number;     // inches (e.g. 0.04)
   topEdgeGradient?: string[];  // Multi-stop gradient for Card Extension style
+  customColors?: string[];     // Up to 5 user-picked colors for custom layouts
+  layoutStyle?: string;        // Layout style id applied to custom colors
 }
 
 export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {
