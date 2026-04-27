@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { View, Image, StyleSheet, Animated, Dimensions, Easing } from 'react-native'
+import { View, Image, StyleSheet, Animated, Dimensions, Easing, TouchableOpacity, Text } from 'react-native'
 import { Colors } from '@/lib/constants'
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
@@ -52,7 +52,7 @@ export default function WelcomeAnimation({ onComplete }: WelcomeAnimationProps) 
     // Phase 1: Cards fly up from bottom center, staggered
     const cardAnimations = cardAnims.map((anim, index) => {
       const dest = CARD_DESTINATIONS[index]
-      const delay = index * 120  // Stagger by 120ms
+      const delay = index * 80  // Stagger by 80ms
 
       return Animated.sequence([
         Animated.delay(delay),
@@ -129,8 +129,8 @@ export default function WelcomeAnimation({ onComplete }: WelcomeAnimationProps) 
           ]),
         ]),
       ]),
-      // Hold for a moment
-      Animated.delay(1200),
+      // Hold briefly
+      Animated.delay(800),
     ]).start(() => {
       // Animation complete — transition to login
       onComplete()
@@ -173,6 +173,11 @@ export default function WelcomeAnimation({ onComplete }: WelcomeAnimationProps) 
           </Animated.View>
         )
       })}
+
+      {/* Skip button */}
+      <TouchableOpacity style={styles.skipButton} onPress={onComplete} activeOpacity={0.7}>
+        <Text style={styles.skipText}>Skip</Text>
+      </TouchableOpacity>
 
       {/* DCM Logo — appears after cards */}
       {showLogo && (
@@ -237,5 +242,19 @@ const styles = StyleSheet.create({
     color: Colors.white,
     marginTop: 8,
     letterSpacing: 1,
+  },
+  skipButton: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+  },
+  skipText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 14,
+    fontWeight: '600',
   },
 })

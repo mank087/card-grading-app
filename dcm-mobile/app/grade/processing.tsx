@@ -302,13 +302,13 @@ const styles = StyleSheet.create({
   // Steps
   stepsContainer: { gap: 12, marginBottom: 20 },
   stepRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  stepIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.gray[700], alignItems: 'center', justifyContent: 'center' },
-  stepIconDone: { backgroundColor: Colors.green[500] },
-  stepIconActive: { backgroundColor: Colors.purple[600] },
-  stepText: { fontSize: 14, color: Colors.gray[500] },
+  stepIcon: { width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  stepIconDone: { backgroundColor: Colors.green[500], borderColor: Colors.green[500] },
+  stepIconActive: { backgroundColor: Colors.purple[600], borderColor: Colors.purple[400] },
+  stepText: { fontSize: 14, color: Colors.gray[400] },
   stepTextDone: { color: Colors.green[400] },
   stepTextActive: { color: Colors.white, fontWeight: '600' },
-  activeIndicator: { color: Colors.purple[400], fontSize: 16, fontWeight: '700' },
+  activeIndicator: { color: Colors.purple[300], fontSize: 16, fontWeight: '700' },
 
   // Timing
   timingText: { fontSize: 12, color: Colors.gray[500], textAlign: 'center', lineHeight: 18 },

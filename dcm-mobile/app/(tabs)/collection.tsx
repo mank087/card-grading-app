@@ -179,13 +179,17 @@ export default function CollectionScreen() {
         keyExtractor={(item) => item.id}
         renderItem={viewMode === 'list' ? renderListItem : renderGridItem}
         numColumns={viewMode === 'grid' ? 2 : 1}
-        key={viewMode} // Force re-render when switching modes
+        key={viewMode}
         contentContainerStyle={viewMode === 'grid' ? styles.gridContainer : styles.listContainer}
         refreshing={refreshing}
         onRefresh={onRefresh}
+        removeClippedSubviews
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={8}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Ionicons name="albums-outline" size={48} color={Colors.gray[300]} />
+            <Ionicons name="albums-outline" size={72} color={Colors.gray[300]} />
             <Text style={styles.emptyTitle}>No cards yet</Text>
             <Text style={styles.emptySubtitle}>Grade your first card to start building your collection</Text>
           </View>

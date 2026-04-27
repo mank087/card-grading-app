@@ -88,13 +88,13 @@ export const ConditionLabels: Record<number, string> = {
   1: 'Poor',
 }
 
-// Card categories
+// Card categories — shortLabel for pills on small screens
 export const CardCategories = [
   { key: 'Sports', label: 'Sports', icon: 'trophy' },
   { key: 'Pokemon', label: 'Pokemon', icon: 'flash' },
-  { key: 'MTG', label: 'Magic: The Gathering', icon: 'sparkles' },
+  { key: 'MTG', label: 'MTG', icon: 'sparkles' },
   { key: 'Lorcana', label: 'Lorcana', icon: 'star' },
   { key: 'One Piece', label: 'One Piece', icon: 'flag' },
-  { key: 'Yu-Gi-Oh', label: 'Yu-Gi-Oh!', icon: 'prism' },
+  { key: 'Yu-Gi-Oh', label: 'Yu-Gi-Oh', icon: 'prism' },
   { key: 'Other', label: 'Other', icon: 'layers' },
 ] as const

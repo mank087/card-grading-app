@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, Image } from 'react-native'
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, Image, TouchableOpacity } from 'react-native'
 import { Link, useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
@@ -13,6 +14,7 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleRegister = async () => {
     if (!email.trim() || !password) {
@@ -74,14 +76,19 @@ export default function RegisterScreen() {
           />
 
           <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            value={password}
-            onChangeText={setPassword}
-            placeholder="At least 6 characters"
-            placeholderTextColor={Colors.gray[400]}
-            secureTextEntry
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              value={password}
+              onChangeText={setPassword}
+              placeholder="At least 6 characters"
+              placeholderTextColor={Colors.gray[400]}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeButton}>
+              <Ionicons name={showPassword ? 'eye-off' : 'eye'} size={20} color={Colors.gray[400]} />
+            </TouchableOpacity>
+          </View>
 
           <Text style={styles.label}>Confirm Password</Text>
           <TextInput
@@ -90,7 +97,7 @@ export default function RegisterScreen() {
             onChangeText={setConfirmPassword}
             placeholder="Confirm your password"
             placeholderTextColor={Colors.gray[400]}
-            secureTextEntry
+            secureTextEntry={!showPassword}
           />
 
           <Button
@@ -129,6 +136,27 @@ const styles = StyleSheet.create({
     padding: 14,
     fontSize: 16,
     color: Colors.gray[900],
+  },
+  passwordContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.gray[300],
+    borderRadius: 10,
+  },
+  passwordInput: {
+    flex: 1,
+    padding: 14,
+    fontSize: 16,
+    color: Colors.gray[900],
+  },
+  eyeButton: {
+    padding: 14,
+    minWidth: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   errorBox: {
     backgroundColor: Colors.red[50],

@@ -298,9 +298,9 @@ const styles = StyleSheet.create({
 
   // Guide (absolute overlay on camera)
   guideContainer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center' },
-  guide: { width: '70%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.6)', borderRadius: 4, position: 'relative' },
-  guideLabel: { position: 'absolute', alignSelf: 'center', top: '45%', color: 'rgba(255,255,255,0.3)', fontSize: 14, fontWeight: '600', letterSpacing: 2 },
-  corner: { position: 'absolute', width: 20, height: 20, borderColor: Colors.white },
+  guide: { width: '70%', borderWidth: 2, borderColor: 'rgba(255,255,255,0.8)', borderRadius: 4, position: 'relative', shadowColor: '#000', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.5, shadowRadius: 4, elevation: 4 },
+  guideLabel: { position: 'absolute', alignSelf: 'center', top: '45%', color: 'rgba(255,255,255,0.5)', fontSize: 16, fontWeight: '700', letterSpacing: 3, textShadowColor: 'rgba(0,0,0,0.8)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
+  corner: { position: 'absolute', width: 24, height: 24, borderColor: Colors.white },
   cornerTL: { top: -1, left: -1, borderTopWidth: 3, borderLeftWidth: 3 },
   cornerTR: { top: -1, right: -1, borderTopWidth: 3, borderRightWidth: 3 },
   cornerBL: { bottom: -1, left: -1, borderBottomWidth: 3, borderLeftWidth: 3 },
