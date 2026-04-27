@@ -122,6 +122,7 @@ export default function AccountScreen() {
       <MenuSection title="Account">
         <MenuItem icon="person" label="My Account" onPress={() => nav('my-account')} />
         <MenuItem icon="lock-closed" label="Change Password" onPress={() => nav('my-account')} />
+        <MenuItem icon="mail" label="Contact Us" onPress={() => nav('contact')} color={Colors.blue[600]} />
         <MenuItem icon="document" label="Terms & Conditions" onPress={() => nav('terms')} />
         <MenuItem icon="shield" label="Privacy Policy" onPress={() => nav('privacy')} />
       </MenuSection>

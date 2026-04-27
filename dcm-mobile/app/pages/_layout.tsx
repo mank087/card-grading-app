@@ -31,6 +31,7 @@ export default function PagesLayout() {
       <Stack.Screen name="terms" options={{ title: 'Terms & Conditions' }} />
       <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
       <Stack.Screen name="ebay-list" options={{ title: 'List on eBay' }} />
+      <Stack.Screen name="contact" options={{ title: 'Contact Us' }} />
     </Stack>
   )
 }

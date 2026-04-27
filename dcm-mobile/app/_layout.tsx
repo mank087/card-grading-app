@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { Colors } from '@/lib/constants'
 import WelcomeAnimation from '@/components/WelcomeAnimation'
+import HelpBot from '@/components/HelpBot'
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 
@@ -85,6 +86,7 @@ export default function RootLayout() {
               options={{ headerShown: false }}
             />
           </Stack>
+          <HelpBot />
         </AuthGate>
       </CreditsProvider>
     </AuthProvider>
