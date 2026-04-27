@@ -1255,7 +1255,91 @@ function CustomDesigner({
                           {isExtension && (
                             <p className="text-[9px] text-gray-400 mt-1">Select up to 5 colors for the extension gradient</p>
                           )}
-                          <p className="text-[9px] text-gray-400 mt-0.5">Tap a color to open the picker — use its eyedropper on the card preview above</p>
+                          <p className="text-[9px] text-gray-400 mt-0.5">Tap a swatch to open the color picker, or pick from the card below</p>
+
+                          {/* Card image eyedropper — tap slot then tap card to pick colors */}
+                          {selectedCard?.front_url && (
+                            <div className="mt-2">
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <span className="text-[10px] text-gray-500 font-medium">Pick from card:</span>
+                                <div className="flex gap-1">
+                                  {Array.from({ length: visibleCount }).map((_, i) => {
+                                    const slotColor = colors[i] || null
+                                    const isActive = eyedropperTarget === `custom-${i}`
+                                    return (
+                                      <button
+                                        key={i}
+                                        onClick={() => setEyedropperTarget(isActive ? null : `custom-${i}`)}
+                                        className={`w-6 h-6 rounded border-2 text-[8px] font-bold transition-all ${
+                                          isActive
+                                            ? 'border-purple-600 ring-2 ring-purple-300 scale-110'
+                                            : 'border-gray-300 hover:border-purple-400'
+                                        }`}
+                                        style={slotColor ? { backgroundColor: slotColor } : { backgroundColor: '#f3f4f6' }}
+                                        title={isActive ? 'Click the card image to pick' : `Select slot ${i + 1}`}
+                                      >
+                                        <span className="text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]">{i + 1}</span>
+                                      </button>
+                                    )
+                                  })}
+                                </div>
+                                {eyedropperTarget?.startsWith('custom-') && (
+                                  <span className="text-[9px] text-purple-600 font-medium">← now tap the card</span>
+                                )}
+                              </div>
+                              {eyedropperTarget?.startsWith('custom-') && (
+                                <div className="rounded-lg border-2 border-purple-300 bg-purple-50 p-2">
+                                  <div className="flex justify-center">
+                                    <canvas
+                                      ref={eyedropperCanvasRef}
+                                      className="cursor-crosshair rounded max-h-[200px]"
+                                      style={{ touchAction: 'none' }}
+                                      onMouseMove={handleEyedropperMove}
+                                      onClick={handleEyedropperClick}
+                                      onTouchEnd={(e) => {
+                                        const touch = e.changedTouches[0]
+                                        if (!touch || !eyedropperTarget) return
+                                        const canvas = eyedropperCanvasRef.current
+                                        if (!canvas) return
+                                        const rect = canvas.getBoundingClientRect()
+                                        const scaleX = canvas.width / rect.width
+                                        const scaleY = canvas.height / rect.height
+                                        const x = Math.floor((touch.clientX - rect.left) * scaleX)
+                                        const y = Math.floor((touch.clientY - rect.top) * scaleY)
+                                        const ctx = canvas.getContext('2d')
+                                        if (!ctx || x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return
+                                        const pixel = ctx.getImageData(x, y, 1, 1).data
+                                        const color = `#${pixel[0].toString(16).padStart(2,'0')}${pixel[1].toString(16).padStart(2,'0')}${pixel[2].toString(16).padStart(2,'0')}`
+                                        // Apply to the target slot
+                                        if (eyedropperTarget.startsWith('custom-')) {
+                                          const idx = parseInt(eyedropperTarget.split('-')[1])
+                                          const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+                                          while (cols.length <= idx) cols.push('#7c3aed')
+                                          cols[idx] = color
+                                          if (idx + 1 > customColorCount) setCustomColorCount(idx + 1)
+                                          const layout = config.layoutStyle || 'color-gradient'
+                                          updateConfig({
+                                            customColors: cols,
+                                            ...applyLayoutToColors(layout, cols),
+                                            layoutStyle: layout,
+                                          })
+                                        }
+                                        setEyedropperTarget(null)
+                                        setEyedropperHoverColor(null)
+                                      }}
+                                      onMouseLeave={() => setEyedropperHoverColor(null)}
+                                    />
+                                  </div>
+                                  {eyedropperHoverColor && (
+                                    <div className="flex items-center justify-center gap-2 mt-1">
+                                      <span className="w-5 h-5 rounded border border-gray-300" style={{ backgroundColor: eyedropperHoverColor }} />
+                                      <span className="text-[10px] font-mono text-gray-600">{eyedropperHoverColor}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </>
                       )
                     })()}

@@ -14,10 +14,9 @@ import { renderFrontCanvas, renderBackCanvas } from '@/lib/customSlabLabelGenera
 import type { SlabLabelData } from '@/lib/slabLabelGenerator';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 
-// Render at 2x minimum for sharp previews on all screens (retina and standard).
-// devicePixelRatio is typically 2 on retina, 1 on standard — floor of 2 ensures
-// the canvas is always crisp. 96 * 2 = 192 DPI, which matches retina rendering.
-const PREVIEW_DPI = 96 * Math.max(2, typeof window !== 'undefined' ? Math.ceil(window.devicePixelRatio) : 2);
+// Render at 2x for sharp previews. Capped at 2x to avoid huge canvases on
+// high-DPI mobile devices (3x+) that can fail or render slowly.
+const PREVIEW_DPI = 192;
 
 interface UseLabelPreviewOptions {
   config: CustomLabelConfig;
@@ -43,6 +42,10 @@ export function useLabelPreview({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const renderIdRef = useRef(0);
 
+  // Serialize config to detect all field changes (object reference may not change)
+  const configKey = JSON.stringify(config);
+  const dataKey = data ? `${data.serial}-${data.grade}-${data.primaryName}` : '';
+
   const render = useCallback(async () => {
     if (!data) return;
 
@@ -50,19 +53,16 @@ export function useLabelPreview({
     setIsRendering(true);
 
     try {
-      // Render to a fresh offscreen canvas (always works, no DOM dependency)
       const offscreen = config.side === 'front'
         ? await renderFrontCanvas(data, config, PREVIEW_DPI)
         : await renderBackCanvas(data, config, PREVIEW_DPI);
 
-      // Capture data URL from the offscreen canvas (guaranteed untainted)
       try {
         setPreviewDataUrl(offscreen.toDataURL('image/png'));
       } catch {
-        // Extremely unlikely for an offscreen canvas, but handle gracefully
+        // Extremely unlikely for an offscreen canvas
       }
 
-      // Copy to the target canvas element if available (for desktop display)
       const target = canvasRef.current;
       if (target) {
         target.width = offscreen.width;
@@ -76,11 +76,11 @@ export function useLabelPreview({
       console.error('Label preview render error:', err);
     }
 
-    // Only clear rendering if this is still the latest render
     if (renderId === renderIdRef.current) {
       setIsRendering(false);
     }
-  }, [config, data, canvasRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configKey, dataKey, canvasRef]);
 
   useEffect(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
