@@ -3,9 +3,12 @@ import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect } from 'react'
+import { StripeProvider } from '@stripe/stripe-react-native'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { Colors } from '@/lib/constants'
+
+const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 
 export { ErrorBoundary } from 'expo-router'
 
@@ -51,6 +54,7 @@ export default function RootLayout() {
   if (!loaded) return null
 
   return (
+    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.dcmgrading">
     <AuthProvider>
       <CreditsProvider>
         <AuthGate>
@@ -79,5 +83,6 @@ export default function RootLayout() {
         </AuthGate>
       </CreditsProvider>
     </AuthProvider>
+    </StripeProvider>
   )
 }
