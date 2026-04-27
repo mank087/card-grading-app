@@ -1196,73 +1196,93 @@ function CustomDesigner({
               {isCustomLayout && (
                 <div className="mt-2 space-y-3">
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-[10px] text-gray-500 font-medium">Your Colors</label>
-                      <div className="flex items-center gap-1.5">
-                        {customColorCount < 5 && (
-                          <button
-                            onClick={() => {
-                              const next = customColorCount + 1
-                              setCustomColorCount(next)
-                              const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                              while (cols.length < next) cols.push('#7c3aed')
-                              updateConfig({ customColors: cols })
-                            }}
-                            className="text-[9px] text-gray-500 hover:text-purple-600 underline"
-                          >
-                            + Add
-                          </button>
-                        )}
-                        {customColorCount > 2 && (
-                          <button
-                            onClick={() => {
-                              const next = customColorCount - 1
-                              setCustomColorCount(next)
-                              const cols = (config.customColors || []).slice(0, next)
-                              const layout = config.layoutStyle || 'color-gradient'
-                              updateConfig({ customColors: cols, ...applyLayoutToColors(layout, cols) })
-                            }}
-                            className="text-[9px] text-gray-500 hover:text-red-500 underline"
-                          >
-                            Remove
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      {Array.from({ length: customColorCount }).map((_, i) => {
-                        const colors = config.customColors || [config.gradientStart, config.gradientEnd]
-                        const color = colors[i] || '#7c3aed'
-                        return (
-                          <label key={i} className="flex-1 relative cursor-pointer group">
-                            <div
-                              className="w-full h-10 rounded-lg border-2 border-gray-300 group-hover:border-purple-400 transition-colors shadow-sm"
-                              style={{ backgroundColor: color }}
-                            />
-                            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                              {i + 1}
-                            </span>
-                            <input
-                              type="color"
-                              value={color}
-                              onChange={(e) => {
-                                const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                                while (cols.length <= i) cols.push('#7c3aed')
-                                cols[i] = e.target.value
-                                const layout = config.layoutStyle || 'color-gradient'
-                                updateConfig({
-                                  customColors: cols,
-                                  ...applyLayoutToColors(layout, cols),
-                                  layoutStyle: layout,
-                                })
-                              }}
-                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                            />
-                          </label>
-                        )
-                      })}
-                    </div>
-                    <p className="text-[9px] text-gray-400 mt-1">Tap a color to open the picker — use its eyedropper on the card preview</p>
+                    {(() => {
+                      const isExtension = config.layoutStyle === 'card-extension'
+                      // Show all saved colors for Extension, only first 2 for other layouts
+                      const visibleCount = isExtension ? customColorCount : 2
+                      return (
+                        <>
+                          <div className="flex items-center justify-between mb-1.5">
+                            <label className="text-[10px] text-gray-500 font-medium">
+                              Your Colors{isExtension && visibleCount > 2 ? ` (${visibleCount})` : ''}
+                            </label>
+                            {isExtension && (
+                              <div className="flex items-center gap-1.5">
+                                {customColorCount < 5 && (
+                                  <button
+                                    onClick={() => {
+                                      const next = customColorCount + 1
+                                      setCustomColorCount(next)
+                                      const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+                                      while (cols.length < next) cols.push('#7c3aed')
+                                      updateConfig({
+                                        customColors: cols,
+                                        ...applyLayoutToColors('card-extension', cols),
+                                        layoutStyle: 'card-extension',
+                                      })
+                                    }}
+                                    className="text-[9px] text-gray-500 hover:text-purple-600 underline"
+                                  >
+                                    + Add
+                                  </button>
+                                )}
+                                {customColorCount > 2 && (
+                                  <button
+                                    onClick={() => {
+                                      const next = customColorCount - 1
+                                      setCustomColorCount(next)
+                                      const cols = (config.customColors || []).slice(0, next)
+                                      updateConfig({
+                                        customColors: cols,
+                                        ...applyLayoutToColors('card-extension', cols),
+                                        layoutStyle: 'card-extension',
+                                      })
+                                    }}
+                                    className="text-[9px] text-gray-500 hover:text-red-500 underline"
+                                  >
+                                    Remove
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            {Array.from({ length: visibleCount }).map((_, i) => {
+                              const colors = config.customColors || [config.gradientStart, config.gradientEnd]
+                              const color = colors[i] || '#7c3aed'
+                              return (
+                                <label key={i} className="flex-1 relative cursor-pointer group">
+                                  <div
+                                    className="w-full h-10 rounded-lg border-2 border-gray-300 group-hover:border-purple-400 transition-colors shadow-sm"
+                                    style={{ backgroundColor: color }}
+                                  />
+                                  <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                                    {i + 1}
+                                  </span>
+                                  <input
+                                    type="color"
+                                    value={color}
+                                    onChange={(e) => {
+                                      const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+                                      while (cols.length <= i) cols.push('#7c3aed')
+                                      cols[i] = e.target.value
+                                      const layout = config.layoutStyle || 'color-gradient'
+                                      updateConfig({
+                                        customColors: cols,
+                                        ...applyLayoutToColors(layout, cols),
+                                        layoutStyle: layout,
+                                      })
+                                    }}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                  />
+                                </label>
+                              )
+                            })}
+                          </div>
+                          <p className="text-[9px] text-gray-400 mt-1">Tap a color to open the picker — use its eyedropper on the card preview above</p>
+                        </>
+                      )
+                    })()}
                   </div>
 
                   {/* Layout style buttons */}
