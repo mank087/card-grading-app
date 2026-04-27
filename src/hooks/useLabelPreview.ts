@@ -14,7 +14,10 @@ import { renderFrontCanvas, renderBackCanvas } from '@/lib/customSlabLabelGenera
 import type { SlabLabelData } from '@/lib/slabLabelGenerator';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 
-const PREVIEW_DPI = 96;
+// Render at 2x minimum for sharp previews on all screens (retina and standard).
+// devicePixelRatio is typically 2 on retina, 1 on standard — floor of 2 ensures
+// the canvas is always crisp. 96 * 2 = 192 DPI, which matches retina rendering.
+const PREVIEW_DPI = 96 * Math.max(2, typeof window !== 'undefined' ? Math.ceil(window.devicePixelRatio) : 2);
 
 interface UseLabelPreviewOptions {
   config: CustomLabelConfig;
