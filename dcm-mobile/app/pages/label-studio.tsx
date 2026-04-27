@@ -17,7 +17,7 @@ import {
 const GEOMETRIC_PATTERNS = [
   { id: 0, name: 'Shattered' },
   { id: 1, name: 'Stripes' },
-  { id: 2, name: 'Random' },
+  { id: 2, name: 'Lines' },
   { id: 3, name: 'Mosaic' },
   { id: 4, name: 'Lightning' },
 ] as const

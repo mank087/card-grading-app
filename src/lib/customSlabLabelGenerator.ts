@@ -289,56 +289,40 @@ function drawCustomBackground(
         strokeDivider(ctx, p, scale);
       }
     } else if (patternIdx === 2) {
-      // Random Lines: irregular lines breaking the label into regions
-      // Use a deterministic seed from the label dimensions so it's consistent
-      const seed = (W * 7 + H * 13) % 1000;
-      const pseudoRand = (i: number) => ((seed * (i + 1) * 9301 + 49297) % 233280) / 233280;
+      // Scattered Lines: 4 diagonal lines of varying lengths scattered across the label
+      // Some perpendicular to others, creating an abstract geometric accent
+      // These are decorative lines over a color background — not region dividers
 
-      // Generate 6-8 random line endpoints that cross the label
-      const lineCount = 6 + Math.floor(pseudoRand(99) * 3);
-      const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
-      for (let i = 0; i < lineCount; i++) {
-        // Each line goes from one edge to another
-        const side1 = Math.floor(pseudoRand(i * 4) * 4); // 0=top, 1=right, 2=bottom, 3=left
-        const side2 = (side1 + 1 + Math.floor(pseudoRand(i * 4 + 1) * 2)) % 4;
-        const pos1 = pseudoRand(i * 4 + 2);
-        const pos2 = pseudoRand(i * 4 + 3);
-        const edgePt = (side: number, t: number) => {
-          if (side === 0) return { x: t * W, y: 0 };
-          if (side === 1) return { x: W, y: t * H };
-          if (side === 2) return { x: t * W, y: H };
-          return { x: 0, y: t * H };
-        };
-        const p1 = edgePt(side1, pos1);
-        const p2 = edgePt(side2, pos2);
-        lines.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
-      }
-
-      // Fill background with first color, then overlay regions
-      ctx.fillStyle = pick(0);
+      // Fill background with gradient of first two colors
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0, pick(0));
+      bg.addColorStop(1, pick(1));
+      ctx.fillStyle = bg;
       ctx.fillRect(0, 0, W, H);
 
-      // Create regions by drawing filled triangles from center points
-      const cx = W * (0.3 + pseudoRand(50) * 0.4);
-      const cy = H * (0.3 + pseudoRand(51) * 0.4);
-      for (let i = 0; i < lines.length; i++) {
-        const l = lines[i];
-        ctx.beginPath();
-        ctx.moveTo(cx, cy);
-        ctx.lineTo(l.x1, l.y1);
-        ctx.lineTo(l.x2, l.y2);
-        ctx.closePath();
-        ctx.fillStyle = pick(i + 1);
-        ctx.fill();
-      }
+      // 4 fixed diagonal lines at varying positions, lengths, and angles
+      // Line 1: long diagonal from upper-left area (angle ~30°)
+      // Line 2: medium, perpendicular to line 1 (~120°), lower-center
+      // Line 3: short, same angle as line 1 (~30°), right side
+      // Line 4: medium, perpendicular (~120°), upper-right area
+      const lines = [
+        { x1: W * 0.05, y1: H * 0.15, x2: W * 0.45, y2: H * 0.85 },  // long, ~60°
+        { x1: W * 0.25, y1: H * 0.80, x2: W * 0.60, y2: H * 0.20 },  // medium, ~-60° (perpendicular)
+        { x1: W * 0.55, y1: H * 0.10, x2: W * 0.75, y2: H * 0.65 },  // short-medium, ~60°
+        { x1: W * 0.65, y1: H * 0.70, x2: W * 0.90, y2: H * 0.15 },  // medium, ~-60° (perpendicular)
+      ];
 
-      // Stroke all divider lines — black only, no white border
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+      ctx.lineWidth = 2.5 * scale;
+      ctx.lineCap = 'round';
       for (const l of lines) {
-        const p = new Path2D();
-        p.moveTo(l.x1, l.y1);
-        p.lineTo(l.x2, l.y2);
-        strokeDivider(ctx, p, scale);
+        ctx.beginPath();
+        ctx.moveTo(l.x1, l.y1);
+        ctx.lineTo(l.x2, l.y2);
+        ctx.stroke();
       }
+      ctx.restore();
     } else if (patternIdx === 3) {
       // Mosaic Grid: 5x2 rectangular tiles
       const cols = 5, rows = 2;
