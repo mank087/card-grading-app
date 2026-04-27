@@ -1,7 +1,8 @@
 import { View, StyleSheet, ActivityIndicator } from 'react-native'
 import { WebView } from 'react-native-webview'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Colors } from '@/lib/constants'
+import { supabase } from '@/lib/supabase'
 
 const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
 
@@ -11,28 +12,67 @@ interface InAppPageProps {
 
 /**
  * Renders a DCM web page inside the app using WebView.
- * Hides the web navigation/footer to show just the content.
+ * Injects the user's auth session BEFORE page load so authenticated
+ * features (Label Studio, Market Pricing, Account) work correctly.
  */
 export default function InAppPage({ path }: InAppPageProps) {
   const [loading, setLoading] = useState(true)
+  const [session, setSession] = useState<{ access_token: string; refresh_token: string; user: any } | null>(null)
+  const [ready, setReady] = useState(false)
   const url = `${WEB_URL}${path}`
 
-  // Injected JS to hide the web nav and footer for a cleaner in-app look
-  const injectedJS = `
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session: s } }) => {
+      if (s) {
+        setSession({
+          access_token: s.access_token,
+          refresh_token: s.refresh_token,
+          user: s.user,
+        })
+      }
+      setReady(true)
+    })
+  }, [])
+
+  // Inject auth BEFORE page content loads — ensures authenticated state on first render
+  const injectedBeforeLoad = session ? `
+    (function() {
+      try {
+        var sessionData = {
+          access_token: '${session.access_token}',
+          refresh_token: '${session.refresh_token}',
+          expires_at: ${Math.floor(Date.now() / 1000) + 3600},
+          user: ${JSON.stringify(session.user)}
+        };
+        localStorage.setItem('supabase.auth.token', JSON.stringify(sessionData));
+      } catch(e) {}
+    })();
+    true;
+  ` : 'true;'
+
+  // After load: hide nav/footer for clean in-app look
+  const injectedAfterLoad = `
     (function() {
       var nav = document.querySelector('nav');
       if (nav) nav.style.display = 'none';
       var footer = document.querySelector('footer');
       if (footer) footer.style.display = 'none';
-      // Hide any fixed headers
       var headers = document.querySelectorAll('header');
       headers.forEach(function(h) { h.style.display = 'none'; });
-      // Add top padding to compensate for hidden nav
       var main = document.querySelector('main');
       if (main) main.style.paddingTop = '16px';
     })();
     true;
   `
+
+  // Wait for session check before rendering WebView
+  if (!ready) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={Colors.purple[600]} />
+      </View>
+    )
+  }
 
   return (
     <View style={styles.container}>
@@ -45,11 +85,16 @@ export default function InAppPage({ path }: InAppPageProps) {
         source={{ uri: url }}
         style={styles.webview}
         onLoadEnd={() => setLoading(false)}
-        injectedJavaScript={injectedJS}
+        injectedJavaScriptBeforeContentLoaded={injectedBeforeLoad}
+        injectedJavaScript={injectedAfterLoad}
         javaScriptEnabled
         domStorageEnabled
         startInLoadingState={false}
         showsVerticalScrollIndicator={false}
+        allowFileAccess
+        allowFileAccessFromFileURLs
+        // Share cookies/storage within the app
+        sharedCookiesEnabled
       />
     </View>
   )
