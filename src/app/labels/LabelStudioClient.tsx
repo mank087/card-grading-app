@@ -1045,6 +1045,39 @@ function CustomDesigner({
 
           {/* Controls */}
           <div className="lg:w-[340px] flex-shrink-0 space-y-5">
+            {/* Live slab preview with card image — always visible for eyedropper reference */}
+            {selectedCard && (
+              <div className="flex justify-center">
+                <div className="w-full max-w-[200px] relative" style={{ aspectRatio: '280 / 460' }}>
+                  <img
+                    src="/labels/graded-card-slab.png"
+                    alt="Graded Card Slab"
+                    className="absolute inset-0 w-full h-full object-contain"
+                  />
+                  {/* Label in slab slot */}
+                  <div className="absolute overflow-hidden" style={{ top: '4.5%', left: '13.5%', width: '73%' }}>
+                    {previewDataUrl ? (
+                      <img src={previewDataUrl} alt="Label preview" className="w-full h-auto" />
+                    ) : (
+                      <div className="w-full bg-gray-200 rounded" style={{ aspectRatio: '3.5 / 1' }} />
+                    )}
+                  </div>
+                  {/* Card image */}
+                  <div className="absolute overflow-hidden" style={{ top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }}>
+                    {selectedCard.front_url ? (
+                      <img src={selectedCard.front_url} alt={selectedCard.card_name || 'Card'}
+                        className="w-full h-full object-contain" loading="lazy" />
+                    ) : (
+                      <div className="w-full h-full" />
+                    )}
+                  </div>
+                  {/* Gloss */}
+                  <div className="absolute inset-0 pointer-events-none"
+                    style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.08) 0%, transparent 30%, transparent 70%, rgba(255,255,255,0.03) 100%)' }} />
+                </div>
+              </div>
+            )}
+
             {/* Dimension Presets */}
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Dimensions</h3>
