@@ -257,8 +257,31 @@ function drawCustomBackground(
 
 /** Determine if colors are light (for text contrast) */
 function isLightTheme(config: CustomLabelConfig): boolean {
-  return config.style === 'traditional' ||
-    config.colorPreset === 'traditional';
+  if (config.style === 'traditional' || config.colorPreset === 'traditional') return true;
+  if (config.colorPreset === 'frosted-glass') return true;
+  // For card-color styles, check actual luminance of the gradient
+  if (isCardColorPreset(config.colorPreset)) {
+    return avgLuminance(config.gradientStart, config.gradientEnd) > 0.55;
+  }
+  return false;
+}
+
+/** Check if a preset is one of the card-color derived styles */
+function isCardColorPreset(preset: string): boolean {
+  return ['color-gradient', 'card-extension', 'neon-outline', 'frosted-glass', 'team-colors'].includes(preset);
+}
+
+/** Compute average luminance from hex colors */
+function avgLuminance(...hexColors: string[]): number {
+  let total = 0;
+  for (const hex of hexColors) {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (m) {
+      const r = parseInt(m[1], 16), g = parseInt(m[2], 16), b = parseInt(m[3], 16);
+      total += (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+    }
+  }
+  return total / hexColors.length;
 }
 
 /**
@@ -296,7 +319,12 @@ function drawBorder(
   return bw + trim;
 }
 
-/** Draw text with a subtle dark stroke for legibility on dark/gradient backgrounds */
+/**
+ * Draw text with a contrast-aware stroke for legibility on any background.
+ * On dark backgrounds: dark stroke behind white text.
+ * On light backgrounds: light stroke behind dark text.
+ * On card-color gradients: always strokes for guaranteed readability.
+ */
 function strokeText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -305,15 +333,17 @@ function strokeText(
   isDark: boolean,
   strokeWidth: number = 3
 ) {
+  ctx.save();
   if (isDark) {
-    ctx.save();
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.lineWidth = strokeWidth;
-    ctx.lineJoin = 'round';
-    ctx.miterLimit = 2;
-    ctx.strokeText(text, x, y);
-    ctx.restore();
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+  } else {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
   }
+  ctx.lineWidth = strokeWidth;
+  ctx.lineJoin = 'round';
+  ctx.miterLimit = 2;
+  ctx.strokeText(text, x, y);
+  ctx.restore();
   ctx.fillText(text, x, y);
 }
 
@@ -392,6 +422,22 @@ export async function renderFrontCanvas(
   const totalGradeH = gradeFontSize + dividerGap + condFontSize;
   const gradeStartY = EB + (ECH - totalGradeH) / 2;
 
+  // Draw a subtle scrim behind the grade on card-color styles
+  if (isCardColorPreset(config.colorPreset)) {
+    const scrimPad = Math.round(10 * scale);
+    const scrimX = gradeCenterX - gradeAreaWidth / 2 - scrimPad;
+    const scrimY = gradeStartY - scrimPad;
+    const scrimW = gradeAreaWidth + scrimPad * 2;
+    const scrimH = totalGradeH + scrimPad * 2;
+    const scrimR = Math.round(8 * scale);
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(scrimX, scrimY, scrimW, scrimH, scrimR);
+    ctx.fillStyle = light ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)';
+    ctx.fill();
+    ctx.restore();
+  }
+
   ctx.fillStyle = light ? TRAD_COLORS.purplePrimary : TRAD_COLORS.white;
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
@@ -454,6 +500,22 @@ export async function renderFrontCanvas(
   blockH += fs.afterFeatures + fs.serial;
 
   let currentY = EB + (ECH - blockH) / 2;
+
+  // Draw a subtle scrim behind text on card-color styles for readability
+  if (isCardColorPreset(config.colorPreset)) {
+    const scrimPad = Math.round(8 * scale);
+    const scrimX = infoX - scrimPad;
+    const scrimY = currentY - scrimPad;
+    const scrimW = infoMaxWidth + scrimPad * 2;
+    const scrimH = blockH + scrimPad * 2;
+    const scrimR = Math.round(6 * scale);
+    ctx.save();
+    ctx.beginPath();
+    ctx.roundRect(scrimX, scrimY, scrimW, scrimH, scrimR);
+    ctx.fillStyle = light ? 'rgba(255, 255, 255, 0.35)' : 'rgba(0, 0, 0, 0.35)';
+    ctx.fill();
+    ctx.restore();
+  }
 
   ctx.fillStyle = light ? TRAD_COLORS.textDark : 'rgba(255, 255, 255, 0.95)';
   ctx.textAlign = 'left';
