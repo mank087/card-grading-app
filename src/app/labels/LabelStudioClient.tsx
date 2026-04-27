@@ -35,37 +35,43 @@ interface Props {
 // ============================================================================
 
 // ============================================================================
-// CARD COLOR PICKER — self-contained inline component
+// COLOR SLOT PICKER — unified inline color picker with 3 modes
 // ============================================================================
 
-function CardColorPicker({
+const QUICK_COLORS = [
+  '#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#22c55e',
+  '#14b8a6', '#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#a855f7',
+  '#d946ef', '#ec4899', '#f43f5e', '#78716c', '#1f2937', '#ffffff',
+]
+
+function ColorSlotPicker({
   frontUrl,
-  slotCount,
-  colors,
-  onPickColor,
+  slotIndex,
+  currentColor,
+  onSelectColor,
+  onClose,
 }: {
-  frontUrl: string
-  slotCount: number
-  colors: (string | null)[]
-  onPickColor: (slotIndex: number, hex: string) => void
+  frontUrl?: string
+  slotIndex: number
+  currentColor: string
+  onSelectColor: (hex: string) => void
+  onClose: () => void
 }) {
+  const [tab, setTab] = useState<'presets' | 'custom' | 'card'>('presets')
+  const [pendingColor, setPendingColor] = useState(currentColor)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [activeSlot, setActiveSlot] = useState<number | null>(null)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [pickedColor, setPickedColor] = useState<string | null>(null)
+  const [cardLoaded, setCardLoaded] = useState(false)
   const [hoverColor, setHoverColor] = useState<string | null>(null)
 
-  // Load card image into canvas when a slot is activated
+  // Load card image when card tab selected
   useEffect(() => {
-    if (activeSlot === null) return
-    setIsLoaded(false)
-    setPickedColor(null)
+    if (tab !== 'card' || !frontUrl) return
+    setCardLoaded(false)
     const img = new Image()
     img.crossOrigin = 'anonymous'
     img.onload = () => {
       const canvas = canvasRef.current
       if (!canvas) return
-      // Size canvas to fit within container while preserving aspect ratio
       const maxW = 300
       const scale = Math.min(maxW / img.width, 1)
       canvas.width = Math.round(img.width * scale)
@@ -73,11 +79,11 @@ function CardColorPicker({
       const ctx = canvas.getContext('2d')
       if (ctx) {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        setIsLoaded(true)
+        setCardLoaded(true)
       }
     }
     img.src = frontUrl
-  }, [activeSlot, frontUrl])
+  }, [tab, frontUrl])
 
   const sampleAt = useCallback((clientX: number, clientY: number): string | null => {
     const canvas = canvasRef.current
@@ -85,121 +91,113 @@ function CardColorPicker({
     const ctx = canvas.getContext('2d')
     if (!ctx) return null
     const rect = canvas.getBoundingClientRect()
-    const scaleX = canvas.width / rect.width
-    const scaleY = canvas.height / rect.height
-    const x = Math.floor((clientX - rect.left) * scaleX)
-    const y = Math.floor((clientY - rect.top) * scaleY)
+    const x = Math.floor((clientX - rect.left) * (canvas.width / rect.width))
+    const y = Math.floor((clientY - rect.top) * (canvas.height / rect.height))
     if (x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return null
-    const pixel = ctx.getImageData(x, y, 1, 1).data
-    return `#${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`
+    const p = ctx.getImageData(x, y, 1, 1).data
+    return `#${p[0].toString(16).padStart(2,'0')}${p[1].toString(16).padStart(2,'0')}${p[2].toString(16).padStart(2,'0')}`
   }, [])
 
-  const handleTap = useCallback((clientX: number, clientY: number) => {
-    const color = sampleAt(clientX, clientY)
-    if (color) setPickedColor(color)
-  }, [sampleAt])
-
-  const handleConfirm = useCallback(() => {
-    if (activeSlot !== null && pickedColor) {
-      onPickColor(activeSlot, pickedColor)
-    }
-    setPickedColor(null)
-    setActiveSlot(null)
-  }, [activeSlot, pickedColor, onPickColor])
-
   return (
-    <div className="mt-3">
-      <div className="flex items-center gap-2 mb-2">
-        <span className="text-[10px] text-gray-500 font-medium">Pick from card:</span>
-        <div className="flex gap-1">
-          {Array.from({ length: slotCount }).map((_, i) => {
-            const slotColor = colors[i] || null
-            const isActive = activeSlot === i
-            return (
-              <button
-                key={i}
-                onClick={() => setActiveSlot(isActive ? null : i)}
-                className={`w-7 h-7 rounded-md border-2 text-[9px] font-bold flex items-center justify-center transition-all ${
-                  isActive
-                    ? 'border-purple-600 ring-2 ring-purple-300 scale-110'
-                    : 'border-gray-300 hover:border-purple-400'
-                }`}
-                style={slotColor ? { backgroundColor: slotColor } : { backgroundColor: '#f3f4f6' }}
-              >
-                <span className={slotColor ? 'text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]' : 'text-gray-400'}>
-                  {i + 1}
-                </span>
-              </button>
-            )
-          })}
+    <div className="rounded-lg border-2 border-purple-300 bg-white p-3 mt-2 shadow-lg space-y-2">
+      {/* Header: preview + slot label */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-md border-2 border-gray-300 shadow-sm" style={{ backgroundColor: pendingColor }} />
+          <div>
+            <span className="text-[10px] text-gray-500">Color {slotIndex + 1}</span>
+            <span className="text-[10px] font-mono text-gray-600 ml-1">{pendingColor}</span>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="text-[10px] px-3 py-1.5 rounded-md border border-gray-300 text-gray-600">Cancel</button>
+          <button onClick={() => onSelectColor(pendingColor)} className="text-[10px] px-3 py-1.5 rounded-md bg-purple-600 text-white font-medium">OK</button>
         </div>
       </div>
 
-      {activeSlot !== null && (
-        <div className="rounded-lg border-2 border-purple-300 bg-purple-50/50 p-3 space-y-2">
-          <p className="text-[10px] text-purple-700 font-medium text-center">
-            Tap the card to pick a color for slot {activeSlot + 1}
-          </p>
+      {/* Tabs */}
+      <div className="flex border-b border-gray-200">
+        {(['presets', 'custom', ...(frontUrl ? ['card'] : [])] as const).map(t => (
+          <button
+            key={t}
+            onClick={() => setTab(t as any)}
+            className={`flex-1 text-[10px] py-1.5 font-medium border-b-2 transition-colors ${
+              tab === t ? 'border-purple-600 text-purple-700' : 'border-transparent text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            {t === 'presets' ? 'Presets' : t === 'custom' ? 'Custom' : 'Pick from Card'}
+          </button>
+        ))}
+      </div>
 
-          {/* Card canvas */}
+      {/* Presets tab */}
+      {tab === 'presets' && (
+        <div className="grid grid-cols-6 gap-1.5 pt-1">
+          {QUICK_COLORS.map(c => (
+            <button
+              key={c}
+              onClick={() => setPendingColor(c)}
+              className={`w-full aspect-square rounded-md border-2 transition-all ${
+                pendingColor === c ? 'border-purple-600 scale-110 ring-1 ring-purple-300' : 'border-gray-200 hover:border-purple-300'
+              }`}
+              style={{ backgroundColor: c }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Custom tab */}
+      {tab === 'custom' && (
+        <div className="pt-1 space-y-2">
+          <input
+            type="color"
+            value={pendingColor}
+            onChange={e => setPendingColor(e.target.value)}
+            className="w-full h-32 rounded-md border border-gray-300 cursor-pointer"
+          />
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] text-gray-500">Hex:</label>
+            <input
+              type="text"
+              value={pendingColor}
+              onChange={e => {
+                const v = e.target.value
+                if (/^#[0-9a-fA-F]{6}$/.test(v)) setPendingColor(v)
+              }}
+              className="flex-1 px-2 py-1 text-[11px] font-mono border border-gray-300 rounded"
+              maxLength={7}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Pick from card tab */}
+      {tab === 'card' && frontUrl && (
+        <div className="pt-1 space-y-2">
+          <p className="text-[9px] text-purple-600 text-center font-medium">Tap the card to pick a color</p>
           <div className="flex justify-center">
-            {!isLoaded && (
+            {!cardLoaded && (
               <div className="flex items-center justify-center py-8">
                 <div className="w-4 h-4 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
-                <span className="ml-2 text-[10px] text-gray-500">Loading card...</span>
+                <span className="ml-2 text-[10px] text-gray-500">Loading...</span>
               </div>
             )}
             <canvas
               ref={canvasRef}
-              className={`cursor-crosshair rounded shadow-sm w-full max-w-[280px] ${!isLoaded ? 'hidden' : ''}`}
+              className={`cursor-crosshair rounded shadow-sm w-full max-w-[280px] ${!cardLoaded ? 'hidden' : ''}`}
               style={{ touchAction: 'none' }}
-              onMouseMove={(e) => {
-                const color = sampleAt(e.clientX, e.clientY)
-                if (color) setHoverColor(color)
-              }}
-              onClick={(e) => handleTap(e.clientX, e.clientY)}
-              onTouchEnd={(e) => {
-                e.preventDefault()
-                const touch = e.changedTouches[0]
-                if (touch) handleTap(touch.clientX, touch.clientY)
-              }}
+              onMouseMove={e => { const c = sampleAt(e.clientX, e.clientY); if (c) setHoverColor(c) }}
+              onClick={e => { const c = sampleAt(e.clientX, e.clientY); if (c) setPendingColor(c) }}
+              onTouchEnd={e => { e.preventDefault(); const t = e.changedTouches[0]; if (t) { const c = sampleAt(t.clientX, t.clientY); if (c) setPendingColor(c) } }}
               onMouseLeave={() => setHoverColor(null)}
             />
           </div>
-
-          {/* Picked color preview + confirm */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {(pickedColor || hoverColor) && (
-                <>
-                  <div
-                    className="w-8 h-8 rounded-md border-2 border-gray-300 shadow-sm"
-                    style={{ backgroundColor: pickedColor || hoverColor || undefined }}
-                  />
-                  <span className="text-[11px] font-mono text-gray-600">{pickedColor || hoverColor}</span>
-                </>
-              )}
-              {!pickedColor && !hoverColor && (
-                <span className="text-[10px] text-gray-400">Tap the card image above</span>
-              )}
+          {hoverColor && (
+            <div className="flex items-center justify-center gap-2">
+              <div className="w-5 h-5 rounded border border-gray-300" style={{ backgroundColor: hoverColor }} />
+              <span className="text-[10px] font-mono text-gray-500">{hoverColor}</span>
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => { setActiveSlot(null); setPickedColor(null); setHoverColor(null) }}
-                className="text-[10px] px-3 py-1.5 rounded-md border border-gray-300 text-gray-600 hover:bg-gray-100"
-              >
-                Cancel
-              </button>
-              {pickedColor && (
-                <button
-                  onClick={handleConfirm}
-                  className="text-[10px] px-3 py-1.5 rounded-md bg-purple-600 text-white font-medium hover:bg-purple-700"
-                >
-                  OK
-                </button>
-              )}
-            </div>
-          </div>
+          )}
         </div>
       )}
     </div>
@@ -853,6 +851,7 @@ function CustomDesigner({
 
   // Custom multi-color state
   const [customColorCount, setCustomColorCount] = useState(2)
+  const [editingSlot, setEditingSlot] = useState<number | null>(null)
   const isCustomLayout = !!(config.layoutStyle) || config.colorPreset === 'custom'
 
   // Eyedropper state — supports 'start', 'end', 'border', or 'custom-0' through 'custom-4'
@@ -1371,7 +1370,6 @@ function CustomDesigner({
                     {(() => {
                       const isExtension = config.layoutStyle === 'card-extension'
                       const colors = config.customColors || [config.gradientStart, config.gradientEnd]
-                      // Extension always shows 5 slots, others show 2
                       const visibleCount = isExtension ? 5 : 2
                       return (
                         <>
@@ -1382,73 +1380,56 @@ function CustomDesigner({
                             {Array.from({ length: visibleCount }).map((_, i) => {
                               const color = colors[i] || null
                               const hasColor = !!color
+                              const isOpen = editingSlot === i
                               return (
-                                <label key={i} className="flex-1 relative cursor-pointer group">
-                                  <div
-                                    className={`w-full h-10 rounded-lg border-2 transition-colors shadow-sm ${
-                                      hasColor
-                                        ? 'border-gray-300 group-hover:border-purple-400'
-                                        : 'border-dashed border-gray-300 group-hover:border-purple-400'
-                                    }`}
-                                    style={hasColor ? { backgroundColor: color } : { backgroundColor: '#f3f4f6' }}
-                                  >
-                                    {!hasColor && (
-                                      <span className="absolute inset-0 flex items-center justify-center text-[9px] text-gray-400">
-                                        +
-                                      </span>
-                                    )}
-                                  </div>
-                                  {hasColor && (
+                                <button
+                                  key={i}
+                                  onClick={() => setEditingSlot(isOpen ? null : i)}
+                                  className={`flex-1 h-10 rounded-lg border-2 transition-all shadow-sm relative ${
+                                    isOpen
+                                      ? 'border-purple-600 ring-2 ring-purple-300'
+                                      : hasColor
+                                        ? 'border-gray-300 hover:border-purple-400'
+                                        : 'border-dashed border-gray-300 hover:border-purple-400'
+                                  }`}
+                                  style={hasColor ? { backgroundColor: color } : { backgroundColor: '#f3f4f6' }}
+                                >
+                                  {hasColor ? (
                                     <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                                       {i + 1}
                                     </span>
+                                  ) : (
+                                    <span className="text-[9px] text-gray-400">+</span>
                                   )}
-                                  <input
-                                    type="color"
-                                    value={color || '#7c3aed'}
-                                    onChange={(e) => {
-                                      const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                                      while (cols.length <= i) cols.push('#7c3aed')
-                                      cols[i] = e.target.value
-                                      if (i + 1 > customColorCount) setCustomColorCount(i + 1)
-                                      const layout = config.layoutStyle || 'color-gradient'
-                                      updateConfig({
-                                        customColors: cols,
-                                        ...applyLayoutToColors(layout, cols),
-                                        layoutStyle: layout,
-                                      })
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                  />
-                                </label>
+                                </button>
                               )
                             })}
                           </div>
                           {isExtension && (
                             <p className="text-[9px] text-gray-400 mt-1">Select up to 5 colors for the extension gradient</p>
                           )}
-                          {isExtension && (
-                            <p className="text-[9px] text-gray-400 mt-0.5">Tap a swatch to open the color picker</p>
-                          )}
+                          <p className="text-[9px] text-gray-400 mt-0.5">Tap a color to open the picker</p>
 
-                          {/* Pick from card — self-contained inline picker */}
-                          {selectedCard?.front_url && (
-                            <CardColorPicker
-                              frontUrl={selectedCard.front_url}
-                              slotCount={visibleCount}
-                              colors={colors}
-                              onPickColor={(slotIndex, hex) => {
+                          {/* Inline color picker for the active slot */}
+                          {editingSlot !== null && (
+                            <ColorSlotPicker
+                              frontUrl={selectedCard?.front_url}
+                              slotIndex={editingSlot}
+                              currentColor={colors[editingSlot] || '#7c3aed'}
+                              onSelectColor={(hex) => {
                                 const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                                while (cols.length <= slotIndex) cols.push('#7c3aed')
-                                cols[slotIndex] = hex
-                                if (slotIndex + 1 > customColorCount) setCustomColorCount(slotIndex + 1)
+                                while (cols.length <= editingSlot) cols.push('#7c3aed')
+                                cols[editingSlot] = hex
+                                if (editingSlot + 1 > customColorCount) setCustomColorCount(editingSlot + 1)
                                 const layout = config.layoutStyle || 'color-gradient'
                                 updateConfig({
                                   customColors: cols,
                                   ...applyLayoutToColors(layout, cols),
                                   layoutStyle: layout,
                                 })
+                                setEditingSlot(null)
                               }}
+                              onClose={() => setEditingSlot(null)}
                             />
                           )}
                         </>
