@@ -2,11 +2,12 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { StripeProvider } from '@stripe/stripe-react-native'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { Colors } from '@/lib/constants'
+import WelcomeAnimation from '@/components/WelcomeAnimation'
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 
@@ -26,10 +27,8 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     const inAuthGroup = segments[0] === '(auth)'
 
     if (!user && !inAuthGroup) {
-      // Not logged in and not on auth screen — redirect to login
       router.replace('/(auth)/login')
     } else if (user && inAuthGroup) {
-      // Logged in but on auth screen — redirect to main app
       router.replace('/(tabs)/grade')
     }
   }, [user, isLoading, segments])
@@ -42,6 +41,7 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   })
+  const [showWelcome, setShowWelcome] = useState(true)
 
   useEffect(() => {
     if (error) throw error
@@ -52,6 +52,11 @@ export default function RootLayout() {
   }, [loaded])
 
   if (!loaded) return null
+
+  // Show animated welcome screen before anything else
+  if (showWelcome) {
+    return <WelcomeAnimation onComplete={() => setShowWelcome(false)} />
+  }
 
   return (
     <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.dcmgrading">
