@@ -186,6 +186,22 @@ function drawCustomBackground(
     grad.addColorStop(1, '#ff00ff');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
+  } else if (config.colorPreset === 'card-extension') {
+    // Card Extension: horizontal gradient across the label using the top-edge colors.
+    // The config stores gradientStart/End from the first/last top-edge samples,
+    // but we also blend through the midpoint for a richer effect.
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, config.gradientStart);
+    grad.addColorStop(0.5, config.gradientEnd);
+    grad.addColorStop(1, config.gradientStart);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    // Slight darkening at the bottom to add depth
+    const fade = ctx.createLinearGradient(0, 0, 0, H);
+    fade.addColorStop(0, 'rgba(0,0,0,0)');
+    fade.addColorStop(1, 'rgba(0,0,0,0.3)');
+    ctx.fillStyle = fade;
+    ctx.fillRect(0, 0, W, H);
   } else if (config.colorPreset === 'team-colors') {
     // Bold split: left half primary, right half secondary with a diagonal blend
     const grad = ctx.createLinearGradient(0, 0, W, 0);

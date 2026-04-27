@@ -4,6 +4,12 @@
  * Extracts dominant colors from card images during the grading pipeline.
  * Uses sharp for image processing (already available via Next.js).
  * Stores results in cards.card_colors JSONB column.
+ *
+ * Zone-based sampling:
+ *   - Outer ring (12%) → background detection (excluded from palette)
+ *   - Border zone (12-22%) → card border/frame color (Pokemon yellow, etc.)
+ *   - Artwork zone (inner 56%) → true card artwork colors
+ *   - Top artwork strip → for Card Extension label style
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -17,6 +23,8 @@ interface CardColors {
   secondary: string
   palette: string[]
   isDark: boolean
+  borderColor: string
+  topEdgeColors: string[]
 }
 
 function rgbToHex({ r, g, b }: RGB): string {
@@ -31,7 +39,7 @@ function colorDistance(a: RGB, b: RGB): number {
   return Math.sqrt((a.r - b.r) ** 2 + (a.g - b.g) ** 2 + (a.b - b.b) ** 2)
 }
 
-function kMeans(pixels: RGB[], k: number = 6, iterations: number = 10): RGB[] {
+function kMeans(pixels: RGB[], k: number = 6, iterations: number = 12): RGB[] {
   if (pixels.length <= k) return pixels
 
   const centroids: RGB[] = []
@@ -55,7 +63,6 @@ function kMeans(pixels: RGB[], k: number = 6, iterations: number = 10): RGB[] {
     }
   }
 
-  // Count and sort by frequency
   const counts = new Array(k).fill(0)
   for (const p of pixels) {
     let minD = Infinity, closest = 0
@@ -82,27 +89,48 @@ function filterInteresting(colors: RGB[]): RGB[] {
   })
 }
 
+/** Sample pixels from a rectangular zone of a raw pixel buffer. */
+function sampleZone(
+  rawPixels: Buffer, w: number, h: number,
+  x1: number, y1: number, x2: number, y2: number
+): RGB[] {
+  const pixels: RGB[] = []
+  for (let y = y1; y < y2; y++) {
+    for (let x = x1; x < x2; x++) {
+      const i = (y * w + x) * 3
+      pixels.push({ r: rawPixels[i], g: rawPixels[i + 1], b: rawPixels[i + 2] })
+    }
+  }
+  return pixels
+}
+
+/** Detect if outer ring is a uniform background color different from artwork. */
+function detectBackground(outerPixels: RGB[], innerPixels: RGB[]): RGB | null {
+  if (outerPixels.length < 10 || innerPixels.length < 10) return null
+  const outerClusters = kMeans(outerPixels, 3, 8)
+  const dominant = outerClusters[0]
+  const innerClusters = kMeans(innerPixels, 4, 8)
+  const minDist = Math.min(...innerClusters.map(c => colorDistance(dominant, c)))
+  return minDist > 60 ? dominant : null
+}
+
 /**
  * Extract colors from a card's front image and save to database.
- * Call this after grading completes and the front image is available.
  */
 export async function extractAndSaveCardColors(cardId: string, frontPath: string): Promise<CardColors | null> {
   try {
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Get signed URL for the front image
     const { data: urlData } = await supabase.storage.from('cards').createSignedUrl(frontPath, 300)
     if (!urlData?.signedUrl) {
       console.warn('[ColorExtractor] Could not get signed URL for', frontPath)
       return null
     }
 
-    // Fetch the image
     const response = await fetch(urlData.signedUrl)
     if (!response.ok) return null
     const buffer = Buffer.from(await response.arrayBuffer())
 
-    // Use sharp to downsample and get raw pixel data
     let sharp: any
     try {
       sharp = require('sharp')
@@ -111,37 +139,102 @@ export async function extractAndSaveCardColors(cardId: string, frontPath: string
       return null
     }
 
-    const { data: rawPixels, info } = await sharp(buffer)
-      .resize(60, 84, { fit: 'cover' })
+    // Downsample to 100x140 for processing
+    const w = 100
+    const h = 140
+    const { data: rawPixels } = await sharp(buffer)
+      .resize(w, h, { fit: 'cover' })
       .removeAlpha()
       .raw()
       .toBuffer({ resolveWithObject: true })
 
-    // Convert raw pixel buffer to RGB array
-    const pixels: RGB[] = []
-    for (let i = 0; i < rawPixels.length; i += 3) {
-      pixels.push({ r: rawPixels[i], g: rawPixels[i + 1], b: rawPixels[i + 2] })
+    // --- Zone definitions ---
+    const outerFrac = 0.12
+    const borderInner = 0.22
+    const artworkInset = 0.22
+
+    const outerL = Math.round(w * outerFrac)
+    const outerT = Math.round(h * outerFrac)
+    const outerR = Math.round(w * (1 - outerFrac))
+    const outerB = Math.round(h * (1 - outerFrac))
+
+    const borderL = Math.round(w * borderInner)
+    const borderT = Math.round(h * borderInner)
+    const borderR = Math.round(w * (1 - borderInner))
+    const borderB = Math.round(h * (1 - borderInner))
+
+    const artL = Math.round(w * artworkInset)
+    const artT = Math.round(h * artworkInset)
+    const artR = Math.round(w * (1 - artworkInset))
+    const artB = Math.round(h * (1 - artworkInset))
+
+    // --- Sample zones ---
+    const outerPixels = [
+      ...sampleZone(rawPixels, w, h, 0, 0, w, outerT),
+      ...sampleZone(rawPixels, w, h, 0, outerB, w, h),
+      ...sampleZone(rawPixels, w, h, 0, outerT, outerL, outerB),
+      ...sampleZone(rawPixels, w, h, outerR, outerT, w, outerB),
+    ]
+
+    const borderPixels = [
+      ...sampleZone(rawPixels, w, h, outerL, outerT, borderL, outerB),
+      ...sampleZone(rawPixels, w, h, borderR, outerT, outerR, outerB),
+      ...sampleZone(rawPixels, w, h, outerL, outerT, outerR, borderT),
+      ...sampleZone(rawPixels, w, h, outerL, borderB, outerR, outerB),
+    ]
+
+    const artworkPixels = sampleZone(rawPixels, w, h, artL, artT, artR, artB)
+
+    // --- Background detection & exclusion ---
+    const bgColor = detectBackground(outerPixels, artworkPixels)
+
+    // --- Artwork colors ---
+    const artClusters = kMeans(artworkPixels, 8, 12)
+    let artInteresting = filterInteresting(artClusters)
+    if (bgColor) {
+      artInteresting = artInteresting.filter(c => colorDistance(c, bgColor) > 50)
+    }
+    const finalArt = artInteresting.length >= 2 ? artInteresting : artClusters
+
+    let primary = finalArt[0]
+    let secondary = finalArt.length > 1 ? finalArt[1] : finalArt[0]
+    if (colorDistance(primary, secondary) < 40 && finalArt.length > 2) {
+      secondary = finalArt[2]
     }
 
-    // Run k-means clustering
-    const clusters = kMeans(pixels, 8, 12)
-    const interesting = filterInteresting(clusters)
-    const final = interesting.length >= 2 ? interesting : clusters
+    // --- Border color ---
+    const borderClusters = kMeans(borderPixels, 4, 8)
+    let borderDominant = borderClusters[0]
+    if (bgColor) {
+      const nonBg = borderClusters.filter(c => colorDistance(c, bgColor) > 40)
+      if (nonBg.length > 0) borderDominant = nonBg[0]
+    }
 
-    let primary = final[0]
-    let secondary = final.length > 1 ? final[1] : final[0]
-    if (colorDistance(primary, secondary) < 40 && final.length > 2) {
-      secondary = final[2]
+    // --- Top edge colors (for Card Extension) ---
+    const topStripH = Math.max(2, Math.round((artB - artT) * 0.15))
+    const topEdgeSamples: string[] = []
+    const sampleCount = 12
+    const stripW = artR - artL
+    for (let i = 0; i < sampleCount; i++) {
+      const sx = artL + Math.round((i / (sampleCount - 1)) * (stripW - 1))
+      const sy = artT + Math.round(topStripH / 2)
+      const idx = (sy * w + sx) * 3
+      topEdgeSamples.push(rgbToHex({
+        r: rawPixels[idx],
+        g: rawPixels[idx + 1],
+        b: rawPixels[idx + 2],
+      }))
     }
 
     const cardColors: CardColors = {
       primary: rgbToHex(primary),
       secondary: rgbToHex(secondary),
-      palette: final.slice(0, 5).map(rgbToHex),
+      palette: finalArt.slice(0, 5).map(rgbToHex),
       isDark: luminance(primary) < 0.5,
+      borderColor: rgbToHex(borderDominant),
+      topEdgeColors: topEdgeSamples,
     }
 
-    // Save to database
     const { error } = await supabase
       .from('cards')
       .update({ card_colors: cardColors })
@@ -150,7 +243,7 @@ export async function extractAndSaveCardColors(cardId: string, frontPath: string
     if (error) {
       console.warn('[ColorExtractor] Failed to save colors:', error.message)
     } else {
-      console.log('[ColorExtractor] Colors saved for card', cardId, ':', cardColors.primary, cardColors.secondary)
+      console.log('[ColorExtractor] Colors saved for card', cardId, ':', cardColors.primary, '/', cardColors.secondary, 'border:', cardColors.borderColor)
     }
 
     return cardColors

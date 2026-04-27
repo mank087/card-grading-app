@@ -8,6 +8,9 @@
  * Uses the server-side color extractor (sharp + k-means).
  */
 
+import * as dotenv from 'dotenv'
+dotenv.config({ path: '.env.local' })
+
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -28,6 +31,8 @@ interface CardColors {
   secondary: string
   palette: string[]
   isDark: boolean
+  borderColor: string
+  topEdgeColors: string[]
 }
 
 function rgbToHex({ r, g, b }: RGB): string {
@@ -91,6 +96,25 @@ function filterInteresting(colors: RGB[]): RGB[] {
   })
 }
 
+function sampleZone(raw: Buffer, w: number, h: number, x1: number, y1: number, x2: number, y2: number): RGB[] {
+  const px: RGB[] = []
+  for (let y = y1; y < y2; y++) {
+    for (let x = x1; x < x2; x++) {
+      const i = (y * w + x) * 3
+      px.push({ r: raw[i], g: raw[i + 1], b: raw[i + 2] })
+    }
+  }
+  return px
+}
+
+function detectBackground(outerPixels: RGB[], innerPixels: RGB[]): RGB | null {
+  if (outerPixels.length < 10 || innerPixels.length < 10) return null
+  const outerC = kMeans(outerPixels, 3, 8)
+  const innerC = kMeans(innerPixels, 4, 8)
+  const minDist = Math.min(...innerC.map(c => colorDistance(outerC[0], c)))
+  return minDist > 60 ? outerC[0] : null
+}
+
 async function extractColors(frontPath: string): Promise<CardColors | null> {
   const { data: urlData } = await supabase.storage.from('cards').createSignedUrl(frontPath, 300)
   if (!urlData?.signedUrl) return null
@@ -100,30 +124,72 @@ async function extractColors(frontPath: string): Promise<CardColors | null> {
   const buffer = Buffer.from(await response.arrayBuffer())
 
   const sharp = require('sharp')
+  const w = 100, h = 140
   const { data: rawPixels } = await sharp(buffer)
-    .resize(60, 84, { fit: 'cover' })
+    .resize(w, h, { fit: 'cover' })
     .removeAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true })
 
-  const pixels: RGB[] = []
-  for (let i = 0; i < rawPixels.length; i += 3) {
-    pixels.push({ r: rawPixels[i], g: rawPixels[i + 1], b: rawPixels[i + 2] })
+  // Zone fractions
+  const outerL = Math.round(w * 0.12), outerT = Math.round(h * 0.12)
+  const outerR = Math.round(w * 0.88), outerB = Math.round(h * 0.88)
+  const borderL = Math.round(w * 0.22), borderT = Math.round(h * 0.22)
+  const borderR = Math.round(w * 0.78), borderB = Math.round(h * 0.78)
+  const artL = Math.round(w * 0.22), artT = Math.round(h * 0.22)
+  const artR = Math.round(w * 0.78), artB = Math.round(h * 0.78)
+
+  const outerPixels = [
+    ...sampleZone(rawPixels, w, h, 0, 0, w, outerT),
+    ...sampleZone(rawPixels, w, h, 0, outerB, w, h),
+    ...sampleZone(rawPixels, w, h, 0, outerT, outerL, outerB),
+    ...sampleZone(rawPixels, w, h, outerR, outerT, w, outerB),
+  ]
+  const borderPixels = [
+    ...sampleZone(rawPixels, w, h, outerL, outerT, borderL, outerB),
+    ...sampleZone(rawPixels, w, h, borderR, outerT, outerR, outerB),
+    ...sampleZone(rawPixels, w, h, outerL, outerT, outerR, borderT),
+    ...sampleZone(rawPixels, w, h, outerL, borderB, outerR, outerB),
+  ]
+  const artworkPixels = sampleZone(rawPixels, w, h, artL, artT, artR, artB)
+
+  const bgColor = detectBackground(outerPixels, artworkPixels)
+
+  const artClusters = kMeans(artworkPixels)
+  let artInteresting = filterInteresting(artClusters)
+  if (bgColor) artInteresting = artInteresting.filter(c => colorDistance(c, bgColor) > 50)
+  const finalArt = artInteresting.length >= 2 ? artInteresting : artClusters
+
+  let primary = finalArt[0]
+  let secondary = finalArt.length > 1 ? finalArt[1] : finalArt[0]
+  if (colorDistance(primary, secondary) < 40 && finalArt.length > 2) secondary = finalArt[2]
+
+  // Border color
+  const borderClusters = kMeans(borderPixels, 4, 8)
+  let borderDominant = borderClusters[0]
+  if (bgColor) {
+    const nonBg = borderClusters.filter(c => colorDistance(c, bgColor) > 40)
+    if (nonBg.length > 0) borderDominant = nonBg[0]
   }
 
-  const clusters = kMeans(pixels)
-  const interesting = filterInteresting(clusters)
-  const final = interesting.length >= 2 ? interesting : clusters
-
-  let primary = final[0]
-  let secondary = final.length > 1 ? final[1] : final[0]
-  if (colorDistance(primary, secondary) < 40 && final.length > 2) secondary = final[2]
+  // Top edge colors
+  const topStripH = Math.max(2, Math.round((artB - artT) * 0.15))
+  const topEdgeSamples: string[] = []
+  const stripW = artR - artL
+  for (let i = 0; i < 12; i++) {
+    const sx = artL + Math.round((i / 11) * (stripW - 1))
+    const sy = artT + Math.round(topStripH / 2)
+    const idx = (sy * w + sx) * 3
+    topEdgeSamples.push(rgbToHex({ r: rawPixels[idx], g: rawPixels[idx + 1], b: rawPixels[idx + 2] }))
+  }
 
   return {
     primary: rgbToHex(primary),
     secondary: rgbToHex(secondary),
-    palette: final.slice(0, 5).map(rgbToHex),
+    palette: finalArt.slice(0, 5).map(rgbToHex),
     isDark: luminance(primary) < 0.5,
+    borderColor: rgbToHex(borderDominant),
+    topEdgeColors: topEdgeSamples,
   }
 }
 
@@ -132,20 +198,26 @@ async function extractColors(frontPath: string): Promise<CardColors | null> {
 async function main() {
   const args = process.argv.slice(2)
   const dryRun = args.includes('--dry-run')
+  const force = args.includes('--force') // Re-extract even if colors exist
   const limitIdx = args.indexOf('--limit')
   const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1]) || 100 : 9999
 
-  console.log(`Backfilling card colors (limit: ${limit}, dry-run: ${dryRun})`)
+  console.log(`Backfilling card colors (limit: ${limit}, dry-run: ${dryRun}, force: ${force})`)
 
-  // Fetch cards without card_colors that have a front image
-  const { data: cards, error } = await supabase
+  // Fetch cards that need color extraction
+  let query = supabase
     .from('cards')
     .select('id, front_path')
     .not('front_path', 'is', null)
-    .is('card_colors', null)
     .not('conversational_whole_grade', 'is', null)
     .order('created_at', { ascending: false })
     .limit(limit)
+
+  if (!force) {
+    query = query.is('card_colors', null)
+  }
+
+  const { data: cards, error } = await query
 
   if (error) {
     console.error('Failed to fetch cards:', error.message)

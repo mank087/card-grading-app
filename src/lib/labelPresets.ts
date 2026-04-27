@@ -57,18 +57,29 @@ export const COLOR_PRESETS: ColorPreset[] = [
  * These are computed dynamically from CardColors data, not static presets.
  */
 
+export interface CardColorInput {
+  primary: string;
+  secondary: string;
+  isDark: boolean;
+  borderColor?: string;
+  topEdgeColors?: string[];
+}
+
+export interface CardColorResult {
+  gradientStart: string;
+  gradientEnd: string;
+  accentColor: string;
+  textColor: string;
+  style: 'modern' | 'traditional';
+  /** Multi-stop gradient colors for Card Extension (left-to-right across label) */
+  topEdgeGradient?: string[];
+}
+
 export interface CardColorStyle {
   id: string;
   name: string;
   description: string;
-  /** Generate gradient colors from extracted card colors */
-  getColors: (primary: string, secondary: string, isDark: boolean) => {
-    gradientStart: string;
-    gradientEnd: string;
-    accentColor: string;
-    textColor: string;
-    style: 'modern' | 'traditional';
-  };
+  getColors: (colors: CardColorInput) => CardColorResult;
 }
 
 export const CARD_COLOR_STYLES: CardColorStyle[] = [
@@ -76,7 +87,7 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     id: 'color-gradient',
     name: 'Color Gradient',
     description: 'Smooth gradient from card\'s primary to secondary color',
-    getColors: (primary, secondary, isDark) => ({
+    getColors: ({ primary, secondary, isDark }) => ({
       gradientStart: primary,
       gradientEnd: secondary,
       accentColor: isDark ? '#ffffff' : '#1a1625',
@@ -87,20 +98,29 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
   {
     id: 'card-extension',
     name: 'Card Extension',
-    description: 'Label seamlessly continues the card\'s top edge colors',
-    getColors: (primary, secondary, isDark) => ({
-      gradientStart: primary,
-      gradientEnd: mixHex(primary, '#000000', 0.4),
-      accentColor: secondary,
-      textColor: '#ffffff',
-      style: 'modern',
-    }),
+    description: 'Label continues the card\'s top edge colors as a gradient',
+    getColors: ({ primary, secondary, topEdgeColors }) => {
+      // Use actual top-edge pixel samples for a multi-color gradient
+      // that seamlessly continues from the card image
+      const topGradient = topEdgeColors && topEdgeColors.length >= 4
+        ? topEdgeColors
+        : [primary, mixHex(primary, secondary, 0.5), secondary];
+
+      return {
+        gradientStart: topGradient[0],
+        gradientEnd: topGradient[topGradient.length - 1],
+        accentColor: secondary,
+        textColor: '#ffffff',
+        style: 'modern',
+        topEdgeGradient: topGradient,
+      };
+    },
   },
   {
     id: 'neon-outline',
     name: 'Neon Outline',
     description: 'Dark background with glowing neon border in card color',
-    getColors: (primary, _secondary, _isDark) => ({
+    getColors: ({ primary }) => ({
       gradientStart: '#0a0a0a',
       gradientEnd: '#1a1a2e',
       accentColor: primary,
@@ -112,7 +132,7 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     id: 'frosted-glass',
     name: 'Frosted Glass',
     description: 'Light translucent label tinted with card colors',
-    getColors: (primary, secondary, _isDark) => ({
+    getColors: ({ primary, secondary }) => ({
       gradientStart: mixHex(primary, '#ffffff', 0.85),
       gradientEnd: mixHex(secondary, '#ffffff', 0.85),
       accentColor: primary,
@@ -124,7 +144,7 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     id: 'team-colors',
     name: 'Team Colors',
     description: 'Bold split design using card\'s two dominant colors',
-    getColors: (primary, secondary, isDark) => ({
+    getColors: ({ primary, secondary, isDark }) => ({
       gradientStart: mixHex(primary, '#000000', 0.2),
       gradientEnd: mixHex(secondary, '#000000', 0.2),
       accentColor: isDark ? '#ffffff' : '#1a1625',

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
 import { buildContextLine, buildFeaturesLine } from '@/lib/labelDataGenerator'
 import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES } from '@/lib/labelPresets'
-import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle } from '@/lib/labelPresets'
+import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle, CardColorInput } from '@/lib/labelPresets'
 import { extractCardColors, type CardColors } from '@/lib/colorExtractor'
 import { LabelMockup } from '@/components/labels/LabelMockup'
 import { useLabelPreview } from '@/hooks/useLabelPreview'
@@ -652,9 +652,20 @@ function CustomDesigner({
     }
   }, [selectedCard])
 
+  const cardColorInput = useMemo<CardColorInput | null>(() => {
+    if (!cardColors) return null
+    return {
+      primary: cardColors.primary,
+      secondary: cardColors.secondary,
+      isDark: cardColors.isDark,
+      borderColor: cardColors.borderColor,
+      topEdgeColors: cardColors.topEdgeColors,
+    }
+  }, [cardColors])
+
   const handleCardColorStyle = useCallback((style: CardColorStyle) => {
-    if (!cardColors) return
-    const colors = style.getColors(cardColors.primary, cardColors.secondary, cardColors.isDark)
+    if (!cardColorInput) return
+    const colors = style.getColors(cardColorInput)
     setActiveCardColorStyle(style.id)
     updateConfig({
       colorPreset: style.id,
@@ -665,7 +676,7 @@ function CustomDesigner({
       borderColor: colors.accentColor,
       borderWidth: style.id === 'neon-outline' ? 0.03 : 0.04,
     })
-  }, [cardColors, updateConfig])
+  }, [cardColorInput, updateConfig])
 
   // Eyedropper state
   const [eyedropperTarget, setEyedropperTarget] = useState<'start' | 'end' | 'border' | null>(null)
@@ -1225,8 +1236,26 @@ function CustomDesigner({
                     {/* Card color style buttons */}
                     <div className="grid grid-cols-5 gap-1.5">
                       {CARD_COLOR_STYLES.map((style) => {
-                        const colors = style.getColors(cardColors.primary, cardColors.secondary, cardColors.isDark)
+                        const colors = cardColorInput ? style.getColors(cardColorInput) : null
+                        if (!colors) return null
                         const isActive = activeCardColorStyle === style.id
+
+                        // Build preview background
+                        let previewBg: React.CSSProperties
+                        if (style.id === 'neon-outline') {
+                          previewBg = { background: '#0a0a0a', boxShadow: `inset 0 0 8px ${cardColors.primary}88` }
+                        } else if (style.id === 'card-extension' && colors.topEdgeGradient && colors.topEdgeGradient.length >= 3) {
+                          // Multi-color gradient matching the card's top edge
+                          const stops = colors.topEdgeGradient.map((c, i, arr) =>
+                            `${c} ${Math.round((i / (arr.length - 1)) * 100)}%`
+                          ).join(', ')
+                          previewBg = { background: `linear-gradient(90deg, ${stops})` }
+                        } else if (style.id === 'team-colors') {
+                          previewBg = { background: `linear-gradient(90deg, ${colors.gradientStart} 45%, ${colors.gradientEnd} 55%)` }
+                        } else {
+                          previewBg = { background: `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientEnd})` }
+                        }
+
                         return (
                           <button
                             key={style.id}
@@ -1238,16 +1267,7 @@ function CustomDesigner({
                             }`}
                             title={`${style.name}: ${style.description}`}
                           >
-                            <div
-                              className="w-full aspect-square"
-                              style={
-                                style.id === 'neon-outline'
-                                  ? { background: '#0a0a0a', boxShadow: `inset 0 0 8px ${cardColors.primary}88` }
-                                  : style.id === 'team-colors'
-                                    ? { background: `linear-gradient(90deg, ${colors.gradientStart} 45%, ${colors.gradientEnd} 55%)` }
-                                    : { background: `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientEnd})` }
-                              }
-                            />
+                            <div className="w-full aspect-square" style={previewBg} />
                             <div className="text-[8px] text-gray-600 text-center py-0.5 bg-white truncate px-0.5">
                               {style.name}
                             </div>
