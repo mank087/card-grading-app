@@ -1156,14 +1156,48 @@ function CustomDesigner({
                 })}
               </div>
 
-              {/* Custom color pickers — 2-5 user colors with eyedropper + layout styles */}
+              {/* Custom color designer — colors + card reference image + layout styles */}
               {isCustomLayout && (
                 <div className="mt-2 space-y-3">
+                  {/* Card image reference — visible so browser eyedropper can pick from it */}
+                  {selectedCard?.front_url && (
+                    <div className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
+                      <div className="flex items-center justify-between px-2 py-1 bg-gray-100 border-b border-gray-200">
+                        <span className="text-[10px] text-gray-500 font-medium">Reference — use eyedropper to pick colors</span>
+                      </div>
+                      <div className="flex justify-center p-2">
+                        <img
+                          src={selectedCard.front_url}
+                          alt="Card front"
+                          className="max-h-[180px] rounded shadow-sm"
+                          crossOrigin="anonymous"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Your Colors */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="text-[10px] text-gray-500 font-medium">Your Colors</label>
                       <div className="flex items-center gap-1.5">
+                        {cardColors && (
+                          <button
+                            onClick={() => {
+                              const pulled = cardColors.palette.slice(0, Math.max(2, customColorCount))
+                              setCustomColorCount(pulled.length)
+                              const layout = config.layoutStyle || 'color-gradient'
+                              updateConfig({
+                                customColors: pulled,
+                                ...applyLayoutToColors(layout, pulled),
+                                layoutStyle: layout,
+                              })
+                            }}
+                            className="text-[9px] text-purple-600 hover:text-purple-800 underline"
+                          >
+                            Pull from card
+                          </button>
+                        )}
                         {customColorCount < 5 && (
                           <button
                             onClick={() => {
@@ -1175,7 +1209,7 @@ function CustomDesigner({
                             }}
                             className="text-[9px] text-gray-500 hover:text-purple-600 underline"
                           >
-                            + Add color
+                            + Add
                           </button>
                         )}
                         {customColorCount > 2 && (
@@ -1201,10 +1235,8 @@ function CustomDesigner({
                       {Array.from({ length: customColorCount }).map((_, i) => {
                         const colors = config.customColors || [config.gradientStart, config.gradientEnd]
                         const color = colors[i] || '#7c3aed'
-                        const targetId = `custom-${i}`
-                        const isPickingThis = eyedropperTarget === targetId
                         return (
-                          <div key={i} className="flex-1 flex flex-col gap-1">
+                          <div key={i} className="flex-1">
                             <input
                               type="color"
                               value={color}
@@ -1219,29 +1251,13 @@ function CustomDesigner({
                                   layoutStyle: layout,
                                 })
                               }}
-                              className="w-full h-8 rounded border border-gray-300 cursor-pointer"
+                              className="w-full h-9 rounded border border-gray-300 cursor-pointer"
                             />
-                            {selectedCard?.front_url && (
-                              <button
-                                onClick={() => setEyedropperTarget(isPickingThis ? null : targetId)}
-                                className={`w-full h-6 rounded border flex items-center justify-center gap-0.5 transition-colors text-[9px] ${
-                                  isPickingThis
-                                    ? 'border-purple-500 bg-purple-100 text-purple-700'
-                                    : 'border-gray-200 text-gray-400 hover:border-purple-300 hover:text-purple-500'
-                                }`}
-                                title="Pick from card image"
-                              >
-                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                  <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                  <circle cx="12" cy="12" r="3" fill="currentColor" />
-                                </svg>
-                                Pick
-                              </button>
-                            )}
                           </div>
                         )
                       })}
                     </div>
+                    <p className="text-[9px] text-gray-400 mt-1">Click a color, then use the eyedropper on the card image above</p>
                   </div>
 
                   {/* Layout style buttons */}
