@@ -50,48 +50,61 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
 }
 
 /**
- * Crop image to card aspect ratio (center crop with 10% margin).
+ * Crop image to match the camera guide overlay, plus 5% padding.
+ *
+ * The guide overlay is 70% of the camera view width with a card aspect ratio
+ * (2.5:3.5), centered. The camera sensor captures a wider frame than what
+ * the guide covers. This crops to match the guide region so background
+ * behind the card is removed.
  */
 export async function cropToCardAspect(
   uri: string,
   orientation: 'portrait' | 'landscape' = 'portrait'
 ): Promise<string> {
-  // Get original dimensions
   const original = await ImageManipulator.manipulateAsync(uri, [], {
     format: ImageManipulator.SaveFormat.JPEG,
   })
   const { width, height } = original
 
   const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
-  const imageAspect = width / height
+
+  // The guide overlay is 70% of the camera view width.
+  // The camera frame maps to the full CameraView area.
+  // We crop to 70% + 5% padding = 75% of the frame, maintaining card AR.
+  const guideScale = 0.70
+  const padding = 0.05
+  const targetScale = guideScale + padding * 2 // 0.80
 
   let cropWidth: number, cropHeight: number
 
-  if (imageAspect > cardAspect) {
-    // Image is wider — crop sides
-    cropHeight = Math.round(height * 0.90)
+  // Fit the card AR within the target scale of the captured frame
+  const imgAspect = width / height
+  if (imgAspect > cardAspect) {
+    // Image wider than card — height is the constraint
+    cropHeight = Math.round(height * targetScale)
     cropWidth = Math.round(cropHeight * cardAspect)
   } else {
-    // Image is taller — crop top/bottom
-    cropWidth = Math.round(width * 0.90)
+    // Image taller than card — width is the constraint
+    cropWidth = Math.round(width * targetScale)
     cropHeight = Math.round(cropWidth / cardAspect)
   }
 
-  // Ensure crop dimensions don't exceed image
+  // Clamp to image bounds
   cropWidth = Math.min(cropWidth, width)
   cropHeight = Math.min(cropHeight, height)
 
-  const originX = Math.round((width - cropWidth) / 2)
-  const originY = Math.round((height - cropHeight) / 2)
+  // Center the crop
+  const originX = Math.max(0, Math.round((width - cropWidth) / 2))
+  const originY = Math.max(0, Math.round((height - cropHeight) / 2))
 
   const cropped = await ImageManipulator.manipulateAsync(
     uri,
     [{
       crop: {
-        originX: Math.max(0, originX),
-        originY: Math.max(0, originY),
-        width: cropWidth,
-        height: cropHeight,
+        originX,
+        originY,
+        width: Math.min(cropWidth, width - originX),
+        height: Math.min(cropHeight, height - originY),
       }
     }],
     { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }

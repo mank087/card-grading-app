@@ -20,19 +20,19 @@ export interface CropOptions {
 }
 
 /**
- * Crop image to guide frame boundaries
+ * Crop image to guide frame boundaries.
  *
- * @param file - Original captured image file
- * @param options - Crop configuration options
- * @returns Promise with cropped image and metadata
+ * Strategy: The guide overlay sits centered in the camera view and occupies
+ * a known percentage of the screen. The camera video frame is also centered.
+ * We calculate the card-aspect-ratio crop region as a proportion of the
+ * captured image, matching what the guide shows on screen, then add padding.
  */
 export async function cropToGuideFrame(
   file: File,
   options: CropOptions = {}
 ): Promise<CropResult> {
   const {
-    paddingPercent = 0.05, // 5% padding for tight crop
-    maintainAspectRatio = true,
+    paddingPercent = 0.05,
     orientation = 'portrait'
   } = options;
 
@@ -42,75 +42,55 @@ export async function cropToGuideFrame(
 
     img.onload = () => {
       try {
-        const originalWidth = img.width;
-        const originalHeight = img.height;
+        const W = img.width;
+        const H = img.height;
 
-        // Calculate guide frame dimensions (matches CameraGuideOverlay.tsx dynamic sizing)
         // Card aspect ratio: 2.5" x 3.5" standard trading card
-        const cardAspectRatio = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5;
+        const cardAR = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5;
 
-        // Mirror the CameraGuideOverlay calculation logic
-        // Available space accounts for header (~48px) and bottom controls (~100px)
-        // But for the captured image, we use proportional calculation based on image dimensions
-        const headerRatio = 48 / 800; // Approximate header as % of typical screen height
-        const bottomRatio = 100 / 800; // Approximate bottom controls as % of typical screen height
+        // The guide overlay uses ~96% of the narrower screen dimension.
+        // The captured video frame maps 1:1 to the camera view area.
+        // We size the crop box to the largest card-aspect-ratio rectangle
+        // that fits within 96% of the image, centered, then add padding.
+        const guideScale = 0.96;
 
-        const effectiveHeight = originalHeight * (1 - headerRatio - bottomRatio);
-        const effectiveWidth = originalWidth * 0.98; // 98% width usage
+        // Fit card AR inside guideScale% of the image
+        let cropW: number, cropH: number;
+        const imgAR = W / H;
 
-        // Width-constrained calculation
-        const widthBasedWidth = effectiveWidth;
-        const widthBasedHeight = widthBasedWidth / cardAspectRatio;
-
-        // Height-constrained calculation
-        const heightBasedHeight = effectiveHeight * 0.98;
-        const heightBasedWidth = heightBasedHeight * cardAspectRatio;
-
-        // Use whichever allows LARGER guide (same logic as overlay)
-        let guideWidth: number;
-        let guideHeight: number;
-
-        if (widthBasedHeight <= effectiveHeight) {
-          // Width is limiting factor
-          guideWidth = widthBasedWidth;
-          guideHeight = widthBasedHeight;
+        if (imgAR > cardAR) {
+          // Image is wider than card — height-constrained
+          cropH = Math.round(H * guideScale);
+          cropW = Math.round(cropH * cardAR);
         } else {
-          // Height is limiting factor
-          guideWidth = heightBasedWidth;
-          guideHeight = heightBasedHeight;
+          // Image is taller than card — width-constrained
+          cropW = Math.round(W * guideScale);
+          cropH = Math.round(cropW / cardAR);
         }
 
-        // Calculate guide position (centered)
-        const guideX = (originalWidth - guideWidth) / 2;
-        const guideY = (originalHeight - guideHeight) / 2;
+        // Add padding
+        const padX = Math.round(cropW * paddingPercent);
+        const padY = Math.round(cropH * paddingPercent);
+        cropW = Math.min(W, cropW + padX * 2);
+        cropH = Math.min(H, cropH + padY * 2);
 
-        // Apply padding (expand crop area slightly for positioning tolerance)
-        const paddingX = guideWidth * paddingPercent;
-        const paddingY = guideHeight * paddingPercent;
-
-        const cropX = Math.max(0, guideX - paddingX);
-        const cropY = Math.max(0, guideY - paddingY);
-        const cropWidth = Math.min(originalWidth - cropX, guideWidth + (paddingX * 2));
-        const cropHeight = Math.min(originalHeight - cropY, guideHeight + (paddingY * 2));
+        // Center the crop
+        const cropX = Math.max(0, Math.round((W - cropW) / 2));
+        const cropY = Math.max(0, Math.round((H - cropH) / 2));
+        // Clamp to image bounds
+        cropW = Math.min(cropW, W - cropX);
+        cropH = Math.min(cropH, H - cropY);
 
         // Create canvas for cropped image
         const canvas = document.createElement('canvas');
-        canvas.width = cropWidth;
-        canvas.height = cropHeight;
+        canvas.width = cropW;
+        canvas.height = cropH;
 
         const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          throw new Error('Failed to get canvas context');
-        }
+        if (!ctx) throw new Error('Failed to get canvas context');
 
-        // Draw cropped portion
-        ctx.drawImage(
-          img,
-          cropX, cropY, cropWidth, cropHeight, // Source rectangle
-          0, 0, cropWidth, cropHeight          // Destination rectangle
-        );
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
 
-        // Convert to blob
         canvas.toBlob((blob) => {
           if (!blob) {
             reject(new Error('Failed to create cropped image blob'));
@@ -130,14 +110,9 @@ export async function cropToGuideFrame(
             croppedFile,
             croppedDataUrl,
             croppedBlob: blob,
-            originalSize: { width: originalWidth, height: originalHeight },
-            croppedSize: { width: cropWidth, height: cropHeight },
-            cropArea: {
-              x: Math.round(cropX),
-              y: Math.round(cropY),
-              width: Math.round(cropWidth),
-              height: Math.round(cropHeight)
-            }
+            originalSize: { width: W, height: H },
+            croppedSize: { width: cropW, height: cropH },
+            cropArea: { x: cropX, y: cropY, width: cropW, height: cropH }
           });
         }, 'image/jpeg', 0.95);
 

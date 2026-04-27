@@ -73,8 +73,7 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
       // Process crop in background
       try {
         const cropResult = await cropToGuideFrame(captured.file, {
-          paddingPercent: 0.03, // Tight 3% padding for maximum card coverage
-          maintainAspectRatio: true,
+          paddingPercent: 0.05, // 5% padding around the card guide
           orientation: orientation,
         });
         setCapturedImageUrl(cropResult.croppedDataUrl);
