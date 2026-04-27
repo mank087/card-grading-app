@@ -268,7 +268,7 @@ function GeometricPatternSelector({ pattern, onChange }: { pattern: number; onCh
           >
             <div className="w-full aspect-square bg-gray-800 flex items-center justify-center">
               <span className="text-[10px] text-gray-300">
-                {p.id === 0 ? '◇' : p.id === 1 ? '⫽' : p.id === 2 ? '>' : p.id === 3 ? '▦' : '⚡'}
+                {p.id === 0 ? '◇' : p.id === 1 ? '⫽' : p.id === 2 ? '╳' : p.id === 3 ? '▦' : '⚡'}
               </span>
             </div>
             <div className="text-[7px] text-gray-600 text-center py-0.5 bg-white truncate px-0.5">

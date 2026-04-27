@@ -172,11 +172,8 @@ function fitCardInfoFonts(
 
 function strokeDivider(ctx: CanvasRenderingContext2D, path: Path2D, scale: number = 1) {
   ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-  ctx.lineWidth = 4 * scale;
-  ctx.stroke(path);
   ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-  ctx.lineWidth = 2 * scale;
+  ctx.lineWidth = 2.5 * scale;
   ctx.stroke(path);
   ctx.restore();
 }
@@ -292,48 +289,55 @@ function drawCustomBackground(
         strokeDivider(ctx, p, scale);
       }
     } else if (patternIdx === 2) {
-      // Chevron: nested V-shaped chevrons pointing right
-      const chevronCount = 5;
-      const bandH = H / chevronCount;
-      const pointX = W * 0.85;
-      for (let i = 0; i < chevronCount; i++) {
-        const y0 = i * bandH;
-        const y1 = y0 + bandH;
-        const midY = (y0 + y1) / 2;
+      // Random Lines: irregular lines breaking the label into regions
+      // Use a deterministic seed from the label dimensions so it's consistent
+      const seed = (W * 7 + H * 13) % 1000;
+      const pseudoRand = (i: number) => ((seed * (i + 1) * 9301 + 49297) % 233280) / 233280;
+
+      // Generate 6-8 random line endpoints that cross the label
+      const lineCount = 6 + Math.floor(pseudoRand(99) * 3);
+      const lines: { x1: number; y1: number; x2: number; y2: number }[] = [];
+      for (let i = 0; i < lineCount; i++) {
+        // Each line goes from one edge to another
+        const side1 = Math.floor(pseudoRand(i * 4) * 4); // 0=top, 1=right, 2=bottom, 3=left
+        const side2 = (side1 + 1 + Math.floor(pseudoRand(i * 4 + 1) * 2)) % 4;
+        const pos1 = pseudoRand(i * 4 + 2);
+        const pos2 = pseudoRand(i * 4 + 3);
+        const edgePt = (side: number, t: number) => {
+          if (side === 0) return { x: t * W, y: 0 };
+          if (side === 1) return { x: W, y: t * H };
+          if (side === 2) return { x: t * W, y: H };
+          return { x: 0, y: t * H };
+        };
+        const p1 = edgePt(side1, pos1);
+        const p2 = edgePt(side2, pos2);
+        lines.push({ x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y });
+      }
+
+      // Fill background with first color, then overlay regions
+      ctx.fillStyle = pick(0);
+      ctx.fillRect(0, 0, W, H);
+
+      // Create regions by drawing filled triangles from center points
+      const cx = W * (0.3 + pseudoRand(50) * 0.4);
+      const cy = H * (0.3 + pseudoRand(51) * 0.4);
+      for (let i = 0; i < lines.length; i++) {
+        const l = lines[i];
         ctx.beginPath();
-        ctx.moveTo(0, y0);
-        ctx.lineTo(pointX, midY);
-        ctx.lineTo(0, y1);
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(l.x1, l.y1);
+        ctx.lineTo(l.x2, l.y2);
         ctx.closePath();
-        ctx.fillStyle = pick(i);
-        ctx.fill();
-        // Fill the right triangle to cover full width
-        ctx.beginPath();
-        ctx.moveTo(pointX, midY);
-        ctx.lineTo(W, y0);
-        ctx.lineTo(W, y1);
-        ctx.closePath();
-        ctx.fillStyle = pick(i + chevronCount);
+        ctx.fillStyle = pick(i + 1);
         ctx.fill();
       }
-      // Stroke chevron edges
-      for (let i = 0; i <= chevronCount; i++) {
-        const y0 = i * bandH;
-        const prevY = (i - 1) * bandH;
-        const midY = (prevY + y0) / 2;
-        if (i > 0) {
-          const p = new Path2D();
-          p.moveTo(0, prevY);
-          p.lineTo(pointX, midY);
-          p.lineTo(0, y0);
-          strokeDivider(ctx, p, scale);
-          const p2 = new Path2D();
-          p2.moveTo(pointX, midY);
-          p2.lineTo(W, prevY);
-          p2.moveTo(pointX, midY);
-          p2.lineTo(W, y0);
-          strokeDivider(ctx, p2, scale);
-        }
+
+      // Stroke all divider lines — black only, no white border
+      for (const l of lines) {
+        const p = new Path2D();
+        p.moveTo(l.x1, l.y1);
+        p.lineTo(l.x2, l.y2);
+        strokeDivider(ctx, p, scale);
       }
     } else if (patternIdx === 3) {
       // Mosaic Grid: 5x2 rectangular tiles
