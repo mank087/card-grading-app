@@ -186,6 +186,25 @@ function drawCustomBackground(
     grad.addColorStop(1, '#ff00ff');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
+  } else if (config.colorPreset === 'team-colors') {
+    // Bold split: left half primary, right half secondary with a diagonal blend
+    const grad = ctx.createLinearGradient(0, 0, W, 0);
+    grad.addColorStop(0, config.gradientStart);
+    grad.addColorStop(0.45, config.gradientStart);
+    grad.addColorStop(0.55, config.gradientEnd);
+    grad.addColorStop(1, config.gradientEnd);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+  } else if (config.colorPreset === 'frosted-glass') {
+    // Frosted: light base with subtle noise texture effect
+    const grad = ctx.createLinearGradient(0, 0, W, H);
+    grad.addColorStop(0, config.gradientStart);
+    grad.addColorStop(1, config.gradientEnd);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
+    // Add frosted overlay
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fillRect(0, 0, W, H);
   } else {
     const grad = ctx.createLinearGradient(0, 0, W, H);
     grad.addColorStop(0, config.gradientStart);
@@ -195,8 +214,18 @@ function drawCustomBackground(
     ctx.fillRect(0, 0, W, H);
   }
 
+  // Neon outline: add inner glow in the accent color (stored in borderColor)
+  if (config.colorPreset === 'neon-outline' && config.borderColor) {
+    const glowColor = config.borderColor;
+    // Inner glow along edges
+    const glow = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, W / 2);
+    glow.addColorStop(0, 'transparent');
+    glow.addColorStop(1, glowColor + '33');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+  }
   // Subtle glow for dark themes
-  if (config.style === 'modern') {
+  else if (config.style === 'modern') {
     const glow = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, W / 2);
     glow.addColorStop(0, 'rgba(139, 92, 246, 0.1)');
     glow.addColorStop(1, 'transparent');

@@ -13,6 +13,7 @@ import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Yu-Gi-Oh cards
 import { lookupYugiohCard } from "@/lib/yugiohCardMatcher";
+import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -1016,6 +1017,17 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
     if (updateError) {
       console.error(`[GET /api/yugioh/${cardId}] Database update failed:`, updateError);
       return NextResponse.json({ error: "Failed to save Yu-Gi-Oh card grading results" }, { status: 500 });
+    }
+
+    // 🎨 Color Extraction (Post-Grading, fire-and-forget)
+    if (card.front_path) {
+      extractAndSaveCardColors(cardId, card.front_path)
+        .then((colors) => {
+          if (colors) console.log(`[COLOR] Extracted colors for card ${cardId}: ${colors.primary} / ${colors.secondary}`);
+        })
+        .catch((colorErr) => {
+          console.warn(`[COLOR] Color extraction failed for card ${cardId}:`, colorErr.message);
+        });
     }
 
     console.log(`[GET /api/yugioh/${cardId}] Yu-Gi-Oh card request completed in ${Date.now() - startTime}ms`);

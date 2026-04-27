@@ -37,7 +37,8 @@ export async function GET(request: NextRequest) {
         dcm_price_estimate, dcm_price_raw, dcm_price_graded_high, dcm_price_median, dcm_price_average,
         dcm_price_updated_at, dcm_price_match_confidence, dcm_price_product_id, dcm_price_product_name,
         dcm_prices_cached_at,
-        custom_label_data
+        custom_label_data,
+        card_colors
       `)
       .eq('user_id', userId)
       .order('created_at', { ascending: false });

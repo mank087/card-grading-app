@@ -5,8 +5,9 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
 import { buildContextLine, buildFeaturesLine } from '@/lib/labelDataGenerator'
-import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG } from '@/lib/labelPresets'
-import type { CustomLabelConfig, DimensionPreset, ColorPreset } from '@/lib/labelPresets'
+import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES } from '@/lib/labelPresets'
+import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle } from '@/lib/labelPresets'
+import { extractCardColors, type CardColors } from '@/lib/colorExtractor'
 import { LabelMockup } from '@/components/labels/LabelMockup'
 import { useLabelPreview } from '@/hooks/useLabelPreview'
 import { downloadCustomSlabLabel, downloadFoldOverSlabLabel } from '@/lib/customSlabLabelGenerator'
@@ -614,6 +615,58 @@ function CustomDesigner({
     setConfig((prev) => ({ ...prev, ...partial }))
   }, [setConfig])
 
+  // Card color extraction state
+  const [cardColors, setCardColors] = useState<CardColors | null>(null)
+  const [cardColorsLoading, setCardColorsLoading] = useState(false)
+  const [activeCardColorStyle, setActiveCardColorStyle] = useState<string | null>(null)
+  const cardColorsCardIdRef = useRef<string | null>(null)
+
+  // Extract colors when card changes (use DB-cached colors first, then client-side extraction)
+  useEffect(() => {
+    if (!selectedCard) {
+      setCardColors(null)
+      setActiveCardColorStyle(null)
+      cardColorsCardIdRef.current = null
+      return
+    }
+    if (cardColorsCardIdRef.current === selectedCard.id) return
+    cardColorsCardIdRef.current = selectedCard.id
+
+    // Check for pre-cached colors from server
+    if (selectedCard.card_colors) {
+      setCardColors(selectedCard.card_colors)
+      return
+    }
+
+    // Client-side extraction fallback
+    if (selectedCard.front_url) {
+      setCardColorsLoading(true)
+      extractCardColors(selectedCard.front_url)
+        .then((colors) => {
+          if (cardColorsCardIdRef.current === selectedCard.id) {
+            setCardColors(colors)
+          }
+        })
+        .catch(() => {})
+        .finally(() => setCardColorsLoading(false))
+    }
+  }, [selectedCard])
+
+  const handleCardColorStyle = useCallback((style: CardColorStyle) => {
+    if (!cardColors) return
+    const colors = style.getColors(cardColors.primary, cardColors.secondary, cardColors.isDark)
+    setActiveCardColorStyle(style.id)
+    updateConfig({
+      colorPreset: style.id,
+      gradientStart: colors.gradientStart,
+      gradientEnd: colors.gradientEnd,
+      style: colors.style,
+      borderEnabled: style.id === 'neon-outline',
+      borderColor: colors.accentColor,
+      borderWidth: style.id === 'neon-outline' ? 0.03 : 0.04,
+    })
+  }, [cardColors, updateConfig])
+
   // Eyedropper state
   const [eyedropperTarget, setEyedropperTarget] = useState<'start' | 'end' | 'border' | null>(null)
   const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null)
@@ -839,6 +892,7 @@ function CustomDesigner({
   }
 
   const handleColorPreset = (color: ColorPreset) => {
+    setActiveCardColorStyle(null)
     updateConfig({
       colorPreset: color.id,
       gradientStart: color.gradientStart,
@@ -1144,6 +1198,67 @@ function CustomDesigner({
                 </div>
               )}
             </div>
+
+            {/* Card Colors — auto-extracted from selected card image */}
+            {selectedCard && (cardColors || cardColorsLoading) && (
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 mb-2">
+                  Card Colors
+                  {cardColorsLoading && (
+                    <span className="ml-2 inline-block w-3 h-3 border-2 border-purple-400/30 border-t-purple-500 rounded-full animate-spin align-middle" />
+                  )}
+                </h3>
+                {cardColors && (
+                  <>
+                    {/* Color palette preview */}
+                    <div className="flex items-center gap-1.5 mb-2">
+                      {cardColors.palette.map((color, i) => (
+                        <div
+                          key={i}
+                          className="w-6 h-6 rounded-full border border-gray-300 shadow-sm"
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                      <span className="text-[9px] text-gray-400 ml-1">extracted from card</span>
+                    </div>
+                    {/* Card color style buttons */}
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {CARD_COLOR_STYLES.map((style) => {
+                        const colors = style.getColors(cardColors.primary, cardColors.secondary, cardColors.isDark)
+                        const isActive = activeCardColorStyle === style.id
+                        return (
+                          <button
+                            key={style.id}
+                            onClick={() => handleCardColorStyle(style)}
+                            className={`group relative rounded-lg overflow-hidden border-2 transition-all ${
+                              isActive
+                                ? 'border-purple-600 ring-2 ring-purple-300'
+                                : 'border-gray-200 hover:border-purple-300'
+                            }`}
+                            title={`${style.name}: ${style.description}`}
+                          >
+                            <div
+                              className="w-full aspect-square"
+                              style={
+                                style.id === 'neon-outline'
+                                  ? { background: '#0a0a0a', boxShadow: `inset 0 0 8px ${cardColors.primary}88` }
+                                  : style.id === 'team-colors'
+                                    ? { background: `linear-gradient(90deg, ${colors.gradientStart} 45%, ${colors.gradientEnd} 55%)` }
+                                    : { background: `linear-gradient(135deg, ${colors.gradientStart}, ${colors.gradientEnd})` }
+                              }
+                            />
+                            <div className="text-[8px] text-gray-600 text-center py-0.5 bg-white truncate px-0.5">
+                              {style.name}
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Style Toggle */}
             <div>

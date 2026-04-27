@@ -28,6 +28,7 @@ import {
   parseCenteringMeasurements,
   parseGradingMetadata
 } from "@/lib/conversationalDefectParser";
+import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 import { fetchAndCacheCardPrice } from "@/lib/ebay/priceTracker";
 import { fetchAndCacheDcmPrice, isSportsCardCategory, type CardForDcmPricing } from "@/lib/pricing/dcmPriceTracker";
 // PriceCharting pricing for non-sports card types (Pokemon, MTG, Lorcana, One Piece, Other)
@@ -2248,6 +2249,20 @@ EXTRACTION RULES:
     } catch (priceError: any) {
       console.error(`[PRICE CACHE] Price caching setup error:`, priceError.message);
       // Don't fail grading - price caching is optional enhancement
+    }
+
+    // 🎨 Color Extraction (Post-Grading, fire-and-forget)
+    // Extract dominant colors from the card's front image for color-matched labels
+    if (card.front_path) {
+      extractAndSaveCardColors(cardId, card.front_path)
+        .then((colors) => {
+          if (colors) {
+            console.log(`[COLOR] Extracted colors for card ${cardId}: ${colors.primary} / ${colors.secondary}`);
+          }
+        })
+        .catch((colorErr) => {
+          console.warn(`[COLOR] Color extraction failed for card ${cardId}:`, colorErr.message);
+        });
     }
 
     const processingTime = Date.now() - startTime;

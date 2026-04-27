@@ -11,6 +11,8 @@ import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
+// Color extraction for color-matched labels
+import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -960,6 +962,17 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     if (updateError) {
       console.error(`[GET /api/sports/${cardId}] Database update failed:`, updateError);
       return NextResponse.json({ error: "Failed to save sports card grading results" }, { status: 500 });
+    }
+
+    // 🎨 Color Extraction (Post-Grading, fire-and-forget)
+    if (card.front_path) {
+      extractAndSaveCardColors(cardId, card.front_path)
+        .then((colors) => {
+          if (colors) console.log(`[COLOR] Extracted colors for sports card ${cardId}: ${colors.primary} / ${colors.secondary}`);
+        })
+        .catch((colorErr) => {
+          console.warn(`[COLOR] Color extraction failed for sports card ${cardId}:`, colorErr.message);
+        });
     }
 
     console.log(`[GET /api/sports/${cardId}] Sports card request completed in ${Date.now() - startTime}ms`);

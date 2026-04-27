@@ -10,6 +10,7 @@ import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
+import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -762,6 +763,17 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
 
     if (updateError) {
       console.error(`[GET /api/other/${cardId}] ❌ Failed to update card:`, updateError);
+    }
+
+    // 🎨 Color Extraction (Post-Grading, fire-and-forget)
+    if (card.front_path) {
+      extractAndSaveCardColors(cardId, card.front_path)
+        .then((colors) => {
+          if (colors) console.log(`[COLOR] Extracted colors for card ${cardId}: ${colors.primary} / ${colors.secondary}`);
+        })
+        .catch((colorErr) => {
+          console.warn(`[COLOR] Color extraction failed for card ${cardId}:`, colorErr.message);
+        });
     }
 
     // Fetch updated card

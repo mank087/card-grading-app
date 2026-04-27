@@ -15,6 +15,7 @@ import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 import { getUserCredits } from "@/lib/credits";
 // 🃏 CARD IDENTIFICATION: Local Supabase database lookup for MTG cards
 import { lookupMtgCard, type MtgCard } from "@/lib/mtgCardMatcher";
+import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -1169,6 +1170,17 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     if (updateError) {
       console.error(`[GET /api/mtg/${cardId}] Database update failed:`, updateError);
       return NextResponse.json({ error: "Failed to save MTG card grading results" }, { status: 500 });
+    }
+
+    // 🎨 Color Extraction (Post-Grading, fire-and-forget)
+    if (card.front_path) {
+      extractAndSaveCardColors(cardId, card.front_path)
+        .then((colors) => {
+          if (colors) console.log(`[COLOR] Extracted colors for card ${cardId}: ${colors.primary} / ${colors.secondary}`);
+        })
+        .catch((colorErr) => {
+          console.warn(`[COLOR] Color extraction failed for card ${cardId}:`, colorErr.message);
+        });
     }
 
     // Card identification handled by internal MTG database lookup above (line ~903)

@@ -49,6 +49,103 @@ export const COLOR_PRESETS: ColorPreset[] = [
 ];
 
 // ============================================================================
+// CARD COLOR LABEL STYLES
+// ============================================================================
+
+/**
+ * Card-color-aware label styles that use colors extracted from the card image.
+ * These are computed dynamically from CardColors data, not static presets.
+ */
+
+export interface CardColorStyle {
+  id: string;
+  name: string;
+  description: string;
+  /** Generate gradient colors from extracted card colors */
+  getColors: (primary: string, secondary: string, isDark: boolean) => {
+    gradientStart: string;
+    gradientEnd: string;
+    accentColor: string;
+    textColor: string;
+    style: 'modern' | 'traditional';
+  };
+}
+
+export const CARD_COLOR_STYLES: CardColorStyle[] = [
+  {
+    id: 'color-gradient',
+    name: 'Color Gradient',
+    description: 'Smooth gradient from card\'s primary to secondary color',
+    getColors: (primary, secondary, isDark) => ({
+      gradientStart: primary,
+      gradientEnd: secondary,
+      accentColor: isDark ? '#ffffff' : '#1a1625',
+      textColor: isDark ? '#ffffff' : '#1f2937',
+      style: 'modern',
+    }),
+  },
+  {
+    id: 'card-extension',
+    name: 'Card Extension',
+    description: 'Label seamlessly continues the card\'s top edge colors',
+    getColors: (primary, secondary, isDark) => ({
+      gradientStart: primary,
+      gradientEnd: mixHex(primary, '#000000', 0.4),
+      accentColor: secondary,
+      textColor: '#ffffff',
+      style: 'modern',
+    }),
+  },
+  {
+    id: 'neon-outline',
+    name: 'Neon Outline',
+    description: 'Dark background with glowing neon border in card color',
+    getColors: (primary, _secondary, _isDark) => ({
+      gradientStart: '#0a0a0a',
+      gradientEnd: '#1a1a2e',
+      accentColor: primary,
+      textColor: '#ffffff',
+      style: 'modern',
+    }),
+  },
+  {
+    id: 'frosted-glass',
+    name: 'Frosted Glass',
+    description: 'Light translucent label tinted with card colors',
+    getColors: (primary, secondary, _isDark) => ({
+      gradientStart: mixHex(primary, '#ffffff', 0.85),
+      gradientEnd: mixHex(secondary, '#ffffff', 0.85),
+      accentColor: primary,
+      textColor: '#1f2937',
+      style: 'traditional',
+    }),
+  },
+  {
+    id: 'team-colors',
+    name: 'Team Colors',
+    description: 'Bold split design using card\'s two dominant colors',
+    getColors: (primary, secondary, isDark) => ({
+      gradientStart: mixHex(primary, '#000000', 0.2),
+      gradientEnd: mixHex(secondary, '#000000', 0.2),
+      accentColor: isDark ? '#ffffff' : '#1a1625',
+      textColor: '#ffffff',
+      style: 'modern',
+    }),
+  },
+];
+
+/** Helper: mix two hex colors */
+function mixHex(hex1: string, hex2: string, ratio: number): string {
+  const parse = (h: string) => {
+    const m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(h);
+    return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : [0, 0, 0];
+  };
+  const c1 = parse(hex1), c2 = parse(hex2);
+  const mix = (i: number) => Math.round(c1[i] * (1 - ratio) + c2[i] * ratio).toString(16).padStart(2, '0');
+  return `#${mix(0)}${mix(1)}${mix(2)}`;
+}
+
+// ============================================================================
 // CUSTOM LABEL CONFIG
 // ============================================================================
 
@@ -97,6 +194,7 @@ export interface LabelColorOverrides {
   borderColor: string;
   borderWidth: number;  // inches, converted to px by consumer
   isRainbow?: boolean;  // true when colorPreset === 'rainbow'
+  isNeonOutline?: boolean;  // true when using neon-outline card color style
 }
 
 /** Rainbow CSS gradient string for reuse across components */
@@ -112,6 +210,13 @@ export function getSlabWrapperStyle(overrides: LabelColorOverrides | undefined):
       background: 'linear-gradient(145deg, #ff0000 0%, #ff8800 17%, #ffff00 33%, #00cc00 50%, #0066ff 67%, #8800ff 83%, #ff00ff 100%)',
       boxShadow: '0 0 20px rgba(255, 255, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 -1px 0 rgba(0,0,0,0.3)',
       border: '1px solid rgba(255, 255, 255, 0.3)',
+    };
+  }
+  if (overrides?.isNeonOutline) {
+    return {
+      background: `linear-gradient(145deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%)`,
+      boxShadow: `0 0 15px ${overrides.borderColor}66, 0 0 30px ${overrides.borderColor}33, inset 0 1px 0 ${overrides.borderColor}33, inset 0 -1px 0 rgba(0,0,0,0.3)`,
+      border: `2px solid ${overrides.borderColor}88`,
     };
   }
   if (overrides) {
@@ -142,6 +247,7 @@ export function extractColorOverrides(config: CustomLabelConfig | null | undefin
     borderColor: config.borderColor,
     borderWidth: config.borderWidth,
     isRainbow: config.colorPreset === 'rainbow',
+    isNeonOutline: config.colorPreset === 'neon-outline',
   };
 }
 

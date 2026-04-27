@@ -25,7 +25,8 @@ export async function GET() {
         serial_numbering, rarity_tier, rarity_description,
         autographed, autograph_type, memorabilia_type,
         rookie_card, first_print_rookie,
-        custom_label_data
+        custom_label_data,
+        card_colors
       `)
       .in('id', SAMPLE_CARD_IDS)
       .eq('visibility', 'public')
