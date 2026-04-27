@@ -682,7 +682,6 @@ function CustomDesigner({
   // Custom multi-color state
   const [customColorCount, setCustomColorCount] = useState(2)
   const isCustomLayout = !!(config.layoutStyle) || config.colorPreset === 'custom'
-  const [activeCustomSlot, setActiveCustomSlot] = useState<number | null>(null)
 
   // Eyedropper state — supports 'start', 'end', 'border', or 'custom-0' through 'custom-4'
   const [eyedropperTarget, setEyedropperTarget] = useState<string | null>(null)
@@ -739,12 +738,12 @@ function CustomDesigner({
     img.src = url
   }, [])
 
-  // Load image when eyedropper activates, side changes, or custom mode shows card
+  // Load image when eyedropper activates or side changes
   useEffect(() => {
-    if ((!eyedropperTarget && !isCustomLayout) || !selectedCard) return
+    if (!eyedropperTarget || !selectedCard) return
     const url = eyedropperSide === 'front' ? selectedCard.front_url : selectedCard.back_url
     if (url) loadEyedropperImage(url)
-  }, [eyedropperTarget, eyedropperSide, selectedCard, loadEyedropperImage, isCustomLayout])
+  }, [eyedropperTarget, eyedropperSide, selectedCard, loadEyedropperImage])
 
   // Sample color directly from the canvas — 1:1 pixel mapping, no offset math needed
   const sampleColorAt = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -922,16 +921,19 @@ function CustomDesigner({
   const handleColorPreset = (color: ColorPreset) => {
     setActiveCardColorStyle(null)
     if (color.id === 'custom') {
-      // Initialize custom colors from current gradient
-      const cols = config.customColors || [config.gradientStart, config.gradientEnd]
+      // Default to card's primary/secondary if available, else current gradient
+      const defaultCols = cardColors
+        ? [cardColors.primary, cardColors.secondary]
+        : config.customColors || [config.gradientStart, config.gradientEnd]
+      const cols = config.customColors && config.customColors.length >= 2
+        ? config.customColors
+        : defaultCols
       setCustomColorCount(Math.max(2, cols.length))
+      const layout = config.layoutStyle || 'color-gradient'
       updateConfig({
-        colorPreset: 'custom',
+        ...applyLayoutToColors(layout, cols),
         customColors: cols,
-        layoutStyle: config.layoutStyle || 'color-gradient',
-        gradientStart: cols[0],
-        gradientEnd: cols[1] || cols[0],
-        style: 'modern',
+        layoutStyle: layout,
       })
     } else if (color.isCardColors) {
       // Apply extracted card colors with default layout
@@ -1157,12 +1159,11 @@ function CustomDesigner({
                 })}
               </div>
 
-              {/* Custom color designer — tap card image to pick, color inputs, layout styles */}
+              {/* Custom colors — swatches that open native color picker + layout styles */}
               {isCustomLayout && (
                 <div className="mt-2 space-y-3">
-                  {/* Your Colors — slot selector + color inputs */}
                   <div>
-                    <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center justify-between mb-1.5">
                       <label className="text-[10px] text-gray-500 font-medium">Your Colors</label>
                       <div className="flex items-center gap-1.5">
                         {customColorCount < 5 && (
@@ -1184,7 +1185,6 @@ function CustomDesigner({
                             onClick={() => {
                               const next = customColorCount - 1
                               setCustomColorCount(next)
-                              if (activeCustomSlot !== null && activeCustomSlot >= next) setActiveCustomSlot(null)
                               const cols = (config.customColors || []).slice(0, next)
                               const layout = config.layoutStyle || 'color-gradient'
                               updateConfig({ customColors: cols, ...applyLayoutToColors(layout, cols) })
@@ -1196,26 +1196,19 @@ function CustomDesigner({
                         )}
                       </div>
                     </div>
-                    {/* Color slots — tap to select for eyedropper, or use color input */}
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-2">
                       {Array.from({ length: customColorCount }).map((_, i) => {
                         const colors = config.customColors || [config.gradientStart, config.gradientEnd]
                         const color = colors[i] || '#7c3aed'
-                        const isSlotActive = activeCustomSlot === i
                         return (
-                          <div key={i} className="flex-1 flex flex-col gap-1">
-                            {/* Clickable swatch — selects slot for card picking */}
-                            <button
-                              onClick={() => setActiveCustomSlot(isSlotActive ? null : i)}
-                              className={`w-full h-7 rounded-t transition-all ${
-                                isSlotActive
-                                  ? 'ring-2 ring-purple-500 ring-offset-1'
-                                  : 'hover:ring-1 hover:ring-purple-300'
-                              }`}
+                          <label key={i} className="flex-1 relative cursor-pointer group">
+                            <div
+                              className="w-full h-10 rounded-lg border-2 border-gray-300 group-hover:border-purple-400 transition-colors shadow-sm"
                               style={{ backgroundColor: color }}
-                              title={isSlotActive ? 'Tap the card image below to pick' : `Select slot ${i + 1} to pick from card`}
                             />
-                            {/* Standard color input */}
+                            <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                              {i + 1}
+                            </span>
                             <input
                               type="color"
                               value={color}
@@ -1230,83 +1223,14 @@ function CustomDesigner({
                                   layoutStyle: layout,
                                 })
                               }}
-                              className="w-full h-5 rounded-b border border-gray-300 cursor-pointer"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />
-                          </div>
+                          </label>
                         )
                       })}
                     </div>
-                    {activeCustomSlot !== null && (
-                      <p className="text-[9px] text-purple-600 mt-1">
-                        Color {activeCustomSlot + 1} selected — tap the card image below to pick a color
-                      </p>
-                    )}
+                    <p className="text-[9px] text-gray-400 mt-1">Tap a color to open the picker — use its eyedropper on the card preview</p>
                   </div>
-
-                  {/* Card image for tap-to-pick + eyedropper hover color */}
-                  {selectedCard?.front_url && (
-                    <div className="rounded-lg border border-gray-200 overflow-hidden bg-gray-50">
-                      <div className="flex justify-center p-2">
-                        <canvas
-                          ref={eyedropperCanvasRef}
-                          className={`max-h-[200px] rounded shadow-sm ${activeCustomSlot !== null ? 'cursor-crosshair' : 'cursor-default'}`}
-                          style={{ touchAction: 'none' }}
-                          onMouseMove={(e) => {
-                            if (activeCustomSlot === null) return
-                            const color = sampleColorAt(e)
-                            if (color) setEyedropperHoverColor(color)
-                          }}
-                          onClick={(e) => {
-                            if (activeCustomSlot === null) return
-                            const color = sampleColorAt(e)
-                            if (!color) return
-                            const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                            while (cols.length <= activeCustomSlot) cols.push('#7c3aed')
-                            cols[activeCustomSlot] = color
-                            const layout = config.layoutStyle || 'color-gradient'
-                            updateConfig({
-                              customColors: cols,
-                              ...applyLayoutToColors(layout, cols),
-                              layoutStyle: layout,
-                            })
-                            setEyedropperHoverColor(null)
-                          }}
-                          onTouchEnd={(e) => {
-                            if (activeCustomSlot === null) return
-                            const touch = e.changedTouches[0]
-                            if (!touch) return
-                            const canvas = eyedropperCanvasRef.current
-                            if (!canvas) return
-                            const rect = canvas.getBoundingClientRect()
-                            const scaleX = canvas.width / rect.width
-                            const scaleY = canvas.height / rect.height
-                            const x = Math.floor((touch.clientX - rect.left) * scaleX)
-                            const y = Math.floor((touch.clientY - rect.top) * scaleY)
-                            const ctx = canvas.getContext('2d')
-                            if (!ctx || x < 0 || y < 0 || x >= canvas.width || y >= canvas.height) return
-                            const pixel = ctx.getImageData(x, y, 1, 1).data
-                            const color = `#${pixel[0].toString(16).padStart(2,'0')}${pixel[1].toString(16).padStart(2,'0')}${pixel[2].toString(16).padStart(2,'0')}`
-                            const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                            while (cols.length <= activeCustomSlot) cols.push('#7c3aed')
-                            cols[activeCustomSlot] = color
-                            const layout = config.layoutStyle || 'color-gradient'
-                            updateConfig({
-                              customColors: cols,
-                              ...applyLayoutToColors(layout, cols),
-                              layoutStyle: layout,
-                            })
-                          }}
-                          onMouseLeave={() => setEyedropperHoverColor(null)}
-                        />
-                      </div>
-                      {activeCustomSlot !== null && eyedropperHoverColor && (
-                        <div className="flex items-center justify-center gap-2 pb-2">
-                          <span className="w-5 h-5 rounded border border-gray-300" style={{ backgroundColor: eyedropperHoverColor }} />
-                          <span className="text-[10px] font-mono text-gray-500">{eyedropperHoverColor}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
 
                   {/* Layout style buttons */}
                   <div>
