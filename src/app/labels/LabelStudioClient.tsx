@@ -681,10 +681,10 @@ function CustomDesigner({
 
   // Custom multi-color state
   const [customColorCount, setCustomColorCount] = useState(2)
-  const isCustomLayout = !!(config.layoutStyle && config.customColors && config.customColors.length > 0)
+  const isCustomLayout = config.colorPreset === 'custom'
 
-  // Eyedropper state
-  const [eyedropperTarget, setEyedropperTarget] = useState<'start' | 'end' | 'border' | null>(null)
+  // Eyedropper state — supports 'start', 'end', 'border', or 'custom-0' through 'custom-4'
+  const [eyedropperTarget, setEyedropperTarget] = useState<string | null>(null)
   const [eyedropperHoverColor, setEyedropperHoverColor] = useState<string | null>(null)
   const eyedropperCanvasRef = useRef<HTMLCanvasElement>(null)
   const [eyedropperSide, setEyedropperSide] = useState<'front' | 'back'>('front')
@@ -779,10 +779,21 @@ function CustomDesigner({
       updateConfig({ colorPreset: 'custom', gradientEnd: color })
     } else if (eyedropperTarget === 'border') {
       updateConfig({ borderColor: color })
+    } else if (eyedropperTarget.startsWith('custom-')) {
+      const idx = parseInt(eyedropperTarget.split('-')[1])
+      const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+      while (cols.length <= idx) cols.push('#7c3aed')
+      cols[idx] = color
+      const layout = config.layoutStyle || 'color-gradient'
+      updateConfig({
+        customColors: cols,
+        ...applyLayoutToColors(layout, cols),
+        layoutStyle: layout,
+      })
     }
     setEyedropperTarget(null)
     setEyedropperHoverColor(null)
-  }, [eyedropperTarget, sampleColorAt, updateConfig])
+  }, [eyedropperTarget, sampleColorAt, updateConfig, config])
 
   // Label text fields — initialized from slabData, editable directly
   interface LabelFields {
@@ -912,7 +923,7 @@ function CustomDesigner({
     if (color.id === 'custom') {
       // Initialize custom colors from current gradient
       const cols = config.customColors || [config.gradientStart, config.gradientEnd]
-      setCustomColorCount(cols.length)
+      setCustomColorCount(Math.max(2, cols.length))
       updateConfig({
         colorPreset: 'custom',
         customColors: cols,
@@ -920,6 +931,19 @@ function CustomDesigner({
         gradientStart: cols[0],
         gradientEnd: cols[1] || cols[0],
         style: 'modern',
+      })
+    } else if (color.isCardColors) {
+      // Apply extracted card colors with default layout
+      if (!cardColors) return
+      const cols = cardColors.palette.slice(0, 5)
+      setActiveCardColorStyle('color-gradient')
+      updateConfig({
+        colorPreset: 'color-gradient',
+        gradientStart: cardColors.primary,
+        gradientEnd: cardColors.secondary,
+        style: 'modern',
+        customColors: undefined,
+        layoutStyle: undefined,
       })
     } else {
       updateConfig({
@@ -1077,57 +1101,69 @@ function CustomDesigner({
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Color Theme</h3>
               <div className="grid grid-cols-4 gap-2">
-                {COLOR_PRESETS.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => handleColorPreset(c)}
-                    className={`group relative rounded-lg overflow-hidden border-2 transition-all ${
-                      config.colorPreset === c.id
-                        ? 'border-purple-600 ring-2 ring-purple-300'
-                        : 'border-gray-200 hover:border-purple-300'
-                    }`}
-                    title={c.name}
-                  >
+                {COLOR_PRESETS.map((c) => {
+                  // Card Colors swatch: show actual card colors or disabled state
+                  if (c.isCardColors && !cardColors) return (
                     <div
-                      className="w-full aspect-square"
-                      style={
-                        c.isRainbow
-                          ? { background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00cc00, #0066ff, #8800ff)' }
-                          : { background: `linear-gradient(135deg, ${c.gradientStart}, ${c.gradientEnd})` }
-                      }
-                    />
-                    <div className="text-[9px] text-gray-600 text-center py-0.5 bg-white truncate px-0.5">
-                      {c.name}
+                      key={c.id}
+                      className="rounded-lg overflow-hidden border-2 border-gray-100 opacity-40 cursor-not-allowed"
+                      title="Grade a card to use card colors"
+                    >
+                      <div className="w-full aspect-square bg-gray-100 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                          <path d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343" />
+                        </svg>
+                      </div>
+                      <div className="text-[9px] text-gray-400 text-center py-0.5 bg-white truncate px-0.5">{c.name}</div>
                     </div>
-                  </button>
-                ))}
+                  )
+
+                  const isActive = c.isCardColors
+                    ? !!(activeCardColorStyle && !isCustomLayout)
+                    : c.id === 'custom'
+                      ? isCustomLayout
+                      : config.colorPreset === c.id && !isCustomLayout && !activeCardColorStyle
+
+                  let swatchBg: React.CSSProperties
+                  if (c.isRainbow) {
+                    swatchBg = { background: 'linear-gradient(135deg, #ff0000, #ff8800, #ffff00, #00cc00, #0066ff, #8800ff)' }
+                  } else if (c.isCardColors && cardColors) {
+                    const stops = cardColors.palette.slice(0, 3).map((clr, i, arr) =>
+                      `${clr} ${Math.round((i / Math.max(arr.length - 1, 1)) * 100)}%`
+                    ).join(', ')
+                    swatchBg = { background: `linear-gradient(135deg, ${stops})` }
+                  } else {
+                    swatchBg = { background: `linear-gradient(135deg, ${c.gradientStart}, ${c.gradientEnd})` }
+                  }
+
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => handleColorPreset(c)}
+                      className={`group relative rounded-lg overflow-hidden border-2 transition-all ${
+                        isActive
+                          ? 'border-purple-600 ring-2 ring-purple-300'
+                          : 'border-gray-200 hover:border-purple-300'
+                      }`}
+                      title={c.name}
+                    >
+                      <div className="w-full aspect-square" style={swatchBg} />
+                      <div className="text-[9px] text-gray-600 text-center py-0.5 bg-white truncate px-0.5">
+                        {c.name}
+                      </div>
+                    </button>
+                  )
+                })}
               </div>
 
-              {/* Custom color pickers — 2-5 user colors + layout style */}
-              {config.colorPreset === 'custom' || (config.customColors && config.customColors.length > 0 && isCustomLayout) ? (
+              {/* Custom color pickers — 2-5 user colors with eyedropper + layout styles */}
+              {isCustomLayout && (
                 <div className="mt-2 space-y-3">
-                  {/* Color swatches */}
+                  {/* Your Colors */}
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-[10px] text-gray-500 font-medium">Your Colors ({customColorCount})</label>
+                      <label className="text-[10px] text-gray-500 font-medium">Your Colors</label>
                       <div className="flex items-center gap-1.5">
-                        {cardColors && (
-                          <button
-                            onClick={() => {
-                              const pulled = cardColors.palette.slice(0, 5)
-                              setCustomColorCount(pulled.length)
-                              const layout = config.layoutStyle || 'color-gradient'
-                              updateConfig({
-                                customColors: pulled,
-                                ...applyLayoutToColors(layout, pulled),
-                                layoutStyle: layout,
-                              })
-                            }}
-                            className="text-[9px] text-purple-600 hover:text-purple-800 underline"
-                          >
-                            Pull from card
-                          </button>
-                        )}
                         {customColorCount < 5 && (
                           <button
                             onClick={() => {
@@ -1139,7 +1175,7 @@ function CustomDesigner({
                             }}
                             className="text-[9px] text-gray-500 hover:text-purple-600 underline"
                           >
-                            + Add
+                            + Add color
                           </button>
                         )}
                         {customColorCount > 2 && (
@@ -1165,8 +1201,10 @@ function CustomDesigner({
                       {Array.from({ length: customColorCount }).map((_, i) => {
                         const colors = config.customColors || [config.gradientStart, config.gradientEnd]
                         const color = colors[i] || '#7c3aed'
+                        const targetId = `custom-${i}`
+                        const isPickingThis = eyedropperTarget === targetId
                         return (
-                          <div key={i} className="flex-1">
+                          <div key={i} className="flex-1 flex flex-col gap-1">
                             <input
                               type="color"
                               value={color}
@@ -1183,6 +1221,23 @@ function CustomDesigner({
                               }}
                               className="w-full h-8 rounded border border-gray-300 cursor-pointer"
                             />
+                            {selectedCard?.front_url && (
+                              <button
+                                onClick={() => setEyedropperTarget(isPickingThis ? null : targetId)}
+                                className={`w-full h-6 rounded border flex items-center justify-center gap-0.5 transition-colors text-[9px] ${
+                                  isPickingThis
+                                    ? 'border-purple-500 bg-purple-100 text-purple-700'
+                                    : 'border-gray-200 text-gray-400 hover:border-purple-300 hover:text-purple-500'
+                                }`}
+                                title="Pick from card image"
+                              >
+                                <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                  <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  <circle cx="12" cy="12" r="3" fill="currentColor" />
+                                </svg>
+                                Pick
+                              </button>
+                            )}
                           </div>
                         )
                       })}
@@ -1203,8 +1258,8 @@ function CustomDesigner({
                         if (ls.id === 'neon-outline') {
                           bg = { background: '#0a0a0a', boxShadow: `inset 0 0 6px ${c1}88` }
                         } else if (ls.id === 'card-extension') {
-                          const stops = previewColors.map((c, i, arr) =>
-                            `${c} ${Math.round((i / Math.max(arr.length - 1, 1)) * 100)}%`
+                          const stops = previewColors.map((c, idx, arr) =>
+                            `${c} ${Math.round((idx / Math.max(arr.length - 1, 1)) * 100)}%`
                           ).join(', ')
                           bg = { background: `linear-gradient(90deg, ${stops})` }
                         } else if (ls.id === 'team-colors') {
@@ -1244,7 +1299,7 @@ function CustomDesigner({
                     </div>
                   </div>
                 </div>
-              ) : null}
+              )}
 
               {/* Eyedropper card image sampler */}
               {eyedropperTarget && selectedCard && (
@@ -1252,7 +1307,13 @@ function CustomDesigner({
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-semibold text-purple-700 uppercase tracking-wide">
-                        Picking: {eyedropperTarget === 'border' ? 'Border' : eyedropperTarget === 'start' ? 'Gradient Start' : 'Gradient End'}
+                        Picking: {
+                          eyedropperTarget === 'border' ? 'Border'
+                          : eyedropperTarget === 'start' ? 'Gradient Start'
+                          : eyedropperTarget === 'end' ? 'Gradient End'
+                          : eyedropperTarget?.startsWith('custom-') ? `Color ${parseInt(eyedropperTarget.split('-')[1]) + 1}`
+                          : 'Color'
+                        }
                       </span>
                       {eyedropperHoverColor && (
                         <span className="flex items-center gap-1">
@@ -1311,8 +1372,8 @@ function CustomDesigner({
               )}
             </div>
 
-            {/* Card Colors — auto-extracted from selected card image */}
-            {selectedCard && (cardColors || cardColorsLoading) && (
+            {/* Card Colors — shown when "Card Colors" theme is selected or a card-color style is active */}
+            {selectedCard && !isCustomLayout && (cardColors || cardColorsLoading) && (activeCardColorStyle || config.colorPreset === 'color-gradient' || config.colorPreset === 'card-extension' || config.colorPreset === 'neon-outline' || config.colorPreset === 'frosted-glass' || config.colorPreset === 'team-colors') && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">
                   Card Colors

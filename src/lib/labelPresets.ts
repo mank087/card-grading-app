@@ -35,16 +35,17 @@ export interface ColorPreset {
   gradientEnd: string;
   isCustom?: boolean;
   isRainbow?: boolean;
+  isCardColors?: boolean;
 }
 
 export const COLOR_PRESETS: ColorPreset[] = [
+  { id: 'midnight', name: 'Midnight Black', gradientStart: '#0a0a0a', gradientEnd: '#0a0a0a' },
   { id: 'modern-dark', name: 'Modern Dark', gradientStart: '#1a1625', gradientEnd: '#2d1f47' },
   { id: 'traditional', name: 'Traditional Light', gradientStart: '#f9fafb', gradientEnd: '#ffffff' },
-  { id: 'midnight', name: 'Midnight Black', gradientStart: '#0a0a0a', gradientEnd: '#1a1a2e' },
   { id: 'royal-blue', name: 'Royal Blue', gradientStart: '#1e3a5f', gradientEnd: '#0f2347' },
-  { id: 'forest-green', name: 'Forest Green', gradientStart: '#1a3c2a', gradientEnd: '#0f2418' },
   { id: 'crimson', name: 'Crimson Red', gradientStart: '#3c1a1a', gradientEnd: '#241010' },
   { id: 'rainbow', name: 'Rainbow Gradient', gradientStart: '#ff0000', gradientEnd: '#0000ff', isRainbow: true },
+  { id: 'card-colors', name: 'Card Colors', gradientStart: '#7c3aed', gradientEnd: '#4c1d95', isCardColors: true },
   { id: 'custom', name: 'Custom', gradientStart: '#1a1625', gradientEnd: '#2d1f47', isCustom: true },
 ];
 
@@ -142,8 +143,8 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
   },
   {
     id: 'team-colors',
-    name: 'Team Colors',
-    description: 'Bold split design using card\'s two dominant colors',
+    name: 'Split',
+    description: 'Bold split design using two dominant colors',
     getColors: ({ primary, secondary, isDark }) => ({
       gradientStart: mixHex(primary, '#000000', 0.2),
       gradientEnd: mixHex(secondary, '#000000', 0.2),
@@ -246,6 +247,9 @@ export const LAYOUT_STYLES = [
   { id: 'frosted-glass', name: 'Frosted', icon: '◻' },
   { id: 'team-colors', name: 'Split', icon: '◧' },
 ] as const;
+
+/** Simple gradient — used when 'custom' is selected without a layout style */
+export const DEFAULT_LAYOUT = 'color-gradient';
 
 // ============================================================================
 // CUSTOM LABEL CONFIG
