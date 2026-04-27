@@ -25,7 +25,7 @@ export const LAYOUT_STYLES = [
   { id: 'color-gradient', name: 'Gradient' },
   { id: 'card-extension', name: 'Extension' },
   { id: 'neon-outline', name: 'Neon' },
-  { id: 'frosted-glass', name: 'Frosted' },
+  { id: 'geometric', name: 'Geometric' },
   { id: 'team-colors', name: 'Split' },
 ] as const
 
@@ -110,15 +110,15 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     }),
   },
   {
-    id: 'frosted-glass',
-    name: 'Frosted Glass',
-    description: 'Light translucent tint of card colors',
-    getColors: ({ primary, secondary }) => ({
-      gradientStart: mixHex(primary, '#ffffff', 0.85),
-      gradientEnd: mixHex(secondary, '#ffffff', 0.85),
-      accentColor: primary,
-      textColor: '#1f2937',
-      style: 'traditional',
+    id: 'geometric',
+    name: 'Geometric',
+    description: 'Hard-line geometric dividers between colors',
+    getColors: ({ primary, secondary, isDark }) => ({
+      gradientStart: primary,
+      gradientEnd: secondary,
+      accentColor: isDark ? '#ffffff' : '#1a1625',
+      textColor: '#ffffff',
+      style: 'modern',
     }),
   },
   {
@@ -158,8 +158,8 @@ export function applyLayoutToColors(layoutId: string, colors: string[]): {
     }
     case 'neon-outline':
       return { colorPreset: 'neon-outline', gradientStart: '#0a0a0a', gradientEnd: '#1a1a2e', borderEnabled: true, borderColor: c1, borderWidth: 0.03, style: 'modern' }
-    case 'frosted-glass':
-      return { colorPreset: 'frosted-glass', gradientStart: mixHex(c1, '#ffffff', 0.85), gradientEnd: mixHex(c2, '#ffffff', 0.85), style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
+    case 'geometric':
+      return { colorPreset: 'geometric', gradientStart: c1, gradientEnd: c2, style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
     case 'team-colors':
       return { colorPreset: 'team-colors', gradientStart: mixHex(c1, '#000000', 0.2), gradientEnd: mixHex(c2, '#000000', 0.2), style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
     default:

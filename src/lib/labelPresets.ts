@@ -130,15 +130,15 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     }),
   },
   {
-    id: 'frosted-glass',
-    name: 'Frosted Glass',
-    description: 'Light translucent label tinted with card colors',
-    getColors: ({ primary, secondary }) => ({
-      gradientStart: mixHex(primary, '#ffffff', 0.85),
-      gradientEnd: mixHex(secondary, '#ffffff', 0.85),
-      accentColor: primary,
-      textColor: '#1f2937',
-      style: 'traditional',
+    id: 'geometric',
+    name: 'Geometric',
+    description: 'Hard-line geometric dividers between colors',
+    getColors: ({ primary, secondary, isDark }) => ({
+      gradientStart: primary,
+      gradientEnd: secondary,
+      accentColor: isDark ? '#ffffff' : '#1a1625',
+      textColor: '#ffffff',
+      style: 'modern',
     }),
   },
   {
@@ -213,11 +213,11 @@ export function applyLayoutToColors(
         borderWidth: 0.03,
         style: 'modern',
       };
-    case 'frosted-glass':
+    case 'geometric':
       return {
-        colorPreset: 'frosted-glass',
-        gradientStart: mixHex(c1, '#ffffff', 0.85),
-        gradientEnd: mixHex(c2, '#ffffff', 0.85),
+        colorPreset: 'geometric',
+        gradientStart: c1,
+        gradientEnd: c2,
         style: 'modern',
         borderEnabled: false,
       };
@@ -244,12 +244,21 @@ export const LAYOUT_STYLES = [
   { id: 'color-gradient', name: 'Gradient', icon: '↗' },
   { id: 'card-extension', name: 'Extension', icon: '═' },
   { id: 'neon-outline', name: 'Neon', icon: '◇' },
-  { id: 'frosted-glass', name: 'Frosted', icon: '◻' },
+  { id: 'geometric', name: 'Geometric', icon: '◆' },
   { id: 'team-colors', name: 'Split', icon: '◧' },
 ] as const;
 
 /** Simple gradient — used when 'custom' is selected without a layout style */
 export const DEFAULT_LAYOUT = 'color-gradient';
+
+/** Geometric pattern variations */
+export const GEOMETRIC_PATTERNS = [
+  { id: 0, name: 'Shattered Glass' },
+  { id: 1, name: 'Diagonal Stripes' },
+  { id: 2, name: 'Chevron' },
+  { id: 3, name: 'Mosaic Grid' },
+  { id: 4, name: 'Lightning Bolt' },
+] as const;
 
 // ============================================================================
 // CUSTOM LABEL CONFIG
@@ -270,6 +279,8 @@ export interface CustomLabelConfig {
   topEdgeGradient?: string[];  // Multi-stop gradient for Card Extension style
   customColors?: string[];     // Up to 5 user-picked colors for custom layouts
   layoutStyle?: string;        // Layout style id applied to custom colors
+  gradientAngle?: number;      // Gradient direction in degrees (0-360, default 135)
+  geometricPattern?: number;   // Geometric pattern index (0-4)
 }
 
 export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {

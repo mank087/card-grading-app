@@ -5,7 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
 import { buildContextLine, buildFeaturesLine } from '@/lib/labelDataGenerator'
-import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, applyLayoutToColors } from '@/lib/labelPresets'
+import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors } from '@/lib/labelPresets'
 import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle, CardColorInput } from '@/lib/labelPresets'
 import { extractCardColors, type CardColors } from '@/lib/colorExtractor'
 import { LabelMockup } from '@/components/labels/LabelMockup'
@@ -200,6 +200,83 @@ function ColorSlotPicker({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ============================================================================
+// GRADIENT ANGLE SLIDER
+// ============================================================================
+
+function GradientAngleSlider({ angle, onChange }: { angle: number; onChange: (a: number) => void }) {
+  return (
+    <div className="mt-3">
+      <div className="flex items-center justify-between mb-1">
+        <label className="text-[10px] text-gray-500 font-medium">Gradient Direction</label>
+        <span className="text-[10px] font-mono text-gray-400">{Math.round(angle)}°</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={360}
+        step={5}
+        value={angle}
+        onChange={(e) => onChange(parseInt(e.target.value))}
+        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-purple-600"
+      />
+      <div className="flex justify-between mt-1">
+        {[
+          { label: '→', value: 0 },
+          { label: '↘', value: 135 },
+          { label: '↓', value: 90 },
+          { label: '←', value: 180 },
+          { label: '↑', value: 270 },
+        ].map(p => (
+          <button
+            key={p.value}
+            onClick={() => onChange(p.value)}
+            className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+              Math.abs(angle - p.value) < 10 ? 'bg-purple-100 text-purple-700 font-medium' : 'text-gray-400 hover:text-gray-600'
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================================
+// GEOMETRIC PATTERN SELECTOR
+// ============================================================================
+
+function GeometricPatternSelector({ pattern, onChange }: { pattern: number; onChange: (p: number) => void }) {
+  return (
+    <div className="mt-3">
+      <label className="text-[10px] text-gray-500 font-medium mb-1.5 block">Pattern Style</label>
+      <div className="grid grid-cols-5 gap-1.5">
+        {GEOMETRIC_PATTERNS.map(p => (
+          <button
+            key={p.id}
+            onClick={() => onChange(p.id)}
+            className={`rounded-lg border-2 transition-all overflow-hidden ${
+              pattern === p.id
+                ? 'border-purple-600 ring-1 ring-purple-300'
+                : 'border-gray-200 hover:border-purple-300'
+            }`}
+          >
+            <div className="w-full aspect-square bg-gray-800 flex items-center justify-center">
+              <span className="text-[10px] text-gray-300">
+                {p.id === 0 ? '◇' : p.id === 1 ? '⫽' : p.id === 2 ? '>' : p.id === 3 ? '▦' : '⚡'}
+              </span>
+            </div>
+            <div className="text-[7px] text-gray-600 text-center py-0.5 bg-white truncate px-0.5">
+              {p.name}
+            </div>
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -1457,8 +1534,9 @@ function CustomDesigner({
                           bg = { background: `linear-gradient(90deg, ${stops})` }
                         } else if (ls.id === 'team-colors') {
                           bg = { background: `linear-gradient(90deg, ${c1} 45%, ${c2} 55%)` }
-                        } else if (ls.id === 'frosted-glass') {
-                          bg = { background: `linear-gradient(135deg, ${c1}30, ${c2}30)`, border: '1px solid #e5e7eb' }
+                        } else if (ls.id === 'geometric') {
+                          // Geometric swatch: diagonal split with line
+                          bg = { background: `linear-gradient(135deg, ${c1} 48%, #000 48%, #000 52%, ${c2} 52%)` }
                         } else {
                           bg = { background: `linear-gradient(135deg, ${c1}, ${c2})` }
                         }
@@ -1490,6 +1568,16 @@ function CustomDesigner({
                         )
                       })}
                     </div>
+
+                    {/* Gradient angle slider — when Gradient layout is active */}
+                    {config.layoutStyle === 'color-gradient' && (
+                      <GradientAngleSlider angle={config.gradientAngle ?? 135} onChange={(a) => updateConfig({ gradientAngle: a })} />
+                    )}
+
+                    {/* Geometric pattern selector — when Geometric layout is active */}
+                    {config.layoutStyle === 'geometric' && (
+                      <GeometricPatternSelector pattern={config.geometricPattern ?? 0} onChange={(p) => updateConfig({ geometricPattern: p })} />
+                    )}
                   </div>
                 </div>
               )}
@@ -1566,7 +1654,7 @@ function CustomDesigner({
             </div>
 
             {/* Card Colors — shown when "Card Colors" theme is selected or a card-color style is active */}
-            {selectedCard && !isCustomLayout && (cardColors || cardColorsLoading) && (activeCardColorStyle || config.colorPreset === 'color-gradient' || config.colorPreset === 'card-extension' || config.colorPreset === 'neon-outline' || config.colorPreset === 'frosted-glass' || config.colorPreset === 'team-colors') && (
+            {selectedCard && !isCustomLayout && (cardColors || cardColorsLoading) && (activeCardColorStyle || config.colorPreset === 'color-gradient' || config.colorPreset === 'card-extension' || config.colorPreset === 'neon-outline' || config.colorPreset === 'geometric' || config.colorPreset === 'team-colors') && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">
                   Card Colors
@@ -1630,6 +1718,16 @@ function CustomDesigner({
                         )
                       })}
                     </div>
+
+                    {/* Gradient angle slider — when Gradient is active */}
+                    {activeCardColorStyle === 'color-gradient' && (
+                      <GradientAngleSlider angle={config.gradientAngle ?? 135} onChange={(a) => updateConfig({ gradientAngle: a })} />
+                    )}
+
+                    {/* Geometric pattern selector — when Geometric is active */}
+                    {activeCardColorStyle === 'geometric' && (
+                      <GeometricPatternSelector pattern={config.geometricPattern ?? 0} onChange={(p) => updateConfig({ geometricPattern: p })} />
+                    )}
                   </>
                 )}
               </div>
@@ -2523,6 +2621,22 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         {/* Section 3: Custom Designer */}
         <CustomDesigner selectedCard={selectedCard} slabData={slabData} config={customConfig} setConfig={setCustomConfig} onPreviewDataChange={setCustomPreviewData} />
 
+        {/* Section 4: Save & Manage Custom Styles */}
+        {isAuthenticated && (
+          <SavedStylesManager
+            customConfig={customConfig}
+            setConfig={setCustomConfig}
+            customStyles={customStyles}
+            onSave={saveCustomStyle}
+            onDelete={deleteCustomStyle}
+            onRename={renameCustomStyle}
+            onApplyToAll={async (id: string) => {
+              await switchStyle(id as any)
+              alert('Style applied! This custom label style will now be used across all pages.')
+            }}
+          />
+        )}
+
         {/* Affiliate: Amazon Graded Card Slabs */}
         <section className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl shadow-sm p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row gap-5 items-center">
@@ -2560,22 +2674,6 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
             </div>
           </div>
         </section>
-
-        {/* Section 4: Save & Manage Custom Styles */}
-        {isAuthenticated && (
-          <SavedStylesManager
-            customConfig={customConfig}
-            setConfig={setCustomConfig}
-            customStyles={customStyles}
-            onSave={saveCustomStyle}
-            onDelete={deleteCustomStyle}
-            onRename={renameCustomStyle}
-            onApplyToAll={async (id: string) => {
-              await switchStyle(id as any)
-              alert('Style applied! This custom label style will now be used across all pages.')
-            }}
-          />
-        )}
       </div>
 
       {/* Batch Modals */}

@@ -13,6 +13,14 @@ import {
   applyLayoutToColors,
   type ColorPreset, type CardColorInput,
 } from '@/lib/labelPresets'
+
+const GEOMETRIC_PATTERNS = [
+  { id: 0, name: 'Shattered' },
+  { id: 1, name: 'Stripes' },
+  { id: 2, name: 'Chevron' },
+  { id: 3, name: 'Mosaic' },
+  { id: 4, name: 'Lightning' },
+] as const
 import LabelWebRenderer, { type LabelConfig, type LabelCardData } from '@/components/labels/LabelWebRenderer'
 import ColorPickerModal from '@/components/labels/ColorPickerModal'
 
@@ -42,6 +50,8 @@ interface DesignerConfig {
   topEdgeGradient?: string[]
   customColors?: string[]
   layoutStyle?: string
+  gradientAngle?: number
+  geometricPattern?: number
 }
 
 // ============================================================================
@@ -146,6 +156,9 @@ export default function LabelStudioScreen() {
     borderColor: config.borderColor,
     borderWidth: config.borderWidth,
     topEdgeGradient: config.topEdgeGradient,
+    gradientAngle: config.gradientAngle,
+    geometricPattern: config.geometricPattern,
+    customColors: config.customColors,
   }), [config])
 
   // ---- Handlers ----
@@ -451,6 +464,45 @@ export default function LabelStudioScreen() {
                       )
                     })}
                   </View>
+
+                  {/* Gradient direction — when Gradient is active */}
+                  {activeCardColorStyle === 'color-gradient' && (
+                    <View style={{ marginTop: 10 }}>
+                      <Text style={s.subLabel}>Gradient Direction</Text>
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        {[
+                          { label: '→', value: 0 }, { label: '↘', value: 135 },
+                          { label: '↓', value: 90 }, { label: '←', value: 180 }, { label: '↑', value: 270 },
+                        ].map(d => (
+                          <TouchableOpacity
+                            key={d.value}
+                            style={[s.dirBtn, Math.abs((config.gradientAngle ?? 135) - d.value) < 10 && s.dirBtnActive]}
+                            onPress={() => updateConfig({ gradientAngle: d.value })}
+                          >
+                            <Text style={[s.dirBtnText, Math.abs((config.gradientAngle ?? 135) - d.value) < 10 && s.dirBtnTextActive]}>{d.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Geometric pattern — when Geometric is active */}
+                  {activeCardColorStyle === 'geometric' && (
+                    <View style={{ marginTop: 10 }}>
+                      <Text style={s.subLabel}>Pattern Style</Text>
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        {GEOMETRIC_PATTERNS.map(p => (
+                          <TouchableOpacity
+                            key={p.id}
+                            style={[s.dirBtn, { flex: 1 }, (config.geometricPattern ?? 0) === p.id && s.dirBtnActive]}
+                            onPress={() => updateConfig({ geometricPattern: p.id })}
+                          >
+                            <Text style={[s.dirBtnText, { fontSize: 8 }, (config.geometricPattern ?? 0) === p.id && s.dirBtnTextActive]}>{p.name}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -516,6 +568,45 @@ export default function LabelStudioScreen() {
                       )
                     })}
                   </View>
+
+                  {/* Gradient direction for custom */}
+                  {config.layoutStyle === 'color-gradient' && (
+                    <View style={{ marginTop: 10 }}>
+                      <Text style={s.subLabel}>Gradient Direction</Text>
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        {[
+                          { label: '→', value: 0 }, { label: '↘', value: 135 },
+                          { label: '↓', value: 90 }, { label: '←', value: 180 }, { label: '↑', value: 270 },
+                        ].map(d => (
+                          <TouchableOpacity
+                            key={d.value}
+                            style={[s.dirBtn, Math.abs((config.gradientAngle ?? 135) - d.value) < 10 && s.dirBtnActive]}
+                            onPress={() => updateConfig({ gradientAngle: d.value })}
+                          >
+                            <Text style={[s.dirBtnText, Math.abs((config.gradientAngle ?? 135) - d.value) < 10 && s.dirBtnTextActive]}>{d.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Geometric pattern for custom */}
+                  {config.layoutStyle === 'geometric' && (
+                    <View style={{ marginTop: 10 }}>
+                      <Text style={s.subLabel}>Pattern Style</Text>
+                      <View style={{ flexDirection: 'row', gap: 4 }}>
+                        {GEOMETRIC_PATTERNS.map(p => (
+                          <TouchableOpacity
+                            key={p.id}
+                            style={[s.dirBtn, { flex: 1 }, (config.geometricPattern ?? 0) === p.id && s.dirBtnActive]}
+                            onPress={() => updateConfig({ geometricPattern: p.id })}
+                          >
+                            <Text style={[s.dirBtnText, { fontSize: 8 }, (config.geometricPattern ?? 0) === p.id && s.dirBtnTextActive]}>{p.name}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </View>
+                  )}
                 </View>
               )}
             </View>
@@ -686,8 +777,14 @@ function CustomLayoutSwatch({ layoutId, colors }: { layoutId: string; colors: st
       />
     )
   }
-  if (layoutId === 'frosted-glass') {
-    return <View style={[s.themeSwatch, { backgroundColor: c1 + '30', borderWidth: 1, borderColor: Colors.gray[200] }]} />
+  if (layoutId === 'geometric') {
+    return (
+      <View style={[s.themeSwatch, { flexDirection: 'row', overflow: 'hidden' }]}>
+        <View style={{ flex: 1, backgroundColor: c1 }} />
+        <View style={{ width: 2, backgroundColor: '#000' }} />
+        <View style={{ flex: 1, backgroundColor: c2 }} />
+      </View>
+    )
   }
   return (
     <LinearGradient
@@ -784,6 +881,12 @@ const s = StyleSheet.create({
   borderControls: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
   borderColorSwatch: { width: 36, height: 28, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[300] },
   borderLabel: { fontSize: 12, color: Colors.gray[500] },
+
+  // Direction buttons
+  dirBtn: { paddingVertical: 6, paddingHorizontal: 10, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200], alignItems: 'center' as const },
+  dirBtnActive: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[50] },
+  dirBtnText: { fontSize: 11, color: Colors.gray[400] },
+  dirBtnTextActive: { color: Colors.purple[700], fontWeight: '600' as const },
 
   // Download
   downloadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.purple[600], borderRadius: 10, paddingVertical: 14 },

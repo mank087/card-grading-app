@@ -28,6 +28,9 @@ export interface LabelConfig {
   borderColor: string
   borderWidth: number
   topEdgeGradient?: string[]
+  gradientAngle?: number
+  geometricPattern?: number
+  customColors?: string[]
 }
 
 export interface LabelCardData {
@@ -87,7 +90,7 @@ function formatGrade(grade, isAltAuth) {
 }
 
 function isCardColorPreset(p) {
-  return ['color-gradient','card-extension','neon-outline','frosted-glass','team-colors'].indexOf(p) !== -1;
+  return ['color-gradient','card-extension','neon-outline','geometric','team-colors'].indexOf(p) !== -1;
 }
 
 function isLightTheme(cfg) {
@@ -192,13 +195,20 @@ function drawBG(ctx, W, H, cfg) {
     g3.addColorStop(0, cfg.gradientStart); g3.addColorStop(0.45, cfg.gradientStart);
     g3.addColorStop(0.55, cfg.gradientEnd); g3.addColorStop(1, cfg.gradientEnd);
     ctx.fillStyle = g3; ctx.fillRect(0, 0, W, H);
-  } else if (cfg.colorPreset === 'frosted-glass') {
-    var g4 = ctx.createLinearGradient(0, 0, W, H);
-    g4.addColorStop(0, cfg.gradientStart); g4.addColorStop(1, cfg.gradientEnd);
-    ctx.fillStyle = g4; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = 'rgba(255,255,255,0.15)'; ctx.fillRect(0, 0, W, H);
+  } else if (cfg.colorPreset === 'geometric') {
+    // Geometric: diagonal split with black divider line
+    var cols = cfg.customColors || [cfg.gradientStart, cfg.gradientEnd];
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(W,H*0.4); ctx.lineTo(0,H); ctx.closePath();
+    ctx.fillStyle = cols[0]; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0,H); ctx.lineTo(W,H*0.4); ctx.lineTo(W,H); ctx.closePath();
+    ctx.fillStyle = cols[1] || cols[0]; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(0,H); ctx.lineTo(W,H*0.4); ctx.strokeStyle='rgba(255,255,255,0.8)'; ctx.lineWidth=4; ctx.stroke();
+    ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.fillRect(0,0,W,H);
   } else {
-    var g5 = ctx.createLinearGradient(0, 0, W, H);
+    var angle = (cfg.gradientAngle !== undefined ? cfg.gradientAngle : 135) * Math.PI / 180;
+    var cx2 = W/2, cy2 = H/2, len = Math.max(W,H)/2;
+    var g5 = ctx.createLinearGradient(cx2-Math.cos(angle)*len, cy2-Math.sin(angle)*len, cx2+Math.cos(angle)*len, cy2+Math.sin(angle)*len);
     g5.addColorStop(0, cfg.gradientStart); g5.addColorStop(0.5, cfg.gradientEnd);
     g5.addColorStop(1, cfg.gradientStart);
     ctx.fillStyle = g5; ctx.fillRect(0, 0, W, H);

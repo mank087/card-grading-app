@@ -170,6 +170,17 @@ function fitCardInfoFonts(
 // BACKGROUND
 // ============================================================================
 
+function strokeDivider(ctx: CanvasRenderingContext2D, path: Path2D, scale: number = 1) {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth = 4 * scale;
+  ctx.stroke(path);
+  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+  ctx.lineWidth = 2 * scale;
+  ctx.stroke(path);
+  ctx.restore();
+}
+
 function drawCustomBackground(
   ctx: CanvasRenderingContext2D,
   W: number, H: number,
@@ -216,21 +227,218 @@ function drawCustomBackground(
     grad.addColorStop(1, config.gradientEnd);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
-  } else if (config.colorPreset === 'frosted-glass') {
-    // Frosted: light base with subtle noise texture effect
-    const grad = ctx.createLinearGradient(0, 0, W, H);
+  } else if (config.colorPreset === 'geometric') {
+    // Geometric patterns: 5 variations selected by config.geometricPattern
+    const patternIdx = config.geometricPattern ?? 0;
+    const colors = (config.customColors && config.customColors.length >= 2)
+      ? config.customColors
+      : [config.gradientStart, config.gradientEnd];
+    const pick = (i: number) => colors[i % colors.length];
+    const scale = Math.min(W, H) / 400; // scale divider lines relative to label size
+
+    if (patternIdx === 0) {
+      // Shattered Glass: triangular shards radiating from a focal point
+      const cx = W * 0.35, cy = H * 0.4;
+      const edgePoints: [number, number][] = [
+        [0, 0], [W * 0.33, 0], [W * 0.66, 0], [W, 0],
+        [W, H * 0.5], [W, H],
+        [W * 0.66, H], [W * 0.33, H], [0, H],
+        [0, H * 0.5],
+      ];
+      for (let i = 0; i < edgePoints.length; i++) {
+        const [ax, ay] = edgePoints[i];
+        const [bx, by] = edgePoints[(i + 1) % edgePoints.length];
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(ax, ay);
+        ctx.lineTo(bx, by);
+        ctx.closePath();
+        ctx.fillStyle = pick(i);
+        ctx.fill();
+      }
+      // Stroke divider lines along each shard edge
+      for (let i = 0; i < edgePoints.length; i++) {
+        const [ax, ay] = edgePoints[i];
+        const [bx, by] = edgePoints[(i + 1) % edgePoints.length];
+        const p = new Path2D();
+        p.moveTo(cx, cy);
+        p.lineTo(ax, ay);
+        p.lineTo(bx, by);
+        p.closePath();
+        strokeDivider(ctx, p, scale);
+      }
+    } else if (patternIdx === 1) {
+      // Diagonal Stripes: 7 diagonal bands at ~30 degrees
+      const stripeCount = 7;
+      const bandW = W / stripeCount;
+      const skew = H * Math.tan(30 * Math.PI / 180);
+      for (let i = -1; i <= stripeCount; i++) {
+        const x0 = i * bandW;
+        ctx.beginPath();
+        ctx.moveTo(x0 - skew, 0);
+        ctx.lineTo(x0 + bandW - skew, 0);
+        ctx.lineTo(x0 + bandW, H);
+        ctx.lineTo(x0, H);
+        ctx.closePath();
+        ctx.fillStyle = pick(i + 1);
+        ctx.fill();
+      }
+      // Stroke divider lines between stripes
+      for (let i = 0; i <= stripeCount; i++) {
+        const x0 = i * bandW;
+        const p = new Path2D();
+        p.moveTo(x0 - skew, 0);
+        p.lineTo(x0, H);
+        strokeDivider(ctx, p, scale);
+      }
+    } else if (patternIdx === 2) {
+      // Chevron: nested V-shaped chevrons pointing right
+      const chevronCount = 5;
+      const bandH = H / chevronCount;
+      const pointX = W * 0.85;
+      for (let i = 0; i < chevronCount; i++) {
+        const y0 = i * bandH;
+        const y1 = y0 + bandH;
+        const midY = (y0 + y1) / 2;
+        ctx.beginPath();
+        ctx.moveTo(0, y0);
+        ctx.lineTo(pointX, midY);
+        ctx.lineTo(0, y1);
+        ctx.closePath();
+        ctx.fillStyle = pick(i);
+        ctx.fill();
+        // Fill the right triangle to cover full width
+        ctx.beginPath();
+        ctx.moveTo(pointX, midY);
+        ctx.lineTo(W, y0);
+        ctx.lineTo(W, y1);
+        ctx.closePath();
+        ctx.fillStyle = pick(i + chevronCount);
+        ctx.fill();
+      }
+      // Stroke chevron edges
+      for (let i = 0; i <= chevronCount; i++) {
+        const y0 = i * bandH;
+        const prevY = (i - 1) * bandH;
+        const midY = (prevY + y0) / 2;
+        if (i > 0) {
+          const p = new Path2D();
+          p.moveTo(0, prevY);
+          p.lineTo(pointX, midY);
+          p.lineTo(0, y0);
+          strokeDivider(ctx, p, scale);
+          const p2 = new Path2D();
+          p2.moveTo(pointX, midY);
+          p2.lineTo(W, prevY);
+          p2.moveTo(pointX, midY);
+          p2.lineTo(W, y0);
+          strokeDivider(ctx, p2, scale);
+        }
+      }
+    } else if (patternIdx === 3) {
+      // Mosaic Grid: 5x2 rectangular tiles
+      const cols = 5, rows = 2;
+      const tileW = W / cols, tileH = H / rows;
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          ctx.fillStyle = pick(r * cols + c);
+          ctx.fillRect(c * tileW, r * tileH, tileW, tileH);
+        }
+      }
+      // Stroke grid divider lines
+      for (let c = 1; c < cols; c++) {
+        const p = new Path2D();
+        p.moveTo(c * tileW, 0);
+        p.lineTo(c * tileW, H);
+        strokeDivider(ctx, p, scale);
+      }
+      for (let r = 1; r < rows; r++) {
+        const p = new Path2D();
+        p.moveTo(0, r * tileH);
+        p.lineTo(W, r * tileH);
+        strokeDivider(ctx, p, scale);
+      }
+    } else {
+      // Pattern 4: Lightning Bolt zigzag
+      const zigPoints: [number, number][] = [
+        [W * 0.3, 0],
+        [W * 0.55, H * 0.3],
+        [W * 0.35, H * 0.45],
+        [W * 0.65, H * 0.7],
+        [W * 0.5, H],
+      ];
+      // Fill left/top region
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(zigPoints[0][0], zigPoints[0][1]);
+      for (const [zx, zy] of zigPoints) ctx.lineTo(zx, zy);
+      ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fillStyle = pick(0);
+      ctx.fill();
+      // Fill right/bottom region
+      ctx.beginPath();
+      ctx.moveTo(W, 0);
+      ctx.lineTo(zigPoints[0][0], zigPoints[0][1]);
+      for (const [zx, zy] of zigPoints) ctx.lineTo(zx, zy);
+      ctx.lineTo(W, H);
+      ctx.closePath();
+      ctx.fillStyle = pick(1);
+      ctx.fill();
+      // Optional extra zigzag fills for additional colors
+      if (colors.length >= 3) {
+        const offset = W * 0.08;
+        ctx.beginPath();
+        ctx.moveTo(zigPoints[0][0] - offset, zigPoints[0][1]);
+        for (const [zx, zy] of zigPoints) ctx.lineTo(zx - offset, zy);
+        ctx.lineTo(zigPoints[zigPoints.length - 1][0], zigPoints[zigPoints.length - 1][1]);
+        for (let i = zigPoints.length - 1; i >= 0; i--) ctx.lineTo(zigPoints[i][0], zigPoints[i][1]);
+        ctx.closePath();
+        ctx.fillStyle = pick(2);
+        ctx.fill();
+      }
+      // Stroke the zigzag divider
+      const p = new Path2D();
+      p.moveTo(zigPoints[0][0], zigPoints[0][1]);
+      for (let i = 1; i < zigPoints.length; i++) p.lineTo(zigPoints[i][0], zigPoints[i][1]);
+      strokeDivider(ctx, p, scale);
+    }
+
+    // Subtle overall darkening for text readability
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.fillRect(0, 0, W, H);
+  } else if (config.colorPreset === 'color-gradient') {
+    // Color gradient with angle support
+    const angle = (config.gradientAngle ?? 135) * Math.PI / 180;
+    const cx = W / 2, cy = H / 2;
+    const len = Math.max(W, H) / 2;
+    const x1 = cx - Math.cos(angle) * len;
+    const y1 = cy - Math.sin(angle) * len;
+    const x2 = cx + Math.cos(angle) * len;
+    const y2 = cy + Math.sin(angle) * len;
+    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
     grad.addColorStop(0, config.gradientStart);
     grad.addColorStop(1, config.gradientEnd);
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
-    // Add frosted overlay
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.fillRect(0, 0, W, H);
   } else {
-    const grad = ctx.createLinearGradient(0, 0, W, H);
-    grad.addColorStop(0, config.gradientStart);
-    grad.addColorStop(0.5, config.gradientEnd);
-    grad.addColorStop(1, config.gradientStart);
+    // Default gradient with angle support
+    const angle = (config.gradientAngle ?? 135) * Math.PI / 180;
+    const cx = W / 2, cy = H / 2;
+    const len = Math.max(W, H) / 2;
+    const x1 = cx - Math.cos(angle) * len;
+    const y1 = cy - Math.sin(angle) * len;
+    const x2 = cx + Math.cos(angle) * len;
+    const y2 = cy + Math.sin(angle) * len;
+    const grad = ctx.createLinearGradient(x1, y1, x2, y2);
+    if (config.style === 'modern') {
+      grad.addColorStop(0, config.gradientStart);
+      grad.addColorStop(0.5, config.gradientEnd);
+      grad.addColorStop(1, config.gradientStart);
+    } else {
+      grad.addColorStop(0, config.gradientStart);
+      grad.addColorStop(1, config.gradientEnd);
+    }
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, W, H);
   }
@@ -265,7 +473,7 @@ function isLightTheme(config: CustomLabelConfig): boolean {
 
 /** Check if a preset is one of the card-color derived styles */
 function isCardColorPreset(preset: string): boolean {
-  return ['color-gradient', 'card-extension', 'neon-outline', 'frosted-glass', 'team-colors'].includes(preset);
+  return ['color-gradient', 'card-extension', 'neon-outline', 'geometric', 'team-colors'].includes(preset);
 }
 
 /**
