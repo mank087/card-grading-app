@@ -264,6 +264,23 @@ export default function CardDetailScreen() {
           <Ionicons name="share-social" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Share</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={s.shareBtn} onPress={() => {
+          const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
+          const url = `https://dcmgrading.com/${catPath}/${card.id}`
+          Linking.openURL(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`)
+        }}>
+          <Ionicons name="logo-facebook" size={16} color="#1877F2" />
+          <Text style={s.shareBtnText}>Facebook</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.shareBtn} onPress={() => {
+          const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
+          const url = `https://dcmgrading.com/${catPath}/${card.id}`
+          const text = `Check out this ${cardName} graded ${grade}/10 by DCM Grading!`
+          Linking.openURL(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`)
+        }}>
+          <Ionicons name="logo-twitter" size={16} color="#1DA1F2" />
+          <Text style={s.shareBtnText}>X</Text>
+        </TouchableOpacity>
         <TouchableOpacity style={s.shareBtn} onPress={async () => {
           const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
           const url = `https://dcmgrading.com/${catPath}/${card.id}`
@@ -291,6 +308,27 @@ export default function CardDetailScreen() {
       <View style={{ paddingHorizontal: 12, paddingBottom: 40 }}>
 
         {/* ══════ 1. CARD INFORMATION ══════ */}
+        {/* Professional Slab Detection */}
+        {card.slab_detected && card.slab_company && (
+          <View style={{ marginHorizontal: 0, marginBottom: 8, borderRadius: 12, borderWidth: 2, borderColor: Colors.amber[500], backgroundColor: Colors.amber[50], padding: 12 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.amber[600], marginBottom: 8 }}>Professional Grade Detected</Text>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: Colors.amber[200] }}>
+                <Text style={{ fontSize: 9, color: Colors.gray[500], fontWeight: '600' }}>{card.slab_company}</Text>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.amber[600] }}>{card.slab_grade || 'N/A'}</Text>
+                <Text style={{ fontSize: 8, color: Colors.gray[400] }}>Professional Grade</Text>
+              </View>
+              <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: Colors.purple[200] }}>
+                <Text style={{ fontSize: 9, color: Colors.gray[500], fontWeight: '600' }}>DCM Optic™</Text>
+                <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.purple[600] }}>{grade != null ? Math.round(grade) : 'N/A'}</Text>
+                <Text style={{ fontSize: 8, color: Colors.gray[400] }}>Independent Grade</Text>
+              </View>
+            </View>
+            {card.slab_cert_number && <Text style={{ fontSize: 9, color: Colors.gray[500], marginTop: 6 }}>Cert #: {card.slab_cert_number}</Text>}
+            <Text style={{ fontSize: 8, color: Colors.gray[400], marginTop: 4 }}>DCM analysis grade is provided as independent verification of the professional grade.</Text>
+          </View>
+        )}
+
         <CollapsibleSection title="Card Information" icon="information-circle">
           <InfoRow label="Card Name" value={cardName} />
           <InfoRow label="Set" value={setName} />
@@ -314,8 +352,15 @@ export default function CardDetailScreen() {
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.purple[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], alignSelf: 'flex-start' }}
               onPress={() => {
-                const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-                router.push({ pathname: '/pages/label-studio' as any, params: { cardId: card.id } })
+                Alert.prompt ? Alert.prompt('Edit Card Name', 'Enter new card name:', async (newName) => {
+                  if (newName && newName.trim()) {
+                    await supabase.from('cards').update({ card_name: newName.trim() }).eq('id', card.id)
+                    setCard((prev: any) => prev ? { ...prev, card_name: newName.trim() } : prev)
+                  }
+                }, 'plain-text', cardName) : Alert.alert('Edit Card', 'Use Label Studio to edit card details.', [
+                  { text: 'Open Label Studio', onPress: () => router.push({ pathname: '/pages/label-studio' as any, params: { cardId: card.id } }) },
+                  { text: 'Cancel', style: 'cancel' },
+                ])
               }}
             >
               <Ionicons name="create-outline" size={14} color={Colors.purple[600]} />
