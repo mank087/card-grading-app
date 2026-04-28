@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl } from 'react-native'
+import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -24,6 +24,7 @@ export default function CardDetailScreen() {
   const [frontUrl, setFrontUrl] = useState<string | null>(null)
   const [backUrl, setBackUrl] = useState<string | null>(null)
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
+  const [zoomImage, setZoomImage] = useState<string | null>(null)
 
   const fetchCard = useCallback(async () => {
     if (!id) return
@@ -110,8 +111,19 @@ export default function CardDetailScreen() {
   return (
     <ScrollView style={s.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCard() }} tintColor={Colors.purple[600]} />}>
 
+      {/* Image Zoom Modal */}
+      <Modal visible={!!zoomImage} transparent animationType="fade" onRequestClose={() => setZoomImage(null)}>
+        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setZoomImage(null)}>
+          {zoomImage && (
+            <Image source={{ uri: zoomImage }} style={{ width: Dimensions.get('window').width - 24, height: Dimensions.get('window').height * 0.7 }} resizeMode="contain" />
+          )}
+          <Text style={{ color: '#fff', fontSize: 12, marginTop: 12, opacity: 0.6 }}>Tap anywhere to close</Text>
+        </Pressable>
+      </Modal>
+
       {/* ══════ SLAB PREVIEW ══════ */}
       <View style={s.slabSection}>
+        <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
         <View style={s.slabContainer}>
           <SlabCard
             imageUrl={activeImage === 'front' ? frontUrl : backUrl}
@@ -125,6 +137,8 @@ export default function CardDetailScreen() {
             subScores={sub}
           />
         </View>
+        </TouchableOpacity>
+        <Text style={{ fontSize: 9, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>Tap image to zoom</Text>
         <View style={s.imageToggle}>
           {['front', 'back'].map(side => (
             <TouchableOpacity key={side} style={[s.toggleBtn, activeImage === side && s.toggleBtnActive]} onPress={() => setActiveImage(side as any)}>
@@ -179,11 +193,70 @@ export default function CardDetailScreen() {
         </View>
       )}
 
-      {/* Serial + Actions */}
-      <View style={s.serialRow}>
-        <Text style={s.serialLabel}>DCM Serial#:</Text>
-        <Text style={s.serialValue}>{card.serial}</Text>
+      {/* Category badge */}
+      <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 4 }}>
+        <View style={{ backgroundColor: Colors.purple[50], paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: Colors.purple[200] }}>
+          <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.purple[700] }}>{card.category || 'Card'}</Text>
+        </View>
       </View>
+
+      {/* Serial + QR */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 8 }}>
+        <View>
+          <Text style={s.serialLabel}>DCM Serial#:</Text>
+          <Text style={s.serialValue}>{card.serial}</Text>
+        </View>
+        <TouchableOpacity
+          onPress={() => {
+            const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
+            Linking.openURL(`https://dcmgrading.com/verify/${card.serial}`)
+          }}
+          style={{ alignItems: 'center' }}
+        >
+          <View style={{ width: 48, height: 48, backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200], justifyContent: 'center', alignItems: 'center', padding: 4 }}>
+            <Ionicons name="qr-code" size={32} color={Colors.purple[600]} />
+          </View>
+          <Text style={{ fontSize: 8, color: Colors.gray[400], marginTop: 2 }}>Verify</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Owner controls: Visibility + Regrade */}
+      {isOwner && (
+        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, marginBottom: 8 }}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: card.visibility === 'public' ? Colors.green[500] : Colors.gray[300], backgroundColor: card.visibility === 'public' ? Colors.green[50] : Colors.gray[50] }}
+            onPress={async () => {
+              const newVis = card.visibility === 'public' ? 'private' : 'public'
+              await supabase.from('cards').update({ visibility: newVis }).eq('id', card.id)
+              setCard((prev: any) => prev ? { ...prev, visibility: newVis } : prev)
+            }}
+          >
+            <Ionicons name={card.visibility === 'public' ? 'eye' : 'eye-off'} size={14} color={card.visibility === 'public' ? Colors.green[600] : Colors.gray[500]} />
+            <Text style={{ fontSize: 11, fontWeight: '600', color: card.visibility === 'public' ? Colors.green[600] : Colors.gray[500] }}>{card.visibility === 'public' ? 'Public' : 'Private'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: Colors.blue[300], backgroundColor: Colors.blue[50] }}
+            onPress={() => {
+              Alert.alert('Regrade Card', 'This will use 1 credit to regrade this card with the latest DCM Optic™ AI. Continue?', [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Regrade', onPress: async () => {
+                  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+                  const endpoint = card.category === 'Sports' ? 'sports' : card.category === 'Pokemon' ? 'pokemon' : card.category === 'MTG' ? 'mtg' : 'other'
+                  try {
+                    await fetch(`${API_BASE}/api/${endpoint}/${card.id}`)
+                    Alert.alert('Regrading', 'Your card is being regraded. Check back in 1-2 minutes.')
+                  } catch {
+                    Alert.alert('Error', 'Failed to start regrading.')
+                  }
+                }},
+              ])
+            }}
+          >
+            <Ionicons name="refresh" size={14} color={Colors.blue[600]} />
+            <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.blue[600] }}>Regrade</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Share Buttons */}
       <View style={s.shareRow}>
@@ -687,7 +760,7 @@ export default function CardDetailScreen() {
                 {/* Grading Company Prices */}
                 {prices && (prices.psa || prices.bgs || prices.cgc) && (
                   <View style={{ marginTop: 14 }}>
-                    {['PSA', 'BGS', 'CGC'].map(company => {
+                    {['PSA', 'BGS', 'SGC', 'CGC'].map(company => {
                       const companyPrices = prices[company.toLowerCase() as 'psa' | 'bgs' | 'cgc']
                       if (!companyPrices || Object.keys(companyPrices).length === 0) return null
                       const sorted = Object.entries(companyPrices).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
