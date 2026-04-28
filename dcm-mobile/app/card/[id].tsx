@@ -48,7 +48,13 @@ export default function CardDetailScreen() {
 
   const subRaw = card.conversational_weighted_sub_scores || card.conversational_sub_scores
   const ci = card.conversational_card_info
-  const cen = card.conversational_centering
+
+  // Parse grading JSON early — needed for centering fallback
+  let gradingJsonEarly: any = null
+  try { gradingJsonEarly = card.conversational_grading ? JSON.parse(card.conversational_grading) : null } catch {}
+
+  // Centering: try column first, then grading JSON
+  const cen = card.conversational_centering || gradingJsonEarly?.centering || null
 
   // Extract numeric score from either flat number or nested { weighted: N } format
   const extractScore = (obj: any, key: string): number | null => {
@@ -84,9 +90,7 @@ export default function CardDetailScreen() {
   const year = card.release_date || ci?.year || ''
   const confidence = card.conversational_image_confidence || ''
 
-  // Parse grading JSON for detailed data
-  let gradingJson: any = null
-  try { gradingJson = card.conversational_grading ? JSON.parse(card.conversational_grading) : null } catch {}
+  const gradingJson = gradingJsonEarly
 
   const handleShare = async () => {
     const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
@@ -252,23 +256,26 @@ export default function CardDetailScreen() {
                 )}
               </View>
               <View style={s.centeringGrid}>
-                <View style={s.centeringHalf}>
-                  <Text style={s.centeringSide}>Front</Text>
-                  <Text style={s.centeringScore}>{sub?.centering != null ? Math.round(sub.centering) : 'N/A'}</Text>
-                  <InfoRow label="L/R" value={cen.front_left_right || cen.front_lr || 'N/A'} />
-                  <InfoRow label="T/B" value={cen.front_top_bottom || cen.front_tb || 'N/A'} />
-                  {cen.front_quality_tier && <Text style={s.centeringTier}>{cen.front_quality_tier}</Text>}
-                  {(cen.front_analysis || cen.front_notes) && <Text style={s.analysisText}>{cen.front_analysis || cen.front_notes}</Text>}
-                </View>
-                <View style={s.centeringDivider} />
-                <View style={s.centeringHalf}>
-                  <Text style={s.centeringSide}>Back</Text>
-                  <Text style={s.centeringScore}>{sub?.centering != null ? Math.round(sub.centering) : 'N/A'}</Text>
-                  <InfoRow label="L/R" value={cen.back_left_right || cen.back_lr || 'N/A'} />
-                  <InfoRow label="T/B" value={cen.back_top_bottom || cen.back_tb || 'N/A'} />
-                  {cen.back_quality_tier && <Text style={s.centeringTier}>{cen.back_quality_tier}</Text>}
-                  {(cen.back_analysis || cen.back_notes) && <Text style={s.analysisText}>{cen.back_analysis || cen.back_notes}</Text>}
-                </View>
+                {['front', 'back'].map(side => {
+                  // Handle both flat column format and nested JSON format
+                  const sideData = (cen as any)?.[side] || cen
+                  const lr = sideData?.left_right || sideData?.[`${side}_left_right`] || sideData?.[`${side}_lr`] || 'N/A'
+                  const tb = sideData?.top_bottom || sideData?.[`${side}_top_bottom`] || sideData?.[`${side}_tb`] || 'N/A'
+                  const tier = sideData?.quality_tier || sideData?.[`${side}_quality_tier`] || null
+                  const analysis = sideData?.analysis || sideData?.[`${side}_analysis`] || sideData?.[`${side}_notes`] || null
+                  const score = sideData?.score ?? (sub?.centering != null ? Math.round(sub.centering) : null)
+                  return (
+                    <View key={side} style={s.centeringHalf}>
+                      <Text style={s.centeringSide}>{side === 'front' ? 'Front' : 'Back'}</Text>
+                      <Text style={s.centeringScore}>{score ?? 'N/A'}/10</Text>
+                      <InfoRow label="L/R" value={lr} />
+                      <InfoRow label="T/B" value={tb} />
+                      {tier && <Text style={s.centeringTier}>{tier}</Text>}
+                      {analysis && <Text style={s.analysisText}>{analysis}</Text>}
+                      {side === 'front' && <View style={s.centeringDivider} />}
+                    </View>
+                  )
+                })}
               </View>
             </>
           ) : (
@@ -305,42 +312,82 @@ export default function CardDetailScreen() {
             </>
           )}
 
-          {/* Front/Back summaries */}
-          {card.conversational_front_summary && (
+          {/* Front/Back summaries — from column or grading JSON */}
+          {(card.conversational_front_summary || gradingJson?.front_summary) && (
             <View style={s.analysisSummary}>
               <Text style={s.analysisSideLabel}>Front Analysis</Text>
-              <Text style={s.analysisText}>{card.conversational_front_summary}</Text>
+              <Text style={s.analysisText}>{card.conversational_front_summary || gradingJson?.front_summary}</Text>
             </View>
           )}
-          {card.conversational_back_summary && (
+          {(card.conversational_back_summary || gradingJson?.back_summary) && (
             <View style={s.analysisSummary}>
               <Text style={s.analysisSideLabel}>Back Analysis</Text>
-              <Text style={s.analysisText}>{card.conversational_back_summary}</Text>
+              <Text style={s.analysisText}>{card.conversational_back_summary || gradingJson?.back_summary}</Text>
             </View>
           )}
 
-          {/* Corners/Edges/Surface structured details */}
-          {card.conversational_corners_edges_surface && (() => {
-            const ces = typeof card.conversational_corners_edges_surface === 'string'
-              ? JSON.parse(card.conversational_corners_edges_surface) : card.conversational_corners_edges_surface
+          {/* Corners/Edges/Surface structured details from DB or grading JSON */}
+          {(() => {
+            const cesRaw = card.conversational_corners_edges_surface || gradingJson?.corners_edges_surface
+            if (!cesRaw) return null
+            const ces = typeof cesRaw === 'string' ? JSON.parse(cesRaw) : cesRaw
+
+            // Extract analysis text — handles both flat summary and per-side detailed keys
+            const getAnalysis = (area: string) => {
+              const summaryKey = `${area}_summary`
+              if (ces[summaryKey]) return ces[summaryKey]
+              // Try to build from front/back detailed entries
+              const frontKey = `front_${area}`
+              const backKey = `back_${area}`
+              const parts: string[] = []
+              if (ces[frontKey]) {
+                const fd = ces[frontKey]
+                if (typeof fd === 'string') parts.push(`Front: ${fd}`)
+                else if (fd.analysis || fd.summary) parts.push(`Front: ${fd.analysis || fd.summary}`)
+                else {
+                  // It's an object with top/bottom/left/right or top_left/etc
+                  Object.entries(fd).forEach(([k, v]) => {
+                    if (typeof v === 'string' && v.length > 20) parts.push(`${k}: ${v}`)
+                  })
+                }
+              }
+              if (ces[backKey]) {
+                const bd = ces[backKey]
+                if (typeof bd === 'string') parts.push(`Back: ${bd}`)
+                else if (bd.analysis || bd.summary) parts.push(`Back: ${bd.analysis || bd.summary}`)
+                else {
+                  Object.entries(bd).forEach(([k, v]) => {
+                    if (typeof v === 'string' && v.length > 20) parts.push(`${k}: ${v}`)
+                  })
+                }
+              }
+              return parts.length > 0 ? parts.join('\n\n') : null
+            }
+
+            const cornersText = getAnalysis('corners')
+            const edgesText = getAnalysis('edges')
+            const surfaceText = getAnalysis('surface')
+
+            if (!cornersText && !edgesText && !surfaceText) return null
+
             return (
               <View style={{ marginTop: 12, gap: 8 }}>
-                {ces.corners_summary && (
+                {cornersText && (
                   <View style={s.analysisSummary}>
-                    <Text style={s.analysisSideLabel}>Corners</Text>
-                    <Text style={s.analysisText}>{ces.corners_summary}</Text>
+                    <Text style={s.analysisSideLabel}>Corners {sub?.corners != null ? `(${Math.round(sub.corners)}/10)` : ''}</Text>
+                    <Text style={s.analysisText}>{cornersText}</Text>
                   </View>
                 )}
-                {ces.edges_summary && (
+                {edgesText && (
                   <View style={s.analysisSummary}>
-                    <Text style={s.analysisSideLabel}>Edges</Text>
-                    <Text style={s.analysisText}>{ces.edges_summary}</Text>
+                    <Text style={s.analysisSideLabel}>Edges {sub?.edges != null ? `(${Math.round(sub.edges)}/10)` : ''}</Text>
+                    <Text style={s.analysisText}>{edgesText}</Text>
                   </View>
                 )}
-                {ces.surface_summary && (
+                {surfaceText && (
                   <View style={s.analysisSummary}>
-                    <Text style={s.analysisSideLabel}>Surface</Text>
-                    <Text style={s.analysisText}>{ces.surface_summary}</Text>
+                    <Text style={s.analysisSideLabel}>Surface {sub?.surface != null ? `(${Math.round(sub.surface)}/10)` : ''}</Text>
+                    <Text style={s.analysisText}>{surfaceText}</Text>
                   </View>
                 )}
               </View>
@@ -368,10 +415,13 @@ export default function CardDetailScreen() {
             </Text>
           </View>
           <Text style={s.confDescription}>
-            {confidence === 'A' ? 'Excellent image quality. Grade uncertainty ±0.25 — the assigned grade is highly reliable.'
-              : confidence === 'B' ? 'Good image quality. Grade uncertainty ±0.5 — the assigned grade is reliable with minor margin.'
-              : confidence === 'C' ? 'Fair image quality. Grade uncertainty ±1.0 — consider retaking photos for a more accurate grade.'
-              : 'Poor image quality. Grade uncertainty ±1.5 — we recommend retaking clearer photos for reliable grading.'}
+            {confidence === 'A'
+              ? `Excellent image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±0'} — the assigned grade is highly reliable.`
+              : confidence === 'B'
+              ? `Good image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±0.5'} — the assigned grade is reliable with minor margin.`
+              : confidence === 'C'
+              ? `Fair image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±1.0'} — consider retaking photos for a more accurate grade.`
+              : `Poor image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±1.5'} — we recommend retaking clearer photos for reliable grading.`}
           </Text>
           {card.conversational_case_detection?.case_type && card.conversational_case_detection.case_type !== 'none' && (
             <InfoRow label="Protective Case" value={card.conversational_case_detection.case_type.replace('_', ' ')} />
