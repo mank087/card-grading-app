@@ -393,14 +393,10 @@ export default function CardDetailScreen() {
 
         {/* ══════ 3. CORNERS, EDGES & SURFACE ANALYSIS ══════ */}
         <CollapsibleSection title="Corners, Edges & Surface Analysis" icon="cube">
-          {/* Subgrade scores for this section */}
+          {/* Subgrade score row */}
           {sub && (
             <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
-              {[
-                { label: 'Corners', score: sub.corners },
-                { label: 'Edges', score: sub.edges },
-                { label: 'Surface', score: sub.surface },
-              ].map(sg => {
+              {[{ label: 'Corners', score: sub.corners }, { label: 'Edges', score: sub.edges }, { label: 'Surface', score: sub.surface }].map(sg => {
                 const val = sg.score != null ? Math.round(sg.score) : null
                 return (
                   <View key={sg.label} style={[s.subBox, { flex: 1 }]}>
@@ -412,99 +408,149 @@ export default function CardDetailScreen() {
             </View>
           )}
 
-          {/* Corner Zooms */}
-          {frontUrl && !card.slab_detected && (
-            <>
-              <CornerZoomGrid imageUrl={frontUrl} side="Front" />
-              {backUrl && <View style={{ marginTop: 12 }}><CornerZoomGrid imageUrl={backUrl} side="Back" /></View>}
-            </>
-          )}
+          {/* Front and Back sides */}
+          {['front', 'back'].map(side => {
+            const imageUrl = side === 'front' ? frontUrl : backUrl
+            const isBlue = side === 'front'
+            const headerColors: [string, string] = isBlue ? [Colors.blue[600], '#4f46e5'] : [Colors.purple[600], '#db2777']
+            const themeBg = isBlue ? Colors.blue[50] : Colors.purple[50]
+            const themeBorder = isBlue ? Colors.blue[100] : Colors.purple[100]
+            const themeText = isBlue ? Colors.blue[600] : Colors.purple[600]
+            const themeHeading = isBlue ? Colors.blue[600] : Colors.purple[600]
 
-          {/* Front/Back summaries — from column or grading JSON */}
-          {(card.conversational_front_summary || gradingJson?.front_summary) && (
-            <View style={s.analysisSummary}>
-              <Text style={s.analysisSideLabel}>Front Analysis</Text>
-              <Text style={s.analysisText}>{card.conversational_front_summary || gradingJson?.front_summary}</Text>
-            </View>
-          )}
-          {(card.conversational_back_summary || gradingJson?.back_summary) && (
-            <View style={s.analysisSummary}>
-              <Text style={s.analysisSideLabel}>Back Analysis</Text>
-              <Text style={s.analysisText}>{card.conversational_back_summary || gradingJson?.back_summary}</Text>
-            </View>
-          )}
+            const cornersData = gradingJson?.corners?.[side]
+            const edgesData = gradingJson?.edges?.[side]
+            const surfaceData = gradingJson?.surface?.[side]
 
-          {/* Corners/Edges/Surface structured details from DB or grading JSON */}
-          {(() => {
+            // Also try CES from column
             const cesRaw = card.conversational_corners_edges_surface || gradingJson?.corners_edges_surface
-            if (!cesRaw) return null
-            const ces = typeof cesRaw === 'string' ? JSON.parse(cesRaw) : cesRaw
+            const ces = cesRaw ? (typeof cesRaw === 'string' ? JSON.parse(cesRaw) : cesRaw) : null
 
-            // Extract analysis text — handles both flat summary and per-side detailed keys
-            const getAnalysis = (area: string) => {
-              const summaryKey = `${area}_summary`
-              if (ces[summaryKey]) return ces[summaryKey]
-              // Try to build from front/back detailed entries
-              const frontKey = `front_${area}`
-              const backKey = `back_${area}`
-              const parts: string[] = []
-              if (ces[frontKey]) {
-                const fd = ces[frontKey]
-                if (typeof fd === 'string') parts.push(`Front: ${fd}`)
-                else if (fd.analysis || fd.summary) parts.push(`Front: ${fd.analysis || fd.summary}`)
-                else {
-                  // It's an object with top/bottom/left/right or top_left/etc
-                  Object.entries(fd).forEach(([k, v]) => {
-                    if (typeof v === 'string' && v.length > 20) parts.push(`${k}: ${v}`)
-                  })
-                }
-              }
-              if (ces[backKey]) {
-                const bd = ces[backKey]
-                if (typeof bd === 'string') parts.push(`Back: ${bd}`)
-                else if (bd.analysis || bd.summary) parts.push(`Back: ${bd.analysis || bd.summary}`)
-                else {
-                  Object.entries(bd).forEach(([k, v]) => {
-                    if (typeof v === 'string' && v.length > 20) parts.push(`${k}: ${v}`)
-                  })
-                }
-              }
-              return parts.length > 0 ? parts.join('\n\n') : null
-            }
+            const hasData = cornersData || edgesData || surfaceData || imageUrl
 
-            const cornersText = getAnalysis('corners')
-            const edgesText = getAnalysis('edges')
-            const surfaceText = getAnalysis('surface')
-
-            if (!cornersText && !edgesText && !surfaceText) return null
+            if (!hasData) return null
 
             return (
-              <View style={{ marginTop: 12, gap: 8 }}>
-                {cornersText && (
-                  <View style={s.analysisSummary}>
-                    <Text style={s.analysisSideLabel}>Corners {sub?.corners != null ? `(${Math.round(sub.corners)}/10)` : ''}</Text>
-                    <Text style={s.analysisText}>{cornersText}</Text>
-                  </View>
-                )}
-                {edgesText && (
-                  <View style={s.analysisSummary}>
-                    <Text style={s.analysisSideLabel}>Edges {sub?.edges != null ? `(${Math.round(sub.edges)}/10)` : ''}</Text>
-                    <Text style={s.analysisText}>{edgesText}</Text>
-                  </View>
-                )}
-                {surfaceText && (
-                  <View style={s.analysisSummary}>
-                    <Text style={s.analysisSideLabel}>Surface {sub?.surface != null ? `(${Math.round(sub.surface)}/10)` : ''}</Text>
-                    <Text style={s.analysisText}>{surfaceText}</Text>
-                  </View>
-                )}
+              <View key={side} style={{ marginBottom: 16, borderRadius: 12, borderWidth: 1, borderColor: themeBorder, overflow: 'hidden' }}>
+                {/* Side header */}
+                <LinearGradient colors={headerColors} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 8, paddingHorizontal: 12 }}>
+                  <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700' }}>{side === 'front' ? 'Front Side' : 'Back Side'}</Text>
+                </LinearGradient>
+
+                <View style={{ padding: 10 }}>
+                  {/* Corner zoom images */}
+                  {imageUrl && !card.slab_detected && (
+                    <View style={{ marginBottom: 10 }}>
+                      <CornerZoomGrid imageUrl={imageUrl} side={side === 'front' ? 'Front' : 'Back'} />
+                    </View>
+                  )}
+
+                  {/* Corners */}
+                  {cornersData && (
+                    <View style={{ marginBottom: 10, backgroundColor: themeBg, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: themeBorder }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: themeHeading }}>Corners</Text>
+                        {cornersData.score != null && <Text style={{ fontSize: 13, fontWeight: '800', color: themeText }}>{cornersData.score}/10</Text>}
+                      </View>
+                      {/* Per-corner detail grid */}
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                        {['top_left', 'top_right', 'bottom_left', 'bottom_right'].map(pos => {
+                          const cd = cornersData[pos]
+                          if (!cd) return null
+                          const label = pos.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                          const text = typeof cd === 'object' ? cd.condition : (typeof cd === 'string' ? cd : null)
+                          const score = typeof cd === 'object' ? cd.score : null
+                          return (
+                            <View key={pos} style={{ width: '48%', backgroundColor: '#fff', borderRadius: 6, padding: 6, borderWidth: 1, borderColor: themeBorder }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700] }}>{label}</Text>
+                                {score != null && <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>{score}/10</Text>}
+                              </View>
+                              {text && <Text style={{ fontSize: 8, color: Colors.gray[500], lineHeight: 12, marginTop: 2 }} numberOfLines={4}>{text}</Text>}
+                            </View>
+                          )
+                        })}
+                      </View>
+                      {cornersData.summary && (
+                        <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: themeBorder, paddingTop: 6 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
+                          <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{cornersData.summary}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Edges */}
+                  {edgesData && (
+                    <View style={{ marginBottom: 10, backgroundColor: themeBg, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: themeBorder }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: themeHeading }}>Edges</Text>
+                        {edgesData.score != null && <Text style={{ fontSize: 13, fontWeight: '800', color: themeText }}>{edgesData.score}/10</Text>}
+                      </View>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                        {['top', 'bottom', 'left', 'right'].map(pos => {
+                          const ed = edgesData[pos]
+                          if (!ed) return null
+                          const label = pos.charAt(0).toUpperCase() + pos.slice(1)
+                          const text = typeof ed === 'object' ? ed.condition : (typeof ed === 'string' ? ed : null)
+                          const score = typeof ed === 'object' ? ed.score : null
+                          return (
+                            <View key={pos} style={{ width: '48%', backgroundColor: '#fff', borderRadius: 6, padding: 6, borderWidth: 1, borderColor: themeBorder }}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700] }}>{label}</Text>
+                                {score != null && <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>{score}/10</Text>}
+                              </View>
+                              {text && <Text style={{ fontSize: 8, color: Colors.gray[500], lineHeight: 12, marginTop: 2 }} numberOfLines={4}>{text}</Text>}
+                            </View>
+                          )
+                        })}
+                      </View>
+                      {edgesData.summary && (
+                        <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: themeBorder, paddingTop: 6 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
+                          <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{edgesData.summary}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+
+                  {/* Surface */}
+                  {surfaceData && (
+                    <View style={{ backgroundColor: themeBg, borderRadius: 8, padding: 8, borderWidth: 1, borderColor: themeBorder }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={{ fontSize: 12, fontWeight: '700', color: themeHeading }}>Surface</Text>
+                        {surfaceData.score != null && <Text style={{ fontSize: 13, fontWeight: '800', color: themeText }}>{surfaceData.score}/10</Text>}
+                      </View>
+                      {surfaceData.finish_type && <Text style={{ fontSize: 9, color: Colors.gray[500], marginBottom: 4 }}>Finish: {surfaceData.finish_type}</Text>}
+                      {surfaceData.condition && <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13 }}>{surfaceData.condition}</Text>}
+                      {surfaceData.defects && Array.isArray(surfaceData.defects) && surfaceData.defects.length > 0 && (
+                        <View style={{ marginTop: 6 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700], marginBottom: 2 }}>Defects:</Text>
+                          {surfaceData.defects.map((d: any, i: number) => (
+                            <View key={i} style={{ backgroundColor: '#fff', borderRadius: 4, padding: 4, marginTop: 2, borderWidth: 1, borderColor: themeBorder }}>
+                              <Text style={{ fontSize: 8, fontWeight: '600', color: Colors.gray[700] }}>{d.type} ({d.severity})</Text>
+                              {d.location && <Text style={{ fontSize: 8, color: Colors.gray[500] }}>Location: {d.location}</Text>}
+                              {d.description && <Text style={{ fontSize: 8, color: Colors.gray[500] }}>{d.description}</Text>}
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                      {surfaceData.summary && (
+                        <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: themeBorder, paddingTop: 6 }}>
+                          <Text style={{ fontSize: 9, fontWeight: '700', color: themeText }}>DCM Optic™ Analysis:</Text>
+                          <Text style={{ fontSize: 9, color: Colors.gray[600], lineHeight: 13, marginTop: 2 }}>{surfaceData.summary}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
             )
-          })()}
+          })}
 
-          {/* Detailed defects */}
+          {/* Detailed defects fallback */}
           {(card.conversational_defects_front || card.conversational_defects_back) && (
-            <View style={{ marginTop: 12 }}>
+            <View style={{ marginTop: 4 }}>
               {card.conversational_defects_front && <DefectSection side="Front" defects={card.conversational_defects_front} />}
               {card.conversational_defects_back && <DefectSection side="Back" defects={card.conversational_defects_back} />}
             </View>
