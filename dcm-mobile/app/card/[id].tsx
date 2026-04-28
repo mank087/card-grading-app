@@ -644,19 +644,40 @@ export default function CardDetailScreen() {
 
         {/* ══════ 8. DCM OPTIC™ REPORT ══════ */}
         <CollapsibleSection title="DCM Optic™ Report" icon="document-text">
-          {/* Card Info */}
-          {ci && (
-            <View style={{ marginBottom: 12 }}>
-              <Text style={s.reportSubhead}>Card Information</Text>
-              <InfoRow label="Card Name" value={ci.card_name || cardName} />
-              <InfoRow label="Set" value={ci.set_name || setName} />
-              {ci.year && <InfoRow label="Year" value={ci.year} />}
-              {ci.manufacturer && <InfoRow label="Manufacturer" value={ci.manufacturer} />}
-              {ci.card_number && <InfoRow label="Card Number" value={ci.card_number} />}
-              {ci.player_or_character && <InfoRow label="Character" value={ci.player_or_character} />}
-              {ci.rarity_tier && <InfoRow label="Rarity" value={ci.rarity_tier} />}
-            </View>
-          )}
+          {/* Card Info — from card_info column or grading JSON */}
+          {(() => {
+            const info = ci || gradingJson?.card_info
+            if (!info) return null
+            return (
+              <View style={{ marginBottom: 12 }}>
+                <Text style={s.reportSubhead}>Card Information</Text>
+                <InfoRow label="Card Name" value={info.card_name || cardName} />
+                <InfoRow label="Set Name" value={info.set_name || setName} />
+                {info.year && <InfoRow label="Year" value={info.year} />}
+                {info.manufacturer && <InfoRow label="Manufacturer" value={info.manufacturer} />}
+                {info.card_number && <InfoRow label="Card Number" value={info.card_number} />}
+                {info.player_or_character && <InfoRow label="Character" value={info.player_or_character} />}
+                {info.authentic != null && <InfoRow label="Authentic" value={String(info.authentic)} />}
+                {info.rarity_tier && <InfoRow label="Rarity Tier" value={info.rarity_tier} />}
+                {info.subset && <InfoRow label="Subset" value={info.subset} />}
+                {info.serial_number && <InfoRow label="Serial Number" value={info.serial_number} />}
+                {info.card_type && <InfoRow label="Card Type" value={info.card_type} />}
+                {info.game && <InfoRow label="Game" value={info.game} />}
+                {info.card_front_text && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '600', color: Colors.gray[500] }}>Card Front Text:</Text>
+                    <Text style={[s.analysisText, { fontSize: 10 }]}>{info.card_front_text}</Text>
+                  </View>
+                )}
+                {info.card_back_text && (
+                  <View style={{ marginTop: 4 }}>
+                    <Text style={{ fontSize: 9, fontWeight: '600', color: Colors.gray[500] }}>Card Back Text:</Text>
+                    <Text style={[s.analysisText, { fontSize: 10 }]}>{info.card_back_text}</Text>
+                  </View>
+                )}
+              </View>
+            )
+          })()}
 
           {/* Three-Pass Evaluation */}
           {gradingJson?.grading_passes && (
@@ -716,6 +737,121 @@ export default function CardDetailScreen() {
                   ))}
                 </View>
               )}
+            </View>
+          )}
+
+          {/* Centering Analysis from grading JSON */}
+          {gradingJson?.centering && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={s.reportSubhead}>Centering Analysis</Text>
+              {['front', 'back'].map(side => {
+                const sd = gradingJson.centering[side]
+                if (!sd) return null
+                return (
+                  <View key={side} style={{ marginTop: 6, backgroundColor: Colors.gray[50], borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.gray[200] }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.gray[700] }}>{side === 'front' ? 'Front' : 'Back'}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.purple[600] }}>{sd.score}/10</Text>
+                    </View>
+                    {sd.card_type && <Text style={s.priceNote}>Card type: {sd.card_type}. {sd.measurement_method}</Text>}
+                    {sd.measurements && <Text style={[s.priceNote, { marginTop: 2 }]}>{sd.measurements}</Text>}
+                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                      <InfoRow label="L/R" value={sd.left_right || 'N/A'} />
+                      <InfoRow label="T/B" value={sd.top_bottom || 'N/A'} />
+                    </View>
+                    {sd.quality_tier && <Text style={[s.centeringTier, { marginTop: 4 }]}>Quality: {sd.quality_tier}</Text>}
+                    {sd.analysis && <Text style={[s.analysisText, { marginTop: 4 }]}>{sd.analysis}</Text>}
+                  </View>
+                )
+              })}
+            </View>
+          )}
+
+          {/* Corner Analysis from grading JSON */}
+          {gradingJson?.corners && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={s.reportSubhead}>Corner Analysis</Text>
+              {['front', 'back'].map(side => {
+                const sd = gradingJson.corners[side]
+                if (!sd) return null
+                return (
+                  <View key={side} style={{ marginTop: 6, backgroundColor: Colors.gray[50], borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.gray[200] }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.gray[700] }}>{side === 'front' ? 'Front' : 'Back'}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.purple[600] }}>{sd.score}/10</Text>
+                    </View>
+                    {sd.summary && <Text style={s.analysisText}>{sd.summary}</Text>}
+                    {['top_left', 'top_right', 'bottom_left', 'bottom_right'].map(corner => {
+                      const cd = sd[corner]
+                      if (!cd) return null
+                      const label = corner.replace('_', ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())
+                      const score = typeof cd === 'object' ? cd.score : null
+                      const text = typeof cd === 'object' ? cd.condition : (typeof cd === 'string' ? cd : null)
+                      return (
+                        <View key={corner} style={{ marginTop: 4, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: Colors.purple[200] }}>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.gray[700] }}>{label}{score != null ? ` (${score}/10)` : ''}</Text>
+                          {text && <Text style={[s.analysisText, { fontSize: 10 }]}>{text}</Text>}
+                        </View>
+                      )
+                    })}
+                  </View>
+                )
+              })}
+            </View>
+          )}
+
+          {/* Edge Analysis from grading JSON */}
+          {gradingJson?.edges && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={s.reportSubhead}>Edge Analysis</Text>
+              {['front', 'back'].map(side => {
+                const sd = gradingJson.edges[side]
+                if (!sd) return null
+                return (
+                  <View key={side} style={{ marginTop: 6, backgroundColor: Colors.gray[50], borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.gray[200] }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.gray[700] }}>{side === 'front' ? 'Front' : 'Back'}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.purple[600] }}>{sd.score}/10</Text>
+                    </View>
+                    {sd.summary && <Text style={s.analysisText}>{sd.summary}</Text>}
+                    {['top', 'bottom', 'left', 'right'].map(edge => {
+                      const ed = sd[edge]
+                      if (!ed) return null
+                      const label = edge.charAt(0).toUpperCase() + edge.slice(1)
+                      const score = typeof ed === 'object' ? ed.score : null
+                      const text = typeof ed === 'object' ? ed.condition : (typeof ed === 'string' ? ed : null)
+                      return (
+                        <View key={edge} style={{ marginTop: 4, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: Colors.purple[200] }}>
+                          <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.gray[700] }}>{label}{score != null ? ` (${score}/10)` : ''}</Text>
+                          {text && <Text style={[s.analysisText, { fontSize: 10 }]}>{text}</Text>}
+                        </View>
+                      )
+                    })}
+                  </View>
+                )
+              })}
+            </View>
+          )}
+
+          {/* Surface Analysis from grading JSON */}
+          {gradingJson?.surface && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={s.reportSubhead}>Surface Analysis</Text>
+              {['front', 'back'].map(side => {
+                const sd = gradingJson.surface[side]
+                if (!sd) return null
+                return (
+                  <View key={side} style={{ marginTop: 6, backgroundColor: Colors.gray[50], borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.gray[200] }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.gray[700] }}>{side === 'front' ? 'Front' : 'Back'}</Text>
+                      <Text style={{ fontSize: 12, fontWeight: '800', color: Colors.purple[600] }}>{sd.score}/10</Text>
+                    </View>
+                    {sd.finish_type && <Text style={s.priceNote}>Finish: {sd.finish_type}</Text>}
+                    {sd.condition && <Text style={[s.analysisText, { marginTop: 4 }]}>{sd.condition}</Text>}
+                    {sd.summary && <Text style={[s.analysisText, { marginTop: 4, fontStyle: 'italic' }]}>DCM Optic™ Analysis: {sd.summary}</Text>}
+                  </View>
+                )
+              })}
             </View>
           )}
 
