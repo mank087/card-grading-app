@@ -259,13 +259,23 @@ export default function CardDetailScreen() {
           )}
         </CollapsibleSection>
 
-        {/* ══════ 4. DCM OPTIC CONFIDENCE SCORE ══════ */}
-        <CollapsibleSection title={`DCM Optic\u2122 Confidence Score${confidence ? `  ${confidence}` : ''}`} icon="shield-checkmark">
+        {/* ══════ 4. DCM OPTIC™ CONFIDENCE SCORE ══════ */}
+        <CollapsibleSection title={`DCM Optic™ Confidence Score${confidence ? `  ${confidence}` : ''}`} icon="shield-checkmark">
+          {/* Confidence bar */}
+          <View style={s.confBarContainer}>
+            <View style={[s.confBarFill, { width: `${confidence === 'A' ? 100 : confidence === 'B' ? 75 : confidence === 'C' ? 50 : 25}%`, backgroundColor: ConfidenceColors[confidence]?.text || Colors.gray[400] }]} />
+          </View>
           <View style={[s.confBadgeLarge, { backgroundColor: ConfidenceColors[confidence]?.bg || Colors.gray[100] }]}>
             <Text style={[s.confBadgeGrade, { color: ConfidenceColors[confidence]?.text || Colors.gray[600] }]}>
-              Grade {confidence} — {confidence === 'A' ? 'Excellent' : confidence === 'B' ? 'Good' : confidence === 'C' ? 'Fair' : 'Poor'}
+              Grade {confidence} — {confidence === 'A' ? 'Very High Confidence' : confidence === 'B' ? 'High Confidence' : confidence === 'C' ? 'Moderate Confidence' : 'Low Confidence'}
             </Text>
           </View>
+          <Text style={s.confDescription}>
+            {confidence === 'A' ? 'Excellent image quality. Grade uncertainty ±0.25 — the assigned grade is highly reliable.'
+              : confidence === 'B' ? 'Good image quality. Grade uncertainty ±0.5 — the assigned grade is reliable with minor margin.'
+              : confidence === 'C' ? 'Fair image quality. Grade uncertainty ±1.0 — consider retaking photos for a more accurate grade.'
+              : 'Poor image quality. Grade uncertainty ±1.5 — we recommend retaking clearer photos for reliable grading.'}
+          </Text>
           {card.conversational_case_detection?.case_type && card.conversational_case_detection.case_type !== 'none' && (
             <InfoRow label="Protective Case" value={card.conversational_case_detection.case_type.replace('_', ' ')} />
           )}
@@ -273,12 +283,34 @@ export default function CardDetailScreen() {
             <Text style={s.rawCardNote}>Raw card — no protective case detected</Text>
           )}
           <InfoRow label="Grade Uncertainty" value={card.conversational_grade_uncertainty || '±0'} />
+          <InfoRow label="Image Quality Grade" value={confidence || 'N/A'} />
         </CollapsibleSection>
 
         {/* ══════ 5. MARKET VALUE ══════ */}
         <CollapsibleSection title={`Market Value${card.ebay_price_median || card.dcm_price_estimate ? `  ~$${(card.dcm_price_estimate || card.ebay_price_median || 0).toFixed(2)}` : ''}`} icon="trending-up">
-          {card.ebay_price_median && (
-            <>
+          {/* DCM Price Estimate */}
+          {card.dcm_price_estimate != null && (
+            <View style={s.dcmPriceCard}>
+              <Text style={s.pricingSource}>DCM Price Estimate</Text>
+              <Text style={s.dcmPrice}>${card.dcm_price_estimate.toFixed(2)}</Text>
+              {card.dcm_price_match_confidence && (
+                <Text style={s.priceNote}>Match confidence: {card.dcm_price_match_confidence}</Text>
+              )}
+              {card.dcm_price_product_name && (
+                <Text style={[s.priceNote, { marginTop: 2 }]}>Matched: {card.dcm_price_product_name}</Text>
+              )}
+              {card.dcm_price_at_grading != null && (
+                <Text style={s.priceNote}>Price at grading: ${card.dcm_price_at_grading.toFixed(2)}</Text>
+              )}
+              {card.dcm_prices_cached_at && (
+                <Text style={s.priceNote}>Updated: {new Date(card.dcm_prices_cached_at).toLocaleDateString()}</Text>
+              )}
+            </View>
+          )}
+
+          {/* eBay Comparable Sales */}
+          {card.ebay_price_median != null && (
+            <View style={{ marginTop: card.dcm_price_estimate ? 16 : 0 }}>
               <Text style={s.pricingSource}>eBay Comparable Sales</Text>
               <View style={s.priceGrid}>
                 <PriceCell label="Lowest" value={card.ebay_price_lowest} />
@@ -286,18 +318,21 @@ export default function CardDetailScreen() {
                 <PriceCell label="Average" value={card.ebay_price_average} />
                 <PriceCell label="Highest" value={card.ebay_price_highest} />
               </View>
-              {card.ebay_price_listing_count && <Text style={s.priceNote}>{card.ebay_price_listing_count} listings found</Text>}
+              {card.ebay_price_listing_count != null && <Text style={s.priceNote}>{card.ebay_price_listing_count} comparable listings found</Text>}
               {card.ebay_price_updated_at && <Text style={s.priceNote}>Updated: {new Date(card.ebay_price_updated_at).toLocaleDateString()}</Text>}
-            </>
-          )}
-          {card.dcm_price_estimate && (
-            <View style={{ marginTop: card.ebay_price_median ? 16 : 0 }}>
-              <Text style={s.pricingSource}>DCM Price Estimate</Text>
-              <Text style={s.dcmPrice}>${card.dcm_price_estimate.toFixed(2)}</Text>
             </View>
           )}
-          {!card.ebay_price_median && !card.dcm_price_estimate && (
-            <Text style={s.naText}>No pricing data available</Text>
+
+          {/* Scryfall (MTG/Pokemon) */}
+          {card.scryfall_price_usd != null && (
+            <View style={{ marginTop: 16 }}>
+              <Text style={s.pricingSource}>TCG Market Price</Text>
+              <Text style={s.dcmPrice}>${card.scryfall_price_usd}</Text>
+            </View>
+          )}
+
+          {!card.ebay_price_median && !card.dcm_price_estimate && !card.scryfall_price_usd && (
+            <Text style={s.naText}>No pricing data available yet. Pricing is fetched automatically after grading.</Text>
           )}
         </CollapsibleSection>
 
@@ -308,18 +343,24 @@ export default function CardDetailScreen() {
               const est = (card.estimated_professional_grades as any)?.[company]
               if (!est) return null
               return (
-                <View key={company} style={s.proRow}>
-                  <Text style={s.proCompany}>{company}</Text>
-                  <View style={s.proRight}>
-                    <Text style={s.proGrade}>{est.estimated_grade}</Text>
-                    <View style={[s.proBadge, { backgroundColor: est.confidence === 'high' ? Colors.green[50] : est.confidence === 'medium' ? Colors.amber[50] : Colors.red[50] }]}>
-                      <Text style={[s.proConfText, { color: est.confidence === 'high' ? Colors.green[600] : est.confidence === 'medium' ? Colors.amber[600] : Colors.red[600] }]}>{est.confidence?.toUpperCase()}</Text>
+                <View key={company} style={s.proCard}>
+                  <View style={s.proHeader}>
+                    <Text style={s.proCompany}>{company}</Text>
+                    <View style={s.proRight}>
+                      <Text style={s.proGrade}>{est.estimated_grade}</Text>
+                      {est.numeric_score != null && (
+                        <Text style={s.proNumeric}>({est.numeric_score})</Text>
+                      )}
+                      <View style={[s.proBadge, { backgroundColor: est.confidence === 'high' ? Colors.green[50] : est.confidence === 'medium' ? Colors.amber[50] : Colors.red[50] }]}>
+                        <Text style={[s.proConfText, { color: est.confidence === 'high' ? Colors.green[600] : est.confidence === 'medium' ? Colors.amber[600] : Colors.red[600] }]}>{est.confidence?.toUpperCase()}</Text>
+                      </View>
                     </View>
                   </View>
+                  {est.notes && <Text style={s.proNotes}>{est.notes}</Text>}
                 </View>
               )
             })}
-            <Text style={s.disclaimer}>These are projections only and not official grades.</Text>
+            <Text style={s.disclaimer}>These are estimated projections based on DCM's AI grading analysis. They are not official grades from PSA, BGS, SGC, or CGC. Actual grades may vary.</Text>
           </CollapsibleSection>
         )}
 
@@ -328,8 +369,6 @@ export default function CardDetailScreen() {
           <CollapsibleSection title="Insta-List on eBay" icon="pricetag">
             <Text style={s.ebayInfo}>Automatically includes front & back card images with DCM grade labels, mini grading report, and pre-filled title.</Text>
             <TouchableOpacity style={s.ebayButton} onPress={() => {
-              // eBay listing requires the web interface for OAuth + listing creation
-              // Opens in in-app WebView via the pages route
               const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
               router.push({ pathname: '/pages/ebay-list' as any, params: { cardPath: `/${catPath}/${card.id}` } })
             }}>
@@ -339,12 +378,33 @@ export default function CardDetailScreen() {
           </CollapsibleSection>
         )}
 
-        {/* ══════ 8. DCM OPTIC REPORT ══════ */}
-        <CollapsibleSection title="DCM Optic\u2122 Report" icon="document-text">
-          <InfoRow label="DCM Optic\u2122 Version" value={card.conversational_prompt_version || 'N/A'} />
+        {/* ══════ 8. DCM OPTIC™ REPORT ══════ */}
+        <CollapsibleSection title="DCM Optic™ Report" icon="document-text">
+          <InfoRow label="DCM Optic™ Version" value={card.conversational_prompt_version || 'N/A'} />
           <InfoRow label="Graded Date" value={card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'} />
           <InfoRow label="Category" value={card.category} />
           <InfoRow label="Visibility" value={card.visibility} />
+          {card.conversational_metadata?.model && (
+            <InfoRow label="AI Model" value={card.conversational_metadata.model} />
+          )}
+          {card.conversational_limiting_factor && (
+            <InfoRow label="Limiting Factor" value={card.conversational_limiting_factor} />
+          )}
+          {card.conversational_preliminary_grade != null && (
+            <InfoRow label="Pre-Cap Grade" value={String(card.conversational_preliminary_grade)} />
+          )}
+          {gradingJson?.final_grade?.summary && (
+            <View style={{ marginTop: 8 }}>
+              <Text style={s.reportSubhead}>Grading Summary</Text>
+              <Text style={s.analysisText}>{gradingJson.final_grade.summary}</Text>
+            </View>
+          )}
+          {card.conversational_final_grade_summary && !gradingJson?.final_grade?.summary && (
+            <View style={{ marginTop: 8 }}>
+              <Text style={s.reportSubhead}>Grading Summary</Text>
+              <Text style={s.analysisText}>{card.conversational_final_grade_summary}</Text>
+            </View>
+          )}
         </CollapsibleSection>
 
         {/* ══════ DELETE ══════ */}
@@ -481,7 +541,10 @@ const s = StyleSheet.create({
   analysisText: { fontSize: 12, color: Colors.gray[600], lineHeight: 18 },
 
   // Confidence
-  confBadgeLarge: { padding: 16, borderRadius: 12, alignItems: 'center', marginBottom: 12 },
+  confBarContainer: { height: 8, backgroundColor: Colors.gray[200], borderRadius: 4, marginBottom: 10, overflow: 'hidden' as const },
+  confBarFill: { height: '100%' as any, borderRadius: 4 },
+  confDescription: { fontSize: 12, color: Colors.gray[600], lineHeight: 18, marginBottom: 10 },
+  confBadgeLarge: { padding: 16, borderRadius: 12, alignItems: 'center' as const, marginBottom: 12 },
   confBadgeGrade: { fontSize: 16, fontWeight: '700' },
   rawCardNote: { fontSize: 12, color: Colors.gray[500], fontStyle: 'italic', marginTop: 4 },
 
@@ -492,11 +555,17 @@ const s = StyleSheet.create({
   priceCellLabel: { fontSize: 11, color: Colors.gray[500] },
   priceCellValue: { fontSize: 16, fontWeight: '700', color: Colors.gray[900], marginTop: 2 },
   priceNote: { fontSize: 11, color: Colors.gray[400], marginTop: 4 },
-  dcmPrice: { fontSize: 24, fontWeight: '800', color: Colors.green[600] },
+  dcmPriceCard: { backgroundColor: Colors.green[50], borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.green[100] },
+  dcmPrice: { fontSize: 24, fontWeight: '800' as const, color: Colors.green[600] },
+  reportSubhead: { fontSize: 12, fontWeight: '700' as const, color: Colors.gray[700], marginBottom: 4 },
   naText: { fontSize: 13, color: Colors.gray[400], fontStyle: 'italic' },
 
   // Professional grades
-  proRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
+  proCard: { backgroundColor: Colors.gray[50], borderRadius: 10, padding: 12, marginBottom: 8, borderWidth: 1, borderColor: Colors.gray[200] },
+  proHeader: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const },
+  proNumeric: { fontSize: 12, color: Colors.gray[500], marginLeft: 4 },
+  proNotes: { fontSize: 11, color: Colors.gray[600], marginTop: 6, lineHeight: 16 },
+  proRow: { flexDirection: 'row' as const, justifyContent: 'space-between' as const, alignItems: 'center' as const, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
   proCompany: { fontSize: 15, fontWeight: '700', color: Colors.gray[800] },
   proRight: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   proGrade: { fontSize: 18, fontWeight: '800', color: Colors.purple[600] },

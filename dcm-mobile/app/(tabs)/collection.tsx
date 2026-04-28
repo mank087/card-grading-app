@@ -41,6 +41,7 @@ export default function CollectionScreen() {
         .from('cards')
         .select(`
           id, serial, card_name, featured, category, card_set,
+          card_number, release_date, manufacturer_name,
           conversational_whole_grade, conversational_condition_label,
           conversational_card_info, front_path,
           ebay_price_median, dcm_price_estimate, created_at
@@ -48,7 +49,7 @@ export default function CollectionScreen() {
         .eq('user_id', session.user.id)
         .not('conversational_whole_grade', 'is', null)
         .order('created_at', { ascending: false })
-        .limit(100)
+        .limit(1000)
 
       if (search) {
         query = query.or(`serial.ilike.%${search}%,card_name.ilike.%${search}%`)
@@ -86,6 +87,10 @@ export default function CollectionScreen() {
     const ci = item.conversational_card_info
     const name = item.card_name || item.featured || ci?.card_name || `Card #${item.serial}`
     const set = item.card_set || ci?.set_name || ''
+    const year = item.release_date || ci?.year || ''
+    const num = item.card_number || ci?.card_number || ''
+    const condition = item.conversational_condition_label || ''
+    const contextParts = [set, num ? `#${num}` : '', year].filter(Boolean).join(' \u2022 ')
     const price = item.ebay_price_median || item.dcm_price_estimate
 
     return (
@@ -103,10 +108,11 @@ export default function CollectionScreen() {
         )}
         <View style={styles.listInfo}>
           <Text style={styles.listName} numberOfLines={1}>{name}</Text>
-          <Text style={styles.listSet} numberOfLines={1}>{set}</Text>
+          <Text style={styles.listSet} numberOfLines={1}>{contextParts}</Text>
           <View style={styles.listMeta}>
             <Text style={styles.listCategory}>{item.category}</Text>
-            {price && <Text style={styles.listPrice}>${price.toFixed(2)}</Text>}
+            {condition ? <Text style={styles.listCondition}>{condition}</Text> : null}
+            {price ? <Text style={styles.listPrice}>${price.toFixed(2)}</Text> : null}
           </View>
         </View>
         <GradeBadge grade={item.conversational_whole_grade} size="sm" />
@@ -234,6 +240,7 @@ const styles = StyleSheet.create({
   listSet: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
   listMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   listCategory: { fontSize: 11, color: Colors.purple[600], fontWeight: '500' },
+  listCondition: { fontSize: 10, color: Colors.purple[600], fontWeight: '500' },
   listPrice: { fontSize: 11, color: Colors.green[600], fontWeight: '600' },
 
   // Grid view
