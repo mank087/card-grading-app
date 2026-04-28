@@ -644,7 +644,8 @@ async function renderBackLabelCanvas(
     const totalSubH = lineHeight * 4 - 10; // 4 lines, no gap after last
     const subStartY = B + (CH - totalSubH) / 2;
 
-    const drawSubScore = (label: string, value: number, index: number) => {
+    const drawSubScore = (label: string, value: number | undefined | null, index: number) => {
+      if (value == null || isNaN(value)) return;
       const y = subStartY + index * lineHeight + subFontSize / 2;
       const scoreText = `${label}: ${Math.round(value)}`;
       ctx.fillStyle = isModern ? MODERN_COLORS.textWhite : COLORS.textMedium;

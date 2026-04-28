@@ -880,7 +880,8 @@ export async function renderBackCanvas(
     const totalSubH = lineHeight * 4 - Math.round(10 * scale);
     const subStartY = EB + (ECH - totalSubH) / 2;
 
-    const drawSubScore = (label: string, value: number, index: number) => {
+    const drawSubScore = (label: string, value: number | undefined | null, index: number) => {
+      if (value == null || isNaN(value)) return; // skip if no score
       const y = subStartY + index * lineHeight + subFontSize / 2;
       const scoreText = `${label}: ${Math.round(value)}`;
       ctx.fillStyle = light ? TRAD_COLORS.textMedium : 'rgba(255, 255, 255, 0.95)';
