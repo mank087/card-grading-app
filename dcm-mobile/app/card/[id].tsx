@@ -255,43 +255,136 @@ export default function CardDetailScreen() {
         <CollapsibleSection title={`Centering Analysis${sub?.centering != null ? `  ${Math.round(sub.centering)}/10` : ''}`} icon="resize">
           {cen ? (
             <>
-              {/* Card images for centering reference */}
-              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
-                {frontUrl && (
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.centeringSide, { marginBottom: 4 }]}>Front</Text>
-                    <Image source={{ uri: frontUrl }} style={{ width: '100%', aspectRatio: 2.5/3.5, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200] }} resizeMode="contain" />
-                  </View>
-                )}
-                {backUrl && (
-                  <View style={{ flex: 1 }}>
-                    <Text style={[s.centeringSide, { marginBottom: 4 }]}>Back</Text>
-                    <Image source={{ uri: backUrl }} style={{ width: '100%', aspectRatio: 2.5/3.5, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200] }} resizeMode="contain" />
-                  </View>
-                )}
-              </View>
-              <View style={s.centeringGrid}>
-                {['front', 'back'].map(side => {
-                  // Handle both flat column format and nested JSON format
-                  const sideData = (cen as any)?.[side] || cen
-                  const lr = sideData?.left_right || sideData?.[`${side}_left_right`] || sideData?.[`${side}_lr`] || 'N/A'
-                  const tb = sideData?.top_bottom || sideData?.[`${side}_top_bottom`] || sideData?.[`${side}_tb`] || 'N/A'
-                  const tier = sideData?.quality_tier || sideData?.[`${side}_quality_tier`] || null
-                  const analysis = sideData?.analysis || sideData?.[`${side}_analysis`] || sideData?.[`${side}_notes`] || null
-                  const score = sideData?.score ?? (sub?.centering != null ? Math.round(sub.centering) : null)
-                  return (
-                    <View key={side} style={s.centeringHalf}>
-                      <Text style={s.centeringSide}>{side === 'front' ? 'Front' : 'Back'}</Text>
-                      <Text style={s.centeringScore}>{score ?? 'N/A'}/10</Text>
-                      <InfoRow label="L/R" value={lr} />
-                      <InfoRow label="T/B" value={tb} />
-                      {tier && <Text style={s.centeringTier}>{tier}</Text>}
-                      {analysis && <Text style={s.analysisText}>{analysis}</Text>}
-                      {side === 'front' && <View style={s.centeringDivider} />}
+              {/* Front and Back centering cards */}
+              {['front', 'back'].map(side => {
+                const sideData = (cen as any)?.[side] || cen
+                const lr = sideData?.left_right || sideData?.[`${side}_left_right`] || sideData?.[`${side}_lr`] || 'N/A'
+                const tb = sideData?.top_bottom || sideData?.[`${side}_top_bottom`] || sideData?.[`${side}_tb`] || 'N/A'
+                const tier = sideData?.quality_tier || sideData?.[`${side}_quality_tier`] || null
+                const analysis = sideData?.analysis || sideData?.[`${side}_analysis`] || sideData?.[`${side}_notes`] || null
+                const scoreVal = sideData?.score ?? (sub?.centering != null ? Math.round(sub.centering) : null)
+                const imageUrl = side === 'front' ? frontUrl : backUrl
+                const measurements = sideData?.measurements
+                const cardType = sideData?.card_type
+                const measureMethod = sideData?.measurement_method
+                const worstAxis = sideData?.worst_axis
+
+                // Quality tier color
+                const tierColor = tier === 'Perfect' || tier === 'Excellent' ? Colors.green[600]
+                  : tier === 'Good' ? Colors.blue[600]
+                  : tier === 'Fair' ? Colors.amber[600]
+                  : tier === 'Off-Center' ? Colors.red[600] : Colors.gray[600]
+                const tierIcon = tier === 'Perfect' || tier === 'Excellent' || tier === 'Good' ? '✓' : tier === 'Fair' ? '⚠' : tier === 'Off-Center' ? '✗' : '•'
+                const tierBg = tier === 'Perfect' || tier === 'Excellent' ? Colors.green[50]
+                  : tier === 'Good' ? Colors.blue[50]
+                  : tier === 'Fair' ? Colors.amber[50]
+                  : tier === 'Off-Center' ? Colors.red[50] : Colors.gray[50]
+
+                return (
+                  <View key={side} style={{ marginBottom: 16, backgroundColor: Colors.purple[50], borderRadius: 12, borderWidth: 1, borderColor: Colors.purple[200], overflow: 'hidden' }}>
+                    {/* Side header */}
+                    <LinearGradient colors={[Colors.purple[600], '#4f46e5']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={{ paddingVertical: 6, paddingHorizontal: 12 }}>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>{side === 'front' ? 'Front' : 'Back'}</Text>
+                    </LinearGradient>
+
+                    <View style={{ padding: 12 }}>
+                      {/* Score + Image row */}
+                      <View style={{ flexDirection: 'row', gap: 12, marginBottom: 10 }}>
+                        {/* Score display */}
+                        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                          <Text style={{ fontSize: 9, color: Colors.gray[500], fontWeight: '600' }}>Centering Score</Text>
+                          <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.purple[600] }}>{scoreVal ?? 'N/A'}<Text style={{ fontSize: 14, color: Colors.gray[400] }}>/10</Text></Text>
+                        </View>
+                        {/* Card image */}
+                        {imageUrl && (
+                          <View style={{ flex: 1 }}>
+                            <Image source={{ uri: imageUrl }} style={{ width: '100%', aspectRatio: 2.5 / 3.5, borderRadius: 8, borderWidth: 3, borderColor: Colors.purple[300] }} resizeMode="contain" />
+                          </View>
+                        )}
+                      </View>
+
+                      {/* DCM Optic Analysis box */}
+                      <View style={{ backgroundColor: '#fff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: Colors.purple[200] }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                          <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.purple[700] }}>DCM Optic™ Analysis</Text>
+                          {tier && <Text style={{ fontSize: 12 }}>{tierIcon}</Text>}
+                        </View>
+
+                        {/* Ratio info box */}
+                        <View style={{ backgroundColor: Colors.gray[50], borderRadius: 8, padding: 8, gap: 4 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 10, color: Colors.gray[500], fontWeight: '600' }}>Horizontal (L/R):</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.purple[700] }}>{lr}</Text>
+                          </View>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                            <Text style={{ fontSize: 10, color: Colors.gray[500], fontWeight: '600' }}>Vertical (T/B):</Text>
+                            <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.purple[700] }}>{tb}</Text>
+                          </View>
+                          {tier && (
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Text style={{ fontSize: 10, color: Colors.gray[500], fontWeight: '600' }}>Quality:</Text>
+                              <View style={{ backgroundColor: tierBg, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 10 }}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: tierColor }}>{tier}</Text>
+                              </View>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Analysis text */}
+                        {analysis && <Text style={{ fontSize: 10, color: Colors.gray[600], lineHeight: 15, marginTop: 6 }}>{analysis}</Text>}
+                      </View>
+
+                      {/* Card type + measurements */}
+                      {(cardType || measurements) && (
+                        <View style={{ marginTop: 6 }}>
+                          {cardType && <Text style={{ fontSize: 9, color: Colors.gray[400] }}>Card type: {cardType}. {measureMethod || ''}</Text>}
+                          {measurements && <Text style={{ fontSize: 9, color: Colors.gray[400] }}>{measurements}</Text>}
+                        </View>
+                      )}
                     </View>
-                  )
-                })}
-              </View>
+                  </View>
+                )
+              })}
+
+              {/* Orientation info */}
+              {(() => {
+                const frontData = (cen as any)?.front || cen
+                const worstAxis = frontData?.worst_axis
+                if (!worstAxis) return null
+                return (
+                  <View style={{ backgroundColor: '#eef2ff', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#c7d2fe', marginBottom: 8 }}>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: '#4338ca', marginBottom: 4 }}>Card Orientation</Text>
+                    <InfoRow label="Worst Axis" value={worstAxis.replace('_', ' ')} />
+                  </View>
+                )
+              })()}
+
+              {/* How Centering Was Measured (accordion) */}
+              {(() => {
+                const frontData = (cen as any)?.front || {}
+                const backData = (cen as any)?.back || {}
+                const hasMeasurementDetails = frontData.measurement_method || frontData.card_type
+                if (!hasMeasurementDetails) return null
+                return (
+                  <CollapsibleSection title="How Centering Was Measured" icon="help-circle">
+                    {frontData.analysis && (
+                      <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.blue[100], marginBottom: 8 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.blue[600], marginBottom: 4 }}>Front Analysis</Text>
+                        <Text style={{ fontSize: 10, color: Colors.gray[600], lineHeight: 15 }}>{frontData.analysis}</Text>
+                      </View>
+                    )}
+                    {backData.analysis && (
+                      <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#06b6d4', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#0891b2', marginBottom: 4 }}>Back Analysis</Text>
+                        <Text style={{ fontSize: 10, color: Colors.gray[600], lineHeight: 15 }}>{backData.analysis}</Text>
+                      </View>
+                    )}
+                    <View style={{ backgroundColor: Colors.amber[50], borderRadius: 8, padding: 8, borderWidth: 1, borderColor: Colors.amber[100] }}>
+                      <Text style={{ fontSize: 9, color: Colors.amber[600] }}>This analysis explains the specific visual elements and measurements used to determine centering ratios.</Text>
+                    </View>
+                  </CollapsibleSection>
+                )
+              })()}
             </>
           ) : (
             <Text style={s.naText}>No centering data available</Text>
