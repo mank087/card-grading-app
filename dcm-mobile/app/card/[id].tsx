@@ -1022,15 +1022,47 @@ export default function CardDetailScreen() {
             </View>
           )}
 
-          {/* Metadata */}
-          <View style={{ marginTop: 4, borderTopWidth: 1, borderTopColor: Colors.gray[100], paddingTop: 8 }}>
-            <InfoRow label="DCM Optic™ Version" value={card.conversational_prompt_version || 'N/A'} />
-            <InfoRow label="Graded Date" value={card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'} />
-            <InfoRow label="Category" value={card.category} />
-            {card.conversational_limiting_factor && (
-              <InfoRow label="Limiting Factor" value={card.conversational_limiting_factor} />
-            )}
-          </View>
+          {/* Evaluation Details */}
+          {(() => {
+            const meta = gradingJson?.metadata || {}
+            const promptVersion = card.conversational_prompt_version || meta.rubric_version || meta.model_version || meta.prompt_version || null
+            // Extract clean version (e.g., "master_v8.6" → "V8.6")
+            const cleanVersion = promptVersion ? (promptVersion.match(/v(\d+\.?\d*)/i)?.[0]?.toUpperCase() || promptVersion) : null
+            const modelVersion = meta.model_version || null
+            const rubricVersion = meta.rubric_version || null
+            const deltaApplied = meta.delta_applied || null
+            const processingNotes = meta.processing_notes || null
+            const timestamp = meta.timestamp || null
+
+            return (
+              <View style={{ marginTop: 12, backgroundColor: Colors.gray[50], borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200] }}>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[800], marginBottom: 8 }}>Evaluation Details</Text>
+                {modelVersion && <InfoRow label="DCM Optic™ Model" value={modelVersion} />}
+                {rubricVersion && <InfoRow label="Rubric Version" value={rubricVersion} />}
+                {deltaApplied && <InfoRow label="Delta Applied" value={deltaApplied} />}
+                <InfoRow label="Graded Date" value={card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'} />
+                <InfoRow label="Category" value={card.category} />
+                {card.conversational_limiting_factor && (
+                  <InfoRow label="Limiting Factor" value={card.conversational_limiting_factor} />
+                )}
+                {processingNotes && (
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={{ fontSize: 9, color: Colors.gray[400] }}>Processing Notes:</Text>
+                    <Text style={{ fontSize: 9, color: Colors.gray[500], lineHeight: 13, marginTop: 2 }}>{processingNotes}</Text>
+                  </View>
+                )}
+
+                {/* Version badge at bottom */}
+                {cleanVersion && (
+                  <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <View style={{ backgroundColor: Colors.purple[100], paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.purple[700] }}>DCM Optic™ {cleanVersion}</Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )
+          })()}
         </CollapsibleSection>
 
         {/* ══════ DELETE ══════ */}
