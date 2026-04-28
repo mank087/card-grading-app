@@ -237,23 +237,36 @@ function drawBG(ctx, W, H, cfg) {
         strokeDiv(sx2,0,sx2-W*0.3,H);
       }
     } else if (pat === 2) {
-      // Fractured: 4 edge-to-edge lines creating irregular regions
-      var d=[{x1:W*0.15,y1:0,x2:W*0.55,y2:H},{x1:0,y1:H*0.3,x2:W,y2:H*0.65},
-             {x1:W*0.40,y1:0,x2:W*0.85,y2:H},{x1:0,y1:H*0.7,x2:W*0.70,y2:0}];
-      ctx.fillStyle=pick(0); ctx.fillRect(0,0,W,H);
-      // Region left of line 0
-      ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(d[0].x1,0); ctx.lineTo(d[0].x2,H); ctx.lineTo(0,H); ctx.closePath();
-      ctx.fillStyle=pick(1); ctx.fill(); ctx.restore();
-      // Region between lines 0 and 2
-      ctx.save(); ctx.beginPath(); ctx.moveTo(d[0].x1,0); ctx.lineTo(d[2].x1,0); ctx.lineTo(d[2].x2,H); ctx.lineTo(d[0].x2,H); ctx.closePath();
-      ctx.fillStyle=pick(2); ctx.fill(); ctx.restore();
-      // Region right of line 2
-      ctx.save(); ctx.beginPath(); ctx.moveTo(d[2].x1,0); ctx.lineTo(W,0); ctx.lineTo(W,H); ctx.lineTo(d[2].x2,H); ctx.closePath();
-      ctx.fillStyle=pick(3); ctx.fill(); ctx.restore();
-      // Overlay from horizontal line
-      ctx.save(); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(W,0); ctx.lineTo(d[1].x2,d[1].y2); ctx.lineTo(d[1].x1,d[1].y1); ctx.closePath();
-      ctx.fillStyle=pick(4)+'60'; ctx.fill(); ctx.restore();
-      for(var di=0;di<d.length;di++) strokeDiv(d[di].x1,d[di].y1,d[di].x2,d[di].y2);
+      // Fractured: 5 distinct non-overlapping regions, no color repeats
+      // Ensure 5 unique colors
+      var c5=[];
+      for(var ci=0;ci<5;ci++){
+        var cc=cols[ci%cols.length];
+        if(c5.indexOf(cc)!==-1){
+          var rr=parseInt(cc.slice(1,3),16),gg2=parseInt(cc.slice(3,5),16),bb=parseInt(cc.slice(5,7),16);
+          var adj=ci%2===0?30:-30;
+          c5.push('#'+[rr,gg2,bb].map(function(v){return Math.max(0,Math.min(255,v+adj)).toString(16).padStart(2,'0')}).join(''));
+        } else { c5.push(cc); }
+      }
+      var d1x=W*0.12,d2x=W*0.38,d3x=W*0.62,hY2=H*0.45;
+      // Region 0: far left
+      ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(d1x,0); ctx.lineTo(d1x+W*0.08,H); ctx.lineTo(0,H); ctx.closePath();
+      ctx.fillStyle=c5[0]; ctx.fill();
+      // Region 1: left-center
+      ctx.beginPath(); ctx.moveTo(d1x,0); ctx.lineTo(d2x,0); ctx.lineTo(d2x+W*0.05,H); ctx.lineTo(d1x+W*0.08,H); ctx.closePath();
+      ctx.fillStyle=c5[1]; ctx.fill();
+      // Region 2: center
+      ctx.beginPath(); ctx.moveTo(d2x,0); ctx.lineTo(d3x,0); ctx.lineTo(d3x-W*0.03,H); ctx.lineTo(d2x+W*0.05,H); ctx.closePath();
+      ctx.fillStyle=c5[2]; ctx.fill();
+      // Region 3: upper right
+      ctx.beginPath(); ctx.moveTo(d3x,0); ctx.lineTo(W,0); ctx.lineTo(W,hY2); ctx.lineTo(d3x-W*0.01,hY2); ctx.closePath();
+      ctx.fillStyle=c5[3]; ctx.fill();
+      // Region 4: lower right
+      ctx.beginPath(); ctx.moveTo(d3x-W*0.01,hY2); ctx.lineTo(W,hY2); ctx.lineTo(W,H); ctx.lineTo(d3x-W*0.03,H); ctx.closePath();
+      ctx.fillStyle=c5[4]; ctx.fill();
+      // Divider lines
+      strokeDiv(d1x,0,d1x+W*0.08,H); strokeDiv(d2x,0,d2x+W*0.05,H);
+      strokeDiv(d3x,0,d3x-W*0.03,H); strokeDiv(d3x-W*0.01,hY2,W,hY2);
     } else if (pat === 3) {
       // Mosaic Grid: 5x2
       var gc=5, gr=2, tw=W/gc, th=H/gr;

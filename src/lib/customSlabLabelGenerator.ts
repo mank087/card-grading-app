@@ -289,77 +289,75 @@ function drawCustomBackground(
         strokeDivider(ctx, p, scale);
       }
     } else if (patternIdx === 2) {
-      // Fractured: 4 edge-to-edge diagonal lines at varied angles that divide
-      // the label into irregular regions, each filled with a color. Like
-      // shattered glass but without a central origin — lines cross randomly.
+      // Fractured: 4 diagonal lines creating exactly 5 distinct regions.
+      // Each region gets a unique color — no repeats.
+      // Uses 3 vertical-ish dividers + 1 horizontal divider to create 5 zones.
 
-      // 4 lines, each from one edge to another at different angles/positions
-      // Defined as fractions along each edge (0-1)
+      // Ensure exactly 5 unique colors (pad or truncate)
+      const c5: string[] = [];
+      for (let ci = 0; ci < 5; ci++) {
+        const c = colors[ci % colors.length];
+        // Avoid repeats: if this color is already used, darken/lighten it
+        if (c5.includes(c)) {
+          const r = parseInt(c.slice(1, 3), 16);
+          const g = parseInt(c.slice(3, 5), 16);
+          const b = parseInt(c.slice(5, 7), 16);
+          const adj = ci % 2 === 0 ? 30 : -30;
+          c5.push('#' + [r, g, b].map(v => Math.max(0, Math.min(255, v + adj)).toString(16).padStart(2, '0')).join(''));
+        } else {
+          c5.push(c);
+        }
+      }
+
+      // 3 angled dividers from top to bottom (varying widths = varying region sizes)
+      const d1x = W * 0.12; // narrow left region
+      const d2x = W * 0.38; // medium region
+      const d3x = W * 0.62; // medium region
+      // Horizontal divider splits the right portion
+      const hY = H * 0.45;
+
+      // Region 0: far left (narrow)
+      ctx.beginPath();
+      ctx.moveTo(0, 0); ctx.lineTo(d1x, 0);
+      ctx.lineTo(d1x + W * 0.08, H); ctx.lineTo(0, H);
+      ctx.closePath();
+      ctx.fillStyle = c5[0]; ctx.fill();
+
+      // Region 1: left-center
+      ctx.beginPath();
+      ctx.moveTo(d1x, 0); ctx.lineTo(d2x, 0);
+      ctx.lineTo(d2x + W * 0.05, H); ctx.lineTo(d1x + W * 0.08, H);
+      ctx.closePath();
+      ctx.fillStyle = c5[1]; ctx.fill();
+
+      // Region 2: center (larger)
+      ctx.beginPath();
+      ctx.moveTo(d2x, 0); ctx.lineTo(d3x, 0);
+      ctx.lineTo(d3x - W * 0.03, H); ctx.lineTo(d2x + W * 0.05, H);
+      ctx.closePath();
+      ctx.fillStyle = c5[2]; ctx.fill();
+
+      // Region 3: upper right
+      ctx.beginPath();
+      ctx.moveTo(d3x, 0); ctx.lineTo(W, 0);
+      ctx.lineTo(W, hY); ctx.lineTo(d3x - W * 0.01, hY);
+      ctx.closePath();
+      ctx.fillStyle = c5[3]; ctx.fill();
+
+      // Region 4: lower right
+      ctx.beginPath();
+      ctx.moveTo(d3x - W * 0.01, hY); ctx.lineTo(W, hY);
+      ctx.lineTo(W, H); ctx.lineTo(d3x - W * 0.03, H);
+      ctx.closePath();
+      ctx.fillStyle = c5[4]; ctx.fill();
+
+      // Stroke divider lines
       const dividers = [
-        { x1: W * 0.15, y1: 0,     x2: W * 0.55, y2: H },        // top→bottom, slight angle
-        { x1: 0,        y1: H*0.3,  x2: W,        y2: H * 0.65 }, // left→right, gentle slope
-        { x1: W * 0.40, y1: 0,     x2: W * 0.85, y2: H },        // top→bottom, steeper
-        { x1: 0,        y1: H*0.7,  x2: W * 0.70, y2: 0 },       // left→top, crossing back
+        { x1: d1x, y1: 0, x2: d1x + W * 0.08, y2: H },
+        { x1: d2x, y1: 0, x2: d2x + W * 0.05, y2: H },
+        { x1: d3x, y1: 0, x2: d3x - W * 0.03, y2: H },
+        { x1: d3x - W * 0.01, y1: hY, x2: W, y2: hY },
       ];
-
-      // Build polygon regions by using the divider lines as boundaries.
-      // Approximate approach: fill vertical slices colored by which "side"
-      // of each line they fall on, creating a region map.
-      // Simpler and more reliable: use the lines to clip triangular/quad regions.
-
-      // Fill base color
-      ctx.fillStyle = pick(0);
-      ctx.fillRect(0, 0, W, H);
-
-      // Region 1: above line 0 and left of line 2
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(dividers[0].x1, 0);
-      ctx.lineTo(dividers[0].x2, H);
-      ctx.lineTo(0, H);
-      ctx.closePath();
-      ctx.fillStyle = pick(1);
-      ctx.fill();
-      ctx.restore();
-
-      // Region 2: between lines 0 and 2
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(dividers[0].x1, 0);
-      ctx.lineTo(dividers[2].x1, 0);
-      ctx.lineTo(dividers[2].x2, H);
-      ctx.lineTo(dividers[0].x2, H);
-      ctx.closePath();
-      ctx.fillStyle = pick(2);
-      ctx.fill();
-      ctx.restore();
-
-      // Region 3: right of line 2
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(dividers[2].x1, 0);
-      ctx.lineTo(W, 0);
-      ctx.lineTo(W, H);
-      ctx.lineTo(dividers[2].x2, H);
-      ctx.closePath();
-      ctx.fillStyle = pick(3);
-      ctx.fill();
-      ctx.restore();
-
-      // Region 4: clip by horizontal line 1 — upper portion gets an overlay
-      ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(W, 0);
-      ctx.lineTo(dividers[1].x2, dividers[1].y2);
-      ctx.lineTo(dividers[1].x1, dividers[1].y1);
-      ctx.closePath();
-      ctx.fillStyle = pick(4) + '60'; // semi-transparent overlay
-      ctx.fill();
-      ctx.restore();
-
-      // Stroke all 4 divider lines
       for (const d of dividers) {
         const p = new Path2D();
         p.moveTo(d.x1, d.y1);
