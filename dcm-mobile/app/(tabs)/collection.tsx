@@ -47,7 +47,6 @@ export default function CollectionScreen() {
           ebay_price_median, dcm_price_estimate, created_at
         `)
         .eq('user_id', session.user.id)
-        .not('conversational_whole_grade', 'is', null)
         .order('created_at', { ascending: false })
         .limit(1000)
 
@@ -115,7 +114,13 @@ export default function CollectionScreen() {
             {price ? <Text style={styles.listPrice}>${price.toFixed(2)}</Text> : null}
           </View>
         </View>
-        <GradeBadge grade={item.conversational_whole_grade} size="sm" />
+        {item.conversational_whole_grade != null ? (
+          <GradeBadge grade={item.conversational_whole_grade} size="sm" />
+        ) : (
+          <View style={styles.pendingBadge}>
+            <Text style={styles.pendingText}>Grading...</Text>
+          </View>
+        )}
       </TouchableOpacity>
     )
   }
@@ -241,6 +246,8 @@ const styles = StyleSheet.create({
   listMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 },
   listCategory: { fontSize: 11, color: Colors.purple[600], fontWeight: '500' },
   listCondition: { fontSize: 10, color: Colors.purple[600], fontWeight: '500' },
+  pendingBadge: { backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[500], borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 },
+  pendingText: { fontSize: 10, fontWeight: '600', color: Colors.amber[600] },
   listPrice: { fontSize: 11, color: Colors.green[600], fontWeight: '600' },
 
   // Grid view

@@ -67,6 +67,20 @@ export default function ProcessingScreen() {
   const [pollCount, setPollCount] = useState(0)
   const [gradingError, setGradingError] = useState(false)
 
+  // Trigger grading API (fire-and-forget — don't await)
+  useEffect(() => {
+    if (!params.cardId || !params.category) return
+    const endpoint = CATEGORY_ROUTES[params.category] || 'other'
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+    const url = `${API_BASE}/api/${endpoint}/${params.cardId}`
+    console.log('[Processing] Triggering grading API:', url)
+    fetch(url).then(r => {
+      console.log('[Processing] Grading API response:', r.status)
+    }).catch(err => {
+      console.warn('[Processing] Grading API error (will poll anyway):', err.message)
+    })
+  }, [params.cardId, params.category])
+
   // Poll for grading completion
   useEffect(() => {
     if (!params.cardId || isComplete) return

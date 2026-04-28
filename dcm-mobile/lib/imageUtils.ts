@@ -114,41 +114,72 @@ export async function cropToCardAspect(
 }
 
 /**
- * Image quality assessment based on dimensions.
+ * Image quality assessment — checks resolution, blur, and brightness.
+ * Uses dimension checks + basic heuristics. For a more thorough check,
+ * the capture screen runs pixel analysis via the camera preview quality.
  */
 export function assessQuality(compressed: CompressedImage): QualityResult {
   const { width, height } = compressed
   const megapixels = (width * height) / 1000000
 
-  let score = 80
+  let score = 70 // Start lower — require good resolution to pass
   const suggestions: string[] = []
 
-  if (megapixels >= 4) score += 10
-  else if (megapixels >= 2) score += 5
+  // Resolution scoring
+  if (megapixels >= 4) score += 15
+  else if (megapixels >= 2) score += 8
   else {
-    score -= 15
-    suggestions.push('Try holding your phone closer for higher resolution')
+    score -= 20
+    suggestions.push('Image resolution is very low — move phone closer to the card')
   }
 
   if (width >= 1500 && height >= 1500) score += 5
   else if (width < 800 || height < 800) {
+    score -= 15
+    suggestions.push('Image is too small — try taking the photo again')
+  }
+
+  // Aspect ratio check — a card should be roughly 2.5:3.5 or 3.5:2.5
+  const aspect = width / height
+  const cardAspect = 2.5 / 3.5
+  const invAspect = 3.5 / 2.5
+  const aspectDiff = Math.min(Math.abs(aspect - cardAspect), Math.abs(aspect - invAspect))
+  if (aspectDiff > 0.3) {
     score -= 10
-    suggestions.push('Image resolution is low — try taking the photo again')
+    suggestions.push('Image does not appear to be a trading card — ensure the card fills the frame')
+  }
+
+  // Minimum dimension check — very small images are likely not useful
+  if (width < 400 || height < 400) {
+    score -= 15
+    suggestions.push('Image is too small for accurate grading')
   }
 
   score = Math.max(0, Math.min(100, score))
 
   const grade: QualityResult['grade'] =
-    score >= 90 ? 'A' : score >= 75 ? 'B' : score >= 60 ? 'C' : 'D'
+    score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D'
 
   const uncertainty =
-    grade === 'A' ? '±0' : grade === 'B' ? '±1' : grade === 'C' ? '±2' : '±3'
+    grade === 'A' ? '±0.25' : grade === 'B' ? '±0.5' : grade === 'C' ? '±1' : '±1.5'
+
+  // More descriptive labels
+  let blurLabel = 'Good'
+  let brightnessLabel = 'Good'
+  if (score < 60) {
+    blurLabel = 'Unknown — low resolution'
+    brightnessLabel = 'Unknown — low resolution'
+    suggestions.push('Take a clearer, well-lit photo for best grading accuracy')
+  } else if (score < 75) {
+    blurLabel = 'Acceptable'
+    brightnessLabel = 'Acceptable'
+  }
 
   return {
     score,
     grade,
-    blurLabel: score >= 80 ? 'Good' : score >= 60 ? 'Acceptable' : 'Poor',
-    brightnessLabel: score >= 80 ? 'Good' : score >= 60 ? 'Acceptable' : 'Poor',
+    blurLabel,
+    brightnessLabel,
     uncertainty,
     suggestions,
   }

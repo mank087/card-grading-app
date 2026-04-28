@@ -162,29 +162,7 @@ export default function ReviewScreen() {
       }
       refreshCredits()
 
-      // Trigger grading API
-      // The grading endpoints are GET requests that start the AI grading process
-      const endpoint = API_ENDPOINTS[category] || '/api/other'
-      const gradingUrl = `${API_BASE}${endpoint}/${cardId}`
-      console.log('[Upload] Triggering grading:', gradingUrl)
-
-      try {
-        const gradingResponse = await fetch(gradingUrl, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        })
-        console.log('[Upload] Grading trigger response:', gradingResponse.status)
-        if (!gradingResponse.ok) {
-          const errorText = await gradingResponse.text()
-          console.warn('[Upload] Grading trigger returned non-200:', errorText.substring(0, 200))
-        }
-      } catch (err) {
-        console.warn('[Upload] Grading trigger error (will retry via web):', err)
-      }
-
-      // Navigate to processing screen
+      // Navigate to processing screen IMMEDIATELY — don't wait for grading
       router.replace({
         pathname: '/grade/processing',
         params: { cardId, category, frontUri: params.frontUri },
