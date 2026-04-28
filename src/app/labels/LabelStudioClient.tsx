@@ -597,17 +597,26 @@ function LabelGallery({
   const backLabelProps = useMemo(() => {
     if (!selectedCard || !slabData) return undefined
     const grade = selectedCard.conversational_whole_grade ?? selectedCard.dcm_grade_whole ?? null
-    const subScores = selectedCard.conversational_weighted_sub_scores || selectedCard.conversational_sub_scores
+    const ws = selectedCard.conversational_weighted_sub_scores || {}
+    const sr = selectedCard.conversational_sub_scores || {}
+    const ext = (key: string): number => {
+      const v = ws[key]; if (typeof v === 'number') return v;
+      if (v && typeof v === 'object' && typeof v.weighted === 'number') return v.weighted;
+      const s = sr[key]; if (typeof s === 'number') return s;
+      if (s && typeof s === 'object' && typeof s.weighted === 'number') return s.weighted;
+      return 0;
+    }
+    const hasSub = ws.centering !== undefined || sr.centering !== undefined
     return {
       serial: selectedCard.serial || '',
       grade,
       condition: selectedCard.conversational_condition_label || '',
       qrCodeUrl: `https://dcmgrading.com/verify/${selectedCard.serial}`,
-      subScores: subScores ? {
-        centering: subScores.centering ?? 0,
-        corners: subScores.corners ?? 0,
-        edges: subScores.edges ?? 0,
-        surface: subScores.surface ?? 0,
+      subScores: hasSub ? {
+        centering: ext('centering'),
+        corners: ext('corners'),
+        edges: ext('edges'),
+        surface: ext('surface'),
       } : undefined,
       isAlteredAuthentic: false,
       showFounderEmblem,
@@ -2409,7 +2418,19 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
 
       if (cancelled) return
 
-      const subScores = selectedCard.conversational_weighted_sub_scores || selectedCard.conversational_sub_scores
+      const weightedScores = selectedCard.conversational_weighted_sub_scores || {}
+      const subScoresRaw = selectedCard.conversational_sub_scores || {}
+      // Extract numeric value from either flat number or nested { weighted: number } format
+      const extractScore = (key: string): number => {
+        const ws = weightedScores[key]
+        if (typeof ws === 'number') return ws
+        if (ws && typeof ws === 'object' && typeof ws.weighted === 'number') return ws.weighted
+        const sr = subScoresRaw[key]
+        if (typeof sr === 'number') return sr
+        if (sr && typeof sr === 'object' && typeof sr.weighted === 'number') return sr.weighted
+        return 0
+      }
+      const hasSubScores = weightedScores.centering !== undefined || subScoresRaw.centering !== undefined
 
       const data: SlabLabelData = {
         primaryName: labelData.primaryName,
@@ -2423,11 +2444,11 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         isAlteredAuthentic: labelData.isAlteredAuthentic,
         englishName: (labelData as any).englishName,
         qrCodeDataUrl,
-        subScores: subScores ? {
-          centering: subScores.centering ?? 0,
-          corners: subScores.corners ?? 0,
-          edges: subScores.edges ?? 0,
-          surface: subScores.surface ?? 0,
+        subScores: hasSubScores ? {
+          centering: extractScore('centering'),
+          corners: extractScore('corners'),
+          edges: extractScore('edges'),
+          surface: extractScore('surface'),
         } : undefined,
         showFounderEmblem,
         showVipEmblem,
