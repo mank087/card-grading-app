@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, TextInput,
-  ActivityIndicator, Dimensions, FlatList, Alert,
+  ActivityIndicator, Dimensions, FlatList, Alert, Share,
 } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
@@ -82,6 +85,17 @@ export default function LabelStudioScreen() {
   const [labelPreviewUrl, setLabelPreviewUrl] = useState<string | null>(null)
   const [side, setSide] = useState<'front' | 'back'>('front')
 
+  // Editable text fields
+  const [labelName, setLabelName] = useState('')
+  const [labelSet, setLabelSet] = useState('')
+  const [labelNumber, setLabelNumber] = useState('')
+  const [labelYear, setLabelYear] = useState('')
+  const [labelFeatures, setLabelFeatures] = useState('')
+  const [fieldsInitialized, setFieldsInitialized] = useState<string | null>(null)
+
+  // Saved styles
+  const [savedStyles, setSavedStyles] = useState<{ id: string; name: string; config: DesignerConfig }[]>([])
+
   // Color picker modal
   const [pickerVisible, setPickerVisible] = useState(false)
   const [pickerSlot, setPickerSlot] = useState<number>(0)
@@ -106,6 +120,25 @@ export default function LabelStudioScreen() {
 
   useEffect(() => { fetchCards() }, [fetchCards])
 
+  // Load saved styles from AsyncStorage
+  useEffect(() => {
+    AsyncStorage.getItem('dcm_saved_label_styles').then(raw => {
+      if (raw) try { setSavedStyles(JSON.parse(raw)) } catch {}
+    })
+  }, [])
+
+  // Initialize text fields when card changes
+  useEffect(() => {
+    if (!selectedCard || fieldsInitialized === selectedCard.id) return
+    const ci = selectedCard.conversational_card_info
+    setLabelName(selectedCard.card_name || ci?.card_name || selectedCard.featured || '')
+    setLabelSet(selectedCard.card_set || ci?.set_name || '')
+    setLabelNumber(selectedCard.card_number || ci?.card_number || '')
+    setLabelYear(selectedCard.release_date || ci?.year || '')
+    setLabelFeatures('')
+    setFieldsInitialized(selectedCard.id)
+  }, [selectedCard, fieldsInitialized])
+
   // Load card image when selected
   useEffect(() => {
     if (!selectedCard?.front_path) { setFrontUrl(null); return }
@@ -128,22 +161,18 @@ export default function LabelStudioScreen() {
   // Build label data for renderer
   const labelCardData = useMemo<LabelCardData | null>(() => {
     if (!selectedCard) return null
-    const ci = selectedCard.conversational_card_info
     const grade = selectedCard.conversational_whole_grade
-    const name = selectedCard.card_name || ci?.card_name || selectedCard.featured || 'Card'
-    const set = selectedCard.card_set || ci?.set_name || ''
-    const year = selectedCard.release_date || ci?.year || ''
-    const num = selectedCard.card_number || ci?.card_number || ''
-    const contextParts = [set, year, num].filter(Boolean)
+    const name = labelName || 'Card'
+    const contextParts = [labelSet, labelYear, labelNumber].filter(Boolean)
     return {
       primaryName: name,
       contextLine: contextParts.join(' • '),
-      featuresLine: '',
+      featuresLine: labelFeatures || '',
       serial: selectedCard.serial || '',
       grade: grade,
       condition: selectedCard.conversational_condition_label || '',
     }
-  }, [selectedCard])
+  }, [selectedCard, labelName, labelSet, labelYear, labelNumber, labelFeatures])
 
   const labelConfig = useMemo<LabelConfig>(() => ({
     width: 2.8,
@@ -259,6 +288,45 @@ export default function LabelStudioScreen() {
     })
     setPickerVisible(false)
   }, [config, pickerSlot, customColorCount, updateConfig])
+
+  // ---- Saved styles ----
+  const saveStyle = useCallback(async () => {
+    const id = `custom-${Date.now()}`
+    const name = `Style ${savedStyles.length + 1}`
+    const updated = [...savedStyles, { id, name, config: { ...config } }].slice(-4)
+    setSavedStyles(updated)
+    await AsyncStorage.setItem('dcm_saved_label_styles', JSON.stringify(updated))
+    Alert.alert('Saved', `"${name}" has been saved.`)
+  }, [config, savedStyles])
+
+  const deleteStyle = useCallback(async (id: string) => {
+    const updated = savedStyles.filter(s => s.id !== id)
+    setSavedStyles(updated)
+    await AsyncStorage.setItem('dcm_saved_label_styles', JSON.stringify(updated))
+  }, [savedStyles])
+
+  const loadStyle = useCallback((styleConfig: DesignerConfig) => {
+    setConfig(styleConfig)
+    setActiveCardColorStyle(null)
+  }, [])
+
+  // ---- Download/Share ----
+  const handleShare = useCallback(async () => {
+    if (!labelPreviewUrl) return
+    try {
+      const base64 = labelPreviewUrl.split(',')[1]
+      if (!base64) return
+      const fileUri = FileSystem.cacheDirectory + `dcm-label-${Date.now()}.png`
+      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 })
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Share Label' })
+      } else {
+        Alert.alert('Sharing not available on this device')
+      }
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to share label')
+    }
+  }, [labelPreviewUrl])
 
   // ---- Filter cards ----
   const filtered = useMemo(() => {
@@ -673,32 +741,115 @@ export default function LabelStudioScreen() {
                 <Text style={s.checkboxLabel}>Enable border</Text>
               </TouchableOpacity>
               {config.borderEnabled && (
-                <View style={s.borderControls}>
-                  <TouchableOpacity
-                    style={[s.borderColorSwatch, { backgroundColor: config.borderColor }]}
-                    onPress={() => {
-                      setPickerSlot(-1)
-                      setPickerCurrentColor(config.borderColor)
-                      setPickerVisible(true)
-                    }}
-                  />
-                  <Text style={s.borderLabel}>Border color</Text>
+                <View style={{ gap: 10, marginTop: 10 }}>
+                  <View style={s.borderControls}>
+                    <TouchableOpacity
+                      style={[s.borderColorSwatch, { backgroundColor: config.borderColor }]}
+                      onPress={() => {
+                        setPickerSlot(-1)
+                        setPickerCurrentColor(config.borderColor)
+                        setPickerVisible(true)
+                      }}
+                    />
+                    <Text style={s.borderLabel}>Color</Text>
+                  </View>
+                  <View style={s.borderControls}>
+                    <Text style={[s.borderLabel, { width: 50 }]}>Width</Text>
+                    <View style={{ flexDirection: 'row', gap: 4 }}>
+                      {[0.02, 0.03, 0.04, 0.06, 0.08].map(w => (
+                        <TouchableOpacity
+                          key={w}
+                          style={[s.dirBtn, config.borderWidth === w && s.dirBtnActive]}
+                          onPress={() => updateConfig({ borderWidth: w })}
+                        >
+                          <Text style={[s.dirBtnText, config.borderWidth === w && s.dirBtnTextActive]}>
+                            {w}"
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
                 </View>
               )}
             </View>
 
-            {/* ============ Download ============ */}
+            {/* ============ Label Text ============ */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Label Text</Text>
+              <View style={{ gap: 8 }}>
+                <View>
+                  <Text style={s.fieldLabel}>Card Name</Text>
+                  <TextInput style={s.fieldInput} value={labelName} onChangeText={setLabelName} placeholder="Card name" placeholderTextColor={Colors.gray[400]} />
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.fieldLabel}>Set</Text>
+                    <TextInput style={s.fieldInput} value={labelSet} onChangeText={setLabelSet} placeholder="Set name" placeholderTextColor={Colors.gray[400]} />
+                  </View>
+                  <View style={{ flex: 0.5 }}>
+                    <Text style={s.fieldLabel}>Year</Text>
+                    <TextInput style={s.fieldInput} value={labelYear} onChangeText={setLabelYear} placeholder="Year" placeholderTextColor={Colors.gray[400]} />
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                  <View style={{ flex: 0.5 }}>
+                    <Text style={s.fieldLabel}>Card #</Text>
+                    <TextInput style={s.fieldInput} value={labelNumber} onChangeText={setLabelNumber} placeholder="#" placeholderTextColor={Colors.gray[400]} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.fieldLabel}>Features</Text>
+                    <TextInput style={s.fieldInput} value={labelFeatures} onChangeText={setLabelFeatures} placeholder="RC, Holo, etc." placeholderTextColor={Colors.gray[400]} />
+                  </View>
+                </View>
+              </View>
+            </View>
+
+            {/* ============ Download / Share ============ */}
             <View style={s.section}>
               <TouchableOpacity
                 style={s.downloadBtn}
-                onPress={() => {
-                  Alert.alert('Coming Soon', 'Label download and sharing will be available in the next update.')
-                }}
+                onPress={handleShare}
+                disabled={!labelPreviewUrl}
                 activeOpacity={0.7}
               >
-                <Ionicons name="download-outline" size={20} color="#fff" />
-                <Text style={s.downloadBtnText}>Download Label</Text>
+                <Ionicons name="share-outline" size={20} color="#fff" />
+                <Text style={s.downloadBtnText}>Share Label</Text>
               </TouchableOpacity>
+            </View>
+
+            {/* ============ Saved Styles ============ */}
+            <View style={s.section}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <Text style={s.sectionTitle}>Saved Styles</Text>
+                <TouchableOpacity
+                  onPress={saveStyle}
+                  style={{ backgroundColor: Colors.purple[600], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                >
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Save Current</Text>
+                </TouchableOpacity>
+              </View>
+              {savedStyles.length === 0 && (
+                <Text style={{ color: Colors.gray[400], fontSize: 12 }}>No saved styles yet. Save your current design to reuse later.</Text>
+              )}
+              {savedStyles.map((style) => (
+                <View key={style.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.gray[100] }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <LinearGradient
+                      colors={[style.config.gradientStart, style.config.gradientEnd]}
+                      style={{ width: 28, height: 28, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200] }}
+                    />
+                    <Text style={{ fontSize: 13, color: Colors.gray[700], fontWeight: '500' }}>{style.name}</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <TouchableOpacity onPress={() => loadStyle(style.config)}>
+                      <Text style={{ fontSize: 12, color: Colors.purple[600], fontWeight: '600' }}>Apply</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => deleteStyle(style.id)}>
+                      <Ionicons name="trash-outline" size={16} color={Colors.red[500]} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ))}
             </View>
           </>
         )}
@@ -915,6 +1066,10 @@ const s = StyleSheet.create({
   dirBtnActive: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[50] },
   dirBtnText: { fontSize: 11, color: Colors.gray[400] },
   dirBtnTextActive: { color: Colors.purple[700], fontWeight: '600' as const },
+
+  // Text fields
+  fieldLabel: { fontSize: 10, fontWeight: '600' as const, color: Colors.gray[500], marginBottom: 2 },
+  fieldInput: { backgroundColor: Colors.gray[50], borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 6, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, color: Colors.gray[900] },
 
   // Download
   downloadBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.purple[600], borderRadius: 10, paddingVertical: 14 },
