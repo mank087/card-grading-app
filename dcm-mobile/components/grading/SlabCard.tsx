@@ -65,18 +65,41 @@ export default function SlabCard({
           style={[styles.label, { height: labelHeight }]}
         >
           {isBack ? (
-            /* Back label — grade center + sub-scores right */
+            /* Back label — QR left + grade center + sub-scores right */
             <View style={styles.backLabelContent}>
+              {/* QR code placeholder */}
+              <View style={styles.backQrBox}>
+                <View style={styles.qrPattern}>
+                  {[0,1,2,3,4,5,6].map(r => (
+                    <View key={r} style={{ flexDirection: 'row' }}>
+                      {[0,1,2,3,4,5,6].map(c => (
+                        <View key={c} style={{
+                          width: size === 'sm' ? 3 : size === 'md' ? 4 : 5,
+                          height: size === 'sm' ? 3 : size === 'md' ? 4 : 5,
+                          backgroundColor: ((r < 3 && c < 3) || (r < 3 && c > 3) || (r > 3 && c < 3) || (r === 3 && c === 3)) ? '#000' : '#fff',
+                        }} />
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              </View>
+              {/* Grade + condition */}
               <View style={styles.backGradeSection}>
                 <Text style={[styles.backGradeText, { fontSize: 28 * fontSize }]}>{gradeText}</Text>
                 <Text style={[styles.backConditionText, { fontSize: 8 * fontSize }]}>{conditionText}</Text>
               </View>
+              {/* Sub-scores */}
               {subScores && (
                 <View style={styles.backSubScores}>
-                  <Text style={styles.subScoreText}>C: {subScores.centering}</Text>
-                  <Text style={styles.subScoreText}>Co: {subScores.corners}</Text>
-                  <Text style={styles.subScoreText}>E: {subScores.edges}</Text>
-                  <Text style={styles.subScoreText}>S: {subScores.surface}</Text>
+                  {[
+                    ['C', subScores.centering],
+                    ['Co', subScores.corners],
+                    ['E', subScores.edges],
+                    ['S', subScores.surface],
+                  ].map(([label, val]) => {
+                    const v = typeof val === 'number' ? Math.round(val) : (val && typeof val === 'object' && (val as any).weighted != null ? Math.round((val as any).weighted) : null)
+                    return v != null ? <Text key={label as string} style={styles.subScoreText}>{label}: {v}</Text> : null
+                  })}
                 </View>
               )}
             </View>
@@ -209,7 +232,9 @@ const styles = StyleSheet.create({
     flex: 1,
     gap: 16,
   },
-  backGradeSection: { alignItems: 'center' },
+  backQrBox: { backgroundColor: '#fff', borderRadius: 4, padding: 3, justifyContent: 'center' as const, alignItems: 'center' as const },
+  qrPattern: { gap: 0 },
+  backGradeSection: { alignItems: 'center' as const, flex: 1 },
   backGradeText: { color: Colors.white, fontWeight: '800' },
   backConditionText: { color: 'rgba(255,255,255,0.8)', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 2 },
   backSubScores: { gap: 2 },

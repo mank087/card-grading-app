@@ -226,14 +226,29 @@ export default function CardDetailScreen() {
           <InfoRow label="Category" value={card.category} />
           {card.sub_category && <InfoRow label="Sub-Category" value={card.sub_category} />}
           <InfoRow label="Manufacturer" value={ci?.manufacturer} />
-          {ci?.rarity_or_variant && <InfoRow label="Rarity" value={ci.rarity_or_variant} />}
+          {ci?.rarity_tier && <InfoRow label="Rarity" value={ci.rarity_tier} />}
+          {ci?.rarity_or_variant && !ci?.rarity_tier && <InfoRow label="Rarity" value={ci.rarity_or_variant} />}
+          {ci?.player_or_character && <InfoRow label="Character" value={ci.player_or_character} />}
           {card.rookie_card && <InfoRow label="Rookie Card" value="Yes" />}
           {card.autographed && <InfoRow label="Autograph" value={card.autograph_type || 'Yes'} />}
-          {card.memorabilia_type && <InfoRow label="Memorabilia" value={card.memorabilia_type} />}
+          {card.memorabilia_type && card.memorabilia_type !== 'none' && <InfoRow label="Memorabilia" value={card.memorabilia_type} />}
           {card.serial_numbering && <InfoRow label="Serial Numbering" value={card.serial_numbering} />}
           {card.is_foil && <InfoRow label="Foil" value={card.foil_type || 'Yes'} />}
           {card.slab_company && <InfoRow label="Slab Company" value={card.slab_company} />}
           {card.slab_grade && <InfoRow label="Slab Grade" value={card.slab_grade} />}
+          {/* Edit button */}
+          {isOwner && (
+            <TouchableOpacity
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.purple[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], alignSelf: 'flex-start' }}
+              onPress={() => {
+                const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
+                router.push({ pathname: '/pages/label-studio' as any, params: { cardId: card.id } })
+              }}
+            >
+              <Ionicons name="create-outline" size={14} color={Colors.purple[600]} />
+              <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.purple[600] }}>Edit Card Info</Text>
+            </TouchableOpacity>
+          )}
         </CollapsibleSection>
 
         {/* ══════ 2. CENTERING ANALYSIS ══════ */}
