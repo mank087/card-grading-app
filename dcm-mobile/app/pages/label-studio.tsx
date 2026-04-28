@@ -365,6 +365,7 @@ export default function LabelStudioScreen() {
         currentColor={pickerCurrentColor}
         onSelectColor={handlePickerSelect}
         onClose={() => setPickerVisible(false)}
+        cardImageUrl={frontUrl}
       />
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
