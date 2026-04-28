@@ -46,9 +46,35 @@ export default function CardDetailScreen() {
   if (isLoading) return <View style={s.loading}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
   if (!card) return <View style={s.loading}><Text style={{ color: Colors.gray[500] }}>Card not found</Text></View>
 
-  const sub = card.conversational_weighted_sub_scores
+  const subRaw = card.conversational_weighted_sub_scores || card.conversational_sub_scores
   const ci = card.conversational_card_info
   const cen = card.conversational_centering
+
+  // Extract numeric score from either flat number or nested { weighted: N } format
+  const extractScore = (obj: any, key: string): number | null => {
+    if (!obj) return null
+    const v = obj[key]
+    if (typeof v === 'number') return v
+    if (v && typeof v === 'object') {
+      if (typeof v.weighted === 'number') return v.weighted
+      if (typeof v.raw === 'number') return v.raw
+    }
+    // Try conversational_sub_scores as fallback
+    const sr = card.conversational_sub_scores
+    if (sr) {
+      const sv = sr[key]
+      if (typeof sv === 'number') return sv
+      if (sv && typeof sv === 'object' && typeof sv.weighted === 'number') return sv.weighted
+    }
+    return null
+  }
+
+  const sub = subRaw ? {
+    centering: extractScore(subRaw, 'centering'),
+    corners: extractScore(subRaw, 'corners'),
+    edges: extractScore(subRaw, 'edges'),
+    surface: extractScore(subRaw, 'surface'),
+  } : null
   const grade = card.conversational_whole_grade
   const lf = card.conversational_limiting_factor?.toLowerCase()
   const isOwner = session?.user?.id === card.user_id
@@ -114,19 +140,22 @@ export default function CardDetailScreen() {
       </View>
 
       {/* 4 Subgrade Boxes */}
-      {sub && (
+      {sub && (sub.centering != null || sub.corners != null) && (
         <View style={s.subgradeGrid}>
           {[
             { label: 'Centering', icon: '🎯', score: sub.centering },
             { label: 'Corners', icon: '📐', score: sub.corners },
             { label: 'Edges', icon: '📏', score: sub.edges },
             { label: 'Surface', icon: '✨', score: sub.surface },
-          ].map(sg => (
-            <View key={sg.label} style={s.subBox}>
-              <Text style={[s.subBoxScore, { color: (sg.score ?? 0) >= 9 ? Colors.green[600] : (sg.score ?? 0) >= 7 ? Colors.blue[600] : Colors.amber[600] }]}>{sg.score ?? 'N/A'}</Text>
-              <Text style={s.subBoxLabel}>{sg.icon} {sg.label}</Text>
-            </View>
-          ))}
+          ].map(sg => {
+            const val = sg.score != null ? Math.round(sg.score) : null
+            return (
+              <View key={sg.label} style={s.subBox}>
+                <Text style={[s.subBoxScore, { color: (val ?? 0) >= 9 ? Colors.green[600] : (val ?? 0) >= 7 ? Colors.blue[600] : Colors.amber[600] }]}>{val ?? 'N/A'}</Text>
+                <Text style={s.subBoxLabel}>{sg.icon} {sg.label}</Text>
+              </View>
+            )
+          })}
         </View>
       )}
 
@@ -168,8 +197,12 @@ export default function CardDetailScreen() {
           <Text style={s.shareBtnText}>Copy Link</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.shareBtn} onPress={() => {
-          Alert.alert('Labels', 'Choose an option:', [
-            { text: 'Open in Label Studio', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id } } as any) },
+          Alert.alert('Labels & Downloads', 'Choose an option:', [
+            { text: 'Open Label Studio', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id } } as any) },
+            { text: 'Download Slab Label (Modern)', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'slab-modern' } } as any) },
+            { text: 'Download Slab Label (Traditional)', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'slab-traditional' } } as any) },
+            { text: 'Download One-Touch Label', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'onetouch' } } as any) },
+            { text: 'Download Toploader Labels', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'toploader' } } as any) },
             { text: 'Cancel', style: 'cancel' },
           ])
         }}>
@@ -200,27 +233,44 @@ export default function CardDetailScreen() {
         </CollapsibleSection>
 
         {/* ══════ 2. CENTERING ANALYSIS ══════ */}
-        <CollapsibleSection title={`Centering Analysis${sub?.centering ? `  ${sub.centering}/10` : ''}`} icon="resize">
+        <CollapsibleSection title={`Centering Analysis${sub?.centering != null ? `  ${Math.round(sub.centering)}/10` : ''}`} icon="resize">
           {cen ? (
-            <View style={s.centeringGrid}>
-              <View style={s.centeringHalf}>
-                <Text style={s.centeringSide}>Front</Text>
-                <Text style={s.centeringScore}>{sub?.centering ?? 'N/A'}</Text>
-                <InfoRow label="L/R" value={cen.front_left_right || cen.front_lr || 'N/A'} />
-                <InfoRow label="T/B" value={cen.front_top_bottom || cen.front_tb || 'N/A'} />
-                {cen.front_quality_tier && <Text style={s.centeringTier}>{cen.front_quality_tier}</Text>}
-                {(cen.front_analysis || cen.front_notes) && <Text style={s.analysisText}>{cen.front_analysis || cen.front_notes}</Text>}
+            <>
+              {/* Card images for centering reference */}
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+                {frontUrl && (
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.centeringSide, { marginBottom: 4 }]}>Front</Text>
+                    <Image source={{ uri: frontUrl }} style={{ width: '100%', aspectRatio: 2.5/3.5, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200] }} resizeMode="contain" />
+                  </View>
+                )}
+                {backUrl && (
+                  <View style={{ flex: 1 }}>
+                    <Text style={[s.centeringSide, { marginBottom: 4 }]}>Back</Text>
+                    <Image source={{ uri: backUrl }} style={{ width: '100%', aspectRatio: 2.5/3.5, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200] }} resizeMode="contain" />
+                  </View>
+                )}
               </View>
-              <View style={s.centeringDivider} />
-              <View style={s.centeringHalf}>
-                <Text style={s.centeringSide}>Back</Text>
-                <Text style={s.centeringScore}>{sub?.centering ?? 'N/A'}</Text>
-                <InfoRow label="L/R" value={cen.back_left_right || cen.back_lr || 'N/A'} />
-                <InfoRow label="T/B" value={cen.back_top_bottom || cen.back_tb || 'N/A'} />
-                {cen.back_quality_tier && <Text style={s.centeringTier}>{cen.back_quality_tier}</Text>}
-                {(cen.back_analysis || cen.back_notes) && <Text style={s.analysisText}>{cen.back_analysis || cen.back_notes}</Text>}
+              <View style={s.centeringGrid}>
+                <View style={s.centeringHalf}>
+                  <Text style={s.centeringSide}>Front</Text>
+                  <Text style={s.centeringScore}>{sub?.centering != null ? Math.round(sub.centering) : 'N/A'}</Text>
+                  <InfoRow label="L/R" value={cen.front_left_right || cen.front_lr || 'N/A'} />
+                  <InfoRow label="T/B" value={cen.front_top_bottom || cen.front_tb || 'N/A'} />
+                  {cen.front_quality_tier && <Text style={s.centeringTier}>{cen.front_quality_tier}</Text>}
+                  {(cen.front_analysis || cen.front_notes) && <Text style={s.analysisText}>{cen.front_analysis || cen.front_notes}</Text>}
+                </View>
+                <View style={s.centeringDivider} />
+                <View style={s.centeringHalf}>
+                  <Text style={s.centeringSide}>Back</Text>
+                  <Text style={s.centeringScore}>{sub?.centering != null ? Math.round(sub.centering) : 'N/A'}</Text>
+                  <InfoRow label="L/R" value={cen.back_left_right || cen.back_lr || 'N/A'} />
+                  <InfoRow label="T/B" value={cen.back_top_bottom || cen.back_tb || 'N/A'} />
+                  {cen.back_quality_tier && <Text style={s.centeringTier}>{cen.back_quality_tier}</Text>}
+                  {(cen.back_analysis || cen.back_notes) && <Text style={s.analysisText}>{cen.back_analysis || cen.back_notes}</Text>}
+                </View>
               </View>
-            </View>
+            </>
           ) : (
             <Text style={s.naText}>No centering data available</Text>
           )}
@@ -228,6 +278,25 @@ export default function CardDetailScreen() {
 
         {/* ══════ 3. CORNERS, EDGES & SURFACE ANALYSIS ══════ */}
         <CollapsibleSection title="Corners, Edges & Surface Analysis" icon="cube">
+          {/* Subgrade scores for this section */}
+          {sub && (
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+              {[
+                { label: 'Corners', score: sub.corners },
+                { label: 'Edges', score: sub.edges },
+                { label: 'Surface', score: sub.surface },
+              ].map(sg => {
+                const val = sg.score != null ? Math.round(sg.score) : null
+                return (
+                  <View key={sg.label} style={[s.subBox, { flex: 1 }]}>
+                    <Text style={[s.subBoxScore, { fontSize: 16, color: (val ?? 0) >= 9 ? Colors.green[600] : (val ?? 0) >= 7 ? Colors.blue[600] : Colors.amber[600] }]}>{val ?? 'N/A'}</Text>
+                    <Text style={[s.subBoxLabel, { fontSize: 9 }]}>{sg.label}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          )}
+
           {/* Corner Zooms */}
           {frontUrl && !card.slab_detected && (
             <>
@@ -249,6 +318,34 @@ export default function CardDetailScreen() {
               <Text style={s.analysisText}>{card.conversational_back_summary}</Text>
             </View>
           )}
+
+          {/* Corners/Edges/Surface structured details */}
+          {card.conversational_corners_edges_surface && (() => {
+            const ces = typeof card.conversational_corners_edges_surface === 'string'
+              ? JSON.parse(card.conversational_corners_edges_surface) : card.conversational_corners_edges_surface
+            return (
+              <View style={{ marginTop: 12, gap: 8 }}>
+                {ces.corners_summary && (
+                  <View style={s.analysisSummary}>
+                    <Text style={s.analysisSideLabel}>Corners</Text>
+                    <Text style={s.analysisText}>{ces.corners_summary}</Text>
+                  </View>
+                )}
+                {ces.edges_summary && (
+                  <View style={s.analysisSummary}>
+                    <Text style={s.analysisSideLabel}>Edges</Text>
+                    <Text style={s.analysisText}>{ces.edges_summary}</Text>
+                  </View>
+                )}
+                {ces.surface_summary && (
+                  <View style={s.analysisSummary}>
+                    <Text style={s.analysisSideLabel}>Surface</Text>
+                    <Text style={s.analysisText}>{ces.surface_summary}</Text>
+                  </View>
+                )}
+              </View>
+            )
+          })()}
 
           {/* Detailed defects */}
           {(card.conversational_defects_front || card.conversational_defects_back) && (
@@ -282,7 +379,6 @@ export default function CardDetailScreen() {
           {card.conversational_case_detection?.case_type === 'none' && (
             <Text style={s.rawCardNote}>Raw card — no protective case detected</Text>
           )}
-          <InfoRow label="Grade Uncertainty" value={card.conversational_grade_uncertainty || '±0'} />
           <InfoRow label="Image Quality Grade" value={confidence || 'N/A'} />
         </CollapsibleSection>
 
@@ -380,31 +476,118 @@ export default function CardDetailScreen() {
 
         {/* ══════ 8. DCM OPTIC™ REPORT ══════ */}
         <CollapsibleSection title="DCM Optic™ Report" icon="document-text">
-          <InfoRow label="DCM Optic™ Version" value={card.conversational_prompt_version || 'N/A'} />
-          <InfoRow label="Graded Date" value={card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'} />
-          <InfoRow label="Category" value={card.category} />
-          <InfoRow label="Visibility" value={card.visibility} />
-          {card.conversational_metadata?.model && (
-            <InfoRow label="AI Model" value={card.conversational_metadata.model} />
+          {/* Card Info */}
+          {ci && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={s.reportSubhead}>Card Information</Text>
+              <InfoRow label="Card Name" value={ci.card_name || cardName} />
+              <InfoRow label="Set" value={ci.set_name || setName} />
+              {ci.year && <InfoRow label="Year" value={ci.year} />}
+              {ci.manufacturer && <InfoRow label="Manufacturer" value={ci.manufacturer} />}
+              {ci.card_number && <InfoRow label="Card Number" value={ci.card_number} />}
+              {ci.player_or_character && <InfoRow label="Character" value={ci.player_or_character} />}
+              {ci.rarity_tier && <InfoRow label="Rarity" value={ci.rarity_tier} />}
+            </View>
           )}
-          {card.conversational_limiting_factor && (
-            <InfoRow label="Limiting Factor" value={card.conversational_limiting_factor} />
+
+          {/* Three-Pass Evaluation */}
+          {gradingJson?.grading_passes && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={s.reportSubhead}>Three-Pass Evaluation</Text>
+              <Text style={s.analysisText}>DCM Optic™ performs three independent evaluations of each card to ensure accuracy.</Text>
+              <View style={{ marginTop: 8, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8, overflow: 'hidden' }}>
+                {/* Header */}
+                <View style={{ flexDirection: 'row', backgroundColor: Colors.gray[100], paddingVertical: 6, paddingHorizontal: 8 }}>
+                  <Text style={{ flex: 1, fontSize: 9, fontWeight: '700', color: Colors.gray[600] }}>Pass</Text>
+                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>C</Text>
+                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>Co</Text>
+                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>E</Text>
+                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>S</Text>
+                  <Text style={{ width: 36, fontSize: 9, fontWeight: '700', color: Colors.gray[600], textAlign: 'center' }}>Final</Text>
+                </View>
+                {/* Pass rows */}
+                {[1, 2, 3].map(passNum => {
+                  const pass = gradingJson.grading_passes?.[`pass_${passNum}`] || gradingJson.grading_passes?.passes?.[passNum - 1]
+                  if (!pass) return null
+                  const sc = pass.sub_scores || pass
+                  return (
+                    <View key={passNum} style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: Colors.gray[100] }}>
+                      <Text style={{ flex: 1, fontSize: 10, color: Colors.gray[700] }}>Pass {passNum}</Text>
+                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.centering ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.corners ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.edges ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.surface ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '700' }}>{pass.final_grade ?? pass.whole_grade ?? '-'}</Text>
+                    </View>
+                  )
+                })}
+                {/* Average row */}
+                {gradingJson.grading_passes?.averaged_rounded && (
+                  <View style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: Colors.gray[200], backgroundColor: Colors.purple[50] }}>
+                    <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: Colors.gray[800] }}>Average</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.centering ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.corners ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.edges ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.surface ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '800' }}>{gradingJson.grading_passes.averaged_rounded.final ?? '-'}</Text>
+                  </View>
+                )}
+              </View>
+              {/* Consistency */}
+              {gradingJson.grading_passes?.consistency && (
+                <Text style={[s.priceNote, { marginTop: 4 }]}>Consistency: {gradingJson.grading_passes.consistency} · Variance: {gradingJson.grading_passes.variance ?? '0'}</Text>
+              )}
+              {/* Consensus notes */}
+              {gradingJson.grading_passes?.consensus_notes && (
+                <View style={{ marginTop: 6 }}>
+                  {(Array.isArray(gradingJson.grading_passes.consensus_notes)
+                    ? gradingJson.grading_passes.consensus_notes
+                    : [gradingJson.grading_passes.consensus_notes]
+                  ).map((note: string, i: number) => (
+                    <Text key={i} style={[s.analysisText, { marginTop: 2 }]}>• {note}</Text>
+                  ))}
+                </View>
+              )}
+            </View>
           )}
-          {card.conversational_preliminary_grade != null && (
-            <InfoRow label="Pre-Cap Grade" value={String(card.conversational_preliminary_grade)} />
-          )}
-          {gradingJson?.final_grade?.summary && (
-            <View style={{ marginTop: 8 }}>
-              <Text style={s.reportSubhead}>Grading Summary</Text>
-              <Text style={s.analysisText}>{gradingJson.final_grade.summary}</Text>
+
+          {/* Final Grade */}
+          {gradingJson?.final_grade && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={s.reportSubhead}>Final Grade</Text>
+              <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
+                <View style={{ alignItems: 'center' }}>
+                  <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.purple[600] }}>{gradingJson.final_grade.whole_grade ?? grade}</Text>
+                  <Text style={{ fontSize: 10, color: Colors.gray[500] }}>{gradingJson.final_grade.condition_label || card.conversational_condition_label}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  {gradingJson.final_grade.decimal_grade != null && (
+                    <InfoRow label="Decimal Grade" value={String(gradingJson.final_grade.decimal_grade)} />
+                  )}
+                  <InfoRow label="Grade Range" value={card.conversational_grade_uncertainty || '±0'} />
+                </View>
+              </View>
+              {gradingJson.final_grade.summary && (
+                <Text style={[s.analysisText, { marginTop: 8 }]}>{gradingJson.final_grade.summary}</Text>
+              )}
             </View>
           )}
           {card.conversational_final_grade_summary && !gradingJson?.final_grade?.summary && (
-            <View style={{ marginTop: 8 }}>
+            <View style={{ marginBottom: 12 }}>
               <Text style={s.reportSubhead}>Grading Summary</Text>
               <Text style={s.analysisText}>{card.conversational_final_grade_summary}</Text>
             </View>
           )}
+
+          {/* Metadata */}
+          <View style={{ marginTop: 4, borderTopWidth: 1, borderTopColor: Colors.gray[100], paddingTop: 8 }}>
+            <InfoRow label="DCM Optic™ Version" value={card.conversational_prompt_version || 'N/A'} />
+            <InfoRow label="Graded Date" value={card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'} />
+            <InfoRow label="Category" value={card.category} />
+            {card.conversational_limiting_factor && (
+              <InfoRow label="Limiting Factor" value={card.conversational_limiting_factor} />
+            )}
+          </View>
         </CollapsibleSection>
 
         {/* ══════ DELETE ══════ */}
