@@ -82,13 +82,6 @@ export default function CardDetailScreen() {
 
       {/* ══════ SLAB PREVIEW ══════ */}
       <View style={s.slabSection}>
-        <View style={s.imageToggle}>
-          {['front', 'back'].map(side => (
-            <TouchableOpacity key={side} style={[s.toggleBtn, activeImage === side && s.toggleBtnActive]} onPress={() => setActiveImage(side as any)}>
-              <Text style={[s.toggleText, activeImage === side && s.toggleTextActive]}>{side === 'front' ? 'Front' : 'Back'}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
         <View style={s.slabContainer}>
           <SlabCard
             imageUrl={activeImage === 'front' ? frontUrl : backUrl}
@@ -101,6 +94,13 @@ export default function CardDetailScreen() {
             isBack={activeImage === 'back'}
             subScores={sub}
           />
+        </View>
+        <View style={s.imageToggle}>
+          {['front', 'back'].map(side => (
+            <TouchableOpacity key={side} style={[s.toggleBtn, activeImage === side && s.toggleBtnActive]} onPress={() => setActiveImage(side as any)}>
+              <Text style={[s.toggleText, activeImage === side && s.toggleTextActive]}>{side === 'front' ? 'Front' : 'Back'}</Text>
+            </TouchableOpacity>
+          ))}
         </View>
       </View>
 
@@ -167,7 +167,12 @@ export default function CardDetailScreen() {
           <Ionicons name="copy" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Copy Link</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => router.push('/pages/label-studio' as any)}>
+        <TouchableOpacity style={s.shareBtn} onPress={() => {
+          Alert.alert('Labels', 'Choose an option:', [
+            { text: 'Open in Label Studio', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id } } as any) },
+            { text: 'Cancel', style: 'cancel' },
+          ])
+        }}>
           <Ionicons name="pricetags" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Labels</Text>
         </TouchableOpacity>
@@ -204,6 +209,7 @@ export default function CardDetailScreen() {
                 <InfoRow label="L/R" value={cen.front_left_right || cen.front_lr || 'N/A'} />
                 <InfoRow label="T/B" value={cen.front_top_bottom || cen.front_tb || 'N/A'} />
                 {cen.front_quality_tier && <Text style={s.centeringTier}>{cen.front_quality_tier}</Text>}
+                {(cen.front_analysis || cen.front_notes) && <Text style={s.analysisText}>{cen.front_analysis || cen.front_notes}</Text>}
               </View>
               <View style={s.centeringDivider} />
               <View style={s.centeringHalf}>
@@ -212,6 +218,7 @@ export default function CardDetailScreen() {
                 <InfoRow label="L/R" value={cen.back_left_right || cen.back_lr || 'N/A'} />
                 <InfoRow label="T/B" value={cen.back_top_bottom || cen.back_tb || 'N/A'} />
                 {cen.back_quality_tier && <Text style={s.centeringTier}>{cen.back_quality_tier}</Text>}
+                {(cen.back_analysis || cen.back_notes) && <Text style={s.analysisText}>{cen.back_analysis || cen.back_notes}</Text>}
               </View>
             </View>
           ) : (

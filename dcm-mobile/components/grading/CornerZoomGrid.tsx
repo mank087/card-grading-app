@@ -13,10 +13,10 @@ interface CornerZoomGridProps {
 }
 
 const corners = [
-  { label: 'Top Left', position: { top: 0, left: 0 } },
-  { label: 'Top Right', position: { top: 0, right: 0 } },
-  { label: 'Bottom Left', position: { bottom: 0, left: 0 } },
-  { label: 'Bottom Right', position: { bottom: 0, right: 0 } },
+  { label: 'Top Left', offset: { top: 0, left: 0 } },
+  { label: 'Top Right', offset: { top: 0, left: '-150%' } },
+  { label: 'Bottom Left', offset: { top: '-150%', left: 0 } },
+  { label: 'Bottom Right', offset: { top: '-150%', left: '-150%' } },
 ]
 
 export default function CornerZoomGrid({ imageUrl, side }: CornerZoomGridProps) {
@@ -30,13 +30,7 @@ export default function CornerZoomGrid({ imageUrl, side }: CornerZoomGridProps) 
               {/* Overflow hidden container shows only corner region */}
               <Image
                 source={{ uri: imageUrl }}
-                style={[
-                  styles.zoomedImage,
-                  corner.position.top !== undefined && { top: corner.position.top === 0 ? 0 : undefined },
-                  corner.position.bottom !== undefined && { bottom: corner.position.bottom === 0 ? 0 : undefined },
-                  corner.position.left !== undefined && { left: corner.position.left === 0 ? 0 : undefined },
-                  corner.position.right !== undefined && { right: corner.position.right === 0 ? 0 : undefined },
-                ]}
+                style={[styles.zoomedImage, { top: corner.offset.top, left: corner.offset.left }]}
                 resizeMode="cover"
               />
             </View>

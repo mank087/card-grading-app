@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, TextInput,
   ActivityIndicator, Dimensions, FlatList, Alert, Share,
 } from 'react-native'
+import { useLocalSearchParams } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
@@ -62,6 +63,7 @@ interface DesignerConfig {
 // ============================================================================
 
 export default function LabelStudioScreen() {
+  const params = useLocalSearchParams<{ cardId?: string }>()
   const { session } = useAuth()
   const [cards, setCards] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -119,6 +121,14 @@ export default function LabelStudioScreen() {
   }, [session])
 
   useEffect(() => { fetchCards() }, [fetchCards])
+
+  // Auto-select card if cardId param was passed
+  useEffect(() => {
+    if (params.cardId && cards.length > 0 && !selectedCard) {
+      const found = cards.find(c => c.id === params.cardId)
+      if (found) setSelectedCard(found)
+    }
+  }, [params.cardId, cards, selectedCard])
 
   // Load saved styles from AsyncStorage
   useEffect(() => {
