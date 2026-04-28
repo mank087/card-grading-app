@@ -448,53 +448,156 @@ export default function CardDetailScreen() {
         </CollapsibleSection>
 
         {/* ══════ 5. MARKET VALUE ══════ */}
-        <CollapsibleSection title={`Market Value${card.ebay_price_median || card.dcm_price_estimate ? `  ~$${(card.dcm_price_estimate || card.ebay_price_median || 0).toFixed(2)}` : ''}`} icon="trending-up">
-          {/* DCM Price Estimate */}
-          {card.dcm_price_estimate != null && (
-            <View style={s.dcmPriceCard}>
-              <Text style={s.pricingSource}>DCM Price Estimate</Text>
-              <Text style={s.dcmPrice}>${card.dcm_price_estimate.toFixed(2)}</Text>
-              {card.dcm_price_match_confidence && (
-                <Text style={s.priceNote}>Match confidence: {card.dcm_price_match_confidence}</Text>
-              )}
-              {card.dcm_price_product_name && (
-                <Text style={[s.priceNote, { marginTop: 2 }]}>Matched: {card.dcm_price_product_name}</Text>
-              )}
-              {card.dcm_price_at_grading != null && (
-                <Text style={s.priceNote}>Price at grading: ${card.dcm_price_at_grading.toFixed(2)}</Text>
-              )}
-              {card.dcm_prices_cached_at && (
-                <Text style={s.priceNote}>Updated: {new Date(card.dcm_prices_cached_at).toLocaleDateString()}</Text>
-              )}
-            </View>
-          )}
+        <CollapsibleSection title={`Market Value${card.dcm_price_estimate ? `  ~$${card.dcm_price_estimate.toFixed(2)}` : ''}`} icon="trending-up">
+          {(() => {
+            const cached = card.dcm_cached_prices
+            const prices = cached?.prices
+            const raw = prices?.raw
+            const dcmEst = cached?.estimatedValue || card.dcm_price_estimate
+            const salesVol = prices?.salesVolume
+            const matchConf = cached?.matchConfidence || card.dcm_price_match_confidence
+            const prodName = prices?.productName || card.dcm_price_product_name
 
-          {/* eBay Comparable Sales */}
-          {card.ebay_price_median != null && (
-            <View style={{ marginTop: card.dcm_price_estimate ? 16 : 0 }}>
-              <Text style={s.pricingSource}>eBay Comparable Sales</Text>
-              <View style={s.priceGrid}>
-                <PriceCell label="Lowest" value={card.ebay_price_lowest} />
-                <PriceCell label="Median" value={card.ebay_price_median} />
-                <PriceCell label="Average" value={card.ebay_price_average} />
-                <PriceCell label="Highest" value={card.ebay_price_highest} />
-              </View>
-              {card.ebay_price_listing_count != null && <Text style={s.priceNote}>{card.ebay_price_listing_count} comparable listings found</Text>}
-              {card.ebay_price_updated_at && <Text style={s.priceNote}>Updated: {new Date(card.ebay_price_updated_at).toLocaleDateString()}</Text>}
-            </View>
-          )}
+            // Build price-by-grade chart data
+            const chartData: { label: string; price: number; color: string }[] = []
+            if (raw && raw > 0) chartData.push({ label: 'Raw', price: raw, color: Colors.amber[500] })
+            if (prices?.psa) {
+              ['7','8','9','9.5','10'].forEach(g => {
+                const p = prices.psa[g]
+                if (p && p > 0) chartData.push({ label: `Grade ${g}`, price: p, color: Colors.green[500] })
+              })
+            }
+            if (dcmEst && dcmEst > 0) chartData.push({ label: `DCM ${grade || ''}`, price: dcmEst, color: Colors.purple[600] })
+            chartData.sort((a, b) => a.price - b.price)
+            const maxPrice = Math.max(...chartData.map(d => d.price), 1)
 
-          {/* Scryfall (MTG/Pokemon) */}
-          {card.scryfall_price_usd != null && (
-            <View style={{ marginTop: 16 }}>
-              <Text style={s.pricingSource}>TCG Market Price</Text>
-              <Text style={s.dcmPrice}>${card.scryfall_price_usd}</Text>
-            </View>
-          )}
+            // Grading premium
+            const psa10 = prices?.psa?.['10']
+            const premium = raw && psa10 && raw > 0 ? Math.round(((psa10 - raw) / raw) * 100) : null
 
-          {!card.ebay_price_median && !card.dcm_price_estimate && !card.scryfall_price_usd && (
-            <Text style={s.naText}>No pricing data available yet. Pricing is fetched automatically after grading.</Text>
-          )}
+            return (
+              <>
+                {/* DCM Estimated Value */}
+                {dcmEst != null && (
+                  <View style={s.dcmPriceCard}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <View>
+                        <Text style={s.pricingSource}>Your DCM Grade</Text>
+                        <Text style={s.dcmPrice}>${dcmEst.toFixed(2)}</Text>
+                      </View>
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.purple[600] }}>{grade}</Text>
+                        <Text style={{ fontSize: 9, color: Colors.gray[500] }}>Estimated Value</Text>
+                      </View>
+                    </View>
+                    {matchConf && <Text style={[s.priceNote, { marginTop: 4 }]}>Match: {matchConf} · {prodName || ''}</Text>}
+                    {card.dcm_prices_cached_at && (
+                      <Text style={s.priceNote}>Updated: {new Date(card.dcm_prices_cached_at).toLocaleDateString()}</Text>
+                    )}
+                  </View>
+                )}
+
+                {/* Market Price Range */}
+                {prices && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={s.pricingSource}>Market Price Range</Text>
+                    {salesVol && <Text style={[s.priceNote, { marginBottom: 4 }]}>Sales Volume: {salesVol}</Text>}
+                    <View style={s.priceGrid}>
+                      <PriceCell label="Low" value={raw} />
+                      <PriceCell label="Median" value={prices.psa?.['9'] || card.ebay_price_median} />
+                      <PriceCell label="Average" value={card.dcm_price_average || dcmEst} />
+                      <PriceCell label="High" value={psa10 || prices.bgs?.['10'] || card.ebay_price_highest} />
+                    </View>
+                    {premium != null && <Text style={[s.priceNote, { marginTop: 4, color: Colors.green[600] }]}>Grading premium: +{premium}% from raw to graded</Text>}
+                  </View>
+                )}
+
+                {/* Price by Grade Chart */}
+                {chartData.length >= 2 && (
+                  <View style={{ marginTop: 14 }}>
+                    <Text style={s.pricingSource}>Price by Grade</Text>
+                    <Text style={[s.priceNote, { marginBottom: 8 }]}>Market prices from raw to graded</Text>
+                    {chartData.map((d, i) => (
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={{ width: 55, fontSize: 10, color: Colors.gray[600], fontWeight: '500' }}>{d.label}</Text>
+                        <View style={{ flex: 1, height: 18, backgroundColor: Colors.gray[100], borderRadius: 4, overflow: 'hidden' }}>
+                          <View style={{ width: `${Math.max(5, (d.price / maxPrice) * 100)}%`, height: '100%', backgroundColor: d.color, borderRadius: 4, justifyContent: 'center', paddingLeft: 4 }}>
+                            {d.price >= maxPrice * 0.15 && <Text style={{ fontSize: 8, color: '#fff', fontWeight: '700' }}>${d.price.toFixed(2)}</Text>}
+                          </View>
+                        </View>
+                        {d.price < maxPrice * 0.15 && <Text style={{ fontSize: 8, color: Colors.gray[500], marginLeft: 4 }}>${d.price.toFixed(2)}</Text>}
+                      </View>
+                    ))}
+                    <View style={{ flexDirection: 'row', gap: 12, marginTop: 6 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: Colors.amber[500] }} />
+                        <Text style={{ fontSize: 8, color: Colors.gray[500] }}>Raw</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: Colors.purple[600] }} />
+                        <Text style={{ fontSize: 8, color: Colors.gray[500] }}>DCM</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                        <View style={{ width: 8, height: 8, borderRadius: 2, backgroundColor: Colors.green[500] }} />
+                        <Text style={{ fontSize: 8, color: Colors.gray[500] }}>PSA/BGS/CGC</Text>
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Grading Company Prices */}
+                {prices && (prices.psa || prices.bgs || prices.cgc) && (
+                  <View style={{ marginTop: 14 }}>
+                    {['PSA', 'BGS', 'CGC'].map(company => {
+                      const companyPrices = prices[company.toLowerCase() as 'psa' | 'bgs' | 'cgc']
+                      if (!companyPrices || Object.keys(companyPrices).length === 0) return null
+                      const sorted = Object.entries(companyPrices).sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
+                      return (
+                        <View key={company} style={{ marginBottom: 10 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.gray[700], marginBottom: 4 }}>{company}</Text>
+                          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>
+                            {sorted.map(([g, p]) => (
+                              <View key={g} style={{ backgroundColor: parseFloat(g) >= 9 ? Colors.green[50] : Colors.gray[50], borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1, borderColor: parseFloat(g) >= 9 ? Colors.green[100] : Colors.gray[200] }}>
+                                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.gray[700] }}>Grade {g}</Text>
+                                <Text style={{ fontSize: 11, fontWeight: '700', color: parseFloat(g) >= 9 ? Colors.green[600] : Colors.gray[800] }}>${(p as number).toFixed(2)}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )
+                    })}
+                    <Text style={[s.priceNote, { marginTop: 4 }]}>Data from PriceCharting</Text>
+                  </View>
+                )}
+
+                {/* eBay fallback */}
+                {!prices && card.ebay_price_median != null && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={s.pricingSource}>eBay Comparable Sales</Text>
+                    <View style={s.priceGrid}>
+                      <PriceCell label="Lowest" value={card.ebay_price_lowest} />
+                      <PriceCell label="Median" value={card.ebay_price_median} />
+                      <PriceCell label="Average" value={card.ebay_price_average} />
+                      <PriceCell label="Highest" value={card.ebay_price_highest} />
+                    </View>
+                    {card.ebay_price_listing_count != null && <Text style={s.priceNote}>{card.ebay_price_listing_count} listings found</Text>}
+                  </View>
+                )}
+
+                {/* TCG Market */}
+                {card.scryfall_price_usd != null && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={s.pricingSource}>TCG Market Price</Text>
+                    <Text style={s.dcmPrice}>${card.scryfall_price_usd}</Text>
+                  </View>
+                )}
+
+                {!dcmEst && !prices && !card.ebay_price_median && !card.scryfall_price_usd && (
+                  <Text style={s.naText}>No pricing data available yet. Pricing is fetched automatically after grading.</Text>
+                )}
+              </>
+            )
+          })()}
         </CollapsibleSection>
 
         {/* ══════ 6. ESTIMATED MAIL-AWAY GRADES ══════ */}
