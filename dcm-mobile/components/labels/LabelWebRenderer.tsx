@@ -41,6 +41,8 @@ export interface LabelCardData {
   grade: number | null
   condition: string
   isAlteredAuthentic?: boolean
+  subScores?: { centering: number; corners: number; edges: number; surface: number }
+  qrUrl?: string
 }
 
 export interface LabelWebRendererProps {
@@ -454,8 +456,8 @@ function renderBack(ctx, canvas, cfg, card) {
   var EB = B + bi, ECW = CW - bi * 2, ECH = CH - bi * 2;
   var pad = Math.round(18 * scale);
 
-  // QR placeholder (square)
-  var qrSize = ECH * 0.55;
+  // LEFT: QR Code area
+  var qrSize = ECH * 0.72;
   var qrX = EB + pad + Math.round(12 * scale);
   var qrY = EB + (ECH - qrSize) / 2;
   var qrPad = Math.round(8 * scale);
@@ -471,33 +473,89 @@ function renderBack(ctx, canvas, cfg, card) {
     ctx.strokeRect(qrX - qrPad, qrY - qrPad, qrSize + qrPad * 2, qrSize + qrPad * 2);
   }
   ctx.fillStyle = '#ffffff';
-  ctx.fillRect(qrX - 3, qrY - 3, qrSize + 6, qrSize + 6);
+  if (light) {
+    ctx.shadowColor = 'rgba(0,0,0,0.1)'; ctx.shadowBlur = 4;
+    ctx.fillRect(qrX - 5, qrY - 5, qrSize + 10, qrSize + 10);
+    ctx.shadowBlur = 0;
+  } else {
+    ctx.fillRect(qrX - 3, qrY - 3, qrSize + 6, qrSize + 6);
+  }
 
-  // QR placeholder pattern
+  // Draw QR code pattern (deterministic from serial)
+  var qrUrl = card.qrUrl || ('https://dcmgrading.com/verify/' + (card.serial || ''));
+  var qrGrid = 21; // QR Version 1 = 21x21 modules
+  var cellSize = qrSize / qrGrid;
   ctx.fillStyle = '#000000';
-  var cell = qrSize / 7;
-  for (var r = 0; r < 7; r++) {
-    for (var c = 0; c < 7; c++) {
-      if ((r < 3 && c < 3) || (r < 3 && c > 3) || (r > 3 && c < 3) || (r === 3 && c === 3)) {
-        ctx.fillRect(qrX + c * cell, qrY + r * cell, cell, cell);
-      }
+  // Generate a deterministic QR-like pattern from the serial
+  var serialHash = 0;
+  for (var si = 0; si < qrUrl.length; si++) serialHash = ((serialHash << 5) - serialHash + qrUrl.charCodeAt(si)) | 0;
+  // Finder patterns (3 corners)
+  function drawFinder(fx, fy) {
+    ctx.fillRect(qrX + fx * cellSize, qrY + fy * cellSize, 7 * cellSize, cellSize);
+    ctx.fillRect(qrX + fx * cellSize, qrY + (fy + 6) * cellSize, 7 * cellSize, cellSize);
+    ctx.fillRect(qrX + fx * cellSize, qrY + fy * cellSize, cellSize, 7 * cellSize);
+    ctx.fillRect(qrX + (fx + 6) * cellSize, qrY + fy * cellSize, cellSize, 7 * cellSize);
+    ctx.fillRect(qrX + (fx + 2) * cellSize, qrY + (fy + 2) * cellSize, 3 * cellSize, 3 * cellSize);
+  }
+  drawFinder(0, 0); drawFinder(14, 0); drawFinder(0, 14);
+  // Data modules (deterministic from serial hash)
+  for (var qr = 7; qr < qrGrid; qr++) {
+    for (var qc = 7; qc < qrGrid; qc++) {
+      if (qr < 9 && qc > 12) continue; // skip near finder
+      var bit = ((serialHash * (qr * 31 + qc * 17 + 7)) >>> 0) % 3;
+      if (bit === 0) ctx.fillRect(qrX + qc * cellSize, qrY + qr * cellSize, cellSize, cellSize);
     }
   }
 
-  // Right text
-  var textX = qrX + qrSize + qrPad + Math.round(24 * scale);
-  var textMaxW = EB + ECW - pad - textX;
-  var centerY = EB + ECH / 2;
-  var fontSize = Math.round(18 * scale);
+  // CENTER: Grade + Condition
+  var gradeText = fmtGrade(card.grade, card.isAlteredAuthentic);
+  var condText = card.isAlteredAuthentic && card.grade === null ? 'AUTHENTIC' : (card.condition || '').toUpperCase();
+  var centerX = EB + ECW / 2;
+  var gradeFontSize = Math.round(88 * scale);
+  var condFontSize = Math.round(24 * scale);
+  var condGap = Math.round(8 * scale);
+  var totalH = gradeFontSize + (condText ? condGap + condFontSize : 0);
+  var centerStartY = EB + (ECH - totalH) / 2;
 
-  ctx.fillStyle = light ? TRAD.textDark : 'rgba(255,255,255,0.9)';
-  ctx.font = "bold " + fontSize + "px 'Helvetica Neue', Arial, sans-serif";
-  ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  strokeT(ctx, 'dcmgrading.com', textX, centerY - fontSize, !light, 2);
+  ctx.fillStyle = light ? TRAD.purplePrimary : '#ffffff';
+  ctx.font = 'bold ' + gradeFontSize + "px 'Helvetica Neue', Arial, sans-serif";
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  strokeT(ctx, gradeText, centerX, centerStartY, !light, 4);
 
-  ctx.fillStyle = light ? TRAD.textMedium : 'rgba(255,255,255,0.6)';
-  ctx.font = Math.round(fontSize * 0.85) + "px 'Helvetica Neue', Arial, sans-serif";
-  strokeT(ctx, card.serial || '', textX, centerY + fontSize * 0.4, !light, 2);
+  if (condText) {
+    ctx.fillStyle = light ? TRAD.purpleDark : 'rgba(255,255,255,0.8)';
+    ctx.font = 'bold ' + condFontSize + "px 'Helvetica Neue', Arial, sans-serif";
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    strokeT(ctx, condText, centerX, centerStartY + gradeFontSize + condGap, !light, 3);
+  }
+
+  // RIGHT: Subgrade scores
+  if (card.subScores) {
+    var cutPad = Math.round(30 * scale);
+    var rightEdge = EB + ECW - pad - cutPad;
+    var subFontSize = Math.round(26 * scale);
+    var lineH = subFontSize + Math.round(10 * scale);
+    var totalSubH = lineH * 4 - Math.round(10 * scale);
+    var subStartY = EB + (ECH - totalSubH) / 2;
+
+    var subItems = [
+      ['Centering', card.subScores.centering],
+      ['Corners', card.subScores.corners],
+      ['Edges', card.subScores.edges],
+      ['Surface', card.subScores.surface],
+    ];
+
+    for (var si2 = 0; si2 < subItems.length; si2++) {
+      var val = subItems[si2][1];
+      if (val == null || isNaN(val)) continue;
+      var y = subStartY + si2 * lineH + subFontSize / 2;
+      var scoreText = subItems[si2][0] + ': ' + Math.round(val);
+      ctx.fillStyle = light ? TRAD.textMedium : 'rgba(255,255,255,0.95)';
+      ctx.font = subFontSize + "px 'Helvetica Neue', Arial, sans-serif";
+      ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+      strokeT(ctx, scoreText, rightEdge, y, !light, 2);
+    }
+  }
 }
 
 // ---------- main entry ----------

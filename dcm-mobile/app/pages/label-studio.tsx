@@ -30,6 +30,15 @@ import ColorPickerModal from '@/components/labels/ColorPickerModal'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
+const LABEL_GALLERY = [
+  { id: 'slab-modern', name: 'Graded Slab (Modern)', shortName: 'Modern Slab', dimensions: '2.8" × 0.8"', description: 'Dark gradient label for standard grading slabs. Duplex printing with front grade and back QR code.' },
+  { id: 'slab-traditional', name: 'Graded Slab (Traditional)', shortName: 'Traditional Slab', dimensions: '2.8" × 0.8"', description: 'Light/white label with classic grading style. Clean, professional look.' },
+  { id: 'onetouch', name: 'Magnetic One-Touch', shortName: 'One-Touch', dimensions: '1.25" × 2.375"', description: 'Sized for Avery 6871 labels. Fits magnetic one-touch card holders.' },
+  { id: 'toploader', name: 'Toploader Front+Back', shortName: 'Toploader', dimensions: '1.75" × 0.5"', description: 'Two small labels — grade info on front, QR code on back of toploader.' },
+  { id: 'foldover', name: 'Fold-Over Toploader', shortName: 'Fold-Over', dimensions: '1.75" × 0.5"', description: 'Single label that folds over the toploader opening.' },
+  { id: 'custom', name: 'Custom Label', shortName: 'Custom', dimensions: 'Any size', description: 'Design your own with custom colors, layouts, and borders.' },
+]
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -110,7 +119,7 @@ export default function LabelStudioScreen() {
     if (!session?.user) return
     const { data, error } = await supabase
       .from('cards')
-      .select('id, serial, front_path, card_name, featured, category, card_set, release_date, card_number, conversational_whole_grade, conversational_condition_label, conversational_card_info, card_colors, custom_label_data')
+      .select('id, serial, front_path, card_name, featured, category, card_set, release_date, card_number, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
       .eq('user_id', session.user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
@@ -174,6 +183,17 @@ export default function LabelStudioScreen() {
     const grade = selectedCard.conversational_whole_grade
     const name = labelName || 'Card'
     const contextParts = [labelSet, labelYear, labelNumber].filter(Boolean)
+    const ws = selectedCard.conversational_weighted_sub_scores || {}
+    const sr = selectedCard.conversational_sub_scores || {}
+    const ext = (key: string): number => {
+      const v = ws[key]; if (typeof v === 'number') return v
+      if (v && typeof v === 'object' && typeof v.weighted === 'number') return v.weighted
+      const sv = sr[key]; if (typeof sv === 'number') return sv
+      if (sv && typeof sv === 'object' && typeof sv.weighted === 'number') return sv.weighted
+      return 0
+    }
+    const hasSub = ws.centering !== undefined || sr.centering !== undefined
+
     return {
       primaryName: name,
       contextLine: contextParts.join(' • '),
@@ -181,6 +201,8 @@ export default function LabelStudioScreen() {
       serial: selectedCard.serial || '',
       grade: grade,
       condition: selectedCard.conversational_condition_label || '',
+      subScores: hasSub ? { centering: ext('centering'), corners: ext('corners'), edges: ext('edges'), surface: ext('surface') } : undefined,
+      qrUrl: `https://dcmgrading.com/verify/${selectedCard.serial || ''}`,
     }
   }, [selectedCard, labelName, labelSet, labelYear, labelNumber, labelFeatures])
 
@@ -439,6 +461,61 @@ export default function LabelStudioScreen() {
 
         {selectedCard && (
           <>
+            {/* ============ Label Gallery (Swipeable) ============ */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Label Types</Text>
+              <FlatList
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                data={LABEL_GALLERY}
+                keyExtractor={item => item.id}
+                contentContainerStyle={{ gap: 0 }}
+                snapToAlignment="center"
+                decelerationRate="fast"
+                snapToInterval={SCREEN_W - 24 - 32}
+                renderItem={({ item: labelType }) => (
+                  <View style={{ width: SCREEN_W - 24 - 32, paddingHorizontal: 4 }}>
+                    {/* Slab mockup with label */}
+                    <View style={{ alignItems: 'center' }}>
+                      <View style={[s.slabContainer, { width: 180 }]}>
+                        <Image source={require('@/assets/images/graded-card-slab.png')} style={s.slabImage} resizeMode="contain" />
+                        <View style={s.slabLabelSlot}>
+                          {labelPreviewUrl ? (
+                            <Image source={{ uri: labelPreviewUrl }} style={s.slabLabel} resizeMode="contain" />
+                          ) : (
+                            <View style={[s.slabLabel, { backgroundColor: Colors.gray[200] }]} />
+                          )}
+                        </View>
+                        <View style={s.slabCardSlot}>
+                          {frontUrl ? (
+                            <Image source={{ uri: frontUrl }} style={s.slabCardImage} resizeMode="contain" />
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.gray[800], textAlign: 'center', marginTop: 8 }}>{labelType.name}</Text>
+                    <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center' }}>{labelType.dimensions}</Text>
+                    <Text style={{ fontSize: 10, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>{labelType.description}</Text>
+                    <TouchableOpacity
+                      style={[s.downloadBtn, { marginTop: 10, marginHorizontal: 20 }]}
+                      onPress={handleShare}
+                      disabled={!labelPreviewUrl}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="share-outline" size={16} color="#fff" />
+                      <Text style={s.downloadBtnText}>Download {labelType.shortName}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+              />
+              <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, gap: 4 }}>
+                {LABEL_GALLERY.map((_, i) => (
+                  <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.gray[300] }} />
+                ))}
+              </View>
+            </View>
+
             {/* ============ Slab Preview ============ */}
             <View style={s.section}>
               <View style={s.slabContainer}>
