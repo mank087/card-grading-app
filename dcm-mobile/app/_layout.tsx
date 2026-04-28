@@ -3,7 +3,13 @@ import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useState } from 'react'
-import { StripeProvider } from '@stripe/stripe-react-native'
+// StripeProvider wrapped in try/catch — fails gracefully in Expo Go
+let StripeProvider: any
+try {
+  StripeProvider = require('@stripe/stripe-react-native').StripeProvider
+} catch {
+  StripeProvider = ({ children }: any) => children
+}
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { Colors } from '@/lib/constants'
