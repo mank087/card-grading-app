@@ -522,42 +522,40 @@ export default function LabelStudioScreen() {
                           const color = colors[i] || null
                           const hasColor = !!color
                           return (
-                            <View key={i} style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
-                              <View style={{ flex: 1, position: 'relative' }}>
-                                <TouchableOpacity
-                                  style={[
-                                    s.customSwatch,
-                                    hasColor
-                                      ? { backgroundColor: color, borderStyle: 'solid' as const }
-                                      : { backgroundColor: Colors.gray[100], borderStyle: 'dashed' as const }
-                                  ]}
-                                  onPress={() => openColorPicker(i)}
-                                  activeOpacity={0.7}
-                                >
-                                  {hasColor ? (
-                                    <Text style={s.customSwatchNum}>{i + 1}</Text>
-                                  ) : (
-                                    <Ionicons name="add" size={18} color={Colors.gray[400]} />
-                                  )}
-                                </TouchableOpacity>
-                                {i >= 2 && hasColor && (
-                                  <TouchableOpacity
-                                    style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.red[500], justifyContent: 'center', alignItems: 'center', zIndex: 10 }}
-                                    onPress={() => {
-                                      const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                                      cols.splice(i, 1)
-                                      setCustomColorCount(Math.max(2, cols.length))
-                                      const layout = config.layoutStyle || 'color-gradient'
-                                      updateConfig({ customColors: cols, ...applyLayoutToColors(layout, cols), layoutStyle: layout })
-                                    }}
-                                  >
-                                    <Ionicons name="close" size={12} color="#fff" />
-                                  </TouchableOpacity>
+                            <View key={i} style={{ flex: 1, position: 'relative' }}>
+                              <TouchableOpacity
+                                style={[
+                                  s.customSwatch,
+                                  hasColor
+                                    ? { backgroundColor: color, borderStyle: 'solid' as const }
+                                    : { backgroundColor: Colors.gray[100], borderStyle: 'dashed' as const }
+                                ]}
+                                onPress={() => openColorPicker(i)}
+                                activeOpacity={0.7}
+                              >
+                                {hasColor ? (
+                                  <Text style={s.customSwatchNum}>{i + 1}</Text>
+                                ) : (
+                                  <Ionicons name="add" size={18} color={Colors.gray[400]} />
                                 )}
-                              </View>
+                              </TouchableOpacity>
+                              {i >= 2 && hasColor && (
+                                <TouchableOpacity
+                                  style={{ position: 'absolute', top: -6, right: -6, width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.red[500], justifyContent: 'center', alignItems: 'center', zIndex: 10 }}
+                                  onPress={() => {
+                                    const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+                                    cols.splice(i, 1)
+                                    setCustomColorCount(Math.max(2, cols.length))
+                                    const layout = config.layoutStyle || 'color-gradient'
+                                    updateConfig({ customColors: cols, ...applyLayoutToColors(layout, cols), layoutStyle: layout })
+                                  }}
+                                >
+                                  <Ionicons name="close" size={12} color="#fff" />
+                                </TouchableOpacity>
+                              )}
                               {i < visibleCount - 1 && hasColor && colors[i + 1] && (
                                 <TouchableOpacity
-                                  style={{ paddingHorizontal: 2 }}
+                                  style={{ position: 'absolute', right: -9, top: '50%' as any, marginTop: -8, zIndex: 10 }}
                                   onPress={() => {
                                     const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
                                     const tmp = cols[i]; cols[i] = cols[i + 1]; cols[i + 1] = tmp

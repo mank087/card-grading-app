@@ -1460,67 +1460,63 @@ function CustomDesigner({
                           <div className="flex items-center justify-between mb-1.5">
                             <label className="text-[10px] text-gray-500 font-medium">Your Colors</label>
                           </div>
-                          <div className="flex items-center gap-1">
+                          {/* Color swatches — equal width grid */}
+                          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${visibleCount}, 1fr)` }}>
                             {Array.from({ length: visibleCount }).map((_, i) => {
                               const color = colors[i] || null
                               const hasColor = !!color
                               const isOpen = editingSlot === i
                               return (
-                                <div key={i} className="flex items-center" style={{ flex: 1 }}>
-                                  <div className="flex-1 relative">
-                                    <button
-                                      onClick={() => setEditingSlot(isOpen ? null : i)}
-                                      className={`w-full h-10 rounded-lg border-2 transition-all shadow-sm relative ${
-                                        isOpen
-                                          ? 'border-purple-600 ring-2 ring-purple-300'
-                                          : hasColor
-                                            ? 'border-gray-300 hover:border-purple-400'
-                                            : 'border-dashed border-gray-300 hover:border-purple-400'
-                                      }`}
-                                      style={hasColor ? { backgroundColor: color } : { backgroundColor: '#f3f4f6' }}
-                                    >
-                                      {hasColor ? (
-                                        <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                                          {i + 1}
-                                        </span>
-                                      ) : (
-                                        <span className="text-[9px] text-gray-400">+</span>
-                                      )}
-                                    </button>
-                                    {/* Delete button for slots 3-5 that have a color */}
-                                    {i >= 2 && hasColor && (
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                                          cols.splice(i, 1)
-                                          if (editingSlot === i) setEditingSlot(null)
-                                          if (editingSlot !== null && editingSlot > i) setEditingSlot(editingSlot - 1)
-                                          setCustomColorCount(Math.max(2, cols.length))
-                                          const layout = config.layoutStyle || 'color-gradient'
-                                          updateConfig({ customColors: cols, ...applyLayoutToColors(layout, cols), layoutStyle: layout })
-                                        }}
-                                        className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[8px] leading-none hover:bg-red-600 z-10"
-                                        title="Remove color"
-                                      >
-                                        ×
-                                      </button>
+                                <div key={i} className="relative">
+                                  <button
+                                    onClick={() => setEditingSlot(isOpen ? null : i)}
+                                    className={`w-full h-10 rounded-lg border-2 transition-all shadow-sm relative ${
+                                      isOpen
+                                        ? 'border-purple-600 ring-2 ring-purple-300'
+                                        : hasColor
+                                          ? 'border-gray-300 hover:border-purple-400'
+                                          : 'border-dashed border-gray-300 hover:border-purple-400'
+                                    }`}
+                                    style={hasColor ? { backgroundColor: color } : { backgroundColor: '#f3f4f6' }}
+                                  >
+                                    {hasColor ? (
+                                      <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 text-[8px] font-mono text-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                                        {i + 1}
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] text-gray-400">+</span>
                                     )}
-                                  </div>
-                                  {/* Swap arrow between slots */}
+                                  </button>
+                                  {i >= 2 && hasColor && (
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
+                                        cols.splice(i, 1)
+                                        if (editingSlot === i) setEditingSlot(null)
+                                        if (editingSlot !== null && editingSlot > i) setEditingSlot(editingSlot - 1)
+                                        setCustomColorCount(Math.max(2, cols.length))
+                                        const layout = config.layoutStyle || 'color-gradient'
+                                        updateConfig({ customColors: cols, ...applyLayoutToColors(layout, cols), layoutStyle: layout })
+                                      }}
+                                      className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[8px] leading-none hover:bg-red-600 z-10"
+                                      title="Remove color"
+                                    >
+                                      ×
+                                    </button>
+                                  )}
+                                  {/* Swap arrow */}
                                   {i < visibleCount - 1 && hasColor && colors[i + 1] && (
                                     <button
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         const cols = [...(config.customColors || [config.gradientStart, config.gradientEnd])]
-                                        const tmp = cols[i]
-                                        cols[i] = cols[i + 1]
-                                        cols[i + 1] = tmp
+                                        const tmp = cols[i]; cols[i] = cols[i + 1]; cols[i + 1] = tmp
                                         const layout = config.layoutStyle || 'color-gradient'
                                         updateConfig({ customColors: cols, ...applyLayoutToColors(layout, cols), layoutStyle: layout })
                                       }}
-                                      className="px-0.5 text-gray-300 hover:text-purple-500 transition-colors flex-shrink-0"
-                                      title={`Swap colors ${i + 1} and ${i + 2}`}
+                                      className="absolute -right-3 top-1/2 -translate-y-1/2 z-10 text-gray-300 hover:text-purple-500"
+                                      title={`Swap ${i + 1} ↔ ${i + 2}`}
                                     >
                                       <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
                                         <path d="M7 16l-4-4 4-4M17 8l4 4-4 4" />
