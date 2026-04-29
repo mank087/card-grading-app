@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, Touchable
 import * as Clipboard from 'expo-clipboard'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors, GradeColors, ConfidenceColors } from '@/lib/constants'
