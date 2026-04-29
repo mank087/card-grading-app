@@ -28,21 +28,23 @@ const ROW2_CARDS = [
 ]
 
 // ─── Slab images for Panel 2 ───
-const SLABS = [
-  require('@/assets/images/onboarding/slab-judge.png'),
-  require('@/assets/images/onboarding/slab-pikachu.png'),
-  require('@/assets/images/onboarding/slab-luffy.png'),
-  require('@/assets/images/onboarding/slab-starwars.png'),
-  require('@/assets/images/onboarding/slab-drake.png'),
-]
+const SLAB_JUDGE = require('@/assets/images/onboarding/slab-judge.png')
+const SLAB_PIKACHU = require('@/assets/images/onboarding/slab-pikachu.png')
+const SLAB_LUFFY = require('@/assets/images/onboarding/slab-luffy.png')
+const SLAB_STARWARS = require('@/assets/images/onboarding/slab-starwars.png')
+const SLAB_DRAKE = require('@/assets/images/onboarding/slab-drake.png')
+
+// ─── Label Studio images for Panel 3 ───
+const LABEL_STUDIO_IMG = require('@/assets/images/onboarding/label-studio.png')
+const LABEL_SLAB_IMG = require('@/assets/images/onboarding/label-slab.png')
 
 // ─── Panel definitions ───
 const PANELS = [
   {
     id: '1',
     icon: 'diamond' as const,
-    headline: 'AI-Powered Card Grading',
-    subtitle: 'Grade any trading card in seconds with DCM Optic™ AI — Pokemon, Sports, MTG & more.',
+    headline: 'The Power of Card Grading\nin Your Hands',
+    subtitle: 'Grade any trading card in seconds with DCM Optic™ Technology and receive full subgrade reports for Centering, Corners, Edges and Surface condition.',
   },
   {
     id: '2',
@@ -54,7 +56,7 @@ const PANELS = [
     id: '3',
     icon: 'color-palette' as const,
     headline: 'Custom Label Studio',
-    subtitle: 'Design unique labels with custom colors, geometric patterns, and card-matched themes. Print-ready PDFs.',
+    subtitle: 'Design unique labels with custom colors, geometric patterns, and card-matched themes. Print-ready PDFs for slabs, toploaders, and one-touch holders.',
   },
   {
     id: '4',
@@ -78,7 +80,7 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   const row2Anim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    const cardW = 120
+    const cardW = 108
     const totalW = ROW1_CARDS.length * cardW
     Animated.loop(
       Animated.timing(row1Anim, { toValue: -totalW, duration: 20000, easing: Easing.linear, useNativeDriver: true })
@@ -95,7 +97,7 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   const renderPanel = ({ item, index }: { item: typeof PANELS[0]; index: number }) => {
     return (
       <View style={st.panel}>
-        {/* Visual area — top 55% */}
+        {/* Visual area — top ~55% */}
         <View style={st.visualArea}>
           {index === 0 && <ScrollingCardsVisual row1Anim={row1Anim} row2Anim={row2Anim} />}
           {index === 1 && <SlabCollageVisual />}
@@ -103,13 +105,10 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
           {index === 3 && <ChartVisual />}
 
           {/* Gradient fade to dark */}
-          <LinearGradient
-            colors={['transparent', '#0f0a1a']}
-            style={st.gradientFade}
-          />
+          <LinearGradient colors={['transparent', '#0f0a1a']} style={st.gradientFade} />
         </View>
 
-        {/* Content — bottom 45% */}
+        {/* Content — bottom */}
         <View style={st.contentArea}>
           <View style={st.iconCircle}>
             <Ionicons name={item.icon} size={28} color={Colors.purple[600]} />
@@ -123,11 +122,29 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
 
   return (
     <View style={st.container}>
-      {/* DCM Logo at top */}
+      {/* Logo + Name at top */}
       <View style={st.logoContainer}>
         <Image source={require('@/assets/images/dcm-logo.png')} style={st.logo} resizeMode="contain" tintColor="#fff" />
-        <Text style={st.logoText}>DCM Grading</Text>
+        <Text style={st.logoText}>Dynamic Collectibles Management</Text>
       </View>
+
+      {/* Swipe hint arrows */}
+      {activeIndex > 0 && (
+        <TouchableOpacity
+          style={[st.arrowBtn, st.arrowLeft]}
+          onPress={() => flatListRef.current?.scrollToIndex({ index: activeIndex - 1, animated: true })}
+        >
+          <Ionicons name="chevron-back" size={20} color={Colors.purple[400]} />
+        </TouchableOpacity>
+      )}
+      {activeIndex < PANELS.length - 1 && (
+        <TouchableOpacity
+          style={[st.arrowBtn, st.arrowRight]}
+          onPress={() => flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true })}
+        >
+          <Ionicons name="chevron-forward" size={20} color={Colors.purple[400]} />
+        </TouchableOpacity>
+      )}
 
       {/* Panels */}
       <FlatList
@@ -146,19 +163,16 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
 
       {/* Bottom: dots + buttons */}
       <View style={st.bottomArea}>
-        {/* Pagination dots */}
         <View style={st.dots}>
           {PANELS.map((_, i) => (
             <View key={i} style={[st.dot, i === activeIndex && st.dotActive]} />
           ))}
         </View>
 
-        {/* Get Started button */}
         <TouchableOpacity style={st.getStartedBtn} onPress={onGetStarted} activeOpacity={0.8}>
           <Text style={st.getStartedText}>Get Started</Text>
         </TouchableOpacity>
 
-        {/* Sign In link */}
         <TouchableOpacity onPress={onSignIn} style={st.signInLink}>
           <Text style={st.signInText}>Already have an account? <Text style={st.signInBold}>Sign In</Text></Text>
         </TouchableOpacity>
@@ -174,18 +188,18 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
 function ScrollingCardsVisual({ row1Anim, row2Anim }: { row1Anim: Animated.Value; row2Anim: Animated.Value }) {
   const cardW = 100
   const cardH = 140
-  const doubled1 = [...ROW1_CARDS, ...ROW1_CARDS, ...ROW1_CARDS]
-  const doubled2 = [...ROW2_CARDS, ...ROW2_CARDS, ...ROW2_CARDS]
+  const tripled1 = [...ROW1_CARDS, ...ROW1_CARDS, ...ROW1_CARDS]
+  const tripled2 = [...ROW2_CARDS, ...ROW2_CARDS, ...ROW2_CARDS]
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', overflow: 'hidden' }}>
       <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: row1Anim }], marginBottom: 8 }}>
-        {doubled1.map((src, i) => (
+        {tripled1.map((src, i) => (
           <Image key={`r1-${i}`} source={src} style={{ width: cardW, height: cardH, borderRadius: 8, marginRight: 8 }} resizeMode="cover" />
         ))}
       </Animated.View>
       <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: row2Anim }], marginLeft: -200 }}>
-        {doubled2.map((src, i) => (
+        {tripled2.map((src, i) => (
           <Image key={`r2-${i}`} source={src} style={{ width: cardW, height: cardH, borderRadius: 8, marginRight: 8 }} resizeMode="cover" />
         ))}
       </Animated.View>
@@ -194,33 +208,37 @@ function ScrollingCardsVisual({ row1Anim, row2Anim }: { row1Anim: Animated.Value
 }
 
 // ════════════════════════════════════════════════
-// Panel 2: Overlapping slab collage
+// Panel 2: Slab collage — Judge center, Pikachu bottom-right
 // ════════════════════════════════════════════════
 
 function SlabCollageVisual() {
-  const positions = [
-    { left: '5%', top: '15%', rotate: '-8deg', zIndex: 1 },
-    { left: '55%', top: '5%', rotate: '6deg', zIndex: 2 },
-    { left: '25%', top: '25%', rotate: '-2deg', zIndex: 5 },
-    { left: '0%', top: '40%', rotate: '10deg', zIndex: 3 },
-    { left: '50%', top: '35%', rotate: '-5deg', zIndex: 4 },
+  // Positions: Judge center-front, others around it
+  const slabs = [
+    { src: SLAB_DRAKE,    left: '2%',  top: '8%',  rotate: '-10deg', zIndex: 1 },
+    { src: SLAB_STARWARS, left: '58%', top: '5%',  rotate: '8deg',   zIndex: 2 },
+    { src: SLAB_LUFFY,    left: '0%',  top: '42%', rotate: '6deg',   zIndex: 3 },
+    { src: SLAB_JUDGE,    left: '22%', top: '18%', rotate: '-1deg',  zIndex: 5 },
+    { src: SLAB_PIKACHU,  left: '52%', top: '40%', rotate: '-6deg',  zIndex: 4 },
   ]
+
   return (
     <View style={{ flex: 1, position: 'relative' }}>
-      {SLABS.map((src, i) => (
+      {slabs.map((s, i) => (
         <Image
           key={i}
-          source={src}
+          source={s.src}
           style={{
             position: 'absolute',
             width: W * 0.38,
             height: W * 0.52,
             borderRadius: 8,
-            ...(positions[i] as any),
-            transform: [{ rotate: positions[i].rotate }],
+            left: s.left as any,
+            top: s.top as any,
+            zIndex: s.zIndex,
+            transform: [{ rotate: s.rotate }],
             shadowColor: '#000',
-            shadowOpacity: 0.4,
-            shadowRadius: 8,
+            shadowOpacity: 0.5,
+            shadowRadius: 10,
             shadowOffset: { width: 0, height: 4 },
           }}
           resizeMode="contain"
@@ -231,43 +249,28 @@ function SlabCollageVisual() {
 }
 
 // ════════════════════════════════════════════════
-// Panel 3: Label Studio showcase
+// Panel 3: Label Studio — real screenshots
 // ════════════════════════════════════════════════
 
 function LabelStudioVisual() {
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-      {/* Mockup of label studio features */}
-      <View style={{ backgroundColor: '#fff', borderRadius: 16, padding: 16, width: W * 0.75, shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 12, elevation: 8 }}>
-        {/* Color theme grid */}
-        <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.gray[700], marginBottom: 6 }}>Color Theme</Text>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
-          {['#0a0a0a', '#1a1625', '#f9fafb', '#1e3a5f', '#3c1a1a', '#ff0000', '#7c3aed', '#2d1f47'].map((c, i) => (
-            <View key={i} style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: c, borderWidth: i === 6 ? 2 : 1, borderColor: i === 6 ? Colors.purple[600] : Colors.gray[200] }} />
-          ))}
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12 }}>
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+        {/* Label studio UI screenshot */}
+        <View style={{ flex: 1, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+          <Image
+            source={LABEL_STUDIO_IMG}
+            style={{ width: '100%', height: H * 0.38, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+            resizeMode="contain"
+          />
         </View>
-        {/* Layout style row */}
-        <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.gray[700], marginBottom: 4 }}>Layout Style</Text>
-        <View style={{ flexDirection: 'row', gap: 4, marginBottom: 10 }}>
-          {['Gradient', 'Extension', 'Neon', 'Geometric', 'Split'].map((l, i) => (
-            <View key={l} style={{ flex: 1, backgroundColor: i === 3 ? Colors.purple[50] : Colors.gray[50], borderRadius: 6, paddingVertical: 4, borderWidth: i === 3 ? 1 : 0, borderColor: Colors.purple[600] }}>
-              <Text style={{ fontSize: 7, textAlign: 'center', color: i === 3 ? Colors.purple[700] : Colors.gray[500], fontWeight: '600' }}>{l}</Text>
-            </View>
-          ))}
-        </View>
-        {/* Mini slab preview */}
-        <View style={{ alignItems: 'center' }}>
-          <LinearGradient
-            colors={['#7c3aed', '#4c1d95']}
-            style={{ width: W * 0.55, height: 24, borderRadius: 4, justifyContent: 'center', paddingHorizontal: 8 }}
-            start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-          >
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ color: '#fff', fontSize: 7, fontWeight: '700' }}>DCM</Text>
-              <Text style={{ color: '#fff', fontSize: 6 }}>Card Name • Set</Text>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: '800' }}>10</Text>
-            </View>
-          </LinearGradient>
+        {/* Custom designed label / slab screenshot */}
+        <View style={{ flex: 1, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 8 }}>
+          <Image
+            source={LABEL_SLAB_IMG}
+            style={{ width: '100%', height: H * 0.38, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' }}
+            resizeMode="contain"
+          />
         </View>
       </View>
     </View>
@@ -280,12 +283,11 @@ function LabelStudioVisual() {
 
 function ChartVisual() {
   const barHeights = [40, 65, 50, 80, 55, 90, 70, 100, 85, 95, 75, 110]
-  const linePoints = [60, 55, 70, 65, 80, 75, 90, 85, 95, 100, 90, 105]
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 }}>
       {/* Value card */}
-      <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, padding: 16, width: W * 0.7, marginBottom: 16 }}>
+      <View style={{ backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 16, padding: 16, width: W * 0.7, marginBottom: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' }}>
         <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.green[500] }}>$4,827</Text>
         <Text style={{ fontSize: 12, color: Colors.gray[400] }}>Collection Value</Text>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
@@ -306,7 +308,7 @@ function ChartVisual() {
         ))}
       </View>
 
-      {/* Line overlay hint */}
+      {/* Trend line */}
       <View style={{ position: 'absolute', top: '55%', left: 30, right: 30, height: 2, borderRadius: 1 }}>
         <LinearGradient
           colors={[Colors.green[500], Colors.green[500]]}
@@ -325,18 +327,23 @@ function ChartVisual() {
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0f0a1a' },
 
-  logoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 50, paddingBottom: 8, zIndex: 10 },
-  logo: { width: 32, height: 32 },
-  logoText: { fontSize: 20, fontWeight: '800', color: '#fff', letterSpacing: 0.5 },
+  logoContainer: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingTop: 50, paddingBottom: 8, paddingHorizontal: 16, zIndex: 10 },
+  logo: { width: 28, height: 28 },
+  logoText: { fontSize: 14, fontWeight: '700', color: '#fff', letterSpacing: 0.3 },
+
+  // Swipe arrows
+  arrowBtn: { position: 'absolute', top: '45%', zIndex: 20, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(124,58,237,0.2)', justifyContent: 'center', alignItems: 'center' },
+  arrowLeft: { left: 6 },
+  arrowRight: { right: 6 },
 
   panel: { width: W, flex: 1 },
   visualArea: { flex: 0.55, overflow: 'hidden', position: 'relative' },
   gradientFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120 },
-  contentArea: { flex: 0.45, alignItems: 'center', paddingHorizontal: 32, paddingTop: 8 },
+  contentArea: { flex: 0.45, alignItems: 'center', paddingHorizontal: 28, paddingTop: 4 },
 
-  iconCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(124,58,237,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-  headline: { fontSize: 26, fontWeight: '800', color: '#fff', textAlign: 'center', lineHeight: 32, marginBottom: 10 },
-  subtitle: { fontSize: 14, color: Colors.gray[400], textAlign: 'center', lineHeight: 20 },
+  iconCircle: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(124,58,237,0.15)', justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
+  headline: { fontSize: 24, fontWeight: '800', color: '#fff', textAlign: 'center', lineHeight: 30, marginBottom: 10 },
+  subtitle: { fontSize: 13, color: Colors.gray[400], textAlign: 'center', lineHeight: 19 },
 
   bottomArea: { paddingHorizontal: 24, paddingBottom: 32 },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 20 },

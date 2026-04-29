@@ -14,7 +14,6 @@ try {
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { Colors } from '@/lib/constants'
-import WelcomeAnimation from '@/components/WelcomeAnimation'
 import OnboardingCarousel from '@/components/OnboardingCarousel'
 import HelpBot from '@/components/HelpBot'
 
@@ -75,8 +74,6 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   })
-  const [showWelcome, setShowWelcome] = useState(true)
-
   useEffect(() => {
     if (error) throw error
   }, [error])
@@ -86,11 +83,6 @@ export default function RootLayout() {
   }, [loaded])
 
   if (!loaded) return null
-
-  // Show animated welcome screen before anything else
-  if (showWelcome) {
-    return <WelcomeAnimation onComplete={() => setShowWelcome(false)} />
-  }
 
   return (
     <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.dcmgrading">
