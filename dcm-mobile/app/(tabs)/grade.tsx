@@ -9,11 +9,13 @@ import { purchaseCredits, CREDIT_TIERS } from '@/lib/stripe'
 import { compressImage, cropToCardAspect } from '@/lib/imageUtils'
 import Button from '@/components/ui/Button'
 
-const OTHER_SUB_CATEGORIES = [
-  'Digimon', 'Dragon Ball', 'Flesh and Blood', 'Weiss Schwarz', 'Union Arena',
-  'Star Wars', 'Marvel', 'DC Comics', 'Disney', 'Garbage Pail Kids',
-  'WWE / Wrestling', 'Movie / TV', 'Anime', 'Non-Sport Vintage', 'Other',
-]
+const OTHER_SUB_CATEGORIES_GROUPED = {
+  'TCG': ['Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard', 'Weiss Schwarz', 'MetaZoo', 'Force of Will', 'Final Fantasy TCG', 'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena'],
+  'Entertainment': ['Star Wars', 'Marvel', 'DC Comics', 'Disney', 'Garbage Pail Kids', 'Wacky Packages', 'WWE / Wrestling', 'Movie / TV', 'Music', 'Anime'],
+  'Vintage': ['Non-Sport Vintage', 'Art Cards', 'Promotional', 'Racing', 'Historical'],
+  'Other': ['Other'],
+}
+const OTHER_SUB_CATEGORIES = Object.values(OTHER_SUB_CATEGORIES_GROUPED).flat()
 
 export default function GradeScreen() {
   const router = useRouter()

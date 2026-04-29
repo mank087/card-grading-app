@@ -138,26 +138,32 @@ export default function ReviewScreen() {
 
       console.log('[Upload] Card record created')
 
-      // Deduct credit — decrement balance, increment total_used
-      const { data: currentCredits } = await supabase
-        .from('user_credits')
-        .select('balance, total_used')
-        .eq('user_id', user.id)
-        .single()
-
-      if (currentCredits) {
-        const { error: creditError } = await supabase
+      // Deduct credit via API (same as web — handles tracking)
+      try {
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+        await fetch(`${API_BASE}/api/stripe/deduct`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${currentSession?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ cardId }),
+        })
+        console.log('[Upload] Credit deducted via API')
+      } catch (creditErr) {
+        console.warn('[Upload] API credit deduction failed, falling back to direct:', creditErr)
+        // Fallback: direct Supabase update
+        const { data: currentCredits } = await supabase
           .from('user_credits')
-          .update({
+          .select('balance, total_used')
+          .eq('user_id', user.id)
+          .single()
+        if (currentCredits) {
+          await supabase.from('user_credits').update({
             balance: Math.max(0, currentCredits.balance - 1),
             total_used: (currentCredits.total_used || 0) + 1,
-          })
-          .eq('user_id', user.id)
-
-        if (creditError) {
-          console.error('[Upload] Credit deduction error:', creditError)
-        } else {
-          console.log('[Upload] Credit deducted. New balance:', currentCredits.balance - 1)
+          }).eq('user_id', user.id)
         }
       }
       refreshCredits()
