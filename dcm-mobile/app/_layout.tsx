@@ -2,7 +2,8 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 // StripeProvider wrapped in try/catch — fails gracefully in Expo Go
 let StripeProvider: any
 try {
@@ -14,6 +15,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { Colors } from '@/lib/constants'
 import WelcomeAnimation from '@/components/WelcomeAnimation'
+import OnboardingCarousel from '@/components/OnboardingCarousel'
 import HelpBot from '@/components/HelpBot'
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
@@ -22,23 +24,48 @@ export { ErrorBoundary } from 'expo-router'
 
 SplashScreen.preventAutoHideAsync()
 
-// Auth guard — redirects to login if not authenticated
+// Auth guard — shows onboarding for first-time users, redirects to login otherwise
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const segments = useSegments()
   const router = useRouter()
+  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
+
+  // Check if user has seen onboarding
+  useEffect(() => {
+    AsyncStorage.getItem('dcm_onboarding_seen').then(val => {
+      setShowOnboarding(val !== 'true')
+    })
+  }, [])
 
   useEffect(() => {
-    if (isLoading) return
+    if (isLoading || showOnboarding === null) return
 
     const inAuthGroup = segments[0] === '(auth)'
 
-    if (!user && !inAuthGroup) {
+    if (!user && !inAuthGroup && !showOnboarding) {
       router.replace('/(auth)/login')
     } else if (user && inAuthGroup) {
       router.replace('/(tabs)/grade')
     }
-  }, [user, isLoading, segments])
+  }, [user, isLoading, segments, showOnboarding])
+
+  const handleGetStarted = useCallback(() => {
+    AsyncStorage.setItem('dcm_onboarding_seen', 'true')
+    setShowOnboarding(false)
+    router.replace('/(auth)/register')
+  }, [router])
+
+  const handleSignIn = useCallback(() => {
+    AsyncStorage.setItem('dcm_onboarding_seen', 'true')
+    setShowOnboarding(false)
+    router.replace('/(auth)/login')
+  }, [router])
+
+  // Show onboarding for first-time unauthenticated users
+  if (!user && showOnboarding && !isLoading) {
+    return <OnboardingCarousel onGetStarted={handleGetStarted} onSignIn={handleSignIn} />
+  }
 
   return <>{children}</>
 }
