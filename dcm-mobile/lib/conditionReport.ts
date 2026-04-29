@@ -3,10 +3,10 @@
 export interface SideDefectReport {
   surface: {
     scratches: boolean; print_lines: boolean; fingerprints: boolean; holo_scratches: boolean
-    dents: boolean; white_dots: boolean; fish_eyes: boolean; staining: boolean
+    indentations: boolean; white_spots: boolean; fish_eyes: boolean; staining: boolean
   }
   corners: {
-    whitening: boolean; soft_rounded: boolean; dings: boolean; creases: boolean
+    whitening: boolean; soft_rounded: boolean; dings: boolean; creasing: boolean
   }
   edges: {
     whitening: boolean; chipping: boolean; rough_cut: boolean; peeling: boolean
@@ -18,7 +18,7 @@ export interface ConditionReportData {
   front: SideDefectReport
   back: SideDefectReport
   structural: {
-    crease: boolean; bend: boolean; warping: boolean; water_damage: boolean
+    crease: boolean; bend: boolean; warp: boolean; water_damage: boolean
   }
   factory: {
     crimping: boolean; miscut: boolean; ink_error: boolean
@@ -28,16 +28,16 @@ export interface ConditionReportData {
 
 export const EMPTY_REPORT: ConditionReportData = {
   front: {
-    surface: { scratches: false, print_lines: false, fingerprints: false, holo_scratches: false, dents: false, white_dots: false, fish_eyes: false, staining: false },
-    corners: { whitening: false, soft_rounded: false, dings: false, creases: false },
+    surface: { scratches: false, print_lines: false, fingerprints: false, holo_scratches: false, indentations: false, white_spots: false, fish_eyes: false, staining: false },
+    corners: { whitening: false, soft_rounded: false, dings: false, creasing: false },
     edges: { whitening: false, chipping: false, rough_cut: false, peeling: false, silvering: false, white_dots: false },
   },
   back: {
-    surface: { scratches: false, print_lines: false, fingerprints: false, holo_scratches: false, dents: false, white_dots: false, fish_eyes: false, staining: false },
-    corners: { whitening: false, soft_rounded: false, dings: false, creases: false },
+    surface: { scratches: false, print_lines: false, fingerprints: false, holo_scratches: false, indentations: false, white_spots: false, fish_eyes: false, staining: false },
+    corners: { whitening: false, soft_rounded: false, dings: false, creasing: false },
     edges: { whitening: false, chipping: false, rough_cut: false, peeling: false, silvering: false, white_dots: false },
   },
-  structural: { crease: false, bend: false, warping: false, water_damage: false },
+  structural: { crease: false, bend: false, warp: false, water_damage: false },
   factory: { crimping: false, miscut: false, ink_error: false },
   notes: '',
 }
@@ -47,8 +47,8 @@ export const SURFACE_LABELS: Record<string, string> = {
   print_lines: 'Print lines or roller marks',
   fingerprints: 'Fingerprints or residue',
   holo_scratches: 'Holofoil scratches',
-  dents: 'Dents or pressure marks',
-  white_dots: 'White dots or specks',
+  indentations: 'Dents, pressure marks, or indentations',
+  white_spots: 'White dots or specks',
   fish_eyes: 'Fish eyes (print voids)',
   staining: 'Staining or discoloration',
 }
@@ -57,7 +57,7 @@ export const CORNER_LABELS: Record<string, string> = {
   whitening: 'Corner whitening',
   soft_rounded: 'Soft or rounded corners',
   dings: 'Corner dings or nicks',
-  creases: 'Corner creases',
+  creasing: 'Corner creases',
 }
 
 export const EDGE_LABELS: Record<string, string> = {
@@ -72,7 +72,7 @@ export const EDGE_LABELS: Record<string, string> = {
 export const STRUCTURAL_LABELS: Record<string, string> = {
   crease: 'Crease or fold line',
   bend: 'Bend (no crease)',
-  warping: 'Warping',
+  warp: 'Warping or bowing',
   water_damage: 'Water damage',
 }
 
