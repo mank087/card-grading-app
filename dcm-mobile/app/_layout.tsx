@@ -69,6 +69,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
+// Hide HelpBot on WebView pages (pages/* routes) to avoid duplicate with web's HelpBot
+function ConditionalHelpBot() {
+  const segments = useSegments()
+  // WebView pages are under the 'pages' segment — hide mobile HelpBot there
+  const isWebViewPage = segments[0] === 'pages'
+  if (isWebViewPage) return null
+  return <HelpBot />
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -111,7 +120,7 @@ export default function RootLayout() {
               options={{ headerShown: false }}
             />
           </Stack>
-          <HelpBot />
+          <ConditionalHelpBot />
         </AuthGate>
       </CreditsProvider>
     </AuthProvider>

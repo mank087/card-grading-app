@@ -50,7 +50,7 @@ export default function InAppPage({ path }: InAppPageProps) {
     true;
   ` : 'true;'
 
-  // After load: hide nav/footer for clean in-app look
+  // After load: hide nav/footer/helpbot for clean in-app look
   const injectedAfterLoad = `
     (function() {
       var nav = document.querySelector('nav');
@@ -61,6 +61,18 @@ export default function InAppPage({ path }: InAppPageProps) {
       headers.forEach(function(h) { h.style.display = 'none'; });
       var main = document.querySelector('main');
       if (main) main.style.paddingTop = '16px';
+      // Hide web HelpBot (fixed bottom-right floating button)
+      var fixedEls = document.querySelectorAll('.fixed.bottom-6.right-6, [class*="fixed"][class*="bottom-6"][class*="right-6"]');
+      fixedEls.forEach(function(el) { el.style.display = 'none'; });
+      // Also hide by z-index pattern (HelpBot uses z-40)
+      setTimeout(function() {
+        document.querySelectorAll('.fixed').forEach(function(el) {
+          var s = window.getComputedStyle(el);
+          if (s.position === 'fixed' && parseInt(s.bottom) < 50 && parseInt(s.right) < 50 && parseInt(s.zIndex) >= 40) {
+            el.style.display = 'none';
+          }
+        });
+      }, 1000);
     })();
     true;
   `
