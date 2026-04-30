@@ -20,6 +20,8 @@ import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { mapCardToItemSpecifics, getCategoryForCardType } from '@/lib/ebay/itemSpecifics';
+import { pdf } from '@react-pdf/renderer';
+import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 
 declare global {
   interface Window {
@@ -50,6 +52,43 @@ function getGradeColor(grade: number): string {
   if (grade >= 7) return '#3B82F6';
   if (grade >= 5) return '#F59E0B';
   return '#EF4444';
+}
+
+function getConditionLabel(grade: number): string {
+  if (grade >= 10) return 'Pristine';
+  if (grade >= 9) return 'Gem Mint';
+  if (grade >= 8) return 'Near Mint-Mint';
+  if (grade >= 7) return 'Near Mint';
+  if (grade >= 6) return 'Excellent-Mint';
+  if (grade >= 5) return 'Excellent';
+  if (grade >= 4) return 'Very Good-Excellent';
+  if (grade >= 3) return 'Very Good';
+  if (grade >= 2) return 'Good';
+  if (grade >= 1) return 'Fair';
+  return 'Poor';
+}
+
+// Convert a remote image URL to a JPEG base64 (PDF lib doesn't support WebP)
+async function imageToJpegBase64(imageUrl: string): Promise<string> {
+  const response = await fetch(imageUrl);
+  const blob = await response.blob();
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  return new Promise((resolve, reject) => {
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject(new Error('canvas ctx'));
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+      } catch (e) { reject(e); }
+    };
+    img.onerror = reject;
+    img.src = URL.createObjectURL(blob);
+  });
 }
 
 // Mirrors generateHtmlDescription in EbayListingModal.tsx so mobile listings
@@ -248,6 +287,89 @@ export default function EbayImagePrepPage() {
         const itemSpecifics = mapCardToItemSpecifics(card, cardTypeForSpecifics);
         const categoryId = getCategoryForCardType(cardTypeForSpecifics);
 
+        // Generate Certificate of Analysis (DCM grading report PDF) + upload to eBay
+        // as a regulatory document. Best-effort — listing still works without it.
+        let regulatoryDocumentId: string | null = null;
+        try {
+          setStatus('Generating Certificate of Analysis…');
+          const cardInfo = card.conversational_card_info || {};
+          const wScores = card.conversational_weighted_sub_scores || {};
+          const sScores = card.conversational_sub_scores || {};
+          const centeringScore = Math.round(wScores.centering ?? sScores.centering?.weighted ?? 0);
+          const cornersScore = Math.round(wScores.corners ?? sScores.corners?.weighted ?? 0);
+          const edgesScore = Math.round(wScores.edges ?? sScores.edges?.weighted ?? 0);
+          const surfaceScore = Math.round(wScores.surface ?? sScores.surface?.weighted ?? 0);
+
+          let frontJpeg = '';
+          let backJpeg = '';
+          try { frontJpeg = await imageToJpegBase64(frontImageUrl); } catch (e) { console.warn('[CoA] front image failed:', e); }
+          try { backJpeg = await imageToJpegBase64(backImageUrl); } catch (e) { console.warn('[CoA] back image failed:', e); }
+
+          const reportCardData: ReportCardData = {
+            primaryName: labelData.primaryName || '',
+            contextLine: (labelData as any).contextLine || (labelData as any).line2 || '',
+            featuresLine: (labelData as any).featuresLine || (labelData as any).line3 || null,
+            serial: card.serial,
+            grade: labelData.grade ?? 0,
+            gradeFormatted: (labelData.grade ?? 0) % 1 === 0 ? String(labelData.grade ?? 0) : (labelData.grade ?? 0).toFixed(1),
+            condition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
+            cardName: cardInfo.card_name || card.card_name || '',
+            playerName: cardInfo.player_or_character || card.featured || card.pokemon_featured || '',
+            setName: cardInfo.set_name || card.card_set || '',
+            year: cardInfo.year || '',
+            manufacturer: cardInfo.manufacturer || '',
+            cardNumber: cardInfo.card_number || card.card_number || '',
+            sport: card.category || 'Other',
+            frontImageUrl: frontJpeg,
+            backImageUrl: backJpeg,
+            conditionLabel: labelData.condition || getConditionLabel(labelData.grade ?? 0),
+            labelCondition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
+            gradeRange: card.conversational_grade_uncertainty || '±0.5',
+            professionalGrades: {
+              psa: card.estimated_professional_grades?.psa?.grade || '-',
+              bgs: card.estimated_professional_grades?.bgs?.grade || '-',
+              sgc: card.estimated_professional_grades?.sgc?.grade || '-',
+              cgc: card.estimated_professional_grades?.cgc?.grade || '-',
+            },
+            subgrades: {
+              centering: { score: centeringScore, summary: sScores.centering?.notes || 'Centering assessed', frontScore: sScores.centering?.front ?? centeringScore, backScore: sScores.centering?.back ?? centeringScore, frontSummary: '', backSummary: '' },
+              corners: { score: cornersScore, summary: sScores.corners?.notes || 'Corners assessed', frontScore: sScores.corners?.front ?? cornersScore, backScore: sScores.corners?.back ?? cornersScore, frontSummary: '', backSummary: '' },
+              edges: { score: edgesScore, summary: sScores.edges?.notes || 'Edges assessed', frontScore: sScores.edges?.front ?? edgesScore, backScore: sScores.edges?.back ?? edgesScore, frontSummary: '', backSummary: '' },
+              surface: { score: surfaceScore, summary: sScores.surface?.notes || 'Surface assessed', frontScore: sScores.surface?.front ?? surfaceScore, backScore: sScores.surface?.back ?? surfaceScore, frontSummary: '', backSummary: '' },
+            },
+            specialFeatures: {
+              autographed: cardInfo.autographed || false,
+              serialNumbered: cardInfo.serial_number || undefined,
+              subset: cardInfo.subset || undefined,
+            },
+            gradedAt: card.graded_at || card.created_at || new Date().toISOString(),
+            qrCodeUrl: qrCodeDataUrl,
+          };
+
+          const pdfDoc = pdf(<CardGradingReport cardData={reportCardData} />);
+          const pdfBlob = await pdfDoc.toBlob();
+
+          setStatus('Uploading certificate…');
+          const formData = new FormData();
+          formData.append('file', pdfBlob, `DCM-Report-${card.serial}.pdf`);
+          formData.append('fileName', `DCM-Report-${card.serial}.pdf`);
+          const docRes = await fetch('/api/ebay/document', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
+          if (docRes.ok) {
+            const docJson = await docRes.json();
+            regulatoryDocumentId = docJson.documentId || null;
+            console.log('[CoA] uploaded, documentId:', regulatoryDocumentId);
+          } else {
+            const txt = await docRes.text().catch(() => '');
+            console.warn('[CoA] upload failed:', docRes.status, txt);
+          }
+        } catch (err) {
+          console.warn('[CoA] generation failed (non-fatal):', err);
+        }
+
         setStatus('Done');
         postToRN({
           type: 'images-ready',
@@ -261,6 +383,7 @@ export default function EbayImagePrepPage() {
           description,
           itemSpecifics,
           categoryId,
+          regulatoryDocumentId,
         });
       } catch (err: any) {
         if (cancelled) return;

@@ -84,6 +84,9 @@ export default function EbayListScreen() {
   const [itemSpecifics, setItemSpecifics] = useState<ItemSpecific[]>([])
   const [categoryId, setCategoryId] = useState<string>('')
 
+  // Certificate of Analysis (uploaded to eBay as a regulatory document by the prep WebView)
+  const [regulatoryDocumentId, setRegulatoryDocumentId] = useState<string | null>(null)
+
   // Step 4: Shipping
   const [shipping, setShipping] = useState({
     shippingType: 'CALCULATED' as 'FREE' | 'FLAT_RATE' | 'CALCULATED',
@@ -351,6 +354,8 @@ export default function EbayListScreen() {
         domesticReturnPeriodDays: parseInt(shipping.returnPeriod) || 30,
         domesticReturnShippingPaidBy: shipping.returnShipping,
         internationalReturnsAccepted: false,
+        // Attach Certificate of Analysis as eBay regulatory document if generation+upload succeeded
+        regulatoryDocumentIds: regulatoryDocumentId ? [regulatoryDocumentId] : undefined,
       }
 
       const result = await createListing(listingData)
@@ -369,7 +374,7 @@ export default function EbayListScreen() {
       setIsPublishing(false)
       setPublishProgress('')
     }
-  }, [card, cardId, title, price, description, listingFormat, bestOfferEnabled, duration, imageOrder, imageUrls, selectedImages, additionalImages, frontUrl, backUrl, itemSpecifics, shipping])
+  }, [card, cardId, title, price, description, listingFormat, bestOfferEnabled, duration, imageOrder, imageUrls, selectedImages, additionalImages, frontUrl, backUrl, itemSpecifics, shipping, regulatoryDocumentId])
 
   // ─── Navigation helpers ───
   const canGoNext = useMemo(() => {
@@ -638,6 +643,7 @@ export default function EbayListScreen() {
                     if (msg.description && !description) setDescription(msg.description)
                     if (Array.isArray(msg.itemSpecifics) && itemSpecifics.length === 0) setItemSpecifics(msg.itemSpecifics)
                     if (msg.categoryId && !categoryId) setCategoryId(msg.categoryId)
+                    if (msg.regulatoryDocumentId) setRegulatoryDocumentId(msg.regulatoryDocumentId)
                   } else if (msg.type === 'error') {
                     setImagesError(msg.message || 'Failed to generate images')
                     setImagesGenerating(false)
@@ -914,7 +920,20 @@ export default function EbayListScreen() {
             </View>
             <View style={st.reviewBox}>
               <Text style={st.reviewLabel}>Images</Text>
-              <Text style={st.reviewValue}>{Object.values(selectedImages).filter(Boolean).length} selected</Text>
+              <Text style={st.reviewValue}>
+                {Object.values(selectedImages).filter(Boolean).length + additionalImages.filter(i => i.selected).length} selected
+              </Text>
+            </View>
+            <View style={st.reviewBox}>
+              <Text style={st.reviewLabel}>Certificate of Analysis</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Ionicons
+                  name={regulatoryDocumentId ? 'checkmark-circle' : 'close-circle-outline'}
+                  size={14}
+                  color={regulatoryDocumentId ? Colors.green[600] : Colors.gray[400]}
+                />
+                <Text style={st.reviewValue}>{regulatoryDocumentId ? 'Attached' : 'Not attached'}</Text>
+              </View>
             </View>
 
             <TouchableOpacity style={[st.primaryBtn, { marginTop: 16 }]} onPress={handlePublish} disabled={isPublishing}>
