@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
+import * as FileSystem from 'expo-file-system'
+import * as Sharing from 'expo-sharing'
+import { WebView } from 'react-native-webview'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -32,6 +35,12 @@ export default function CardDetailScreen() {
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
   const [zoomImage, setZoomImage] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
+  // Label export state — opens a hidden WebView that runs the canvas/PDF generators on the web
+  // and posts back base64 files; mobile then shares them via expo-sharing.
+  const [labelSheetOpen, setLabelSheetOpen] = useState(false)
+  const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover' } | null>(null)
+  const [exportError, setExportError] = useState<string | null>(null)
+  const [exportStatus, setExportStatus] = useState<string>('')
   const [editForm, setEditForm] = useState<{
     card_name: string
     card_set: string
@@ -227,6 +236,149 @@ export default function CardDetailScreen() {
         </Pressable>
       </Modal>
 
+      {/* Label picker bottom-sheet — mirrors the web's LABEL_TYPES gallery */}
+      <Modal visible={labelSheetOpen} transparent animationType="slide" onRequestClose={() => setLabelSheetOpen(false)}>
+        <Pressable style={s.editBackdrop} onPress={() => setLabelSheetOpen(false)}>
+          <Pressable style={[s.editSheet, { paddingBottom: 28 }]} onPress={e => e.stopPropagation()}>
+            <View style={s.editHandle} />
+            <Text style={s.editTitle}>Download Labels & Images</Text>
+            <Text style={s.editSubtitle}>Same options as web. Tap any item to generate and share.</Text>
+            <ScrollView style={{ maxHeight: 480 }}>
+              {([
+                { id: 'slab-modern', name: 'Graded Slab — Modern', desc: 'Dark-gradient slab label PDF (2.8" × 0.8")', icon: 'card', needsFormat: true },
+                { id: 'slab-traditional', name: 'Graded Slab — Traditional', desc: 'Light/white classic slab label PDF', icon: 'card-outline', needsFormat: true },
+                { id: 'onetouch', name: 'Magnetic One-Touch', desc: 'Avery 6871 PDF for magnetic cases', icon: 'magnet' },
+                { id: 'toploader', name: 'Toploader Front+Back', desc: 'Avery 8167 — front grade + back QR', icon: 'copy' },
+                { id: 'foldover', name: 'Fold-Over Toploader', desc: 'Avery 8167 — single label, fold over tab', icon: 'reader' },
+                { id: 'card-image-modern', name: 'Card Image — Modern', desc: 'JPG with modern dark slab label', icon: 'image' },
+                { id: 'card-image-traditional', name: 'Card Image — Traditional', desc: 'JPG with traditional light slab label', icon: 'image-outline' },
+                { id: 'mini-report', name: 'Mini Grade Report', desc: 'Foldable summary card with QR + sub-grades', icon: 'document-text' },
+              ] as const).map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 }]}
+                  onPress={() => {
+                    setLabelSheetOpen(false)
+                    if ((item as any).needsFormat) {
+                      Alert.alert(item.name, 'Choose print format', [
+                        { text: 'Duplex (front/back on one sheet)', onPress: () => { setExportError(null); setExportTask({ type: item.id, format: 'duplex' }) } },
+                        { text: 'Fold-Over (single side)', onPress: () => { setExportError(null); setExportTask({ type: item.id, format: 'foldover' }) } },
+                        { text: 'Cancel', style: 'cancel' },
+                      ])
+                    } else {
+                      setExportError(null)
+                      setExportTask({ type: item.id })
+                    }
+                  }}
+                >
+                  <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.gray[900] }}>{item.name}</Text>
+                    <Text style={{ fontSize: 10, color: Colors.gray[500], marginTop: 2 }}>{item.desc}</Text>
+                  </View>
+                  <Ionicons name="download-outline" size={16} color={Colors.gray[400]} />
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity
+                style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.purple[200], borderRadius: 10, backgroundColor: Colors.purple[50] }]}
+                onPress={() => { setLabelSheetOpen(false); router.push({ pathname: '/pages/label-studio' as any, params: { cardId: card.id } }) }}
+              >
+                <Ionicons name="color-palette" size={20} color={Colors.purple[700]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.purple[700] }}>Open Label Studio</Text>
+                  <Text style={{ fontSize: 10, color: Colors.purple[600], marginTop: 2 }}>Customize colors, layouts, and styles</Text>
+                </View>
+              </TouchableOpacity>
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Label-export progress modal — runs the hidden WebView, saves the result, shares */}
+      <Modal visible={!!exportTask} transparent animationType="fade" onRequestClose={() => { setExportTask(null); setExportError(null) }}>
+        <Pressable style={s.editBackdrop} onPress={() => { setExportTask(null); setExportError(null) }}>
+          <Pressable style={[s.editSheet, { alignItems: 'center', paddingVertical: 24 }]} onPress={e => e.stopPropagation()}>
+            <View style={s.editHandle} />
+            {exportError ? (
+              <>
+                <Ionicons name="warning" size={36} color={Colors.red[600]} style={{ marginBottom: 8 }} />
+                <Text style={s.editTitle}>Export Failed</Text>
+                <Text style={[s.editSubtitle, { textAlign: 'center', marginBottom: 12 }]}>{exportError}</Text>
+                <TouchableOpacity onPress={() => { setExportTask(null); setExportError(null) }} style={[s.editBtn, s.editBtnCancel, { paddingHorizontal: 24 }]}>
+                  <Text style={s.editBtnCancelText}>Close</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <ActivityIndicator size="large" color={Colors.purple[600]} />
+                <Text style={[s.editTitle, { marginTop: 12 }]}>Generating…</Text>
+                <Text style={[s.editSubtitle, { textAlign: 'center' }]}>{exportStatus || 'Building your label on the web — saving locally when ready.'}</Text>
+              </>
+            )}
+            {/* Hidden WebView that drives generation */}
+            {exportTask && session?.access_token && card?.id && !exportError && (
+              <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 }}>
+                <WebView
+                  source={{
+                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${labelStyle}`,
+                  }}
+                  originWhitelist={['*']}
+                  javaScriptEnabled
+                  onLoadStart={() => setExportStatus('Generating on the web…')}
+                  onMessage={async (e) => {
+                    try {
+                      const msg = JSON.parse(e.nativeEvent.data)
+                      if (msg.type === 'label-export-ready' && Array.isArray(msg.files)) {
+                        setExportStatus(`Saving ${msg.files.length} file${msg.files.length > 1 ? 's' : ''}…`)
+                        const savedPaths: string[] = []
+                        for (const f of msg.files) {
+                          const base64 = (f.dataUrl || '').split(',')[1] || ''
+                          if (!base64) continue
+                          const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory
+                          const path = `${dir}${f.name}`
+                          await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' as any })
+                          savedPaths.push(path)
+                        }
+                        setExportTask(null)
+                        setExportStatus('')
+                        if (await Sharing.isAvailableAsync()) {
+                          // expo-sharing only shares one file at a time; share the first.
+                          // For 2-file card-image exports, share front first; user can re-run for back.
+                          if (savedPaths[0]) {
+                            await Sharing.shareAsync(savedPaths[0], {
+                              mimeType: msg.files[0].mime,
+                              dialogTitle: msg.files[0].name,
+                            })
+                          }
+                          if (savedPaths.length > 1) {
+                            // Offer to share remaining files
+                            Alert.alert('Additional file ready', `${msg.files.length - 1} more file${msg.files.length > 2 ? 's' : ''} saved. Share next?`, [
+                              { text: 'Share', onPress: async () => {
+                                for (let i = 1; i < savedPaths.length; i++) {
+                                  await Sharing.shareAsync(savedPaths[i], { mimeType: msg.files[i].mime, dialogTitle: msg.files[i].name })
+                                }
+                              }},
+                              { text: 'Skip', style: 'cancel' },
+                            ])
+                          }
+                        } else {
+                          Alert.alert('Saved', `Files saved to:\n${savedPaths.join('\n')}`)
+                        }
+                      } else if (msg.type === 'error') {
+                        setExportError(msg.message || 'Failed to generate label')
+                      }
+                    } catch (err: any) {
+                      setExportError(err?.message || 'Failed to save file')
+                    }
+                  }}
+                  onError={(syntheticEvent) => setExportError(syntheticEvent.nativeEvent?.description || 'WebView load error')}
+                />
+              </View>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       {/* Edit Card Info Modal */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -384,9 +536,9 @@ export default function CardDetailScreen() {
         </View>
       )}
 
-      {/* Serial */}
-      <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
-        <Text style={s.serialLabel}>DCM Serial#:</Text>
+      {/* Serial — centered chip */}
+      <View style={s.serialChip}>
+        <Text style={s.serialLabel}>DCM Serial #</Text>
         <Text style={s.serialValue}>{card.serial}</Text>
       </View>
 
@@ -422,16 +574,7 @@ export default function CardDetailScreen() {
           <Ionicons name="copy" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Copy Link</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => {
-          Alert.alert('Labels & Downloads', 'Choose an option:', [
-            { text: 'Open Label Studio', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id } } as any) },
-            { text: 'Download Slab Label (Modern)', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'slab-modern' } } as any) },
-            { text: 'Download Slab Label (Traditional)', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'slab-traditional' } } as any) },
-            { text: 'Download One-Touch Label', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'onetouch' } } as any) },
-            { text: 'Download Toploader Labels', onPress: () => router.push({ pathname: '/pages/label-studio', params: { cardId: card.id, autoDownload: 'toploader' } } as any) },
-            { text: 'Cancel', style: 'cancel' },
-          ])
-        }}>
+        <TouchableOpacity style={s.shareBtn} onPress={() => setLabelSheetOpen(true)}>
           <Ionicons name="pricetags" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Labels</Text>
         </TouchableOpacity>
@@ -1522,8 +1665,9 @@ const s = StyleSheet.create({
 
   // Serial
   serialRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 12, marginTop: 12, padding: 12, backgroundColor: Colors.white, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[200] },
-  serialLabel: { fontSize: 13, color: Colors.gray[500] },
-  serialValue: { fontSize: 13, fontWeight: '700', color: Colors.gray[800], fontFamily: 'SpaceMono' },
+  serialChip: { alignSelf: 'center', alignItems: 'center', paddingVertical: 8, paddingHorizontal: 18, marginHorizontal: 12, marginBottom: 10, backgroundColor: Colors.purple[50], borderRadius: 10, borderWidth: 1, borderColor: Colors.purple[200] },
+  serialLabel: { fontSize: 10, color: Colors.purple[600], fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
+  serialValue: { fontSize: 14, fontWeight: '800', color: Colors.purple[700], fontFamily: 'SpaceMono', marginTop: 2, letterSpacing: 1 },
 
   // Share
   shareRow: { flexDirection: 'row', gap: 8, marginHorizontal: 12, marginTop: 8, marginBottom: 12 },
