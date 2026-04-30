@@ -72,12 +72,16 @@ export default function EbayListScreen() {
   // Step 2: Details
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
+  const [description, setDescription] = useState('')
   const [listingFormat, setListingFormat] = useState<'FIXED_PRICE' | 'AUCTION'>('FIXED_PRICE')
   const [bestOfferEnabled, setBestOfferEnabled] = useState(true)
   const [duration, setDuration] = useState('GTC')
+  const [showDescriptionPreview, setShowDescriptionPreview] = useState(false)
 
   // Step 3: Specifics
-  const [itemSpecifics, setItemSpecifics] = useState<{ name: string; value: string }[]>([])
+  type ItemSpecific = { name: string; value: string | string[]; required?: boolean; editable?: boolean }
+  const [itemSpecifics, setItemSpecifics] = useState<ItemSpecific[]>([])
+  const [categoryId, setCategoryId] = useState<string>('')
 
   // Step 4: Shipping
   const [shipping, setShipping] = useState({
@@ -311,12 +315,15 @@ export default function EbayListScreen() {
         cardId,
         grade,
         title,
+        description,
         price: parseFloat(price) || 0,
         listingFormat,
         bestOfferEnabled: listingFormat === 'FIXED_PRICE' ? bestOfferEnabled : false,
         duration,
         imageUrls: allImageUrls,
-        itemSpecifics: itemSpecifics.filter(s => s.value.trim()).map(s => ({ name: s.name, value: s.value })),
+        itemSpecifics: itemSpecifics
+          .filter(s => Array.isArray(s.value) ? s.value.length > 0 : (s.value || '').trim().length > 0)
+          .map(s => ({ name: s.name, value: s.value })),
         shippingType: shipping.shippingType,
         domesticShippingService: shipping.domesticService,
         flatRateAmount: parseFloat(shipping.flatRate) || 5,
@@ -615,6 +622,9 @@ export default function EbayListScreen() {
                     setImageUrls(msg.images)
                     setImagesReady(true)
                     setImagesGenerating(false)
+                    if (msg.description && !description) setDescription(msg.description)
+                    if (Array.isArray(msg.itemSpecifics) && itemSpecifics.length === 0) setItemSpecifics(msg.itemSpecifics)
+                    if (msg.categoryId && !categoryId) setCategoryId(msg.categoryId)
                   } else if (msg.type === 'error') {
                     setImagesError(msg.message || 'Failed to generate images')
                     setImagesGenerating(false)
@@ -667,33 +677,88 @@ export default function EbayListScreen() {
                 ))}
               </View>
             </ScrollView>
+
+            {/* Listing Description (HTML, pre-filled with DCM-branded template) */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
+              <Text style={st.fieldLabel}>Listing Description</Text>
+              {description.length > 0 && (
+                <TouchableOpacity onPress={() => setShowDescriptionPreview(true)} style={st.previewBtn}>
+                  <Ionicons name="eye-outline" size={12} color={Colors.purple[600]} />
+                  <Text style={st.previewBtnText}>Preview</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={st.helperText}>Auto-generated DCM template. Edit the HTML directly to customize.</Text>
+            <TextInput
+              style={[st.input, { minHeight: 120, textAlignVertical: 'top' as const, fontSize: 11, fontFamily: 'SpaceMono' }]}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              placeholder={imagesGenerating ? 'Generating description…' : 'Description will appear here once images finish generating.'}
+              placeholderTextColor={Colors.gray[400]}
+            />
           </View>
         )}
+
+        {/* Description preview modal — renders the HTML in a WebView to match what eBay will show */}
+        <Modal visible={showDescriptionPreview} animationType="slide" onRequestClose={() => setShowDescriptionPreview(false)}>
+          <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            <View style={st.oauthHeader}>
+              <TouchableOpacity onPress={() => setShowDescriptionPreview(false)}>
+                <Ionicons name="close" size={24} color={Colors.gray[700]} />
+              </TouchableOpacity>
+              <Text style={st.oauthTitle}>Description Preview</Text>
+              <View style={{ width: 24 }} />
+            </View>
+            <WebView
+              originWhitelist={['*']}
+              source={{ html: description ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${description}</body></html>` : '<p>No description</p>' }}
+            />
+          </View>
+        </Modal>
 
         {/* ═══ STEP 3: Item Specifics ═══ */}
         {step === 'specifics' && (
           <View style={st.section}>
             <Text style={st.sectionTitle}>Item Specifics</Text>
-            <Text style={{ fontSize: 11, color: Colors.gray[500], marginBottom: 12 }}>Pre-filled from your card data. Edit as needed.</Text>
+            <Text style={{ fontSize: 11, color: Colors.gray[500], marginBottom: 12 }}>
+              Pre-filled from your card data. Required fields are marked with *. Tap any field to edit.
+            </Text>
             {itemSpecifics.length === 0 && (
-              <Text style={{ fontSize: 12, color: Colors.gray[400], textAlign: 'center', paddingVertical: 20 }}>
-                Item specifics will be auto-filled based on your card's category and details.
-              </Text>
-            )}
-            {itemSpecifics.map((spec, i) => (
-              <View key={i} style={{ marginBottom: 8 }}>
-                <Text style={st.fieldLabel}>{spec.name}</Text>
-                <TextInput
-                  style={st.input}
-                  value={spec.value}
-                  onChangeText={v => {
-                    const updated = [...itemSpecifics]
-                    updated[i] = { ...updated[i], value: v }
-                    setItemSpecifics(updated)
-                  }}
-                />
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                {imagesGenerating
+                  ? <ActivityIndicator size="small" color={Colors.purple[600]} />
+                  : <Text style={{ fontSize: 12, color: Colors.gray[400], textAlign: 'center' }}>Item specifics will be auto-filled based on your card's category and details.</Text>}
               </View>
-            ))}
+            )}
+            {itemSpecifics.map((spec, i) => {
+              const stringValue = Array.isArray(spec.value) ? spec.value.join(', ') : (spec.value || '')
+              const editable = spec.editable !== false
+              return (
+                <View key={`${spec.name}-${i}`} style={{ marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <Text style={st.fieldLabel}>
+                      {spec.name}
+                      {spec.required && <Text style={{ color: Colors.red[600] }}> *</Text>}
+                    </Text>
+                    {!editable && <Text style={st.lockedText}>locked</Text>}
+                  </View>
+                  <TextInput
+                    style={[st.input, !editable && { backgroundColor: Colors.gray[100], color: Colors.gray[600] }]}
+                    value={stringValue}
+                    editable={editable}
+                    onChangeText={v => {
+                      if (!editable) return
+                      const updated = [...itemSpecifics]
+                      updated[i] = { ...updated[i], value: v }
+                      setItemSpecifics(updated)
+                    }}
+                    placeholder={spec.required ? `${spec.name} (required)` : `Optional`}
+                    placeholderTextColor={Colors.gray[400]}
+                  />
+                </View>
+              )
+            })}
           </View>
         )}
 
@@ -729,8 +794,22 @@ export default function EbayListScreen() {
               </>
             )}
 
-            <Text style={st.fieldLabel}>Postal Code</Text>
-            <TextInput style={st.input} value={shipping.postalCode} onChangeText={v => setShipping(p => ({ ...p, postalCode: v }))} keyboardType="number-pad" maxLength={5} placeholder="12345" placeholderTextColor={Colors.gray[400]} />
+            <Text style={st.fieldLabel}>
+              Postal Code <Text style={{ color: Colors.red[600] }}>*</Text>
+            </Text>
+            <TextInput
+              style={[
+                st.input,
+                shipping.postalCode.length > 0 && shipping.postalCode.length < 5 && { borderColor: Colors.red[500] },
+              ]}
+              value={shipping.postalCode}
+              onChangeText={v => setShipping(p => ({ ...p, postalCode: v.replace(/[^0-9]/g, '') }))}
+              keyboardType="number-pad"
+              maxLength={5}
+              placeholder="12345 (required)"
+              placeholderTextColor={Colors.gray[400]}
+            />
+            <Text style={st.helperText}>Required by eBay for shipping calculations.</Text>
 
             <Text style={st.fieldLabel}>Handling Days</Text>
             <TextInput style={st.input} value={shipping.handlingDays} onChangeText={v => setShipping(p => ({ ...p, handlingDays: v }))} keyboardType="number-pad" />
@@ -956,6 +1035,10 @@ const st = StyleSheet.create({
   addPhotoText: { fontSize: 10, color: Colors.gray[500], fontWeight: '600' },
   imageHint: { fontSize: 10, color: Colors.gray[500], marginTop: 8 },
   hiddenWebViewWrapper: { position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: Colors.purple[200], backgroundColor: Colors.purple[50] },
+  previewBtnText: { fontSize: 11, fontWeight: '600', color: Colors.purple[700] },
+  helperText: { fontSize: 10, color: Colors.gray[500], marginTop: 2, marginBottom: 6 },
+  lockedText: { fontSize: 9, fontStyle: 'italic', color: Colors.gray[400] },
 
   // Review
   reviewBox: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
