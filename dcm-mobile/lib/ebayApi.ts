@@ -85,9 +85,53 @@ export async function uploadImages(
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
-    throw new Error(err.error || 'Failed to upload images')
+    throw new Error(err.error || `Failed to upload images (HTTP ${res.status})`)
   }
   return res.json()
+}
+
+/**
+ * Upload images one at a time to avoid Vercel's 4.5 MB request-body limit.
+ * Base64 data URLs are ~33% larger than the original bytes, and a slab/mini-
+ * report PNG can easily be 1-3 MB each; bundling 5+ in a single POST exceeds
+ * the limit. Splitting into individual calls is slightly slower but reliable.
+ */
+export async function uploadImagesSequential(
+  cardId: string,
+  images: {
+    front?: string
+    back?: string
+    miniReport?: string
+    rawFront?: string
+    rawBack?: string
+  },
+  additionalImages?: string[],
+  onProgress?: (label: string, current: number, total: number) => void,
+): Promise<ImageUploadResult> {
+  const merged: ImageUploadResult['urls'] = {}
+  const systemEntries = Object.entries(images).filter(([, v]) => !!v) as Array<[keyof typeof images, string]>
+  const extras = additionalImages?.filter(Boolean) ?? []
+  const total = systemEntries.length + extras.length
+  let current = 0
+
+  for (const [key, dataUrl] of systemEntries) {
+    current += 1
+    onProgress?.(`Uploading ${key}…`, current, total)
+    const result = await uploadImages(cardId, { [key]: dataUrl } as any)
+    Object.assign(merged, result.urls)
+  }
+
+  const additionalUrls: string[] = []
+  for (const dataUrl of extras) {
+    current += 1
+    onProgress?.(`Uploading custom photo ${current}/${total}…`, current, total)
+    const result = await uploadImages(cardId, {}, [dataUrl])
+    const url = result.urls.additional?.[0]
+    if (url) additionalUrls.push(url)
+  }
+  if (additionalUrls.length > 0) merged.additional = additionalUrls
+
+  return { urls: merged }
 }
 
 // ─── Create Listing ───

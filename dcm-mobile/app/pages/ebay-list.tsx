@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import {
-  checkEbayStatus, checkExistingListing, uploadImages, createListing,
+  checkEbayStatus, checkExistingListing, uploadImages, uploadImagesSequential, createListing,
   getAspects, checkDisclaimer, acceptDisclaimer, getOAuthUrl,
   generateTitle, CATEGORY_MAP, SHIPPING_SERVICES, DURATION_OPTIONS,
   type EbayConnectionStatus, type CreateListingRequest,
@@ -76,7 +76,8 @@ export default function EbayListScreen() {
   const [listingFormat, setListingFormat] = useState<'FIXED_PRICE' | 'AUCTION'>('FIXED_PRICE')
   const [bestOfferEnabled, setBestOfferEnabled] = useState(true)
   const [duration, setDuration] = useState('GTC')
-  const [showDescriptionPreview, setShowDescriptionPreview] = useState(false)
+  // Default to rendered preview — matches the web's UX
+  const [showDescriptionPreview, setShowDescriptionPreview] = useState(true)
 
   // Step 3: Specifics
   type ItemSpecific = { name: string; value: string | string[]; required?: boolean; editable?: boolean }
@@ -106,6 +107,7 @@ export default function EbayListScreen() {
   const [listingResult, setListingResult] = useState<any>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
+  const [publishProgress, setPublishProgress] = useState<string>('')
 
   // ─── Load card data ───
   useEffect(() => {
@@ -283,7 +285,16 @@ export default function EbayListScreen() {
         if (backUrl) imagesToUpload.back = backUrl
       }
 
-      const uploadResult = await uploadImages(cardId, imagesToUpload, orderedExtras.map(e => e.base64))
+      // Upload one image at a time — Vercel has a 4.5 MB body limit and bundling
+      // 5+ base64 PNGs blows past it.
+      setPublishProgress('Uploading images…')
+      const uploadResult = await uploadImagesSequential(
+        cardId,
+        imagesToUpload,
+        orderedExtras.map(e => e.base64),
+        (label, cur, total) => setPublishProgress(`${label} (${cur}/${total})`),
+      )
+      console.log('[ebay-list] upload result urls:', Object.keys(uploadResult.urls))
 
       // Build the final URL list in the user's chosen order
       const orderedUrls: string[] = []
@@ -351,12 +362,14 @@ export default function EbayListScreen() {
         throw new Error(result.error || result.userAction || 'Listing failed')
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to create listing')
+      console.warn('[ebay-list] publish failed:', err)
+      setErrorMessage(err?.message || String(err) || 'Failed to create listing')
       setStep('error')
     } finally {
       setIsPublishing(false)
+      setPublishProgress('')
     }
-  }, [card, cardId, title, price, listingFormat, bestOfferEnabled, duration, selectedImages, frontUrl, backUrl, itemSpecifics, shipping])
+  }, [card, cardId, title, price, description, listingFormat, bestOfferEnabled, duration, imageOrder, imageUrls, selectedImages, additionalImages, frontUrl, backUrl, itemSpecifics, shipping])
 
   // ─── Navigation helpers ───
   const canGoNext = useMemo(() => {
@@ -682,40 +695,47 @@ export default function EbayListScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
               <Text style={st.fieldLabel}>Listing Description</Text>
               {description.length > 0 && (
-                <TouchableOpacity onPress={() => setShowDescriptionPreview(true)} style={st.previewBtn}>
-                  <Ionicons name="eye-outline" size={12} color={Colors.purple[600]} />
-                  <Text style={st.previewBtnText}>Preview</Text>
+                <TouchableOpacity
+                  onPress={() => setShowDescriptionPreview(prev => !prev)}
+                  style={st.previewBtn}
+                >
+                  <Ionicons
+                    name={showDescriptionPreview ? 'code-slash-outline' : 'eye-outline'}
+                    size={12}
+                    color={Colors.purple[600]}
+                  />
+                  <Text style={st.previewBtnText}>
+                    {showDescriptionPreview ? 'Edit HTML' : 'Preview'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
-            <Text style={st.helperText}>Auto-generated DCM template. Edit the HTML directly to customize.</Text>
-            <TextInput
-              style={[st.input, { minHeight: 120, textAlignVertical: 'top' as const, fontSize: 11, fontFamily: 'SpaceMono' }]}
-              value={description}
-              onChangeText={setDescription}
-              multiline
-              placeholder={imagesGenerating ? 'Generating description…' : 'Description will appear here once images finish generating.'}
-              placeholderTextColor={Colors.gray[400]}
-            />
+            <Text style={st.helperText}>
+              {showDescriptionPreview
+                ? 'Preview of how this will appear on eBay. Tap "Edit HTML" to customize the markup.'
+                : 'Edit the HTML directly. Tap "Preview" to see how it will render on eBay.'}
+            </Text>
+            {description.length > 0 && showDescriptionPreview ? (
+              <View style={st.descriptionPreviewBox}>
+                <WebView
+                  originWhitelist={['*']}
+                  source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:8px;font-family:-apple-system,Roboto,sans-serif;}</style></head><body>${description}</body></html>` }}
+                  style={{ flex: 1, backgroundColor: 'transparent' }}
+                  scrollEnabled
+                />
+              </View>
+            ) : (
+              <TextInput
+                style={[st.input, { minHeight: 140, textAlignVertical: 'top' as const, fontSize: 10, fontFamily: 'SpaceMono' }]}
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                placeholder={imagesGenerating ? 'Generating description…' : 'Description will appear here once images finish generating.'}
+                placeholderTextColor={Colors.gray[400]}
+              />
+            )}
           </View>
         )}
-
-        {/* Description preview modal — renders the HTML in a WebView to match what eBay will show */}
-        <Modal visible={showDescriptionPreview} animationType="slide" onRequestClose={() => setShowDescriptionPreview(false)}>
-          <View style={{ flex: 1, backgroundColor: '#fff' }}>
-            <View style={st.oauthHeader}>
-              <TouchableOpacity onPress={() => setShowDescriptionPreview(false)}>
-                <Ionicons name="close" size={24} color={Colors.gray[700]} />
-              </TouchableOpacity>
-              <Text style={st.oauthTitle}>Description Preview</Text>
-              <View style={{ width: 24 }} />
-            </View>
-            <WebView
-              originWhitelist={['*']}
-              source={{ html: description ? `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>${description}</body></html>` : '<p>No description</p>' }}
-            />
-          </View>
-        </Modal>
 
         {/* ═══ STEP 3: Item Specifics ═══ */}
         {step === 'specifics' && (
@@ -915,7 +935,7 @@ export default function EbayListScreen() {
           <View style={[st.section, { alignItems: 'center', paddingVertical: 40 }]}>
             <ActivityIndicator size="large" color={Colors.purple[600]} />
             <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.gray[800], marginTop: 16 }}>Creating Your Listing...</Text>
-            <Text style={{ fontSize: 12, color: Colors.gray[500], marginTop: 4 }}>Uploading images and publishing to eBay</Text>
+            <Text style={{ fontSize: 12, color: Colors.gray[500], marginTop: 4 }}>{publishProgress || 'Uploading images and publishing to eBay'}</Text>
           </View>
         )}
 
@@ -1039,6 +1059,7 @@ const st = StyleSheet.create({
   previewBtnText: { fontSize: 11, fontWeight: '600', color: Colors.purple[700] },
   helperText: { fontSize: 10, color: Colors.gray[500], marginTop: 2, marginBottom: 6 },
   lockedText: { fontSize: 9, fontStyle: 'italic', color: Colors.gray[400] },
+  descriptionPreviewBox: { height: 360, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8, overflow: 'hidden', backgroundColor: '#fff' },
 
   // Review
   reviewBox: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
