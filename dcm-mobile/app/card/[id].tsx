@@ -41,6 +41,16 @@ export default function CardDetailScreen() {
   const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover' } | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<string>('')
+
+  // Safety timeout — if the export page never posts back within 90s, surface an error
+  // so the user isn't stuck on an indefinite spinner.
+  useEffect(() => {
+    if (!exportTask) return
+    const timer = setTimeout(() => {
+      setExportError('Generation timed out after 90 seconds. The label generator may have failed silently or the page is still deploying. Try again in a minute.')
+    }, 90_000)
+    return () => clearTimeout(timer)
+  }, [exportTask])
   const [editForm, setEditForm] = useState<{
     card_name: string
     card_set: string
@@ -324,10 +334,14 @@ export default function CardDetailScreen() {
                   }}
                   originWhitelist={['*']}
                   javaScriptEnabled
-                  onLoadStart={() => setExportStatus('Generating on the web…')}
+                  onLoadStart={() => setExportStatus('Loading export page…')}
                   onMessage={async (e) => {
                     try {
                       const msg = JSON.parse(e.nativeEvent.data)
+                      if (msg.type === 'status' && msg.message) {
+                        setExportStatus(msg.message)
+                        return
+                      }
                       if (msg.type === 'label-export-ready' && Array.isArray(msg.files)) {
                         setExportStatus(`Saving ${msg.files.length} file${msg.files.length > 1 ? 's' : ''}…`)
                         const savedPaths: string[] = []

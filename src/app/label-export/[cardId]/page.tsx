@@ -63,12 +63,18 @@ export default function LabelExportPage() {
   const [status, setStatus] = useState('Initializing…');
   const [error, setError] = useState<string | null>(null);
 
+  // Wraps setStatus + posts back to RN so mobile can show progress
+  const postStatus = (s: string) => {
+    setStatus(s);
+    postToRN({ type: 'status', message: s });
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         if (!cardId || !token) throw new Error('Missing cardId or token');
-        setStatus('Loading card…');
+        postStatus('Loading card…');
         const supabase = createClient(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -102,7 +108,7 @@ export default function LabelExportPage() {
         const blobs: Array<{ name: string; mime: string; dataUrl: string }> = [];
 
         if (type === 'card-image-modern' || type === 'card-image-traditional') {
-          setStatus('Generating slab card images…');
+          postStatus('Generating slab card images…');
           const imageData: CardImageData = {
             cardName: labelData.primaryName,
             contextLine: labelData.contextLine,
@@ -121,7 +127,7 @@ export default function LabelExportPage() {
           blobs.push({ name: `DCM-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });
           blobs.push({ name: `DCM-${namePrefix}-back.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(back) });
         } else if (type === 'mini-report') {
-          setStatus('Generating mini grade report…');
+          postStatus('Generating mini grade report…');
           const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
             generateQRCodeWithLogo(cardUrl).catch(() => ''),
             loadLogoAsBase64().catch(() => undefined),
@@ -145,7 +151,7 @@ export default function LabelExportPage() {
           const blob = await generateMiniReportJpg(fold);
           blobs.push({ name: `DCM-${namePrefix}-mini-report.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(blob) });
         } else if (type === 'onetouch') {
-          setStatus('Generating Avery 6871 one-touch label…');
+          postStatus('Generating Avery 6871 one-touch label…');
           const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
             generateQRCodeWithLogo(cardUrl).catch(() => ''),
             loadLogoAsBase64().catch(() => ''),
@@ -169,7 +175,7 @@ export default function LabelExportPage() {
           const blob = await generateAveryLabel(fold, 0);
           blobs.push({ name: `DCM-OneTouch-${namePrefix}.pdf`, mime: 'application/pdf', dataUrl: await blobToDataUrl(blob) });
         } else if (type === 'toploader' || type === 'foldover') {
-          setStatus('Generating Avery 8167 toploader label…');
+          postStatus('Generating Avery 8167 toploader label…');
           const toploaderData = {
             grade,
             conditionLabel: card.conversational_condition_label || labelData.condition,
@@ -185,25 +191,31 @@ export default function LabelExportPage() {
             dataUrl: await blobToDataUrl(blob),
           });
         } else if (type === 'slab-modern' || type === 'slab-traditional') {
-          setStatus('Generating slab label PDF…');
-          const slabStyle = type === 'slab-traditional' ? 'traditional' : 'modern';
+          postStatus('Generating slab label PDF…');
+          const slabStyle: 'modern' | 'traditional' = type === 'slab-traditional' ? 'traditional' : 'modern';
+          const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+            generateQRCodeWithLogo(cardUrl).catch(() => ''),
+            loadLogoAsBase64().catch(() => ''),
+          ]);
+          // SlabLabelData shape per src/lib/slabLabelGenerator.ts
           const slabPayload: any = {
-            cardName: labelData.primaryName,
-            setName: labelData.setName || '',
-            cardNumber: labelData.cardNumber || undefined,
-            year: labelData.year || undefined,
-            specialFeatures: labelData.featuresLine || undefined,
+            primaryName: labelData.primaryName,
+            contextLine: labelData.contextLine || '',
+            features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
+            featuresLine: labelData.featuresLine || null,
             serial: labelData.serial,
-            englishName: card.featured || card.pokemon_featured || undefined,
             grade,
-            conditionLabel: labelData.condition,
-            subgrades: subScores,
-            cardUrl,
-            style: slabStyle,
+            gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
+            condition: labelData.condition,
+            isAlteredAuthentic: false,
+            englishName: card.featured || card.pokemon_featured || undefined,
+            qrCodeDataUrl,
+            subScores,
+            logoDataUrl,
           };
           const blob = format === 'foldover'
-            ? await generateFoldOverSlabLabel(slabPayload)
-            : await generateSlabLabel(slabPayload);
+            ? await generateFoldOverSlabLabel(slabPayload, slabStyle)
+            : await generateSlabLabel(slabPayload, slabStyle);
           blobs.push({
             name: `DCM-Slab-${slabStyle}-${format}-${namePrefix}.pdf`,
             mime: 'application/pdf',
@@ -214,13 +226,13 @@ export default function LabelExportPage() {
         }
 
         if (cancelled) return;
-        setStatus('Done');
+        postStatus('Done');
         postToRN({ type: 'label-export-ready', files: blobs });
       } catch (err: any) {
         if (cancelled) return;
         const msg = err?.message || String(err);
         setError(msg);
-        setStatus('Error');
+        postStatus('Error');
         postToRN({ type: 'error', message: msg });
       }
     })();
