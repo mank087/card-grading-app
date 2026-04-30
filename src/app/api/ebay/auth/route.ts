@@ -55,7 +55,11 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // For Bearer-token auth (mobile / non-cookie clients) pass the token explicitly,
+    // since auth.getUser() with no args only reads a session from storage.
+    const { data: { user }, error: userError } = accessToken
+      ? await supabase.auth.getUser(accessToken)
+      : await supabase.auth.getUser();
 
     if (userError || !user) {
       return NextResponse.json(

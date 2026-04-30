@@ -12,11 +12,13 @@ interface CornerZoomGridProps {
   side: 'Front' | 'Back'
 }
 
+// Zoom factor 5x (matches web's CSS backgroundSize: '500% 500%').
+// Offsets are -400% so each corner of the source image lands in the visible window.
 const corners = [
   { label: 'Top Left', offset: { top: 0, left: 0 } },
-  { label: 'Top Right', offset: { top: 0, left: '-150%' } },
-  { label: 'Bottom Left', offset: { top: '-150%', left: 0 } },
-  { label: 'Bottom Right', offset: { top: '-150%', left: '-150%' } },
+  { label: 'Top Right', offset: { top: 0, left: '-400%' } },
+  { label: 'Bottom Left', offset: { top: '-400%', left: 0 } },
+  { label: 'Bottom Right', offset: { top: '-400%', left: '-400%' } },
 ]
 
 export default function CornerZoomGrid({ imageUrl, side }: CornerZoomGridProps) {
@@ -31,7 +33,7 @@ export default function CornerZoomGrid({ imageUrl, side }: CornerZoomGridProps) 
               <Image
                 source={{ uri: imageUrl }}
                 style={[styles.zoomedImage, { top: corner.offset.top, left: corner.offset.left }]}
-                resizeMode="cover"
+                resizeMode="stretch"
               />
             </View>
             <Text style={styles.cornerLabel}>{corner.label}</Text>
@@ -69,8 +71,8 @@ const styles = StyleSheet.create({
   },
   zoomedImage: {
     position: 'absolute',
-    width: '250%',
-    height: '250%',
+    width: '500%',
+    height: '500%',
   },
   cornerLabel: {
     fontSize: 10,

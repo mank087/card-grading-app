@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable } from 'react-native'
+import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -14,11 +14,16 @@ import CollapsibleSection from '@/components/ui/CollapsibleSection'
 import SlabCard from '@/components/grading/SlabCard'
 import CornerZoomGrid from '@/components/grading/CornerZoomGrid'
 import DefectOverlay, { extractDefectMarkers } from '@/components/grading/DefectOverlay'
+import { useLabelStyle } from '@/hooks/useLabelStyle'
+import { useUserEmblems } from '@/hooks/useUserEmblems'
+import { getDisplayName, getContextLine } from '@/lib/labelData'
 
 export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const { session } = useAuth()
+  const { labelStyle, colorOverrides } = useLabelStyle()
+  const emblems = useUserEmblems()
   const [card, setCard] = useState<Card | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -26,6 +31,19 @@ export default function CardDetailScreen() {
   const [backUrl, setBackUrl] = useState<string | null>(null)
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
   const [zoomImage, setZoomImage] = useState<string | null>(null)
+  const [editOpen, setEditOpen] = useState(false)
+  const [editForm, setEditForm] = useState<{
+    card_name: string
+    card_set: string
+    card_number: string
+    release_date: string
+    player_or_character: string
+    manufacturer: string
+    rarity: string
+  }>({ card_name: '', card_set: '', card_number: '', release_date: '', player_or_character: '', manufacturer: '', rarity: '' })
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [hideMarkers, setHideMarkers] = useState(false)
+  const [refreshingPrice, setRefreshingPrice] = useState(false)
 
   const fetchCard = useCallback(async () => {
     if (!id) return
@@ -44,6 +62,93 @@ export default function CardDetailScreen() {
   }, [id])
 
   useEffect(() => { fetchCard() }, [fetchCard])
+
+  // Build the appropriate /api/pricing/{category} request body for a card.
+  // Mirrors the request shape each route expects (sports vs pokemon vs others).
+  const buildPriceRequest = useCallback((c: Card | null) => {
+    if (!c) return null
+    const ci = c.conversational_card_info as any
+    const cat = c.category || ''
+    const setName = c.card_set || ci?.set_name || ''
+    const cardNumber = c.card_number || ci?.card_number || ''
+    const year = c.release_date || ci?.year || ''
+    const dcmGrade = c.conversational_whole_grade ? Math.round(c.conversational_whole_grade) : undefined
+    const variant = ci?.variant || ci?.parallel || undefined
+    const baseFields = { setName, cardNumber, year, variant, dcmGrade, cardId: c.id, forceRefresh: true }
+    switch (cat) {
+      case 'Sports':
+        return {
+          path: '/api/pricing/pricecharting',
+          body: {
+            ...baseFields,
+            playerName: ci?.player_or_character || c.featured || c.card_name || '',
+            sport: ci?.sport_or_category || undefined,
+            rookie: ci?.rookie_or_first || c.rookie_card || undefined,
+            serialNumbering: c.serial_numbering || undefined,
+          },
+        }
+      case 'Pokemon':
+        return {
+          path: '/api/pricing/pokemon',
+          body: {
+            ...baseFields,
+            pokemonName: ci?.player_or_character || c.pokemon_featured || c.card_name || ci?.card_name || '',
+            isHolo: !!ci?.holofoil || ci?.holofoil === 'true' || undefined,
+            isFirstEdition: ci?.is_first_edition || undefined,
+            isReverseHolo: ci?.is_reverse_holo || undefined,
+          },
+        }
+      case 'MTG': return { path: '/api/pricing/mtg', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
+      case 'Lorcana': return { path: '/api/pricing/lorcana', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
+      case 'One Piece': return { path: '/api/pricing/onepiece', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
+      default: return { path: '/api/pricing/other', body: { ...baseFields, cardName: c.card_name || ci?.card_name || '' } }
+    }
+  }, [])
+
+  const refreshPrice = useCallback(async (silent = false) => {
+    if (!card) return
+    const req = buildPriceRequest(card)
+    if (!req) return
+    if (!silent) setRefreshingPrice(true)
+    try {
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+      const token = session?.access_token
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) headers['Authorization'] = `Bearer ${token}`
+      const res = await fetch(`${API_BASE}${req.path}`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(req.body),
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        console.warn('[refreshPrice] non-OK:', res.status, text)
+        if (!silent) Alert.alert('Refresh failed', text || `Status ${res.status}`)
+        return
+      }
+      // Refetch the card to pick up the new dcm_cached_prices column
+      await fetchCard()
+    } catch (err: any) {
+      console.warn('[refreshPrice] error:', err)
+      if (!silent) Alert.alert('Refresh failed', err?.message || 'Network error')
+    } finally {
+      if (!silent) setRefreshingPrice(false)
+    }
+  }, [card, session?.access_token, buildPriceRequest, fetchCard])
+
+  // Auto-refresh on mount when prices are stale (≥7 days) — matches web's 7-day cache TTL.
+  useEffect(() => {
+    if (!card) return
+    if (card.conversational_whole_grade == null) return // skip ungraded cards
+    const cachedAt = card.dcm_prices_cached_at
+    const stale = !cachedAt || (Date.now() - new Date(cachedAt).getTime()) >= 7 * 24 * 60 * 60 * 1000
+    if (stale) {
+      console.log('[card detail] prices stale (cachedAt=' + cachedAt + ') — auto-refreshing')
+      refreshPrice(true)
+    }
+    // Fire once per card load, keyed on card.id.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [card?.id])
 
   if (isLoading) return <View style={s.loading}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
   if (!card) return <View style={s.loading}><Text style={{ color: Colors.gray[500] }}>Card not found</Text></View>
@@ -122,20 +227,105 @@ export default function CardDetailScreen() {
         </Pressable>
       </Modal>
 
+      {/* Edit Card Info Modal */}
+      <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <Pressable style={s.editBackdrop} onPress={() => setEditOpen(false)}>
+            <Pressable style={s.editSheet} onPress={e => e.stopPropagation()}>
+              <View style={s.editHandle} />
+              <Text style={s.editTitle}>Edit Card Info</Text>
+              <Text style={s.editSubtitle}>Updates appear on the slab label, collection, and downloadable labels.</Text>
+              <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
+                {[
+                  { key: 'card_name', label: 'Card Name', placeholder: 'e.g. Charizard' },
+                  { key: 'player_or_character', label: 'Player / Character', placeholder: 'e.g. Patrick Mahomes' },
+                  { key: 'card_set', label: 'Set', placeholder: 'e.g. Topps Chrome' },
+                  { key: 'card_number', label: 'Card Number', placeholder: 'e.g. 4 or 94/102' },
+                  { key: 'release_date', label: 'Year', placeholder: 'e.g. 2023' },
+                  { key: 'manufacturer', label: 'Manufacturer', placeholder: 'e.g. Topps' },
+                  { key: 'rarity', label: 'Rarity', placeholder: 'e.g. Holo Rare' },
+                ].map(field => (
+                  <View key={field.key} style={s.editField}>
+                    <Text style={s.editLabel}>{field.label}</Text>
+                    <TextInput
+                      style={s.editInput}
+                      value={(editForm as any)[field.key]}
+                      onChangeText={t => setEditForm(f => ({ ...f, [field.key]: t }))}
+                      placeholder={field.placeholder}
+                      placeholderTextColor={Colors.gray[400]}
+                      autoCapitalize="words"
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                <TouchableOpacity style={[s.editBtn, s.editBtnCancel]} onPress={() => setEditOpen(false)} disabled={savingEdit}>
+                  <Text style={s.editBtnCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.editBtn, s.editBtnSave]}
+                  disabled={savingEdit}
+                  onPress={async () => {
+                    setSavingEdit(true)
+                    try {
+                      const mergedCi = {
+                        ...(card.conversational_card_info || {}),
+                        card_name: editForm.card_name || null,
+                        set_name: editForm.card_set || null,
+                        card_number: editForm.card_number || null,
+                        year: editForm.release_date || null,
+                        player_or_character: editForm.player_or_character || null,
+                        manufacturer: editForm.manufacturer || null,
+                        rarity_tier: editForm.rarity || null,
+                      }
+                      const update = {
+                        card_name: editForm.card_name || null,
+                        card_set: editForm.card_set || null,
+                        card_number: editForm.card_number || null,
+                        release_date: editForm.release_date || null,
+                        conversational_card_info: mergedCi,
+                      }
+                      const { error } = await supabase.from('cards').update(update).eq('id', card.id)
+                      if (error) throw error
+                      setCard((prev: any) => prev ? { ...prev, ...update } : prev)
+                      setEditOpen(false)
+                    } catch (err: any) {
+                      Alert.alert('Save failed', err?.message || 'Could not update card.')
+                    } finally {
+                      setSavingEdit(false)
+                    }
+                  }}
+                >
+                  {savingEdit
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.editBtnSaveText}>Save</Text>}
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* ══════ SLAB PREVIEW ══════ */}
       <View style={s.slabSection}>
         <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
         <View style={s.slabContainer}>
           <SlabCard
             imageUrl={activeImage === 'front' ? frontUrl : backUrl}
-            displayName={cardName}
-            contextLine={[setName, cardNumber ? `#${cardNumber}` : null, year].filter(Boolean).join(' \u2022 ')}
+            displayName={getDisplayName(card as any)}
+            contextLine={getContextLine(card as any)}
             serial={card.serial}
             grade={grade}
             condition={card.conversational_condition_label || ''}
             size="lg"
             isBack={activeImage === 'back'}
             subScores={sub}
+            labelStyle={labelStyle}
+            colorOverrides={colorOverrides}
+            qrUrl={`https://dcmgrading.com/verify/${card.serial}`}
+            showFounderEmblem={emblems.showFounder}
+            showVipEmblem={emblems.showVip}
+            showCardLoversEmblem={emblems.showCardLovers}
           />
         </View>
         </TouchableOpacity>
@@ -194,34 +384,13 @@ export default function CardDetailScreen() {
         </View>
       )}
 
-      {/* Category badge */}
-      <View style={{ flexDirection: 'row', justifyContent: 'center', marginBottom: 4 }}>
-        <View style={{ backgroundColor: Colors.purple[50], paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, borderWidth: 1, borderColor: Colors.purple[200] }}>
-          <Text style={{ fontSize: 10, fontWeight: '600', color: Colors.purple[700] }}>{card.category || 'Card'}</Text>
-        </View>
+      {/* Serial */}
+      <View style={{ paddingHorizontal: 12, marginBottom: 8 }}>
+        <Text style={s.serialLabel}>DCM Serial#:</Text>
+        <Text style={s.serialValue}>{card.serial}</Text>
       </View>
 
-      {/* Serial + QR */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 12, marginBottom: 8 }}>
-        <View>
-          <Text style={s.serialLabel}>DCM Serial#:</Text>
-          <Text style={s.serialValue}>{card.serial}</Text>
-        </View>
-        <TouchableOpacity
-          onPress={() => {
-            const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-            Linking.openURL(`https://dcmgrading.com/verify/${card.serial}`)
-          }}
-          style={{ alignItems: 'center' }}
-        >
-          <View style={{ width: 48, height: 48, backgroundColor: '#fff', borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200], justifyContent: 'center', alignItems: 'center', padding: 4 }}>
-            <Ionicons name="qr-code" size={32} color={Colors.purple[600]} />
-          </View>
-          <Text style={{ fontSize: 8, color: Colors.gray[400], marginTop: 2 }}>Verify</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Owner controls: Visibility + Regrade */}
+      {/* Owner controls: Visibility */}
       {isOwner && (
         <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, marginBottom: 8 }}>
           <TouchableOpacity
@@ -235,52 +404,14 @@ export default function CardDetailScreen() {
             <Ionicons name={card.visibility === 'public' ? 'eye' : 'eye-off'} size={14} color={card.visibility === 'public' ? Colors.green[600] : Colors.gray[500]} />
             <Text style={{ fontSize: 11, fontWeight: '600', color: card.visibility === 'public' ? Colors.green[600] : Colors.gray[500] }}>{card.visibility === 'public' ? 'Public' : 'Private'}</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: Colors.blue[300], backgroundColor: Colors.blue[50] }}
-            onPress={() => {
-              Alert.alert('Regrade Card', 'This will use 1 credit to regrade this card with the latest DCM Optic™ AI. Continue?', [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Regrade', onPress: async () => {
-                  const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
-                  const endpoint = card.category === 'Sports' ? 'sports' : card.category === 'Pokemon' ? 'pokemon' : card.category === 'MTG' ? 'mtg' : 'other'
-                  try {
-                    await fetch(`${API_BASE}/api/${endpoint}/${card.id}`)
-                    Alert.alert('Regrading', 'Your card is being regraded. Check back in 1-2 minutes.')
-                  } catch {
-                    Alert.alert('Error', 'Failed to start regrading.')
-                  }
-                }},
-              ])
-            }}
-          >
-            <Ionicons name="refresh" size={14} color={Colors.blue[600]} />
-            <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.blue[600] }}>Regrade</Text>
-          </TouchableOpacity>
         </View>
       )}
 
-      {/* Share Buttons */}
+      {/* Share + Copy + Labels */}
       <View style={s.shareRow}>
         <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
           <Ionicons name="share-social" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Share</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => {
-          const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-          const url = `https://dcmgrading.com/${catPath}/${card.id}`
-          Linking.openURL(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`)
-        }}>
-          <Ionicons name="logo-facebook" size={16} color="#1877F2" />
-          <Text style={s.shareBtnText}>Facebook</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => {
-          const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-          const url = `https://dcmgrading.com/${catPath}/${card.id}`
-          const text = `Check out this ${cardName} graded ${grade}/10 by DCM Grading!`
-          Linking.openURL(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`)
-        }}>
-          <Ionicons name="logo-twitter" size={16} color="#1DA1F2" />
-          <Text style={s.shareBtnText}>X</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.shareBtn} onPress={async () => {
           const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
@@ -353,15 +484,16 @@ export default function CardDetailScreen() {
             <TouchableOpacity
               style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.purple[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], alignSelf: 'flex-start' }}
               onPress={() => {
-                Alert.prompt ? Alert.prompt('Edit Card Name', 'Enter new card name:', async (newName) => {
-                  if (newName && newName.trim()) {
-                    await supabase.from('cards').update({ card_name: newName.trim() }).eq('id', card.id)
-                    setCard((prev: any) => prev ? { ...prev, card_name: newName.trim() } : prev)
-                  }
-                }, 'plain-text', cardName) : Alert.alert('Edit Card', 'Use Label Studio to edit card details.', [
-                  { text: 'Open Label Studio', onPress: () => router.push({ pathname: '/pages/label-studio' as any, params: { cardId: card.id } }) },
-                  { text: 'Cancel', style: 'cancel' },
-                ])
+                setEditForm({
+                  card_name: card.card_name || ci?.card_name || '',
+                  card_set: card.card_set || ci?.set_name || '',
+                  card_number: card.card_number || ci?.card_number || '',
+                  release_date: card.release_date || ci?.year || '',
+                  player_or_character: ci?.player_or_character || '',
+                  manufacturer: ci?.manufacturer || (card as any).manufacturer_name || '',
+                  rarity: ci?.rarity_tier || ci?.rarity_or_variant || '',
+                })
+                setEditOpen(true)
               }}
             >
               <Ionicons name="create-outline" size={14} color={Colors.purple[600]} />
@@ -478,32 +610,6 @@ export default function CardDetailScreen() {
                 )
               })()}
 
-              {/* How Centering Was Measured (accordion) */}
-              {(() => {
-                const frontData = (cen as any)?.front || {}
-                const backData = (cen as any)?.back || {}
-                const hasMeasurementDetails = frontData.measurement_method || frontData.card_type
-                if (!hasMeasurementDetails) return null
-                return (
-                  <CollapsibleSection title="How Centering Was Measured" icon="help-circle">
-                    {frontData.analysis && (
-                      <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: Colors.blue[100], marginBottom: 8 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.blue[600], marginBottom: 4 }}>Front Analysis</Text>
-                        <Text style={{ fontSize: 10, color: Colors.gray[600], lineHeight: 15 }}>{frontData.analysis}</Text>
-                      </View>
-                    )}
-                    {backData.analysis && (
-                      <View style={{ backgroundColor: '#fff', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#06b6d4', marginBottom: 8 }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: '#0891b2', marginBottom: 4 }}>Back Analysis</Text>
-                        <Text style={{ fontSize: 10, color: Colors.gray[600], lineHeight: 15 }}>{backData.analysis}</Text>
-                      </View>
-                    )}
-                    <View style={{ backgroundColor: Colors.amber[50], borderRadius: 8, padding: 8, borderWidth: 1, borderColor: Colors.amber[100] }}>
-                      <Text style={{ fontSize: 9, color: Colors.amber[600] }}>This analysis explains the specific visual elements and measurements used to determine centering ratios.</Text>
-                    </View>
-                  </CollapsibleSection>
-                )
-              })()}
             </>
           ) : (
             <Text style={s.naText}>No centering data available</Text>
@@ -563,6 +669,65 @@ export default function CardDetailScreen() {
                       <CornerZoomGrid imageUrl={imageUrl} side={side === 'front' ? 'Front' : 'Back'} />
                     </View>
                   )}
+
+                  {/* Defect Map */}
+                  {imageUrl && (() => {
+                    const markers = extractDefectMarkers(card.conversational_grading, side as 'front' | 'back')
+                    if (markers.length === 0) return null
+                    // Group markers by source for the legend
+                    const grouped: Record<string, typeof markers> = { Corners: [], Edges: [], Surface: [] }
+                    markers.forEach(m => {
+                      const cat = m.type.startsWith('Corner') ? 'Corners' : m.type.startsWith('Edge') ? 'Edges' : 'Surface'
+                      grouped[cat].push(m)
+                    })
+                    return (
+                      <View style={{ marginBottom: 10, backgroundColor: '#fff', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: themeBorder }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <Text style={{ fontSize: 12, fontWeight: '700', color: themeHeading }}>Defect Map</Text>
+                          <TouchableOpacity onPress={() => setHideMarkers(v => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, backgroundColor: Colors.gray[100], borderRadius: 6 }}>
+                            <Ionicons name={hideMarkers ? 'eye-off' : 'eye'} size={12} color={Colors.gray[600]} />
+                            <Text style={{ fontSize: 10, color: Colors.gray[600], fontWeight: '600' }}>{hideMarkers ? 'Show Markers' : 'Hide Markers'}</Text>
+                          </TouchableOpacity>
+                        </View>
+                        {/* Image with overlaid markers */}
+                        <View style={{ borderRadius: 6, borderWidth: 1, borderColor: themeBorder, overflow: 'hidden', alignSelf: 'center' }}>
+                          <View style={{ width: 220, aspectRatio: 2.5 / 3.5, position: 'relative' }}>
+                            <Image source={{ uri: imageUrl }} style={{ width: '100%', height: '100%' }} resizeMode="contain" />
+                            {!hideMarkers && <DefectOverlay defects={markers} />}
+                          </View>
+                        </View>
+                        {/* Legend */}
+                        <View style={{ marginTop: 8, gap: 6 }}>
+                          <Text style={{ fontSize: 11, fontWeight: '700', color: Colors.gray[700] }}>Defect Map Legend</Text>
+                          {(['Corners', 'Edges', 'Surface'] as const).map(cat => {
+                            const items = grouped[cat]
+                            if (!items || items.length === 0) return null
+                            return (
+                              <View key={cat}>
+                                <Text style={{ fontSize: 10, fontWeight: '700', color: themeText, marginTop: 4 }}>{cat}</Text>
+                                {items.map(m => {
+                                  const dotColor = m.severity === 'heavy' ? Colors.red[500] : m.severity === 'moderate' ? Colors.amber[500] : Colors.green[500]
+                                  return (
+                                    <View key={m.id} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 6, marginTop: 3 }}>
+                                      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: dotColor, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
+                                        <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>{m.id}</Text>
+                                      </View>
+                                      <Text style={{ flex: 1, fontSize: 9, color: Colors.gray[700], lineHeight: 13 }}>
+                                        <Text style={{ fontWeight: '700' }}>#{m.id} </Text>
+                                        <Text style={{ fontWeight: '700', textTransform: 'capitalize' }}>{m.type.replace(/^(Corner|Edge) \(/, '').replace(/\)$/, '')}</Text>
+                                        {' '}<Text style={{ fontWeight: '600', color: dotColor }}>({m.severity})</Text>
+                                        {' — ' + (typeof m.description === 'string' ? m.description : '')}
+                                      </Text>
+                                    </View>
+                                  )
+                                })}
+                              </View>
+                            )
+                          })}
+                        </View>
+                      </View>
+                    )
+                  })()}
 
                   {/* Corners */}
                   {cornersData && (
@@ -735,25 +900,25 @@ export default function CardDetailScreen() {
 
             return (
               <>
-                {/* DCM Estimated Value */}
-                {dcmEst != null && (
-                  <View style={s.dcmPriceCard}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View>
-                        <Text style={s.pricingSource}>Your DCM Grade</Text>
-                        <Text style={s.dcmPrice}>${dcmEst.toFixed(2)}</Text>
-                      </View>
-                      <View style={{ alignItems: 'flex-end' }}>
-                        <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.purple[600] }}>{grade}</Text>
-                        <Text style={{ fontSize: 9, color: Colors.gray[500] }}>Estimated Value</Text>
-                      </View>
-                    </View>
-                    {matchConf && <Text style={[s.priceNote, { marginTop: 4 }]}>Match: {matchConf} · {prodName || ''}</Text>}
-                    {card.dcm_prices_cached_at && (
-                      <Text style={s.priceNote}>Updated: {new Date(card.dcm_prices_cached_at).toLocaleDateString()}</Text>
-                    )}
+                {/* Refresh row + cache info */}
+                <View style={s.priceHeaderRow}>
+                  <View style={{ flex: 1 }}>
+                    {matchConf && <Text style={s.priceNote}>Match: {matchConf}{prodName ? ` · ${prodName}` : ''}</Text>}
+                    {card.dcm_prices_cached_at
+                      ? <Text style={s.priceNote}>Updated: {new Date(card.dcm_prices_cached_at).toLocaleDateString()}</Text>
+                      : <Text style={s.priceNote}>Pricing data has not been fetched yet.</Text>}
                   </View>
-                )}
+                  <TouchableOpacity
+                    style={[s.refreshBtn, refreshingPrice && { opacity: 0.6 }]}
+                    onPress={() => refreshPrice(false)}
+                    disabled={refreshingPrice}
+                  >
+                    {refreshingPrice
+                      ? <ActivityIndicator size="small" color={Colors.purple[600]} />
+                      : <Ionicons name="refresh" size={14} color={Colors.purple[600]} />}
+                    <Text style={s.refreshBtnText}>{refreshingPrice ? 'Refreshing...' : 'Refresh'}</Text>
+                  </TouchableOpacity>
+                </View>
 
                 {/* Market Price Range */}
                 {prices && (
@@ -853,6 +1018,69 @@ export default function CardDetailScreen() {
                 {!dcmEst && !prices && !card.ebay_price_median && !card.scryfall_price_usd && (
                   <Text style={s.naText}>No pricing data available yet. Pricing is fetched automatically after grading.</Text>
                 )}
+
+                {/* Marketplace links — direct PriceCharting/SCP URL via cached product slugs, plus eBay fallback */}
+                {(() => {
+                  const slugify = (s: string) => s.toLowerCase().replace(/#/g, '').replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '')
+                  const isSports = card.category === 'Sports'
+                  const host = isSports ? 'https://www.sportscardspro.com' : 'https://www.pricecharting.com'
+                  const sourceLabel = isSports ? 'SportsCardsPro' : 'PriceCharting'
+                  const cachedSetName = prices?.setName
+                  const cachedProductName = prices?.productName || card.dcm_price_product_name
+                  const setSlug = cachedSetName ? slugify(cachedSetName) : ''
+                  const productSlug = cachedProductName ? slugify(cachedProductName) : ''
+                  const directUrl = setSlug && productSlug ? `${host}/game/${setSlug}/${productSlug}` : null
+                  const queryParts = [
+                    cardName,
+                    setName,
+                    cardNumber ? `#${cardNumber}` : '',
+                    year,
+                  ].filter(Boolean).join(' ').trim()
+                  const searchUrl = isSports
+                    ? `${host}/search?q=${encodeURIComponent(queryParts)}`
+                    : `${host}/search-products?q=${encodeURIComponent(queryParts)}&type=prices`
+                  const pricingUrl = directUrl || searchUrl
+                  const ebayActive = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(queryParts)}`
+                  const ebaySold = `${ebayActive}&LH_Sold=1&LH_Complete=1`
+                  return (
+                    <View style={{ marginTop: 14, gap: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.gray[600], marginBottom: 2 }}>Look up this card</Text>
+                      <TouchableOpacity
+                        style={s.marketLinkRow}
+                        onPress={() => Linking.openURL(pricingUrl).catch(() => Alert.alert('Could not open link', pricingUrl))}
+                      >
+                        <Ionicons name="bar-chart-outline" size={14} color={Colors.purple[600]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.marketLinkLabel}>{directUrl ? `View on ${sourceLabel}` : `Search ${sourceLabel}`}</Text>
+                          <Text style={s.marketLinkSub}>{directUrl ? 'Direct match' : 'No exact match — opens search'}</Text>
+                        </View>
+                        <Ionicons name="open-outline" size={14} color={Colors.gray[400]} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.marketLinkRow}
+                        onPress={() => Linking.openURL(ebaySold).catch(() => Alert.alert('Could not open link', ebaySold))}
+                      >
+                        <Ionicons name="cash-outline" size={14} color={Colors.green[600]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.marketLinkLabel}>eBay Sold Listings</Text>
+                          <Text style={s.marketLinkSub}>Recent comparable sales</Text>
+                        </View>
+                        <Ionicons name="open-outline" size={14} color={Colors.gray[400]} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={s.marketLinkRow}
+                        onPress={() => Linking.openURL(ebayActive).catch(() => Alert.alert('Could not open link', ebayActive))}
+                      >
+                        <Ionicons name="search-outline" size={14} color={Colors.blue[600]} />
+                        <View style={{ flex: 1 }}>
+                          <Text style={s.marketLinkLabel}>eBay Active Listings</Text>
+                          <Text style={s.marketLinkSub}>Currently for sale</Text>
+                        </View>
+                        <Ionicons name="open-outline" size={14} color={Colors.gray[400]} />
+                      </TouchableOpacity>
+                    </View>
+                  )
+                })()}
               </>
             )
           })()}
@@ -891,8 +1119,7 @@ export default function CardDetailScreen() {
           <CollapsibleSection title="Insta-List on eBay" icon="pricetag">
             <Text style={s.ebayInfo}>Automatically includes front & back card images with DCM grade labels, mini grading report, and pre-filled title.</Text>
             <TouchableOpacity style={s.ebayButton} onPress={() => {
-              const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-              router.push({ pathname: '/pages/ebay-list' as any, params: { cardPath: `/${catPath}/${card.id}` } })
+              router.push({ pathname: '/pages/ebay-list' as any, params: { cardId: card.id } })
             }}>
               <Ionicons name="cart" size={18} color={Colors.white} />
               <Text style={s.ebayButtonText}>List on eBay</Text>
@@ -1141,21 +1368,29 @@ export default function CardDetailScreen() {
             </View>
           )}
 
-          {/* Evaluation Details */}
-          {(() => {
-            const meta = gradingJson?.metadata || {}
-            const modelVersion = meta.model_version || card.conversational_prompt_version || null
-
-            return (
-              <View style={{ marginTop: 12, backgroundColor: Colors.gray[50], borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200] }}>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[800], marginBottom: 8 }}>Evaluation Details</Text>
-                {modelVersion && <InfoRow label="DCM Optic™ Version" value={modelVersion} />}
-                <InfoRow label="Graded Date" value={card.created_at ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'} />
-                <InfoRow label="Category" value={card.category} />
-              </View>
-            )
-          })()}
         </CollapsibleSection>
+
+        {/* ══════ EVALUATION DETAILS (always visible) ══════ */}
+        {(() => {
+          const meta = (gradingJson?.metadata || {}) as any
+          const promptVersion =
+            gradingJson?.prompt_version ||
+            meta.prompt_version ||
+            meta.model_version ||
+            card.conversational_prompt_version ||
+            null
+          const gradedAt = card.created_at
+            ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+            : null
+          if (!promptVersion && !gradedAt) return null
+          return (
+            <View style={{ marginTop: 12, backgroundColor: Colors.gray[50], borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200] }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.gray[800], marginBottom: 8 }}>Evaluation Details</Text>
+              {promptVersion && <InfoRow label="Prompt Version" value={String(promptVersion)} />}
+              {gradedAt && <InfoRow label="Graded Date" value={gradedAt} />}
+            </View>
+          )
+        })()}
 
         {/* ══════ DELETE ══════ */}
         {isOwner && (
@@ -1261,6 +1496,24 @@ const s = StyleSheet.create({
   valueCard: { marginHorizontal: 12, marginTop: 12, backgroundColor: Colors.green[50], borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.green[500] },
   valueLabel: { fontSize: 13, fontWeight: '600', color: Colors.green[600] },
   valueAmount: { fontSize: 28, fontWeight: '800', color: Colors.green[600], marginTop: 4 },
+  marketLinkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.gray[50], borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8 },
+  marketLinkLabel: { fontSize: 12, fontWeight: '700', color: Colors.gray[800] },
+  marketLinkSub: { fontSize: 9, color: Colors.gray[500], marginTop: 1 },
+
+  // Edit modal
+  editBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  editSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  editHandle: { width: 36, height: 4, backgroundColor: Colors.gray[300], borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
+  editTitle: { fontSize: 18, fontWeight: '700', color: Colors.gray[900] },
+  editSubtitle: { fontSize: 11, color: Colors.gray[500], marginBottom: 12, marginTop: 2 },
+  editField: { marginBottom: 10 },
+  editLabel: { fontSize: 11, fontWeight: '600', color: Colors.gray[600], marginBottom: 4 },
+  editInput: { borderWidth: 1, borderColor: Colors.gray[300], borderRadius: 8, paddingHorizontal: 10, paddingVertical: 8, fontSize: 14, color: Colors.gray[900], backgroundColor: Colors.gray[50] },
+  editBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  editBtnCancel: { backgroundColor: Colors.gray[100], borderWidth: 1, borderColor: Colors.gray[200] },
+  editBtnCancelText: { fontSize: 13, fontWeight: '600', color: Colors.gray[700] },
+  editBtnSave: { backgroundColor: Colors.purple[600] },
+  editBtnSaveText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
   // Summary
   summaryCard: { marginHorizontal: 12, marginTop: 12, backgroundColor: Colors.white, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200] },
@@ -1307,6 +1560,9 @@ const s = StyleSheet.create({
   priceNote: { fontSize: 11, color: Colors.gray[400], marginTop: 4 },
   dcmPriceCard: { backgroundColor: Colors.green[50], borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.green[100] },
   dcmPrice: { fontSize: 24, fontWeight: '800' as const, color: Colors.green[600] },
+  priceHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },
+  refreshBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: Colors.purple[50], borderWidth: 1, borderColor: Colors.purple[200], borderRadius: 8 },
+  refreshBtnText: { fontSize: 11, fontWeight: '700', color: Colors.purple[700] },
   reportSubhead: { fontSize: 12, fontWeight: '700' as const, color: Colors.gray[700], marginBottom: 4 },
   naText: { fontSize: 13, color: Colors.gray[400], fontStyle: 'italic' },
 

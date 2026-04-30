@@ -7,6 +7,9 @@ import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
 import SlabCard from '@/components/grading/SlabCard'
 import { supabase } from '@/lib/supabase'
+import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
+import { useLabelStyle } from '@/hooks/useLabelStyle'
+import LabelStylePicker from '@/components/labels/LabelStylePicker'
 
 const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Star Wars', 'Other']
 const SORT_OPTIONS = [
@@ -40,6 +43,7 @@ interface CardItem {
 export default function CollectionScreen() {
   const { session } = useAuth()
   const router = useRouter()
+  const { labelStyle, customStyles, colorOverrides, switchStyle } = useLabelStyle()
   const [cards, setCards] = useState<CardItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -56,8 +60,9 @@ export default function CollectionScreen() {
       const { data, error } = await supabase
         .from('cards')
         .select(`
-          id, serial, card_name, featured, category, card_set,
+          id, serial, card_name, featured, category, sub_category, card_set,
           card_number, release_date, manufacturer_name, visibility,
+          rookie_card, autographed, serial_numbering,
           conversational_whole_grade, conversational_condition_label,
           conversational_card_info, front_path,
           ebay_price_median, dcm_price_estimate, created_at
@@ -144,13 +149,10 @@ export default function CollectionScreen() {
   }, [cards])
 
   const renderListItem = ({ item }: { item: CardItem }) => {
-    const ci = item.conversational_card_info
-    const name = item.card_name || item.featured || ci?.card_name || `Card #${item.serial}`
-    const set = item.card_set || ci?.set_name || ''
-    const year = item.release_date || ci?.year || ''
-    const num = item.card_number || ci?.card_number || ''
+    const name = getDisplayName(item as any)
+    const contextParts = getContextLine(item as any)
+    const featuresArr = getFeatures(item as any)
     const condition = item.conversational_condition_label || ''
-    const contextParts = [set, num ? `#${num}` : '', year].filter(Boolean).join(' \u2022 ')
     const price = item.dcm_price_estimate || item.ebay_price_median
 
     return (
@@ -163,6 +165,9 @@ export default function CollectionScreen() {
         <View style={st.listInfo}>
           <Text style={st.listName} numberOfLines={1}>{name}</Text>
           <Text style={st.listSet} numberOfLines={1}>{contextParts}</Text>
+          {featuresArr.length > 0 && (
+            <Text style={st.listFeatures} numberOfLines={1}>{featuresArr.join(' \u2022 ')}</Text>
+          )}
           <View style={st.listMeta}>
             <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center', flex: 1 }}>
               <Text style={st.listCategory}>{item.category}</Text>
@@ -182,12 +187,44 @@ export default function CollectionScreen() {
   }
 
   const renderGridItem = ({ item }: { item: CardItem }) => {
-    const ci = item.conversational_card_info
-    const name = item.card_name || item.featured || ci?.card_name || `#${item.serial}`
-    const set = item.card_set || ci?.set_name || ''
+    const name = getDisplayName(item as any)
+    const contextLine = getContextLine(item as any)
+    const isPublic = item.visibility === 'public'
+    const price = item.dcm_price_estimate || item.ebay_price_median
     return (
-      <TouchableOpacity style={st.gridItem} onPress={() => router.push(`/card/${item.id}`)} activeOpacity={0.7}>
-        <SlabCard imageUrl={item.front_url || null} displayName={name} contextLine={set} serial={item.serial} grade={item.conversational_whole_grade} condition={item.conversational_condition_label || ''} size="sm" />
+      <TouchableOpacity style={st.gridItem} onPress={() => router.push(`/card/${item.id}`)} activeOpacity={0.85}>
+        <SlabCard
+          imageUrl={item.front_url || null}
+          displayName={name}
+          contextLine={contextLine}
+          serial={item.serial}
+          grade={item.conversational_whole_grade}
+          condition={item.conversational_condition_label || ''}
+          size="sm"
+          labelStyle={labelStyle}
+          colorOverrides={colorOverrides}
+        />
+        {item.conversational_whole_grade == null && (
+          <View style={st.gridPendingBadge}><Text style={st.gridPendingText}>Grading...</Text></View>
+        )}
+        <View style={st.gridBadgeRow}>
+          <View style={[st.gridVisBadge, isPublic ? st.gridVisPublic : st.gridVisPrivate]}>
+            <Ionicons
+              name={isPublic ? 'globe-outline' : 'lock-closed'}
+              size={10}
+              color={isPublic ? Colors.green[600] : Colors.gray[600]}
+            />
+            <Text style={[st.gridVisText, { color: isPublic ? Colors.green[600] : Colors.gray[600] }]} numberOfLines={1}>
+              {isPublic ? 'Public' : 'Private'}
+            </Text>
+          </View>
+          {price != null && (
+            <View style={st.gridPriceBadge}>
+              <Ionicons name="pricetag" size={10} color={Colors.green[600]} />
+              <Text style={st.gridPriceText} numberOfLines={1}>${price.toFixed(2)}</Text>
+            </View>
+          )}
+        </View>
       </TouchableOpacity>
     )
   }
@@ -223,6 +260,13 @@ export default function CollectionScreen() {
           <Ionicons name={viewMode === 'list' ? 'grid' : 'list'} size={20} color={Colors.purple[600]} />
         </TouchableOpacity>
       </View>
+
+      {/* Label-style picker (only meaningful in grid view, but useful to access here) */}
+      {viewMode === 'grid' && (
+        <View style={st.styleBar}>
+          <LabelStylePicker labelStyle={labelStyle} customStyles={customStyles} onSwitch={switchStyle} compact />
+        </View>
+      )}
 
       {/* Sort options */}
       {showSort && (
@@ -309,9 +353,9 @@ const st = StyleSheet.create({
   sortChipTextActive: { color: Colors.purple[700] },
 
   // Category tabs
-  catScroll: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.gray[200] },
-  catContent: { paddingHorizontal: 12, paddingVertical: 8, gap: 6 },
-  catTab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: Colors.gray[100] },
+  catScroll: { backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.gray[200], height: 52, flexGrow: 0, flexShrink: 0 },
+  catContent: { paddingHorizontal: 12, gap: 6, alignItems: 'center' },
+  catTab: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 16, backgroundColor: Colors.gray[100] },
   catTabActive: { backgroundColor: Colors.purple[600] },
   catTabText: { fontSize: 12, fontWeight: '600', color: Colors.gray[600] },
   catTabTextActive: { color: '#fff' },
@@ -329,6 +373,7 @@ const st = StyleSheet.create({
   listInfo: { flex: 1 },
   listName: { fontSize: 14, fontWeight: '600', color: Colors.gray[900] },
   listSet: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
+  listFeatures: { fontSize: 10, color: Colors.blue[600], fontWeight: '700', marginTop: 2 },
   listMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   listCategory: { fontSize: 10, color: Colors.purple[600], fontWeight: '500' },
   listCondition: { fontSize: 10, color: Colors.gray[500], fontWeight: '500' },
@@ -336,9 +381,21 @@ const st = StyleSheet.create({
   pendingText: { fontSize: 10, fontWeight: '600', color: Colors.amber[600] },
   listPrice: { fontSize: 11, color: Colors.green[600], fontWeight: '600' },
 
+  // Style picker bar
+  styleBar: { flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
+
   // Grid view
   gridContainer: { padding: 8 },
-  gridItem: { flex: 1, backgroundColor: Colors.white, borderRadius: 12, margin: 4, borderWidth: 1, borderColor: Colors.gray[200], overflow: 'hidden' },
+  gridItem: { flex: 1, backgroundColor: Colors.white, borderRadius: 12, margin: 4, borderWidth: 1, borderColor: Colors.gray[200], overflow: 'hidden', paddingBottom: 8 },
+  gridPendingBadge: { position: 'absolute', top: 8, right: 8, backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[500], borderRadius: 8, paddingHorizontal: 6, paddingVertical: 2, zIndex: 5 },
+  gridPendingText: { fontSize: 9, fontWeight: '700', color: Colors.amber[600] },
+  gridBadgeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 8, paddingTop: 8, gap: 6 },
+  gridVisBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10, borderWidth: 1.5 },
+  gridVisPublic: { backgroundColor: Colors.green[50], borderColor: Colors.green[500] },
+  gridVisPrivate: { backgroundColor: Colors.gray[100], borderColor: Colors.gray[300] },
+  gridVisText: { fontSize: 9, fontWeight: '700' },
+  gridPriceBadge: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 10, borderWidth: 1.5, backgroundColor: Colors.green[50], borderColor: Colors.green[500] },
+  gridPriceText: { fontSize: 9, fontWeight: '700', color: Colors.green[600] },
 
   // Empty state
   empty: { alignItems: 'center', padding: 48 },

@@ -33,7 +33,9 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    // Pass the Bearer token explicitly — auth.getUser() with no args
+    // returns null on server unless the session is in storage.
+    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
 
     if (userError || !user) {
       return NextResponse.json(

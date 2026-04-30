@@ -33,7 +33,8 @@ export default function EbayListScreen() {
   const router = useRouter()
   const params = useLocalSearchParams<{ cardId?: string; cardPath?: string }>()
   const { session } = useAuth()
-  const cardId = params.cardId || ''
+  // Accept either ?cardId=… or the legacy ?cardPath=/category/<id>
+  const cardId = params.cardId || (params.cardPath ? params.cardPath.split('/').filter(Boolean).pop() || '' : '')
 
   // Card data
   const [card, setCard] = useState<any>(null)
