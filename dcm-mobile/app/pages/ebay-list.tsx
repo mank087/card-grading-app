@@ -6,6 +6,8 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { WebView } from 'react-native-webview'
+import * as ImagePicker from 'expo-image-picker'
+import * as FileSystem from 'expo-file-system'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -61,6 +63,8 @@ export default function EbayListScreen() {
   const [imagesReady, setImagesReady] = useState(false)
   const [imagesGenerating, setImagesGenerating] = useState(false)
   const [imagesError, setImagesError] = useState<string | null>(null)
+  // User-uploaded additional images from device gallery
+  const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; uri: string; base64?: string; selected: boolean }>>([])
 
   // Step 2: Details
   const [title, setTitle] = useState('')
@@ -133,6 +137,53 @@ export default function EbayListScreen() {
     })
   }, [])
 
+  // ─── Pick additional images from gallery ───
+  const pickAdditionalImages = useCallback(async () => {
+    const systemSelectedCount = Object.values(selectedImages).filter(Boolean).length
+    const additionalSelectedCount = additionalImages.filter(i => i.selected).length
+    const remaining = Math.max(0, 12 - systemSelectedCount - additionalSelectedCount)
+    if (remaining === 0) {
+      Alert.alert('Image limit reached', 'eBay allows up to 12 images per listing.')
+      return
+    }
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Please allow photo library access to add images.')
+      return
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsMultipleSelection: true,
+      selectionLimit: remaining,
+      quality: 0.85,
+      base64: false,
+    })
+    if (result.canceled) return
+    const picked = result.assets.slice(0, remaining)
+    // Read each asset as base64 so we can hand it to /api/ebay/images
+    const enriched = await Promise.all(
+      picked.map(async (asset) => {
+        try {
+          const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 })
+          const dataUrl = `data:${asset.mimeType || 'image/jpeg'};base64,${base64}`
+          return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, uri: asset.uri, base64: dataUrl, selected: true }
+        } catch (err) {
+          console.warn('Failed to read image:', err)
+          return null
+        }
+      })
+    )
+    setAdditionalImages(prev => [...prev, ...enriched.filter(Boolean) as any])
+  }, [selectedImages, additionalImages])
+
+  const removeAdditionalImage = useCallback((id: string) => {
+    setAdditionalImages(prev => prev.filter(i => i.id !== id))
+  }, [])
+
+  const toggleAdditionalImage = useCallback((id: string) => {
+    setAdditionalImages(prev => prev.map(i => i.id === id ? { ...i, selected: !i.selected } : i))
+  }, [])
+
   const startOAuth = useCallback(async () => {
     try {
       const url = await getOAuthUrl()
@@ -164,7 +215,12 @@ export default function EbayListScreen() {
         if (selectedImages.back && backUrl) imagesToUpload.back = backUrl
       }
 
-      const uploadResult = await uploadImages(cardId, imagesToUpload)
+      // User-picked extras (from gallery)
+      const extrasBase64 = additionalImages
+        .filter(i => i.selected && i.base64)
+        .map(i => i.base64!) as string[]
+
+      const uploadResult = await uploadImages(cardId, imagesToUpload, extrasBase64)
       const allImageUrls = Object.values(uploadResult.urls).flat().filter(Boolean) as string[]
 
       if (allImageUrls.length === 0) throw new Error('No images to upload')
@@ -387,7 +443,50 @@ export default function EbayListScreen() {
                         </TouchableOpacity>
                       )
                     })}
+
+                    {/* User-picked additional images */}
+                    {additionalImages.map(img => (
+                      <View key={img.id} style={[st.imageTile, img.selected && st.imageTileSelected]}>
+                        <TouchableOpacity onPress={() => toggleAdditionalImage(img.id)} activeOpacity={0.8}>
+                          <Image source={{ uri: img.uri }} style={st.imageTileThumb} resizeMode="cover" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={st.removeImageBtn}
+                          onPress={() => removeAdditionalImage(img.id)}
+                          hitSlop={{ top: 6, right: 6, bottom: 6, left: 6 }}
+                        >
+                          <Ionicons name="close-circle" size={18} color={Colors.red[600]} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => toggleAdditionalImage(img.id)} style={st.imageTileFooter}>
+                          <Ionicons
+                            name={img.selected ? 'checkmark-circle' : 'ellipse-outline'}
+                            size={14}
+                            color={img.selected ? Colors.purple[600] : Colors.gray[400]}
+                          />
+                          <Text style={st.imageTileLabel} numberOfLines={1}>Custom</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+
+                    {/* Add Photo button */}
+                    {(() => {
+                      const totalSelected =
+                        Object.values(selectedImages).filter(Boolean).length +
+                        additionalImages.filter(i => i.selected).length
+                      if (totalSelected >= 12 || additionalImages.length >= 12) return null
+                      return (
+                        <TouchableOpacity style={st.addPhotoTile} onPress={pickAdditionalImages} activeOpacity={0.7}>
+                          <Ionicons name="add-circle-outline" size={28} color={Colors.gray[400]} />
+                          <Text style={st.addPhotoText}>Add Photo</Text>
+                        </TouchableOpacity>
+                      )
+                    })()}
                   </View>
+                )}
+                {imagesReady && (
+                  <Text style={st.imageHint}>
+                    {Object.values(selectedImages).filter(Boolean).length + additionalImages.filter(i => i.selected).length} of 12 selected. Tap to toggle, X to remove a custom photo.
+                  </Text>
                 )}
               </View>
             )}
@@ -742,6 +841,10 @@ const st = StyleSheet.create({
   imageTileThumb: { width: '100%', aspectRatio: 0.75, backgroundColor: Colors.gray[100] },
   imageTileFooter: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 6, paddingVertical: 4, backgroundColor: Colors.gray[50] },
   imageTileLabel: { fontSize: 9, fontWeight: '600', color: Colors.gray[700], flex: 1 },
+  removeImageBtn: { position: 'absolute', top: 2, right: 2, backgroundColor: '#fff', borderRadius: 10 },
+  addPhotoTile: { width: '31%', aspectRatio: 0.75, borderRadius: 8, borderWidth: 2, borderStyle: 'dashed', borderColor: Colors.gray[300], backgroundColor: Colors.gray[50], alignItems: 'center', justifyContent: 'center', gap: 4 },
+  addPhotoText: { fontSize: 10, color: Colors.gray[500], fontWeight: '600' },
+  imageHint: { fontSize: 10, color: Colors.gray[500], marginTop: 8 },
   hiddenWebViewWrapper: { position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 },
 
   // Review
