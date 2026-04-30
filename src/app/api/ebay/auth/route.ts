@@ -32,8 +32,18 @@ export async function GET(request: NextRequest) {
     // didn't work for mobile Bearer-token clients).
     const auth = await verifyAuth(request);
     if (!auth.authenticated || !auth.user) {
+      // Diagnostic: include the list of headers the route actually received so we can
+      // pinpoint whether something is stripping Authorization en route to the server.
+      const seenHeaders: string[] = [];
+      request.headers.forEach((_v, k) => seenHeaders.push(k));
       return NextResponse.json(
-        { error: auth.error || 'Unauthorized. Please log in first.' },
+        {
+          error: auth.error || 'Unauthorized. Please log in first.',
+          debug: {
+            received_headers: seenHeaders,
+            url: request.url,
+          },
+        },
         { status: 401 }
       );
     }
