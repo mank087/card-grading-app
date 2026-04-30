@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { deleteEbayConnection, getEbayConnection } from '@/lib/ebay';
+import { verifyAuth } from '@/lib/serverAuth';
 
 /**
  * POST /api/ebay/disconnect
@@ -10,39 +10,15 @@ import { deleteEbayConnection, getEbayConnection } from '@/lib/ebay';
  */
 export async function POST(request: NextRequest) {
   try {
-    // Get the authenticated user from Authorization header
-    const authHeader = request.headers.get('Authorization');
-
-    if (!authHeader?.startsWith('Bearer ')) {
+    // Verify auth via the standard helper (works for Bearer + cookie clients).
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.user) {
       return NextResponse.json(
-        { error: 'Unauthorized. Missing authentication token.' },
+        { error: auth.error || 'Unauthorized. Invalid authentication token.' },
         { status: 401 }
       );
     }
-
-    const accessToken = authHeader.slice(7);
-
-    // Verify the user with Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        },
-      }
-    );
-
-    // Pass the Bearer token explicitly — auth.getUser() with no args
-    // returns null on server unless the session is in storage.
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized. Invalid authentication token.' },
-        { status: 401 }
-      );
-    }
+    const user = auth.user;
 
     // Check if user has an eBay connection
     const connection = await getEbayConnection(user.id);

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   getEbayConnection,
   hasActiveEbayConnection,
   isEbayConfigured,
   getEbayEnvironment,
 } from '@/lib/ebay';
+import { verifyAuth } from '@/lib/serverAuth';
 
 /**
  * GET /api/ebay/status
@@ -18,41 +18,17 @@ export async function GET(request: NextRequest) {
     // Check if eBay integration is configured
     const ebayConfigured = isEbayConfigured();
 
-    // Get the authenticated user from Authorization header
-    const authHeader = request.headers.get('Authorization');
-
-    if (!authHeader?.startsWith('Bearer ')) {
+    // Verify auth via the standard helper (works for both web cookie auth and
+    // mobile Bearer-token auth — the previous in-line approach broke mobile).
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.user) {
       return NextResponse.json({
         configured: ebayConfigured,
         connected: false,
-        error: 'Not authenticated',
+        error: auth.error || 'Not authenticated',
       });
     }
-
-    const accessToken = authHeader.slice(7);
-
-    // Verify the user with Supabase
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        },
-      }
-    );
-
-    // Pass the Bearer token explicitly — auth.getUser() with no args
-    // returns null on server unless the session is in storage.
-    const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
-
-    if (userError || !user) {
-      return NextResponse.json({
-        configured: ebayConfigured,
-        connected: false,
-        error: 'Invalid authentication',
-      });
-    }
+    const user = auth.user;
 
     // Check for active eBay connection
     const isConnected = await hasActiveEbayConnection(user.id);

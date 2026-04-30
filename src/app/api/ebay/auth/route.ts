@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import {
   isEbayConfigured,
   getAuthorizationUrl,
   createAuthState,
   EBAY_OAUTH_SCOPES,
 } from '@/lib/ebay';
+import { verifyAuth } from '@/lib/serverAuth';
 
 /**
  * GET /api/ebay/auth
@@ -27,46 +27,17 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get the authenticated user
-    const authHeader = request.headers.get('Authorization');
-    const cookieHeader = request.headers.get('cookie');
-
-    // Try to get token from Authorization header or cookies
-    let accessToken: string | null = null;
-
-    if (authHeader?.startsWith('Bearer ')) {
-      accessToken = authHeader.slice(7);
-    } else if (cookieHeader) {
-      // Parse cookies to find Supabase token
-      const cookies = Object.fromEntries(
-        cookieHeader.split('; ').map(c => c.split('='))
-      );
-      accessToken = cookies['sb-access-token'] || cookies['supabase-auth-token'];
-    }
-
-    // Create Supabase client to verify user
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        global: {
-          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
-        },
-      }
-    );
-
-    // For Bearer-token auth (mobile / non-cookie clients) pass the token explicitly,
-    // since auth.getUser() with no args only reads a session from storage.
-    const { data: { user }, error: userError } = accessToken
-      ? await supabase.auth.getUser(accessToken)
-      : await supabase.auth.getUser();
-
-    if (userError || !user) {
+    // Verify auth via the standard helper that handles Bearer tokens correctly
+    // (the previous in-line createClient + global.headers + getUser() approach
+    // didn't work for mobile Bearer-token clients).
+    const auth = await verifyAuth(request);
+    if (!auth.authenticated || !auth.user) {
       return NextResponse.json(
-        { error: 'Unauthorized. Please log in first.' },
+        { error: auth.error || 'Unauthorized. Please log in first.' },
         { status: 401 }
       );
     }
+    const user = auth.user;
 
     // Get optional return URL from query params
     const { searchParams } = new URL(request.url);
