@@ -5,7 +5,7 @@
 
 import { supabase } from './supabase'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()

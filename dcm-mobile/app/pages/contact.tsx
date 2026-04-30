@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
 export default function ContactPage() {
   const { user } = useAuth()

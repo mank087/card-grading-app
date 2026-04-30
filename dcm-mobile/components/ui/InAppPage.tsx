@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
 
-const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
 interface InAppPageProps {
   path: string

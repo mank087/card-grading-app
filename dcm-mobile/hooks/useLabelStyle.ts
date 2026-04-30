@@ -32,7 +32,7 @@ export interface LabelColorOverrides {
   topEdgeGradient?: string[]
 }
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 const CACHE_KEY = 'dcm_label_style_cache'
 
 function extractColorOverrides(config: CustomLabelConfig | null | undefined): LabelColorOverrides | undefined {

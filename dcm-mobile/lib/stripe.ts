@@ -2,7 +2,7 @@ import { Alert } from 'react-native'
 import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native'
 import { supabase } from './supabase'
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
 export interface CreditTier {
   id: string

@@ -111,7 +111,7 @@ export default function CardDetailScreen() {
     if (!req) return
     if (!silent) setRefreshingPrice(true)
     try {
-      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://dcmgrading.com'
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
       const token = session?.access_token
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
       if (token) headers['Authorization'] = `Bearer ${token}`
