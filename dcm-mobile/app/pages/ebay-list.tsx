@@ -1109,7 +1109,7 @@ const st = StyleSheet.create({
   reviewValue: { fontSize: 12, color: Colors.gray[800], fontWeight: '500', flex: 1, textAlign: 'right' },
 
   // Buttons
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.purple[600], borderRadius: 10, paddingVertical: 14 },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.purple[600], borderRadius: 10, paddingVertical: 14, paddingHorizontal: 24 },
   primaryBtnText: { fontSize: 15, fontWeight: '700', color: '#fff' },
 
   // Navigation
