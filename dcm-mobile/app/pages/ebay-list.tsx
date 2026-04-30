@@ -249,8 +249,25 @@ export default function EbayListScreen() {
             <WebView
               source={{ uri: oauthUrl }}
               onNavigationStateChange={(navState) => {
-                if (navState.url.includes('ebay-auth-success') || navState.url.includes('callback')) {
-                  handleOAuthComplete()
+                const url = navState.url
+                // Only react to the FINAL success page, not the intermediate /api/ebay/callback hop —
+                // the server needs that hop to exchange the code for tokens and save the connection
+                // before redirecting to /ebay-auth-success?ebay_connected=true.
+                if (url.includes('/ebay-auth-success')) {
+                  if (url.includes('ebay_error=') || url.includes('ebay_connected=false')) {
+                    setShowOAuth(false)
+                    const params = new URL(url).searchParams
+                    const message = params.get('message') || 'eBay connection failed.'
+                    Alert.alert('eBay Connection Failed', message)
+                  } else {
+                    handleOAuthComplete()
+                  }
+                  return
+                }
+                // User denied at the eBay consent screen
+                if (url.includes('error=access_denied')) {
+                  setShowOAuth(false)
+                  Alert.alert('eBay Connection Cancelled', 'You did not authorize the connection.')
                 }
               }}
             />
