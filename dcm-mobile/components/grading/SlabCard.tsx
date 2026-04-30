@@ -89,13 +89,16 @@ export default function SlabCard({
 }: SlabCardProps) {
   const gradeText = grade !== null ? Math.round(grade).toString() : 'N/A'
   const conditionText = condition?.toUpperCase() || ''
-  // Back labels need more height to fit the full sub-grade names
-  const labelHeight = isBack
-    ? (size === 'sm' ? 70 : size === 'md' ? 84 : 110)
-    : (size === 'sm' ? 60 : size === 'md' ? 72 : 85)
+  // Front and back labels share the same height so they line up across the slab —
+  // matches the web (ModernFrontLabel heights match ModernBackLabel by design).
+  // The taller dimension wins so the back label still fits the full sub-grade names.
+  const labelHeight = size === 'sm' ? 70 : size === 'md' ? 84 : 110
   const fontScale = size === 'sm' ? 0.85 : size === 'md' ? 1 : 1.15
   const isTraditional = labelStyle === 'traditional'
   const qrSize = size === 'sm' ? 44 : size === 'md' ? 56 : 70
+  // Allow the context line (Set • #Num • Year) to wrap to 2 lines on the card detail
+  // page (size=lg) where there's enough vertical room. Keep 1 line on sm/md.
+  const contextLines = size === 'lg' ? 2 : 1
 
   const wrapperColors = isTraditional ? ['#e5e7eb', '#f3f4f6', '#e5e7eb'] : getWrapperColors(colorOverrides)
   const labelColors = isTraditional ? ['#f9fafb', '#ffffff', '#f9fafb'] : (colorOverrides?.isCardExtension ? wrapperColors : (colorOverrides?.isRainbow ? ['#1a1625', '#2d1f47', '#1a1625'] : (colorOverrides ? [colorOverrides.gradientStart, colorOverrides.gradientEnd, colorOverrides.gradientStart] : DEFAULT_MODERN_COLORS)))
@@ -217,7 +220,10 @@ export default function SlabCard({
                   {displayName}
                 </Text>
                 {contextLine ? (
-                  <Text style={[styles.labelContext, { fontSize: 8 * fontScale, color: contextColor }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.labelContext, { fontSize: (size === 'lg' ? 9 : 8) * fontScale, color: contextColor, lineHeight: (size === 'lg' ? 11 : 10) }]}
+                    numberOfLines={contextLines}
+                  >
                     {contextLine}
                   </Text>
                 ) : null}
