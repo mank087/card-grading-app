@@ -78,6 +78,7 @@ export default function EbayListScreen() {
   const [duration, setDuration] = useState('GTC')
   // Default to rendered preview — matches the web's UX
   const [showDescriptionPreview, setShowDescriptionPreview] = useState(true)
+  const [descriptionPreviewHeight, setDescriptionPreviewHeight] = useState(400)
 
   // Step 3: Specifics
   type ItemSpecific = { name: string; value: string | string[]; required?: boolean; editable?: boolean }
@@ -722,12 +723,34 @@ export default function EbayListScreen() {
                 : 'Edit the HTML directly. Tap "Preview" to see how it will render on eBay.'}
             </Text>
             {description.length > 0 && showDescriptionPreview ? (
-              <View style={st.descriptionPreviewBox}>
+              <View style={[st.descriptionPreviewBox, { height: descriptionPreviewHeight }]}>
                 <WebView
                   originWhitelist={['*']}
-                  source={{ html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>body{margin:0;padding:8px;font-family:-apple-system,Roboto,sans-serif;}</style></head><body>${description}</body></html>` }}
+                  source={{
+                    html: `<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><style>html,body{margin:0;padding:8px;font-family:-apple-system,Roboto,sans-serif;background:#fff;}img{max-width:100%;height:auto;}</style></head><body>${description}<script>
+                      function postHeight(){
+                        var h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
+                        if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(JSON.stringify({type:'height',value:h}));
+                      }
+                      window.addEventListener('load', postHeight);
+                      window.addEventListener('resize', postHeight);
+                      // Re-measure after images load
+                      setTimeout(postHeight, 200);
+                      setTimeout(postHeight, 800);
+                    <\/script></body></html>`,
+                  }}
+                  onMessage={(e) => {
+                    try {
+                      const msg = JSON.parse(e.nativeEvent.data)
+                      if (msg.type === 'height' && typeof msg.value === 'number') {
+                        // +24px buffer to avoid clipping the last line
+                        const next = Math.ceil(msg.value) + 24
+                        setDescriptionPreviewHeight(prev => (Math.abs(prev - next) > 4 ? next : prev))
+                      }
+                    } catch {}
+                  }}
                   style={{ flex: 1, backgroundColor: 'transparent' }}
-                  scrollEnabled
+                  scrollEnabled={false}
                 />
               </View>
             ) : (
@@ -1078,7 +1101,7 @@ const st = StyleSheet.create({
   previewBtnText: { fontSize: 11, fontWeight: '600', color: Colors.purple[700] },
   helperText: { fontSize: 10, color: Colors.gray[500], marginTop: 2, marginBottom: 6 },
   lockedText: { fontSize: 9, fontStyle: 'italic', color: Colors.gray[400] },
-  descriptionPreviewBox: { height: 360, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8, overflow: 'hidden', backgroundColor: '#fff' },
+  descriptionPreviewBox: { borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8, overflow: 'hidden', backgroundColor: '#fff' },
 
   // Review
   reviewBox: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
