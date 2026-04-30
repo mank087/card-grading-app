@@ -178,29 +178,55 @@ export default function EbayListScreen() {
       Alert.alert('Permission needed', 'Please allow photo library access to add images.')
       return
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsMultipleSelection: true,
-      selectionLimit: remaining,
-      quality: 0.85,
-      base64: false,
-    })
+    let result: ImagePicker.ImagePickerResult
+    try {
+      // expo-image-picker 17+: MediaTypeOptions is deprecated; use the array form.
+      result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        selectionLimit: remaining,
+        quality: 0.85,
+        base64: true,
+      })
+    } catch (err: any) {
+      console.warn('[ebay-list] picker error:', err)
+      Alert.alert('Picker failed', err?.message || 'Could not open the photo library.')
+      return
+    }
+    console.log('[ebay-list] picker result:', { canceled: result.canceled, count: result.canceled ? 0 : result.assets?.length })
     if (result.canceled) return
-    const picked = result.assets.slice(0, remaining)
-    // Read each asset as base64 so we can hand it to /api/ebay/images
+    const picked = (result.assets || []).slice(0, remaining)
+    if (picked.length === 0) return
+    // Build data URLs. Prefer base64 returned directly; fall back to FileSystem.read.
     const enriched = await Promise.all(
       picked.map(async (asset) => {
         try {
-          const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 })
-          const dataUrl = `data:${asset.mimeType || 'image/jpeg'};base64,${base64}`
-          return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, uri: asset.uri, base64: dataUrl, selected: true }
+          let dataUrl: string | null = null
+          if (asset.base64) {
+            dataUrl = `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
+          } else if (asset.uri) {
+            const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' as any })
+            dataUrl = `data:${asset.mimeType || 'image/jpeg'};base64,${b64}`
+          }
+          if (!dataUrl) return null
+          return {
+            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            uri: asset.uri,
+            base64: dataUrl,
+            selected: true,
+          }
         } catch (err) {
-          console.warn('Failed to read image:', err)
+          console.warn('[ebay-list] failed to read picked image:', err)
           return null
         }
       })
     )
     const valid = enriched.filter(Boolean) as Array<{ id: string; uri: string; base64?: string; selected: boolean }>
+    console.log('[ebay-list] adding', valid.length, 'custom images')
+    if (valid.length === 0) {
+      Alert.alert('Could not load images', 'Failed to read the selected photos.')
+      return
+    }
     setAdditionalImages(prev => [...prev, ...valid])
     setImageOrder(prev => [...prev, ...valid.map(v => ({ kind: 'custom' as const, id: v.id }))])
   }, [selectedImages, additionalImages])
