@@ -186,11 +186,15 @@ export async function acceptDisclaimer(): Promise<void> {
 
 export async function getOAuthUrl(): Promise<string> {
   const headers = await getAuthHeaders()
-  const res = await fetch(`${API_BASE}/api/ebay/auth?return_url=${encodeURIComponent(API_BASE + '/ebay-auth-success')}`, { headers })
+  const url = `${API_BASE}/api/ebay/auth?return_url=${encodeURIComponent(API_BASE + '/ebay-auth-success')}`
+  console.log('[ebay/getOAuthUrl] fetching', url, 'with header keys', Object.keys(headers), 'tokenLen', (headers['Authorization'] || '').length)
+  const res = await fetch(url, { method: 'GET', headers })
+  console.log('[ebay/getOAuthUrl] response status', res.status)
   if (!res.ok) {
     let msg = `Failed to get OAuth URL (HTTP ${res.status})`
     try {
       const body = await res.json()
+      console.warn('[ebay/getOAuthUrl] error body', body)
       if (body?.error) msg = body.error
     } catch {}
     throw new Error(msg)

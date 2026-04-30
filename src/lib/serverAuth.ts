@@ -30,13 +30,26 @@ export interface AuthResult {
  */
 export async function verifyAuth(request: NextRequest): Promise<AuthResult> {
   try {
-    const authHeader = request.headers.get('authorization');
+    // Try both casings explicitly. Headers should be case-insensitive but we
+    // want to be defensive against any runtime quirk.
+    const authHeader =
+      request.headers.get('authorization') ||
+      request.headers.get('Authorization');
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader) {
+      // Diagnostic: dump every header name we did receive so we can confirm
+      // whether Authorization is being stripped en route.
+      const seenHeaders: string[] = [];
+      request.headers.forEach((_v, k) => seenHeaders.push(k));
+      console.warn('[ServerAuth] No authorization header. Received:', seenHeaders.join(', '));
       return { authenticated: false, userId: null, user: null, error: 'Missing authorization header' };
     }
 
-    const token = authHeader.split(' ')[1];
+    if (!authHeader.toLowerCase().startsWith('bearer ')) {
+      return { authenticated: false, userId: null, user: null, error: 'Authorization header is not a Bearer token' };
+    }
+
+    const token = authHeader.slice(authHeader.indexOf(' ') + 1).trim();
 
     if (!token) {
       return { authenticated: false, userId: null, user: null, error: 'No token provided' };
