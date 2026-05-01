@@ -57,6 +57,7 @@ export default function CardDetailScreen() {
   // Label export state — opens a hidden WebView that runs the canvas/PDF generators on the web
   // and posts back base64 files; mobile then previews them with explicit Download/Print buttons.
   const [labelSheetOpen, setLabelSheetOpen] = useState(false)
+  const [reportSheetOpen, setReportSheetOpen] = useState(false)
   const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover'; title?: string; position?: number } | null>(null)
   const [positionPicker, setPositionPicker] = useState<{ type: string; title: string; sheet: 'avery6871' | 'avery8167' } | null>(null)
   const [pickerPosition, setPickerPosition] = useState(0)
@@ -268,6 +269,45 @@ export default function CardDetailScreen() {
             <Image source={{ uri: zoomImage }} style={{ width: Dimensions.get('window').width - 24, height: Dimensions.get('window').height * 0.7 }} resizeMode="contain" />
           )}
           <Text style={{ color: '#fff', fontSize: 12, marginTop: 12, opacity: 0.6 }}>Tap anywhere to close</Text>
+        </Pressable>
+      </Modal>
+
+      {/* Reports bottom-sheet — mirrors the web's DownloadReportButton "Reports" dropdown:
+          Full Grading Report (PDF), Mini-Report (PDF), Mini-Report Image (JPG). */}
+      <Modal visible={reportSheetOpen} transparent animationType="slide" onRequestClose={() => setReportSheetOpen(false)}>
+        <Pressable style={s.editBackdrop} onPress={() => setReportSheetOpen(false)}>
+          <Pressable style={[s.editSheet, { paddingBottom: 28 }]} onPress={e => e.stopPropagation()}>
+            <View style={s.editHandle} />
+            <Text style={s.editTitle}>Download Reports</Text>
+            <Text style={s.editSubtitle}>Same formats as web. Generated on the fly using your card's grading data.</Text>
+            <ScrollView style={{ maxHeight: 420 }}>
+              {([
+                { id: 'full-report', name: 'Full Grading Report', desc: 'Complete PDF with grade, sub-grades, defect detail, card images, and DCM Optic™ analysis.', icon: 'document-text' },
+                { id: 'mini-report-pdf', name: 'Mini-Report (PDF)', desc: 'Foldable summary card — fold or cut to 2.5" × 3.5".', icon: 'document' },
+                { id: 'mini-report', name: 'Mini-Report Image', desc: 'JPG version for marketplaces and social media.', icon: 'image' },
+              ] as const).map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 }]}
+                  onPress={() => {
+                    setReportSheetOpen(false)
+                    setExportError(null)
+                    setExportFiles([])
+                    setExportPreviewIdx(0)
+                    setExportStatus('')
+                    setExportTask({ type: item.id, title: item.name })
+                  }}
+                >
+                  <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: Colors.gray[900] }}>{item.name}</Text>
+                    <Text style={{ fontSize: 10, color: Colors.gray[500], marginTop: 2 }}>{item.desc}</Text>
+                  </View>
+                  <Ionicons name="download-outline" size={16} color={Colors.gray[400]} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Pressable>
         </Pressable>
       </Modal>
 
@@ -892,6 +932,10 @@ export default function CardDetailScreen() {
         }}>
           <Ionicons name="copy" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Copy Link</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={s.shareBtn} onPress={() => setReportSheetOpen(true)}>
+          <Ionicons name="document-text" size={16} color={Colors.purple[600]} />
+          <Text style={s.shareBtnText}>Reports</Text>
         </TouchableOpacity>
         <TouchableOpacity style={s.shareBtn} onPress={() => setLabelSheetOpen(true)}>
           <Ionicons name="pricetags" size={16} color={Colors.purple[600]} />
