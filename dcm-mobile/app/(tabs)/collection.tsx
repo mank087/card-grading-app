@@ -11,7 +11,8 @@ import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import LabelStylePicker from '@/components/labels/LabelStylePicker'
 
-const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Star Wars', 'Other']
+// Star Wars was retired as a top-level category and is now an "Other" sub-category.
+const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Other']
 const SORT_OPTIONS = [
   { value: 'created_at', label: 'Date' },
   { value: 'conversational_whole_grade', label: 'Grade' },

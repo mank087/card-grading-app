@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Modal, Pressable } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors, CardCategories } from '@/lib/constants'
@@ -22,6 +22,7 @@ export default function GradeScreen() {
   const [selectedCategory, setSelectedCategory] = useState('Sports')
   const [subCategory, setSubCategory] = useState('')
   const [showSubCategories, setShowSubCategories] = useState(false)
+  const [subCategoryDropdownOpen, setSubCategoryDropdownOpen] = useState(false)
 
   const canGrade = balance >= 1 && (selectedCategory !== 'Other' || subCategory !== '')
 
@@ -107,26 +108,52 @@ export default function GradeScreen() {
           ))}
         </View>
 
-        {/* Sub-category for Other */}
+        {/* Sub-category for Other — dropdown matches the web's grouped select */}
         {selectedCategory === 'Other' && (
           <View style={styles.subCategoryContainer}>
-            <Text style={styles.subCategoryLabel}>Sub-Category *</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.subCategoryScroll}>
-              <View style={styles.subCategoryRow}>
-                {OTHER_SUB_CATEGORIES.map(sub => (
-                  <TouchableOpacity
-                    key={sub}
-                    style={[styles.subPill, subCategory === sub && styles.subPillActive]}
-                    onPress={() => setSubCategory(sub)}
-                  >
-                    <Text style={[styles.subPillText, subCategory === sub && styles.subPillTextActive]}>{sub}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
+            <Text style={styles.subCategoryLabel}>Sub-Category <Text style={{ color: Colors.red[500] }}>*</Text></Text>
+            <TouchableOpacity
+              style={[styles.subDropdown, !subCategory && styles.subDropdownPlaceholder]}
+              onPress={() => setSubCategoryDropdownOpen(true)}
+            >
+              <Text style={[styles.subDropdownText, !subCategory && styles.subDropdownTextPlaceholder]}>
+                {subCategory || 'Select sub-category…'}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color={Colors.gray[500]} />
+            </TouchableOpacity>
           </View>
         )}
       </View>
+
+      {/* Sub-category dropdown modal */}
+      <Modal visible={subCategoryDropdownOpen} transparent animationType="slide" onRequestClose={() => setSubCategoryDropdownOpen(false)}>
+        <Pressable style={styles.dropdownBackdrop} onPress={() => setSubCategoryDropdownOpen(false)}>
+          <Pressable style={styles.dropdownSheet} onPress={e => e.stopPropagation()}>
+            <View style={styles.dropdownHandle} />
+            <Text style={styles.dropdownTitle}>Select Sub-Category</Text>
+            <ScrollView style={{ maxHeight: 480 }}>
+              {(Object.entries(OTHER_SUB_CATEGORIES_GROUPED) as Array<[string, string[]]>).map(([group, items]) => (
+                <View key={group} style={{ marginBottom: 12 }}>
+                  <Text style={styles.dropdownGroupLabel}>{group}</Text>
+                  {items.map(sub => {
+                    const isSelected = subCategory === sub
+                    return (
+                      <TouchableOpacity
+                        key={sub}
+                        style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
+                        onPress={() => { setSubCategory(sub); setSubCategoryDropdownOpen(false) }}
+                      >
+                        <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>{sub}</Text>
+                        {isSelected && <Ionicons name="checkmark" size={18} color={Colors.purple[600]} />}
+                      </TouchableOpacity>
+                    )
+                  })}
+                </View>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* Upload Actions */}
       <View style={styles.section}>
@@ -275,12 +302,19 @@ const styles = StyleSheet.create({
   // Sub-category
   subCategoryContainer: { marginTop: 12 },
   subCategoryLabel: { fontSize: 13, fontWeight: '600', color: Colors.gray[600], marginBottom: 6 },
-  subCategoryScroll: { marginHorizontal: -16 },
-  subCategoryRow: { flexDirection: 'row', gap: 6, paddingHorizontal: 16 },
-  subPill: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, backgroundColor: Colors.gray[100], borderWidth: 1, borderColor: Colors.gray[200] },
-  subPillActive: { backgroundColor: Colors.purple[100], borderColor: Colors.purple[400] },
-  subPillText: { fontSize: 12, color: Colors.gray[600] },
-  subPillTextActive: { color: Colors.purple[700], fontWeight: '600' },
+  subDropdown: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: Colors.gray[300], backgroundColor: '#fff', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 12 },
+  subDropdownPlaceholder: { borderColor: Colors.amber[400] },
+  subDropdownText: { fontSize: 14, color: Colors.gray[900], fontWeight: '600' },
+  subDropdownTextPlaceholder: { color: Colors.gray[400], fontWeight: '500' },
+  dropdownBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
+  dropdownSheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, maxHeight: '85%' as any },
+  dropdownHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.gray[300], alignSelf: 'center', marginBottom: 8 },
+  dropdownTitle: { fontSize: 16, fontWeight: '700', color: Colors.gray[900], paddingHorizontal: 4, paddingBottom: 8 },
+  dropdownGroupLabel: { fontSize: 11, fontWeight: '700', color: Colors.purple[700], textTransform: 'uppercase', letterSpacing: 0.6, paddingHorizontal: 8, paddingVertical: 6, backgroundColor: Colors.purple[50], borderRadius: 6, marginBottom: 4 },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 11, paddingHorizontal: 12, borderRadius: 8 },
+  dropdownItemSelected: { backgroundColor: Colors.purple[50] },
+  dropdownItemText: { fontSize: 14, color: Colors.gray[800] },
+  dropdownItemTextSelected: { color: Colors.purple[700], fontWeight: '700' },
 
   // Upload actions
   uploadActions: { flexDirection: 'row', gap: 12 },
