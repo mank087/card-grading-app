@@ -670,6 +670,11 @@ export default function LabelStudioScreen() {
                 snapToAlignment="center"
                 decelerationRate="fast"
                 snapToInterval={SCREEN_W - 24}
+                // Negate the section's horizontal padding (16px each side) so
+                // the FlatList viewport equals the panel width (SCREEN_W-24).
+                // Without this, panels are wider than the viewport and the
+                // holder PNG bleeds into the neighboring slide.
+                style={{ marginHorizontal: -16 }}
                 onMomentumScrollEnd={(e) => {
                   const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
                   setActiveGalleryIdx(idx)
