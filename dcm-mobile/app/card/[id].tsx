@@ -38,7 +38,7 @@ import CornerZoomGrid from '@/components/grading/CornerZoomGrid'
 import DefectOverlay, { extractDefectMarkers } from '@/components/grading/DefectOverlay'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
-import { getDisplayName, getContextLine } from '@/lib/labelData'
+import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 
 export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
@@ -861,6 +861,7 @@ export default function CardDetailScreen() {
             imageUrl={activeImage === 'front' ? frontUrl : backUrl}
             displayName={getDisplayName(card as any)}
             contextLine={getContextLine(card as any)}
+            features={getFeatures(card as any)}
             serial={card.serial}
             grade={grade}
             condition={card.conversational_condition_label || ''}

@@ -190,6 +190,7 @@ export default function CollectionScreen() {
   const renderGridItem = ({ item }: { item: CardItem }) => {
     const name = getDisplayName(item as any)
     const contextLine = getContextLine(item as any)
+    const featuresArr = getFeatures(item as any)
     const isPublic = item.visibility === 'public'
     const price = item.dcm_price_estimate || item.ebay_price_median
     return (
@@ -198,6 +199,7 @@ export default function CollectionScreen() {
           imageUrl={item.front_url || null}
           displayName={name}
           contextLine={contextLine}
+          features={featuresArr}
           serial={item.serial}
           grade={item.conversational_whole_grade}
           condition={item.conversational_condition_label || ''}

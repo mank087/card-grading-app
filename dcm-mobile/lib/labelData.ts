@@ -141,36 +141,74 @@ export function getContextLine(card: CardLike): string {
   return parts.join(' • ')
 }
 
+function isValidSerialNumber(s?: string | null): boolean {
+  if (!s) return false
+  const v = String(s).trim()
+  if (!v) return false
+  const lower = v.toLowerCase()
+  if (['unknown', 'n/a', '??', 'none', 'no', 'false'].includes(lower)) return false
+  // Accept things like "12/99", "/99", "RARE", numeric counts
+  return v.length > 0
+}
+
 /**
- * Extract feature tags (RC, Auto, Mem, /99, Holo, etc.) for the third label line.
+ * Extract feature tags for the third label line. Mirrors the web's per-category
+ * feature builders in src/lib/labelDataGenerator.ts so labels show RC, Auto,
+ * Mem, 1st Ed, /99, etc. consistent with what the slab on web shows.
  */
 export function getFeatures(card: CardLike): string[] {
   const ci = card.conversational_card_info || {}
+  const category = card.category || 'Other'
+  const isSports = SPORTS_CATEGORIES.has(category) || card.sub_category === 'Sports'
   const features: string[] = []
 
-  const isRookie =
+  const rookieOrFirst =
     ci.rookie_or_first === true ||
     ci.rookie_or_first === 'true' ||
-    (typeof ci.rookie_or_first === 'string' && ci.rookie_or_first.toLowerCase() === 'yes') ||
-    card.rookie_card === true
-  if (isRookie) features.push('RC')
+    (typeof ci.rookie_or_first === 'string' && ci.rookie_or_first.toLowerCase() === 'yes')
+  const rookieCard = card.rookie_card === true || rookieOrFirst
 
+  if (isSports) {
+    if (rookieCard) features.push('RC')
+    if (ci.autographed === true || card.autographed === true || (card as any).autograph_type === 'authentic') features.push('Auto')
+    if (ci.facsimile_autograph === true) features.push('Facsimile')
+    if (ci.memorabilia === true || ((card as any).memorabilia_type && (card as any).memorabilia_type !== 'none')) features.push('Mem')
+    if (ci.official_reprint === true) features.push('Reprint')
+    const serialNum = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
+    if (isValidSerialNumber(serialNum)) features.push(serialNum!.startsWith('/') ? serialNum! : `/${serialNum!.replace(/^\//, '')}`)
+    return features.slice(0, 4)
+  }
+
+  if (category === 'Pokemon') {
+    if (rookieOrFirst || (card as any).first_print_rookie === 'true') features.push('1st Ed')
+    if (ci.autographed === true) features.push('Auto')
+    const holo = stripMarkdown((ci as any).holofoil)
+    if (holo && holo.toLowerCase() !== 'none') features.push(holo)
+    const serialNum = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
+    if (isValidSerialNumber(serialNum)) features.push(serialNum!.startsWith('/') ? serialNum! : `/${serialNum!.replace(/^\//, '')}`)
+    return features.slice(0, 4)
+  }
+
+  if (category === 'MTG') {
+    if ((ci as any).is_promo === true) features.push('Promo')
+    if ((ci as any).is_double_faced === true || (card as any).is_double_faced === true) features.push('DFC')
+    if (ci.is_foil === true || (card as any).is_foil === true) {
+      const foilType = stripMarkdown(ci.foil_type) || stripMarkdown((card as any).foil_type)
+      features.push(foilType || 'Foil')
+    }
+    return features.slice(0, 4)
+  }
+
+  // Lorcana / One Piece / Yu-Gi-Oh / Other — generic fallback
+  if (rookieCard) features.push('RC')
   if (ci.autographed === true || card.autographed === true) features.push('Auto')
-  if (ci.facsimile_autograph === true) features.push('Facsimile Auto')
   if (ci.memorabilia === true) features.push('Mem')
-
-  const numbering = stripMarkdown(card.serial_numbering) || stripMarkdown(ci.serial_number)
-  if (numbering) features.push(`/${numbering.replace(/^\//, '')}`)
-
   if (ci.is_foil === true || stripMarkdown(ci.foil_type)) {
-    const foil = stripMarkdown(ci.foil_type)
-    features.push(foil || 'Foil')
+    features.push(stripMarkdown(ci.foil_type) || 'Foil')
   }
-
+  const serialNum = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
+  if (isValidSerialNumber(serialNum)) features.push(serialNum!.startsWith('/') ? serialNum! : `/${serialNum!.replace(/^\//, '')}`)
   const rarity = stripMarkdown(ci.rarity_tier)
-  if (rarity && rarity.toLowerCase() !== 'common' && rarity.toLowerCase() !== 'uncommon') {
-    features.push(rarity)
-  }
-
-  return features.slice(0, 4) // cap to keep label readable
+  if (rarity && !['common', 'uncommon'].includes(rarity.toLowerCase())) features.push(rarity)
+  return features.slice(0, 4)
 }
