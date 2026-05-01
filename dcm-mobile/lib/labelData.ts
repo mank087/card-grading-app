@@ -141,98 +141,129 @@ export function getContextLine(card: CardLike): string {
   return parts.join(' • ')
 }
 
+// Matches isValidSerialNumber in src/lib/labelDataGenerator.ts — keep filters
+// identical so mobile and web emit the same features list.
 function isValidSerialNumber(s?: string | null): boolean {
   if (!s) return false
   const v = String(s).trim()
   if (!v) return false
   const lower = v.toLowerCase()
   if (['unknown', 'n/a', '??', 'none', 'no', 'false'].includes(lower)) return false
-  // Accept things like "12/99", "/99", "RARE", numeric counts
-  return v.length > 0
+  return true
+}
+
+// Per-category feature builders — direct ports of the matching functions in
+// src/lib/labelDataGenerator.ts. Comments cite the source line numbers so the
+// two stay in lockstep when web changes; do not add fields here that aren't
+// in the web equivalent.
+function getSportsFeatures(ci: any, card: any): string[] {
+  const f: string[] = []
+  if (ci.rookie_or_first === true || ci.rookie_or_first === 'true' || card.rookie_card === true) f.push('RC')
+  if (ci.autographed === true || card.autographed === true || card.autograph_type === 'authentic') f.push('Auto')
+  if (ci.facsimile_autograph === true) f.push('Facsimile')
+  if (ci.memorabilia === true || (card.memorabilia_type && card.memorabilia_type !== 'none')) f.push('Mem')
+  if (ci.official_reprint === true) f.push('Reprint')
+  const sn = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
+  if (isValidSerialNumber(sn)) f.push(sn!)
+  return f
+}
+
+function getPokemonFeatures(ci: any, card: any): string[] {
+  const f: string[] = []
+  if (ci.rookie_or_first === true || ci.rookie_or_first === 'true' || card.first_print_rookie === 'true') f.push('1st Ed')
+  if (ci.autographed === true) f.push('Auto')
+  const sn = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
+  if (isValidSerialNumber(sn)) f.push(sn!)
+  return f
+}
+
+function getMTGFeatures(ci: any, card: any): string[] {
+  const f: string[] = []
+  if (ci.is_promo === true) f.push('Promo')
+  if (ci.is_double_faced === true || card.is_double_faced === true) f.push('DFC')
+  if (card.mtg_rarity === 'mythic') f.push('Mythic')
+  const sn = stripMarkdown(ci.serial_number)
+  if (isValidSerialNumber(sn)) f.push(sn!)
+  return f
+}
+
+function getLorcanaFeatures(ci: any, _card: any): string[] {
+  const f: string[] = []
+  const sn = stripMarkdown(ci.serial_number)
+  if (isValidSerialNumber(sn)) f.push(sn!)
+  return f
+}
+
+function getYugiohFeatures(ci: any, card: any): string[] {
+  const f: string[] = []
+  const attr = stripMarkdown(ci.ygo_attribute) || stripMarkdown(card.ygo_attribute)
+  if (attr) f.push(attr)
+  const race = stripMarkdown(ci.ygo_race) || stripMarkdown(card.ygo_race)
+  if (race) f.push(race)
+  if (ci.is_foil === true) f.push('Foil')
+  const sn = stripMarkdown(ci.serial_number)
+  if (isValidSerialNumber(sn)) f.push(sn!)
+  return f
+}
+
+function getOnePieceFeatures(ci: any, _card: any): string[] {
+  const f: string[] = []
+  if (typeof ci.op_card_type === 'string' && ci.op_card_type.toLowerCase() === 'leader') f.push('Leader')
+  const variant = typeof ci.op_variant_type === 'string' ? ci.op_variant_type.toLowerCase() : ''
+  const isParallel = variant === 'parallel' || variant === 'parallel_manga'
+  if (ci.is_foil === true && !isParallel) f.push('Foil')
+  const sn = stripMarkdown(ci.serial_number)
+  if (isValidSerialNumber(sn)) f.push(sn!)
+  return f
+}
+
+function getStarWarsFeatures(ci: any, card: any): string[] {
+  const f: string[] = []
+  if (ci.is_foil || card.is_foil) f.push('Foil')
+  if (ci.holofoil && isValidValue(ci.holofoil) && ci.holofoil !== 'None') f.push(ci.holofoil)
+  if (ci.autographed) f.push('Auto')
+  const sn = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
+  if (sn && isValidValue(sn)) f.push(sn)
+  const special = stripMarkdown(ci.special_features)
+  if (special && isValidValue(special)) {
+    special.split(/[,;]/).forEach((s: string) => {
+      const t = s.trim()
+      if (t && !f.includes(t)) f.push(t)
+    })
+  }
+  return f
+}
+
+function getOtherFeatures(ci: any, card: any): string[] {
+  const f: string[] = []
+  if (ci.rookie_or_first === true || ci.rookie_or_first === 'true') f.push('RC')
+  if (ci.autographed === true || card.autographed === true) f.push('Auto')
+  if (ci.facsimile_autograph === true) f.push('Facsimile')
+  const sn = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
+  if (isValidSerialNumber(sn)) f.push(sn!)
+  return f
 }
 
 /**
- * Extract feature tags for the third label line. Mirrors the web's per-category
- * feature builders in src/lib/labelDataGenerator.ts so labels show RC, Auto,
- * Mem, 1st Ed, /99, etc. consistent with what the slab on web shows.
+ * Dispatch by category — mirrors src/lib/labelDataGenerator.ts:1222–1247.
+ * Star Wars is detected via card.sub_category since it was demoted from a
+ * top-level category to a sub-category of Other.
  */
 export function getFeatures(card: CardLike): string[] {
   const ci = card.conversational_card_info || {}
   const category = card.category || 'Other'
   const isSports = SPORTS_CATEGORIES.has(category) || card.sub_category === 'Sports'
-  const features: string[] = []
 
-  const rookieOrFirst =
-    ci.rookie_or_first === true ||
-    ci.rookie_or_first === 'true' ||
-    (typeof ci.rookie_or_first === 'string' && ci.rookie_or_first.toLowerCase() === 'yes')
-  const rookieCard = card.rookie_card === true || rookieOrFirst
-
-  if (isSports) {
-    if (rookieCard) features.push('RC')
-    if (ci.autographed === true || card.autographed === true || (card as any).autograph_type === 'authentic') features.push('Auto')
-    if (ci.facsimile_autograph === true) features.push('Facsimile')
-    if (ci.memorabilia === true || ((card as any).memorabilia_type && (card as any).memorabilia_type !== 'none')) features.push('Mem')
-    if (ci.official_reprint === true) features.push('Reprint')
-    const serialNum = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
-    if (isValidSerialNumber(serialNum)) features.push(serialNum!.startsWith('/') ? serialNum! : `/${serialNum!.replace(/^\//, '')}`)
-    return features.slice(0, 4)
+  if (isSports) return getSportsFeatures(ci, card)
+  switch (category) {
+    case 'Pokemon':   return getPokemonFeatures(ci, card)
+    case 'MTG':       return getMTGFeatures(ci, card)
+    case 'Lorcana':   return getLorcanaFeatures(ci, card)
+    case 'One Piece': return getOnePieceFeatures(ci, card)
+    case 'Yu-Gi-Oh':  return getYugiohFeatures(ci, card)
+    default:
+      return card.sub_category === 'Star Wars'
+        ? getStarWarsFeatures(ci, card)
+        : getOtherFeatures(ci, card)
   }
-
-  if (category === 'Pokemon') {
-    if (rookieOrFirst || (card as any).first_print_rookie === 'true') features.push('1st Ed')
-    if (ci.autographed === true) features.push('Auto')
-    const holo = stripMarkdown((ci as any).holofoil)
-    if (holo && holo.toLowerCase() !== 'none') features.push(holo)
-    const serialNum = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
-    if (isValidSerialNumber(serialNum)) features.push(serialNum!.startsWith('/') ? serialNum! : `/${serialNum!.replace(/^\//, '')}`)
-    return features.slice(0, 4)
-  }
-
-  if (category === 'MTG') {
-    if ((ci as any).is_promo === true) features.push('Promo')
-    if ((ci as any).is_double_faced === true || (card as any).is_double_faced === true) features.push('DFC')
-    if (ci.is_foil === true || (card as any).is_foil === true) {
-      const foilType = stripMarkdown(ci.foil_type) || stripMarkdown((card as any).foil_type)
-      features.push(foilType || 'Foil')
-    }
-    return features.slice(0, 4)
-  }
-
-  if (category === 'Lorcana') {
-    const serialNum = stripMarkdown(ci.serial_number)
-    if (isValidSerialNumber(serialNum)) features.push(serialNum!)
-    return features.slice(0, 4)
-  }
-
-  if (category === 'Yu-Gi-Oh') {
-    const attribute = stripMarkdown((ci as any).ygo_attribute) || stripMarkdown((card as any).ygo_attribute)
-    if (attribute) features.push(attribute)
-    const race = stripMarkdown((ci as any).ygo_race) || stripMarkdown((card as any).ygo_race)
-    if (race) features.push(race)
-    if (ci.is_foil === true) features.push('Foil')
-    const serialNum = stripMarkdown(ci.serial_number)
-    if (isValidSerialNumber(serialNum)) features.push(serialNum!)
-    return features.slice(0, 4)
-  }
-
-  if (category === 'One Piece') {
-    const opType = stripMarkdown((ci as any).op_card_type)
-    if (opType && opType.toLowerCase() === 'leader') features.push('Leader')
-    const variantType = stripMarkdown((ci as any).op_variant_type)?.toLowerCase()
-    const isParallel = variantType === 'parallel' || variantType === 'parallel_manga'
-    if (ci.is_foil === true && !isParallel) features.push('Foil')
-    const serialNum = stripMarkdown(ci.serial_number)
-    if (isValidSerialNumber(serialNum)) features.push(serialNum!)
-    return features.slice(0, 4)
-  }
-
-  // Other (and unknown categories) — matches getOtherFeatures on web:
-  // RC + Auto + Facsimile + serial number.
-  if (rookieOrFirst) features.push('RC')
-  if (ci.autographed === true || card.autographed === true) features.push('Auto')
-  if (ci.facsimile_autograph === true) features.push('Facsimile')
-  const serialNum = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
-  if (isValidSerialNumber(serialNum)) features.push(serialNum!.startsWith('/') ? serialNum! : `/${serialNum!.replace(/^\//, '')}`)
-  return features.slice(0, 4)
 }
