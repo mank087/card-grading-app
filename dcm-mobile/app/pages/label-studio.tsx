@@ -241,6 +241,25 @@ export default function LabelStudioScreen() {
     }
   }, [selectedCard, labelName, labelSet, labelYear, labelNumber, labelFeatures])
 
+  // Inline label props for non-slab gallery tiles (toploader, one-touch, foldover).
+  // These holders use compact Avery-sticker layouts that are NOT the slab label,
+  // so they need the same fields web's getCardSlabProps yields. Web returns the
+  // features as an array; mobile stores them as a CSV — split here.
+  const inlineLabelProps = useMemo(() => {
+    if (!labelCardData) return undefined
+    const features = (labelCardData.featuresLine || '')
+      .split(/[•,]/).map(f => f.trim()).filter(Boolean)
+    return {
+      displayName: labelCardData.primaryName || '',
+      setLineText: labelCardData.contextLine || '',
+      features,
+      serial: labelCardData.serial || '',
+      grade: typeof labelCardData.grade === 'number' ? labelCardData.grade : null,
+      condition: labelCardData.condition || '',
+      isAlteredAuthentic: false,
+    }
+  }, [labelCardData])
+
   const labelConfig = useMemo<LabelConfig>(() => ({
     width: config.width ?? 2.8,
     height: config.height ?? 0.8,
@@ -697,6 +716,8 @@ export default function LabelStudioScreen() {
                       labelImageUrl={labelPreviewUrl}
                       cardImageUrl={frontUrl}
                       width={210}
+                      labelProps={inlineLabelProps}
+                      side={side}
                     />
 
                     {/* Side toggle (front/back) — same as designer below */}
