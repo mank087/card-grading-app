@@ -5,9 +5,12 @@ import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
 import { WebView } from 'react-native-webview'
 
-// expo-print is optional — degrades to share-sheet Print if not installed.
+// Both deps are optional at build time so we can ship code that lights up once
+// the user runs `npx expo install expo-print expo-media-library`.
 let Print: any = null
+let MediaLibrary: any = null
 try { Print = require('expo-print') } catch {}
+try { MediaLibrary = require('expo-media-library') } catch {}
 
 /**
  * Persist a base64 file to the cache directory and return its file:// path so we
@@ -371,14 +374,31 @@ export default function CardDetailScreen() {
                     if (!cur) return null
                     const isImage = cur.mime?.startsWith('image/')
                     if (isImage) {
-                      return <Image source={{ uri: cur.dataUrl }} style={{ width: '100%', height: 320 }} resizeMode="contain" />
+                      return <Image source={{ uri: cur.dataUrl }} style={{ width: '100%', height: 360 }} resizeMode="contain" />
                     }
-                    // PDF — show a styled card; native PDF preview varies across platforms
+                    // PDF — render via WebView. iOS WebKit renders PDFs natively from the
+                    // data URL; Android System WebView can't, so we show a fallback card.
+                    if (Platform.OS === 'ios') {
+                      return (
+                        <WebView
+                          originWhitelist={['*']}
+                          source={{ uri: cur.dataUrl }}
+                          style={{ width: '100%', height: 380, backgroundColor: '#fff' }}
+                        />
+                      )
+                    }
                     return (
                       <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 8 }}>
                         <Ionicons name="document-text" size={64} color={Colors.purple[600]} />
                         <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.gray[800] }}>PDF Ready</Text>
                         <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center', paddingHorizontal: 12 }} numberOfLines={2}>{cur.name}</Text>
+                        <TouchableOpacity
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: Colors.purple[50], borderRadius: 6, borderWidth: 1, borderColor: Colors.purple[200] }}
+                          onPress={() => Linking.openURL(cur.localPath).catch(() => Alert.alert('No PDF viewer', 'Install a PDF viewer (Adobe, Drive) to preview PDFs in-app.'))}
+                        >
+                          <Ionicons name="eye-outline" size={12} color={Colors.purple[700]} />
+                          <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.purple[700] }}>Open in PDF viewer</Text>
+                        </TouchableOpacity>
                       </View>
                     )
                   })()}
@@ -393,15 +413,40 @@ export default function CardDetailScreen() {
                       if (!cur) return
                       setExportActionBusy('download')
                       try {
-                        if (await Sharing.isAvailableAsync()) {
-                          await Sharing.shareAsync(cur.localPath, {
-                            mimeType: cur.mime,
-                            dialogTitle: cur.name,
-                            UTI: cur.mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
-                          })
+                        // Preferred: expo-media-library auto-saves to Downloads (Android)
+                        // or Photos (iOS for images). One-time permission, no share sheet.
+                        if (MediaLibrary && typeof MediaLibrary.saveToLibraryAsync === 'function') {
+                          let perm = await MediaLibrary.getPermissionsAsync()
+                          if (!perm.granted) perm = await MediaLibrary.requestPermissionsAsync()
+                          if (!perm.granted) {
+                            Alert.alert(
+                              'Permission needed',
+                              'Allow file/media access so we can save downloads to your device.',
+                            )
+                            setExportActionBusy(null)
+                            return
+                          }
+                          await MediaLibrary.saveToLibraryAsync(cur.localPath)
+                          Alert.alert(
+                            'Downloaded',
+                            Platform.OS === 'android'
+                              ? `${cur.name} saved to Downloads.`
+                              : `${cur.name} saved to your Photos / Files.`,
+                          )
                         } else {
-                          Alert.alert('Saved', `File at ${cur.localPath}`)
+                          // Fallback when expo-media-library isn't installed yet
+                          if (await Sharing.isAvailableAsync()) {
+                            await Sharing.shareAsync(cur.localPath, {
+                              mimeType: cur.mime,
+                              dialogTitle: cur.name,
+                              UTI: cur.mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+                            })
+                          } else {
+                            Alert.alert('Saved', `File at ${cur.localPath}`)
+                          }
                         }
+                      } catch (err: any) {
+                        Alert.alert('Download failed', err?.message || 'Could not save file')
                       } finally { setExportActionBusy(null) }
                     }}
                   >
@@ -440,9 +485,9 @@ export default function CardDetailScreen() {
                       : <><Ionicons name="print-outline" size={16} color={Colors.gray[800]} /><Text style={s.editBtnCancelText}>Print</Text></>}
                   </TouchableOpacity>
                 </View>
-                {!Print && (
+                {(!Print || !MediaLibrary) && (
                   <Text style={{ fontSize: 9, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
-                    Tip: install expo-print for a one-tap native print dialog.
+                    Run `npx expo install expo-print expo-media-library` for direct save + native print (no share sheet).
                   </Text>
                 )}
               </View>
