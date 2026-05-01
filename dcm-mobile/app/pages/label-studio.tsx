@@ -119,10 +119,12 @@ export default function LabelStudioScreen() {
   // Editable text fields
   const [labelName, setLabelName] = useState('')
   const [labelSet, setLabelSet] = useState('')
+  const [labelSubset, setLabelSubset] = useState('')
   const [labelNumber, setLabelNumber] = useState('')
   const [labelYear, setLabelYear] = useState('')
   const [labelFeatures, setLabelFeatures] = useState('')
   const [fieldsInitialized, setFieldsInitialized] = useState<string | null>(null)
+  const [savingLabelFields, setSavingLabelFields] = useState(false)
 
   // Saved styles — synced with web via useLabelStyle hook (server source of truth).
   // Replaces the previous AsyncStorage-only flow so users see the same custom-1..4
@@ -168,15 +170,19 @@ export default function LabelStudioScreen() {
   // Saved styles now live in user_credits.custom_label_styles via the hook —
   // no local hydration needed.
 
-  // Initialize text fields when card changes
+  // Initialize text fields when card changes — prefer existing custom_label_data
+  // overrides (saved via the Save to Card button) over the AI-generated values
+  // so users don't lose their edits across visits.
   useEffect(() => {
     if (!selectedCard || fieldsInitialized === selectedCard.id) return
     const ci = selectedCard.conversational_card_info
-    setLabelName(selectedCard.card_name || ci?.card_name || selectedCard.featured || '')
-    setLabelSet(selectedCard.card_set || ci?.set_name || '')
-    setLabelNumber(selectedCard.card_number || ci?.card_number || '')
-    setLabelYear(selectedCard.release_date || ci?.year || '')
-    setLabelFeatures('')
+    const custom = selectedCard.custom_label_data || {}
+    setLabelName(custom.primaryName ?? (selectedCard.card_name || ci?.card_name || selectedCard.featured || ''))
+    setLabelSet(custom.setName ?? (selectedCard.card_set || ci?.set_name || ''))
+    setLabelSubset(custom.subset ?? (ci?.subset || ''))
+    setLabelNumber(custom.cardNumber ?? (selectedCard.card_number || ci?.card_number || ''))
+    setLabelYear(custom.year ?? (selectedCard.release_date || ci?.year || ''))
+    setLabelFeatures(Array.isArray(custom.features) ? custom.features.join(', ') : '')
     setFieldsInitialized(selectedCard.id)
   }, [selectedCard, fieldsInitialized])
 
@@ -395,6 +401,50 @@ export default function LabelStudioScreen() {
     setRenamingValue('')
     if (!ok) Alert.alert('Rename failed', 'Could not rename the style.')
   }, [renamingStyleId, renamingValue, renameCustomStyle])
+
+  // Save edited label-fields back to the card row. Uses the same shape and
+  // endpoint the web does (PUT /api/cards/{id}/custom-label) so edits made
+  // on mobile show up identically when the card is rendered on web (slab,
+  // collection grid, downloadable labels, etc.).
+  const saveLabelFieldsToCard = useCallback(async () => {
+    if (!selectedCard?.id || !session?.access_token) return
+    setSavingLabelFields(true)
+    try {
+      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+      const features = labelFeatures
+        .split(',')
+        .map(f => f.trim())
+        .filter(Boolean)
+        .slice(0, 10)
+      const payload = {
+        primaryName: labelName.trim() || null,
+        setName: labelSet.trim() || null,
+        subset: labelSubset.trim() || null,
+        cardNumber: labelNumber.trim() || null,
+        year: labelYear.trim() || null,
+        features,
+      }
+      const res = await fetch(`${API_BASE}/api/cards/${selectedCard.id}/custom-label`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(payload),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({} as any))
+        throw new Error(body.error || `Save failed (HTTP ${res.status})`)
+      }
+      // Patch the cached selectedCard so re-renders reuse the new values
+      setSelectedCard((prev: any) => prev ? { ...prev, custom_label_data: payload } : prev)
+      Alert.alert('Saved', 'Custom label text saved to this card. It will show up on slabs, collection thumbnails, and downloadable labels everywhere.')
+    } catch (err: any) {
+      Alert.alert('Save failed', err?.message || 'Could not save custom label text.')
+    } finally {
+      setSavingLabelFields(false)
+    }
+  }, [selectedCard, session?.access_token, labelName, labelSet, labelSubset, labelNumber, labelYear, labelFeatures])
 
   // Gallery tile download — for now uses the same Share flow so the user
   // gets a PNG of the currently-visible label preview. Full per-type PDF
@@ -979,33 +1029,54 @@ export default function LabelStudioScreen() {
 
             {/* ============ Label Text ============ */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>Label Text</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={s.sectionTitle}>Label Text</Text>
+                <Text style={{ fontSize: 10, color: Colors.gray[400] }}>Edits override AI values</Text>
+              </View>
               <View style={{ gap: 8 }}>
                 <View>
                   <Text style={s.fieldLabel}>Card Name</Text>
-                  <TextInput style={s.fieldInput} value={labelName} onChangeText={setLabelName} placeholder="Card name" placeholderTextColor={Colors.gray[400]} />
+                  <TextInput style={s.fieldInput} value={labelName} onChangeText={setLabelName} placeholder="Card name" placeholderTextColor={Colors.gray[400]} maxLength={200} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={s.fieldLabel}>Set</Text>
-                    <TextInput style={s.fieldInput} value={labelSet} onChangeText={setLabelSet} placeholder="Set name" placeholderTextColor={Colors.gray[400]} />
+                    <TextInput style={s.fieldInput} value={labelSet} onChangeText={setLabelSet} placeholder="Set name" placeholderTextColor={Colors.gray[400]} maxLength={200} />
                   </View>
                   <View style={{ flex: 0.5 }}>
                     <Text style={s.fieldLabel}>Year</Text>
-                    <TextInput style={s.fieldInput} value={labelYear} onChangeText={setLabelYear} placeholder="Year" placeholderTextColor={Colors.gray[400]} />
+                    <TextInput style={s.fieldInput} value={labelYear} onChangeText={setLabelYear} placeholder="Year" placeholderTextColor={Colors.gray[400]} maxLength={20} />
                   </View>
+                </View>
+                <View>
+                  <Text style={s.fieldLabel}>Subset</Text>
+                  <TextInput style={s.fieldInput} value={labelSubset} onChangeText={setLabelSubset} placeholder="Insert / parallel name (e.g. Power Players)" placeholderTextColor={Colors.gray[400]} maxLength={200} />
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
                   <View style={{ flex: 0.5 }}>
                     <Text style={s.fieldLabel}>Card #</Text>
-                    <TextInput style={s.fieldInput} value={labelNumber} onChangeText={setLabelNumber} placeholder="#" placeholderTextColor={Colors.gray[400]} />
+                    <TextInput style={s.fieldInput} value={labelNumber} onChangeText={setLabelNumber} placeholder="#" placeholderTextColor={Colors.gray[400]} maxLength={50} />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={s.fieldLabel}>Features</Text>
-                    <TextInput style={s.fieldInput} value={labelFeatures} onChangeText={setLabelFeatures} placeholder="RC, Holo, etc." placeholderTextColor={Colors.gray[400]} />
+                    <Text style={s.fieldLabel}>Features (comma-separated, max 10)</Text>
+                    <TextInput style={s.fieldInput} value={labelFeatures} onChangeText={setLabelFeatures} placeholder="RC, Auto, /99" placeholderTextColor={Colors.gray[400]} />
                   </View>
                 </View>
               </View>
+              <TouchableOpacity
+                style={[s.downloadBtn, { marginTop: 12, backgroundColor: savingLabelFields ? Colors.gray[400] : Colors.purple[600] }]}
+                onPress={saveLabelFieldsToCard}
+                disabled={savingLabelFields || !selectedCard}
+                activeOpacity={0.7}
+              >
+                {savingLabelFields
+                  ? <ActivityIndicator size="small" color="#fff" />
+                  : <Ionicons name="save-outline" size={18} color="#fff" />}
+                <Text style={s.downloadBtnText}>{savingLabelFields ? 'Saving…' : 'Save to Card'}</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 10, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
+                Saves to this card so the same text shows on slabs, collection thumbnails, and labels everywhere.
+              </Text>
             </View>
 
             {/* ============ Download / Share ============ */}
