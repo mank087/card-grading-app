@@ -1,13 +1,12 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import * as ImagePicker from 'expo-image-picker'
 import { Colors, CardCategories } from '@/lib/constants'
 import { useCredits } from '@/contexts/CreditsContext'
 import { purchaseCredits, CREDIT_TIERS } from '@/lib/stripe'
-import { compressImage, cropToCardAspect } from '@/lib/imageUtils'
 import Button from '@/components/ui/Button'
+import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 
 const OTHER_SUB_CATEGORIES_GROUPED = {
   'TCG': ['Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard', 'Weiss Schwarz', 'MetaZoo', 'Force of Will', 'Final Fantasy TCG', 'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena'],
@@ -26,86 +25,45 @@ export default function GradeScreen() {
 
   const canGrade = balance >= 1 && (selectedCategory !== 'Other' || subCategory !== '')
 
-  const handleCamera = () => {
-    if (!canGrade) {
-      if (balance < 1) Alert.alert('Insufficient Credits', 'You need at least 1 credit to grade a card.')
-      return
-    }
+  // Pro Tip modal — gates the Camera/Gallery tap so the tips show before the
+  // capture screen. Once dismissed, navigate to /grade/capture in the chosen mode.
+  const [tipsVisible, setTipsVisible] = useState(false)
+  const [tipsLoaded, setTipsLoaded] = useState(false)
+  const [shouldGateOnTips, setShouldGateOnTips] = useState(true)
+  const [pendingMode, setPendingMode] = useState<'camera' | 'gallery' | null>(null)
+
+  useEffect(() => {
+    shouldShowPhotoTips().then(should => {
+      setShouldGateOnTips(should)
+      setTipsLoaded(true)
+    })
+  }, [])
+
+  const navigateToCapture = (mode: 'camera' | 'gallery') => {
     router.push({
       pathname: '/grade/capture',
-      params: { category: selectedCategory, subCategory },
+      params: { category: selectedCategory, subCategory, mode, tipsAcked: '1' },
     })
   }
 
-  const [galleryStep, setGalleryStep] = useState<'idle' | 'front' | 'back' | 'processing'>('idle')
-  const [galleryFrontUri, setGalleryFrontUri] = useState<string | null>(null)
-
-  const handleGallery = async () => {
+  const handleStart = (mode: 'camera' | 'gallery') => {
     if (!canGrade) {
       if (balance < 1) Alert.alert('Insufficient Credits', 'You need at least 1 credit to grade a card.')
       return
     }
-
-    try {
-      setGalleryStep('front')
-
-      // Pick front image
-      const frontResult = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.92,
-        allowsEditing: false,
-      })
-      if (frontResult.canceled || !frontResult.assets?.[0]) {
-        setGalleryStep('idle')
-        return
-      }
-
-      setGalleryFrontUri(frontResult.assets[0].uri)
-      setGalleryStep('back')
-
-      // Pick back image
-      const backResult = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.92,
-        allowsEditing: false,
-      })
-      if (backResult.canceled || !backResult.assets?.[0]) {
-        setGalleryStep('idle')
-        setGalleryFrontUri(null)
-        return
-      }
-
-      setGalleryStep('processing')
-
-      // Crop and compress both
-      const croppedFront = await cropToCardAspect(frontResult.assets[0].uri)
-      const croppedBack = await cropToCardAspect(backResult.assets[0].uri)
-      const compressedFront = await compressImage(croppedFront)
-      const compressedBack = await compressImage(croppedBack)
-
-      setGalleryStep('idle')
-      setGalleryFrontUri(null)
-
-      // Go to review
-      router.push({
-        pathname: '/grade/review',
-        params: {
-          category: selectedCategory,
-          subCategory,
-          frontUri: compressedFront.uri,
-          backUri: compressedBack.uri,
-          frontWidth: String(compressedFront.width),
-          frontHeight: String(compressedFront.height),
-          backWidth: String(compressedBack.width),
-          backHeight: String(compressedBack.height),
-        },
-      })
-    } catch (err) {
-      console.error('Gallery error:', err)
-      setGalleryStep('idle')
-      setGalleryFrontUri(null)
+    if (shouldGateOnTips && tipsLoaded) {
+      setPendingMode(mode)
+      setTipsVisible(true)
+    } else {
+      navigateToCapture(mode)
     }
   }
+
+  const handleCamera = () => handleStart('camera')
+  const handleGallery = () => handleStart('gallery')
+
+  // Legacy state — referenced by the gallery button label below; keep at idle.
+  const galleryStep: 'idle' | 'front' | 'back' | 'processing' = 'idle'
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -272,6 +230,20 @@ export default function GradeScreen() {
           <Text style={styles.tipText}>Avoid flash — it causes glare on glossy cards</Text>
         </View>
       </View>
+
+      {/* Pro Tip popup — gates Camera/Gallery so users see best-practice
+          photography tips before either upload path begins. */}
+      <PhotoTipsModal
+        visible={tipsVisible}
+        onCancel={() => { setTipsVisible(false); setPendingMode(null) }}
+        onProceed={() => {
+          setTipsVisible(false)
+          setShouldGateOnTips(false) // don't re-gate this session
+          const mode = pendingMode
+          setPendingMode(null)
+          if (mode) navigateToCapture(mode)
+        }}
+      />
     </ScrollView>
   )
 }

@@ -13,7 +13,7 @@ import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal
 
 export default function CaptureScreen() {
   const router = useRouter()
-  const params = useLocalSearchParams<{ category: string; subCategory?: string }>()
+  const params = useLocalSearchParams<{ category: string; subCategory?: string; mode?: string; tipsAcked?: string }>()
   const cameraRef = useRef<CameraView>(null)
   const [permission, requestPermission] = useCameraPermissions()
   const [facing, setFacing] = useState<'front' | 'back'>('back')
@@ -37,21 +37,28 @@ export default function CaptureScreen() {
   const [previewQuality, setPreviewQuality] = useState<QualityResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
 
-  // Method (camera vs gallery) — mirrors web's UploadMethodSelector
-  const [mode, setMode] = useState<'camera' | 'gallery'>('camera')
+  // Method (camera vs gallery) — pre-selected from the main grade screen, defaults to camera
+  const [mode, setMode] = useState<'camera' | 'gallery'>(params.mode === 'gallery' ? 'gallery' : 'camera')
 
-  // Pro Tip modal — gates the FIRST upload action (camera tap or gallery pick)
+  // Pro Tip modal — only gates here when the main grade screen didn't already show it
+  // (signaled by tipsAcked=1 in query params). Otherwise users would see the tips twice.
   const [tipsVisible, setTipsVisible] = useState(false)
   const [tipsLoaded, setTipsLoaded] = useState(false)
   const [shouldGateOnTips, setShouldGateOnTips] = useState(true)
   const [pendingAction, setPendingAction] = useState<'capture' | 'gallery' | null>(null)
 
   useEffect(() => {
+    if (params.tipsAcked === '1') {
+      // Main grade screen already showed (or skipped) the tips
+      setShouldGateOnTips(false)
+      setTipsLoaded(true)
+      return
+    }
     shouldShowPhotoTips().then(should => {
       setShouldGateOnTips(should)
       setTipsLoaded(true)
     })
-  }, [])
+  }, [params.tipsAcked])
 
   // Run a captured / picked image through the same compress → quality → hash pipeline
   // and stash it as the current side. Used by both camera and gallery paths.
