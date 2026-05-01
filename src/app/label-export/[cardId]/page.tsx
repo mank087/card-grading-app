@@ -60,6 +60,9 @@ export default function LabelExportPage() {
   const type = sp.get('type') || 'slab-modern';
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
   const labelStyleParam = (sp.get('labelStyle') || 'modern') as 'modern' | 'traditional';
+  // Avery sheet position (0-based). Defaults to 0 if not provided.
+  const position = Math.max(0, parseInt(sp.get('position') || '0', 10) || 0);
+  const secondPosition = Math.max(0, parseInt(sp.get('position2') || String(position + 1), 10) || (position + 1));
   const [status, setStatus] = useState('Initializing…');
   const [error, setError] = useState<string | null>(null);
 
@@ -92,6 +95,28 @@ export default function LabelExportPage() {
         const frontImageUrl = signed?.find(u => u.path === card.front_path)?.signedUrl || '';
         const backImageUrl = signed?.find(u => u.path === card.back_path)?.signedUrl || '';
 
+        // Look up the user's emblem entitlements + selections (same logic as the
+        // mobile useUserEmblems hook). Mirrors web parity so labels carry Founder /
+        // VIP / Card Lover badges when the user has them enabled.
+        let showFounderEmblem = false;
+        let showVipEmblem = false;
+        let showCardLoversEmblem = false;
+        try {
+          const { data: creditsRow } = await supabase
+            .from('user_credits')
+            .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
+            .single();
+          if (creditsRow) {
+            const selected: string[] = (creditsRow.preferred_label_emblem || '')
+              .split(',').map((s: string) => s.trim()).filter(Boolean);
+            showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && selected.includes('founder');
+            showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && selected.includes('vip');
+            showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && selected.includes('card_lover');
+          }
+        } catch (e) {
+          console.warn('[label-export] emblem lookup failed (non-fatal):', e);
+        }
+
         const labelData = getCardLabelData(card);
         const w = card.conversational_weighted_sub_scores || {};
         const s = card.conversational_sub_scores || {};
@@ -122,6 +147,9 @@ export default function LabelExportPage() {
             backImageUrl,
             labelStyle: type === 'card-image-traditional' ? 'traditional' : 'modern',
             subScores,
+            showFounderEmblem,
+            showVipEmblem,
+            showCardLoversEmblem,
           };
           const { front, back } = await generateCardImages(imageData);
           blobs.push({ name: `DCM-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });
@@ -172,7 +200,7 @@ export default function LabelExportPage() {
             cardUrl,
             logoDataUrl,
           };
-          const blob = await generateAveryLabel(fold, 0);
+          const blob = await generateAveryLabel(fold, position);
           blobs.push({ name: `DCM-OneTouch-${namePrefix}.pdf`, mime: 'application/pdf', dataUrl: await blobToDataUrl(blob) });
         } else if (type === 'toploader' || type === 'foldover') {
           postStatus('Generating Avery 8167 toploader label…');
@@ -183,8 +211,8 @@ export default function LabelExportPage() {
             cardName: labelData.primaryName,
           };
           const blob = type === 'foldover'
-            ? await generateFoldOverLabel8167(toploaderData, 0)
-            : await generateToploaderLabelPair(toploaderData, 0, 1);
+            ? await generateFoldOverLabel8167(toploaderData, position)
+            : await generateToploaderLabelPair(toploaderData, position, secondPosition);
           blobs.push({
             name: `DCM-Toploader-${type === 'foldover' ? 'Foldover-' : ''}${namePrefix}.pdf`,
             mime: 'application/pdf',
@@ -212,6 +240,9 @@ export default function LabelExportPage() {
             qrCodeDataUrl,
             subScores,
             logoDataUrl,
+            showFounderEmblem,
+            showVipEmblem,
+            showCardLoversEmblem,
           };
           const blob = format === 'foldover'
             ? await generateFoldOverSlabLabel(slabPayload, slabStyle)
