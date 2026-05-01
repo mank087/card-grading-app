@@ -3,62 +3,25 @@ import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, Touchable
 import * as Clipboard from 'expo-clipboard'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
-import AsyncStorage from '@react-native-async-storage/async-storage'
-
-const SAVE_DIR_KEY = 'dcm_label_save_dir'
-
 /**
- * Save a base64 file directly to the user's chosen folder on Android (no share sheet),
- * falling back to the iOS share sheet (iOS has no Downloads folder concept).
- *
- * On Android the user picks a folder ONCE via Storage Access Framework — that
- * permission is persisted. Subsequent saves write straight to the same folder.
+ * Save a generated label/image. Both platforms use the OS share sheet so the user
+ * gets a "Save to Files" option (and any other app — Drive, Adobe, etc.) without
+ * a separate folder-picker step. Android remembers the last chosen Files folder
+ * so repeat saves are effectively one tap.
  */
-async function saveFileToDevice(name: string, base64: string, mime: string): Promise<{ ok: boolean; uri?: string; viaShare?: boolean; error?: string }> {
-  if (Platform.OS === 'android') {
-    const SAF = (FileSystem as any).StorageAccessFramework
-    if (!SAF) {
-      return { ok: false, error: 'Storage Access Framework not available' }
+async function saveFileToDevice(name: string, base64: string, mime: string): Promise<{ ok: boolean; uri?: string; error?: string }> {
+  try {
+    const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory
+    const path = `${dir}${name}`
+    await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' as any })
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(path, { mimeType: mime, dialogTitle: name, UTI: mime === 'application/pdf' ? 'com.adobe.pdf' : undefined })
+      return { ok: true, uri: path }
     }
-    let dirUri = await AsyncStorage.getItem(SAVE_DIR_KEY)
-    if (!dirUri) {
-      // First-time setup — ask user to pick a folder (e.g. Downloads)
-      const perm = await SAF.requestDirectoryPermissionsAsync()
-      if (!perm.granted) {
-        return { ok: false, error: 'Folder permission denied' }
-      }
-      dirUri = perm.directoryUri as string
-      await AsyncStorage.setItem(SAVE_DIR_KEY, dirUri)
-    }
-    try {
-      const fileUri = await SAF.createFileAsync(dirUri, name, mime)
-      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: 'base64' as any })
-      return { ok: true, uri: fileUri }
-    } catch (err: any) {
-      // Saved permission may have been revoked — clear it and retry once
-      await AsyncStorage.removeItem(SAVE_DIR_KEY)
-      const perm = await SAF.requestDirectoryPermissionsAsync().catch(() => null)
-      if (!perm?.granted) {
-        return { ok: false, error: err?.message || 'Save folder no longer accessible' }
-      }
-      await AsyncStorage.setItem(SAVE_DIR_KEY, perm.directoryUri)
-      try {
-        const fileUri = await SAF.createFileAsync(perm.directoryUri, name, mime)
-        await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: 'base64' as any })
-        return { ok: true, uri: fileUri }
-      } catch (err2: any) {
-        return { ok: false, error: err2?.message || 'Save failed' }
-      }
-    }
+    return { ok: true, uri: path }
+  } catch (err: any) {
+    return { ok: false, error: err?.message || 'Save failed' }
   }
-  // iOS — no Downloads folder concept, fall back to share sheet
-  const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory
-  const path = `${dir}${name}`
-  await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' as any })
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(path, { mimeType: mime, dialogTitle: name })
-  }
-  return { ok: true, uri: path, viaShare: true }
 }
 import { WebView } from 'react-native-webview'
 import { useLocalSearchParams, useRouter } from 'expo-router'
@@ -400,34 +363,19 @@ export default function CardDetailScreen() {
                         return
                       }
                       if (msg.type === 'label-export-ready' && Array.isArray(msg.files)) {
-                        setExportStatus(`Saving ${msg.files.length} file${msg.files.length > 1 ? 's' : ''}…`)
-                        const savedNames: string[] = []
-                        let viaShare = false
+                        setExportStatus(`Opening save dialog…`)
                         let firstError: string | null = null
+                        // Save each file in sequence — share sheet pops once per file so the
+                        // user can pick "Save to Files" / Drive / etc. for each.
                         for (const f of msg.files) {
                           const base64 = (f.dataUrl || '').split(',')[1] || ''
                           if (!base64) continue
                           const result = await saveFileToDevice(f.name, base64, f.mime)
-                          if (result.ok) {
-                            savedNames.push(f.name)
-                            if (result.viaShare) viaShare = true
-                          } else if (!firstError) {
-                            firstError = result.error || 'Save failed'
-                          }
+                          if (!result.ok && !firstError) firstError = result.error || 'Save failed'
                         }
                         setExportTask(null)
                         setExportStatus('')
-                        if (savedNames.length === 0) {
-                          setExportError(firstError || 'No files saved')
-                        } else {
-                          const noun = savedNames.length === 1 ? 'file' : `files`
-                          Alert.alert(
-                            'Saved',
-                            viaShare
-                              ? `${savedNames.length} ${noun} saved.\n\nUse the share menu to send to Files or another app.`
-                              : `${savedNames.length} ${noun} saved to your chosen folder:\n\n${savedNames.join('\n')}\n\nOpen it from your Files / Downloads app.`,
-                          )
-                        }
+                        if (firstError) setExportError(firstError)
                       } else if (msg.type === 'error') {
                         setExportError(msg.message || 'Failed to generate label')
                       }
