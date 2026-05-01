@@ -6,11 +6,13 @@ import * as Sharing from 'expo-sharing'
 import { WebView } from 'react-native-webview'
 
 // Both deps are optional at build time so we can ship code that lights up once
-// the user runs `npx expo install expo-print expo-media-library`.
+// the user runs `npx expo install expo-print expo-media-library expo-intent-launcher`.
 let Print: any = null
 let MediaLibrary: any = null
+let IntentLauncher: any = null
 try { Print = require('expo-print') } catch {}
 try { MediaLibrary = require('expo-media-library') } catch {}
+try { IntentLauncher = require('expo-intent-launcher') } catch {}
 
 /**
  * Persist a base64 file to the cache directory and return its file:// path so we
@@ -394,7 +396,30 @@ export default function CardDetailScreen() {
                         <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center', paddingHorizontal: 12 }} numberOfLines={2}>{cur.name}</Text>
                         <TouchableOpacity
                           style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 6, paddingHorizontal: 10, paddingVertical: 5, backgroundColor: Colors.purple[50], borderRadius: 6, borderWidth: 1, borderColor: Colors.purple[200] }}
-                          onPress={() => Linking.openURL(cur.localPath).catch(() => Alert.alert('No PDF viewer', 'Install a PDF viewer (Adobe, Drive) to preview PDFs in-app.'))}
+                          onPress={async () => {
+                            try {
+                              if (Platform.OS === 'android' && IntentLauncher && typeof IntentLauncher.startActivityAsync === 'function') {
+                                // ACTION_VIEW with a content:// URI from FileProvider triggers
+                                // the system "Open with" chooser (Adobe, Drive, etc.).
+                                const contentUri = await FileSystem.getContentUriAsync(cur.localPath)
+                                await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
+                                  data: contentUri,
+                                  flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
+                                  type: cur.mime,
+                                })
+                              } else {
+                                // iOS or no IntentLauncher — Linking.openURL handles file:// URIs natively
+                                await Linking.openURL(cur.localPath)
+                              }
+                            } catch (err: any) {
+                              // Final fallback — share sheet acts as an "open with" chooser
+                              if (await Sharing.isAvailableAsync()) {
+                                await Sharing.shareAsync(cur.localPath, { mimeType: cur.mime, dialogTitle: 'Open with…' })
+                              } else {
+                                Alert.alert('No PDF viewer found', 'Install a PDF viewer like Adobe Acrobat or Google Drive.')
+                              }
+                            }
+                          }}
                         >
                           <Ionicons name="eye-outline" size={12} color={Colors.purple[700]} />
                           <Text style={{ fontSize: 11, fontWeight: '600', color: Colors.purple[700] }}>Open in PDF viewer</Text>
@@ -416,9 +441,15 @@ export default function CardDetailScreen() {
                         // Preferred: expo-media-library auto-saves to Downloads (Android)
                         // or Photos (iOS for images). One-time permission, no share sheet.
                         if (MediaLibrary && typeof MediaLibrary.saveToLibraryAsync === 'function') {
-                          let perm = await MediaLibrary.getPermissionsAsync()
-                          if (!perm.granted) perm = await MediaLibrary.requestPermissionsAsync()
-                          if (!perm.granted) {
+                          // Pass writeOnly=true and granularPermissions=['photo'] so we don't
+                          // request audio access (which fails without a manifest declaration).
+                          let perm = await MediaLibrary.getPermissionsAsync(true, ['photo']).catch(() => null)
+                            ?? await MediaLibrary.getPermissionsAsync().catch(() => null)
+                          if (!perm?.granted) {
+                            perm = await MediaLibrary.requestPermissionsAsync(true, ['photo']).catch(() => null)
+                              ?? await MediaLibrary.requestPermissionsAsync().catch(() => null)
+                          }
+                          if (!perm?.granted) {
                             Alert.alert(
                               'Permission needed',
                               'Allow file/media access so we can save downloads to your device.',
@@ -485,9 +516,9 @@ export default function CardDetailScreen() {
                       : <><Ionicons name="print-outline" size={16} color={Colors.gray[800]} /><Text style={s.editBtnCancelText}>Print</Text></>}
                   </TouchableOpacity>
                 </View>
-                {(!Print || !MediaLibrary) && (
+                {(!Print || !MediaLibrary || !IntentLauncher) && (
                   <Text style={{ fontSize: 9, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
-                    Run `npx expo install expo-print expo-media-library` for direct save + native print (no share sheet).
+                    Run `npx expo install expo-print expo-media-library expo-intent-launcher` for full native flow.
                   </Text>
                 )}
               </View>
