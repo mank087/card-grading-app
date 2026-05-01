@@ -931,6 +931,112 @@ export default function CardDetailScreen() {
         </View>
       )}
 
+      {/* User-Reported Condition — what the owner manually flagged when grading.
+          Mirrors the web's <ConditionReportDisplay> below the AI summary. */}
+      {(() => {
+        if (!(card as any).has_user_condition_report) return null
+        const report = (card as any).user_condition_report
+        if (!report) return null
+        const aiResp = (card as any).user_condition_ai_response
+        const influencedGrade = (card as any).user_report_influenced_grade
+
+        const frontDefects: string[] = []
+        const backDefects: string[] = []
+        const structuralDefects: string[] = []
+        const factoryDefects: string[] = []
+
+        const SURFACE_LABELS: Record<string, string> = {
+          scratches: 'Surface scratches', print_lines: 'Print lines', fingerprints: 'Fingerprints',
+          holo_scratches: 'Holofoil scratches', indentations: 'Indentations',
+          white_spots: 'White dots/specks', fish_eyes: 'Fish eyes', staining: 'Staining',
+        }
+        const CORNER_LABELS: Record<string, string> = {
+          whitening: 'Corner whitening', soft_rounded: 'Soft corners',
+          dings: 'Corner dings', creasing: 'Corner creases',
+        }
+        const EDGE_LABELS: Record<string, string> = {
+          whitening: 'Edge whitening', chipping: 'Edge chipping', rough_cut: 'Rough cut',
+          peeling: 'Edge peeling', silvering: 'Silvering', white_dots: 'Edge white dots',
+        }
+        const STRUCT_LABELS: Record<string, string> = {
+          crease: 'Crease', bend: 'Bend', warp: 'Warping', water_damage: 'Water damage',
+        }
+        const FACTORY_LABELS: Record<string, string> = {
+          crimping: 'Crimping', miscut: 'Miscut', ink_error: 'Ink/print error',
+        }
+        const collect = (obj: any, labels: Record<string, string>, into: string[]) => {
+          if (!obj) return
+          Object.keys(labels).forEach(k => { if (obj[k]) into.push(labels[k]) })
+        }
+        collect(report.front?.surface, SURFACE_LABELS, frontDefects)
+        collect(report.front?.corners, CORNER_LABELS, frontDefects)
+        collect(report.front?.edges, EDGE_LABELS, frontDefects)
+        collect(report.back?.surface, SURFACE_LABELS, backDefects)
+        collect(report.back?.corners, CORNER_LABELS, backDefects)
+        collect(report.back?.edges, EDGE_LABELS, backDefects)
+        collect(report.structural, STRUCT_LABELS, structuralDefects)
+        collect(report.factory, FACTORY_LABELS, factoryDefects)
+
+        const hasNotes = report.notes && String(report.notes).trim().length > 0
+        const hasCardDescription = report.cardDescription && String(report.cardDescription).trim().length > 0
+        const hasAnything = frontDefects.length || backDefects.length || structuralDefects.length || factoryDefects.length || hasNotes || hasCardDescription
+        if (!hasAnything) return null
+
+        const Section = ({ label, items }: { label: string; items: string[] }) => items.length > 0 ? (
+          <View style={{ marginTop: 6 }}>
+            <Text style={s.userReportSectionLabel}>{label}</Text>
+            <Text style={s.userReportSectionValue}>{items.join(', ')}</Text>
+          </View>
+        ) : null
+
+        return (
+          <View style={s.userReportCard}>
+            <View style={s.userReportHeader}>
+              <Text style={s.userReportTitle}>📋 User-Reported Condition</Text>
+              {influencedGrade && (
+                <View style={s.userReportInfluencedBadge}>
+                  <Text style={s.userReportInfluencedText}>Influenced grade</Text>
+                </View>
+              )}
+            </View>
+            <Section label="Front:" items={frontDefects} />
+            <Section label="Back:" items={backDefects} />
+            <Section label="Structural:" items={structuralDefects} />
+            <Section label="Factory:" items={factoryDefects} />
+            {hasNotes && (
+              <View style={{ marginTop: 6 }}>
+                <Text style={s.userReportSectionLabel}>Additional notes:</Text>
+                <Text style={[s.userReportSectionValue, { fontStyle: 'italic' }]}>"{report.notes}"</Text>
+              </View>
+            )}
+            {hasCardDescription && (
+              <View style={{ marginTop: 6 }}>
+                <Text style={s.userReportSectionLabel}>Card details:</Text>
+                <Text style={[s.userReportSectionValue, { fontStyle: 'italic' }]}>"{report.cardDescription}"</Text>
+              </View>
+            )}
+            {/* AI Verification — what the model could / couldn't see */}
+            {aiResp && (Array.isArray(aiResp.hints_confirmed) || Array.isArray(aiResp.hints_not_visible)) && (
+              <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.amber[100] }}>
+                <Text style={[s.userReportSectionLabel, { marginBottom: 4 }]}>AI Verification:</Text>
+                {Array.isArray(aiResp.hints_confirmed) && aiResp.hints_confirmed.length > 0 && (
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+                    <Text style={{ color: Colors.green[600], fontSize: 12 }}>✓</Text>
+                    <Text style={[s.userReportSectionValue, { flex: 1 }]}>Confirmed: {aiResp.hints_confirmed.join(', ')}</Text>
+                  </View>
+                )}
+                {Array.isArray(aiResp.hints_not_visible) && aiResp.hints_not_visible.length > 0 && (
+                  <View style={{ flexDirection: 'row', gap: 6, marginTop: 2 }}>
+                    <Text style={{ color: Colors.gray[400], fontSize: 12 }}>○</Text>
+                    <Text style={[s.userReportSectionValue, { flex: 1 }]}>Not visible in photos: {aiResp.hints_not_visible.join(', ')}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        )
+      })()}
+
       {/* Serial — centered chip */}
       <View style={s.serialChip}>
         <Text style={s.serialLabel}>DCM Serial #</Text>
@@ -2065,6 +2171,15 @@ const s = StyleSheet.create({
   summaryCard: { marginHorizontal: 12, marginTop: 12, backgroundColor: Colors.white, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200] },
   summaryTitle: { fontSize: 14, fontWeight: '700', color: Colors.gray[900], marginBottom: 8 },
   summaryText: { fontSize: 13, color: Colors.gray[600], lineHeight: 20 },
+
+  // User-Reported Condition card
+  userReportCard: { marginHorizontal: 12, marginTop: 10, marginBottom: 4, padding: 14, borderRadius: 12, backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[100] },
+  userReportHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 },
+  userReportTitle: { fontSize: 13, fontWeight: '700', color: Colors.amber[600], flexShrink: 1 },
+  userReportInfluencedBadge: { paddingHorizontal: 8, paddingVertical: 2, backgroundColor: Colors.amber[100], borderRadius: 10 },
+  userReportInfluencedText: { fontSize: 10, fontWeight: '700', color: Colors.amber[600] },
+  userReportSectionLabel: { fontSize: 12, fontWeight: '600', color: Colors.amber[600] },
+  userReportSectionValue: { fontSize: 12, color: Colors.amber[600], lineHeight: 17 },
 
   // Serial
   serialRow: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 12, marginTop: 12, padding: 12, backgroundColor: Colors.white, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[200] },
