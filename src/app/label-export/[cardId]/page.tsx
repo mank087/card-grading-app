@@ -201,7 +201,10 @@ export default function LabelExportPage() {
           blobs.push({ name: `DCM-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });
           blobs.push({ name: `DCM-${namePrefix}-back.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(back) });
         } else if (type === 'full-report') {
-          // Full grading report PDF — same as web's "Full Grading Report" download.
+          // Full grading report PDF — same data shape as web's DownloadReportButton
+          // (src/components/reports/DownloadReportButton.tsx) so all AI-written
+          // sub-grade summaries, the overall condition summary, AI confidence, and
+          // image-quality blurb show up.
           postStatus('Loading card images…');
           let frontJpeg = '';
           let backJpeg = '';
@@ -209,48 +212,122 @@ export default function LabelExportPage() {
           try { backJpeg = await imageToJpegBase64(backImageUrl); } catch (err) { console.warn('[full-report] back image failed:', err); }
           postStatus('Building grading report…');
           const cardInfo = card.conversational_card_info || {};
+
+          // AI-written sub-grade summaries live in conversational_corners_edges_surface
+          // under {front,back}_{centering,corners,edges,surface}.summary. Mirrors the
+          // extract*Summary helpers in DownloadReportButton.tsx.
+          const ces = card.conversational_corners_edges_surface || {};
+          const summary = (frontKey: string, backKey: string, fallback: string) => {
+            const fs = ces[frontKey]?.summary || '';
+            const bs = ces[backKey]?.summary || '';
+            const combined = fs && bs ? `Front: ${fs} Back: ${bs}` : (fs || bs || fallback);
+            return { front: fs || fallback, back: bs || fallback, combined };
+          };
+          const cenSum = summary('front_centering', 'back_centering', 'Centering analysis not available.');
+          const corSum = summary('front_corners', 'back_corners', 'Corner analysis not available.');
+          const edgSum = summary('front_edges', 'back_edges', 'Edge analysis not available.');
+          const sufSum = summary('front_surface', 'back_surface', 'Surface analysis not available.');
+
+          const aiConfidence = card.conversational_image_confidence || 'N/A';
+          const imageQualityMap: Record<string, string> = {
+            A: 'Excellent - High confidence in grade accuracy',
+            B: 'Good - Moderate confidence in grade accuracy',
+            C: 'Fair - Lower confidence due to image limitations',
+            D: 'Poor - Significant image quality issues affecting analysis',
+          };
+          const imageQuality = imageQualityMap[aiConfidence] || 'Quality assessment not available';
+
+          // gradeRange in the format CardGradingReport expects: "10 ± 0.25"
+          const uncertaintyMatch = (card.conversational_grade_uncertainty || '±0.25').match(/±\s*([\d.]+)/);
+          const gradeRange = `${labelData.grade ?? 0} ± ${uncertaintyMatch ? uncertaintyMatch[1] : '0.25'}`;
+
+          const qrCodeDataUrl = await generateQRCodeWithLogo(cardUrl).catch(() => '');
+          const safePrimary = labelData.primaryName || 'Card';
+          const safeContext = labelData.contextLine || '';
+          const safeFeatures = labelData.featuresLine || null;
+
           const reportCardData: ReportCardData = {
-            primaryName: labelData.primaryName || '',
-            contextLine: (labelData as any).contextLine || (labelData as any).line2 || '',
-            featuresLine: (labelData as any).featuresLine || (labelData as any).line3 || null,
+            primaryName: safePrimary,
+            contextLine: safeContext,
+            featuresLine: safeFeatures,
             serial: card.serial,
             grade: labelData.grade ?? 0,
-            gradeFormatted: (labelData.grade ?? 0) % 1 === 0 ? String(labelData.grade ?? 0) : (labelData.grade ?? 0).toFixed(1),
+            gradeFormatted: (labelData as any).gradeFormatted || ((labelData.grade ?? 0) % 1 === 0 ? String(labelData.grade ?? 0) : (labelData.grade ?? 0).toFixed(1)),
             condition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
-            cardName: cardInfo.card_name || card.card_name || '',
-            playerName: cardInfo.player_or_character || card.featured || card.pokemon_featured || '',
-            setName: cardInfo.set_name || card.card_set || '',
-            year: cardInfo.year || '',
-            manufacturer: cardInfo.manufacturer || '',
-            cardNumber: cardInfo.card_number || card.card_number || '',
-            sport: card.category || 'Other',
+            cardName: safePrimary,
+            playerName: safePrimary,
+            setName: labelData.setName || '',
+            year: labelData.year || '',
+            cardNumber: labelData.cardNumber || '',
+            manufacturer: cardInfo.manufacturer || card.manufacturer_name || '',
+            sport: cardInfo.sport_or_category || card.category || '',
             frontImageUrl: frontJpeg,
             backImageUrl: backJpeg,
-            conditionLabel: labelData.condition || getConditionLabel(labelData.grade ?? 0),
+            conditionLabel: card.conversational_condition_label || labelData.condition || getConditionLabel(labelData.grade ?? 0),
             labelCondition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
-            gradeRange: card.conversational_grade_uncertainty || '±0.5',
+            gradeRange,
+            cardDetails: safeContext,
+            specialFeaturesString: safeFeatures || '',
+            cardUrl,
+            qrCodeDataUrl,
             professionalGrades: {
-              psa: card.estimated_professional_grades?.psa?.grade || '-',
-              bgs: card.estimated_professional_grades?.bgs?.grade || '-',
-              sgc: card.estimated_professional_grades?.sgc?.grade || '-',
-              cgc: card.estimated_professional_grades?.cgc?.grade || '-',
+              psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
+              bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',
+              sgc: card.estimated_professional_grades?.SGC?.numeric_score || 'N/A',
+              cgc: card.estimated_professional_grades?.CGC?.numeric_score || 'N/A',
             },
             subgrades: {
-              centering: { score: subScores.centering, summary: s.centering?.notes || 'Centering assessed', frontScore: s.centering?.front ?? subScores.centering, backScore: s.centering?.back ?? subScores.centering, frontSummary: '', backSummary: '' },
-              corners: { score: subScores.corners, summary: s.corners?.notes || 'Corners assessed', frontScore: s.corners?.front ?? subScores.corners, backScore: s.corners?.back ?? subScores.corners, frontSummary: '', backSummary: '' },
-              edges: { score: subScores.edges, summary: s.edges?.notes || 'Edges assessed', frontScore: s.edges?.front ?? subScores.edges, backScore: s.edges?.back ?? subScores.edges, frontSummary: '', backSummary: '' },
-              surface: { score: subScores.surface, summary: s.surface?.notes || 'Surface assessed', frontScore: s.surface?.front ?? subScores.surface, backScore: s.surface?.back ?? subScores.surface, frontSummary: '', backSummary: '' },
+              centering: {
+                score: w.centering ?? s.centering?.weighted ?? 0,
+                frontScore: s.centering?.front ?? 0,
+                backScore: s.centering?.back ?? 0,
+                summary: cenSum.combined,
+                frontSummary: cenSum.front,
+                backSummary: cenSum.back,
+              },
+              corners: {
+                score: w.corners ?? s.corners?.weighted ?? 0,
+                frontScore: s.corners?.front ?? 0,
+                backScore: s.corners?.back ?? 0,
+                summary: corSum.combined,
+                frontSummary: corSum.front,
+                backSummary: corSum.back,
+              },
+              edges: {
+                score: w.edges ?? s.edges?.weighted ?? 0,
+                frontScore: s.edges?.front ?? 0,
+                backScore: s.edges?.back ?? 0,
+                summary: edgSum.combined,
+                frontSummary: edgSum.front,
+                backSummary: edgSum.back,
+              },
+              surface: {
+                score: w.surface ?? s.surface?.weighted ?? 0,
+                frontScore: s.surface?.front ?? 0,
+                backScore: s.surface?.back ?? 0,
+                summary: sufSum.combined,
+                frontSummary: sufSum.front,
+                backSummary: sufSum.back,
+              },
             },
             specialFeatures: {
-              autographed: cardInfo.autographed || false,
-              serialNumbered: cardInfo.serial_number || undefined,
-              subset: cardInfo.subset || undefined,
+              rookie: cardInfo.rookie_or_first === 'Yes' || cardInfo.rookie_or_first === true || card.rookie_card,
+              autographed: cardInfo.autographed === true || !!card.autograph_type,
+              serialNumbered: cardInfo.serial_number || card.serial_numbering || undefined,
+              subset: cardInfo.subset || card.subset || undefined,
+              isFoil: card.is_foil || false,
+              foilType: card.foil_type || undefined,
+              isDoubleFaced: card.is_double_faced || false,
+              rarity: card.mtg_rarity || undefined,
             },
-            gradedAt: card.graded_at || card.created_at || new Date().toISOString(),
-            qrCodeUrl: await generateQRCodeWithLogo(cardUrl).catch(() => ''),
-          };
-          const pdfDoc = pdf(<CardGradingReport cardData={reportCardData} />);
-          const pdfBlob = await pdfDoc.toBlob();
+            aiConfidence,
+            imageQuality,
+            overallSummary: card.conversational_final_grade_summary || undefined,
+            generatedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            reportId: card.id.substring(0, 8).toUpperCase(),
+          } as any;
+
+          const pdfBlob = await pdf(<CardGradingReport cardData={reportCardData} />).toBlob();
           blobs.push({ name: `DCM-Report-${namePrefix}-${card.serial}.pdf`, mime: 'application/pdf', dataUrl: await blobToDataUrl(pdfBlob) });
         } else if (type === 'mini-report-pdf') {
           // Mini-report PDF — same generator the web's "Mini-Report (PDF)" uses.
