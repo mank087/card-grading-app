@@ -98,15 +98,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="shop"
-        options={{
-          title: 'Shop',
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bag" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="account"
         options={{
           title: 'Menu',
@@ -115,6 +106,9 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* Shop is reachable via the Menu → Tools → Shop link, not the bottom nav */}
+      <Tabs.Screen name="shop" options={{ href: null }} />
 
       {/* Hide template screens */}
       <Tabs.Screen name="index" options={{ href: null }} />
