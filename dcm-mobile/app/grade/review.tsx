@@ -6,6 +6,7 @@ import * as Crypto from 'expo-crypto'
 import { Colors, CardCategories } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
+import { useGradingQueue } from '@/contexts/GradingQueueContext'
 import { supabase } from '@/lib/supabase'
 import { uriToArrayBuffer } from '@/lib/imageUtils'
 import { ConditionReportData, EMPTY_REPORT, SURFACE_LABELS, CORNER_LABELS, EDGE_LABELS, STRUCTURAL_LABELS, FACTORY_LABELS, countDefects } from '@/lib/conditionReport'
@@ -37,6 +38,7 @@ export default function ReviewScreen() {
   const params = useLocalSearchParams<{ category: string; subCategory: string; frontUri: string; backUri: string }>()
   const { user, session } = useAuth()
   const { balance, refresh: refreshCredits } = useCredits()
+  const { addToQueue } = useGradingQueue()
 
   const [step, setStep] = useState(1)
   const [category, setCategory] = useState(params.category || 'Sports')
@@ -168,11 +170,18 @@ export default function ReviewScreen() {
       }
       refreshCredits()
 
-      // Navigate to processing screen IMMEDIATELY — don't wait for grading
-      router.replace({
-        pathname: '/grade/processing',
-        params: { cardId, category, frontUri: params.frontUri },
+      // Add to the global grading queue and bounce the user back to the
+      // collection. The persistent status bar at the top of the app handles
+      // progress; the user can keep grading more cards or browse the app
+      // while this one finishes.
+      addToQueue({
+        cardId,
+        category,
+        frontImageUrl: params.frontUri,
+        status: 'processing',
+        cardName: undefined,
       })
+      router.replace('/(tabs)/collection' as any)
     } catch (err: any) {
       console.error('[Upload] Submit error:', err)
       Alert.alert('Submission Failed', err.message || 'Please try again.')

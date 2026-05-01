@@ -13,9 +13,12 @@ try {
 }
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
+import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
+import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
 import OnboardingCarousel from '@/components/OnboardingCarousel'
 import HelpBot from '@/components/HelpBot'
+import GradingStatusBar from '@/components/GradingStatusBar'
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 
@@ -78,6 +81,12 @@ function ConditionalHelpBot() {
   return <HelpBot />
 }
 
+// Drives the grading queue poller — must be inside GradingQueueProvider.
+function GradingPollerHost() {
+  useGradingPoller()
+  return null
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -97,6 +106,9 @@ export default function RootLayout() {
     <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.dcmgrading">
     <AuthProvider>
       <CreditsProvider>
+        <GradingQueueProvider>
+          <GradingPollerHost />
+          <GradingStatusBar />
         <AuthGate>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
@@ -122,6 +134,7 @@ export default function RootLayout() {
           </Stack>
           <ConditionalHelpBot />
         </AuthGate>
+        </GradingQueueProvider>
       </CreditsProvider>
     </AuthProvider>
     </StripeProvider>
