@@ -61,28 +61,34 @@ export default function LabelMockup({ labelType, labelImageUrl, cardImageUrl, wi
 }
 
 // ============================================================================
-// Graded Slab — photo 280×460, label slot at top, card window below
-// Web (src/components/labels/LabelMockup.tsx:397-414):
-//   Label: top 4.5%, left 13.5%, width 73% (height via aspectRatio 3.5)
-//   Card:  top 20%,  left 10.7%, width 78.6%, height 73.9%
+// Graded Slab — photo 280×460
+// Slot percentages measured directly from public/labels/graded-card-slab.png
+// (the actual visible label/card windows in the photo, NOT web's values which
+// are slightly off):
+//   Label slot (top gray rectangle): x=25-253, y=25-95
+//     → top 5.4%, left 8.9%, width 81.4%, height 15.2%
+//   Card window (lower white rectangle): x=33-244, y=130-410
+//     → top 28.3%, left 11.8%, width 75.7%, height 60.9%
+// Slot aspect 75.7/60.9 ≈ 1.243 in % units → 212px×280px = 0.757 (w/h),
+// card image is 0.714 — resizeMode:contain letterboxes ~6px each side.
 // ============================================================================
 function SlabMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?: string | null; cardImageUrl?: string | null; width: number }) {
-  // Photo aspect 280/460 — explicit pixel height keeps the View from
-  // expanding under any parent flex/aspectRatio quirks.
   const height = (width * 460) / 280
   return (
     <View style={[s.holder, { width, height }]}>
       <Image source={require('@/assets/images/graded-card-slab.png')} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
 
-      {/* Label slot — width-only; aspectRatio derives the 3.5:1 height. */}
-      <View style={[s.slot, { top: '4.5%', left: '13.5%', width: '73%', aspectRatio: 3.5 }]}>
+      {/* Label slot — fits the gray rectangle exactly, label image letterboxes
+          via resizeMode:contain since slot aspect (~3.26:1) is slightly less
+          than the label's 3.5:1. */}
+      <View style={[s.slot, { top: '5.4%', left: '8.9%', width: '81.4%', height: '15.2%' }]}>
         {labelImageUrl
           ? <Image source={{ uri: labelImageUrl }} style={s.fill} resizeMode="contain" />
           : <View style={[s.fill, { backgroundColor: Colors.gray[200] }]} />}
       </View>
 
       {/* Card window */}
-      <View style={[s.slot, { top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }]}>
+      <View style={[s.slot, { top: '28.3%', left: '11.8%', width: '75.7%', height: '60.9%' }]}>
         {cardImageUrl
           ? <Image source={{ uri: cardImageUrl }} style={s.fill} resizeMode="contain" />
           : <View style={[s.fill, { backgroundColor: Colors.gray[100] }]} />}
