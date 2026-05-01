@@ -6,13 +6,10 @@ import * as Sharing from 'expo-sharing'
 import { WebView } from 'react-native-webview'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
-// Both deps are optional at build time so we can ship code that lights up once
-// the user runs `npx expo install expo-print expo-media-library expo-intent-launcher`.
+// Optional deps — `npx expo install expo-print expo-intent-launcher` lights them up.
 let Print: any = null
-let MediaLibrary: any = null
 let IntentLauncher: any = null
 try { Print = require('expo-print') } catch {}
-try { MediaLibrary = require('expo-media-library') } catch {}
 try { IntentLauncher = require('expo-intent-launcher') } catch {}
 
 /**
@@ -534,34 +531,39 @@ export default function CardDetailScreen() {
                       if (!cur) return
                       setExportActionBusy('download')
                       try {
-                        // Preferred: expo-media-library auto-saves to Downloads (Android)
-                        // or Photos (iOS for images). One-time permission, no share sheet.
-                        if (MediaLibrary && typeof MediaLibrary.saveToLibraryAsync === 'function') {
-                          // Pass writeOnly=true and granularPermissions=['photo'] so we don't
-                          // request audio access (which fails without a manifest declaration).
-                          let perm = await MediaLibrary.getPermissionsAsync(true, ['photo']).catch(() => null)
-                            ?? await MediaLibrary.getPermissionsAsync().catch(() => null)
-                          if (!perm?.granted) {
-                            perm = await MediaLibrary.requestPermissionsAsync(true, ['photo']).catch(() => null)
-                              ?? await MediaLibrary.requestPermissionsAsync().catch(() => null)
+                        if (Platform.OS === 'android') {
+                          // Storage Access Framework — works in Expo Go without manifest
+                          // edits. First save asks user to pick a folder (e.g. Downloads);
+                          // the choice persists so future saves are silent.
+                          const SAF = (FileSystem as any).StorageAccessFramework
+                          let dirUri = await AsyncStorage.getItem('dcm_label_save_dir')
+                          if (!dirUri) {
+                            const perm = await SAF.requestDirectoryPermissionsAsync()
+                            if (!perm.granted) {
+                              Alert.alert('Cancelled', 'Pick a folder (e.g. Downloads) to save labels.')
+                              setExportActionBusy(null)
+                              return
+                            }
+                            dirUri = perm.directoryUri as string
+                            await AsyncStorage.setItem('dcm_label_save_dir', dirUri)
                           }
-                          if (!perm?.granted) {
-                            Alert.alert(
-                              'Permission needed',
-                              'Allow file/media access so we can save downloads to your device.',
-                            )
-                            setExportActionBusy(null)
-                            return
+                          let savedUri: string
+                          try {
+                            savedUri = await SAF.createFileAsync(dirUri, cur.name, cur.mime)
+                          } catch {
+                            // Folder may have been deleted/permission revoked — re-prompt once
+                            await AsyncStorage.removeItem('dcm_label_save_dir')
+                            const reperm = await SAF.requestDirectoryPermissionsAsync()
+                            if (!reperm.granted) throw new Error('Save folder unavailable')
+                            await AsyncStorage.setItem('dcm_label_save_dir', reperm.directoryUri)
+                            savedUri = await SAF.createFileAsync(reperm.directoryUri, cur.name, cur.mime)
                           }
-                          await MediaLibrary.saveToLibraryAsync(cur.localPath)
-                          Alert.alert(
-                            'Downloaded',
-                            Platform.OS === 'android'
-                              ? `${cur.name} saved to Downloads.`
-                              : `${cur.name} saved to your Photos / Files.`,
-                          )
+                          // Read base64 from cache file and write to chosen location
+                          const base64 = await FileSystem.readAsStringAsync(cur.localPath, { encoding: 'base64' as any })
+                          await FileSystem.writeAsStringAsync(savedUri, base64, { encoding: 'base64' as any })
+                          Alert.alert('Downloaded', `${cur.name} saved to your chosen folder.\nOpen it from your Files / Downloads app.`)
                         } else {
-                          // Fallback when expo-media-library isn't installed yet
+                          // iOS — use share sheet's "Save to Files"
                           if (await Sharing.isAvailableAsync()) {
                             await Sharing.shareAsync(cur.localPath, {
                               mimeType: cur.mime,
@@ -612,9 +614,9 @@ export default function CardDetailScreen() {
                       : <><Ionicons name="print-outline" size={16} color={Colors.gray[800]} /><Text style={s.editBtnCancelText}>Print</Text></>}
                   </TouchableOpacity>
                 </View>
-                {(!Print || !MediaLibrary || !IntentLauncher) && (
+                {(!Print || !IntentLauncher) && (
                   <Text style={{ fontSize: 9, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
-                    Run `npx expo install expo-print expo-media-library expo-intent-launcher` for full native flow.
+                    Tip: `npx expo install expo-print expo-intent-launcher` for native print + PDF chooser.
                   </Text>
                 )}
               </View>
