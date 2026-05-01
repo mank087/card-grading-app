@@ -27,6 +27,7 @@ const GEOMETRIC_PATTERNS = [
 ] as const
 import LabelWebRenderer, { type LabelConfig, type LabelCardData } from '@/components/labels/LabelWebRenderer'
 import ColorPickerModal from '@/components/labels/ColorPickerModal'
+import { useLabelStyle } from '@/hooks/useLabelStyle'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
@@ -104,8 +105,13 @@ export default function LabelStudioScreen() {
   const [labelFeatures, setLabelFeatures] = useState('')
   const [fieldsInitialized, setFieldsInitialized] = useState<string | null>(null)
 
-  // Saved styles
-  const [savedStyles, setSavedStyles] = useState<{ id: string; name: string; config: DesignerConfig }[]>([])
+  // Saved styles — synced with web via useLabelStyle hook (server source of truth).
+  // Replaces the previous AsyncStorage-only flow so users see the same custom-1..4
+  // slots they have on the web account.
+  const { customStyles, saveCustomStyle, deleteCustomStyle, renameCustomStyle } = useLabelStyle()
+  const [savingStyle, setSavingStyle] = useState(false)
+  const [renamingStyleId, setRenamingStyleId] = useState<string | null>(null)
+  const [renamingValue, setRenamingValue] = useState('')
 
   // Color picker modal
   const [pickerVisible, setPickerVisible] = useState(false)
@@ -139,12 +145,8 @@ export default function LabelStudioScreen() {
     }
   }, [params.cardId, cards, selectedCard])
 
-  // Load saved styles from AsyncStorage
-  useEffect(() => {
-    AsyncStorage.getItem('dcm_saved_label_styles').then(raw => {
-      if (raw) try { setSavedStyles(JSON.parse(raw)) } catch {}
-    })
-  }, [])
+  // Saved styles now live in user_credits.custom_label_styles via the hook —
+  // no local hydration needed.
 
   // Initialize text fields when card changes
   useEffect(() => {
@@ -321,24 +323,70 @@ export default function LabelStudioScreen() {
     setPickerVisible(false)
   }, [config, pickerSlot, customColorCount, updateConfig])
 
-  // ---- Saved styles ----
+  // ---- Saved styles (server-synced via useLabelStyle hook) ----
+  // Convert the in-app DesignerConfig to the CustomLabelConfig shape the API stores.
+  const buildSaveConfig = useCallback(() => ({
+    colorPreset: config.colorPreset,
+    gradientStart: config.gradientStart,
+    gradientEnd: config.gradientEnd,
+    borderEnabled: config.borderEnabled,
+    borderColor: config.borderColor,
+    borderWidth: config.borderWidth,
+    topEdgeGradient: config.topEdgeGradient,
+  }), [config])
+
   const saveStyle = useCallback(async () => {
-    const id = `custom-${Date.now()}`
-    const name = `Style ${savedStyles.length + 1}`
-    const updated = [...savedStyles, { id, name, config: { ...config } }].slice(-4)
-    setSavedStyles(updated)
-    await AsyncStorage.setItem('dcm_saved_label_styles', JSON.stringify(updated))
-    Alert.alert('Saved', `"${name}" has been saved.`)
-  }, [config, savedStyles])
+    if (customStyles.length >= 4) {
+      Alert.alert('Limit reached', 'You can keep up to 4 saved styles. Update or delete one to save a new design.')
+      return
+    }
+    setSavingStyle(true)
+    const slotNumber = customStyles.length + 1
+    const saved = await saveCustomStyle({ name: `Custom Label ${slotNumber}`, config: buildSaveConfig() })
+    setSavingStyle(false)
+    if (saved) Alert.alert('Saved', `"${saved.name}" saved to slot ${saved.id}.`)
+    else Alert.alert('Save failed', 'Could not save the style. Try again.')
+  }, [customStyles.length, saveCustomStyle, buildSaveConfig])
+
+  const updateExistingStyle = useCallback(async (id: string, name: string) => {
+    setSavingStyle(true)
+    const saved = await saveCustomStyle({ id, name, config: buildSaveConfig() })
+    setSavingStyle(false)
+    if (saved) Alert.alert('Updated', `"${saved.name}" updated with current design.`)
+    else Alert.alert('Update failed', 'Could not update the style.')
+  }, [saveCustomStyle, buildSaveConfig])
 
   const deleteStyle = useCallback(async (id: string) => {
-    const updated = savedStyles.filter(s => s.id !== id)
-    setSavedStyles(updated)
-    await AsyncStorage.setItem('dcm_saved_label_styles', JSON.stringify(updated))
-  }, [savedStyles])
+    Alert.alert('Delete saved style?', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: async () => {
+        const ok = await deleteCustomStyle(id)
+        if (!ok) Alert.alert('Delete failed', 'Could not delete the style.')
+      }},
+    ])
+  }, [deleteCustomStyle])
 
-  const loadStyle = useCallback((styleConfig: DesignerConfig) => {
-    setConfig(styleConfig)
+  const submitRename = useCallback(async () => {
+    if (!renamingStyleId) return
+    const trimmed = renamingValue.trim()
+    if (!trimmed) { setRenamingStyleId(null); return }
+    const ok = await renameCustomStyle(renamingStyleId, trimmed)
+    setRenamingStyleId(null)
+    setRenamingValue('')
+    if (!ok) Alert.alert('Rename failed', 'Could not rename the style.')
+  }, [renamingStyleId, renamingValue, renameCustomStyle])
+
+  const loadStyle = useCallback((styleConfig: any) => {
+    setConfig(prev => ({
+      ...prev,
+      colorPreset: styleConfig.colorPreset || prev.colorPreset,
+      gradientStart: styleConfig.gradientStart || prev.gradientStart,
+      gradientEnd: styleConfig.gradientEnd || prev.gradientEnd,
+      borderEnabled: !!styleConfig.borderEnabled,
+      borderColor: styleConfig.borderColor || prev.borderColor,
+      borderWidth: styleConfig.borderWidth ?? prev.borderWidth,
+      topEdgeGradient: styleConfig.topEdgeGradient,
+    }))
     setActiveCardColorStyle(null)
   }, [])
 
@@ -905,39 +953,70 @@ export default function LabelStudioScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* ============ Saved Styles ============ */}
+            {/* ============ Saved Styles (server-synced custom-1..4) ============ */}
             <View style={s.section}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                <Text style={s.sectionTitle}>Saved Styles</Text>
+                <Text style={s.sectionTitle}>Saved Styles {customStyles.length > 0 && <Text style={{ fontSize: 11, color: Colors.gray[400], fontWeight: '500' }}>({customStyles.length}/4)</Text>}</Text>
                 <TouchableOpacity
                   onPress={saveStyle}
-                  style={{ backgroundColor: Colors.purple[600], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
+                  disabled={savingStyle || customStyles.length >= 4}
+                  style={{ backgroundColor: customStyles.length >= 4 ? Colors.gray[300] : Colors.purple[600], paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 }}
                 >
-                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>Save Current</Text>
+                  <Text style={{ color: '#fff', fontSize: 11, fontWeight: '600' }}>{savingStyle ? 'Saving…' : 'Save Current'}</Text>
                 </TouchableOpacity>
               </View>
-              {savedStyles.length === 0 && (
-                <Text style={{ color: Colors.gray[400], fontSize: 12 }}>No saved styles yet. Save your current design to reuse later.</Text>
+              {customStyles.length === 0 && (
+                <Text style={{ color: Colors.gray[400], fontSize: 12 }}>
+                  No saved styles yet. Save your current design to reuse later — synced with your web account.
+                </Text>
               )}
-              {savedStyles.map((style) => (
-                <View key={style.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, borderTopWidth: 1, borderTopColor: Colors.gray[100] }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <LinearGradient
-                      colors={[style.config.gradientStart, style.config.gradientEnd]}
-                      style={{ width: 28, height: 28, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200] }}
-                    />
-                    <Text style={{ fontSize: 13, color: Colors.gray[700], fontWeight: '500' }}>{style.name}</Text>
+              {customStyles.map((style) => {
+                const isRenaming = renamingStyleId === style.id
+                const isRainbow = style.config.colorPreset === 'rainbow'
+                const swatchColors = isRainbow
+                  ? ['#ff0000', '#ff8800', '#ffff00', '#00cc00', '#0066ff', '#8800ff', '#ff00ff'] as const
+                  : [style.config.gradientStart, style.config.gradientEnd] as const
+                return (
+                  <View key={style.id} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.gray[100] }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+                      <LinearGradient
+                        colors={swatchColors as any}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{ width: 32, height: 32, borderRadius: 6, borderWidth: style.config.borderEnabled ? 2 : 1, borderColor: style.config.borderEnabled ? (style.config.borderColor || '#000') : Colors.gray[200] }}
+                      />
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        {isRenaming ? (
+                          <TextInput
+                            value={renamingValue}
+                            onChangeText={setRenamingValue}
+                            onBlur={submitRename}
+                            onSubmitEditing={submitRename}
+                            autoFocus
+                            style={{ fontSize: 13, color: Colors.gray[800], borderBottomWidth: 1, borderBottomColor: Colors.purple[400], paddingVertical: 2 }}
+                          />
+                        ) : (
+                          <TouchableOpacity onPress={() => { setRenamingStyleId(style.id); setRenamingValue(style.name) }}>
+                            <Text style={{ fontSize: 13, color: Colors.gray[800], fontWeight: '600' }} numberOfLines={1}>{style.name}</Text>
+                          </TouchableOpacity>
+                        )}
+                        <Text style={{ fontSize: 10, color: Colors.gray[400] }}>{style.id}</Text>
+                      </View>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
+                      <TouchableOpacity onPress={() => loadStyle(style.config)}>
+                        <Text style={{ fontSize: 12, color: Colors.purple[600], fontWeight: '700' }}>Apply</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => updateExistingStyle(style.id, style.name)}>
+                        <Text style={{ fontSize: 12, color: Colors.blue[600], fontWeight: '700' }}>Update</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => deleteStyle(style.id)}>
+                        <Ionicons name="trash-outline" size={16} color={Colors.red[500]} />
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={{ flexDirection: 'row', gap: 8 }}>
-                    <TouchableOpacity onPress={() => loadStyle(style.config)}>
-                      <Text style={{ fontSize: 12, color: Colors.purple[600], fontWeight: '600' }}>Apply</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => deleteStyle(style.id)}>
-                      <Ionicons name="trash-outline" size={16} color={Colors.red[500]} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
+                )
+              })}
             </View>
           </>
         )}
