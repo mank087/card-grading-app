@@ -220,12 +220,12 @@ function getOnePieceFeatures(ci: any, _card: any): string[] {
 function getStarWarsFeatures(ci: any, card: any): string[] {
   const f: string[] = []
   if (ci.is_foil || card.is_foil) f.push('Foil')
-  if (ci.holofoil && isValidValue(ci.holofoil) && ci.holofoil !== 'None') f.push(ci.holofoil)
+  if (ci.holofoil && isValid(ci.holofoil) && ci.holofoil !== 'None') f.push(ci.holofoil)
   if (ci.autographed) f.push('Auto')
   const sn = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
-  if (sn && isValidValue(sn)) f.push(sn)
+  if (isValidSerialNumber(sn)) f.push(sn!)
   const special = stripMarkdown(ci.special_features)
-  if (special && isValidValue(special)) {
+  if (special && isValid(special)) {
     special.split(/[,;]/).forEach((s: string) => {
       const t = s.trim()
       if (t && !f.includes(t)) f.push(t)

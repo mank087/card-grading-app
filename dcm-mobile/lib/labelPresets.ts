@@ -20,6 +20,22 @@ export const COLOR_PRESETS: ColorPreset[] = [
   { id: 'custom', name: 'Custom', gradientStart: '#1a1625', gradientEnd: '#2d1f47', isCustom: true },
 ]
 
+// Dimension presets — 1:1 with src/lib/labelPresets.ts so saved configs round-trip with web.
+export interface DimensionPreset {
+  id: 'dcm' | 'dcm-traditional' | 'dcm-bordered' | 'custom'
+  name: string
+  width: number
+  height: number
+  description: string
+}
+
+export const DIMENSION_PRESETS: DimensionPreset[] = [
+  { id: 'dcm',             name: 'DCM Modern',      width: 2.8, height: 0.8, description: 'Modern dark gradient style' },
+  { id: 'dcm-traditional', name: 'DCM Traditional', width: 2.8, height: 0.8, description: 'Classic light style' },
+  { id: 'dcm-bordered',    name: 'DCM Bordered',    width: 2.8, height: 0.8, description: 'Traditional with purple border' },
+  { id: 'custom',          name: 'Custom',          width: 2.8, height: 0.8, description: 'Custom dimensions & border' },
+]
+
 // Layout styles for card color and custom modes
 export const LAYOUT_STYLES = [
   { id: 'color-gradient', name: 'Gradient' },

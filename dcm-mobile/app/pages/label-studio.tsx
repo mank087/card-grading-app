@@ -13,9 +13,9 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import {
-  COLOR_PRESETS, LAYOUT_STYLES, CARD_COLOR_STYLES,
+  COLOR_PRESETS, LAYOUT_STYLES, CARD_COLOR_STYLES, DIMENSION_PRESETS,
   applyLayoutToColors,
-  type ColorPreset, type CardColorInput,
+  type ColorPreset, type CardColorInput, type DimensionPreset,
 } from '@/lib/labelPresets'
 
 const GEOMETRIC_PATTERNS = [
@@ -84,6 +84,10 @@ interface DesignerConfig {
   layoutStyle?: string
   gradientAngle?: number
   geometricPattern?: number
+  // Dimension preset bookkeeping (matches CustomLabelConfig in src/lib/labelPresets.ts)
+  preset?: 'dcm' | 'dcm-traditional' | 'dcm-bordered' | 'custom'
+  width?: number
+  height?: number
 }
 
 // ============================================================================
@@ -110,6 +114,9 @@ export default function LabelStudioScreen() {
     borderEnabled: false,
     borderColor: '#7c3aed',
     borderWidth: 0.04,
+    preset: 'dcm',
+    width: 2.8,
+    height: 0.8,
   })
   const [activeCardColorStyle, setActiveCardColorStyle] = useState<string | null>(null)
   const [customColorCount, setCustomColorCount] = useState(2)
@@ -235,8 +242,8 @@ export default function LabelStudioScreen() {
   }, [selectedCard, labelName, labelSet, labelYear, labelNumber, labelFeatures])
 
   const labelConfig = useMemo<LabelConfig>(() => ({
-    width: 2.8,
-    height: 0.8,
+    width: config.width ?? 2.8,
+    height: config.height ?? 0.8,
     colorPreset: config.colorPreset,
     gradientStart: config.gradientStart,
     gradientEnd: config.gradientEnd,
@@ -284,6 +291,39 @@ export default function LabelStudioScreen() {
       })
     }
   }, [cardColors, config, updateConfig])
+
+  // Mirrors handleDimensionPreset in src/app/labels/LabelStudioClient.tsx so the
+  // four DCM presets behave identically on mobile.
+  const handleDimensionPreset = useCallback((preset: DimensionPreset) => {
+    const base: any = {
+      preset: preset.id,
+      width: preset.width,
+      height: preset.height,
+    }
+    if (preset.id === 'dcm') {
+      base.colorPreset = 'modern-dark'
+      base.gradientStart = '#1a1625'
+      base.gradientEnd = '#2d1f47'
+      base.style = 'modern'
+      base.borderEnabled = false
+    } else if (preset.id === 'dcm-traditional') {
+      base.colorPreset = 'traditional'
+      base.gradientStart = '#f9fafb'
+      base.gradientEnd = '#ffffff'
+      base.style = 'traditional'
+      base.borderEnabled = false
+    } else if (preset.id === 'dcm-bordered') {
+      base.colorPreset = 'traditional'
+      base.gradientStart = '#f9fafb'
+      base.gradientEnd = '#ffffff'
+      base.style = 'traditional'
+      base.borderEnabled = true
+      base.borderColor = '#7c3aed'
+      base.borderWidth = 0.04
+    }
+    setActiveCardColorStyle(null)
+    updateConfig(base)
+  }, [updateConfig])
 
   const handleCardColorStyle = useCallback((styleId: string) => {
     if (!cardColors) return
@@ -355,10 +395,14 @@ export default function LabelStudioScreen() {
     colorPreset: config.colorPreset,
     gradientStart: config.gradientStart,
     gradientEnd: config.gradientEnd,
+    style: config.style,
     borderEnabled: config.borderEnabled,
     borderColor: config.borderColor,
     borderWidth: config.borderWidth,
     topEdgeGradient: config.topEdgeGradient,
+    preset: config.preset,
+    width: config.width,
+    height: config.height,
   }), [config])
 
   const saveStyle = useCallback(async () => {
@@ -476,10 +520,14 @@ export default function LabelStudioScreen() {
       colorPreset: styleConfig.colorPreset || prev.colorPreset,
       gradientStart: styleConfig.gradientStart || prev.gradientStart,
       gradientEnd: styleConfig.gradientEnd || prev.gradientEnd,
+      style: styleConfig.style || prev.style,
       borderEnabled: !!styleConfig.borderEnabled,
       borderColor: styleConfig.borderColor || prev.borderColor,
       borderWidth: styleConfig.borderWidth ?? prev.borderWidth,
       topEdgeGradient: styleConfig.topEdgeGradient,
+      preset: styleConfig.preset ?? prev.preset,
+      width: styleConfig.width ?? prev.width,
+      height: styleConfig.height ?? prev.height,
     }))
     setActiveCardColorStyle(null)
   }, [])
@@ -722,6 +770,57 @@ export default function LabelStudioScreen() {
                   <Text style={[s.sideBtnText, side === 'back' && s.sideBtnTextActive]}>Back</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+
+            {/* ============ Dimensions ============ */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Dimensions</Text>
+              <View style={s.dimGrid}>
+                {DIMENSION_PRESETS.map(p => {
+                  const isActive = (config.preset ?? 'dcm') === p.id
+                  return (
+                    <TouchableOpacity
+                      key={p.id}
+                      style={[s.dimTile, isActive && s.dimTileActive]}
+                      onPress={() => handleDimensionPreset(p)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[s.dimTileName, isActive && s.dimTileNameActive]}>{p.name}</Text>
+                      <Text style={s.dimTileSize}>
+                        {p.id === 'custom' ? 'Adjust width & height' : `${p.width}" × ${p.height}"`}
+                      </Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+              {(config.preset === 'custom') && (
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.fieldLabel}>Width (in)</Text>
+                    <TextInput
+                      style={s.fieldInput}
+                      value={String(config.width ?? 2.8)}
+                      keyboardType="decimal-pad"
+                      onChangeText={(t) => {
+                        const v = parseFloat(t)
+                        updateConfig({ width: Number.isFinite(v) ? Math.min(4, Math.max(0.5, v)) : 2.8 })
+                      }}
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={s.fieldLabel}>Height (in)</Text>
+                    <TextInput
+                      style={s.fieldInput}
+                      value={String(config.height ?? 0.8)}
+                      keyboardType="decimal-pad"
+                      onChangeText={(t) => {
+                        const v = parseFloat(t)
+                        updateConfig({ height: Number.isFinite(v) ? Math.min(4, Math.max(0.3, v)) : 0.8 })
+                      }}
+                    />
+                  </View>
+                </View>
+              )}
             </View>
 
             {/* ============ Color Theme ============ */}
@@ -1323,6 +1422,14 @@ const s = StyleSheet.create({
   sideBtnActive: { backgroundColor: Colors.purple[600] },
   sideBtnText: { fontSize: 11, fontWeight: '600', color: Colors.gray[500] },
   sideBtnTextActive: { color: '#fff' },
+
+  // Dimension presets
+  dimGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  dimTile: { width: (SCREEN_W - 24 - 32 - 6) / 2, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200], paddingHorizontal: 8, paddingVertical: 6, backgroundColor: '#fff' },
+  dimTileActive: { borderColor: Colors.purple[600], backgroundColor: '#faf5ff' },
+  dimTileName: { fontSize: 11, fontWeight: '600', color: Colors.gray[600] },
+  dimTileNameActive: { color: Colors.purple[700] },
+  dimTileSize: { fontSize: 9, color: Colors.gray[400], marginTop: 1 },
 
   // Theme grid
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
