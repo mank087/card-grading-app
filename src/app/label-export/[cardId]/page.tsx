@@ -25,6 +25,10 @@ import { generateQRCodeWithLogo, loadLogoAsBase64, type FoldableLabelData } from
 import { generateAveryLabel } from '@/lib/averyLabelGenerator';
 import { generateToploaderLabelPair, generateFoldOverLabel8167 } from '@/lib/avery8167LabelGenerator';
 import { generateSlabLabel, generateFoldOverSlabLabel } from '@/lib/slabLabelGenerator';
+import {
+  generateCustomSlabLabel,
+  generateFoldOverSlabLabel as generateFoldOverCustomSlabLabel,
+} from '@/lib/customSlabLabelGenerator';
 
 declare global {
   interface Window {
@@ -95,16 +99,15 @@ export default function LabelExportPage() {
         const frontImageUrl = signed?.find(u => u.path === card.front_path)?.signedUrl || '';
         const backImageUrl = signed?.find(u => u.path === card.back_path)?.signedUrl || '';
 
-        // Look up the user's emblem entitlements + selections (same logic as the
-        // mobile useUserEmblems hook). Mirrors web parity so labels carry Founder /
-        // VIP / Card Lover badges when the user has them enabled.
+        // Look up emblem entitlements + saved custom label styles in one query.
         let showFounderEmblem = false;
         let showVipEmblem = false;
         let showCardLoversEmblem = false;
+        let savedCustomStyles: Array<{ id: string; name: string; config: any }> = [];
         try {
           const { data: creditsRow } = await supabase
             .from('user_credits')
-            .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem')
+            .select('is_founder, is_vip, is_card_lover, show_founder_badge, show_vip_badge, show_card_lover_badge, preferred_label_emblem, custom_label_styles')
             .single();
           if (creditsRow) {
             const selected: string[] = (creditsRow.preferred_label_emblem || '')
@@ -112,9 +115,12 @@ export default function LabelExportPage() {
             showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && selected.includes('founder');
             showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && selected.includes('vip');
             showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && selected.includes('card_lover');
+            if (Array.isArray(creditsRow.custom_label_styles)) {
+              savedCustomStyles = creditsRow.custom_label_styles as any[];
+            }
           }
         } catch (e) {
-          console.warn('[label-export] emblem lookup failed (non-fatal):', e);
+          console.warn('[label-export] user_credits lookup failed (non-fatal):', e);
         }
 
         const labelData = getCardLabelData(card);
@@ -215,6 +221,45 @@ export default function LabelExportPage() {
             : await generateToploaderLabelPair(toploaderData, position, secondPosition);
           blobs.push({
             name: `DCM-Toploader-${type === 'foldover' ? 'Foldover-' : ''}${namePrefix}.pdf`,
+            mime: 'application/pdf',
+            dataUrl: await blobToDataUrl(blob),
+          });
+        } else if (type === 'slab-custom') {
+          // User has a custom label style selected (custom-1..4); use the matching
+          // saved CustomLabelConfig and the custom slab generators (which support
+          // gradients, geometric patterns, neon outlines, card-extension, etc.).
+          postStatus('Generating custom slab label PDF…');
+          const config = savedCustomStyles.find(s => s.id === labelStyleParam)?.config;
+          if (!config) {
+            throw new Error(`Could not find saved custom label style "${labelStyleParam}". Switch to a different style or save one in Label Studio.`);
+          }
+          const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+            generateQRCodeWithLogo(cardUrl).catch(() => ''),
+            loadLogoAsBase64().catch(() => ''),
+          ]);
+          const slabPayload: any = {
+            primaryName: labelData.primaryName,
+            contextLine: labelData.contextLine || '',
+            features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
+            featuresLine: labelData.featuresLine || null,
+            serial: labelData.serial,
+            grade,
+            gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
+            condition: labelData.condition,
+            isAlteredAuthentic: false,
+            englishName: card.featured || card.pokemon_featured || undefined,
+            qrCodeDataUrl,
+            subScores,
+            logoDataUrl,
+            showFounderEmblem,
+            showVipEmblem,
+            showCardLoversEmblem,
+          };
+          const blob = format === 'foldover'
+            ? await generateFoldOverCustomSlabLabel(slabPayload, config)
+            : await generateCustomSlabLabel(slabPayload, config);
+          blobs.push({
+            name: `DCM-Slab-Custom-${format}-${namePrefix}.pdf`,
             mime: 'application/pdf',
             dataUrl: await blobToDataUrl(blob),
           });

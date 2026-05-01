@@ -279,16 +279,33 @@ export default function CardDetailScreen() {
             <Text style={s.editTitle}>Download Labels & Images</Text>
             <Text style={s.editSubtitle}>Same options as web. Tap any item to generate and share.</Text>
             <ScrollView style={{ maxHeight: 480 }}>
-              {([
-                { id: 'slab-modern', name: 'Graded Slab — Modern', desc: 'Dark-gradient slab label PDF (2.8" × 0.8")', icon: 'card', needsFormat: true },
-                { id: 'slab-traditional', name: 'Graded Slab — Traditional', desc: 'Light/white classic slab label PDF', icon: 'card-outline', needsFormat: true },
-                { id: 'onetouch', name: 'Magnetic One-Touch', desc: 'Avery 6871 PDF for magnetic cases', icon: 'magnet' },
-                { id: 'toploader', name: 'Toploader Front+Back', desc: 'Avery 8167 — front grade + back QR', icon: 'copy' },
-                { id: 'foldover', name: 'Fold-Over Toploader', desc: 'Avery 8167 — single label, fold over tab', icon: 'reader' },
-                { id: 'card-image-modern', name: 'Card Image — Modern', desc: 'JPG with modern dark slab label', icon: 'image' },
-                { id: 'card-image-traditional', name: 'Card Image — Traditional', desc: 'JPG with traditional light slab label', icon: 'image-outline' },
-                { id: 'mini-report', name: 'Mini Grade Report', desc: 'Foldable summary card with QR + sub-grades', icon: 'document-text' },
-              ] as const).map(item => (
+              {(() => {
+                const activeCustom = labelStyle && labelStyle.startsWith('custom-')
+                  ? customStyles.find(s => s.id === labelStyle)
+                  : null
+                const items: Array<{ id: string; name: string; desc: string; icon: string; needsFormat?: boolean }> = []
+                // Show the user's active custom slab first when they have one selected
+                if (activeCustom) {
+                  items.push({
+                    id: 'slab-custom',
+                    name: `Graded Slab — ${activeCustom.name}`,
+                    desc: 'Custom slab label PDF using the style currently selected on your card details page.',
+                    icon: 'color-palette',
+                    needsFormat: true,
+                  })
+                }
+                items.push(
+                  { id: 'slab-modern', name: 'Graded Slab — Modern', desc: 'Dark-gradient slab label PDF (2.8" × 0.8")', icon: 'card', needsFormat: true },
+                  { id: 'slab-traditional', name: 'Graded Slab — Traditional', desc: 'Light/white classic slab label PDF', icon: 'card-outline', needsFormat: true },
+                  { id: 'onetouch', name: 'Magnetic One-Touch', desc: 'Avery 6871 PDF for magnetic cases', icon: 'magnet' },
+                  { id: 'toploader', name: 'Toploader Front+Back', desc: 'Avery 8167 — front grade + back QR', icon: 'copy' },
+                  { id: 'foldover', name: 'Fold-Over Toploader', desc: 'Avery 8167 — single label, fold over tab', icon: 'reader' },
+                  { id: 'card-image-modern', name: 'Card Image — Modern', desc: 'JPG with modern dark slab label', icon: 'image' },
+                  { id: 'card-image-traditional', name: 'Card Image — Traditional', desc: 'JPG with traditional light slab label', icon: 'image-outline' },
+                  { id: 'mini-report', name: 'Mini Grade Report', desc: 'Foldable summary card with QR + sub-grades', icon: 'document-text' },
+                )
+                return items
+              })().map(item => (
                 <TouchableOpacity
                   key={item.id}
                   style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 }]}
