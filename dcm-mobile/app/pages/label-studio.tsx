@@ -3,7 +3,7 @@ import {
   View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, TextInput,
   ActivityIndicator, Dimensions, FlatList, Alert, Share,
 } from 'react-native'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as FileSystem from 'expo-file-system'
 import * as Sharing from 'expo-sharing'
@@ -27,17 +27,35 @@ const GEOMETRIC_PATTERNS = [
 ] as const
 import LabelWebRenderer, { type LabelConfig, type LabelCardData } from '@/components/labels/LabelWebRenderer'
 import ColorPickerModal from '@/components/labels/ColorPickerModal'
+import LabelMockup, { type LabelTypeId } from '@/components/labels/LabelMockup'
+import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
-const LABEL_GALLERY = [
-  { id: 'slab-modern', name: 'Graded Slab (Modern)', shortName: 'Modern Slab', dimensions: '2.8" × 0.8"', description: 'Dark gradient label for standard grading slabs. Duplex printing with front grade and back QR code.' },
-  { id: 'slab-traditional', name: 'Graded Slab (Traditional)', shortName: 'Traditional Slab', dimensions: '2.8" × 0.8"', description: 'Light/white label with classic grading style. Clean, professional look.' },
-  { id: 'onetouch', name: 'Magnetic One-Touch', shortName: 'One-Touch', dimensions: '1.25" × 2.375"', description: 'Sized for Avery 6871 labels. Fits magnetic one-touch card holders.' },
-  { id: 'toploader', name: 'Toploader Front+Back', shortName: 'Toploader', dimensions: '1.75" × 0.5"', description: 'Two small labels — grade info on front, QR code on back of toploader.' },
-  { id: 'foldover', name: 'Fold-Over Toploader', shortName: 'Fold-Over', dimensions: '1.75" × 0.5"', description: 'Single label that folds over the toploader opening.' },
-  { id: 'custom', name: 'Custom Label', shortName: 'Custom', dimensions: 'Any size', description: 'Design your own with custom colors, layouts, and borders.' },
+// Label gallery — matches LABEL_TYPES on web. Each item has a holder type
+// (slab / one-touch / toploader / digital) so the mockup tile renders the
+// correct frame, plus the export route ID used by the /label-export flow.
+const LABEL_GALLERY: Array<{
+  id: LabelTypeId
+  name: string
+  holderLabel: string
+  shortName: string
+  dimensions: string
+  useCase: string
+  description: string
+  howToApply: string
+  forcedStyle?: 'modern' | 'traditional'
+  needsFormat?: boolean
+}> = [
+  { id: 'slab-modern',         name: 'Graded Slab (Modern)',      holderLabel: 'Graded Card Slab', shortName: 'Modern Slab',      dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Dark gradient label matching DCM modern style. Duplex printing with front grade and back QR code.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'modern', needsFormat: true },
+  { id: 'slab-traditional',    name: 'Graded Slab (Traditional)', holderLabel: 'Graded Card Slab', shortName: 'Traditional Slab', dimensions: '2.8" × 0.8"',     useCase: 'Insert into standard grading slab', description: 'Light/white label with classic grading style. Clean, professional look for any slab.', howToApply: 'Print on standard paper at 100% scale. Cut along dotted lines. Insert into slab label slot.', forcedStyle: 'traditional', needsFormat: true },
+  { id: 'onetouch',            name: 'Magnetic One-Touch',        holderLabel: 'Mag One Touch',    shortName: 'One-Touch',        dimensions: '1.25" × 2.375"',  useCase: 'Avery 6871 for magnetic cases',     description: 'Sized for Avery 6871 labels. Fits magnetic one-touch card holders perfectly.', howToApply: 'Print on Avery 6871 label sheets. Peel and stick to one-touch magnetic case.' },
+  { id: 'toploader',           name: 'Toploader Front+Back',      holderLabel: 'Top Loader',       shortName: 'Toploader',        dimensions: '1.75" × 0.5"',    useCase: 'Avery 8167, front grade + back QR', description: 'Two small labels per card — grade info on front, QR code on back of toploader.', howToApply: 'Print on Avery 8167 sheets. Apply front label to toploader front, back label to rear.' },
+  { id: 'foldover',            name: 'Fold-Over Toploader',       holderLabel: 'Top Loader',       shortName: 'Fold-Over',        dimensions: '1.75" × 0.5"',    useCase: 'Single label, fold over toploader tab', description: 'One label that folds over the toploader opening. Grade visible on front, QR on back.', howToApply: 'Print on Avery 8167. Apply to toploader top edge and fold over to seal.' },
+  { id: 'card-image-modern',   name: 'Card Image (Modern)',       holderLabel: 'Digital',          shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with modern dark label overlay. Perfect for online listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'modern' },
+  { id: 'card-image-traditional', name: 'Card Image (Traditional)', holderLabel: 'Digital',         shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with traditional light label overlay. Clean look for listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'traditional' },
+  { id: 'custom',              name: 'Custom Label',              holderLabel: 'Graded Card Slab', shortName: 'Custom',           dimensions: 'Any size',        useCase: 'Design your own',                   description: 'Custom dimensions, colors, borders, and editable text.', howToApply: 'Customize the colors, layout, and dimensions in the Customize section below.' },
 ]
 
 // ============================================================================
@@ -74,6 +92,7 @@ interface DesignerConfig {
 
 export default function LabelStudioScreen() {
   const params = useLocalSearchParams<{ cardId?: string }>()
+  const router = useRouter()
   const { session } = useAuth()
   const [cards, setCards] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -112,6 +131,7 @@ export default function LabelStudioScreen() {
   const [savingStyle, setSavingStyle] = useState(false)
   const [renamingStyleId, setRenamingStyleId] = useState<string | null>(null)
   const [renamingValue, setRenamingValue] = useState('')
+  const [activeGalleryIdx, setActiveGalleryIdx] = useState(0)
 
   // Color picker modal
   const [pickerVisible, setPickerVisible] = useState(false)
@@ -376,6 +396,30 @@ export default function LabelStudioScreen() {
     if (!ok) Alert.alert('Rename failed', 'Could not rename the style.')
   }, [renamingStyleId, renamingValue, renameCustomStyle])
 
+  // Gallery tile download — for now uses the same Share flow so the user
+  // gets a PNG of the currently-visible label preview. Full per-type PDF
+  // exports (Avery 6871/8167, foldover slabs, etc.) live on the card detail
+  // page's Labels sheet; route the user there for those.
+  const handleGalleryDownload = useCallback((labelType: typeof LABEL_GALLERY[number]) => {
+    if (labelType.holderLabel === 'Digital') {
+      // Card images / digital — share current preview
+      return handleShare()
+    }
+    if (selectedCard?.id) {
+      Alert.alert(
+        labelType.name,
+        'Open this card on the card detail page to download as a printable PDF (with position selector for Avery sheets).',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Card', onPress: () => router.push(`/card/${selectedCard.id}` as any) },
+          { text: 'Save Preview as PNG', onPress: () => handleShare() },
+        ],
+      )
+    } else {
+      handleShare()
+    }
+  }, [selectedCard, handleShare])
+
   const loadStyle = useCallback((styleConfig: any) => {
     setConfig(prev => ({
       ...prev,
@@ -509,9 +553,15 @@ export default function LabelStudioScreen() {
 
         {selectedCard && (
           <>
+            {/* ============ Label Badges ============ */}
+            <LabelBadgesPicker />
+
             {/* ============ Label Gallery (Swipeable) ============ */}
             <View style={s.section}>
-              <Text style={s.sectionTitle}>Label Types</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <Text style={s.sectionTitle}>Label Gallery</Text>
+                <Text style={{ fontSize: 11, color: Colors.gray[400] }}>{LABEL_GALLERY.length} label types</Text>
+              </View>
               <FlatList
                 horizontal
                 pagingEnabled
@@ -521,45 +571,63 @@ export default function LabelStudioScreen() {
                 contentContainerStyle={{ gap: 0 }}
                 snapToAlignment="center"
                 decelerationRate="fast"
-                snapToInterval={SCREEN_W - 24 - 32}
-                renderItem={({ item: labelType }) => (
-                  <View style={{ width: SCREEN_W - 24 - 32, paddingHorizontal: 4 }}>
-                    {/* Slab mockup with label */}
-                    <View style={{ alignItems: 'center' }}>
-                      <View style={[s.slabContainer, { width: 180 }]}>
-                        <Image source={require('@/assets/images/graded-card-slab.png')} style={s.slabImage} resizeMode="contain" />
-                        <View style={s.slabLabelSlot}>
-                          {labelPreviewUrl ? (
-                            <Image source={{ uri: labelPreviewUrl }} style={s.slabLabel} resizeMode="contain" />
-                          ) : (
-                            <View style={[s.slabLabel, { backgroundColor: Colors.gray[200] }]} />
-                          )}
-                        </View>
-                        <View style={s.slabCardSlot}>
-                          {frontUrl ? (
-                            <Image source={{ uri: frontUrl }} style={s.slabCardImage} resizeMode="contain" />
-                          ) : null}
-                        </View>
-                      </View>
+                snapToInterval={SCREEN_W - 24}
+                onMomentumScrollEnd={(e) => {
+                  const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
+                  setActiveGalleryIdx(idx)
+                  // Keep the user's customizer style in sync with the visible tile so
+                  // the rendered preview reflects the type they're swiping through.
+                  const t = LABEL_GALLERY[idx]
+                  if (t?.forcedStyle && config.style !== t.forcedStyle) {
+                    setConfig(prev => ({ ...prev, style: t.forcedStyle! }))
+                  }
+                }}
+                renderItem={({ item: labelType, index }) => (
+                  <View style={{ width: SCREEN_W - 24, paddingHorizontal: 12 }}>
+                    {/* Type label header */}
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.gray[900], textAlign: 'center' }}>{labelType.name}</Text>
+                    <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.purple[600], textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', marginBottom: 8 }}>{labelType.holderLabel}</Text>
+
+                    {/* Holder mockup */}
+                    <LabelMockup
+                      labelType={labelType.id}
+                      labelImageUrl={labelPreviewUrl}
+                      cardImageUrl={frontUrl}
+                      width={210}
+                    />
+
+                    {/* Side toggle (front/back) — same as designer below */}
+                    <View style={[s.sideToggle, { marginTop: 8, alignSelf: 'center' }]}>
+                      <TouchableOpacity style={[s.sideBtn, side === 'front' && s.sideBtnActive]} onPress={() => setSide('front')}>
+                        <Text style={[s.sideBtnText, side === 'front' && s.sideBtnTextActive]}>Front</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[s.sideBtn, side === 'back' && s.sideBtnActive]} onPress={() => setSide('back')}>
+                        <Text style={[s.sideBtnText, side === 'back' && s.sideBtnTextActive]}>Back</Text>
+                      </TouchableOpacity>
                     </View>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.gray[800], textAlign: 'center', marginTop: 8 }}>{labelType.name}</Text>
-                    <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center' }}>{labelType.dimensions}</Text>
-                    <Text style={{ fontSize: 10, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>{labelType.description}</Text>
+
+                    <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center', marginTop: 8 }}>
+                      {labelType.dimensions} — {labelType.useCase}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: Colors.gray[400], textAlign: 'center', marginTop: 4 }} numberOfLines={3}>
+                      {labelType.description}
+                    </Text>
                     <TouchableOpacity
-                      style={[s.downloadBtn, { marginTop: 10, marginHorizontal: 20 }]}
-                      onPress={handleShare}
-                      disabled={!labelPreviewUrl}
+                      style={[s.downloadBtn, { marginTop: 12, marginHorizontal: 20 }]}
+                      onPress={() => handleGalleryDownload(labelType)}
                       activeOpacity={0.7}
                     >
-                      <Ionicons name="share-outline" size={16} color="#fff" />
-                      <Text style={s.downloadBtnText}>Download {labelType.shortName}</Text>
+                      <Ionicons name="download-outline" size={16} color="#fff" />
+                      <Text style={s.downloadBtnText}>
+                        {labelType.holderLabel === 'Digital' ? 'Download Images' : 'Download PDF'}
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 )}
               />
               <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8, gap: 4 }}>
                 {LABEL_GALLERY.map((_, i) => (
-                  <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.gray[300] }} />
+                  <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === activeGalleryIdx ? Colors.purple[600] : Colors.gray[300] }} />
                 ))}
               </View>
             </View>
