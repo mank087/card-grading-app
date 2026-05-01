@@ -98,6 +98,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="labels"
+        options={{
+          title: 'Labels',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="pricetags" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="market-pricing"
+        options={{
+          title: 'Pricing',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="cash" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="account"
         options={{
           title: 'Menu',
