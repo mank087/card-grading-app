@@ -44,7 +44,7 @@ export default function CardDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
   const router = useRouter()
   const { session } = useAuth()
-  const { labelStyle, colorOverrides } = useLabelStyle()
+  const { labelStyle, customStyles, colorOverrides } = useLabelStyle()
   const emblems = useUserEmblems()
   const [card, setCard] = useState<Card | null>(null)
   const [isLoading, setIsLoading] = useState(true)
