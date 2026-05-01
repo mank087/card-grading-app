@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react'
-import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable, TextInput, KeyboardAvoidingView, Platform } from 'react-native'
+import { useEffect, useState, useCallback, useRef } from 'react'
+import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable, TextInput, KeyboardAvoidingView, Platform, PanResponder } from 'react-native'
 import * as Clipboard from 'expo-clipboard'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
@@ -53,6 +53,19 @@ export default function CardDetailScreen() {
   const [backUrl, setBackUrl] = useState<string | null>(null)
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
   const [zoomImage, setZoomImage] = useState<string | null>(null)
+
+  // Swipe gestures on the slab — left/right to switch front/back. Built-in PanResponder
+  // (no extra deps); only triggers on a clear horizontal swipe so the parent ScrollView
+  // can still scroll vertically.
+  const slabPanResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, gs) => Math.abs(gs.dx) > 18 && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
+      onPanResponderRelease: (_e, gs) => {
+        if (gs.dx < -40) setActiveImage('back')   // swipe left → back
+        else if (gs.dx > 40) setActiveImage('front') // swipe right → front
+      },
+    })
+  ).current
   const [editOpen, setEditOpen] = useState(false)
   // Label export state — opens a hidden WebView that runs the canvas/PDF generators on the web
   // and posts back base64 files; mobile then previews them with explicit Download/Print buttons.
@@ -262,14 +275,37 @@ export default function CardDetailScreen() {
   return (
     <ScrollView style={s.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCard() }} tintColor={Colors.purple[600]} />}>
 
-      {/* Image Zoom Modal */}
+      {/* Image Zoom Modal — uses a WebView so the browser handles pinch-to-zoom natively
+          on both iOS and Android (no extra deps). Double-tap also zooms in browsers. */}
       <Modal visible={!!zoomImage} transparent animationType="fade" onRequestClose={() => setZoomImage(null)}>
-        <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }} onPress={() => setZoomImage(null)}>
+        <View style={{ flex: 1, backgroundColor: '#000' }}>
           {zoomImage && (
-            <Image source={{ uri: zoomImage }} style={{ width: Dimensions.get('window').width - 24, height: Dimensions.get('window').height * 0.7 }} resizeMode="contain" />
+            <WebView
+              originWhitelist={['*']}
+              scalesPageToFit
+              source={{
+                html: `<!DOCTYPE html><html><head>
+                  <meta charset="utf-8">
+                  <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=6, user-scalable=yes">
+                  <style>
+                    html, body { margin:0; padding:0; height:100%; background:#000; overflow:hidden; }
+                    .wrap { display:flex; align-items:center; justify-content:center; min-height:100vh; min-width:100vw; }
+                    img { max-width:100vw; max-height:100vh; display:block; }
+                  </style>
+                </head><body>
+                  <div class="wrap"><img src="${zoomImage}" alt="card" /></div>
+                </body></html>`,
+              }}
+              style={{ flex: 1, backgroundColor: '#000' }}
+            />
           )}
-          <Text style={{ color: '#fff', fontSize: 12, marginTop: 12, opacity: 0.6 }}>Tap anywhere to close</Text>
-        </Pressable>
+          <View style={{ position: 'absolute', top: 40, right: 16 }}>
+            <TouchableOpacity onPress={() => setZoomImage(null)} style={{ backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 22, padding: 10 }}>
+              <Ionicons name="close" size={22} color="#fff" />
+            </TouchableOpacity>
+          </View>
+          <Text style={{ position: 'absolute', bottom: 24, alignSelf: 'center', color: '#fff', fontSize: 11, opacity: 0.7 }}>Pinch to zoom · Double-tap to zoom in · Tap × to close</Text>
+        </View>
       </Modal>
 
       {/* Reports bottom-sheet — mirrors the web's DownloadReportButton "Reports" dropdown:
@@ -820,7 +856,7 @@ export default function CardDetailScreen() {
       {/* ══════ SLAB PREVIEW ══════ */}
       <View style={s.slabSection}>
         <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
-        <View style={s.slabContainer}>
+        <View style={s.slabContainer} {...slabPanResponder.panHandlers}>
           <SlabCard
             imageUrl={activeImage === 'front' ? frontUrl : backUrl}
             displayName={getDisplayName(card as any)}
@@ -840,7 +876,7 @@ export default function CardDetailScreen() {
           />
         </View>
         </TouchableOpacity>
-        <Text style={{ fontSize: 9, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>Tap image to zoom</Text>
+        <Text style={{ fontSize: 9, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>Swipe to flip · Tap to zoom</Text>
         <View style={s.imageToggle}>
           {['front', 'back'].map(side => (
             <TouchableOpacity key={side} style={[s.toggleBtn, activeImage === side && s.toggleBtnActive]} onPress={() => setActiveImage(side as any)}>
