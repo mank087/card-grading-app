@@ -67,11 +67,14 @@ export default function LabelMockup({ labelType, labelImageUrl, cardImageUrl, wi
 //   Card:  top 20%,  left 10.7%, width 78.6%, height 73.9%
 // ============================================================================
 function SlabMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?: string | null; cardImageUrl?: string | null; width: number }) {
+  // Photo aspect 280/460 — explicit pixel height keeps the View from
+  // expanding under any parent flex/aspectRatio quirks.
+  const height = (width * 460) / 280
   return (
-    <View style={[s.holder, { width, aspectRatio: 280 / 460 }]}>
+    <View style={[s.holder, { width, height }]}>
       <Image source={require('@/assets/images/graded-card-slab.png')} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
 
-      {/* Label slot — width-only sizing; aspectRatio derives the height (3.5:1) */}
+      {/* Label slot — width-only; aspectRatio derives the 3.5:1 height. */}
       <View style={[s.slot, { top: '4.5%', left: '13.5%', width: '73%', aspectRatio: 3.5 }]}>
         {labelImageUrl
           ? <Image source={{ uri: labelImageUrl }} style={s.fill} resizeMode="contain" />
@@ -97,8 +100,10 @@ function SlabMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?: st
 //   above the label image so the look matches the photo's case edge.
 // ============================================================================
 function OneTouchMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?: string | null; cardImageUrl?: string | null; width: number }) {
+  // Photo aspect 314/457
+  const height = (width * 457) / 314
   return (
-    <View style={[s.holder, { width, aspectRatio: 314 / 457 }]}>
+    <View style={[s.holder, { width, height }]}>
       <Image source={require('@/assets/images/mag-one-touch-DCM.png')} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
 
       {/* Card slot */}
@@ -129,8 +134,10 @@ function OneTouchMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?
 //   Label foldover:     top 0%,    left 35.5%, width 29% (aspectRatio 1.75 — folded half)
 // ============================================================================
 function ToploaderMockup({ labelImageUrl, cardImageUrl, width, variant }: { labelImageUrl?: string | null; cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover' }) {
+  // Photo aspect 451/588
+  const height = (width * 588) / 451
   return (
-    <View style={[s.holder, { width, aspectRatio: 451 / 588 }]}>
+    <View style={[s.holder, { width, height }]}>
       <Image source={require('@/assets/images/top-loader-dcm.png')} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
 
       {/* Card */}
@@ -192,7 +199,10 @@ function DigitalMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?:
 }
 
 const s = StyleSheet.create({
-  holder: { alignSelf: 'center', position: 'relative' },
+  // overflow:hidden hard-clips the holder PNG to the View bounds so the photo
+  // never bleeds into the neighboring slider panels regardless of resizeMode
+  // behavior.
+  holder: { alignSelf: 'center', position: 'relative', overflow: 'hidden' },
   slot: { position: 'absolute', overflow: 'hidden' },
   fill: { width: '100%', height: '100%' },
   // 3px purple fold crease shown above the label on fold-over variants —
