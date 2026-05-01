@@ -5,9 +5,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
+import * as ImagePicker from 'expo-image-picker'
 import { Colors } from '@/lib/constants'
 import { compressImage, cropToCardAspect, assessQuality, hashImage, QualityResult, CompressedImage } from '@/lib/imageUtils'
 import Button from '@/components/ui/Button'
+import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 
 export default function CaptureScreen() {
   const router = useRouter()
@@ -34,6 +36,103 @@ export default function CaptureScreen() {
   const [previewUri, setPreviewUri] = useState<string | null>(null)
   const [previewQuality, setPreviewQuality] = useState<QualityResult | null>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+
+  // Method (camera vs gallery) — mirrors web's UploadMethodSelector
+  const [mode, setMode] = useState<'camera' | 'gallery'>('camera')
+
+  // Pro Tip modal — gates the FIRST upload action (camera tap or gallery pick)
+  const [tipsVisible, setTipsVisible] = useState(false)
+  const [tipsLoaded, setTipsLoaded] = useState(false)
+  const [shouldGateOnTips, setShouldGateOnTips] = useState(true)
+  const [pendingAction, setPendingAction] = useState<'capture' | 'gallery' | null>(null)
+
+  useEffect(() => {
+    shouldShowPhotoTips().then(should => {
+      setShouldGateOnTips(should)
+      setTipsLoaded(true)
+    })
+  }, [])
+
+  // Run a captured / picked image through the same compress → quality → hash pipeline
+  // and stash it as the current side. Used by both camera and gallery paths.
+  const processImage = async (rawUri: string) => {
+    setIsProcessing(true)
+    try {
+      const croppedUri = await cropToCardAspect(rawUri, orientation)
+      const compressed = await compressImage(croppedUri)
+      const quality = assessQuality(compressed)
+      const hash = await hashImage(compressed.uri)
+
+      setPreviewUri(compressed.uri)
+      setPreviewQuality(quality)
+
+      if (currentSide === 'front') {
+        setFrontUri(compressed.uri)
+        setFrontCompressed(compressed)
+        setFrontQuality(quality)
+        setFrontHash(hash)
+      } else {
+        if (frontHash && hash === frontHash) {
+          Alert.alert('Duplicate Image', 'Front and back images appear to be the same. Please pick the other side.')
+          setPreviewUri(null)
+          setPreviewQuality(null)
+          return
+        }
+        setBackUri(compressed.uri)
+        setBackCompressed(compressed)
+        setBackQuality(quality)
+        setBackHash(hash)
+      }
+    } catch (err) {
+      console.error('[capture] processImage error:', err)
+      Alert.alert('Processing Failed', 'Could not process that image. Try a different one.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  // Gallery selection
+  const pickFromGallery = async () => {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo library access to choose card images.')
+      return
+    }
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: false,
+        quality: 1,
+        exif: false,
+      })
+      if (result.canceled) return
+      const asset = result.assets?.[0]
+      if (!asset?.uri) return
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light)
+      await processImage(asset.uri)
+    } catch (err) {
+      console.warn('[capture] picker error:', err)
+      Alert.alert('Picker failed', String((err as any)?.message || err))
+    }
+  }
+
+  // Gate the first capture/gallery action behind the Pro Tip modal
+  const requestCapture = () => {
+    if (shouldGateOnTips && tipsLoaded) {
+      setPendingAction('capture')
+      setTipsVisible(true)
+    } else {
+      handleCapture()
+    }
+  }
+  const requestGallery = () => {
+    if (shouldGateOnTips && tipsLoaded) {
+      setPendingAction('gallery')
+      setTipsVisible(true)
+    } else {
+      pickFromGallery()
+    }
+  }
 
   if (!permission) return <View style={styles.container} />
 
@@ -203,7 +302,7 @@ export default function CaptureScreen() {
     )
   }
 
-  // Camera mode
+  // Camera or Gallery mode
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -215,27 +314,72 @@ export default function CaptureScreen() {
           <Image source={require('@/assets/images/dcm-logo.png')} style={styles.headerLogo} resizeMode="contain" tintColor="white" />
           <Text style={styles.headerSide}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
         </View>
-        <TouchableOpacity onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')} style={styles.headerButton}>
-          <Ionicons name="camera-reverse" size={28} color={Colors.white} />
+        {mode === 'camera' ? (
+          <TouchableOpacity onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')} style={styles.headerButton}>
+            <Ionicons name="camera-reverse" size={28} color={Colors.white} />
+          </TouchableOpacity>
+        ) : <View style={styles.headerButton} />}
+      </View>
+
+      {/* Method toggle: Camera | Gallery */}
+      <View style={styles.methodToggle}>
+        <TouchableOpacity
+          style={[styles.methodTab, mode === 'camera' && styles.methodTabActive]}
+          onPress={() => setMode('camera')}
+        >
+          <Ionicons name="camera" size={16} color={mode === 'camera' ? '#fff' : Colors.gray[400]} />
+          <Text style={[styles.methodTabText, mode === 'camera' && styles.methodTabTextActive]}>Camera</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.methodTab, mode === 'gallery' && styles.methodTabActive]}
+          onPress={() => setMode('gallery')}
+        >
+          <Ionicons name="images" size={16} color={mode === 'gallery' ? '#fff' : Colors.gray[400]} />
+          <Text style={[styles.methodTabText, mode === 'gallery' && styles.methodTabTextActive]}>Gallery</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Camera */}
-      <View style={styles.cameraContainer}>
-        <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
-        {/* Guide overlay — positioned absolutely on top of camera (not as child) */}
-        <View style={styles.guideContainer} pointerEvents="none">
-          <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
-            <View style={[styles.corner, styles.cornerTL]} />
-            <View style={[styles.corner, styles.cornerTR]} />
-            <View style={[styles.corner, styles.cornerBL]} />
-            <View style={[styles.corner, styles.cornerBR]} />
-            <Text style={styles.guideLabel}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
+      {mode === 'camera' ? (
+        /* Camera live view */
+        <View style={styles.cameraContainer}>
+          <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
+          <View style={styles.guideContainer} pointerEvents="none">
+            <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
+              <View style={[styles.corner, styles.cornerTL]} />
+              <View style={[styles.corner, styles.cornerTR]} />
+              <View style={[styles.corner, styles.cornerBL]} />
+              <View style={[styles.corner, styles.cornerBR]} />
+              <Text style={styles.guideLabel}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
+            </View>
           </View>
         </View>
-      </View>
+      ) : (
+        /* Gallery picker view */
+        <View style={styles.galleryContainer}>
+          <View style={styles.galleryCard}>
+            <Ionicons name="images-outline" size={56} color={Colors.purple[400]} />
+            <Text style={styles.galleryTitle}>Select {currentSide === 'front' ? 'Front' : 'Back'} Image</Text>
+            <Text style={styles.gallerySubtitle}>
+              Choose a photo of the card {currentSide === 'front' ? 'front' : 'back'} from your device.
+            </Text>
+            <TouchableOpacity
+              style={styles.galleryPickBtn}
+              onPress={requestGallery}
+              disabled={isProcessing}
+            >
+              <Ionicons name="folder-open" size={20} color="#fff" />
+              <Text style={styles.galleryPickText}>{isProcessing ? 'Processing…' : 'Choose Photo'}</Text>
+            </TouchableOpacity>
+            {(frontUri || backUri) && (
+              <Text style={styles.galleryHint}>
+                {frontUri && backUri ? 'Both sides ready — confirm to proceed.' : `Now select the ${currentSide === 'front' ? 'front' : 'back'} of the card.`}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
 
-      {/* Status bar */}
+      {/* Status bar — captured indicators */}
       <View style={styles.statusBar}>
         <View style={styles.capturedIndicators}>
           <View style={[styles.indicator, frontUri && styles.indicatorDone]}>
@@ -247,32 +391,56 @@ export default function CaptureScreen() {
         </View>
       </View>
 
-      {/* Controls */}
-      <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity
-          onPress={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
-          style={styles.controlButton}
-        >
-          <Ionicons name="phone-landscape" size={22} color={Colors.white} />
-        </TouchableOpacity>
+      {/* Controls (camera mode only) */}
+      {mode === 'camera' && (
+        <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
+          <TouchableOpacity
+            onPress={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
+            style={styles.controlButton}
+          >
+            <Ionicons name="phone-landscape" size={22} color={Colors.white} />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.captureButton}
-          onPress={handleCapture}
-          disabled={isCapturing || isProcessing}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.captureInner, (isCapturing || isProcessing) && { opacity: 0.5 }]} />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.captureButton}
+            onPress={requestCapture}
+            disabled={isCapturing || isProcessing}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.captureInner, (isCapturing || isProcessing) && { opacity: 0.5 }]} />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')}
-          style={styles.controlButton}
-        >
-          <Ionicons name="swap-horizontal" size={22} color={Colors.white} />
-          <Text style={styles.controlLabel}>{currentSide === 'front' ? 'Back' : 'Front'}</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')}
+            style={styles.controlButton}
+          >
+            <Ionicons name="swap-horizontal" size={22} color={Colors.white} />
+            <Text style={styles.controlLabel}>{currentSide === 'front' ? 'Back' : 'Front'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      {mode === 'gallery' && (
+        <View style={[styles.galleryControls, { paddingBottom: insets.bottom + 12 }]}>
+          <TouchableOpacity onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')} style={styles.gallerySwitchBtn}>
+            <Ionicons name="swap-horizontal" size={18} color={Colors.white} />
+            <Text style={styles.gallerySwitchText}>Switch to {currentSide === 'front' ? 'Back' : 'Front'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Pro Tip popup — shows on first upload action (camera or gallery) */}
+      <PhotoTipsModal
+        visible={tipsVisible}
+        onCancel={() => { setTipsVisible(false); setPendingAction(null) }}
+        onProceed={() => {
+          setTipsVisible(false)
+          setShouldGateOnTips(false) // don't re-gate within this session even if user didn't tick "don't show again"
+          const action = pendingAction
+          setPendingAction(null)
+          if (action === 'capture') handleCapture()
+          else if (action === 'gallery') pickFromGallery()
+        }}
+      />
     </View>
   )
 }
@@ -284,6 +452,25 @@ const styles = StyleSheet.create({
   permissionContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32, backgroundColor: Colors.gray[50], gap: 16 },
   permissionTitle: { fontSize: 20, fontWeight: '700', color: Colors.gray[900] },
   permissionText: { fontSize: 14, color: Colors.gray[500], textAlign: 'center' },
+
+  // Camera / Gallery method toggle
+  methodToggle: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.7)' },
+  methodTab: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 18, paddingVertical: 7, borderRadius: 18, borderWidth: 1, borderColor: Colors.gray[700], backgroundColor: 'rgba(0,0,0,0.4)' },
+  methodTabActive: { backgroundColor: Colors.purple[600], borderColor: Colors.purple[400] },
+  methodTabText: { color: Colors.gray[400], fontSize: 13, fontWeight: '600' },
+  methodTabTextActive: { color: '#fff' },
+
+  // Gallery view
+  galleryContainer: { flex: 1, backgroundColor: Colors.gray[900], padding: 24, justifyContent: 'center' },
+  galleryCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', gap: 12 },
+  galleryTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
+  gallerySubtitle: { fontSize: 12, color: Colors.gray[400], textAlign: 'center' },
+  galleryPickBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.purple[600], paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10, marginTop: 8 },
+  galleryPickText: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  galleryHint: { fontSize: 11, color: Colors.purple[300], textAlign: 'center', marginTop: 8 },
+  galleryControls: { flexDirection: 'row', justifyContent: 'center', paddingVertical: 16, backgroundColor: 'rgba(0,0,0,0.8)' },
+  gallerySwitchBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[600] },
+  gallerySwitchText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   // Camera header
   cameraHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 12, backgroundColor: 'rgba(0,0,0,0.6)' },
