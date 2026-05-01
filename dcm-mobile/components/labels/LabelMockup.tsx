@@ -119,7 +119,7 @@ function DenseLogoGrid({ width, height }: { width: number; height: number }) {
       items.push(
         <Image
           key={`${r}-${c}`}
-          source={require('@/assets/images/DCM-logo.png')}
+          source={require('@/assets/images/dcm-logo.png')}
           style={{ position: 'absolute', top: r * (logoSize + 1) + 1, left: c * (logoSize + 1) + 1, width: logoSize, height: logoSize, opacity: 0.08 }}
           resizeMode="contain"
         />
@@ -245,7 +245,7 @@ function ToploaderLabelFront({ width, labelProps }: { width: number; labelProps?
     <View style={{ width: '100%', aspectRatio: 3.5, backgroundColor: '#fff', flexDirection: 'row', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden' }}>
       <View style={{ width: 3, backgroundColor: '#7c3aed' }} />
       <View style={{ paddingHorizontal: 3, justifyContent: 'center' }}>
-        <Image source={require('@/assets/images/DCM-logo.png')} style={{ height: 12, width: 12 }} resizeMode="contain" />
+        <Image source={require('@/assets/images/dcm-logo.png')} style={{ height: 12, width: 12 }} resizeMode="contain" />
       </View>
       <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 2 }}>
         <Text style={{ fontSize: 5, color: '#374151', fontWeight: '500' }} numberOfLines={1}>{labelProps?.displayName || 'Card Name'}</Text>
@@ -309,7 +309,7 @@ function OneTouchLabelFront({ width, labelProps }: { width: number; labelProps?:
   const features = labelProps?.features ?? []
   return (
     <View style={{ width: '100%', aspectRatio: 3.8, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden' }}>
-      <Image source={require('@/assets/images/DCM-logo.png')} style={{ height: 12, width: 12, marginRight: 3 }} resizeMode="contain" />
+      <Image source={require('@/assets/images/dcm-logo.png')} style={{ height: 12, width: 12, marginRight: 3 }} resizeMode="contain" />
       <View style={{ flex: 1, justifyContent: 'center' }}>
         <Text style={{ fontSize: 5, fontWeight: '600', color: '#111827', lineHeight: 6 }} numberOfLines={1}>{labelProps?.displayName || 'Card Name'}</Text>
         {!!labelProps?.setLineText && <Text style={{ fontSize: 3.5, color: '#6b7280', lineHeight: 4.2 }} numberOfLines={1}>{labelProps.setLineText}</Text>}
@@ -333,7 +333,7 @@ function OneTouchLabelBack({ width }: { width: number }) {
   return (
     <View style={{ width: '100%', aspectRatio: 3.8, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden' }}>
       <QRPlaceholder size={16} />
-      <Image source={require('@/assets/images/DCM-logo.png')} style={{ height: 10, width: 10, marginLeft: 4, opacity: 0.25 }} resizeMode="contain" />
+      <Image source={require('@/assets/images/dcm-logo.png')} style={{ height: 10, width: 10, marginLeft: 4, opacity: 0.25 }} resizeMode="contain" />
     </View>
   )
 }
