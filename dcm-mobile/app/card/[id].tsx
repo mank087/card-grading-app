@@ -3,27 +3,23 @@ import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, Touchable
 import * as Clipboard from 'expo-clipboard'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
-/**
- * Save a generated label/image. Both platforms use the OS share sheet so the user
- * gets a "Save to Files" option (and any other app — Drive, Adobe, etc.) without
- * a separate folder-picker step. Android remembers the last chosen Files folder
- * so repeat saves are effectively one tap.
- */
-async function saveFileToDevice(name: string, base64: string, mime: string): Promise<{ ok: boolean; uri?: string; error?: string }> {
-  try {
-    const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory
-    const path = `${dir}${name}`
-    await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' as any })
-    if (await Sharing.isAvailableAsync()) {
-      await Sharing.shareAsync(path, { mimeType: mime, dialogTitle: name, UTI: mime === 'application/pdf' ? 'com.adobe.pdf' : undefined })
-      return { ok: true, uri: path }
-    }
-    return { ok: true, uri: path }
-  } catch (err: any) {
-    return { ok: false, error: err?.message || 'Save failed' }
-  }
-}
 import { WebView } from 'react-native-webview'
+
+// expo-print is optional — degrades to share-sheet Print if not installed.
+let Print: any = null
+try { Print = require('expo-print') } catch {}
+
+/**
+ * Persist a base64 file to the cache directory and return its file:// path so we
+ * can preview, print, or share it. The actual user-facing save / share happens
+ * later via the dedicated buttons in the export modal.
+ */
+async function persistBase64(name: string, base64: string): Promise<string> {
+  const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory
+  const path = `${dir}${name}`
+  await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' as any })
+  return path
+}
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -56,11 +52,15 @@ export default function CardDetailScreen() {
   const [zoomImage, setZoomImage] = useState<string | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   // Label export state — opens a hidden WebView that runs the canvas/PDF generators on the web
-  // and posts back base64 files; mobile then shares them via expo-sharing.
+  // and posts back base64 files; mobile then previews them with explicit Download/Print buttons.
   const [labelSheetOpen, setLabelSheetOpen] = useState(false)
-  const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover' } | null>(null)
+  const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover'; title?: string } | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<string>('')
+  type ExportFile = { name: string; mime: string; dataUrl: string; localPath: string }
+  const [exportFiles, setExportFiles] = useState<ExportFile[]>([])
+  const [exportPreviewIdx, setExportPreviewIdx] = useState(0)
+  const [exportActionBusy, setExportActionBusy] = useState<string | null>(null)
 
   // Safety timeout — if the export page never posts back within 90s, surface an error
   // so the user isn't stuck on an indefinite spinner.
@@ -289,15 +289,21 @@ export default function CardDetailScreen() {
                   style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 }]}
                   onPress={() => {
                     setLabelSheetOpen(false)
+                    const startExport = (format?: 'duplex' | 'foldover') => {
+                      setExportError(null)
+                      setExportFiles([])
+                      setExportPreviewIdx(0)
+                      setExportStatus('')
+                      setExportTask({ type: item.id, format, title: item.name })
+                    }
                     if ((item as any).needsFormat) {
                       Alert.alert(item.name, 'Choose print format', [
-                        { text: 'Duplex (front/back on one sheet)', onPress: () => { setExportError(null); setExportTask({ type: item.id, format: 'duplex' }) } },
-                        { text: 'Fold-Over (single side)', onPress: () => { setExportError(null); setExportTask({ type: item.id, format: 'foldover' }) } },
+                        { text: 'Duplex (front/back on one sheet)', onPress: () => startExport('duplex') },
+                        { text: 'Fold-Over (single side)', onPress: () => startExport('foldover') },
                         { text: 'Cancel', style: 'cancel' },
                       ])
                     } else {
-                      setExportError(null)
-                      setExportTask({ type: item.id })
+                      startExport()
                     }
                   }}
                 >
@@ -324,29 +330,131 @@ export default function CardDetailScreen() {
         </Pressable>
       </Modal>
 
-      {/* Label-export progress modal — runs the hidden WebView, saves the result, shares */}
-      <Modal visible={!!exportTask} transparent animationType="fade" onRequestClose={() => { setExportTask(null); setExportError(null) }}>
-        <Pressable style={s.editBackdrop} onPress={() => { setExportTask(null); setExportError(null) }}>
-          <Pressable style={[s.editSheet, { alignItems: 'center', paddingVertical: 24 }]} onPress={e => e.stopPropagation()}>
+      {/* Label-export modal — generation → preview with Download / Print buttons */}
+      <Modal visible={!!exportTask} transparent animationType="fade" onRequestClose={() => { setExportTask(null); setExportError(null); setExportFiles([]) }}>
+        <Pressable style={s.editBackdrop} onPress={() => { setExportTask(null); setExportError(null); setExportFiles([]) }}>
+          <Pressable style={[s.editSheet, { paddingVertical: 16 }]} onPress={e => e.stopPropagation()}>
             <View style={s.editHandle} />
             {exportError ? (
-              <>
+              <View style={{ alignItems: 'center', paddingVertical: 8 }}>
                 <Ionicons name="warning" size={36} color={Colors.red[600]} style={{ marginBottom: 8 }} />
                 <Text style={s.editTitle}>Export Failed</Text>
                 <Text style={[s.editSubtitle, { textAlign: 'center', marginBottom: 12 }]}>{exportError}</Text>
-                <TouchableOpacity onPress={() => { setExportTask(null); setExportError(null) }} style={[s.editBtn, s.editBtnCancel, { paddingHorizontal: 24 }]}>
+                <TouchableOpacity onPress={() => { setExportTask(null); setExportError(null); setExportFiles([]) }} style={[s.editBtn, s.editBtnCancel, { paddingHorizontal: 24 }]}>
                   <Text style={s.editBtnCancelText}>Close</Text>
                 </TouchableOpacity>
-              </>
+              </View>
+            ) : exportFiles.length > 0 ? (
+              <View>
+                {/* Header with file pager when multiple */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                  <Text style={s.editTitle} numberOfLines={1}>{exportTask?.title || 'Label Ready'}</Text>
+                  <TouchableOpacity onPress={() => { setExportTask(null); setExportFiles([]) }} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                    <Ionicons name="close" size={22} color={Colors.gray[500]} />
+                  </TouchableOpacity>
+                </View>
+                {exportFiles.length > 1 && (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <TouchableOpacity disabled={exportPreviewIdx === 0} onPress={() => setExportPreviewIdx(i => Math.max(0, i - 1))} style={[s.exportPagerBtn, exportPreviewIdx === 0 && { opacity: 0.4 }]}>
+                      <Ionicons name="chevron-back" size={16} color={Colors.purple[600]} />
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 11, color: Colors.gray[600], fontWeight: '600' }}>{exportPreviewIdx + 1} of {exportFiles.length} · {exportFiles[exportPreviewIdx].name}</Text>
+                    <TouchableOpacity disabled={exportPreviewIdx === exportFiles.length - 1} onPress={() => setExportPreviewIdx(i => Math.min(exportFiles.length - 1, i + 1))} style={[s.exportPagerBtn, exportPreviewIdx === exportFiles.length - 1 && { opacity: 0.4 }]}>
+                      <Ionicons name="chevron-forward" size={16} color={Colors.purple[600]} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {/* Preview */}
+                <View style={s.exportPreviewBox}>
+                  {(() => {
+                    const cur = exportFiles[exportPreviewIdx]
+                    if (!cur) return null
+                    const isImage = cur.mime?.startsWith('image/')
+                    if (isImage) {
+                      return <Image source={{ uri: cur.dataUrl }} style={{ width: '100%', height: 320 }} resizeMode="contain" />
+                    }
+                    // PDF — show a styled card; native PDF preview varies across platforms
+                    return (
+                      <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 8 }}>
+                        <Ionicons name="document-text" size={64} color={Colors.purple[600]} />
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: Colors.gray[800] }}>PDF Ready</Text>
+                        <Text style={{ fontSize: 11, color: Colors.gray[500], textAlign: 'center', paddingHorizontal: 12 }} numberOfLines={2}>{cur.name}</Text>
+                      </View>
+                    )
+                  })()}
+                </View>
+                {/* Action buttons */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={[s.editBtn, s.editBtnSave, { flexDirection: 'row', gap: 6 }]}
+                    disabled={exportActionBusy === 'download'}
+                    onPress={async () => {
+                      const cur = exportFiles[exportPreviewIdx]
+                      if (!cur) return
+                      setExportActionBusy('download')
+                      try {
+                        if (await Sharing.isAvailableAsync()) {
+                          await Sharing.shareAsync(cur.localPath, {
+                            mimeType: cur.mime,
+                            dialogTitle: cur.name,
+                            UTI: cur.mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+                          })
+                        } else {
+                          Alert.alert('Saved', `File at ${cur.localPath}`)
+                        }
+                      } finally { setExportActionBusy(null) }
+                    }}
+                  >
+                    {exportActionBusy === 'download'
+                      ? <ActivityIndicator color="#fff" size="small" />
+                      : <><Ionicons name="download-outline" size={16} color="#fff" /><Text style={s.editBtnSaveText}>Download</Text></>}
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[s.editBtn, s.editBtnCancel, { flexDirection: 'row', gap: 6 }]}
+                    disabled={exportActionBusy === 'print'}
+                    onPress={async () => {
+                      const cur = exportFiles[exportPreviewIdx]
+                      if (!cur) return
+                      setExportActionBusy('print')
+                      try {
+                        if (Print && typeof Print.printAsync === 'function') {
+                          // Native print dialog — works for both PDFs and images
+                          await Print.printAsync({ uri: cur.localPath })
+                        } else {
+                          // Fallback: share sheet has a Print action on both iOS and Android
+                          if (await Sharing.isAvailableAsync()) {
+                            await Sharing.shareAsync(cur.localPath, {
+                              mimeType: cur.mime,
+                              dialogTitle: 'Print ' + cur.name,
+                              UTI: cur.mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+                            })
+                          }
+                        }
+                      } catch (err: any) {
+                        Alert.alert('Print failed', err?.message || 'Could not open print dialog')
+                      } finally { setExportActionBusy(null) }
+                    }}
+                  >
+                    {exportActionBusy === 'print'
+                      ? <ActivityIndicator color={Colors.gray[700]} size="small" />
+                      : <><Ionicons name="print-outline" size={16} color={Colors.gray[800]} /><Text style={s.editBtnCancelText}>Print</Text></>}
+                  </TouchableOpacity>
+                </View>
+                {!Print && (
+                  <Text style={{ fontSize: 9, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
+                    Tip: install expo-print for a one-tap native print dialog.
+                  </Text>
+                )}
+              </View>
             ) : (
-              <>
+              <View style={{ alignItems: 'center', paddingVertical: 12 }}>
                 <ActivityIndicator size="large" color={Colors.purple[600]} />
                 <Text style={[s.editTitle, { marginTop: 12 }]}>Generating…</Text>
-                <Text style={[s.editSubtitle, { textAlign: 'center' }]}>{exportStatus || 'Building your label on the web — saving locally when ready.'}</Text>
-              </>
+                <Text style={[s.editSubtitle, { textAlign: 'center' }]}>{exportStatus || 'Building your label on the web — preview will appear here when ready.'}</Text>
+              </View>
             )}
             {/* Hidden WebView that drives generation */}
-            {exportTask && session?.access_token && card?.id && !exportError && (
+            {exportTask && session?.access_token && card?.id && !exportError && exportFiles.length === 0 && (
               <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 }}>
                 <WebView
                   source={{
@@ -363,19 +471,27 @@ export default function CardDetailScreen() {
                         return
                       }
                       if (msg.type === 'label-export-ready' && Array.isArray(msg.files)) {
-                        setExportStatus(`Opening save dialog…`)
+                        setExportStatus('Preparing preview…')
+                        const ready: ExportFile[] = []
                         let firstError: string | null = null
-                        // Save each file in sequence — share sheet pops once per file so the
-                        // user can pick "Save to Files" / Drive / etc. for each.
                         for (const f of msg.files) {
                           const base64 = (f.dataUrl || '').split(',')[1] || ''
                           if (!base64) continue
-                          const result = await saveFileToDevice(f.name, base64, f.mime)
-                          if (!result.ok && !firstError) firstError = result.error || 'Save failed'
+                          try {
+                            const localPath = await persistBase64(f.name, base64)
+                            ready.push({ name: f.name, mime: f.mime, dataUrl: f.dataUrl, localPath })
+                          } catch (err: any) {
+                            if (!firstError) firstError = err?.message || 'Failed to save file locally'
+                          }
                         }
-                        setExportTask(null)
                         setExportStatus('')
-                        if (firstError) setExportError(firstError)
+                        if (ready.length === 0) {
+                          setExportError(firstError || 'No files generated')
+                        } else {
+                          setExportFiles(ready)
+                          setExportPreviewIdx(0)
+                          // Modal stays open in "ready" state — user clicks Download/Print
+                        }
                       } else if (msg.type === 'error') {
                         setExportError(msg.message || 'Failed to generate label')
                       }
@@ -1669,6 +1785,10 @@ const s = StyleSheet.create({
   editBtnCancelText: { fontSize: 13, fontWeight: '600', color: Colors.gray[700] },
   editBtnSave: { backgroundColor: Colors.purple[600] },
   editBtnSaveText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+
+  // Label-export preview modal
+  exportPreviewBox: { borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, backgroundColor: Colors.gray[50], overflow: 'hidden' },
+  exportPagerBtn: { padding: 6, borderRadius: 6, backgroundColor: Colors.purple[50], borderWidth: 1, borderColor: Colors.purple[200] },
 
   // Summary
   summaryCard: { marginHorizontal: 12, marginTop: 12, backgroundColor: Colors.white, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200] },
