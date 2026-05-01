@@ -199,16 +199,40 @@ export function getFeatures(card: CardLike): string[] {
     return features.slice(0, 4)
   }
 
-  // Lorcana / One Piece / Yu-Gi-Oh / Other — generic fallback
-  if (rookieCard) features.push('RC')
-  if (ci.autographed === true || card.autographed === true) features.push('Auto')
-  if (ci.memorabilia === true) features.push('Mem')
-  if (ci.is_foil === true || stripMarkdown(ci.foil_type)) {
-    features.push(stripMarkdown(ci.foil_type) || 'Foil')
+  if (category === 'Lorcana') {
+    const serialNum = stripMarkdown(ci.serial_number)
+    if (isValidSerialNumber(serialNum)) features.push(serialNum!)
+    return features.slice(0, 4)
   }
+
+  if (category === 'Yu-Gi-Oh') {
+    const attribute = stripMarkdown((ci as any).ygo_attribute) || stripMarkdown((card as any).ygo_attribute)
+    if (attribute) features.push(attribute)
+    const race = stripMarkdown((ci as any).ygo_race) || stripMarkdown((card as any).ygo_race)
+    if (race) features.push(race)
+    if (ci.is_foil === true) features.push('Foil')
+    const serialNum = stripMarkdown(ci.serial_number)
+    if (isValidSerialNumber(serialNum)) features.push(serialNum!)
+    return features.slice(0, 4)
+  }
+
+  if (category === 'One Piece') {
+    const opType = stripMarkdown((ci as any).op_card_type)
+    if (opType && opType.toLowerCase() === 'leader') features.push('Leader')
+    const variantType = stripMarkdown((ci as any).op_variant_type)?.toLowerCase()
+    const isParallel = variantType === 'parallel' || variantType === 'parallel_manga'
+    if (ci.is_foil === true && !isParallel) features.push('Foil')
+    const serialNum = stripMarkdown(ci.serial_number)
+    if (isValidSerialNumber(serialNum)) features.push(serialNum!)
+    return features.slice(0, 4)
+  }
+
+  // Other (and unknown categories) — matches getOtherFeatures on web:
+  // RC + Auto + Facsimile + serial number.
+  if (rookieOrFirst) features.push('RC')
+  if (ci.autographed === true || card.autographed === true) features.push('Auto')
+  if (ci.facsimile_autograph === true) features.push('Facsimile')
   const serialNum = stripMarkdown(ci.serial_number) || stripMarkdown(card.serial_numbering)
   if (isValidSerialNumber(serialNum)) features.push(serialNum!.startsWith('/') ? serialNum! : `/${serialNum!.replace(/^\//, '')}`)
-  const rarity = stripMarkdown(ci.rarity_tier)
-  if (rarity && !['common', 'uncommon'].includes(rarity.toLowerCase())) features.push(rarity)
   return features.slice(0, 4)
 }
