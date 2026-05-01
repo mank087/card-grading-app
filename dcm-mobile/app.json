@@ -33,15 +33,7 @@
       ["expo-router", { "root": "./app" }],
       "expo-secure-store",
       "expo-web-browser",
-      ["@stripe/stripe-react-native", { "merchantIdentifier": "merchant.com.dcmgrading" }],
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Allow DCM Grading to save labels and images to your device.",
-          "savePhotosPermission": "Allow DCM Grading to save labels and images to your device.",
-          "isAccessMediaLocationEnabled": false
-        }
-      ]
+      ["@stripe/stripe-react-native", { "merchantIdentifier": "merchant.com.dcmgrading" }]
     ],
     "experiments": {
       "typedRoutes": true
