@@ -37,6 +37,28 @@ function safeTimestampToDate(timestamp: number | undefined | null): Date {
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 }
 
+/**
+ * Read a subscription's current period end. Stripe's API moved this field
+ * from `subscription.current_period_end` (top-level, now deprecated) to
+ * `subscription.items.data[0].current_period_end`. Annual subscribers were
+ * getting `period_end = signup + 30 days` because the top-level field
+ * returned undefined and safeTimestampToDate fell back to "now + 30 days".
+ * This helper checks both locations.
+ */
+function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): Date {
+  const item: any = subscription.items?.data?.[0];
+  const itemTs: number | undefined = item?.current_period_end;
+  const topLevelTs: number | undefined = (subscription as any).current_period_end;
+  if (typeof itemTs === 'number' && itemTs > 0 && isFinite(itemTs)) {
+    return new Date(itemTs * 1000);
+  }
+  if (typeof topLevelTs === 'number' && topLevelTs > 0 && isFinite(topLevelTs)) {
+    return new Date(topLevelTs * 1000);
+  }
+  console.warn('[Webhook] No valid current_period_end on subscription', subscription.id, '— falling back to 30 days from now');
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+}
+
 // Create Supabase client for idempotency checks
 function getServiceClient() {
   return createClient(
@@ -327,14 +349,14 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     userId,
     plan,
     subscriptionId,
-    periodEnd: safeTimestampToDate((subscription as any).current_period_end),
+    periodEnd: getSubscriptionPeriodEnd(subscription),
   });
 
   // Activate the subscription
   const result = await activateCardLoverSubscription(userId, {
     plan,
     subscriptionId,
-    currentPeriodEnd: safeTimestampToDate((subscription as any).current_period_end),
+    currentPeriodEnd: getSubscriptionPeriodEnd(subscription),
     stripeSessionId: session.id,
   });
 
@@ -429,7 +451,7 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     const result = await processCardLoverRenewal(userId, {
       stripeInvoiceId: invoice.id,
       subscriptionId: subscription.id,
-      currentPeriodEnd: safeTimestampToDate((subscription as any).current_period_end),
+      currentPeriodEnd: getSubscriptionPeriodEnd(subscription),
     });
 
     if (result.success) {
@@ -502,7 +524,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   }
 
   // Update period end if changed
-  const newPeriodEnd = safeTimestampToDate((subscription as any).current_period_end);
+  const newPeriodEnd = getSubscriptionPeriodEnd(subscription);
   const currentPeriodEnd = userCredits.card_lover_current_period_end
     ? new Date(userCredits.card_lover_current_period_end)
     : null;
