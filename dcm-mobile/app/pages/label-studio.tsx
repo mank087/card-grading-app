@@ -56,7 +56,7 @@ const LABEL_GALLERY: Array<{
   { id: 'foldover',            name: 'Fold-Over Toploader',       holderLabel: 'Top Loader',       shortName: 'Fold-Over',        dimensions: '1.75" × 0.5"',    useCase: 'Single label, fold over toploader tab', description: 'One label that folds over the toploader opening. Grade visible on front, QR on back.', howToApply: 'Print on Avery 8167. Apply to toploader top edge and fold over to seal.' },
   { id: 'card-image-modern',   name: 'Card Image (Modern)',       holderLabel: 'Digital',          shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with modern dark label overlay. Perfect for online listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'modern' },
   { id: 'card-image-traditional', name: 'Card Image (Traditional)', holderLabel: 'Digital',         shortName: 'Card Image',       dimensions: '800 × 1120 px',   useCase: 'eBay / social media sharing',       description: 'Digital card image with traditional light label overlay. Clean look for listings.', howToApply: 'Download and upload to eBay, social media, or online marketplace listings.', forcedStyle: 'traditional' },
-  { id: 'custom',              name: 'Custom Label',              holderLabel: 'Graded Card Slab', shortName: 'Custom',           dimensions: 'Any size',        useCase: 'Design your own',                   description: 'Custom dimensions, colors, borders, and editable text.', howToApply: 'Customize the colors, layout, and dimensions in the Customize section below.' },
+  { id: 'custom',              name: 'Custom Label',              holderLabel: 'Graded Card Slab', shortName: 'Custom',           dimensions: 'Any size',        useCase: 'Design your own',                   description: 'Custom dimensions, colors, borders, and editable text.', howToApply: 'Customize the colors, layout, and dimensions in the Customize section below.', needsFormat: true },
 ]
 
 // ============================================================================
@@ -540,25 +540,44 @@ export default function LabelStudioScreen() {
   // gets a PNG of the currently-visible label preview. Full per-type PDF
   // exports (Avery 6871/8167, foldover slabs, etc.) live on the card detail
   // page's Labels sheet; route the user there for those.
+  // Triggers the real PDF generation flow on the card detail page via a
+  // deep-link query param. Card detail's useEffect picks up ?openLabel=<type>
+  // and auto-runs setExportTask, which renders the hidden WebView pointing at
+  // /label-export, generates the actual PDF via jsPDF on web, posts back to
+  // mobile, and shows the export modal with Open in PDF Viewer + Download
+  // (system share sheet) + Print buttons.
   const handleGalleryDownload = useCallback((labelType: typeof LABEL_GALLERY[number]) => {
-    if (labelType.holderLabel === 'Digital') {
-      // Card images / digital — share current preview
-      return handleShare()
+    if (!selectedCard?.id) {
+      Alert.alert('Select a card', 'Pick a card above before downloading a label.')
+      return
     }
-    if (selectedCard?.id) {
+    const id = selectedCard.id
+    // Gallery uses 'custom' for the user's custom slab tile; the card detail
+    // page's export pipeline expects 'slab-custom'. Other ids match 1:1.
+    const exportType = labelType.id === 'custom' ? 'slab-custom' : labelType.id
+    const goExport = (format?: 'duplex' | 'foldover') => {
+      const qs = format ? `?openLabel=${exportType}&format=${format}` : `?openLabel=${exportType}`
+      router.push(`/card/${id}${qs}` as any)
+    }
+    // Slab labels (modern / traditional / custom) print in either
+    // duplex (front + back on separate pages) or fold-over (one
+    // page that folds at the center). Prompt the user once per
+    // download.
+    if (labelType.needsFormat) {
       Alert.alert(
         labelType.name,
-        'Open this card on the card detail page to download as a printable PDF (with position selector for Avery sheets).',
+        'Choose print format:',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Open Card', onPress: () => router.push(`/card/${selectedCard.id}` as any) },
-          { text: 'Save Preview as PNG', onPress: () => handleShare() },
+          { text: 'Duplex (front+back)', onPress: () => goExport('duplex') },
+          { text: 'Fold-over', onPress: () => goExport('foldover') },
         ],
       )
-    } else {
-      handleShare()
+      return
     }
-  }, [selectedCard, handleShare])
+    // Toploader / one-touch / digital — no format choice needed.
+    goExport()
+  }, [selectedCard, router])
 
   const loadStyle = useCallback((styleConfig: any) => {
     setConfig(prev => ({

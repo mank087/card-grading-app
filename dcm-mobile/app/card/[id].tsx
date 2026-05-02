@@ -41,7 +41,7 @@ import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 
 export default function CardDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>()
+  const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
   const router = useRouter()
   const { session } = useAuth()
   const { labelStyle, customStyles, colorOverrides } = useLabelStyle()
@@ -90,6 +90,31 @@ export default function CardDetailScreen() {
     }, 90_000)
     return () => clearTimeout(timer)
   }, [exportTask])
+
+  // Deep-link from the Label Studio gallery: ?openLabel=<type>&format=<duplex|foldover>
+  // Auto-triggers the same export sheet the user would open via Download Labels.
+  // Card load must complete first so we have the data for the WebView token check.
+  const [deepLinkConsumed, setDeepLinkConsumed] = useState(false)
+  useEffect(() => {
+    if (deepLinkConsumed || !openLabel || !card?.id || !session?.access_token) return
+    const f = openFormat === 'foldover' ? 'foldover' : openFormat === 'duplex' ? 'duplex' : undefined
+    const titles: Record<string, string> = {
+      'slab-modern': 'Graded Slab — Modern',
+      'slab-traditional': 'Graded Slab — Traditional',
+      'slab-custom': 'Graded Slab — Custom',
+      'onetouch': 'Magnetic One-Touch',
+      'toploader': 'Toploader Front+Back',
+      'foldover': 'Fold-Over Toploader',
+      'card-image-modern': 'Card Image — Modern',
+      'card-image-traditional': 'Card Image — Traditional',
+    }
+    setExportError(null)
+    setExportFiles([])
+    setExportPreviewIdx(0)
+    setExportStatus('')
+    setExportTask({ type: String(openLabel), format: f, title: titles[String(openLabel)] || String(openLabel) })
+    setDeepLinkConsumed(true)
+  }, [openLabel, openFormat, card?.id, session?.access_token, deepLinkConsumed])
   const [editForm, setEditForm] = useState<{
     card_name: string
     card_set: string
