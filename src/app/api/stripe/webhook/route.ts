@@ -14,6 +14,7 @@ import {
   processCardLoverRenewal,
   cancelCardLoverSubscription,
   getUserCredits,
+  findUserIdByStripeCustomer,
 } from '@/lib/credits';
 import {
   getAffiliateByCode,
@@ -377,10 +378,37 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     return;
   }
 
-  // Get user ID from subscription metadata
-  const userId = subscription.metadata?.userId;
+  // Get user ID from subscription metadata, with fallback lookup by Stripe
+  // customer ID. Older subscriptions (created before stripe.subscriptions.
+  // update was added in handleSubscriptionCheckout) don't have userId in
+  // their metadata — without this fallback, every renewal for those subs
+  // would silently skip and never credit the user. This was the root cause
+  // of multiple missed Card Lovers renewals (see fix-jeffrey-may1-renewal.ts
+  // and fix-john-weaver-renewals.ts).
+  let userId = subscription.metadata?.userId;
   if (!userId) {
-    console.error('Missing userId in subscription metadata:', subscription.id);
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+    if (customerId) {
+      const found = await findUserIdByStripeCustomer(customerId);
+      if (found) {
+        userId = found;
+        console.log(`[handleInvoicePaid] Resolved userId via stripe_customer_id fallback (${customerId} → ${userId}); patching subscription metadata.`);
+        // Self-heal: write userId back to subscription metadata so future
+        // webhooks for this subscription don't need the fallback.
+        try {
+          await stripe.subscriptions.update(subscription.id, {
+            metadata: { ...subscription.metadata, userId },
+          });
+        } catch (err) {
+          console.warn('[handleInvoicePaid] Failed to backfill subscription metadata (non-fatal):', err);
+        }
+      }
+    }
+  }
+  if (!userId) {
+    console.error('Missing userId in subscription metadata AND no match by stripe_customer_id:', subscription.id, 'customer:', subscription.customer);
     return;
   }
 
@@ -422,10 +450,30 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
   console.log('Processing subscription.updated:', subscription.id);
 
-  // Get user ID from metadata
-  const userId = subscription.metadata?.userId;
+  // Get user ID from metadata, with same stripe_customer_id fallback used by
+  // handleInvoicePaid — see comment there.
+  let userId = subscription.metadata?.userId;
   if (!userId) {
-    console.error('Missing userId in subscription metadata');
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+    if (customerId) {
+      const found = await findUserIdByStripeCustomer(customerId);
+      if (found) {
+        userId = found;
+        console.log(`[handleSubscriptionUpdated] Resolved userId via stripe_customer_id fallback (${customerId} → ${userId}); patching metadata.`);
+        try {
+          await stripe.subscriptions.update(subscription.id, {
+            metadata: { ...subscription.metadata, userId },
+          });
+        } catch (err) {
+          console.warn('[handleSubscriptionUpdated] Failed to backfill metadata (non-fatal):', err);
+        }
+      }
+    }
+  }
+  if (!userId) {
+    console.error('Missing userId in subscription metadata AND no match by stripe_customer_id:', subscription.id);
     return;
   }
 
@@ -474,10 +522,20 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   console.log('Processing subscription.deleted:', subscription.id);
 
-  // Get user ID from metadata
-  const userId = subscription.metadata?.userId;
+  // Get user ID from metadata, with stripe_customer_id fallback (same as
+  // handleInvoicePaid / handleSubscriptionUpdated).
+  let userId = subscription.metadata?.userId;
   if (!userId) {
-    console.error('Missing userId in subscription metadata');
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+    if (customerId) {
+      const found = await findUserIdByStripeCustomer(customerId);
+      if (found) userId = found;
+    }
+  }
+  if (!userId) {
+    console.error('Missing userId in subscription metadata AND no match by stripe_customer_id:', subscription.id);
     return;
   }
 

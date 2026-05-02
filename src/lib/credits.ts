@@ -57,6 +57,29 @@ export interface CreditTransaction {
 /**
  * Get or create user credits record
  */
+/**
+ * Look up a user_id by stripe_customer_id. Used as a fallback when a webhook
+ * arrives without subscription.metadata.userId — the metadata isn't always
+ * propagated reliably (especially on renewal events for older subscriptions
+ * created before stripe.subscriptions.update was added). Reading
+ * stripe_customer_id is a robust alternative since it's always set during
+ * subscription activation.
+ */
+export async function findUserIdByStripeCustomer(stripeCustomerId: string): Promise<string | null> {
+  if (!stripeCustomerId) return null;
+  const supabase = getServiceClient();
+  const { data, error } = await supabase
+    .from('user_credits')
+    .select('user_id')
+    .eq('stripe_customer_id', stripeCustomerId)
+    .maybeSingle();
+  if (error) {
+    console.error('[findUserIdByStripeCustomer] error:', error);
+    return null;
+  }
+  return data?.user_id ?? null;
+}
+
 export async function getUserCredits(userId: string): Promise<UserCredits | null> {
   const supabase = getServiceClient();
 
