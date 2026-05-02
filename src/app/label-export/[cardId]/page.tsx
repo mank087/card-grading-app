@@ -104,11 +104,25 @@ export default function LabelExportPage() {
   const type = sp.get('type') || 'slab-modern';
   const format = (sp.get('format') as 'duplex' | 'foldover') || 'duplex';
   const labelStyleParam = (sp.get('labelStyle') || 'modern') as 'modern' | 'traditional';
+  // Inline custom config (base64-encoded JSON) — lets the mobile Label Studio
+  // ship the user's IN-FLIGHT customizer config (colors, gradient angle,
+  // geometric pattern, layout style, custom colors array, dimensions, border)
+  // without saving it to a slot first. Wins over savedCustomStyles when set.
+  const inlineCustomConfigRaw = sp.get('customConfig');
   // Avery sheet position (0-based). Defaults to 0 if not provided.
   const position = Math.max(0, parseInt(sp.get('position') || '0', 10) || 0);
   const secondPosition = Math.max(0, parseInt(sp.get('position2') || String(position + 1), 10) || (position + 1));
+  // Browser-direct mode — when ?download=1 OR no ReactNativeWebView host, the
+  // page triggers a normal browser download for each generated blob (jsPDF's
+  // .save() equivalent via anchor click). Used by the mobile app via
+  // expo-web-browser to leverage the device browser's download manager —
+  // file goes straight to /Downloads on Android, Files on iOS.
+  const downloadMode =
+    sp.get('download') === '1' ||
+    (typeof window !== 'undefined' && !window.ReactNativeWebView);
   const [status, setStatus] = useState('Initializing…');
   const [error, setError] = useState<string | null>(null);
+  const [doneFiles, setDoneFiles] = useState<{ name: string; url: string; mime: string }[]>([]);
 
   // Wraps setStatus + posts back to RN so mobile can show progress
   const postStatus = (s: string) => {
@@ -419,13 +433,29 @@ export default function LabelExportPage() {
             dataUrl: await blobToDataUrl(blob),
           });
         } else if (type === 'slab-custom') {
-          // User has a custom label style selected (custom-1..4); use the matching
-          // saved CustomLabelConfig and the custom slab generators (which support
-          // gradients, geometric patterns, neon outlines, card-extension, etc.).
+          // User has a custom label style selected; use the matching saved
+          // CustomLabelConfig and the custom slab generators (which support
+          // gradients, geometric patterns, neon outlines, card-extension,
+          // etc.). The mobile Label Studio passes the IN-FLIGHT customizer
+          // config via ?customConfig=<base64-json> so the download reflects
+          // exactly what the user is currently designing — without forcing a
+          // save-to-slot first.
           postStatus('Generating custom slab label PDF…');
-          const config = savedCustomStyles.find(s => s.id === labelStyleParam)?.config;
+          let config: any = null;
+          if (inlineCustomConfigRaw) {
+            try {
+              const decoded = decodeURIComponent(inlineCustomConfigRaw);
+              const json = atob(decoded);
+              config = JSON.parse(json);
+            } catch (err) {
+              console.warn('[label-export] Failed to parse inline customConfig:', err);
+            }
+          }
           if (!config) {
-            throw new Error(`Could not find saved custom label style "${labelStyleParam}". Switch to a different style or save one in Label Studio.`);
+            config = savedCustomStyles.find(s => s.id === labelStyleParam)?.config;
+          }
+          if (!config) {
+            throw new Error(`Could not find a custom label config. Save one in Label Studio first or pass an inline config.`);
           }
           const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
             generateQRCodeWithLogo(cardUrl).catch(() => ''),
@@ -497,7 +527,29 @@ export default function LabelExportPage() {
 
         if (cancelled) return;
         postStatus('Done');
-        postToRN({ type: 'label-export-ready', files: blobs });
+
+        if (downloadMode) {
+          // Browser-direct: trigger a real <a download> click for each blob so
+          // the device's browser save the file to its Downloads folder. Mobile
+          // wraps this URL in expo-web-browser and stays in-app while the
+          // browser tab handles the actual save.
+          const links: { name: string; url: string; mime: string }[] = [];
+          for (const f of blobs) {
+            const url = f.dataUrl;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = f.name;
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            links.push({ name: f.name, url, mime: f.mime });
+          }
+          setDoneFiles(links);
+          postStatus(`Downloaded ${blobs.length} file${blobs.length === 1 ? '' : 's'}`);
+        } else {
+          postToRN({ type: 'label-export-ready', files: blobs });
+        }
       } catch (err: any) {
         if (cancelled) return;
         const msg = err?.message || String(err);
@@ -510,6 +562,51 @@ export default function LabelExportPage() {
       cancelled = true;
     };
   }, [cardId, token, type, format, labelStyleParam]);
+
+  if (downloadMode) {
+    return (
+      <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <img src="/dcm-logo.png" alt="DCM Grading" style={{ width: 56, height: 56, margin: '0 auto 12px', display: 'block' }} />
+          <h1 style={{ fontSize: 18, fontWeight: 700, color: '#111827', margin: 0 }}>Label Download</h1>
+        </div>
+        {!error && doneFiles.length === 0 && (
+          <div style={{ textAlign: 'center', padding: 32, background: '#f9fafb', borderRadius: 12 }}>
+            <div style={{ width: 32, height: 32, border: '3px solid #e5e7eb', borderTopColor: '#7c3aed', borderRadius: '50%', margin: '0 auto 12px', animation: 'spin 0.8s linear infinite' }} />
+            <p style={{ color: '#6b7280', fontSize: 13, margin: 0 }}>{status}</p>
+          </div>
+        )}
+        {doneFiles.length > 0 && (
+          <div>
+            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: 16, borderRadius: 12, marginBottom: 16, textAlign: 'center' }}>
+              <p style={{ fontSize: 14, fontWeight: 600, color: '#15803d', margin: 0 }}>
+                ✓ Downloaded {doneFiles.length} file{doneFiles.length === 1 ? '' : 's'}
+              </p>
+              <p style={{ fontSize: 12, color: '#16a34a', margin: '4px 0 0' }}>
+                Check your Downloads folder.
+              </p>
+            </div>
+            {doneFiles.map((f, i) => (
+              <a
+                key={i}
+                href={f.url}
+                download={f.name}
+                style={{ display: 'block', padding: 12, background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: 8, marginBottom: 8, color: '#111827', textDecoration: 'none', fontSize: 13 }}
+              >
+                ↓ Re-download {f.name}
+              </a>
+            ))}
+          </div>
+        )}
+        {error && (
+          <div style={{ padding: 16, background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 12 }}>
+            <p style={{ color: '#dc2626', fontSize: 13, margin: 0 }}>Error: {error}</p>
+          </div>
+        )}
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: 16, fontFamily: 'system-ui, sans-serif', fontSize: 14, color: '#374151' }}>

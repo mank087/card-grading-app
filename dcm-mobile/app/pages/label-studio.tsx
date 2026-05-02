@@ -5,8 +5,9 @@ import {
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import * as FileSystem from 'expo-file-system'
+import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
+import * as WebBrowser from 'expo-web-browser'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
@@ -283,9 +284,15 @@ export default function LabelStudioScreen() {
 
   // Custom slab color overrides — pipe the customizer's current gradient into
   // the gallery's "custom" tile so it updates live as the user edits colors.
-  const customOverrides = useMemo(() => ({
-    labelGradient: [config.gradientStart, config.gradientEnd, config.gradientStart],
-  }), [config.gradientStart, config.gradientEnd])
+  // For rainbow + multi-color custom layouts, use the full customColors array
+  // so the LinearGradient renders all stops; otherwise use the 2-color
+  // gradientStart/End triplet for simple gradients.
+  const customOverrides = useMemo(() => {
+    if (config.customColors && config.customColors.length >= 2) {
+      return { labelGradient: config.customColors }
+    }
+    return { labelGradient: [config.gradientStart, config.gradientEnd, config.gradientStart] }
+  }, [config.gradientStart, config.gradientEnd, config.customColors])
 
   const labelConfig = useMemo<LabelConfig>(() => ({
     width: config.width ?? 2.8,
@@ -324,6 +331,18 @@ export default function LabelStudioScreen() {
         gradientEnd: cardColors.secondary,
         style: 'modern',
         customColors: undefined,
+        layoutStyle: undefined,
+      })
+    } else if (preset.isRainbow) {
+      // Rainbow needs a full 7-color palette so the LinearGradient sweeps
+      // through every hue — was rendering as a 2-color red→blue strip.
+      const RAINBOW_HUES = ['#ff0000', '#ff8800', '#ffff00', '#00cc00', '#0066ff', '#8800ff', '#ff00ff']
+      updateConfig({
+        colorPreset: 'rainbow',
+        gradientStart: RAINBOW_HUES[0],
+        gradientEnd: RAINBOW_HUES[RAINBOW_HUES.length - 1],
+        style: 'modern',
+        customColors: RAINBOW_HUES,
         layoutStyle: undefined,
       })
     } else {
@@ -540,44 +559,96 @@ export default function LabelStudioScreen() {
   // gets a PNG of the currently-visible label preview. Full per-type PDF
   // exports (Avery 6871/8167, foldover slabs, etc.) live on the card detail
   // page's Labels sheet; route the user there for those.
-  // Triggers the real PDF generation flow on the card detail page via a
-  // deep-link query param. Card detail's useEffect picks up ?openLabel=<type>
-  // and auto-runs setExportTask, which renders the hidden WebView pointing at
-  // /label-export, generates the actual PDF via jsPDF on web, posts back to
-  // mobile, and shows the export modal with Open in PDF Viewer + Download
-  // (system share sheet) + Print buttons.
+  // Opens the web's /label-export page in an in-app browser (Chrome custom
+  // tab on Android, SFSafariViewController on iOS) with ?download=1. The page
+  // generates the PDF via jsPDF and triggers a real browser download — file
+  // goes straight to the device's Downloads folder. User stays in the app
+  // context (browser dismisses to mobile app on close).
+  const openWebDownload = useCallback(async (exportType: string, format?: 'duplex' | 'foldover') => {
+    if (!selectedCard?.id || !session?.access_token) return
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const params = new URLSearchParams()
+    params.set('token', session.access_token)
+    params.set('type', exportType)
+    if (format) params.set('format', format)
+    params.set('labelStyle', config.style || 'modern')
+    params.set('download', '1')
+
+    // For custom slab, ship the customizer's CURRENT in-flight config so the
+    // generated PDF matches exactly what the user is designing — without
+    // forcing them to save it to a slot first. Web /label-export reads this
+    // base64-encoded JSON via ?customConfig=...
+    if (exportType === 'slab-custom') {
+      const inlineConfig = {
+        colorPreset: config.colorPreset,
+        gradientStart: config.gradientStart,
+        gradientEnd: config.gradientEnd,
+        style: config.style,
+        borderEnabled: config.borderEnabled,
+        borderColor: config.borderColor,
+        borderWidth: config.borderWidth,
+        topEdgeGradient: config.topEdgeGradient,
+        gradientAngle: config.gradientAngle,
+        geometricPattern: config.geometricPattern,
+        customColors: config.customColors,
+        layoutStyle: config.layoutStyle,
+        preset: config.preset,
+        width: config.width,
+        height: config.height,
+      }
+      try {
+        // base64 encoding works in modern RN via global.btoa polyfill or the
+        // base64 npm; expo provides global.btoa. Fall back to manual encoding
+        // if missing.
+        const json = JSON.stringify(inlineConfig)
+        const b64 = typeof global.btoa === 'function'
+          ? global.btoa(json)
+          : Buffer.from(json, 'utf-8').toString('base64')
+        params.set('customConfig', b64)
+      } catch (err) {
+        console.warn('[label-studio] customConfig encode failed:', err)
+      }
+    }
+
+    const url = `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
+    try {
+      await WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        controlsColor: Colors.purple[600],
+        toolbarColor: '#ffffff',
+      })
+    } catch (err: any) {
+      Alert.alert('Could not open download', err?.message || 'Try again.')
+    }
+  }, [selectedCard, session?.access_token, config])
+
+  // Gallery's per-tile Download button — uses the in-app web browser
+  // approach so the user gets the same download UX as mobile web.
   const handleGalleryDownload = useCallback((labelType: typeof LABEL_GALLERY[number]) => {
     if (!selectedCard?.id) {
       Alert.alert('Select a card', 'Pick a card above before downloading a label.')
       return
     }
-    const id = selectedCard.id
-    // Gallery uses 'custom' for the user's custom slab tile; the card detail
-    // page's export pipeline expects 'slab-custom'. Other ids match 1:1.
+    // Gallery uses 'custom' for the user's custom slab tile; the export
+    // pipeline expects 'slab-custom'.
     const exportType = labelType.id === 'custom' ? 'slab-custom' : labelType.id
-    const goExport = (format?: 'duplex' | 'foldover') => {
-      const qs = format ? `?openLabel=${exportType}&format=${format}` : `?openLabel=${exportType}`
-      router.push(`/card/${id}${qs}` as any)
-    }
-    // Slab labels (modern / traditional / custom) print in either
-    // duplex (front + back on separate pages) or fold-over (one
-    // page that folds at the center). Prompt the user once per
-    // download.
+
+    // Slab labels print in duplex (front+back separate pages) or fold-over
+    // (one page that folds at the center). Prompt the user once per download.
     if (labelType.needsFormat) {
       Alert.alert(
         labelType.name,
         'Choose print format:',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Duplex (front+back)', onPress: () => goExport('duplex') },
-          { text: 'Fold-over', onPress: () => goExport('foldover') },
+          { text: 'Duplex (front+back)', onPress: () => openWebDownload(exportType, 'duplex') },
+          { text: 'Fold-over', onPress: () => openWebDownload(exportType, 'foldover') },
         ],
       )
       return
     }
-    // Toploader / one-touch / digital — no format choice needed.
-    goExport()
-  }, [selectedCard, router])
+    openWebDownload(exportType)
+  }, [selectedCard, openWebDownload])
 
   const loadStyle = useCallback((styleConfig: any) => {
     setConfig(prev => ({
@@ -1247,17 +1318,34 @@ export default function LabelStudioScreen() {
               </Text>
             </View>
 
-            {/* ============ Download / Share ============ */}
+            {/* ============ Download Custom Label ============ */}
             <View style={s.section}>
               <TouchableOpacity
                 style={s.downloadBtn}
-                onPress={handleShare}
-                disabled={!labelPreviewUrl}
+                onPress={() => {
+                  if (!selectedCard?.id) {
+                    Alert.alert('Select a card', 'Pick a card above to download its custom label.')
+                    return
+                  }
+                  Alert.alert(
+                    'Download Custom Label',
+                    'Choose print format:',
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: 'Duplex (front+back)', onPress: () => openWebDownload('slab-custom', 'duplex') },
+                      { text: 'Fold-over', onPress: () => openWebDownload('slab-custom', 'foldover') },
+                    ],
+                  )
+                }}
+                disabled={!selectedCard?.id}
                 activeOpacity={0.7}
               >
-                <Ionicons name="share-outline" size={20} color="#fff" />
-                <Text style={s.downloadBtnText}>Download Label</Text>
+                <Ionicons name="download-outline" size={20} color="#fff" />
+                <Text style={s.downloadBtnText}>Download Custom Label</Text>
               </TouchableOpacity>
+              <Text style={{ fontSize: 10, color: Colors.gray[400], marginTop: 6, textAlign: 'center' }}>
+                Opens the DCM download page in your browser. PDF saves to your Downloads folder.
+              </Text>
             </View>
 
             {/* ============ Saved Styles (server-synced custom-1..4) ============ */}
