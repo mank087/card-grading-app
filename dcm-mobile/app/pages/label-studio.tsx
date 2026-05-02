@@ -587,7 +587,7 @@ export default function LabelStudioScreen() {
       const fileUri = FileSystem.cacheDirectory + `dcm-label-${Date.now()}.png`
       await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 })
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Share Label' })
+        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Download Label' })
       } else {
         Alert.alert('Sharing not available on this device')
       }
@@ -1106,19 +1106,14 @@ export default function LabelStudioScreen() {
             </View>
 
             {/* ============ Border Controls ============ */}
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Border</Text>
-              <TouchableOpacity
-                style={s.checkboxRow}
-                onPress={() => updateConfig({ borderEnabled: !config.borderEnabled })}
-              >
-                <View style={[s.checkbox, config.borderEnabled && s.checkboxChecked]}>
-                  {config.borderEnabled && <Ionicons name="checkmark" size={14} color="#fff" />}
-                </View>
-                <Text style={s.checkboxLabel}>Enable border</Text>
-              </TouchableOpacity>
-              {config.borderEnabled && (
-                <View style={{ gap: 10, marginTop: 10 }}>
+            {/* Border is enabled when the user picks "DCM Bordered" in the
+                Dimensions section above (handleDimensionPreset sets
+                borderEnabled: true). Color/width controls below tune the
+                border whenever it's active. */}
+            {config.borderEnabled && (
+              <View style={s.section}>
+                <Text style={s.sectionTitle}>Border</Text>
+                <View style={{ gap: 10 }}>
                   <View style={s.borderControls}>
                     <TouchableOpacity
                       style={[s.borderColorSwatch, { backgroundColor: config.borderColor }]}
@@ -1147,8 +1142,8 @@ export default function LabelStudioScreen() {
                     </View>
                   </View>
                 </View>
-              )}
-            </View>
+              </View>
+            )}
 
             {/* ============ Custom Slab Preview (duplicate) ============ */}
             {/* Second preview below border so users can edit colors/border and
@@ -1242,7 +1237,7 @@ export default function LabelStudioScreen() {
                 activeOpacity={0.7}
               >
                 <Ionicons name="share-outline" size={20} color="#fff" />
-                <Text style={s.downloadBtnText}>Share Label</Text>
+                <Text style={s.downloadBtnText}>Download Label</Text>
               </TouchableOpacity>
             </View>
 

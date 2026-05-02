@@ -348,9 +348,11 @@ const st = StyleSheet.create({
 
   body: { padding: 16 },
 
-  // Presets
+  // Presets — 5 columns × N rows of clearly visible color squares.
+  // Was 6 cols at (SCREEN_W-80)/6 - 10 ≈ 40px each, which collapsed to thin
+  // lines once the 2px border was applied.
   presetsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  presetSwatch: { width: (SCREEN_W - 80) / 6 - 10, aspectRatio: 1, borderRadius: 8, borderWidth: 2, borderColor: Colors.gray[200] },
+  presetSwatch: { width: '18%', aspectRatio: 1, minHeight: 56, borderRadius: 10, borderWidth: 2, borderColor: Colors.gray[200] },
   presetSwatchActive: { borderColor: Colors.purple[600], borderWidth: 3 },
 
   // SV square

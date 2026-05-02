@@ -1805,21 +1805,15 @@ function CustomDesigner({
               </div>
             </div>
 
-            {/* Border Controls — shown for Custom and DCM Bordered presets */}
-            {(config.preset === 'custom' || config.preset === 'dcm-bordered') && (
+            {/* Border Controls — shown when border is active. Border is auto-
+                enabled by selecting "DCM Bordered" in the Dimensions section
+                (handleDimensionPreset sets borderEnabled: true). The manual
+                "Enable border" checkbox was removed since the dimension
+                preset is the source of truth. */}
+            {config.borderEnabled && (
               <div>
                 <h3 className="text-sm font-semibold text-gray-700 mb-2">Border</h3>
                 <div className="space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={config.borderEnabled ?? false}
-                      onChange={(e) => updateConfig({ borderEnabled: e.target.checked })}
-                      className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                    />
-                    <span className="text-xs text-gray-600">Enable border</span>
-                  </label>
-                  {config.borderEnabled && (
                     <div className="flex gap-3 items-end">
                       <div>
                         <label className="text-[10px] text-gray-500">Color</label>
@@ -1869,7 +1863,6 @@ function CustomDesigner({
                         />
                       </div>
                     </div>
-                  )}
                 </div>
               </div>
             )}

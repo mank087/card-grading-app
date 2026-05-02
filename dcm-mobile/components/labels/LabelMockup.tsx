@@ -109,7 +109,7 @@ export default function LabelMockup({
     )
   }
   if (holder === 'onetouch') {
-    return <OneTouchMockup cardImageUrl={cardSrc} width={width} labelProps={labelProps} side={side} />
+    return <OneTouchMockup cardImageUrl={cardSrc} width={width} labelProps={labelProps} side={side} emblems={emblems} />
   }
   if (holder === 'toploader') {
     return (
@@ -119,6 +119,7 @@ export default function LabelMockup({
         variant={labelType === 'foldover' ? 'foldover' : 'front-back'}
         labelProps={labelProps}
         side={side}
+        emblems={emblems}
       />
     )
   }
@@ -167,41 +168,6 @@ function RealQR({ qrUrl, size }: { qrUrl?: string; size: number }) {
       <Image source={{ uri: src }} style={{ width: size - 2, height: size - 2 }} resizeMode="contain" />
     </View>
   )
-}
-
-/** WatermarkPattern — 8 sparse DCM logos at 8% opacity, used on foldover labels.
- *  Mirrors src/components/labels/LabelMockup.tsx:69-78. */
-function WatermarkPattern() {
-  return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.08, padding: 3, flexDirection: 'row', flexWrap: 'wrap', overflow: 'hidden' }} pointerEvents="none">
-      {Array.from({ length: 8 }).map((_, i) => (
-        <Image key={i} source={require('@/assets/images/dcm-logo.png')} style={{ width: 10, height: 10, marginRight: 6, marginBottom: 6 }} resizeMode="contain" />
-      ))}
-    </View>
-  )
-}
-
-/** Dense DCM logo grid filling the toploader 8167 back label (8% opacity).
- *  Mirrors src/components/labels/LabelMockup.tsx:82-93. */
-function DenseLogoGrid({ width, height }: { width: number; height: number }) {
-  const logoSize = 6
-  const stride = logoSize + 1
-  const cols = Math.floor(width / stride)
-  const rows = Math.floor(height / stride)
-  const items: React.ReactNode[] = []
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      items.push(
-        <Image
-          key={`${r}-${c}`}
-          source={require('@/assets/images/dcm-logo.png')}
-          style={{ position: 'absolute', top: r * stride + 1, left: c * stride + 1, width: logoSize, height: logoSize, opacity: 0.08 }}
-          resizeMode="contain"
-        />
-      )
-    }
-  }
-  return <View style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'hidden' }} pointerEvents="none">{items}</View>
 }
 
 // ============================================================================
@@ -440,7 +406,7 @@ function SlabMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems,
 // ============================================================================
 // One-Touch — photo 314×457
 // ============================================================================
-function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back' }) {
+function OneTouchMockup({ cardImageUrl, width, labelProps, side, emblems }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
   const height = (width * 457) / 314
   const labelWidth = width * 0.65
   const cardTop = height * 0.13, cardLeft = width * 0.11, cardW = width * 0.78, cardH = height * 0.76
@@ -458,8 +424,8 @@ function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUr
       <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
         <View style={s.foldCrease} />
         {side === 'front'
-          ? <OneTouchLabelFront width={labelWidth} labelProps={labelProps} />
-          : <OneTouchLabelBack width={labelWidth} qrUrl={labelProps?.qrUrl} />}
+          ? <SlabFrontInline width={labelWidth} labelProps={labelProps} slabStyle="modern" />
+          : <SlabBackInline width={labelWidth} labelProps={labelProps} slabStyle="modern" emblems={emblems} />}
       </View>
     </View>
   )
@@ -468,7 +434,7 @@ function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUr
 // ============================================================================
 // Toploader — photo 451×588
 // ============================================================================
-function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back' }) {
+function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side, emblems }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
   const height = (width * 588) / 451
   const labelWidth = width * (variant === 'foldover' ? 0.29 : 0.58)
   const cardTop = height * 0.045, cardLeft = width * 0.07, cardW = width * 0.86, cardH = height * 0.90
@@ -486,15 +452,17 @@ function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { c
       {variant === 'foldover' ? (
         <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
           <View style={s.foldCrease} />
-          {side === 'front'
-            ? <FoldoverLabelFront width={labelWidth} labelProps={labelProps} />
-            : <FoldoverLabelBack width={labelWidth} qrUrl={labelProps?.qrUrl} />}
+          <View style={{ width: '100%', aspectRatio: 1.75, overflow: 'hidden' }}>
+            {side === 'front'
+              ? <SlabFrontInline width={labelWidth} labelProps={labelProps} slabStyle="modern" />
+              : <SlabBackInline width={labelWidth} labelProps={labelProps} slabStyle="modern" emblems={emblems} />}
+          </View>
         </View>
       ) : (
         <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
           {side === 'front'
-            ? <ToploaderLabelFront width={labelWidth} labelProps={labelProps} />
-            : <ToploaderLabelBack width={labelWidth} qrUrl={labelProps?.qrUrl} />}
+            ? <SlabFrontInline width={labelWidth} labelProps={labelProps} slabStyle="modern" />
+            : <SlabBackInline width={labelWidth} labelProps={labelProps} slabStyle="modern" emblems={emblems} />}
         </View>
       )}
     </View>
@@ -502,111 +470,12 @@ function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { c
 }
 
 // ============================================================================
-// INLINE SMALL-FORMAT LABELS (toploader 8167, foldover, one-touch 6871)
-// Each mirrors web's JSX exactly (LabelMockup.tsx:479-628).
+// INLINE LABELS — every gallery preview reuses the same SlabFrontInline /
+// SlabBackInline used by the slab tile so users see the FULL card details
+// (name, set, features, serial, grade, sub-scores) on every label type
+// regardless of holder. The actual downloaded PDF still gets generated as
+// the proper compact Avery sticker format from the web export pipeline.
 // ============================================================================
-
-/** Toploader Avery 8167 standard front (3.5:1) */
-function ToploaderLabelFront({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
-  const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
-  return (
-    <View style={{ width: '100%', aspectRatio: 3.5, backgroundColor: '#fff', flexDirection: 'row', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden' }}>
-      <View style={{ width: 3, backgroundColor: '#7c3aed' }} />
-      <View style={{ paddingHorizontal: 3, justifyContent: 'center' }}>
-        <Image source={require('@/assets/images/dcm-logo.png')} style={{ height: 12, width: 12 }} resizeMode="contain" />
-      </View>
-      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: 2 }}>
-        <Text style={{ fontSize: 5, color: '#374151', fontWeight: '500' }} numberOfLines={1}>{labelProps?.displayName || 'Card Name'}</Text>
-      </View>
-      <View style={{ width: StyleSheet.hairlineWidth, marginVertical: 2, backgroundColor: 'rgba(124,58,237,0.3)' }} />
-      <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
-        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#7c3aed', lineHeight: 9 }}>{grade}</Text>
-        <View style={{ width: 7, height: StyleSheet.hairlineWidth, backgroundColor: '#7c3aed', marginTop: 0.5 }} />
-        {!!labelProps?.condition && (
-          <Text style={{ fontSize: 3, fontWeight: 'bold', color: '#6b46c1', textTransform: 'uppercase' }} numberOfLines={1}>{labelProps.condition}</Text>
-        )}
-      </View>
-    </View>
-  )
-}
-
-/** Toploader Avery 8167 standard back (3.5:1) — dense logo grid + real QR */
-function ToploaderLabelBack({ width, qrUrl }: { width: number; qrUrl?: string }) {
-  const height = width / 3.5
-  return (
-    <View style={{ width: '100%', aspectRatio: 3.5, backgroundColor: '#fff', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden' }}>
-      <DenseLogoGrid width={width} height={height} />
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-        <RealQR qrUrl={qrUrl} size={Math.max(12, height * 0.85)} />
-      </View>
-    </View>
-  )
-}
-
-/** Foldover front (1.75:1) — DCM logo collage + grade + condition */
-function FoldoverLabelFront({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
-  const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
-  return (
-    <LinearGradient
-      colors={['#ffffff', '#f9fafb']}
-      style={{ width: '100%', aspectRatio: 1.75, alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden', position: 'relative' }}
-    >
-      <WatermarkPattern />
-      <View style={{ alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-        <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#7c3aed', lineHeight: 14 }}>{grade}</Text>
-        {!!labelProps?.condition && (
-          <Text style={{ fontSize: 5, fontWeight: 'bold', color: '#6b46c1', textTransform: 'uppercase', marginTop: 2 }} numberOfLines={1}>{labelProps.condition}</Text>
-        )}
-      </View>
-    </LinearGradient>
-  )
-}
-
-/** Foldover back (1.75:1) — DCM logo collage + real QR */
-function FoldoverLabelBack({ width, qrUrl }: { width: number; qrUrl?: string }) {
-  return (
-    <View style={{ width: '100%', aspectRatio: 1.75, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden', position: 'relative' }}>
-      <WatermarkPattern />
-      <View style={{ zIndex: 10 }}>
-        <RealQR qrUrl={qrUrl} size={Math.max(14, width * 0.4)} />
-      </View>
-    </View>
-  )
-}
-
-/** One-Touch Avery 6871 front (3.8:1) — logo + multi-line text + grade */
-function OneTouchLabelFront({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
-  const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
-  const features = labelProps?.features ?? []
-  return (
-    <View style={{ width: '100%', aspectRatio: 3.8, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 4, borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden' }}>
-      <Image source={require('@/assets/images/dcm-logo.png')} style={{ height: 12, width: 12, marginRight: 3 }} resizeMode="contain" />
-      <View style={{ flex: 1, justifyContent: 'center' }}>
-        <Text style={{ fontSize: 5, fontWeight: '600', color: '#111827', lineHeight: 6 }} numberOfLines={1}>{labelProps?.displayName || 'Card Name'}</Text>
-        {!!labelProps?.setLineText && <Text style={{ fontSize: 3.5, color: '#6b7280', lineHeight: 4.2 }} numberOfLines={1}>{labelProps.setLineText}</Text>}
-        {features.length > 0 && <Text style={{ fontSize: 3.5, fontWeight: '500', color: '#2563eb', lineHeight: 4.2 }} numberOfLines={1}>{features.join(' • ')}</Text>}
-        {!!labelProps?.serial && <Text style={{ fontSize: 3, fontFamily: 'Courier', color: '#9ca3af', lineHeight: 4 }} numberOfLines={1}>{labelProps.serial}</Text>}
-      </View>
-      <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: 2, marginLeft: 2 }}>
-        <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#7c3aed', lineHeight: 9 }}>{grade}</Text>
-        <View style={{ width: 8, height: StyleSheet.hairlineWidth, backgroundColor: '#7c3aed', marginTop: 0.5 }} />
-        {!!labelProps?.condition && (
-          <Text style={{ fontSize: 3, fontWeight: 'bold', color: '#6b46c1', textTransform: 'uppercase', marginTop: 0.5 }} numberOfLines={1}>{labelProps.condition}</Text>
-        )}
-      </View>
-    </View>
-  )
-}
-
-/** One-Touch Avery 6871 back (3.8:1) — real QR + faded DCM logo */
-function OneTouchLabelBack({ width, qrUrl }: { width: number; qrUrl?: string }) {
-  return (
-    <View style={{ width: '100%', aspectRatio: 3.8, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', borderBottomLeftRadius: 2, borderBottomRightRadius: 2, overflow: 'hidden' }}>
-      <RealQR qrUrl={qrUrl} size={16} />
-      <Image source={require('@/assets/images/dcm-logo.png')} style={{ height: 10, width: 10, marginLeft: 4, opacity: 0.25 }} resizeMode="contain" />
-    </View>
-  )
-}
 
 // ============================================================================
 // Card Image (digital) — gradient frame + slab front/back label + card.
