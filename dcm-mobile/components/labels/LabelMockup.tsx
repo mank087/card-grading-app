@@ -229,128 +229,169 @@ function angleToStartEnd(angle?: number): { start: { x: number; y: number }; end
   }
 }
 
-/** Geometric pattern overlay — one approximation per variant. Web's canvas
- *  draws true Voronoi/Delaunay shards etc.; mobile renders a stylized
- *  pattern that visually distinguishes each variant.
- *    0 Shattered  — randomized rotated rectangular shards
- *    1 Stripes    — parallel diagonal stripes
- *    2 Fractured  — angled crack lines radiating from center
- *    3 Mosaic     — small grid of squares in alternating accent colors
- *    4 Lightning  — zigzag bolt across the label */
-function GeometricOverlay({ variant, width, height, c1, c2 }: { variant: number; width: number; height: number; c1: string; c2: string }) {
-  const opacity = 0.16
+/** Geometric pattern background — full-fill multi-color regions matching
+ *  web's customSlabLabelGenerator (lines 227-410). Each variant REPLACES
+ *  the gradient with its own pattern of colored regions; the pattern is the
+ *  background, not an overlay. Colors cycle through the user's customColors
+ *  palette so palette changes flow through to the preview live.
+ *
+ *    0 Shattered  — 9 colored sectors radiating from a focal point
+ *    1 Stripes    — 7 diagonal bands (skewed parallelograms)
+ *    2 Fractured  — 5 angled regions split by 4 dividers
+ *    3 Mosaic     — 5×2 grid of solid color tiles
+ *    4 Lightning  — zigzag bolt with banded background
+ */
+function GeometricBackground({ variant, width, height, palette }: { variant: number; width: number; height: number; palette: string[] }) {
+  const pick = (i: number) => palette[((i % palette.length) + palette.length) % palette.length] || '#7c3aed'
+  const divider = 'rgba(0,0,0,0.18)'
 
-  if (variant === 1) {
-    // Stripes: parallel diagonal stripes
-    return (
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">
-        {Array.from({ length: 14 }).map((_, i) => (
-          <View key={i} style={{
-            position: 'absolute',
-            top: -height,
-            left: (i * width * 1.6) / 14 - width * 0.4,
-            width: width * 0.05,
-            height: height * 3,
-            backgroundColor: c1,
-            transform: [{ rotate: '22deg' }],
-          }} />
-        ))}
-      </View>
-    )
-  }
-
+  // ---- 3 Mosaic — 5 cols × 2 rows of solid tiles -----------------
   if (variant === 3) {
-    // Mosaic: small alternating squares in a grid
-    const cell = Math.max(4, Math.round(height * 0.18))
-    const cols = Math.ceil(width / cell)
-    const rows = Math.ceil(height / cell)
-    const squares: React.ReactNode[] = []
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        if ((r + c) % 2 === 0) {
-          squares.push(
-            <View key={`${r}-${c}`} style={{
-              position: 'absolute',
-              top: r * cell,
-              left: c * cell,
-              width: cell - 1,
-              height: cell - 1,
-              backgroundColor: (r + c) % 4 === 0 ? c1 : c2,
-            }} />
-          )
-        }
-      }
-    }
-    return <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">{squares}</View>
-  }
-
-  if (variant === 4) {
-    // Lightning: a zig-zag bolt running across the label
-    const segments = 6
-    const segW = width / segments
     return (
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: opacity + 0.05 }} pointerEvents="none">
-        {Array.from({ length: segments }).map((_, i) => {
-          const angle = i % 2 === 0 ? 28 : -28
-          return (
-            <View key={i} style={{
-              position: 'absolute',
-              top: height * 0.3,
-              left: i * segW,
-              width: segW * 1.05,
-              height: height * 0.16,
-              backgroundColor: c1,
-              transform: [{ rotate: `${angle}deg` }],
-              borderRadius: 1,
-            }} />
-          )
-        })}
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height, flexDirection: 'column' }}>
+        {[0, 1].map(r => (
+          <View key={r} style={{ flex: 1, flexDirection: 'row' }}>
+            {[0, 1, 2, 3, 4].map(c => (
+              <View key={c} style={{
+                flex: 1,
+                backgroundColor: pick(r * 5 + c),
+                borderRightWidth: c < 4 ? StyleSheet.hairlineWidth : 0,
+                borderBottomWidth: r < 1 ? StyleSheet.hairlineWidth : 0,
+                borderColor: divider,
+              }} />
+            ))}
+          </View>
+        ))}
       </View>
     )
   }
 
-  if (variant === 2) {
-    // Fractured: crack lines radiating from a point
-    const lines = [-30, -10, 10, 30, 50, 70, -50, -70]
+  // ---- 1 Stripes — 7 diagonal bands using skewX -----------------
+  if (variant === 1) {
+    // Each band is a skewed rect spanning the full height, positioned with
+    // a -30° skew so they fan diagonally. Render in an overflow:hidden
+    // container so the skewed edges clip cleanly to the label rect.
+    const stripeCount = 7
+    const skewDeg = -22
+    // Width of each unskewed band, then over-extend to cover the slanted top/bottom
+    const bandW = (width + height * Math.tan((Math.abs(skewDeg) * Math.PI) / 180)) / stripeCount
     return (
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">
-        {lines.map((deg, i) => (
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'hidden' }}>
+        {Array.from({ length: stripeCount }).map((_, i) => (
           <View key={i} style={{
             position: 'absolute',
-            top: height / 2 - 1,
-            left: -width * 0.3,
-            width: width * 1.6,
-            height: 1.5,
-            backgroundColor: i % 2 === 0 ? c1 : c2,
-            transform: [{ rotate: `${deg}deg` }],
+            top: 0,
+            left: i * bandW - height * 0.5,
+            width: bandW + 1,
+            height: height,
+            backgroundColor: pick(i + 1),
+            transform: [{ skewX: `${skewDeg}deg` }],
+            borderRightWidth: StyleSheet.hairlineWidth,
+            borderColor: divider,
           }} />
         ))}
       </View>
     )
   }
 
-  // variant 0 (Shattered) — randomized rotated rectangular shards
-  const shards = [
-    { top: 0.05, left: 0.0, w: 0.3, h: 0.4, rot: 18, color: c1 },
-    { top: 0.0, left: 0.4, w: 0.35, h: 0.3, rot: -22, color: c2 },
-    { top: 0.55, left: 0.05, w: 0.4, h: 0.35, rot: -10, color: c1 },
-    { top: 0.45, left: 0.5, w: 0.5, h: 0.45, rot: 14, color: c2 },
-    { top: 0.15, left: 0.75, w: 0.3, h: 0.35, rot: 32, color: c1 },
-    { top: 0.7, left: 0.65, w: 0.3, h: 0.3, rot: -28, color: c1 },
-  ]
+  // ---- 2 Fractured — 5 angled vertical-ish regions --------------
+  if (variant === 2) {
+    // 5 regions split by 3 angled dividers + 1 horizontal split on the
+    // right portion. Approximated with skewed rects covering the label.
+    const c5 = [pick(0), pick(1), pick(2), pick(3), pick(4)]
+    const skew = -7
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'hidden' }}>
+        {/* Region 0 — far left narrow */}
+        <View style={{ position: 'absolute', top: 0, left: -width * 0.04, width: width * 0.18, height, backgroundColor: c5[0], transform: [{ skewX: `${skew}deg` }] }} />
+        {/* Region 1 — left-center */}
+        <View style={{ position: 'absolute', top: 0, left: width * 0.12, width: width * 0.28, height, backgroundColor: c5[1], transform: [{ skewX: `${skew}deg` }] }} />
+        {/* Region 2 — center */}
+        <View style={{ position: 'absolute', top: 0, left: width * 0.38, width: width * 0.26, height, backgroundColor: c5[2], transform: [{ skewX: `${skew + 2}deg` }] }} />
+        {/* Region 3 — upper right */}
+        <View style={{ position: 'absolute', top: 0, left: width * 0.62, width: width * 0.4, height: height * 0.45, backgroundColor: c5[3] }} />
+        {/* Region 4 — lower right */}
+        <View style={{ position: 'absolute', top: height * 0.45, left: width * 0.62, width: width * 0.4, height: height * 0.55, backgroundColor: c5[4] }} />
+        {/* Divider lines */}
+        <View style={{ position: 'absolute', top: height * 0.45, left: width * 0.6, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: divider }} />
+      </View>
+    )
+  }
+
+  // ---- 4 Lightning — banded background with zigzag bolt --------
+  if (variant === 4) {
+    // Background: 5 horizontal bands; foreground: zigzag yellow/white bolt
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'hidden' }}>
+        {[0, 1, 2, 3, 4].map(i => (
+          <View key={i} style={{
+            position: 'absolute',
+            top: (i * height) / 5,
+            left: 0,
+            right: 0,
+            height: height / 5,
+            backgroundColor: pick(i),
+          }} />
+        ))}
+        {/* Bolt — 6 alternating-angle segments */}
+        {[
+          { t: 0.00, l: 0.30, a: 38 },
+          { t: 0.20, l: 0.50, a: -42 },
+          { t: 0.40, l: 0.32, a: 38 },
+          { t: 0.55, l: 0.55, a: -42 },
+          { t: 0.70, l: 0.40, a: 38 },
+        ].map((seg, i) => (
+          <View key={i} style={{
+            position: 'absolute',
+            top: seg.t * height,
+            left: seg.l * width,
+            width: width * 0.18,
+            height: height * 0.20,
+            backgroundColor: '#fef9c3',
+            transform: [{ rotate: `${seg.a}deg` }],
+            borderRadius: 1,
+            shadowColor: '#fde047',
+            shadowOpacity: 0.8,
+            shadowRadius: 2,
+            elevation: 3,
+          }} />
+        ))}
+      </View>
+    )
+  }
+
+  // ---- 0 Shattered — colored sectors radiating from a focal point.
+  // Each shard is a thin rectangle whose center is placed along the
+  // direction vector from the focal point so its inner edge meets that
+  // point when rotated. 12 shards cover 360°. Background filled with the
+  // first palette color so any sliver gaps blend naturally.
+  const cx = width * 0.35, cy = height * 0.4
+  const shardLen = Math.hypot(width, height)
+  const shardThickness = Math.max(8, height * 0.5)
+  const NUM_SHARDS = 12
   return (
-    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">
-      {shards.map((sh, i) => (
-        <View key={i} style={{
-          position: 'absolute',
-          top: sh.top * height,
-          left: sh.left * width,
-          width: sh.w * width,
-          height: sh.h * height,
-          backgroundColor: sh.color,
-          transform: [{ rotate: `${sh.rot}deg` }],
-        }} />
-      ))}
+    <View style={{ position: 'absolute', top: 0, left: 0, width, height, overflow: 'hidden' }}>
+      <View style={{ position: 'absolute', top: 0, left: 0, width, height, backgroundColor: pick(0) }} />
+      {Array.from({ length: NUM_SHARDS }).map((_, i) => {
+        const angleDeg = (360 / NUM_SHARDS) * i
+        const rad = (angleDeg * Math.PI) / 180
+        const cxShard = cx + (shardLen / 2) * Math.cos(rad)
+        const cyShard = cy + (shardLen / 2) * Math.sin(rad)
+        return (
+          <View key={i} style={{
+            position: 'absolute',
+            left: cxShard - shardLen / 2,
+            top: cyShard - shardThickness / 2,
+            width: shardLen,
+            height: shardThickness,
+            backgroundColor: pick(i + 1),
+            transform: [{ rotate: `${angleDeg}deg` }],
+            borderTopWidth: StyleSheet.hairlineWidth,
+            borderBottomWidth: StyleSheet.hairlineWidth,
+            borderColor: divider,
+          }} />
+        )
+      })}
     </View>
   )
 }
@@ -413,18 +454,20 @@ function SlabBackground({
     )
   }
 
-  // geometric — gradient + per-pattern overlay. Mirrors the 5 GEOMETRIC_PATTERNS:
+  // geometric — full-fill multi-color regions (NOT a gradient + overlay).
+  // Web's customSlabLabelGenerator (lines 227-410) replaces the gradient with
+  // a multi-region pattern that fills the entire label. Mobile mirrors that:
   //   0 Shattered, 1 Stripes, 2 Fractured, 3 Mosaic, 4 Lightning
-  // Approximations using View overlays since RN can't render canvas patterns.
   if (slabStyle === 'custom' && layout === 'geometric') {
-    const accent = (gradient as string[])[1] || (gradient as string[])[0] || '#7c3aed'
-    const accent2 = (gradient as string[])[2] || accent
     const variant = customOverrides?.geometricPattern ?? 0
+    // Use customColors as the full palette (5+ colors); fall back to the
+    // 2-color gradient if the user hasn't picked a custom palette.
+    const palette = (gradient as string[]).length >= 2 ? (gradient as string[]) : ['#7c3aed', '#4c1d95']
     return (
-      <LinearGradient colors={colors as any} start={start} end={end} style={{ width, height, overflow: 'hidden' }}>
-        <GeometricOverlay variant={variant} width={width} height={height} c1={accent} c2={accent2} />
+      <View style={{ width, height, overflow: 'hidden' }}>
+        <GeometricBackground variant={variant} width={width} height={height} palette={palette} />
         {children}
-      </LinearGradient>
+      </View>
     )
   }
 
