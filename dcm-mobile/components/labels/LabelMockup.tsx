@@ -229,6 +229,132 @@ function angleToStartEnd(angle?: number): { start: { x: number; y: number }; end
   }
 }
 
+/** Geometric pattern overlay — one approximation per variant. Web's canvas
+ *  draws true Voronoi/Delaunay shards etc.; mobile renders a stylized
+ *  pattern that visually distinguishes each variant.
+ *    0 Shattered  — randomized rotated rectangular shards
+ *    1 Stripes    — parallel diagonal stripes
+ *    2 Fractured  — angled crack lines radiating from center
+ *    3 Mosaic     — small grid of squares in alternating accent colors
+ *    4 Lightning  — zigzag bolt across the label */
+function GeometricOverlay({ variant, width, height, c1, c2 }: { variant: number; width: number; height: number; c1: string; c2: string }) {
+  const opacity = 0.16
+
+  if (variant === 1) {
+    // Stripes: parallel diagonal stripes
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">
+        {Array.from({ length: 14 }).map((_, i) => (
+          <View key={i} style={{
+            position: 'absolute',
+            top: -height,
+            left: (i * width * 1.6) / 14 - width * 0.4,
+            width: width * 0.05,
+            height: height * 3,
+            backgroundColor: c1,
+            transform: [{ rotate: '22deg' }],
+          }} />
+        ))}
+      </View>
+    )
+  }
+
+  if (variant === 3) {
+    // Mosaic: small alternating squares in a grid
+    const cell = Math.max(4, Math.round(height * 0.18))
+    const cols = Math.ceil(width / cell)
+    const rows = Math.ceil(height / cell)
+    const squares: React.ReactNode[] = []
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if ((r + c) % 2 === 0) {
+          squares.push(
+            <View key={`${r}-${c}`} style={{
+              position: 'absolute',
+              top: r * cell,
+              left: c * cell,
+              width: cell - 1,
+              height: cell - 1,
+              backgroundColor: (r + c) % 4 === 0 ? c1 : c2,
+            }} />
+          )
+        }
+      }
+    }
+    return <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">{squares}</View>
+  }
+
+  if (variant === 4) {
+    // Lightning: a zig-zag bolt running across the label
+    const segments = 6
+    const segW = width / segments
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: opacity + 0.05 }} pointerEvents="none">
+        {Array.from({ length: segments }).map((_, i) => {
+          const angle = i % 2 === 0 ? 28 : -28
+          return (
+            <View key={i} style={{
+              position: 'absolute',
+              top: height * 0.3,
+              left: i * segW,
+              width: segW * 1.05,
+              height: height * 0.16,
+              backgroundColor: c1,
+              transform: [{ rotate: `${angle}deg` }],
+              borderRadius: 1,
+            }} />
+          )
+        })}
+      </View>
+    )
+  }
+
+  if (variant === 2) {
+    // Fractured: crack lines radiating from a point
+    const lines = [-30, -10, 10, 30, 50, 70, -50, -70]
+    return (
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">
+        {lines.map((deg, i) => (
+          <View key={i} style={{
+            position: 'absolute',
+            top: height / 2 - 1,
+            left: -width * 0.3,
+            width: width * 1.6,
+            height: 1.5,
+            backgroundColor: i % 2 === 0 ? c1 : c2,
+            transform: [{ rotate: `${deg}deg` }],
+          }} />
+        ))}
+      </View>
+    )
+  }
+
+  // variant 0 (Shattered) — randomized rotated rectangular shards
+  const shards = [
+    { top: 0.05, left: 0.0, w: 0.3, h: 0.4, rot: 18, color: c1 },
+    { top: 0.0, left: 0.4, w: 0.35, h: 0.3, rot: -22, color: c2 },
+    { top: 0.55, left: 0.05, w: 0.4, h: 0.35, rot: -10, color: c1 },
+    { top: 0.45, left: 0.5, w: 0.5, h: 0.45, rot: 14, color: c2 },
+    { top: 0.15, left: 0.75, w: 0.3, h: 0.35, rot: 32, color: c1 },
+    { top: 0.7, left: 0.65, w: 0.3, h: 0.3, rot: -28, color: c1 },
+  ]
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity }} pointerEvents="none">
+      {shards.map((sh, i) => (
+        <View key={i} style={{
+          position: 'absolute',
+          top: sh.top * height,
+          left: sh.left * width,
+          width: sh.w * width,
+          height: sh.h * height,
+          backgroundColor: sh.color,
+          transform: [{ rotate: `${sh.rot}deg` }],
+        }} />
+      ))}
+    </View>
+  )
+}
+
 /** Layout-aware background. Renders the appropriate visual for each
  *  layoutStyle on top of the slab dimensions. Children are positioned over
  *  the background. Mirrors web's slabLabelGenerator + customSlabLabelGenerator
@@ -287,25 +413,16 @@ function SlabBackground({
     )
   }
 
-  // geometric — gradient + diagonal stripe overlay (approximate of canvas pattern)
+  // geometric — gradient + per-pattern overlay. Mirrors the 5 GEOMETRIC_PATTERNS:
+  //   0 Shattered, 1 Stripes, 2 Fractured, 3 Mosaic, 4 Lightning
+  // Approximations using View overlays since RN can't render canvas patterns.
   if (slabStyle === 'custom' && layout === 'geometric') {
-    const stripeCount = 12
-    const stripeColor = (gradient as string[])[1] || '#7c3aed'
+    const accent = (gradient as string[])[1] || (gradient as string[])[0] || '#7c3aed'
+    const accent2 = (gradient as string[])[2] || accent
+    const variant = customOverrides?.geometricPattern ?? 0
     return (
       <LinearGradient colors={colors as any} start={start} end={end} style={{ width, height, overflow: 'hidden' }}>
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.15 }} pointerEvents="none">
-          {Array.from({ length: stripeCount }).map((_, i) => (
-            <View key={i} style={{
-              position: 'absolute',
-              top: -height,
-              left: (i * (width * 1.6)) / stripeCount - width * 0.4,
-              width: width * 0.06,
-              height: height * 3,
-              backgroundColor: stripeColor,
-              transform: [{ rotate: '20deg' }],
-            }} />
-          ))}
-        </View>
+        <GeometricOverlay variant={variant} width={width} height={height} c1={accent} c2={accent2} />
         {children}
       </LinearGradient>
     )
@@ -330,9 +447,11 @@ function SlabFrontInline({ width, labelProps, slabStyle, customOverrides }: { wi
   const gradeColor = dark ? '#ffffff' : '#7c3aed'
   const conditionColor = dark ? 'rgba(255,255,255,0.8)' : '#6b46c1'
 
-  // Web's font sizes are cqw — scale to width.
+  // Web's font sizes are cqw — scale to width. Slightly larger than web's
+  // cqw values since RN can't auto-shrink to fit the container; we leave
+  // headroom by allowing the name to wrap to 2 lines.
   const nameLen = (labelProps?.displayName || '').length
-  const namePct = nameLen <= 14 ? 0.065 : nameLen <= 20 ? 0.055 : nameLen <= 30 ? 0.048 : 0.042
+  const namePct = nameLen <= 14 ? 0.072 : nameLen <= 20 ? 0.062 : nameLen <= 30 ? 0.054 : 0.048
 
   const condition = labelProps?.isAlteredAuthentic && labelProps?.grade === null
     ? 'AUTHENTIC' : (labelProps?.condition || '').toUpperCase()
@@ -352,23 +471,24 @@ function SlabFrontInline({ width, labelProps, slabStyle, customOverrides }: { wi
           />
         </View>
 
-        {/* CENTER: card info */}
+        {/* CENTER: card info — name wraps to 2 lines like web's
+            WebkitLineClamp:2; other lines stay single-line. */}
         <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: width * 0.015 }}>
-          <Text style={{ fontSize: width * namePct, lineHeight: width * namePct * 1.15, fontWeight: '600', color: nameColor }} numberOfLines={1}>
+          <Text style={{ fontSize: width * namePct, lineHeight: width * namePct * 1.05, fontWeight: '600', color: nameColor }} numberOfLines={2}>
             {labelProps?.displayName || 'Card Name'}
           </Text>
           {!!labelProps?.setLineText && (
-            <Text style={{ fontSize: width * namePct * 0.76, lineHeight: width * namePct * 0.76 * 1.15, color: contextColor }} numberOfLines={1}>
+            <Text style={{ fontSize: width * namePct * 0.76, lineHeight: width * namePct * 0.76 * 1.1, color: contextColor }} numberOfLines={1}>
               {labelProps.setLineText}
             </Text>
           )}
           {labelProps && labelProps.features.length > 0 && (
-            <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.15, fontWeight: '500', color: featuresColor }} numberOfLines={1}>
+            <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.1, fontWeight: '500', color: featuresColor }} numberOfLines={1}>
               {labelProps.features.join(' • ')}
             </Text>
           )}
           {!!labelProps?.serial && (
-            <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.15, fontFamily: 'Courier', color: serialColor }} numberOfLines={1}>
+            <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.1, fontFamily: 'Courier', color: serialColor }} numberOfLines={1}>
               {labelProps.serial}
             </Text>
           )}

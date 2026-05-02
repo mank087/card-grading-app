@@ -839,7 +839,7 @@ export default function LabelStudioScreen() {
                       labelType={labelType.id}
                       cardImageUrl={frontUrl}
                       cardBackImageUrl={backUrl}
-                      width={210}
+                      width={260}
                       labelProps={inlineLabelProps}
                       side={side}
                       emblems={galleryEmblems}
@@ -892,7 +892,7 @@ export default function LabelStudioScreen() {
                 labelType="custom"
                 cardImageUrl={frontUrl}
                 cardBackImageUrl={backUrl}
-                width={210}
+                width={260}
                 labelProps={inlineLabelProps}
                 side={side}
                 emblems={galleryEmblems}
@@ -1251,7 +1251,7 @@ export default function LabelStudioScreen() {
                 labelType="custom"
                 cardImageUrl={frontUrl}
                 cardBackImageUrl={backUrl}
-                width={210}
+                width={260}
                 labelProps={inlineLabelProps}
                 side={side}
                 emblems={galleryEmblems}
