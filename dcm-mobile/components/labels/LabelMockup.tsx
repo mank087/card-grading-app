@@ -137,22 +137,29 @@ function DenseLogoGrid({ width, height }: { width: number; height: number }) {
 // ============================================================================
 function SlabMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?: string | null; cardImageUrl?: string | null; width: number }) {
   const height = (width * 460) / 280
+  // Slots use absolute pixel positions (not percentages) computed from the
+  // measured photo coordinates. RN's percentage positioning + image
+  // resizeMode:'contain' has known platform quirks where the actual rendered
+  // bounds don't match what the slot percentages assume — using explicit
+  // pixels eliminates the ambiguity entirely.
+  const labelTop = height * 0.054, labelLeft = width * 0.089, labelW = width * 0.814, labelH = height * 0.152
+  const cardTop = height * 0.283, cardLeft = width * 0.118, cardW = width * 0.757, cardH = height * 0.609
   return (
     <View style={[s.holder, { width, height }]}>
-      <Image source={require('@/assets/images/graded-card-slab.png')} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
+      <Image source={require('@/assets/images/graded-card-slab.png')} style={{ width, height }} resizeMode="contain" />
 
       {/* Label slot — fills the gray rectangle exactly */}
-      <View style={[s.slot, { top: '5.4%', left: '8.9%', width: '81.4%', height: '15.2%' }]}>
+      <View style={[s.slot, { top: labelTop, left: labelLeft, width: labelW, height: labelH }]}>
         {labelImageUrl
-          ? <Image source={{ uri: labelImageUrl }} style={s.fill} resizeMode="contain" />
-          : <View style={[s.fill, { backgroundColor: Colors.gray[200] }]} />}
+          ? <Image source={{ uri: labelImageUrl }} style={{ width: labelW, height: labelH }} resizeMode="contain" />
+          : <View style={{ width: labelW, height: labelH, backgroundColor: Colors.gray[200] }} />}
       </View>
 
       {/* Card window — fills the white rectangle exactly */}
-      <View style={[s.slot, { top: '28.3%', left: '11.8%', width: '75.7%', height: '60.9%' }]}>
+      <View style={[s.slot, { top: cardTop, left: cardLeft, width: cardW, height: cardH }]}>
         {cardImageUrl
-          ? <Image source={{ uri: cardImageUrl }} style={s.fill} resizeMode="contain" />
-          : <View style={[s.fill, { backgroundColor: Colors.gray[100] }]} />}
+          ? <Image source={{ uri: cardImageUrl }} style={{ width: cardW, height: cardH }} resizeMode="contain" />
+          : <View style={{ width: cardW, height: cardH, backgroundColor: Colors.gray[100] }} />}
       </View>
     </View>
   )
@@ -168,19 +175,21 @@ function SlabMockup({ labelImageUrl, cardImageUrl, width }: { labelImageUrl?: st
 function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back' }) {
   const height = (width * 457) / 314
   const labelWidth = width * 0.65
+  const cardTop = height * 0.13, cardLeft = width * 0.11, cardW = width * 0.78, cardH = height * 0.76
+  const labelLeft = width * 0.175
   return (
     <View style={[s.holder, { width, height }]}>
-      <Image source={require('@/assets/images/mag-one-touch-DCM.png')} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
+      <Image source={require('@/assets/images/mag-one-touch-DCM.png')} style={{ width, height }} resizeMode="contain" />
 
       {/* Card window */}
-      <View style={[s.slot, { top: '13%', left: '11%', width: '78%', height: '76%' }]}>
+      <View style={[s.slot, { top: cardTop, left: cardLeft, width: cardW, height: cardH }]}>
         {cardImageUrl
-          ? <Image source={{ uri: cardImageUrl }} style={s.fill} resizeMode="contain" />
-          : <View style={[s.fill, { backgroundColor: Colors.gray[100] }]} />}
+          ? <Image source={{ uri: cardImageUrl }} style={{ width: cardW, height: cardH }} resizeMode="contain" />
+          : <View style={{ width: cardW, height: cardH, backgroundColor: Colors.gray[100] }} />}
       </View>
 
       {/* Label folded over top edge */}
-      <View style={[s.slot, { top: '0%', left: '17.5%', width: '65%' }]}>
+      <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
         <View style={s.foldCrease} />
         {side === 'front'
           ? <OneTouchLabelFront width={labelWidth} labelProps={labelProps} />
@@ -200,27 +209,29 @@ function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUr
 function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back' }) {
   const height = (width * 588) / 451
   const labelWidth = width * (variant === 'foldover' ? 0.29 : 0.58)
+  const cardTop = height * 0.045, cardLeft = width * 0.07, cardW = width * 0.86, cardH = height * 0.90
+  const labelLeft = width * (variant === 'foldover' ? 0.355 : 0.21)
   return (
     <View style={[s.holder, { width, height }]}>
-      <Image source={require('@/assets/images/top-loader-dcm.png')} style={StyleSheet.absoluteFill as any} resizeMode="contain" />
+      <Image source={require('@/assets/images/top-loader-dcm.png')} style={{ width, height }} resizeMode="contain" />
 
       {/* Card window */}
-      <View style={[s.slot, { top: '4.5%', left: '7%', width: '86%', height: '90%' }]}>
+      <View style={[s.slot, { top: cardTop, left: cardLeft, width: cardW, height: cardH }]}>
         {cardImageUrl
-          ? <Image source={{ uri: cardImageUrl }} style={[s.fill, { borderRadius: 2 }]} resizeMode="contain" />
-          : <View style={[s.fill, { backgroundColor: Colors.gray[100] }]} />}
+          ? <Image source={{ uri: cardImageUrl }} style={{ width: cardW, height: cardH, borderRadius: 2 }} resizeMode="contain" />
+          : <View style={{ width: cardW, height: cardH, backgroundColor: Colors.gray[100] }} />}
       </View>
 
       {/* Label */}
       {variant === 'foldover' ? (
-        <View style={[s.slot, { top: '0%', left: '35.5%', width: '29%' }]}>
+        <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
           <View style={s.foldCrease} />
           {side === 'front'
             ? <FoldoverLabelFront width={labelWidth} labelProps={labelProps} />
             : <FoldoverLabelBack width={labelWidth} />}
         </View>
       ) : (
-        <View style={[s.slot, { top: '0%', left: '21%', width: '58%' }]}>
+        <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
           {side === 'front'
             ? <ToploaderLabelFront width={labelWidth} labelProps={labelProps} />
             : <ToploaderLabelBack width={labelWidth} />}
