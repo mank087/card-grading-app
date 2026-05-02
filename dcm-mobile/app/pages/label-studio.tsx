@@ -785,32 +785,22 @@ export default function LabelStudioScreen() {
               </View>
             </View>
 
-            {/* ============ Slab Preview ============ */}
+            {/* ============ Custom Slab Preview ============ */}
+            {/* Uses LabelMockup (native inline) so the DCM logo, colors, and
+                emblems exactly match what gets exported. The 'custom' labelType
+                pipes customOverrides through so this updates live as the user
+                edits gradient colors below. */}
             <View style={s.section}>
-              <View style={s.slabContainer}>
-                <Image
-                  source={require('@/assets/images/graded-card-slab.png')}
-                  style={s.slabImage}
-                  resizeMode="contain"
-                />
-                {/* Label in slab slot */}
-                <View style={s.slabLabelSlot}>
-                  {labelPreviewUrl ? (
-                    <Image source={{ uri: labelPreviewUrl }} style={s.slabLabel} resizeMode="contain" />
-                  ) : (
-                    <View style={[s.slabLabel, { backgroundColor: Colors.gray[200] }]} />
-                  )}
-                </View>
-                {/* Card image */}
-                <View style={s.slabCardSlot}>
-                  {frontUrl ? (
-                    <Image source={{ uri: frontUrl }} style={s.slabCardImage} resizeMode="contain" />
-                  ) : (
-                    <View style={s.slabCardImage} />
-                  )}
-                </View>
-              </View>
-              {/* Side toggle */}
+              <LabelMockup
+                labelType="custom"
+                cardImageUrl={frontUrl}
+                cardBackImageUrl={backUrl}
+                width={210}
+                labelProps={inlineLabelProps}
+                side={side}
+                emblems={galleryEmblems}
+                customOverrides={customOverrides}
+              />
               <View style={s.sideToggle}>
                 <TouchableOpacity
                   style={[s.sideBtn, side === 'front' && s.sideBtnActive]}
@@ -1115,27 +1105,6 @@ export default function LabelStudioScreen() {
               )}
             </View>
 
-            {/* ============ Style Toggle ============ */}
-            {!isCustomLayout && !activeCardColorStyle && (
-              <View style={s.section}>
-                <Text style={s.sectionTitle}>Style</Text>
-                <View style={s.toggleRow}>
-                  <TouchableOpacity
-                    style={[s.toggleBtn, config.style === 'modern' && s.toggleBtnActive]}
-                    onPress={() => updateConfig({ style: 'modern' })}
-                  >
-                    <Text style={[s.toggleBtnText, config.style === 'modern' && s.toggleBtnTextActive]}>Modern</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[s.toggleBtn, config.style === 'traditional' && s.toggleBtnActive]}
-                    onPress={() => updateConfig({ style: 'traditional' })}
-                  >
-                    <Text style={[s.toggleBtnText, config.style === 'traditional' && s.toggleBtnTextActive]}>Traditional</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
-
             {/* ============ Border Controls ============ */}
             <View style={s.section}>
               <Text style={s.sectionTitle}>Border</Text>
@@ -1179,6 +1148,37 @@ export default function LabelStudioScreen() {
                   </View>
                 </View>
               )}
+            </View>
+
+            {/* ============ Custom Slab Preview (duplicate) ============ */}
+            {/* Second preview below border so users can edit colors/border and
+                see the result without scrolling back to the top. */}
+            <View style={s.section}>
+              <Text style={[s.sectionTitle, { marginBottom: 8 }]}>Live Preview</Text>
+              <LabelMockup
+                labelType="custom"
+                cardImageUrl={frontUrl}
+                cardBackImageUrl={backUrl}
+                width={210}
+                labelProps={inlineLabelProps}
+                side={side}
+                emblems={galleryEmblems}
+                customOverrides={customOverrides}
+              />
+              <View style={s.sideToggle}>
+                <TouchableOpacity
+                  style={[s.sideBtn, side === 'front' && s.sideBtnActive]}
+                  onPress={() => setSide('front')}
+                >
+                  <Text style={[s.sideBtnText, side === 'front' && s.sideBtnTextActive]}>Front</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.sideBtn, side === 'back' && s.sideBtnActive]}
+                  onPress={() => setSide('back')}
+                >
+                  <Text style={[s.sideBtnText, side === 'back' && s.sideBtnTextActive]}>Back</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* ============ Label Text ============ */}
@@ -1478,20 +1478,23 @@ const s = StyleSheet.create({
   sideBtnText: { fontSize: 11, fontWeight: '600', color: Colors.gray[500] },
   sideBtnTextActive: { color: '#fff' },
 
-  // Dimension presets
-  dimGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  dimTile: { width: (SCREEN_W - 24 - 32 - 6) / 2, borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200], paddingHorizontal: 8, paddingVertical: 6, backgroundColor: '#fff' },
+  // Dimension presets — 2 columns × 2 rows. Each tile takes ~48% of section
+  // content width (50% minus half the 6px gap). With 4 presets they wrap to
+  // exactly 2 rows of 2.
+  dimGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'space-between' },
+  dimTile: { width: '48.5%', borderRadius: 6, borderWidth: 1, borderColor: Colors.gray[200], paddingHorizontal: 10, paddingVertical: 10, backgroundColor: '#fff', minHeight: 56 },
   dimTileActive: { borderColor: Colors.purple[600], backgroundColor: '#faf5ff' },
-  dimTileName: { fontSize: 11, fontWeight: '600', color: Colors.gray[600] },
+  dimTileName: { fontSize: 13, fontWeight: '600', color: Colors.gray[700] },
   dimTileNameActive: { color: Colors.purple[700] },
-  dimTileSize: { fontSize: 9, color: Colors.gray[400], marginTop: 1 },
+  dimTileSize: { fontSize: 10, color: Colors.gray[400], marginTop: 3 },
 
-  // Theme grid
+  // Theme grid — 4 columns × 2 rows (with the 7 remaining presets after
+  // crimson removal: row 1 has 4, row 2 has 3).
   themeGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  themeTile: { width: (SCREEN_W - 24 - 32 - 24) / 4, borderRadius: 8, borderWidth: 2, borderColor: Colors.gray[200], overflow: 'hidden' },
+  themeTile: { width: '23.5%', borderRadius: 8, borderWidth: 2, borderColor: Colors.gray[200], overflow: 'hidden' },
   themeTileActive: { borderColor: Colors.purple[600], borderWidth: 2 },
   themeSwatch: { width: '100%', aspectRatio: 1, borderRadius: 0 },
-  themeLabel: { fontSize: 8, color: Colors.gray[600], textAlign: 'center', paddingVertical: 2, backgroundColor: '#fff' },
+  themeLabel: { fontSize: 9, color: Colors.gray[600], textAlign: 'center', paddingVertical: 3, backgroundColor: '#fff' },
 
   // Layout styles (card colors + custom)
   layoutSection: { marginTop: 14 },
@@ -1505,13 +1508,15 @@ const s = StyleSheet.create({
   paletteDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[300] },
   paletteHint: { fontSize: 9, color: Colors.gray[400], marginLeft: 4 },
 
-  // Custom colors
+  // Custom colors — swatches are square aspect-ratio tiles so each one is a
+  // visible, clearly tappable color box (was 40px tall with flex:1, which
+  // collapsed to thin lines when 5 colors were shown).
   customSection: { marginTop: 14 },
   customHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  customSwatches: { flexDirection: 'row', gap: 8 },
-  customSwatch: { flex: 1, height: 40, borderRadius: 8, borderWidth: 2, borderColor: Colors.gray[300], justifyContent: 'center', alignItems: 'center' },
-  customSwatchNum: { fontSize: 10, fontWeight: '800', color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  customHint: { fontSize: 9, color: Colors.gray[400], marginTop: 4 },
+  customSwatches: { flexDirection: 'row', gap: 10 },
+  customSwatch: { flex: 1, aspectRatio: 1, minHeight: 56, maxHeight: 80, borderRadius: 10, borderWidth: 2, borderColor: Colors.gray[300], justifyContent: 'center', alignItems: 'center' },
+  customSwatchNum: { fontSize: 14, fontWeight: '800', color: '#fff', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  customHint: { fontSize: 10, color: Colors.gray[400], marginTop: 6 },
 
   // Style toggle
   toggleRow: { flexDirection: 'row', gap: 8 },

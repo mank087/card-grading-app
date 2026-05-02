@@ -14,7 +14,6 @@ export const COLOR_PRESETS: ColorPreset[] = [
   { id: 'modern-dark', name: 'Modern Dark', gradientStart: '#1a1625', gradientEnd: '#2d1f47' },
   { id: 'traditional', name: 'Traditional Light', gradientStart: '#f9fafb', gradientEnd: '#ffffff' },
   { id: 'royal-blue', name: 'Royal Blue', gradientStart: '#1e3a5f', gradientEnd: '#0f2347' },
-  { id: 'crimson', name: 'Crimson Red', gradientStart: '#3c1a1a', gradientEnd: '#241010' },
   { id: 'rainbow', name: 'Rainbow', gradientStart: '#ff0000', gradientEnd: '#0000ff', isRainbow: true },
   { id: 'card-colors', name: 'Card Colors', gradientStart: '#7c3aed', gradientEnd: '#4c1d95', isCardColors: true },
   { id: 'custom', name: 'Custom', gradientStart: '#1a1625', gradientEnd: '#2d1f47', isCustom: true },
