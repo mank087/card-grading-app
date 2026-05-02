@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useFocusEffect } from '@react-navigation/native'
 import { useAuth } from '@/contexts/AuthContext'
 import { supabase } from '@/lib/supabase'
 
@@ -68,37 +69,65 @@ export function useLabelStyle() {
     })
   }, [])
 
-  // Load from Supabase directly (RLS lets users read their own row in user_credits)
+  // Fetch the user's current saved label_style + custom_label_styles from
+  // Supabase. Wrapped so we can call it on initial mount AND on screen focus
+  // — without a refetch, a custom style saved on one screen (Label Studio)
+  // wouldn't appear in the picker on another screen (Collection) until the
+  // app was fully reloaded, since each useLabelStyle call mounts its own
+  // local state.
+  const fetchRef = useRef<(() => void) | null>(null)
   useEffect(() => {
     const userId = user?.id
     if (!userId) { setLoading(false); return }
 
     let cancelled = false
-    supabase
-      .from('user_credits')
-      .select('label_style, custom_label_styles')
-      .eq('user_id', userId)
-      .maybeSingle()
-      .then(({ data, error }) => {
-        if (cancelled) return
-        if (error) {
-          console.warn('[useLabelStyle] supabase fetch error:', error.message)
+    const fetchStyles = () => {
+      supabase
+        .from('user_credits')
+        .select('label_style, custom_label_styles')
+        .eq('user_id', userId)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (cancelled) return
+          if (error) {
+            console.warn('[useLabelStyle] supabase fetch error:', error.message)
+            setLoading(false)
+            return
+          }
+          const next = {
+            labelStyle: ((data?.label_style as LabelStyleId) || 'modern'),
+            customStyles: (Array.isArray(data?.custom_label_styles) ? data.custom_label_styles : []) as SavedCustomStyle[],
+          }
+          console.log('[useLabelStyle] loaded:', next.labelStyle, `(${next.customStyles.length} custom)`)
+          setLabelStyle(next.labelStyle)
+          setCustomStyles(next.customStyles)
+          AsyncStorage.setItem(CACHE_KEY, JSON.stringify(next))
           setLoading(false)
-          return
-        }
-        const next = {
-          labelStyle: ((data?.label_style as LabelStyleId) || 'modern'),
-          customStyles: (Array.isArray(data?.custom_label_styles) ? data.custom_label_styles : []) as SavedCustomStyle[],
-        }
-        console.log('[useLabelStyle] loaded:', next.labelStyle, `(${next.customStyles.length} custom)`)
-        setLabelStyle(next.labelStyle)
-        setCustomStyles(next.customStyles)
-        AsyncStorage.setItem(CACHE_KEY, JSON.stringify(next))
-        setLoading(false)
-      })
+        })
+    }
 
-    return () => { cancelled = true }
+    fetchRef.current = fetchStyles
+    fetchStyles()
+    return () => { cancelled = true; fetchRef.current = null }
   }, [user?.id])
+
+  // Refetch when the screen using this hook gains focus — picks up new
+  // styles saved in another screen since this one was last visible.
+  useFocusEffect(
+    useCallback(() => {
+      // Re-read cache first for instant update, then fetch from server.
+      AsyncStorage.getItem(CACHE_KEY).then(cached => {
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached)
+            if (Array.isArray(parsed.customStyles)) setCustomStyles(parsed.customStyles)
+            if (parsed.labelStyle) setLabelStyle(parsed.labelStyle)
+          } catch {}
+        }
+      })
+      fetchRef.current?.()
+    }, []),
+  )
 
   const switchStyle = useCallback(async (id: LabelStyleId) => {
     setLabelStyle(id)
