@@ -30,6 +30,7 @@ import ColorPickerModal from '@/components/labels/ColorPickerModal'
 import LabelMockup, { type LabelTypeId } from '@/components/labels/LabelMockup'
 import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
+import { useUserEmblems } from '@/hooks/useUserEmblems'
 
 const { width: SCREEN_W } = Dimensions.get('window')
 
@@ -98,10 +99,12 @@ export default function LabelStudioScreen() {
   const params = useLocalSearchParams<{ cardId?: string }>()
   const router = useRouter()
   const { session } = useAuth()
+  const userEmblems = useUserEmblems()
   const [cards, setCards] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedCard, setSelectedCard] = useState<any | null>(null)
   const [frontUrl, setFrontUrl] = useState<string | null>(null)
+  const [backUrl, setBackUrl] = useState<string | null>(null)
   const [cardColors, setCardColors] = useState<CardColors | null>(null)
   const [search, setSearch] = useState('')
 
@@ -193,11 +196,18 @@ export default function LabelStudioScreen() {
     setFieldsInitialized(selectedCard.id)
   }, [selectedCard, fieldsInitialized])
 
-  // Load card image when selected
+  // Load card image when selected — both front and back so the gallery's
+  // side toggle can flip the card photo too.
   useEffect(() => {
-    if (!selectedCard?.front_path) { setFrontUrl(null); return }
+    if (!selectedCard?.front_path) { setFrontUrl(null); setBackUrl(null); return }
     supabase.storage.from('cards').createSignedUrl(selectedCard.front_path, 3600)
       .then(({ data }) => { if (data?.signedUrl) setFrontUrl(data.signedUrl) })
+    if (selectedCard?.back_path) {
+      supabase.storage.from('cards').createSignedUrl(selectedCard.back_path, 3600)
+        .then(({ data }) => { if (data?.signedUrl) setBackUrl(data.signedUrl) })
+    } else {
+      setBackUrl(null)
+    }
   }, [selectedCard])
 
   // Load card colors
@@ -257,8 +267,25 @@ export default function LabelStudioScreen() {
       grade: typeof labelCardData.grade === 'number' ? labelCardData.grade : null,
       condition: labelCardData.condition || '',
       isAlteredAuthentic: false,
+      subScores: labelCardData.subScores,
+      qrUrl: labelCardData.qrUrl,
     }
   }, [labelCardData])
+
+  // Emblem flags for the slab back label — useUserEmblems combines the
+  // user's entitlement (founder/VIP/card-lover) with which they've selected
+  // in the Label Badges picker.
+  const galleryEmblems = useMemo(() => ({
+    showFounderEmblem: !!userEmblems.showFounder,
+    showVipEmblem: !!userEmblems.showVip,
+    showCardLoversEmblem: !!userEmblems.showCardLovers,
+  }), [userEmblems.showFounder, userEmblems.showVip, userEmblems.showCardLovers])
+
+  // Custom slab color overrides — pipe the customizer's current gradient into
+  // the gallery's "custom" tile so it updates live as the user edits colors.
+  const customOverrides = useMemo(() => ({
+    labelGradient: [config.gradientStart, config.gradientEnd, config.gradientStart],
+  }), [config.gradientStart, config.gradientEnd])
 
   const labelConfig = useMemo<LabelConfig>(() => ({
     width: config.width ?? 2.8,
@@ -713,11 +740,13 @@ export default function LabelStudioScreen() {
                     {/* Holder mockup */}
                     <LabelMockup
                       labelType={labelType.id}
-                      labelImageUrl={labelPreviewUrl}
                       cardImageUrl={frontUrl}
+                      cardBackImageUrl={backUrl}
                       width={210}
                       labelProps={inlineLabelProps}
                       side={side}
+                      emblems={galleryEmblems}
+                      customOverrides={customOverrides}
                     />
 
                     {/* Side toggle (front/back) — same as designer below */}
