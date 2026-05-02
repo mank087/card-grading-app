@@ -612,20 +612,61 @@ export async function processCardLoverRenewal(
     return { success: false, creditsAdded: 0, bonusCredits: 0, error: 'User credits not found' };
   }
 
-  // Only process for monthly subscriptions - annual doesn't renew monthly
-  if (credits.card_lover_plan !== 'monthly') {
-    // For annual, just update the period end
-    await supabase
+  // ANNUAL: a fresh year of access starts on each yearly renewal — credit
+  // the user with another full annual allotment (840 base + 60 bonus = 900
+  // credits), matching what activateCardLoverSubscription gives on initial
+  // signup. Without this, annual subscribers were getting charged $449 with
+  // no new credits applied.
+  if (credits.card_lover_plan === 'annual') {
+    const ANNUAL_BASE = 840;
+    const ANNUAL_BONUS = 60;
+    const annualTotal = ANNUAL_BASE + ANNUAL_BONUS; // 900
+    const newAnnualBalance = credits.balance + annualTotal;
+
+    const { error: annualUpdateError } = await supabase
       .from('user_credits')
       .update({
+        balance: newAnnualBalance,
+        total_purchased: credits.total_purchased + annualTotal,
         card_lover_current_period_end: options.currentPeriodEnd.toISOString(),
         card_lover_months_active: 12, // Reset to 12 for annual renewal
       })
       .eq('user_id', userId);
 
-    return { success: true, creditsAdded: 0, bonusCredits: 0 };
+    if (annualUpdateError) {
+      console.error('Error processing annual Card Lovers renewal:', annualUpdateError);
+      return { success: false, creditsAdded: 0, bonusCredits: 0, error: 'Database error' };
+    }
+
+    await supabase.from('subscription_events').insert({
+      user_id: userId,
+      event_type: 'renewed',
+      plan: 'annual',
+      credits_added: ANNUAL_BASE,
+      bonus_credits: ANNUAL_BONUS,
+      stripe_subscription_id: options.subscriptionId,
+      stripe_invoice_id: options.stripeInvoiceId,
+      metadata: { annual_renewal: true },
+    });
+
+    await supabase.from('credit_transactions').insert({
+      user_id: userId,
+      type: 'purchase',
+      amount: annualTotal,
+      balance_after: newAnnualBalance,
+      description: 'Card Lovers Annual renewal - 900 credits (840 + 60 bonus)',
+      metadata: {
+        subscription: 'card_lovers',
+        plan: 'annual',
+        base_credits: ANNUAL_BASE,
+        bonus_credits: ANNUAL_BONUS,
+      },
+    });
+
+    return { success: true, creditsAdded: ANNUAL_BASE, bonusCredits: ANNUAL_BONUS };
   }
 
+  // MONTHLY: 70 credits + loyalty bonuses at month 3, 6, 9, 12.
   const creditsToAdd = 70;
   const newMonthsActive = credits.card_lover_months_active + 1;
 
