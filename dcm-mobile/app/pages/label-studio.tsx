@@ -302,6 +302,7 @@ export default function LabelStudioScreen() {
   }, [config.gradientStart, config.gradientEnd, config.customColors, config.layoutStyle, config.colorPreset, config.topEdgeGradient, config.borderEnabled, config.borderColor, config.gradientAngle, config.geometricPattern])
 
   const labelConfig = useMemo<LabelConfig>(() => ({
+    preset: config.preset || 'dcm',
     width: config.width ?? 2.8,
     height: config.height ?? 0.8,
     colorPreset: config.colorPreset,
@@ -315,6 +316,7 @@ export default function LabelStudioScreen() {
     gradientAngle: config.gradientAngle,
     geometricPattern: config.geometricPattern,
     customColors: config.customColors,
+    layoutStyle: config.layoutStyle,
   }), [config])
 
   // ---- Handlers ----
@@ -716,10 +718,13 @@ export default function LabelStudioScreen() {
 
   return (
     <View style={s.container}>
-      {/* Hidden label renderer */}
+      {/* Hidden label renderer — loads /label-preview which uses the same
+          renderFrontCanvas / renderBackCanvas as the download PDF, so the
+          live preview matches the downloaded file exactly. */}
       <LabelWebRenderer
         config={labelConfig}
         cardData={labelCardData}
+        cardId={selectedCard?.id}
         side={side}
         onRender={setLabelPreviewUrl}
       />
