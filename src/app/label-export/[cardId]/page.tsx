@@ -567,7 +567,7 @@ export default function LabelExportPage() {
     return (
       <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif', maxWidth: 480, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <img src="/dcm-logo.png" alt="DCM Grading" style={{ width: 56, height: 56, margin: '0 auto 12px', display: 'block' }} />
+          <img src="/DCM-logo.png" alt="DCM Grading" style={{ width: 56, height: 56, margin: '0 auto 12px', display: 'block' }} />
           <h1 style={{ fontSize: 18, fontWeight: 700, color: '#111827', margin: 0 }}>Label Download</h1>
         </div>
         {!error && doneFiles.length === 0 && (
