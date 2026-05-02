@@ -624,48 +624,21 @@ export default function CardDetailScreen() {
                       if (!cur) return
                       setExportActionBusy('download')
                       try {
-                        if (Platform.OS === 'android') {
-                          // Storage Access Framework — works in Expo Go without manifest
-                          // edits. First save asks user to pick a folder (e.g. Downloads);
-                          // the choice persists so future saves are silent.
-                          const SAF = (FileSystem as any).StorageAccessFramework
-                          let dirUri = await AsyncStorage.getItem('dcm_label_save_dir')
-                          if (!dirUri) {
-                            const perm = await SAF.requestDirectoryPermissionsAsync()
-                            if (!perm.granted) {
-                              Alert.alert('Cancelled', 'Pick a folder (e.g. Downloads) to save labels.')
-                              setExportActionBusy(null)
-                              return
-                            }
-                            dirUri = perm.directoryUri as string
-                            await AsyncStorage.setItem('dcm_label_save_dir', dirUri)
-                          }
-                          let savedUri: string
-                          try {
-                            savedUri = await SAF.createFileAsync(dirUri, cur.name, cur.mime)
-                          } catch {
-                            // Folder may have been deleted/permission revoked — re-prompt once
-                            await AsyncStorage.removeItem('dcm_label_save_dir')
-                            const reperm = await SAF.requestDirectoryPermissionsAsync()
-                            if (!reperm.granted) throw new Error('Save folder unavailable')
-                            await AsyncStorage.setItem('dcm_label_save_dir', reperm.directoryUri)
-                            savedUri = await SAF.createFileAsync(reperm.directoryUri, cur.name, cur.mime)
-                          }
-                          // Read base64 from cache file and write to chosen location
-                          const base64 = await FileSystem.readAsStringAsync(cur.localPath, { encoding: 'base64' as any })
-                          await FileSystem.writeAsStringAsync(savedUri, base64, { encoding: 'base64' as any })
-                          Alert.alert('Downloaded', `${cur.name} saved to your chosen folder.\nOpen it from your Files / Downloads app.`)
+                        // Unified flow on both Android + iOS — open the system share
+                        // sheet directly. On Android 10+ it includes "Save to Files",
+                        // "Save in Drive", "Save to Downloads", etc. as one-tap
+                        // primary actions; on iOS it shows "Save to Files" prominently
+                        // (which routes to Files > Downloads or wherever the user
+                        // picks). Same UX as a mobile-web download — one tap and the
+                        // file is on the device, no folder picker dialog first.
+                        if (await Sharing.isAvailableAsync()) {
+                          await Sharing.shareAsync(cur.localPath, {
+                            mimeType: cur.mime,
+                            dialogTitle: cur.name,
+                            UTI: cur.mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+                          })
                         } else {
-                          // iOS — use share sheet's "Save to Files"
-                          if (await Sharing.isAvailableAsync()) {
-                            await Sharing.shareAsync(cur.localPath, {
-                              mimeType: cur.mime,
-                              dialogTitle: cur.name,
-                              UTI: cur.mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
-                            })
-                          } else {
-                            Alert.alert('Saved', `File at ${cur.localPath}`)
-                          }
+                          Alert.alert('Saved', `File saved at ${cur.localPath}`)
                         }
                       } catch (err: any) {
                         Alert.alert('Download failed', err?.message || 'Could not save file')
