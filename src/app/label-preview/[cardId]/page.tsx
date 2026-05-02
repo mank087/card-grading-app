@@ -31,7 +31,7 @@ import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { renderFrontCanvas, renderBackCanvas } from '@/lib/customSlabLabelGenerator';
-import { generateQRCodeWithLogo, loadLogoAsBase64 } from '@/lib/foldableLabelGenerator';
+import { generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64 } from '@/lib/foldableLabelGenerator';
 import type { CustomLabelConfig } from '@/lib/labelPresets';
 import type { SlabLabelData } from '@/lib/slabLabelGenerator';
 
@@ -174,9 +174,14 @@ export default function LabelPreviewPage() {
         };
         const grade = labelData.grade ?? 0;
         const cardUrl = `${window.location.origin}/verify/${card.serial}`;
-        const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+        // Load BOTH the dark and white logos — the renderer picks logoDataUrl
+        // for light/traditional themes, whiteLogoDataUrl for dark/modern/custom
+        // themes (customSlabLabelGenerator.ts:611). Without the white one,
+        // modern + custom slabs fall back to the "DCM" text logo.
+        const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
           generateQRCodeWithLogo(cardUrl).catch(() => ''),
           loadLogoAsBase64().catch(() => ''),
+          loadWhiteLogoAsBase64().catch(() => ''),
         ]);
 
         if (cancelled) return;
@@ -194,6 +199,7 @@ export default function LabelPreviewPage() {
           qrCodeDataUrl,
           subScores,
           logoDataUrl,
+          whiteLogoDataUrl,
           showFounderEmblem,
           showVipEmblem,
           showCardLoversEmblem,

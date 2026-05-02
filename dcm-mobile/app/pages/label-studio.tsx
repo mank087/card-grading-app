@@ -301,23 +301,58 @@ export default function LabelStudioScreen() {
     }
   }, [config.gradientStart, config.gradientEnd, config.customColors, config.layoutStyle, config.colorPreset, config.topEdgeGradient, config.borderEnabled, config.borderColor, config.gradientAngle, config.geometricPattern])
 
-  const labelConfig = useMemo<LabelConfig>(() => ({
-    preset: config.preset || 'dcm',
-    width: config.width ?? 2.8,
-    height: config.height ?? 0.8,
-    colorPreset: config.colorPreset,
-    gradientStart: config.gradientStart,
-    gradientEnd: config.gradientEnd,
-    style: config.style,
-    borderEnabled: config.borderEnabled,
-    borderColor: config.borderColor,
-    borderWidth: config.borderWidth,
-    topEdgeGradient: config.topEdgeGradient,
-    gradientAngle: config.gradientAngle,
-    geometricPattern: config.geometricPattern,
-    customColors: config.customColors,
-    layoutStyle: config.layoutStyle,
-  }), [config])
+  // Derive the labelConfig sent to LabelWebRenderer. For tiles with a
+  // forcedStyle (slab-modern, slab-traditional, card-image-modern,
+  // card-image-traditional), override the user's customizer colors with the
+  // preset values so the preview matches that tile's intended style. For the
+  // custom tile (and all toploader/onetouch variants), pass the live
+  // customizer config so user edits flow through.
+  const labelConfig = useMemo<LabelConfig>(() => {
+    const activeTile = LABEL_GALLERY[activeGalleryIdx]
+    const baseDims = {
+      preset: config.preset || 'dcm',
+      width: config.width ?? 2.8,
+      height: config.height ?? 0.8,
+      borderWidth: config.borderWidth,
+    }
+    if (activeTile?.id === 'slab-modern' || activeTile?.id === 'card-image-modern') {
+      return {
+        ...baseDims,
+        colorPreset: 'modern-dark',
+        gradientStart: '#1a1625',
+        gradientEnd: '#2d1f47',
+        style: 'modern',
+        borderEnabled: false,
+        borderColor: '#7c3aed',
+      }
+    }
+    if (activeTile?.id === 'slab-traditional' || activeTile?.id === 'card-image-traditional') {
+      return {
+        ...baseDims,
+        colorPreset: 'traditional',
+        gradientStart: '#f9fafb',
+        gradientEnd: '#ffffff',
+        style: 'traditional',
+        borderEnabled: false,
+        borderColor: '#7c3aed',
+      }
+    }
+    // Custom + everything else — flow user's customizer state through.
+    return {
+      ...baseDims,
+      colorPreset: config.colorPreset,
+      gradientStart: config.gradientStart,
+      gradientEnd: config.gradientEnd,
+      style: config.style,
+      borderEnabled: config.borderEnabled,
+      borderColor: config.borderColor,
+      topEdgeGradient: config.topEdgeGradient,
+      gradientAngle: config.gradientAngle,
+      geometricPattern: config.geometricPattern,
+      customColors: config.customColors,
+      layoutStyle: config.layoutStyle,
+    }
+  }, [config, activeGalleryIdx])
 
   // ---- Handlers ----
   const handleColorPreset = useCallback((preset: ColorPreset) => {
