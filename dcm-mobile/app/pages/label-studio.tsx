@@ -844,6 +844,7 @@ export default function LabelStudioScreen() {
                       side={side}
                       emblems={galleryEmblems}
                       customOverrides={customOverrides}
+                      labelImageUrl={labelPreviewUrl}
                     />
 
                     {/* Side toggle (front/back) — same as designer below */}
@@ -897,6 +898,7 @@ export default function LabelStudioScreen() {
                 side={side}
                 emblems={galleryEmblems}
                 customOverrides={customOverrides}
+                labelImageUrl={labelPreviewUrl}
               />
               <View style={s.sideToggle}>
                 <TouchableOpacity
@@ -1256,6 +1258,7 @@ export default function LabelStudioScreen() {
                 side={side}
                 emblems={galleryEmblems}
                 customOverrides={customOverrides}
+                labelImageUrl={labelPreviewUrl}
               />
               <View style={s.sideToggle}>
                 <TouchableOpacity

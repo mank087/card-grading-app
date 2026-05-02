@@ -86,6 +86,11 @@ interface LabelMockupProps {
   emblems?: LabelEmblems
   /** Used when labelType === 'custom' to apply user-edited colors. */
   customOverrides?: CustomColorOverrides
+  /** Canvas-rendered slab label (from LabelWebRenderer). When provided, slab
+   *  + digital tiles use this image instead of the native inline label —
+   *  gives accurate gradient/pattern/font rendering matching what the user
+   *  downloads. Falls back to native inline if not yet ready. */
+  labelImageUrl?: string | null
 }
 
 export default function LabelMockup({
@@ -97,6 +102,7 @@ export default function LabelMockup({
   side = 'front',
   emblems,
   customOverrides,
+  labelImageUrl,
 }: LabelMockupProps) {
   const holder = HOLDER_BY_TYPE[labelType] ?? 'slab'
   const cardSrc = side === 'back' ? (cardBackImageUrl || cardImageUrl) : cardImageUrl
@@ -116,6 +122,7 @@ export default function LabelMockup({
         slabStyle={styleFor(labelType)}
         emblems={emblems}
         customOverrides={customOverrides}
+        labelImageUrl={labelImageUrl}
       />
     )
   }
@@ -142,6 +149,7 @@ export default function LabelMockup({
       side={side}
       slabStyle={styleFor(labelType)}
       emblems={emblems}
+      labelImageUrl={labelImageUrl}
     />
   )
 }
@@ -648,7 +656,7 @@ function VerticalEmblem({ icon, iconColor, label, textColor, width }: { icon: st
 //   Label slot: top 5.4% left 8.9% width 81.4% height 15.2%
 //   Card window: top 28.3% left 11.8% width 75.7% height 60.9%
 // ============================================================================
-function SlabMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems, customOverrides }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; slabStyle: SlabStyle; emblems?: LabelEmblems; customOverrides?: CustomColorOverrides }) {
+function SlabMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems, customOverrides, labelImageUrl }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; slabStyle: SlabStyle; emblems?: LabelEmblems; customOverrides?: CustomColorOverrides; labelImageUrl?: string | null }) {
   const height = (width * 460) / 280
   const labelTop = height * 0.054, labelLeft = width * 0.089, labelW = width * 0.814, labelH = height * 0.152
   const cardTop = height * 0.283, cardLeft = width * 0.118, cardW = width * 0.757, cardH = height * 0.609
@@ -656,11 +664,17 @@ function SlabMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems,
     <View style={[s.holder, { width, height }]}>
       <Image source={require('@/assets/images/graded-card-slab.png')} style={{ width, height }} resizeMode="contain" />
 
-      {/* Label slot — render inline modern/traditional/custom slab label */}
+      {/* Label slot — uses canvas-rendered label (LabelWebRenderer output) so
+          all gradient/pattern/font behavior matches the actual download. The
+          inline native label is the fallback while the canvas is loading. */}
       <View style={[s.slot, { top: labelTop, left: labelLeft, width: labelW, height: labelH }]}>
-        {side === 'front'
-          ? <SlabFrontInline width={labelW} labelProps={labelProps} slabStyle={slabStyle} customOverrides={customOverrides} />
-          : <SlabBackInline width={labelW} labelProps={labelProps} slabStyle={slabStyle} customOverrides={customOverrides} emblems={emblems} />}
+        {labelImageUrl ? (
+          <Image source={{ uri: labelImageUrl }} style={{ width: labelW, height: labelH }} resizeMode="contain" />
+        ) : (
+          side === 'front'
+            ? <SlabFrontInline width={labelW} labelProps={labelProps} slabStyle={slabStyle} customOverrides={customOverrides} />
+            : <SlabBackInline width={labelW} labelProps={labelProps} slabStyle={slabStyle} customOverrides={customOverrides} emblems={emblems} />
+        )}
       </View>
 
       {/* Card window */}
@@ -753,7 +767,7 @@ function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side, emble
 //   Modern frame:      ['#1a1625','#2d1f47','#1a1625']
 //   Traditional frame: ['#9333ea','#6b21a8','#a855f7','#7c3aed','#581c87']
 // ============================================================================
-function DigitalMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; slabStyle: SlabStyle; emblems?: LabelEmblems }) {
+function DigitalMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems, labelImageUrl }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; slabStyle: SlabStyle; emblems?: LabelEmblems; labelImageUrl?: string | null }) {
   const isModern = slabStyle === 'modern'
   const frameColors = isModern
     ? ['#1a1625', '#2d1f47', '#1a1625']
@@ -762,6 +776,7 @@ function DigitalMockup({ cardImageUrl, width, labelProps, side, slabStyle, emble
     ? ['#1a1625', '#2d1f47', '#1a1625']
     : ['#9333ea', '#6b21a8', '#a855f7', '#7c3aed']
   const inner = width - 6
+  const labelHeight = inner / 3.5
   return (
     <View style={{ width, alignSelf: 'center' }}>
       <LinearGradient
@@ -771,11 +786,17 @@ function DigitalMockup({ cardImageUrl, width, labelProps, side, slabStyle, emble
         style={{ padding: 3, borderRadius: 6 }}
       >
         <View style={{ width: inner, overflow: 'hidden', borderRadius: 4, backgroundColor: '#0a0a12' }}>
-          {/* Slab label (3.5:1) — front/back follows side toggle */}
+          {/* Slab label (3.5:1) — front/back follows side toggle. Use canvas-
+              rendered output when available so patterns/colors/fonts match
+              the download exactly; native inline is fallback. */}
           <View style={{ width: '100%', overflow: 'hidden' }}>
-            {side === 'front'
-              ? <SlabFrontInline width={inner} labelProps={labelProps} slabStyle={slabStyle} />
-              : <SlabBackInline width={inner} labelProps={labelProps} slabStyle={slabStyle} emblems={emblems} />}
+            {labelImageUrl ? (
+              <Image source={{ uri: labelImageUrl }} style={{ width: inner, height: labelHeight }} resizeMode="contain" />
+            ) : (
+              side === 'front'
+                ? <SlabFrontInline width={inner} labelProps={labelProps} slabStyle={slabStyle} />
+                : <SlabBackInline width={inner} labelProps={labelProps} slabStyle={slabStyle} emblems={emblems} />
+            )}
           </View>
           {/* Separator */}
           <LinearGradient
