@@ -3,6 +3,7 @@ import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, Touchable
 import * as Clipboard from 'expo-clipboard'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
+import * as WebBrowser from 'expo-web-browser'
 import { WebView } from 'react-native-webview'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
@@ -91,30 +92,48 @@ export default function CardDetailScreen() {
     return () => clearTimeout(timer)
   }, [exportTask])
 
+  // Browser-direct download — opens the web's /label-export page in an in-app
+  // browser (Chrome custom tab on Android, SFSafariViewController on iOS).
+  // The page generates the PDF via jsPDF and triggers a real <a download>
+  // click; the file lands in the device's Downloads folder via the browser's
+  // native download manager. User stays in the app context — same UX as
+  // mobile-web. Replaces the old WebView-capture flow for every label type.
+  const openWebDownload = useCallback(async (
+    exportType: string,
+    opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number }
+  ) => {
+    if (!card?.id || !session?.access_token) return
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const params = new URLSearchParams()
+    params.set('token', session.access_token)
+    params.set('type', exportType)
+    if (opts?.format) params.set('format', opts.format)
+    params.set('labelStyle', labelStyle || 'modern')
+    if (opts?.position != null) params.set('position', String(opts.position))
+    if (opts?.position2 != null) params.set('position2', String(opts.position2))
+    params.set('download', '1')
+    const url = `${API_BASE}/label-export/${card.id}?${params.toString()}`
+    try {
+      await WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        controlsColor: Colors.purple[600],
+        toolbarColor: '#ffffff',
+      })
+    } catch (err: any) {
+      Alert.alert('Could not open download', err?.message || 'Try again.')
+    }
+  }, [card?.id, session?.access_token, labelStyle])
+
   // Deep-link from the Label Studio gallery: ?openLabel=<type>&format=<duplex|foldover>
-  // Auto-triggers the same export sheet the user would open via Download Labels.
-  // Card load must complete first so we have the data for the WebView token check.
+  // The gallery now opens the browser directly, but legacy deep-links may
+  // still arrive — auto-route them through openWebDownload too.
   const [deepLinkConsumed, setDeepLinkConsumed] = useState(false)
   useEffect(() => {
     if (deepLinkConsumed || !openLabel || !card?.id || !session?.access_token) return
     const f = openFormat === 'foldover' ? 'foldover' : openFormat === 'duplex' ? 'duplex' : undefined
-    const titles: Record<string, string> = {
-      'slab-modern': 'Graded Slab — Modern',
-      'slab-traditional': 'Graded Slab — Traditional',
-      'slab-custom': 'Graded Slab — Custom',
-      'onetouch': 'Magnetic One-Touch',
-      'toploader': 'Toploader Front+Back',
-      'foldover': 'Fold-Over Toploader',
-      'card-image-modern': 'Card Image — Modern',
-      'card-image-traditional': 'Card Image — Traditional',
-    }
-    setExportError(null)
-    setExportFiles([])
-    setExportPreviewIdx(0)
-    setExportStatus('')
-    setExportTask({ type: String(openLabel), format: f, title: titles[String(openLabel)] || String(openLabel) })
+    openWebDownload(String(openLabel), { format: f })
     setDeepLinkConsumed(true)
-  }, [openLabel, openFormat, card?.id, session?.access_token, deepLinkConsumed])
+  }, [openLabel, openFormat, card?.id, session?.access_token, deepLinkConsumed, openWebDownload])
   const [editForm, setEditForm] = useState<{
     card_name: string
     card_set: string
@@ -352,11 +371,7 @@ export default function CardDetailScreen() {
                   style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 }]}
                   onPress={() => {
                     setReportSheetOpen(false)
-                    setExportError(null)
-                    setExportFiles([])
-                    setExportPreviewIdx(0)
-                    setExportStatus('')
-                    setExportTask({ type: item.id, title: item.name })
+                    openWebDownload(item.id)
                   }}
                 >
                   <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
@@ -412,14 +427,10 @@ export default function CardDetailScreen() {
                   style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 }]}
                   onPress={() => {
                     setLabelSheetOpen(false)
-                    const startExport = (format?: 'duplex' | 'foldover', position?: number) => {
-                      setExportError(null)
-                      setExportFiles([])
-                      setExportPreviewIdx(0)
-                      setExportStatus('')
-                      setExportTask({ type: item.id, format, title: item.name, position })
-                    }
-                    // Avery sheet types — show position picker first
+                    // Avery sheet types — show position picker first; on
+                    // confirm, the picker calls openWebDownload with the
+                    // chosen position. The web /label-export page picks up
+                    // ?position= and renders the sheet position correctly.
                     if (item.id === 'onetouch') {
                       setPositionPicker({ type: item.id, title: item.name, sheet: 'avery6871' })
                       AsyncStorage.getItem('dcm_avery6871_last_pos').then(p => setPickerPosition(p ? parseInt(p, 10) || 0 : 0))
@@ -432,12 +443,12 @@ export default function CardDetailScreen() {
                     }
                     if ((item as any).needsFormat) {
                       Alert.alert(item.name, 'Choose print format', [
-                        { text: 'Duplex (front/back on one sheet)', onPress: () => startExport('duplex') },
-                        { text: 'Fold-Over (single side)', onPress: () => startExport('foldover') },
+                        { text: 'Duplex (front/back on one sheet)', onPress: () => openWebDownload(item.id, { format: 'duplex' }) },
+                        { text: 'Fold-Over (single side)', onPress: () => openWebDownload(item.id, { format: 'foldover' }) },
                         { text: 'Cancel', style: 'cancel' },
                       ])
                     } else {
-                      startExport()
+                      openWebDownload(item.id)
                     }
                   }}
                 >
@@ -526,14 +537,15 @@ export default function CardDetailScreen() {
                       onPress={async () => {
                         await AsyncStorage.setItem(cfg.storageKey, String(pickerPosition))
                         const taskType = positionPicker.type
-                        const taskTitle = positionPicker.title
+                        const pos = pickerPosition
                         setPositionPicker(null)
-                        // Now actually start the export with the chosen position
-                        setExportError(null)
-                        setExportFiles([])
-                        setExportPreviewIdx(0)
-                        setExportStatus('')
-                        setExportTask({ type: taskType, title: taskTitle, position: pickerPosition })
+                        // Browser-direct download with the chosen sheet position.
+                        // For the toploader front+back pair, web's label-export
+                        // page accepts &position2= to place the back at the next
+                        // sheet slot; default is position+1.
+                        const opts: { position?: number; position2?: number } = { position: pos }
+                        if (taskType === 'toploader') opts.position2 = pos + 1
+                        openWebDownload(taskType, opts)
                       }}
                     >
                       <Text style={s.editBtnSaveText}>Use Position {pickerPosition + 1}</Text>

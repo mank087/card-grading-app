@@ -59,10 +59,21 @@ export interface LabelEmblems {
 }
 
 export interface CustomColorOverrides {
-  /** ['#start', '#mid', '#end'] for the slab label background gradient. */
+  /** Slab label background gradient stops. */
   labelGradient?: string[]
-  /** ['#start', '#mid', '#end'] for the outer slab frame (digital card-image only). */
+  /** Slab frame gradient (digital card-image only). */
   frameGradient?: string[]
+  /** Layout selector — affects how the gradient/border/pattern is drawn. */
+  layoutStyle?: 'color-gradient' | 'card-extension' | 'neon-outline' | 'geometric' | 'team-colors' | string
+  /** Top-edge gradient stops for card-extension. */
+  topEdgeGradient?: string[]
+  /** Whether the label has a visible border (auto-on for neon-outline). */
+  borderEnabled?: boolean
+  borderColor?: string
+  /** Gradient sweep direction in degrees (0=horizontal, 90=down, 135=diag). */
+  gradientAngle?: number
+  /** Geometric pattern variant (0-4) per GEOMETRIC_PATTERNS. */
+  geometricPattern?: number
 }
 
 interface LabelMockupProps {
@@ -205,10 +216,112 @@ function isDarkSlab(slabStyle: SlabStyle, customOverrides?: CustomColorOverrides
   return lum < 0.6
 }
 
+/** Convert gradientAngle (degrees) to RN LinearGradient {start, end}.
+ *  0° = horizontal left→right, 90° = top→bottom, 135° = diagonal. */
+function angleToStartEnd(angle?: number): { start: { x: number; y: number }; end: { x: number; y: number } } {
+  const a = ((angle ?? 135) % 360 + 360) % 360
+  const rad = (a * Math.PI) / 180
+  const cx = 0.5, cy = 0.5
+  const dx = Math.cos(rad), dy = Math.sin(rad)
+  return {
+    start: { x: cx - dx * 0.5, y: cy - dy * 0.5 },
+    end:   { x: cx + dx * 0.5, y: cy + dy * 0.5 },
+  }
+}
+
+/** Layout-aware background. Renders the appropriate visual for each
+ *  layoutStyle on top of the slab dimensions. Children are positioned over
+ *  the background. Mirrors web's slabLabelGenerator + customSlabLabelGenerator
+ *  pattern handling — approximates canvas effects using LinearGradient + View
+ *  overlays since RN doesn't have a 2D canvas. */
+function SlabBackground({
+  width,
+  height,
+  slabStyle,
+  customOverrides,
+  children,
+}: {
+  width: number
+  height: number
+  slabStyle: SlabStyle
+  customOverrides?: CustomColorOverrides
+  children: React.ReactNode
+}) {
+  const layout = customOverrides?.layoutStyle
+  const gradient = getLabelGradient(slabStyle, customOverrides)
+  const angle = customOverrides?.gradientAngle ?? 135
+  const { start, end } = angleToStartEnd(angle)
+  const colors = (gradient as string[]).length >= 2 ? gradient : [...gradient, gradient[gradient.length - 1]]
+
+  // team-colors / split — two halves side-by-side using the first 2 customColors
+  if (slabStyle === 'custom' && layout === 'team-colors') {
+    const c1 = (gradient as string[])[0] || '#7c3aed'
+    const c2 = (gradient as string[])[1] || '#4c1d95'
+    return (
+      <View style={{ width, height, flexDirection: 'row', overflow: 'hidden' }}>
+        <View style={{ flex: 1, backgroundColor: c1 }} />
+        <View style={{ flex: 1, backgroundColor: c2 }} />
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}>{children}</View>
+      </View>
+    )
+  }
+
+  // neon-outline — dark gradient + visible accent border using borderColor
+  if (slabStyle === 'custom' && layout === 'neon-outline') {
+    const accent = customOverrides?.borderColor || (gradient as string[])[0] || '#7c3aed'
+    return (
+      <LinearGradient colors={['#0a0a0a', '#1a1a2e', '#0a0a0a'] as any} start={start} end={end}
+        style={{ width, height, borderWidth: 2, borderColor: accent, overflow: 'hidden' }}>
+        {children}
+      </LinearGradient>
+    )
+  }
+
+  // card-extension — multi-stop gradient using topEdgeGradient
+  if (slabStyle === 'custom' && layout === 'card-extension' && customOverrides?.topEdgeGradient && customOverrides.topEdgeGradient.length >= 2) {
+    return (
+      <LinearGradient colors={customOverrides.topEdgeGradient as any} start={start} end={end}
+        style={{ width, height, overflow: 'hidden' }}>
+        {children}
+      </LinearGradient>
+    )
+  }
+
+  // geometric — gradient + diagonal stripe overlay (approximate of canvas pattern)
+  if (slabStyle === 'custom' && layout === 'geometric') {
+    const stripeCount = 12
+    const stripeColor = (gradient as string[])[1] || '#7c3aed'
+    return (
+      <LinearGradient colors={colors as any} start={start} end={end} style={{ width, height, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, opacity: 0.15 }} pointerEvents="none">
+          {Array.from({ length: stripeCount }).map((_, i) => (
+            <View key={i} style={{
+              position: 'absolute',
+              top: -height,
+              left: (i * (width * 1.6)) / stripeCount - width * 0.4,
+              width: width * 0.06,
+              height: height * 3,
+              backgroundColor: stripeColor,
+              transform: [{ rotate: '20deg' }],
+            }} />
+          ))}
+        </View>
+        {children}
+      </LinearGradient>
+    )
+  }
+
+  // Default — color-gradient / rainbow / modern / traditional / single-color presets
+  return (
+    <LinearGradient colors={colors as any} start={start} end={end} style={{ width, height, overflow: 'hidden' }}>
+      {children}
+    </LinearGradient>
+  )
+}
+
 function SlabFrontInline({ width, labelProps, slabStyle, customOverrides }: { width: number; labelProps?: LabelInlineProps; slabStyle: SlabStyle; customOverrides?: CustomColorOverrides }) {
   const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
   const dark = isDarkSlab(slabStyle, customOverrides)
-  const gradient = getLabelGradient(slabStyle, customOverrides)
 
   const nameColor = dark ? 'rgba(255,255,255,0.95)' : '#1f2937'
   const contextColor = dark ? 'rgba(255,255,255,0.7)' : '#4b5563'
@@ -224,64 +337,61 @@ function SlabFrontInline({ width, labelProps, slabStyle, customOverrides }: { wi
   const condition = labelProps?.isAlteredAuthentic && labelProps?.grade === null
     ? 'AUTHENTIC' : (labelProps?.condition || '').toUpperCase()
 
+  const height = width / 3.5
+
   return (
-    <LinearGradient
-      colors={gradient as any}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ width: '100%', aspectRatio: 3.5, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', paddingHorizontal: width * 0.03, paddingVertical: width * 0.03 / 3.5 }}
-    >
-      {/* LEFT: DCM logo (12% width) */}
-      <View style={{ width: width * 0.12, alignItems: 'center', justifyContent: 'center' }}>
-        <Image
-          source={require('@/assets/images/dcm-logo.png')}
-          style={{ width: width * 0.10, height: width * 0.10, opacity: dark ? 0.95 : 1 }}
-          resizeMode="contain"
-          tintColor={dark ? 'rgba(255,255,255,0.9)' : undefined}
-        />
-      </View>
+    <SlabBackground width={width} height={height} slabStyle={slabStyle} customOverrides={customOverrides}>
+      <View style={{ width: '100%', height: '100%', flexDirection: 'row', alignItems: 'center', paddingHorizontal: width * 0.03, paddingVertical: height * 0.06 }}>
+        {/* LEFT: DCM logo (12% width) */}
+        <View style={{ width: width * 0.12, alignItems: 'center', justifyContent: 'center' }}>
+          <Image
+            source={require('@/assets/images/dcm-logo.png')}
+            style={{ width: width * 0.10, height: width * 0.10, opacity: dark ? 0.95 : 1 }}
+            resizeMode="contain"
+            tintColor={dark ? 'rgba(255,255,255,0.9)' : undefined}
+          />
+        </View>
 
-      {/* CENTER: card info */}
-      <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: width * 0.015 }}>
-        <Text style={{ fontSize: width * namePct, lineHeight: width * namePct * 1.15, fontWeight: '600', color: nameColor }} numberOfLines={1}>
-          {labelProps?.displayName || 'Card Name'}
-        </Text>
-        {!!labelProps?.setLineText && (
-          <Text style={{ fontSize: width * namePct * 0.76, lineHeight: width * namePct * 0.76 * 1.15, color: contextColor }} numberOfLines={1}>
-            {labelProps.setLineText}
+        {/* CENTER: card info */}
+        <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal: width * 0.015 }}>
+          <Text style={{ fontSize: width * namePct, lineHeight: width * namePct * 1.15, fontWeight: '600', color: nameColor }} numberOfLines={1}>
+            {labelProps?.displayName || 'Card Name'}
           </Text>
-        )}
-        {labelProps && labelProps.features.length > 0 && (
-          <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.15, fontWeight: '500', color: featuresColor }} numberOfLines={1}>
-            {labelProps.features.join(' • ')}
-          </Text>
-        )}
-        {!!labelProps?.serial && (
-          <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.15, fontFamily: 'Courier', color: serialColor }} numberOfLines={1}>
-            {labelProps.serial}
-          </Text>
-        )}
-      </View>
+          {!!labelProps?.setLineText && (
+            <Text style={{ fontSize: width * namePct * 0.76, lineHeight: width * namePct * 0.76 * 1.15, color: contextColor }} numberOfLines={1}>
+              {labelProps.setLineText}
+            </Text>
+          )}
+          {labelProps && labelProps.features.length > 0 && (
+            <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.15, fontWeight: '500', color: featuresColor }} numberOfLines={1}>
+              {labelProps.features.join(' • ')}
+            </Text>
+          )}
+          {!!labelProps?.serial && (
+            <Text style={{ fontSize: width * namePct * 0.7, lineHeight: width * namePct * 0.7 * 1.15, fontFamily: 'Courier', color: serialColor }} numberOfLines={1}>
+              {labelProps.serial}
+            </Text>
+          )}
+        </View>
 
-      {/* RIGHT: grade + condition (18% width) */}
-      <View style={{ width: width * 0.18, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: width * 0.12, fontWeight: 'bold', lineHeight: width * 0.12, color: gradeColor }}>{grade}</Text>
-        {!dark && <View style={{ width: width * 0.10, height: 1, backgroundColor: '#7c3aed', marginTop: 1 }} />}
-        {!!condition && (
-          <Text style={{ fontSize: width * 0.03, fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center', marginTop: 1, color: conditionColor, letterSpacing: 0.3 }} numberOfLines={1}>
-            {condition}
-          </Text>
-        )}
+        {/* RIGHT: grade + condition (18% width) */}
+        <View style={{ width: width * 0.18, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: width * 0.12, fontWeight: 'bold', lineHeight: width * 0.12, color: gradeColor }}>{grade}</Text>
+          {!dark && <View style={{ width: width * 0.10, height: 1, backgroundColor: '#7c3aed', marginTop: 1 }} />}
+          {!!condition && (
+            <Text style={{ fontSize: width * 0.03, fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center', marginTop: 1, color: conditionColor, letterSpacing: 0.3 }} numberOfLines={1}>
+              {condition}
+            </Text>
+          )}
+        </View>
       </View>
-    </LinearGradient>
+    </SlabBackground>
   )
 }
 
 function SlabBackInline({ width, labelProps, slabStyle, customOverrides, emblems }: { width: number; labelProps?: LabelInlineProps; slabStyle: SlabStyle; customOverrides?: CustomColorOverrides; emblems?: LabelEmblems }) {
   const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
   const dark = isDarkSlab(slabStyle, customOverrides)
-  const gradient = getLabelGradient(slabStyle, customOverrides)
-
   const gradeColor = dark ? '#ffffff' : '#7c3aed'
   const conditionColor = dark ? 'rgba(255,255,255,0.8)' : '#6b46c1'
   const subScoreColor = dark ? 'rgba(255,255,255,0.9)' : '#4b5563'
@@ -295,52 +405,49 @@ function SlabBackInline({ width, labelProps, slabStyle, customOverrides, emblems
   const labelHeight = width / 3.5
 
   return (
-    <LinearGradient
-      colors={gradient as any}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
-      style={{ width: '100%', aspectRatio: 3.5, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', paddingHorizontal: width * 0.03, paddingVertical: width * 0.03 / 3.5 }}
-    >
-      {/* LEFT: QR code (18% width) */}
-      <View style={{ width: width * 0.18, alignItems: 'center', justifyContent: 'center' }}>
-        <RealQR qrUrl={labelProps?.qrUrl} size={qrSize} />
-      </View>
-
-      {/* MIDDLE: emblems (vertical) */}
-      {showAnyEmblem && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', height: '100%', paddingVertical: 2 }}>
-          {emblems?.showFounderEmblem && <VerticalEmblem icon="★" iconColor="#FFD700" label="Founder" textColor={dark ? '#ffffff' : '#7c3aed'} width={width} />}
-          {emblems?.showCardLoversEmblem && <VerticalEmblem icon="♥" iconColor="#f43f5e" label="Card Lover" textColor={dark ? '#ffffff' : '#f43f5e'} width={width} />}
-          {emblems?.showVipEmblem && <VerticalEmblem icon="◆" iconColor="#6366f1" label="VIP" textColor={dark ? '#ffffff' : '#6366f1'} width={width} />}
+    <SlabBackground width={width} height={labelHeight} slabStyle={slabStyle} customOverrides={customOverrides}>
+      <View style={{ width: '100%', height: '100%', flexDirection: 'row', alignItems: 'center', paddingHorizontal: width * 0.03, paddingVertical: labelHeight * 0.06 }}>
+        {/* LEFT: QR code (18% width) */}
+        <View style={{ width: width * 0.18, alignItems: 'center', justifyContent: 'center' }}>
+          <RealQR qrUrl={labelProps?.qrUrl} size={qrSize} />
         </View>
-      )}
 
-      {/* CENTER: large grade + condition */}
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ fontSize: width * 0.12, fontWeight: 'bold', lineHeight: width * 0.12, color: gradeColor }}>{grade}</Text>
-        {!!condition && (
-          <Text style={{ fontSize: width * 0.03, fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center', marginTop: 1, color: conditionColor, letterSpacing: 0.3 }} numberOfLines={1}>
-            {condition}
-          </Text>
+        {/* MIDDLE: emblems (vertical) */}
+        {showAnyEmblem && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', height: '100%', paddingVertical: 2 }}>
+            {emblems?.showFounderEmblem && <VerticalEmblem icon="★" iconColor="#FFD700" label="Founder" textColor={dark ? '#ffffff' : '#7c3aed'} width={width} />}
+            {emblems?.showCardLoversEmblem && <VerticalEmblem icon="♥" iconColor="#f43f5e" label="Card Lover" textColor={dark ? '#ffffff' : '#f43f5e'} width={width} />}
+            {emblems?.showVipEmblem && <VerticalEmblem icon="◆" iconColor="#6366f1" label="VIP" textColor={dark ? '#ffffff' : '#6366f1'} width={width} />}
+          </View>
+        )}
+
+        {/* CENTER: large grade + condition */}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: width * 0.12, fontWeight: 'bold', lineHeight: width * 0.12, color: gradeColor }}>{grade}</Text>
+          {!!condition && (
+            <Text style={{ fontSize: width * 0.03, fontWeight: 'bold', textTransform: 'uppercase', textAlign: 'center', marginTop: 1, color: conditionColor, letterSpacing: 0.3 }} numberOfLines={1}>
+              {condition}
+            </Text>
+          )}
+        </View>
+
+        {/* RIGHT: sub-scores (22% width) — show full names per web */}
+        {subScores && (
+          <View style={{ width: width * 0.22, justifyContent: 'center' }}>
+            {([
+              ['Centering', subScores.centering],
+              ['Corners', subScores.corners],
+              ['Edges', subScores.edges],
+              ['Surface', subScores.surface],
+            ] as const).map(([key, val]) => (
+              <Text key={key} style={{ fontSize: width * 0.035, lineHeight: width * 0.035 * 1.5, color: subScoreColor, textAlign: 'right' }} numberOfLines={1}>
+                {key}: {Math.round(val)}
+              </Text>
+            ))}
+          </View>
         )}
       </View>
-
-      {/* RIGHT: sub-scores (22% width) — show full names per web */}
-      {subScores && (
-        <View style={{ width: width * 0.22, justifyContent: 'center' }}>
-          {([
-            ['Centering', subScores.centering],
-            ['Corners', subScores.corners],
-            ['Edges', subScores.edges],
-            ['Surface', subScores.surface],
-          ] as const).map(([key, val]) => (
-            <Text key={key} style={{ fontSize: width * 0.035, lineHeight: width * 0.035 * 1.5, color: subScoreColor, textAlign: 'right' }} numberOfLines={1}>
-              {key}: {Math.round(val)}
-            </Text>
-          ))}
-        </View>
-      )}
-    </LinearGradient>
+    </SlabBackground>
   )
 }
 

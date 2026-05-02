@@ -282,17 +282,24 @@ export default function LabelStudioScreen() {
     showCardLoversEmblem: !!userEmblems.showCardLovers,
   }), [userEmblems.showFounder, userEmblems.showVip, userEmblems.showCardLovers])
 
-  // Custom slab color overrides — pipe the customizer's current gradient into
-  // the gallery's "custom" tile so it updates live as the user edits colors.
-  // For rainbow + multi-color custom layouts, use the full customColors array
-  // so the LinearGradient renders all stops; otherwise use the 2-color
-  // gradientStart/End triplet for simple gradients.
+  // Custom slab color overrides — pipes the customizer's full in-flight
+  // config into the slab gallery tile so the preview updates live with
+  // colors AND layout style (color-gradient / card-extension / neon-outline
+  // / geometric / team-colors split).
   const customOverrides = useMemo(() => {
-    if (config.customColors && config.customColors.length >= 2) {
-      return { labelGradient: config.customColors }
+    const baseGradient = config.customColors && config.customColors.length >= 2
+      ? config.customColors
+      : [config.gradientStart, config.gradientEnd, config.gradientStart]
+    return {
+      labelGradient: baseGradient,
+      layoutStyle: config.layoutStyle || config.colorPreset,
+      topEdgeGradient: config.topEdgeGradient,
+      borderEnabled: config.borderEnabled,
+      borderColor: config.borderColor,
+      gradientAngle: config.gradientAngle,
+      geometricPattern: config.geometricPattern,
     }
-    return { labelGradient: [config.gradientStart, config.gradientEnd, config.gradientStart] }
-  }, [config.gradientStart, config.gradientEnd, config.customColors])
+  }, [config.gradientStart, config.gradientEnd, config.customColors, config.layoutStyle, config.colorPreset, config.topEdgeGradient, config.borderEnabled, config.borderColor, config.gradientAngle, config.geometricPattern])
 
   const labelConfig = useMemo<LabelConfig>(() => ({
     width: config.width ?? 2.8,
