@@ -13,7 +13,7 @@ declare global {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
-import { compressImage, formatFileSize, getOptimalCompressionSettings } from '@/lib/imageCompression'
+import { compressImage, formatFileSize, getOptimalCompressionSettings, ensureBrowserDecodableImage } from '@/lib/imageCompression'
 import CardAnalysisAnimation from './sports/CardAnalysisAnimation'
 import { useDeviceDetection } from '@/hooks/useDeviceDetection'
 import UploadMethodSelector from '@/components/camera/UploadMethodSelector'
@@ -317,17 +317,39 @@ function UniversalUploadPageContent() {
   };
 
   // Handle file selection and compression
-  const handleFileSelect = async (file: File, side: 'front' | 'back') => {
-    console.log('[Upload] handleFileSelect started:', side, 'size:', file.size)
+  const handleFileSelect = async (originalFile: File, side: 'front' | 'back') => {
+    console.log('[Upload] handleFileSelect started:', side, 'size:', originalFile.size, 'type:', originalFile.type)
     const setCompressingState = side === 'front' ? setIsCompressingFront : setIsCompressingBack
     try {
       setCompressingState(true)
+
+      // Convert HEIC/HEIF (iPhone default) to JPEG up front. Without this,
+      // Android Chrome and other non-Safari browsers can't render the image
+      // (broken icon) and canvas-based compression fails silently, leaving
+      // the submit button permanently grayed out.
+      let file = originalFile
+      try {
+        const before = file.type
+        setStatus(`🔄 Preparing ${side} image...`)
+        file = await ensureBrowserDecodableImage(originalFile)
+        if (file !== originalFile) {
+          console.log('[Upload] Converted HEIC →', file.type, '(was', before, ')')
+        }
+      } catch (convertErr: any) {
+        console.error(`[Upload] HEIC conversion failed for ${side}:`, convertErr)
+        setStatus(`❌ Could not read ${side} image. iPhone HEIC photos sometimes fail — try saving as JPEG (Settings → Camera → Formats → Most Compatible) and re-upload.`)
+        // Clear any prior state for this side so the green check disappears.
+        if (side === 'front') { setFrontFile(null); setFrontHash(null); setFrontCompressed(null); setFrontCompressionInfo(null) }
+        else { setBackFile(null); setBackHash(null); setBackCompressed(null); setBackCompressionInfo(null) }
+        return
+      }
+
       setStatus(`🔄 Compressing ${side} image...`)
 
       // Generate hash for duplicate detection
       const fileHash = await generateImageHash(file);
 
-      // Set original file
+      // Set original file (post-conversion if HEIC)
       if (side === 'front') {
         setFrontFile(file)
         setFrontHash(fileHash)
@@ -342,7 +364,9 @@ function UniversalUploadPageContent() {
 
       if (currentFrontHash && currentBackHash && currentFrontHash === currentBackHash) {
         setStatus('❌ Error: Front and back images are identical. Please upload different images of the front and back of your card.')
-        setIsCompressing(false)
+        // setIsCompressing is a derived const, not a setter — use the
+        // per-side setter that this function already has via setCompressingState.
+        setCompressingState(false)
         // Clear the duplicate image
         if (side === 'front') {
           setFrontFile(null)
@@ -385,9 +409,19 @@ function UniversalUploadPageContent() {
 
       console.log('[Upload] handleFileSelect completed:', side, 'compressed size:', result.compressedSize)
       setStatus(`✅ ${side} image compressed: ${result.compressionRatio.toFixed(1)}% smaller`)
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Failed to compress ${side} image:`, error)
-      setStatus(`❌ Failed to compress ${side} image`)
+      // Clear file + hash so the green check disappears and the submit button
+      // doesn't stay grayed out with the user thinking the image is uploaded.
+      // Without this clearing, the user sees green check + broken preview +
+      // permanently disabled submit and has no clear path to recover.
+      if (side === 'front') {
+        setFrontFile(null); setFrontHash(null); setFrontCompressed(null); setFrontCompressionInfo(null)
+      } else {
+        setBackFile(null); setBackHash(null); setBackCompressed(null); setBackCompressionInfo(null)
+      }
+      const msg = error?.message ? ` (${error.message})` : ''
+      setStatus(`❌ Failed to read ${side} image${msg}. Try a different photo or save as JPEG.`)
     } finally {
       console.log('[Upload] handleFileSelect finished for:', side)
       setCompressingState(false)

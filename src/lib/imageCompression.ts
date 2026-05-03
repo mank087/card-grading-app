@@ -1,6 +1,35 @@
 // Image compression utilities for sports card uploads
 // Optimizes images for faster processing and reduced storage costs
 
+/**
+ * iPhones default to HEIC which Android Chrome and most non-Safari mobile
+ * browsers can't render in <img> elements. Detect via MIME type or extension
+ * since browsers report HEIC files inconsistently (sometimes empty MIME,
+ * sometimes 'image/heic' or 'image/heif').
+ */
+function isHeicFile(file: File): boolean {
+  const t = (file.type || '').toLowerCase();
+  if (t === 'image/heic' || t === 'image/heif' || t === 'image/heic-sequence' || t === 'image/heif-sequence') return true;
+  const n = file.name.toLowerCase();
+  return n.endsWith('.heic') || n.endsWith('.heif');
+}
+
+/**
+ * Convert a HEIC/HEIF file to a JPEG File using heic2any. Returns the
+ * original file unchanged if it's not HEIC. Caller should call this BEFORE
+ * passing the file to compressImage so the canvas can load it.
+ */
+export async function ensureBrowserDecodableImage(file: File): Promise<File> {
+  if (!isHeicFile(file)) return file;
+  // Lazy import — heic2any is ~80kb and only needed on iPhone uploads.
+  const heic2any = (await import('heic2any')).default;
+  const blob = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+  // heic2any may return Blob or Blob[] for multi-image HEICs; take the first.
+  const out = Array.isArray(blob) ? blob[0] : blob;
+  const newName = file.name.replace(/\.(heic|heif)$/i, '.jpg');
+  return new File([out], newName, { type: 'image/jpeg', lastModified: Date.now() });
+}
+
 interface CompressionOptions {
   maxWidth?: number;
   maxHeight?: number;
