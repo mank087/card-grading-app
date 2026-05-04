@@ -64,7 +64,18 @@ export default function CollectionScreen() {
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [batchSheetOpen, setBatchSheetOpen] = useState<null | 'print' | 'reports'>(null)
-  const [positionPicker, setPositionPicker] = useState<null | { type: string; sheet: 'avery6871' | 'avery8167'; format?: 'duplex' | 'foldover' }>(null)
+  // Avery sheet variants:
+  //   avery6871        — one-touch (Avery 6871) — 18 labels per page (3×6),
+  //                      one label per card.
+  //   avery8167-pairs  — toploader front+back (Avery 8167) — 40 CARD slots
+  //                      per page (2×20), each card occupies TWO physical
+  //                      labels side-by-side (front | back). Position picked
+  //                      is the card index, not the label index — matches
+  //                      generateToploaderLabelSheetMultiPage's cardsPerPage
+  //                      = 40 contract.
+  //   avery8167        — fold-over toploader (Avery 8167) — 80 single labels
+  //                      per page (4×20), one label per card.
+  const [positionPicker, setPositionPicker] = useState<null | { type: string; sheet: 'avery6871' | 'avery8167-pairs' | 'avery8167'; format?: 'duplex' | 'foldover' }>(null)
   const [pickerStartPosition, setPickerStartPosition] = useState(0)
 
   const enterSelectionMode = useCallback((firstId?: string) => {
@@ -515,7 +526,14 @@ export default function CollectionScreen() {
                       AsyncStorage.getItem('dcm_avery6871_last_pos').then(p => setPickerStartPosition(p ? parseInt(p, 10) || 0 : 0))
                       return
                     }
-                    if (item.id === 'toploader' || item.id === 'foldover') {
+                    if (item.id === 'toploader') {
+                      // Toploader = 40 card-pair slots per page (front+back labels)
+                      setPositionPicker({ type: item.id, sheet: 'avery8167-pairs' })
+                      AsyncStorage.getItem('dcm_avery8167_pairs_last_pos').then(p => setPickerStartPosition(p ? parseInt(p, 10) || 0 : 0))
+                      return
+                    }
+                    if (item.id === 'foldover') {
+                      // Foldover = 80 single labels per page
                       setPositionPicker({ type: item.id, sheet: 'avery8167' })
                       AsyncStorage.getItem('dcm_avery8167_last_pos').then(p => setPickerStartPosition(p ? parseInt(p, 10) || 0 : 0))
                       return
@@ -569,8 +587,10 @@ export default function CollectionScreen() {
             <View style={st.sheetHandle} />
             {positionPicker && (() => {
               const cfg = positionPicker.sheet === 'avery6871'
-                ? { rows: 6, cols: 3, total: 18, label: 'Avery 6871 — 18 labels (3 × 6)', storageKey: 'dcm_avery6871_last_pos' }
-                : { rows: 20, cols: 4, total: 80, label: 'Avery 8167 — 80 labels (4 × 20)', storageKey: 'dcm_avery8167_last_pos' }
+                ? { rows: 6, cols: 3, total: 18, label: 'Avery 6871 — 18 labels (3 × 6)', storageKey: 'dcm_avery6871_last_pos', isPair: false }
+                : positionPicker.sheet === 'avery8167-pairs'
+                ? { rows: 20, cols: 2, total: 40, label: 'Avery 8167 — 40 card slots (2 × 20, each = front + back)', storageKey: 'dcm_avery8167_pairs_last_pos', isPair: true }
+                : { rows: 20, cols: 4, total: 80, label: 'Avery 8167 — 80 labels (4 × 20)', storageKey: 'dcm_avery8167_last_pos', isPair: false }
               const n = selectedIds.size
               const startPage = Math.floor(pickerStartPosition / cfg.total)
               const endGlobal = pickerStartPosition + n - 1
@@ -586,26 +606,33 @@ export default function CollectionScreen() {
                         <View key={r} style={{ flexDirection: 'row', gap: 4 }}>
                           {Array.from({ length: cfg.cols }).map((_, c) => {
                             const idx = r * cfg.cols + c
-                            // Highlight: green = start, lavender = filled, gray = empty
+                            // Highlight: solid = start, light = will-be-filled, white = empty
                             const isStart = idx === pickerStartPosition % cfg.total
                             const inRange = idx >= (pickerStartPosition % cfg.total) && idx < Math.min(cfg.total, (pickerStartPosition % cfg.total) + n)
-                            const cellSize = positionPicker.sheet === 'avery8167' ? 28 : 48
+                            // Toploader pair cells are wider (each cell = 2 physical labels)
+                            const cellSize = cfg.isPair ? 56 : (positionPicker.sheet === 'avery8167' ? 28 : 48)
+                            const cellHeight = (cfg.isPair ? cellSize * 0.45 : cellSize * 0.7)
                             return (
                               <TouchableOpacity
                                 key={c}
                                 onPress={() => setPickerStartPosition(idx)}
                                 style={{
                                   width: cellSize,
-                                  height: cellSize * 0.7,
+                                  height: cellHeight,
                                   borderRadius: 4,
                                   borderWidth: isStart ? 2 : 1,
                                   borderColor: isStart ? Colors.purple[600] : Colors.gray[300],
                                   backgroundColor: isStart ? Colors.purple[600] : (inRange ? Colors.purple[100] : '#fff'),
                                   alignItems: 'center',
                                   justifyContent: 'center',
+                                  flexDirection: cfg.isPair ? 'row' : 'column',
+                                  overflow: 'hidden',
                                 }}
                               >
-                                <Text style={{ fontSize: positionPicker.sheet === 'avery8167' ? 8 : 11, fontWeight: '700', color: isStart ? '#fff' : (inRange ? Colors.purple[700] : Colors.gray[500]) }}>
+                                {cfg.isPair && (
+                                  <View style={{ position: 'absolute', top: 0, bottom: 0, left: '50%', width: StyleSheet.hairlineWidth, backgroundColor: isStart ? 'rgba(255,255,255,0.4)' : Colors.gray[300] }} />
+                                )}
+                                <Text style={{ fontSize: cfg.isPair ? 11 : (positionPicker.sheet === 'avery8167' ? 8 : 11), fontWeight: '700', color: isStart ? '#fff' : (inRange ? Colors.purple[700] : Colors.gray[500]) }}>
                                   {idx + 1}
                                 </Text>
                               </TouchableOpacity>
