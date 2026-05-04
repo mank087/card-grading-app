@@ -1,6 +1,32 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { Session, User } from '@supabase/supabase-js'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
+
+// App-owned cache keys cleared on sign-out so account-switching on a shared
+// device doesn't leak the previous user's collection, label preferences, or
+// queued grades. Supabase's own `sb-*-auth-token` keys are managed by its SDK
+// and intentionally left alone — supabase.auth.signOut handles those.
+const APP_CACHE_KEYS = [
+  'dcm_label_style_cache',
+  'dcm_user_emblems_cache',
+  'dcm_grading_queue',
+  'dcm_hide_photo_tips',
+  'dcm_avery6871_last_pos',
+  'dcm_avery8167_last_pos',
+  'dcm_avery8167_pairs_last_pos',
+] as const
+
+async function clearAppCaches(userId: string | undefined) {
+  try {
+    const keys = userId
+      ? [...APP_CACHE_KEYS, `dcm_collection_cache_${userId}`]
+      : [...APP_CACHE_KEYS]
+    await AsyncStorage.multiRemove(keys as string[])
+  } catch {
+    // Best-effort — never block sign-out on cache failures.
+  }
+}
 
 interface AuthContextType {
   user: User | null
@@ -54,6 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    await clearAppCaches(user?.id)
     await supabase.auth.signOut()
   }
 

@@ -1,10 +1,13 @@
 import { View, Text, ScrollView, StyleSheet, Alert, Linking, TouchableOpacity, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import Constants from 'expo-constants'
 import { Colors } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import { purchaseCredits } from '@/lib/stripe'
+
+const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0'
 
 interface MenuItemProps {
   icon: keyof typeof Ionicons.glyphMap
@@ -138,7 +141,7 @@ export default function AccountScreen() {
       {/* Footer */}
       <View style={styles.footer}>
         <Image source={require('@/assets/images/dcm-logo.png')} style={styles.footerLogo} resizeMode="contain" />
-        <Text style={styles.footerText}>DCM Grading v1.0.0</Text>
+        <Text style={styles.footerText}>DCM Grading v{APP_VERSION}</Text>
         <Text style={styles.footerCopy}>Dynamic Collectibles Management LLC</Text>
       </View>
     </ScrollView>
