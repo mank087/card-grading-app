@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { stripe, CARD_LOVERS_SUBSCRIPTION } from '@/lib/stripe';
+import { stripe, CARD_LOVERS_SUBSCRIPTION, getSubscriptionPeriodEnd } from '@/lib/stripe';
 import { upgradeCardLoverToAnnual } from '@/lib/credits';
 
 // Create Supabase client for auth
@@ -102,13 +102,16 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Access period_end from subscription object
-    const periodEnd = (updatedSubscription as unknown as { current_period_end: number }).current_period_end;
+    // Read period_end via the helper — top-level current_period_end is
+    // deprecated by Stripe (returns undefined on newer accounts and would
+    // cause the upgrade to set a wrong / 30-days-from-now period_end on
+    // the user's annual subscription).
+    const periodEnd = getSubscriptionPeriodEnd(updatedSubscription);
 
     // Update our database
     const result = await upgradeCardLoverToAnnual(user.id, {
       subscriptionId: updatedSubscription.id,
-      currentPeriodEnd: new Date(periodEnd * 1000),
+      currentPeriodEnd: periodEnd,
       creditsAlreadyGivenThisCycle: creditsAlreadyGiven,
     });
 

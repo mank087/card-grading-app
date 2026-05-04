@@ -106,3 +106,27 @@ export function getTierByPriceId(priceId: string) {
   }
   return null;
 }
+
+/**
+ * Read a subscription's current period end. Stripe's API moved this field
+ * from `subscription.current_period_end` (top-level, deprecated) to
+ * `subscription.items.data[0].current_period_end`. The deprecated field
+ * returns undefined on newer accounts/products — code that fell through
+ * to a `Date.now() + 30 days` fallback was setting wrong period_end values
+ * (notably broke annual subscriptions, which expired after a month
+ * instead of a year). This helper checks both locations and falls back
+ * gracefully with a warning if neither is set.
+ */
+export function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): Date {
+  const item: any = subscription.items?.data?.[0];
+  const itemTs: number | undefined = item?.current_period_end;
+  const topLevelTs: number | undefined = (subscription as any).current_period_end;
+  if (typeof itemTs === 'number' && itemTs > 0 && isFinite(itemTs)) {
+    return new Date(itemTs * 1000);
+  }
+  if (typeof topLevelTs === 'number' && topLevelTs > 0 && isFinite(topLevelTs)) {
+    return new Date(topLevelTs * 1000);
+  }
+  console.warn('[getSubscriptionPeriodEnd] No valid current_period_end on subscription', subscription.id, '— falling back to 30 days from now');
+  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+}

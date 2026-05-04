@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { stripe } from '@/lib/stripe';
+import { stripe, getSubscriptionPeriodEnd } from '@/lib/stripe';
 
 // Create Supabase client for auth
 function getSupabaseClient(accessToken: string) {
@@ -79,13 +79,15 @@ export async function POST(request: NextRequest) {
       }
     );
 
-    // Access the current_period_end from the subscription object
-    const periodEnd = (subscription as unknown as { current_period_end: number }).current_period_end;
+    // Read period_end via the helper — Stripe deprecated subscription.
+    // current_period_end at the top level (returns undefined on newer
+    // accounts); the helper reads from items.data[0] with fallback.
+    const cancelAt = getSubscriptionPeriodEnd(subscription);
 
     return NextResponse.json({
       success: true,
       message: 'Subscription will be cancelled at the end of the current billing period',
-      cancelAt: new Date(periodEnd * 1000).toISOString(),
+      cancelAt: cancelAt.toISOString(),
     });
   } catch (error) {
     console.error('Error cancelling subscription:', error);

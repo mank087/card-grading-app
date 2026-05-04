@@ -4,7 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { stripe, CARD_LOVERS_SUBSCRIPTION } from '@/lib/stripe';
+import { stripe, CARD_LOVERS_SUBSCRIPTION, getSubscriptionPeriodEnd } from '@/lib/stripe';
 import {
   addCredits,
   updateStripeCustomerId,
@@ -34,28 +34,6 @@ function safeTimestampToDate(timestamp: number | undefined | null): Date {
     return new Date(timestamp * 1000);
   }
   console.warn('[Webhook] Invalid timestamp, using fallback (30 days from now):', timestamp);
-  return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-}
-
-/**
- * Read a subscription's current period end. Stripe's API moved this field
- * from `subscription.current_period_end` (top-level, now deprecated) to
- * `subscription.items.data[0].current_period_end`. Annual subscribers were
- * getting `period_end = signup + 30 days` because the top-level field
- * returned undefined and safeTimestampToDate fell back to "now + 30 days".
- * This helper checks both locations.
- */
-function getSubscriptionPeriodEnd(subscription: Stripe.Subscription): Date {
-  const item: any = subscription.items?.data?.[0];
-  const itemTs: number | undefined = item?.current_period_end;
-  const topLevelTs: number | undefined = (subscription as any).current_period_end;
-  if (typeof itemTs === 'number' && itemTs > 0 && isFinite(itemTs)) {
-    return new Date(itemTs * 1000);
-  }
-  if (typeof topLevelTs === 'number' && topLevelTs > 0 && isFinite(topLevelTs)) {
-    return new Date(topLevelTs * 1000);
-  }
-  console.warn('[Webhook] No valid current_period_end on subscription', subscription.id, '— falling back to 30 days from now');
   return new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 }
 
@@ -437,6 +415,22 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   // Skip initial subscription invoice (handled by checkout.session.completed)
   if (invoice.billing_reason === 'subscription_create') {
     console.log('Initial subscription invoice, skipping (handled by checkout)');
+    return;
+  }
+
+  // Defensive guard: skip if the subscription is cancelled or pending cancel.
+  // Stripe normally doesn't fire invoice.paid for cancelled subscriptions, but
+  // this protects against out-of-order webhook delivery (3-day retry window),
+  // manual webhook replays from the Stripe dashboard, and admin actions on
+  // the Stripe side. Without this guard, a stale invoice.paid arriving after
+  // /api/stripe/cancel-subscription marked the sub cancel_at_period_end
+  // would still credit the user.
+  if (subscription.cancel_at_period_end || subscription.status === 'canceled') {
+    console.log('[handleInvoicePaid] Subscription is cancelled or pending cancellation — skipping renewal credit:', {
+      subscriptionId: subscription.id,
+      status: subscription.status,
+      cancelAtPeriodEnd: subscription.cancel_at_period_end,
+    });
     return;
   }
 

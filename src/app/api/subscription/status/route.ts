@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { stripe, CARD_LOVERS_SUBSCRIPTION, CARD_LOVERS_LOYALTY_BONUSES } from '@/lib/stripe';
+import { stripe, CARD_LOVERS_SUBSCRIPTION, CARD_LOVERS_LOYALTY_BONUSES, getSubscriptionPeriodEnd } from '@/lib/stripe';
 import { activateCardLoverSubscription } from '@/lib/credits';
 
 // Create Supabase client for auth
@@ -118,12 +118,14 @@ export async function GET(request: NextRequest) {
             });
           }
 
-          // Activate in our DB
-          const periodEnd = (cardLoversSub as any).current_period_end;
+          // Activate in our DB. Use the helper to read period_end so annual
+          // subs don't fall through to the "now + 30 days" fallback (the
+          // bug that broke Toby Smart's annual sub before commit bb6d022).
+          const periodEnd = getSubscriptionPeriodEnd(cardLoversSub);
           const result = await activateCardLoverSubscription(user.id, {
             plan,
             subscriptionId: cardLoversSub.id,
-            currentPeriodEnd: new Date(periodEnd * 1000),
+            currentPeriodEnd: periodEnd,
           });
 
           if (result.success) {
@@ -133,7 +135,7 @@ export async function GET(request: NextRequest) {
             userCredits.is_card_lover = true;
             userCredits.card_lover_plan = plan;
             userCredits.card_lover_subscription_id = cardLoversSub.id;
-            userCredits.card_lover_current_period_end = new Date(periodEnd * 1000).toISOString();
+            userCredits.card_lover_current_period_end = periodEnd.toISOString();
             userCredits.card_lover_months_active = plan === 'annual' ? 12 : 1;
             userCredits.show_card_lover_badge = true;
           } else {
@@ -152,10 +154,12 @@ export async function GET(request: NextRequest) {
     if (isActive && userCredits.card_lover_subscription_id) {
       try {
         const subscription = await stripe.subscriptions.retrieve(userCredits.card_lover_subscription_id);
-        const subData = subscription as any;
-        if (subData.cancel_at_period_end) {
+        if (subscription.cancel_at_period_end) {
           cancelAtPeriodEnd = true;
-          cancelAt = new Date(subData.current_period_end * 1000).toISOString();
+          // Use the helper — top-level current_period_end is deprecated;
+          // reading from there returned undefined → wrong cancelAt date
+          // shown on the account page after pending cancellation.
+          cancelAt = getSubscriptionPeriodEnd(subscription).toISOString();
         }
       } catch (stripeError) {
         // Don't fail status check if Stripe lookup fails
