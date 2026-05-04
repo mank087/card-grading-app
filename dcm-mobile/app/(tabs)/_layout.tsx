@@ -21,13 +21,26 @@ function AppHeader() {
   return (
     <View style={[styles.header, { paddingTop: insets.top + 4 }]}>
       {/* Left: DCM Logo */}
-      <TouchableOpacity style={styles.logoContainer} onPress={() => router.push('/(tabs)/grade')} activeOpacity={0.8}>
+      <TouchableOpacity
+        style={styles.logoContainer}
+        onPress={() => router.push('/(tabs)/grade')}
+        activeOpacity={0.8}
+        accessibilityLabel="DCM Grading home"
+        accessibilityRole="button"
+        accessibilityHint="Opens the grade-a-card screen"
+      >
         <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
       </TouchableOpacity>
 
       {/* Right: Quick links + Credits */}
       <View style={styles.headerRight}>
-        <TouchableOpacity style={styles.headerLink} onPress={() => router.push('/pages/label-studio' as any)} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.headerLink}
+          onPress={() => router.push('/pages/label-studio' as any)}
+          activeOpacity={0.7}
+          accessibilityLabel="Open Label Studio"
+          accessibilityRole="button"
+        >
           <Ionicons name="pricetags-outline" size={18} color={Colors.gray[600]} />
           <Text style={styles.headerLinkText}>Labels</Text>
         </TouchableOpacity>
@@ -36,6 +49,8 @@ function AppHeader() {
           style={[styles.creditBadge, { backgroundColor: creditBg }]}
           onPress={() => router.push('/pages/credits' as any)}
           activeOpacity={0.7}
+          accessibilityLabel={`${balance} grading credits remaining. Tap to purchase more.`}
+          accessibilityRole="button"
         >
           <Ionicons name="diamond" size={13} color={creditColor} />
           <Text style={[styles.creditBadgeText, { color: creditColor }]}>{balance}</Text>

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { AppState } from 'react-native'
 import { useGradingQueue, calculateStage } from '@/contexts/GradingQueueContext'
 import { supabase } from '@/lib/supabase'
 
@@ -75,10 +76,26 @@ export function useGradingPoller() {
       }
     }
 
-    // Run once immediately and then on an interval. The interval persists
-    // even when the queue is empty (cheap idle), and tick() bails out fast.
-    tick()
-    timer = setInterval(tick, POLL_INTERVAL_MS)
-    return () => { cancelled = true; if (timer) clearInterval(timer) }
+    // Pause polling when the app is backgrounded. Apple App Review rejects
+    // apps that perform unnecessary network activity in the background, and
+    // it drains battery on Android too. Resume immediately on foreground.
+    const startPolling = () => {
+      if (timer) return
+      tick()
+      timer = setInterval(tick, POLL_INTERVAL_MS)
+    }
+    const stopPolling = () => {
+      if (timer) { clearInterval(timer); timer = null }
+    }
+
+    // Initial state — only poll if app is active.
+    if (AppState.currentState === 'active') startPolling()
+
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') startPolling()
+      else stopPolling() // 'background' or 'inactive'
+    })
+
+    return () => { cancelled = true; stopPolling(); sub.remove() }
   }, [updateCardStatus])
 }

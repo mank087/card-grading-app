@@ -18,10 +18,44 @@ import { Colors } from '@/lib/constants'
 import OnboardingCarousel from '@/components/OnboardingCarousel'
 import HelpBot from '@/components/HelpBot'
 import GradingStatusBar from '@/components/GradingStatusBar'
+import OfflineBanner from '@/components/OfflineBanner'
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 
-export { ErrorBoundary } from 'expo-router'
+// Custom error boundary — expo-router renders this automatically if a route's
+// render throws. Friendly fallback with reset, instead of expo-router's
+// default "An error occurred" generic screen.
+import { View, Text, TouchableOpacity, ScrollView } from 'react-native'
+
+export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  return (
+    <View style={{ flex: 1, backgroundColor: Colors.gray[50], justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+      <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.purple[100], justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
+        <Text style={{ fontSize: 28 }}>⚠️</Text>
+      </View>
+      <Text style={{ fontSize: 18, fontWeight: '700', color: Colors.gray[900], marginBottom: 8, textAlign: 'center' }}>
+        Something went wrong
+      </Text>
+      <Text style={{ fontSize: 14, color: Colors.gray[500], textAlign: 'center', marginBottom: 20, maxWidth: 320 }}>
+        The app hit an unexpected error. Tap Reload to try again — your work is safe.
+      </Text>
+      <TouchableOpacity
+        onPress={retry}
+        accessibilityLabel="Reload app"
+        accessibilityRole="button"
+        style={{ backgroundColor: Colors.purple[600], paddingHorizontal: 32, paddingVertical: 14, borderRadius: 10 }}
+      >
+        <Text style={{ color: '#fff', fontWeight: '700', fontSize: 14 }}>Reload</Text>
+      </TouchableOpacity>
+      {__DEV__ && error?.message && (
+        <ScrollView style={{ maxHeight: 200, marginTop: 24, padding: 12, backgroundColor: '#fef2f2', borderRadius: 8, alignSelf: 'stretch' }}>
+          <Text style={{ fontSize: 11, color: '#991b1b', fontFamily: 'SpaceMono' }}>{error.message}</Text>
+          {error.stack && <Text style={{ fontSize: 9, color: '#991b1b', fontFamily: 'SpaceMono', marginTop: 8 }}>{error.stack}</Text>}
+        </ScrollView>
+      )}
+    </View>
+  )
+}
 
 SplashScreen.preventAutoHideAsync()
 
@@ -102,6 +136,7 @@ export default function RootLayout() {
         <GradingQueueProvider>
           <GradingPollerHost />
           <GradingStatusBar />
+          <OfflineBanner />
         <AuthGate>
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />

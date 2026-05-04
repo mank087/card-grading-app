@@ -1,4 +1,5 @@
-import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Modal, Pressable, Alert } from 'react-native'
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Modal, Pressable, Alert } from 'react-native'
+import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Ionicons } from '@expo/vector-icons'
@@ -56,6 +57,7 @@ export default function CollectionScreen() {
   const [sortBy, setSortBy] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
   const [showSort, setShowSort] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
 
   // ---- Multi-select + batch printing ----------------------------------
   // Long-press a card to enter selection mode; then tap toggles selection.
@@ -94,8 +96,31 @@ export default function CollectionScreen() {
     })
   }, [])
 
+  // Cache key is per-user so different accounts on the same device don't
+  // collide.
+  const cacheKey = session?.user?.id ? `dcm_collection_cache_${session.user.id}` : null
+
+  // Hydrate from AsyncStorage on first mount so users see their cards
+  // immediately while the network fetch happens in the background. Also
+  // means the collection survives going offline (fetch may fail, but
+  // the cached cards still render).
+  useEffect(() => {
+    if (!cacheKey) return
+    AsyncStorage.getItem(cacheKey).then(raw => {
+      if (!raw) return
+      try {
+        const parsed = JSON.parse(raw)
+        if (parsed?.cards && Array.isArray(parsed.cards)) {
+          setCards(parsed.cards)
+          setIsLoading(false)
+        }
+      } catch { /* ignore corrupt cache */ }
+    })
+  }, [cacheKey])
+
   const fetchCollection = useCallback(async () => {
     if (!session?.user?.id) return
+    setFetchError(null)
     try {
       const { data, error } = await supabase
         .from('cards')
@@ -124,8 +149,25 @@ export default function CollectionScreen() {
       }
 
       setCards(data || [])
-    } catch (err) {
+
+      // Persist to AsyncStorage so the next cold start can render instantly
+      // from cache while the fresh fetch runs, and so we have something to
+      // show when the user is offline. Only cache the fields needed for
+      // list/grid rendering — front_url is a 1h-TTL signed URL anyway.
+      if (cacheKey && data) {
+        try {
+          await AsyncStorage.setItem(cacheKey, JSON.stringify({
+            cards: data,
+            cachedAt: Date.now(),
+          }))
+        } catch { /* ignore quota errors */ }
+      }
+    } catch (err: any) {
       console.error('Collection fetch error:', err)
+      // Surface the failure with a retry CTA instead of leaving the user
+      // staring at a perpetual spinner or an empty "No cards" state when
+      // the network is the actual problem.
+      setFetchError(err?.message || 'Could not load your collection.')
     } finally {
       setIsLoading(false)
       setRefreshing(false)
@@ -251,7 +293,10 @@ export default function CollectionScreen() {
     return { total: cards.length, graded: graded.length, totalValue, avgGrade, priced: withPrice.length }
   }, [cards])
 
-  const renderListItem = ({ item }: { item: CardItem }) => {
+  // useCallback keeps these stable across re-renders so FlatList doesn't
+  // see a new function reference on every parent render — matters for
+  // scroll perf at 50+ rows.
+  const renderListItem = useCallback(({ item }: { item: CardItem }) => {
     const name = getDisplayName(item as any)
     const contextParts = getContextLine(item as any)
     const featuresArr = getFeatures(item as any)
@@ -269,6 +314,10 @@ export default function CollectionScreen() {
         onLongPress={() => enterSelectionMode(item.id)}
         delayLongPress={350}
         activeOpacity={0.7}
+        accessibilityLabel={`${name}, grade ${item.conversational_whole_grade ?? 'pending'}. ${selectionMode ? (isSelected ? 'Selected' : 'Not selected') : 'Tap to view details'}`}
+        accessibilityRole="button"
+        accessibilityState={selectionMode ? { selected: isSelected } : undefined}
+        accessibilityHint={selectionMode ? 'Toggles card selection' : 'Long-press to enter multi-select mode'}
       >
         {selectionMode && (
           <View style={[st.checkbox, isSelected && st.checkboxOn]}>
@@ -276,7 +325,7 @@ export default function CollectionScreen() {
           </View>
         )}
         {item.front_url ? (
-          <Image source={{ uri: item.front_url }} style={st.listThumb} resizeMode="cover" />
+          <Image source={item.front_url} style={st.listThumb} contentFit="cover" cachePolicy="disk" transition={150} />
         ) : (
           <View style={[st.listThumb, st.placeholder]}><Text style={st.placeholderText}>DCM</Text></View>
         )}
@@ -302,9 +351,9 @@ export default function CollectionScreen() {
         )}
       </TouchableOpacity>
     )
-  }
+  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router])
 
-  const renderGridItem = ({ item }: { item: CardItem }) => {
+  const renderGridItem = useCallback(({ item }: { item: CardItem }) => {
     const name = getDisplayName(item as any)
     const contextLine = getContextLine(item as any)
     const featuresArr = getFeatures(item as any)
@@ -321,6 +370,10 @@ export default function CollectionScreen() {
         onLongPress={() => enterSelectionMode(item.id)}
         delayLongPress={350}
         activeOpacity={0.85}
+        accessibilityLabel={`${name}, grade ${item.conversational_whole_grade ?? 'pending'}. ${selectionMode ? (isSelected ? 'Selected' : 'Not selected') : 'Tap to view details'}`}
+        accessibilityRole="button"
+        accessibilityState={selectionMode ? { selected: isSelected } : undefined}
+        accessibilityHint={selectionMode ? 'Toggles card selection' : 'Long-press to enter multi-select mode'}
       >
         {selectionMode && (
           <View style={[st.checkbox, st.checkboxFloating, isSelected && st.checkboxOn]}>
@@ -362,10 +415,27 @@ export default function CollectionScreen() {
         </View>
       </TouchableOpacity>
     )
-  }
+  }, [selectionMode, selectedIds, toggleSelected, enterSelectionMode, router, labelStyle, colorOverrides])
 
   if (isLoading) {
     return <View style={st.loadingContainer}><ActivityIndicator size="large" color={Colors.purple[600]} /></View>
+  }
+  if (fetchError && cards.length === 0) {
+    return (
+      <View style={[st.loadingContainer, { padding: 24 }]}>
+        <Ionicons name="cloud-offline-outline" size={64} color={Colors.gray[300]} />
+        <Text style={[st.emptyTitle, { marginTop: 12 }]}>Couldn't load your collection</Text>
+        <Text style={[st.emptySubtitle, { textAlign: 'center', marginBottom: 16 }]}>{fetchError}</Text>
+        <TouchableOpacity
+          onPress={() => { setIsLoading(true); fetchCollection() }}
+          accessibilityLabel="Retry loading collection"
+          accessibilityRole="button"
+          style={{ backgroundColor: Colors.purple[600], paddingHorizontal: 24, paddingVertical: 12, borderRadius: 8 }}
+        >
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Tap to Retry</Text>
+        </TouchableOpacity>
+      </View>
+    )
   }
 
   return (
@@ -374,12 +444,22 @@ export default function CollectionScreen() {
           Mirrors web's collection toolbar with Select All / Clear / count. */}
       {selectionMode && (
         <View style={st.selectionBar}>
-          <TouchableOpacity onPress={exitSelectionMode} style={st.selectionAction}>
+          <TouchableOpacity
+            onPress={exitSelectionMode}
+            style={st.selectionAction}
+            accessibilityLabel="Exit selection mode"
+            accessibilityRole="button"
+          >
             <Ionicons name="close" size={20} color={Colors.gray[700]} />
           </TouchableOpacity>
-          <Text style={st.selectionCount}>{selectedIds.size} selected</Text>
+          <Text style={st.selectionCount} accessibilityLiveRegion="polite">{selectedIds.size} selected</Text>
           <View style={{ flex: 1 }} />
-          <TouchableOpacity onPress={selectAllToggle} style={st.selectionAction}>
+          <TouchableOpacity
+            onPress={selectAllToggle}
+            style={st.selectionAction}
+            accessibilityLabel={allFilteredSelected ? 'Clear all selected cards' : 'Select all visible cards'}
+            accessibilityRole="button"
+          >
             <Text style={st.selectionActionText}>{allFilteredSelected ? 'Clear' : 'Select All'}</Text>
           </TouchableOpacity>
         </View>
@@ -489,6 +569,8 @@ export default function CollectionScreen() {
           <TouchableOpacity
             style={[st.batchBtn, st.batchBtnPrint]}
             onPress={() => setBatchSheetOpen('print')}
+            accessibilityLabel={`Print labels for ${selectedIds.size} selected cards`}
+            accessibilityRole="button"
           >
             <Ionicons name="print" size={18} color="#fff" />
             <Text style={st.batchBtnText}>Print Labels ({selectedIds.size})</Text>
@@ -496,6 +578,8 @@ export default function CollectionScreen() {
           <TouchableOpacity
             style={[st.batchBtn, st.batchBtnReports]}
             onPress={() => setBatchSheetOpen('reports')}
+            accessibilityLabel={`Download reports for ${selectedIds.size} selected cards`}
+            accessibilityRole="button"
           >
             <Ionicons name="document-text" size={18} color="#fff" />
             <Text style={st.batchBtnText}>Reports ({selectedIds.size})</Text>

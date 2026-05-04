@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable, TextInput, KeyboardAvoidingView, Platform, PanResponder } from 'react-native'
+import { Image as ExpoImage } from 'expo-image'
 import * as Clipboard from 'expo-clipboard'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
@@ -239,15 +240,21 @@ export default function CardDetailScreen() {
   }, [card, session?.access_token, buildPriceRequest, fetchCard])
 
   // Auto-refresh on mount when prices are stale (≥7 days) — matches web's 7-day cache TTL.
+  // Defer the network call past first paint so the card detail screen renders
+  // immediately with cached prices (or "—" placeholder) and the new prices
+  // slide in when ready. Without the setTimeout, on slow networks the user
+  // sees a brief render hitch as React schedules the price update during
+  // the same frame as initial layout.
   useEffect(() => {
     if (!card) return
     if (card.conversational_whole_grade == null) return // skip ungraded cards
     const cachedAt = card.dcm_prices_cached_at
     const stale = !cachedAt || (Date.now() - new Date(cachedAt).getTime()) >= 7 * 24 * 60 * 60 * 1000
-    if (stale) {
-      console.log('[card detail] prices stale (cachedAt=' + cachedAt + ') — auto-refreshing')
-      refreshPrice(true)
-    }
+    if (!stale) return
+
+    console.log('[card detail] prices stale (cachedAt=' + cachedAt + ') — auto-refreshing in background')
+    const t = setTimeout(() => { refreshPrice(true) }, 250)
+    return () => clearTimeout(t)
     // Fire once per card load, keyed on card.id.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [card?.id])
@@ -1208,7 +1215,7 @@ export default function CardDetailScreen() {
                         {/* Card image */}
                         {imageUrl && (
                           <View style={{ flex: 1 }}>
-                            <Image source={{ uri: imageUrl }} style={{ width: '100%', aspectRatio: 2.5 / 3.5, borderRadius: 8, borderWidth: 3, borderColor: Colors.purple[300] }} resizeMode="contain" />
+                            <ExpoImage source={imageUrl} style={{ width: '100%', aspectRatio: 2.5 / 3.5, borderRadius: 8, borderWidth: 3, borderColor: Colors.purple[300] }} contentFit="contain" cachePolicy="disk" transition={150} />
                           </View>
                         )}
                       </View>

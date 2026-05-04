@@ -40,3 +40,7 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+
+# Compressed image backups (originals, not bundled)
+assets/images-originals/

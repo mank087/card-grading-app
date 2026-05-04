@@ -1,4 +1,9 @@
+import { memo } from 'react'
 import { View, Text, Image, StyleSheet } from 'react-native'
+// expo-image gives us automatic disk caching for remote Supabase signed URLs.
+// The bundled logo (used with tintColor below) stays on react-native Image
+// since tintColor support is more reliable there.
+import { Image as ExpoImage } from 'expo-image'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -69,7 +74,7 @@ function dynamicNameFontSize(name: string, base: number): number {
   return base
 }
 
-export default function SlabCard({
+function SlabCardImpl({
   imageUrl,
   displayName,
   contextLine,
@@ -261,7 +266,7 @@ export default function SlabCard({
         {/* Card image */}
         <View style={styles.imageContainer}>
           {imageUrl ? (
-            <Image source={{ uri: imageUrl }} style={styles.cardImage} resizeMode="contain" />
+            <ExpoImage source={imageUrl} style={styles.cardImage} contentFit="contain" cachePolicy="disk" transition={150} />
           ) : (
             <View style={[styles.cardImage, styles.placeholderImage]}>
               <Text style={styles.placeholderText}>No Image</Text>
@@ -272,6 +277,12 @@ export default function SlabCard({
     </View>
   )
 }
+
+// Memoize so the collection grid doesn't re-render every tile when a sibling
+// changes (e.g., search input updates, sort flips). Default shallow prop
+// equality is enough — most props are primitives or stable references.
+const SlabCard = memo(SlabCardImpl);
+export default SlabCard;
 
 const styles = StyleSheet.create({
   slabWrapper: {
