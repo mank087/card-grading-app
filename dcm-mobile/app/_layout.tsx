@@ -10,6 +10,14 @@ try {
 } catch {
   StripeProvider = ({ children }: any) => children
 }
+// Sentry — wrapped in try/catch for the same reason as Stripe: native module
+// unavailable in Expo Go. captureException is a no-op when not initialized.
+let Sentry: any = { init: () => {}, captureException: () => {} }
+try {
+  Sentry = require('@sentry/react-native')
+} catch {
+  // Expo Go path — keep the no-op shim
+}
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
@@ -21,6 +29,16 @@ import GradingStatusBar from '@/components/GradingStatusBar'
 import OfflineBanner from '@/components/OfflineBanner'
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || ''
+
+if (SENTRY_DSN && !__DEV__) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    tracesSampleRate: 0.1,
+    enableAutoSessionTracking: true,
+    enableNative: true,
+  })
+}
 
 // Custom error boundary — expo-router renders this automatically if a route's
 // render throws. Friendly fallback with reset, instead of expo-router's
@@ -28,6 +46,9 @@ const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native'
 
 export function ErrorBoundary({ error, retry }: { error: Error; retry: () => void }) {
+  useEffect(() => {
+    if (error) Sentry.captureException(error)
+  }, [error])
   return (
     <View style={{ flex: 1, backgroundColor: Colors.gray[50], justifyContent: 'center', alignItems: 'center', padding: 24 }}>
       <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.purple[100], justifyContent: 'center', alignItems: 'center', marginBottom: 16 }}>
@@ -58,6 +79,16 @@ export function ErrorBoundary({ error, retry }: { error: Error; retry: () => voi
 }
 
 SplashScreen.preventAutoHideAsync()
+
+// Cap Dynamic Type / Android font scaling at 1.5x. Without a cap, the
+// "Accessibility Sizes" range (up to ~3.5x) blows out fixed-height labels,
+// tab bars, and tile layouts. 1.5x supports the common "Larger Text"
+// accessibility settings while keeping the UI intact.
+import { Text as RNText, TextInput as RNTextInput } from 'react-native'
+;(RNText as any).defaultProps = (RNText as any).defaultProps || {}
+;(RNText as any).defaultProps.maxFontSizeMultiplier = 1.5
+;(RNTextInput as any).defaultProps = (RNTextInput as any).defaultProps || {}
+;(RNTextInput as any).defaultProps.maxFontSizeMultiplier = 1.5
 
 // Auth guard — the 4-panel welcome carousel is the default home for any
 // unauthenticated user, including users who just logged out. From there

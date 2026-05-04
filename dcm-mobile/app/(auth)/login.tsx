@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image, TouchableOpacity } from 'react-native'
 import { Link } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -8,6 +8,8 @@ import Button from '@/components/ui/Button'
 import { supabase } from '@/lib/supabase'
 import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
+import * as AppleAuthentication from 'expo-apple-authentication'
+import * as Crypto from 'expo-crypto'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -19,6 +21,51 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [appleAvailable, setAppleAvailable] = useState(false)
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false))
+    }
+  }, [])
+
+  const handleApple = async () => {
+    setError(null)
+    setOauthLoading('apple')
+    try {
+      // Apple requires a hashed nonce in the request and Supabase verifies the
+      // raw nonce against the JWT's hashed `nonce` claim — see
+      // https://supabase.com/docs/guides/auth/social-login/auth-apple#using-the-react-native-package
+      const rawNonce = `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      )
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      })
+      if (!credential.identityToken) {
+        throw new Error('Apple did not return an identity token')
+      }
+      const { error: authError } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+        nonce: rawNonce,
+      })
+      if (authError) setError(authError.message)
+    } catch (err: any) {
+      // ERR_REQUEST_CANCELED is the user dismissing the sheet — not an error
+      if (err?.code !== 'ERR_REQUEST_CANCELED') {
+        setError(err?.message || 'Apple sign in failed')
+      }
+    } finally {
+      setOauthLoading(null)
+    }
+  }
 
   const handleLogin = async () => {
     if (!email.trim() || !password) {
@@ -93,7 +140,19 @@ export default function LoginScreen() {
             </View>
           )}
 
-          {/* OAuth Buttons */}
+          {/* OAuth Buttons. Apple is rendered first on iOS to satisfy
+              App Store Review Guideline 4.8, which requires SIWA to be at
+              least as prominent as other social login options. */}
+          {appleAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={10}
+              style={styles.appleButton}
+              onPress={handleApple}
+            />
+          )}
+
           <TouchableOpacity
             style={[styles.oauthButton, styles.googleButton]}
             onPress={() => handleOAuth('google')}
@@ -222,6 +281,10 @@ const styles = StyleSheet.create({
   errorText: { color: Colors.red[600], fontSize: 14 },
 
   // OAuth
+  appleButton: {
+    height: 50,
+    width: '100%',
+  },
   oauthButton: {
     flexDirection: 'row',
     alignItems: 'center',

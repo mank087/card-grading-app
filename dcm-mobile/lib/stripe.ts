@@ -76,7 +76,7 @@ export async function purchaseCredits(tier: string): Promise<{
       customerId: data.customerId,
       merchantDisplayName: 'DCM Grading',
       allowsDelayedPaymentMethods: false,
-      style: 'alwaysDark',
+      style: 'automatic',
     })
 
     if (initError) {

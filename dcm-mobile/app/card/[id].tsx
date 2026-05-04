@@ -31,6 +31,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors, GradeColors, ConfidenceColors } from '@/lib/constants'
+import { formatDate } from '@/lib/locale'
 import { Card } from '@/lib/types'
 import GradeBadge from '@/components/ui/GradeBadge'
 import SubgradeBar from '@/components/grading/SubgradeBar'
@@ -1571,7 +1572,7 @@ export default function CardDetailScreen() {
                   <View style={{ flex: 1 }}>
                     {matchConf && <Text style={s.priceNote}>Match: {matchConf}{prodName ? ` · ${prodName}` : ''}</Text>}
                     {card.dcm_prices_cached_at
-                      ? <Text style={s.priceNote}>Updated: {new Date(card.dcm_prices_cached_at).toLocaleDateString()}</Text>
+                      ? <Text style={s.priceNote}>Updated: {formatDate(card.dcm_prices_cached_at, { year: 'numeric', month: 'short', day: 'numeric' })}</Text>
                       : <Text style={s.priceNote}>Pricing data has not been fetched yet.</Text>}
                   </View>
                   <TouchableOpacity
@@ -2046,7 +2047,7 @@ export default function CardDetailScreen() {
             card.conversational_prompt_version ||
             null
           const gradedAt = card.created_at
-            ? new Date(card.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+            ? formatDate(card.created_at)
             : null
           if (!promptVersion && !gradedAt) return null
           return (
