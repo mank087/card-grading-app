@@ -1,7 +1,9 @@
-import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ActivityIndicator, TextInput, ScrollView } from 'react-native'
+import { View, Text, FlatList, StyleSheet, Image, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Modal, Pressable, Alert } from 'react-native'
 import { useRouter } from 'expo-router'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Ionicons } from '@expo/vector-icons'
+import * as WebBrowser from 'expo-web-browser'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
@@ -54,6 +56,32 @@ export default function CollectionScreen() {
   const [sortBy, setSortBy] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
   const [showSort, setShowSort] = useState(false)
+
+  // ---- Multi-select + batch printing ----------------------------------
+  // Long-press a card to enter selection mode; then tap toggles selection.
+  // Tap-out-of-mode behavior preserved (single tap navigates to /card/[id]).
+  // Bottom action bar appears when at least one card is selected.
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchSheetOpen, setBatchSheetOpen] = useState<null | 'print' | 'reports'>(null)
+  const [positionPicker, setPositionPicker] = useState<null | { type: string; sheet: 'avery6871' | 'avery8167'; format?: 'duplex' | 'foldover' }>(null)
+  const [pickerStartPosition, setPickerStartPosition] = useState(0)
+
+  const enterSelectionMode = useCallback((firstId?: string) => {
+    setSelectionMode(true)
+    if (firstId) setSelectedIds(new Set([firstId]))
+  }, [])
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+  }, [])
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }, [])
 
   const fetchCollection = useCallback(async () => {
     if (!session?.user?.id) return
@@ -140,6 +168,69 @@ export default function CollectionScreen() {
     return result
   }, [cards, category, search, sortBy, sortAsc])
 
+  // Select-all toggles between selecting every visible (filtered) card and
+  // clearing — same UX as web's collection toolbar.
+  const allFilteredSelected = filteredCards.length > 0 && filteredCards.every(c => selectedIds.has(c.id))
+  const selectAllToggle = useCallback(() => {
+    if (allFilteredSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filteredCards.map(c => c.id)))
+    }
+  }, [filteredCards, allFilteredSelected])
+
+  // Open the batch download URL on the web in an in-app browser. Mirrors
+  // the single-card pattern in label-studio.tsx + card/[id].tsx — same
+  // download UX (file lands in device Downloads via the browser's native
+  // download manager).
+  const openBatchDownload = useCallback(async (
+    type: string,
+    opts?: { format?: 'duplex' | 'foldover'; positions?: number[] }
+  ) => {
+    if (!session?.access_token) { Alert.alert('Not signed in'); return }
+    if (selectedIds.size === 0) { Alert.alert('Select cards first'); return }
+    // Batch size limits — full reports run heavier than labels (per-card
+    // pages with images + react-pdf rendering). Match the server-side cap
+    // in /label-export/batch (100) and warn earlier for full reports.
+    const fullReportCap = 50
+    const labelCap = 100
+    const cap = type === 'full-report' ? fullReportCap : labelCap
+    if (selectedIds.size > cap) {
+      Alert.alert(
+        'Too many cards',
+        `${type === 'full-report' ? 'Full reports' : 'Labels'} are capped at ${cap} cards per batch (you selected ${selectedIds.size}). Try a smaller selection or split into multiple batches.`,
+      )
+      return
+    }
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    const cardIds = Array.from(selectedIds).join(',')
+    const params = new URLSearchParams()
+    params.set('token', session.access_token)
+    params.set('cardIds', cardIds)
+    params.set('type', type)
+    if (opts?.format) params.set('format', opts.format)
+    if (opts?.positions && opts.positions.length > 0) params.set('positions', opts.positions.join(','))
+    params.set('download', '1')
+    const url = `${API_BASE}/label-export/batch?${params.toString()}`
+    try {
+      await WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        controlsColor: Colors.purple[600],
+        toolbarColor: '#ffffff',
+      })
+    } catch (err: any) {
+      Alert.alert('Could not open download', err?.message || 'Try again.')
+    }
+  }, [session?.access_token, selectedIds])
+
+  // Avery types need a starting position. Mirrors the single-card position
+  // picker on the card detail page; cards beyond the start auto-fill in
+  // sheet order (overflow paginates automatically — see Phase 4 in plan).
+  const buildSequentialPositions = useCallback((start: number) => {
+    const n = selectedIds.size
+    return Array.from({ length: n }, (_, i) => start + i)
+  }, [selectedIds.size])
+
   // Stats
   const stats = useMemo(() => {
     const graded = cards.filter(c => c.conversational_whole_grade != null)
@@ -155,9 +246,24 @@ export default function CollectionScreen() {
     const featuresArr = getFeatures(item as any)
     const condition = item.conversational_condition_label || ''
     const price = item.dcm_price_estimate || item.ebay_price_median
+    const isSelected = selectedIds.has(item.id)
 
     return (
-      <TouchableOpacity style={st.listItem} onPress={() => router.push(`/card/${item.id}`)} activeOpacity={0.7}>
+      <TouchableOpacity
+        style={[st.listItem, isSelected && st.listItemSelected]}
+        onPress={() => {
+          if (selectionMode) toggleSelected(item.id)
+          else router.push(`/card/${item.id}`)
+        }}
+        onLongPress={() => enterSelectionMode(item.id)}
+        delayLongPress={350}
+        activeOpacity={0.7}
+      >
+        {selectionMode && (
+          <View style={[st.checkbox, isSelected && st.checkboxOn]}>
+            {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </View>
+        )}
         {item.front_url ? (
           <Image source={{ uri: item.front_url }} style={st.listThumb} resizeMode="cover" />
         ) : (
@@ -193,8 +299,23 @@ export default function CollectionScreen() {
     const featuresArr = getFeatures(item as any)
     const isPublic = item.visibility === 'public'
     const price = item.dcm_price_estimate || item.ebay_price_median
+    const isSelected = selectedIds.has(item.id)
     return (
-      <TouchableOpacity style={st.gridItem} onPress={() => router.push(`/card/${item.id}`)} activeOpacity={0.85}>
+      <TouchableOpacity
+        style={[st.gridItem, isSelected && st.gridItemSelected]}
+        onPress={() => {
+          if (selectionMode) toggleSelected(item.id)
+          else router.push(`/card/${item.id}`)
+        }}
+        onLongPress={() => enterSelectionMode(item.id)}
+        delayLongPress={350}
+        activeOpacity={0.85}
+      >
+        {selectionMode && (
+          <View style={[st.checkbox, st.checkboxFloating, isSelected && st.checkboxOn]}>
+            {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
+          </View>
+        )}
         <SlabCard
           imageUrl={item.front_url || null}
           displayName={name}
@@ -238,6 +359,21 @@ export default function CollectionScreen() {
 
   return (
     <View style={st.container}>
+      {/* Selection mode header — shows when user has long-pressed a card.
+          Mirrors web's collection toolbar with Select All / Clear / count. */}
+      {selectionMode && (
+        <View style={st.selectionBar}>
+          <TouchableOpacity onPress={exitSelectionMode} style={st.selectionAction}>
+            <Ionicons name="close" size={20} color={Colors.gray[700]} />
+          </TouchableOpacity>
+          <Text style={st.selectionCount}>{selectedIds.size} selected</Text>
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity onPress={selectAllToggle} style={st.selectionAction}>
+            <Text style={st.selectionActionText}>{allFilteredSelected ? 'Clear' : 'Select All'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Search + Sort + View Toggle */}
       <View style={st.toolbar}>
         <View style={st.searchContainer}>
@@ -317,7 +453,6 @@ export default function CollectionScreen() {
         renderItem={viewMode === 'list' ? renderListItem : renderGridItem}
         numColumns={viewMode === 'grid' ? 2 : 1}
         key={viewMode}
-        contentContainerStyle={viewMode === 'grid' ? st.gridContainer : st.listContainer}
         refreshing={refreshing}
         onRefresh={onRefresh}
         removeClippedSubviews
@@ -333,10 +468,199 @@ export default function CollectionScreen() {
             </Text>
           </View>
         }
+        contentContainerStyle={[viewMode === 'grid' ? st.gridContainer : st.listContainer, selectionMode && selectedIds.size > 0 ? { paddingBottom: 96 } : undefined]}
       />
+
+      {/* Batch action bar — shows when at least one card is selected.
+          Two buttons mirror web's "Print" + "Download" dropdowns. */}
+      {selectionMode && selectedIds.size > 0 && (
+        <View style={st.batchBar}>
+          <TouchableOpacity
+            style={[st.batchBtn, st.batchBtnPrint]}
+            onPress={() => setBatchSheetOpen('print')}
+          >
+            <Ionicons name="print" size={18} color="#fff" />
+            <Text style={st.batchBtnText}>Print Labels ({selectedIds.size})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[st.batchBtn, st.batchBtnReports]}
+            onPress={() => setBatchSheetOpen('reports')}
+          >
+            <Ionicons name="document-text" size={18} color="#fff" />
+            <Text style={st.batchBtnText}>Reports ({selectedIds.size})</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Batch type-selection sheet (Print Labels / Download Reports).
+          Mirrors the web's two dropdowns from src/app/collection/page.tsx. */}
+      <Modal visible={!!batchSheetOpen} transparent animationType="slide" onRequestClose={() => setBatchSheetOpen(null)}>
+        <Pressable style={st.sheetBackdrop} onPress={() => setBatchSheetOpen(null)}>
+          <Pressable style={st.sheet} onPress={e => e.stopPropagation()}>
+            <View style={st.sheetHandle} />
+            <Text style={st.sheetTitle}>
+              {batchSheetOpen === 'print' ? 'Print Labels' : 'Download Reports'}
+            </Text>
+            <Text style={st.sheetSubtitle}>{selectedIds.size} card{selectedIds.size === 1 ? '' : 's'} selected · same options as web</Text>
+            <ScrollView style={{ maxHeight: 480 }}>
+              {batchSheetOpen === 'print' && BATCH_PRINT_TYPES.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={st.sheetItem}
+                  onPress={() => {
+                    setBatchSheetOpen(null)
+                    // Avery types prompt for starting position first
+                    if (item.id === 'onetouch') {
+                      setPositionPicker({ type: item.id, sheet: 'avery6871' })
+                      AsyncStorage.getItem('dcm_avery6871_last_pos').then(p => setPickerStartPosition(p ? parseInt(p, 10) || 0 : 0))
+                      return
+                    }
+                    if (item.id === 'toploader' || item.id === 'foldover') {
+                      setPositionPicker({ type: item.id, sheet: 'avery8167' })
+                      AsyncStorage.getItem('dcm_avery8167_last_pos').then(p => setPickerStartPosition(p ? parseInt(p, 10) || 0 : 0))
+                      return
+                    }
+                    // Slab labels prompt for duplex vs foldover
+                    if (item.needsFormat) {
+                      Alert.alert(item.name, 'Choose print format', [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Duplex (front+back)', onPress: () => openBatchDownload(item.id, { format: 'duplex' }) },
+                        { text: 'Fold-Over', onPress: () => openBatchDownload(item.id, { format: 'foldover' }) },
+                      ])
+                      return
+                    }
+                    openBatchDownload(item.id)
+                  }}
+                >
+                  <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.sheetItemName}>{item.name}</Text>
+                    <Text style={st.sheetItemDesc}>{item.desc}</Text>
+                  </View>
+                  <Ionicons name="download-outline" size={16} color={Colors.gray[400]} />
+                </TouchableOpacity>
+              ))}
+              {batchSheetOpen === 'reports' && BATCH_REPORT_TYPES.map(item => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={st.sheetItem}
+                  onPress={() => { setBatchSheetOpen(null); openBatchDownload(item.id) }}
+                >
+                  <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={st.sheetItemName}>{item.name}</Text>
+                    <Text style={st.sheetItemDesc}>{item.desc}</Text>
+                  </View>
+                  <Ionicons name="download-outline" size={16} color={Colors.gray[400]} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Position picker for Avery 6871 (one-touch) and 8167 (toploader/
+          foldover). User picks the FIRST position; selected cards
+          auto-fill subsequent positions sequentially across pages.
+          Persists last-used start position per Avery type. */}
+      <Modal visible={!!positionPicker} transparent animationType="slide" onRequestClose={() => setPositionPicker(null)}>
+        <Pressable style={st.sheetBackdrop} onPress={() => setPositionPicker(null)}>
+          <Pressable style={st.sheet} onPress={e => e.stopPropagation()}>
+            <View style={st.sheetHandle} />
+            {positionPicker && (() => {
+              const cfg = positionPicker.sheet === 'avery6871'
+                ? { rows: 6, cols: 3, total: 18, label: 'Avery 6871 — 18 labels (3 × 6)', storageKey: 'dcm_avery6871_last_pos' }
+                : { rows: 20, cols: 4, total: 80, label: 'Avery 8167 — 80 labels (4 × 20)', storageKey: 'dcm_avery8167_last_pos' }
+              const n = selectedIds.size
+              const startPage = Math.floor(pickerStartPosition / cfg.total)
+              const endGlobal = pickerStartPosition + n - 1
+              const endPage = Math.floor(endGlobal / cfg.total)
+              const pages = endPage - startPage + 1
+              return (
+                <>
+                  <Text style={st.sheetTitle}>Choose Starting Position</Text>
+                  <Text style={st.sheetSubtitle}>{cfg.label} · {n} card{n === 1 ? '' : 's'} fill positions {pickerStartPosition + 1}–{endGlobal + 1}{pages > 1 ? ` across ${pages} pages` : ''}</Text>
+                  <ScrollView style={{ maxHeight: 320 }}>
+                    <View style={{ alignSelf: 'center', flexDirection: 'column', gap: 4, padding: 4 }}>
+                      {Array.from({ length: cfg.rows }).map((_, r) => (
+                        <View key={r} style={{ flexDirection: 'row', gap: 4 }}>
+                          {Array.from({ length: cfg.cols }).map((_, c) => {
+                            const idx = r * cfg.cols + c
+                            // Highlight: green = start, lavender = filled, gray = empty
+                            const isStart = idx === pickerStartPosition % cfg.total
+                            const inRange = idx >= (pickerStartPosition % cfg.total) && idx < Math.min(cfg.total, (pickerStartPosition % cfg.total) + n)
+                            const cellSize = positionPicker.sheet === 'avery8167' ? 28 : 48
+                            return (
+                              <TouchableOpacity
+                                key={c}
+                                onPress={() => setPickerStartPosition(idx)}
+                                style={{
+                                  width: cellSize,
+                                  height: cellSize * 0.7,
+                                  borderRadius: 4,
+                                  borderWidth: isStart ? 2 : 1,
+                                  borderColor: isStart ? Colors.purple[600] : Colors.gray[300],
+                                  backgroundColor: isStart ? Colors.purple[600] : (inRange ? Colors.purple[100] : '#fff'),
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                }}
+                              >
+                                <Text style={{ fontSize: positionPicker.sheet === 'avery8167' ? 8 : 11, fontWeight: '700', color: isStart ? '#fff' : (inRange ? Colors.purple[700] : Colors.gray[500]) }}>
+                                  {idx + 1}
+                                </Text>
+                              </TouchableOpacity>
+                            )
+                          })}
+                        </View>
+                      ))}
+                    </View>
+                  </ScrollView>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                    <TouchableOpacity style={[st.btn, st.btnCancel]} onPress={() => setPositionPicker(null)}>
+                      <Text style={st.btnCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[st.btn, st.btnPrimary]}
+                      onPress={async () => {
+                        await AsyncStorage.setItem(cfg.storageKey, String(pickerStartPosition))
+                        const positions = buildSequentialPositions(pickerStartPosition)
+                        const t = positionPicker.type
+                        setPositionPicker(null)
+                        openBatchDownload(t, { positions })
+                      }}
+                    >
+                      <Text style={st.btnPrimaryText}>Generate {n} label{n === 1 ? '' : 's'} →</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              )
+            })()}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   )
 }
+
+// Batch print types — mirror web's collection page Print dropdown
+// (src/app/collection/page.tsx). Slab variants prompt for format; Avery
+// variants prompt for sheet starting position.
+const BATCH_PRINT_TYPES: Array<{ id: string; name: string; desc: string; icon: string; needsFormat?: boolean }> = [
+  { id: 'slab-modern',         name: 'Graded Slab — Modern',      desc: 'Dark gradient label PDF (2.8" × 0.8")', icon: 'card', needsFormat: true },
+  { id: 'slab-traditional',    name: 'Graded Slab — Traditional', desc: 'Light/white classic slab label PDF', icon: 'card-outline', needsFormat: true },
+  { id: 'slab-custom',         name: 'Graded Slab — Custom',      desc: 'Use your saved custom label style', icon: 'color-palette', needsFormat: true },
+  { id: 'onetouch',            name: 'Magnetic One-Touch',        desc: 'Avery 6871 — pick starting position', icon: 'magnet' },
+  { id: 'toploader',           name: 'Toploader Front + Back',    desc: 'Avery 8167 — pick starting position', icon: 'copy' },
+  { id: 'foldover',            name: 'Fold-Over Toploader',       desc: 'Avery 8167 fold-over — pick start position', icon: 'reader' },
+  { id: 'card-image-modern',   name: 'Card Image — Modern',       desc: 'JPG with modern dark slab label', icon: 'image' },
+  { id: 'card-image-traditional', name: 'Card Image — Traditional', desc: 'JPG with traditional light slab label', icon: 'image-outline' },
+]
+
+const BATCH_REPORT_TYPES: Array<{ id: string; name: string; desc: string; icon: string }> = [
+  { id: 'full-report',     name: 'Full Grading Report',  desc: 'Complete PDF — grades, sub-grades, defect detail, card images', icon: 'document-text' },
+  { id: 'mini-report-pdf', name: 'Mini-Report (PDF)',    desc: 'Foldable summary card per card — fold or cut to 2.5" × 3.5"', icon: 'document' },
+  { id: 'mini-report',     name: 'Mini-Report Image',    desc: 'JPG version per card for marketplaces', icon: 'image' },
+]
 
 const st = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray[50] },
@@ -370,6 +694,43 @@ const st = StyleSheet.create({
   // List view
   listContainer: { padding: 12 },
   listItem: { backgroundColor: Colors.white, borderRadius: 12, padding: 12, flexDirection: 'row', alignItems: 'center', marginBottom: 8, borderWidth: 1, borderColor: Colors.gray[200], gap: 12 },
+  listItemSelected: { borderColor: Colors.purple[600], backgroundColor: Colors.purple[50] },
+  gridItemSelected: { borderColor: Colors.purple[600], borderWidth: 2 },
+
+  // Selection-mode header bar
+  selectionBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: Colors.purple[50], borderBottomWidth: 1, borderBottomColor: Colors.purple[200], gap: 12 },
+  selectionAction: { paddingHorizontal: 8, paddingVertical: 4 },
+  selectionActionText: { fontSize: 13, fontWeight: '700', color: Colors.purple[700] },
+  selectionCount: { fontSize: 14, fontWeight: '700', color: Colors.purple[700] },
+
+  // Per-item checkbox
+  checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: Colors.gray[300], alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  checkboxOn: { backgroundColor: Colors.purple[600], borderColor: Colors.purple[600] },
+  checkboxFloating: { position: 'absolute', top: 6, left: 6, zIndex: 10, shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 2, shadowOffset: { width: 0, height: 1 }, elevation: 3 },
+
+  // Bottom batch action bar
+  batchBar: { position: 'absolute', bottom: 0, left: 0, right: 0, flexDirection: 'row', backgroundColor: Colors.white, paddingHorizontal: 12, paddingVertical: 10, paddingBottom: 18, gap: 8, borderTopWidth: 1, borderTopColor: Colors.gray[200], shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 6, shadowOffset: { width: 0, height: -2 }, elevation: 8 },
+  batchBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, borderRadius: 10 },
+  batchBtnPrint: { backgroundColor: Colors.purple[600] },
+  batchBtnReports: { backgroundColor: Colors.blue[600] },
+  batchBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  // Bottom-sheet (batch type pickers + position picker)
+  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end' },
+  sheet: { backgroundColor: '#fff', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 28 },
+  sheetHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: Colors.gray[300], alignSelf: 'center', marginBottom: 10 },
+  sheetTitle: { fontSize: 16, fontWeight: '700', color: Colors.gray[900], paddingHorizontal: 8 },
+  sheetSubtitle: { fontSize: 12, color: Colors.gray[500], paddingHorizontal: 8, marginTop: 2, marginBottom: 10 },
+  sheetItem: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 },
+  sheetItemName: { fontSize: 13, fontWeight: '700', color: Colors.gray[900] },
+  sheetItemDesc: { fontSize: 10, color: Colors.gray[500], marginTop: 2 },
+
+  // Buttons (sheet footer)
+  btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
+  btnCancel: { backgroundColor: Colors.gray[100] },
+  btnCancelText: { fontSize: 13, fontWeight: '700', color: Colors.gray[700] },
+  btnPrimary: { backgroundColor: Colors.purple[600] },
+  btnPrimaryText: { fontSize: 13, fontWeight: '700', color: '#fff' },
   listThumb: { width: 50, height: 70, borderRadius: 6 },
   placeholder: { backgroundColor: Colors.gray[200], alignItems: 'center', justifyContent: 'center' },
   placeholderText: { color: Colors.gray[400], fontSize: 10, fontWeight: '700' },
