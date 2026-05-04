@@ -30,8 +30,14 @@
  * dismisses it.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+
+// Skip static prerender — useSearchParams() reads runtime URL params and the
+// page generates Blobs in the browser. Without this, Next 14+ throws
+// "useSearchParams() should be wrapped in a suspense boundary" during the
+// build's static-export phase.
+export const dynamic = 'force-dynamic';
 import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { generateBatchSlabLabels, generateBatchFoldOverSlabLabels } from '@/lib/slabLabelGenerator';
@@ -104,7 +110,20 @@ async function imageToJpegBase64(imageUrl: string): Promise<string> {
 
 interface DoneFile { name: string; url: string; mime: string }
 
+// Wrap the inner client component in Suspense so Next.js's static-export
+// pass doesn't bail on useSearchParams(). Without this, the build fails
+// with "useSearchParams() should be wrapped in a suspense boundary".
 export default function BatchLabelExportPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ padding: 24, fontFamily: 'system-ui, sans-serif' }}>Loading…</div>
+    }>
+      <BatchLabelExportInner />
+    </Suspense>
+  );
+}
+
+function BatchLabelExportInner() {
   const sp = useSearchParams();
   const token = sp.get('token') || '';
   const cardIdsParam = sp.get('cardIds') || '';
