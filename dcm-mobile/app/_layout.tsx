@@ -2,8 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useState, useCallback } from 'react'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useEffect, useCallback } from 'react'
 // StripeProvider wrapped in try/catch — fails gracefully in Expo Go
 let StripeProvider: any
 try {
@@ -26,47 +25,41 @@ export { ErrorBoundary } from 'expo-router'
 
 SplashScreen.preventAutoHideAsync()
 
-// Auth guard — shows onboarding for first-time users, redirects to login otherwise
+// Auth guard — the 4-panel welcome carousel is the default home for any
+// unauthenticated user, including users who just logged out. From there
+// they tap Get Started (register) or Sign In (login). The login/register
+// screens are pushed onto the stack so back-navigating returns to the
+// carousel rather than exiting the app.
 function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth()
   const segments = useSegments()
   const router = useRouter()
-  const [showOnboarding, setShowOnboarding] = useState<boolean | null>(null)
 
-  // Check if user has seen onboarding
+  // Bounce authenticated users off the auth screens straight into the app.
   useEffect(() => {
-    AsyncStorage.getItem('dcm_onboarding_seen').then(val => {
-      setShowOnboarding(val !== 'true')
-    })
-  }, [])
-
-  useEffect(() => {
-    if (isLoading || showOnboarding === null) return
-
+    if (isLoading) return
     const inAuthGroup = segments[0] === '(auth)'
-
-    if (!user && !inAuthGroup && !showOnboarding) {
-      router.replace('/(auth)/login')
-    } else if (user && inAuthGroup) {
+    if (user && inAuthGroup) {
       router.replace('/(tabs)/grade')
     }
-  }, [user, isLoading, segments, showOnboarding])
+  }, [user, isLoading, segments, router])
 
   const handleGetStarted = useCallback(() => {
-    AsyncStorage.setItem('dcm_onboarding_seen', 'true')
-    setShowOnboarding(false)
-    router.replace('/(auth)/register')
+    router.push('/(auth)/register' as any)
   }, [router])
 
   const handleSignIn = useCallback(() => {
-    AsyncStorage.setItem('dcm_onboarding_seen', 'true')
-    setShowOnboarding(false)
-    router.replace('/(auth)/login')
+    router.push('/(auth)/login' as any)
   }, [router])
 
-  // Show onboarding for first-time unauthenticated users
-  if (!user && showOnboarding && !isLoading) {
-    return <OnboardingCarousel onGetStarted={handleGetStarted} onSignIn={handleSignIn} />
+  // Unauthenticated users always see the welcome carousel as the home
+  // screen, except when they've explicitly navigated to login/register.
+  // Logging out drops them back here.
+  if (!isLoading && !user) {
+    const inAuthGroup = segments[0] === '(auth)'
+    if (!inAuthGroup) {
+      return <OnboardingCarousel onGetStarted={handleGetStarted} onSignIn={handleSignIn} />
+    }
   }
 
   return <>{children}</>
