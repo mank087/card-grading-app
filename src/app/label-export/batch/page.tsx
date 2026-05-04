@@ -51,7 +51,7 @@ import { generateBatchFoldableLabels, generateQRCodeWithLogo, loadLogoAsBase64, 
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { pdf } from '@react-pdf/renderer';
-import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
+import { BatchCardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 
 declare global {
   interface Window {
@@ -133,6 +133,20 @@ function BatchLabelExportInner() {
   const positionsParam = sp.get('positions') || '';
   const positions = positionsParam ? positionsParam.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n >= 0) : [];
   const inlineCustomConfigRaw = sp.get('customConfig');
+  // Avery printer calibration offsets (per BatchAveryLabelModal). Mobile app
+  // can pass &calibration=eyJ4Ijo...== (base64-encoded {"x":0,"y":0}) to
+  // shift all printed labels by that delta in points. Defaults to (0,0)
+  // which matches the single-card mobile flow.
+  const calibrationRaw = sp.get('calibration');
+  const calibrationOffsets = (() => {
+    if (!calibrationRaw) return undefined;
+    try {
+      const decoded = JSON.parse(atob(decodeURIComponent(calibrationRaw)));
+      const x = Number(decoded?.x) || 0;
+      const y = Number(decoded?.y) || 0;
+      return { x, y };
+    } catch { return undefined; }
+  })();
   const downloadMode = sp.get('download') === '1' || (typeof window !== 'undefined' && !window.ReactNativeWebView);
 
   const [status, setStatus] = useState('Initializing…');
@@ -234,7 +248,7 @@ function BatchLabelExportInner() {
             grade,
             gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
             condition: labelData.condition,
-            isAlteredAuthentic: false,
+            isAlteredAuthentic: !!(labelData as any).isAlteredAuthentic,
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,
@@ -275,7 +289,7 @@ function BatchLabelExportInner() {
             grade,
             gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
             condition: labelData.condition,
-            isAlteredAuthentic: false,
+            isAlteredAuthentic: !!(labelData as any).isAlteredAuthentic,
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,
@@ -316,7 +330,7 @@ function BatchLabelExportInner() {
             showCardLoversEmblem,
           })) as any[];
           const globalPositions = positions.length === labelDataArray.length ? positions : undefined;
-          const blob = await generateAveryLabelSheetMultiPage(labelDataArray, undefined, globalPositions);
+          const blob = await generateAveryLabelSheetMultiPage(labelDataArray, calibrationOffsets, globalPositions);
           blobs.push({
             name: `DCM-OneTouch-Avery6871-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -345,7 +359,7 @@ function BatchLabelExportInner() {
             showCardLoversEmblem,
           }));
           const globalPositions = positions.length === labelDataArray.length ? positions : undefined;
-          const blob = await generateToploaderLabelSheetMultiPage(labelDataArray as any, undefined, globalPositions);
+          const blob = await generateToploaderLabelSheetMultiPage(labelDataArray as any, calibrationOffsets, globalPositions);
           blobs.push({
             name: `DCM-Toploader-Avery8167-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -443,38 +457,108 @@ function BatchLabelExportInner() {
         }
 
         // ------------------------------------------------------------
-        // FULL REPORT — react-pdf, multi-card
+        // FULL REPORT — react-pdf, multi-card via BatchCardGradingReport
+        // Mirrors the single-card builder in /label-export/[cardId]/page.tsx
+        // exactly, then merges all cards into one BatchCardGradingReport PDF.
         // ------------------------------------------------------------
         else if (type === 'full-report') {
           setStatus(`Generating ${cardIds.length}-card full grading report…`);
-          const reportCards: ReportCardData[] = await Promise.all(perCard.map(async ({ card, labelData, subScores, grade, cardUrl, qrCodeDataUrl }) => {
+          const reportCards: ReportCardData[] = [];
+          for (let i = 0; i < perCard.length; i++) {
+            const { card, labelData, subScores, grade, cardUrl, qrCodeDataUrl } = perCard[i];
+            setStatus(`Building report ${i + 1}/${perCard.length}…`);
             const frontUrl = signedByPath.get(card.front_path) || '';
             const backUrl = signedByPath.get(card.back_path) || '';
-            const [frontImage, backImage] = await Promise.all([
+            const [frontJpeg, backJpeg] = await Promise.all([
               frontUrl ? imageToJpegBase64(frontUrl).catch(() => '') : '',
               backUrl ? imageToJpegBase64(backUrl).catch(() => '') : '',
             ]);
-            return {
-              cardName: labelData.primaryName,
-              contextLine: labelData.contextLine || '',
-              specialFeatures: labelData.featuresLine || '',
-              serial: labelData.serial,
+            const cardInfo = card.conversational_card_info || {};
+            const w = card.conversational_weighted_sub_scores || {};
+            const s = card.conversational_sub_scores || {};
+
+            // AI-written sub-grade summaries from conversational_corners_edges_surface
+            const ces = card.conversational_corners_edges_surface || {};
+            const buildSummary = (frontKey: string, backKey: string, fallback: string) => {
+              const fs = ces[frontKey]?.summary || '';
+              const bs = ces[backKey]?.summary || '';
+              const combined = fs && bs ? `Front: ${fs} Back: ${bs}` : (fs || bs || fallback);
+              return { front: fs || fallback, back: bs || fallback, combined };
+            };
+            const cenSum = buildSummary('front_centering', 'back_centering', 'Centering analysis not available.');
+            const corSum = buildSummary('front_corners', 'back_corners', 'Corner analysis not available.');
+            const edgSum = buildSummary('front_edges', 'back_edges', 'Edge analysis not available.');
+            const sufSum = buildSummary('front_surface', 'back_surface', 'Surface analysis not available.');
+
+            const aiConfidence = card.conversational_image_confidence || 'N/A';
+            const imageQualityMap: Record<string, string> = {
+              A: 'Excellent - High confidence in grade accuracy',
+              B: 'Good - Moderate confidence in grade accuracy',
+              C: 'Fair - Lower confidence due to image limitations',
+              D: 'Poor - Significant image quality issues affecting analysis',
+            };
+            const imageQuality = imageQualityMap[aiConfidence] || 'Quality assessment not available';
+            const uncertaintyMatch = (card.conversational_grade_uncertainty || '±0.25').match(/±\s*([\d.]+)/);
+            const gradeRange = `${grade} ± ${uncertaintyMatch ? uncertaintyMatch[1] : '0.25'}`;
+            const safePrimary = labelData.primaryName || 'Card';
+            const safeContext = labelData.contextLine || '';
+            const safeFeatures = labelData.featuresLine || null;
+
+            reportCards.push({
+              primaryName: safePrimary,
+              contextLine: safeContext,
+              featuresLine: safeFeatures,
+              serial: card.serial,
               grade,
-              conditionLabel: labelData.condition || getConditionLabel(grade),
+              gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
+              condition: labelData.condition || getConditionLabel(grade),
+              cardName: safePrimary,
+              playerName: safePrimary,
+              setName: (labelData as any).setName || '',
+              year: (labelData as any).year || '',
+              cardNumber: (labelData as any).cardNumber || '',
+              manufacturer: cardInfo.manufacturer || card.manufacturer_name || '',
+              sport: cardInfo.sport_or_category || card.category || '',
+              frontImageUrl: frontJpeg,
+              backImageUrl: backJpeg,
+              conditionLabel: card.conversational_condition_label || labelData.condition || getConditionLabel(grade),
+              labelCondition: labelData.condition || getConditionLabel(grade),
+              gradeRange,
+              cardDetails: safeContext,
+              specialFeaturesString: safeFeatures || '',
               cardUrl,
               qrCodeDataUrl,
-              subScores,
-              frontImage,
-              backImage,
-              graderName: 'DCM Grading',
-              gradedAt: card.graded_at || card.created_at,
-              card,
-            } as any;
-          }));
-          // Render each card as a CardGradingReport, merge into one PDF.
-          // CardGradingReport handles single card; for batch we render a
-          // sequence and the react-pdf renderer auto-paginates.
-          const blob = await pdf(<CardGradingReport cardData={reportCards as any} />).toBlob();
+              professionalGrades: {
+                psa: card.estimated_professional_grades?.PSA?.numeric_score || 'N/A',
+                bgs: card.estimated_professional_grades?.BGS?.numeric_score || 'N/A',
+                sgc: card.estimated_professional_grades?.SGC?.numeric_score || 'N/A',
+                cgc: card.estimated_professional_grades?.CGC?.numeric_score || 'N/A',
+              },
+              subgrades: {
+                centering: { score: subScores.centering, frontScore: s.centering?.front ?? 0, backScore: s.centering?.back ?? 0, summary: cenSum.combined, frontSummary: cenSum.front, backSummary: cenSum.back },
+                corners:   { score: subScores.corners,   frontScore: s.corners?.front ?? 0,   backScore: s.corners?.back ?? 0,   summary: corSum.combined, frontSummary: corSum.front, backSummary: corSum.back },
+                edges:     { score: subScores.edges,     frontScore: s.edges?.front ?? 0,     backScore: s.edges?.back ?? 0,     summary: edgSum.combined, frontSummary: edgSum.front, backSummary: edgSum.back },
+                surface:   { score: subScores.surface,   frontScore: s.surface?.front ?? 0,   backScore: s.surface?.back ?? 0,   summary: sufSum.combined, frontSummary: sufSum.front, backSummary: sufSum.back },
+              },
+              specialFeatures: {
+                rookie: cardInfo.rookie_or_first === 'Yes' || cardInfo.rookie_or_first === true || card.rookie_card,
+                autographed: cardInfo.autographed === true || !!card.autograph_type,
+                serialNumbered: cardInfo.serial_number || card.serial_numbering || undefined,
+                subset: cardInfo.subset || card.subset || undefined,
+                isFoil: card.is_foil || false,
+                foilType: card.foil_type || undefined,
+                isDoubleFaced: card.is_double_faced || false,
+                rarity: card.mtg_rarity || undefined,
+              },
+              aiConfidence,
+              imageQuality,
+              overallSummary: card.conversational_final_grade_summary || undefined,
+              generatedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+              reportId: card.id.substring(0, 8).toUpperCase(),
+            } as any);
+          }
+          setStatus(`Rendering ${cardIds.length}-card PDF…`);
+          const blob = await pdf(<BatchCardGradingReport cardDataArray={reportCards} />).toBlob();
           blobs.push({
             name: `DCM-Full-Report-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
