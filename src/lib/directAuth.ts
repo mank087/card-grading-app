@@ -36,7 +36,7 @@ export interface AuthResponse {
   error?: string
 }
 
-type OAuthProvider = 'google' | 'facebook'
+type OAuthProvider = 'google' | 'facebook' | 'apple'
 
 // Create a Supabase client for OAuth
 // Using implicit flow (not PKCE) for simpler callback handling
@@ -327,17 +327,20 @@ export function signOut() {
   }
 }
 
-// OAuth Sign In (Google, Facebook)
+// OAuth Sign In (Google, Facebook, Apple)
 export async function signInWithOAuth(provider: OAuthProvider): Promise<{ error?: string }> {
   try {
+    const isGoogle = provider === 'google'
     const { error } = await supabaseClient.auth.signInWithOAuth({
       provider,
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        }
+        ...(isGoogle && {
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        })
       }
     })
 
