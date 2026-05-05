@@ -211,12 +211,31 @@ export default function LabelStudioScreen() {
     }
   }, [selectedCard])
 
-  // Load card colors
+  // Load card colors. The grading pipeline kicks off extraction
+  // fire-and-forget (see vision-grade etc.), so a freshly-graded card may
+  // not have card_colors populated yet by the time we get here. Web's
+  // LabelStudioClient falls back to client-side Canvas extraction; RN has
+  // no Canvas, so hit the on-demand /extract-colors endpoint instead. The
+  // endpoint is a no-op if colors are already saved.
   useEffect(() => {
     if (!selectedCard) { setCardColors(null); return }
     if (selectedCard.card_colors) { setCardColors(selectedCard.card_colors); return }
     setCardColors(null)
-  }, [selectedCard])
+    if (!session?.access_token || !selectedCard.id) return
+    let cancelled = false
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    fetch(`${API_BASE}/api/cards/${selectedCard.id}/extract-colors`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(json => {
+        if (cancelled || !json?.card_colors) return
+        setCardColors(json.card_colors)
+      })
+      .catch(() => { /* leave cardColors null; UI shows disabled tile */ })
+    return () => { cancelled = true }
+  }, [selectedCard, session?.access_token])
 
   // ---- Config helpers ----
   const updateConfig = useCallback((partial: Partial<DesignerConfig>) => {
@@ -355,7 +374,20 @@ export default function LabelStudioScreen() {
   }, [config, activeGalleryIdx])
 
   // ---- Handlers ----
+  // Slab-modern, slab-traditional, and the matching card-image tiles render
+  // with FIXED preset colors regardless of customizer state (see labelConfig
+  // memo above). When the user starts customizing, hop them to the Custom
+  // Label tile so their changes actually show up in the preview.
+  const switchToCustomTileIfForced = useCallback(() => {
+    const FORCED_TILES = ['slab-modern', 'slab-traditional', 'card-image-modern', 'card-image-traditional']
+    const currentTile = LABEL_GALLERY[activeGalleryIdx]
+    if (!currentTile || !FORCED_TILES.includes(currentTile.id)) return
+    const customIdx = LABEL_GALLERY.findIndex(t => t.id === 'custom')
+    if (customIdx >= 0 && customIdx !== activeGalleryIdx) setActiveGalleryIdx(customIdx)
+  }, [activeGalleryIdx])
+
   const handleColorPreset = useCallback((preset: ColorPreset) => {
+    switchToCustomTileIfForced()
     setActiveCardColorStyle(null)
     if (preset.id === 'custom') {
       const defaultCols = cardColors
@@ -399,7 +431,7 @@ export default function LabelStudioScreen() {
         layoutStyle: undefined,
       })
     }
-  }, [cardColors, config, updateConfig])
+  }, [cardColors, config, updateConfig, switchToCustomTileIfForced])
 
   // Mirrors handleDimensionPreset in src/app/labels/LabelStudioClient.tsx so the
   // four DCM presets behave identically on mobile.
@@ -436,6 +468,7 @@ export default function LabelStudioScreen() {
 
   const handleCardColorStyle = useCallback((styleId: string) => {
     if (!cardColors) return
+    switchToCustomTileIfForced()
     const style = CARD_COLOR_STYLES.find(s => s.id === styleId)
     if (!style) return
     const input: CardColorInput = {
@@ -459,9 +492,10 @@ export default function LabelStudioScreen() {
       customColors: cardColors.palette.slice(0, 5),
       layoutStyle: undefined,
     })
-  }, [cardColors, updateConfig])
+  }, [cardColors, updateConfig, switchToCustomTileIfForced])
 
   const handleCustomLayoutStyle = useCallback((layoutId: string) => {
+    switchToCustomTileIfForced()
     const cols = config.customColors || [config.gradientStart, config.gradientEnd]
     updateConfig({
       ...applyLayoutToColors(layoutId, cols),
@@ -469,7 +503,7 @@ export default function LabelStudioScreen() {
       layoutStyle: layoutId,
     })
     setActiveCardColorStyle(null)
-  }, [config, updateConfig])
+  }, [config, updateConfig, switchToCustomTileIfForced])
 
   const openColorPicker = useCallback((slotIndex: number) => {
     const cols = config.customColors || [config.gradientStart, config.gradientEnd]

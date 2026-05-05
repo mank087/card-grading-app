@@ -129,7 +129,7 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.header}>
           <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
-          <Text style={styles.title}>DCM Grading</Text>
+          <Text style={styles.title}>Dynamic Collectibles Management</Text>
           <Text style={styles.subtitle}>Sign in to your account</Text>
         </View>
 

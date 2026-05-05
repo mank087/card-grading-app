@@ -1,10 +1,17 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Alert, Image, TouchableOpacity } from 'react-native'
 import { Link, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
+import { supabase } from '@/lib/supabase'
+import * as WebBrowser from 'expo-web-browser'
+import { makeRedirectUri } from 'expo-auth-session'
+import * as AppleAuthentication from 'expo-apple-authentication'
+import * as Crypto from 'expo-crypto'
+
+WebBrowser.maybeCompleteAuthSession()
 
 export default function RegisterScreen() {
   const { signUp } = useAuth()
@@ -14,7 +21,88 @@ export default function RegisterScreen() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const [oauthLoading, setOauthLoading] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
+  const [appleAvailable, setAppleAvailable] = useState(false)
+
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(setAppleAvailable).catch(() => setAppleAvailable(false))
+    }
+  }, [])
+
+  const handleApple = async () => {
+    setError(null)
+    setOauthLoading('apple')
+    try {
+      const rawNonce = `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`
+      const hashedNonce = await Crypto.digestStringAsync(
+        Crypto.CryptoDigestAlgorithm.SHA256,
+        rawNonce
+      )
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+        nonce: hashedNonce,
+      })
+      if (!credential.identityToken) {
+        throw new Error('Apple did not return an identity token')
+      }
+      const { error: authError } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+        nonce: rawNonce,
+      })
+      if (authError) setError(authError.message)
+    } catch (err: any) {
+      if (err?.code !== 'ERR_REQUEST_CANCELED') {
+        setError(err?.message || 'Apple sign in failed')
+      }
+    } finally {
+      setOauthLoading(null)
+    }
+  }
+
+  const handleOAuth = async (provider: 'google' | 'facebook') => {
+    setError(null)
+    setOauthLoading(provider)
+    try {
+      const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: redirectUrl,
+          skipBrowserRedirect: true,
+        },
+      })
+
+      if (oauthError) {
+        setError(oauthError.message)
+        setOauthLoading(null)
+        return
+      }
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
+        if (result.type === 'success' && result.url) {
+          const url = new URL(result.url)
+          const params = new URLSearchParams(url.hash?.substring(1) || url.search?.substring(1))
+          const accessToken = params.get('access_token')
+          const refreshToken = params.get('refresh_token')
+
+          if (accessToken && refreshToken) {
+            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+          }
+        }
+      }
+    } catch (err: any) {
+      setError(err.message || 'OAuth sign up failed')
+    } finally {
+      setOauthLoading(null)
+    }
+  }
 
   const handleRegister = async () => {
     if (!email.trim() || !password) {
@@ -62,6 +150,49 @@ export default function RegisterScreen() {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           )}
+
+          {/* OAuth Buttons. Apple is rendered first on iOS to satisfy
+              App Store Review Guideline 4.8, which requires SIWA to be at
+              least as prominent as other social login options. */}
+          {appleAvailable && (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+              buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+              cornerRadius={10}
+              style={styles.appleButton}
+              onPress={handleApple}
+            />
+          )}
+
+          <TouchableOpacity
+            style={[styles.oauthButton, styles.googleButton]}
+            onPress={() => handleOAuth('google')}
+            disabled={!!oauthLoading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="logo-google" size={20} color="#DB4437" />
+            <Text style={styles.oauthText}>
+              {oauthLoading === 'google' ? 'Connecting...' : 'Continue with Google'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.oauthButton, styles.facebookButton]}
+            onPress={() => handleOAuth('facebook')}
+            disabled={!!oauthLoading}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
+            <Text style={styles.oauthText}>
+              {oauthLoading === 'facebook' ? 'Connecting...' : 'Continue with Facebook'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.divider}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
 
           <Text style={styles.label}>Email</Text>
           <TextInput
@@ -166,6 +297,40 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   errorText: { color: Colors.red[600], fontSize: 14 },
+
+  // OAuth
+  appleButton: {
+    height: 50,
+    width: '100%',
+  },
+  oauthButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 14,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  googleButton: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.gray[300],
+  },
+  facebookButton: {
+    backgroundColor: Colors.white,
+    borderColor: Colors.gray[300],
+  },
+  oauthText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.gray[800],
+  },
+
+  // Divider
+  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 4 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.gray[300] },
+  dividerText: { paddingHorizontal: 12, fontSize: 13, color: Colors.gray[400] },
+
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   footerText: { color: Colors.gray[500], fontSize: 14 },
   footerLink: { color: Colors.purple[600], fontWeight: '600', fontSize: 14 },

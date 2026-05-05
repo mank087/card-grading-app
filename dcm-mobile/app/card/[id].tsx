@@ -94,17 +94,33 @@ export default function CardDetailScreen() {
     return () => clearTimeout(timer)
   }, [exportTask])
 
-  // Browser-direct download — opens the web's /label-export page in an in-app
-  // browser (Chrome custom tab on Android, SFSafariViewController on iOS).
-  // The page generates the PDF via jsPDF and triggers a real <a download>
-  // click; the file lands in the device's Downloads folder via the browser's
-  // native download manager. User stays in the app context — same UX as
-  // mobile-web. Replaces the old WebView-capture flow for every label type.
+  // Download dispatcher — platform-specific to avoid SFSafariViewController
+  // hanging on multi-MB data URLs (full grading report) and to give iOS a
+  // native preview/share-sheet flow where saved files actually land in Files.
+  //
+  // iOS: hidden WebView (setExportTask) generates the file, posts it back via
+  // postMessage; modal shows a preview and a Download button → iOS share
+  // sheet → Save to Files. PDF preview + native print also work in-app.
+  //
+  // Android: in-app Chrome Custom Tab opens the export URL with download=1;
+  // Chrome's native download manager saves the file to /Downloads. Works
+  // reliably without the data-URL size issues iOS has.
   const openWebDownload = useCallback(async (
     exportType: string,
-    opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number }
+    opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number; title?: string }
   ) => {
     if (!card?.id || !session?.access_token) return
+
+    if (Platform.OS === 'ios') {
+      setExportTask({
+        type: exportType,
+        format: opts?.format,
+        position: opts?.position,
+        title: opts?.title,
+      })
+      return
+    }
+
     const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
     const params = new URLSearchParams()
     params.set('token', session.access_token)
