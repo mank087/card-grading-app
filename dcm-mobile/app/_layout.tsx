@@ -23,6 +23,7 @@ import { CreditsProvider } from '@/contexts/CreditsContext'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
+import { supabase } from '@/lib/supabase'
 import OnboardingCarousel from '@/components/OnboardingCarousel'
 import HelpBot from '@/components/HelpBot'
 import GradingStatusBar from '@/components/GradingStatusBar'
@@ -101,12 +102,25 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   // Bounce authenticated users off the auth screens straight into the app.
+  // Match web's behavior: users with at least one graded card land on
+  // collection; brand-new users (or users who've never finished a grade)
+  // land on the grade tab so they're immediately prompted to grade.
   useEffect(() => {
     if (isLoading) return
     const inAuthGroup = segments[0] === '(auth)'
-    if (user && inAuthGroup) {
-      router.replace('/(tabs)/grade')
-    }
+    if (!user || !inAuthGroup) return
+    let cancelled = false
+    supabase
+      .from('cards')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .not('conversational_whole_grade', 'is', null)
+      .then(({ count, error }) => {
+        if (cancelled) return
+        const hasGraded = !error && (count ?? 0) > 0
+        router.replace(hasGraded ? '/(tabs)/collection' : '/(tabs)/grade')
+      })
+    return () => { cancelled = true }
   }, [user, isLoading, segments, router])
 
   const handleGetStarted = useCallback(() => {

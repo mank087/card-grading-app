@@ -13,14 +13,27 @@ interface CollapsibleSectionProps {
   children: React.ReactNode
   defaultOpen?: boolean
   icon?: keyof typeof Ionicons.glyphMap
+  /** Optional controlled mode — when `open` is provided, the parent owns
+   *  the state. Required for the onboarding tour, which programmatically
+   *  expands sections to highlight their content. */
+  open?: boolean
+  onOpenChange?: (next: boolean) => void
 }
 
-export default function CollapsibleSection({ title, children, defaultOpen = false, icon }: CollapsibleSectionProps) {
-  const [isOpen, setIsOpen] = useState(defaultOpen)
+export default function CollapsibleSection({ title, children, defaultOpen = false, icon, open, onOpenChange }: CollapsibleSectionProps) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen)
+  const isControlled = typeof open === 'boolean'
+  const isOpen = isControlled ? open : internalOpen
 
   const toggle = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
-    setIsOpen(!isOpen)
+    const next = !isOpen
+    if (isControlled) {
+      onOpenChange?.(next)
+    } else {
+      setInternalOpen(next)
+      onOpenChange?.(next)
+    }
   }
 
   return (

@@ -42,6 +42,7 @@ import DefectOverlay, { extractDefectMarkers } from '@/components/grading/Defect
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
+import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/onboarding/OnboardingTour'
 
 export default function CardDetailScreen() {
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
@@ -70,6 +71,74 @@ export default function CardDetailScreen() {
     })
   ).current
   const [editOpen, setEditOpen] = useState(false)
+
+  // ---------- Onboarding tour (mirrors src/components/onboarding/OnboardingTour for the card detail page) ----------
+  // Refs are attached to wrapper Views around each section so the tour can
+  // measure them with View.measure(). Order matches TOUR_STEPS below.
+  const scrollRef = useRef<ScrollView | null>(null)
+  const tourRefs = {
+    'card-images': useRef<View | null>(null),
+    'visibility-toggle': useRef<View | null>(null),
+    'grade-score': useRef<View | null>(null),
+    'subgrades': useRef<View | null>(null),
+    'condition-summary': useRef<View | null>(null),
+    'download-buttons': useRef<View | null>(null),
+    'card-info': useRef<View | null>(null),
+    'centering': useRef<View | null>(null),
+    'optic-score': useRef<View | null>(null),
+    'market-value': useRef<View | null>(null),
+    'pro-estimates': useRef<View | null>(null),
+    'insta-list': useRef<View | null>(null),
+  }
+  const [tourActive, setTourActive] = useState(false)
+  const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({})
+
+  const TOUR_STEPS: TourStep[] = [
+    { id: 'card-images', title: 'Your Graded Card Images', description: 'Your card has been professionally analyzed! The front and back images now include DCM identification labels and grade information, making it easy to share and verify your card\'s authenticity.' },
+    { id: 'visibility-toggle', title: 'Privacy & Label Style', description: 'Control who can see your card with the Public/Private toggle. You can also switch between Modern and Traditional label styles to match your preference.' },
+    { id: 'grade-score', title: 'Your DCM Grade', description: 'This is your card\'s overall grade on a 1-10 scale. The confidence indicator (A, B, C, or D) shows how certain DCM Optic™ is about the grade based on image quality and card clarity.' },
+    { id: 'subgrades', title: 'Sub-Grade Scores', description: 'Individual grades for Centering, Corners, Edges, and Surface. These four categories combine to determine your overall grade.' },
+    { id: 'condition-summary', title: 'Condition Summary', description: 'A detailed written analysis of your card\'s overall condition, highlighting key observations about centering, corners, edges, and surface quality.' },
+    { id: 'download-buttons', title: 'Download Reports & Labels', description: 'Download your official DCM grading report as a PDF, or get printable labels for your card holders. You can also download images of your cards with their graded labels included!' },
+    { id: 'card-info', title: 'Card Information', description: 'Your card\'s identified details including player/character, set name, card number, and more. You can edit any details that need correcting to improve market pricing accuracy.', sectionId: 'card-info' },
+    { id: 'centering', title: 'Centering Analysis', description: 'Precise measurements of your card\'s centering ratios for both front and back. Perfect centering (50/50) scores highest, with detailed analysis of any misalignment.', sectionId: 'centering' },
+    { id: 'optic-score', title: 'DCM Optic™ Confidence', description: 'This score reflects the quality of your uploaded images. Higher quality photos allow for more accurate grading. Tips: use good lighting, avoid glare, and capture the full card.', sectionId: 'optic-score' },
+    { id: 'market-value', title: 'Market Value', description: 'Your estimated card value based on real market data, plus quick links to search eBay, TCGplayer, and other marketplaces. Pricing updates weekly to track market changes.', sectionId: 'market-value' },
+    { id: 'pro-estimates', title: 'Estimated Mail-Away Grade Scores', description: 'See estimated grades from mail-away companies like PSA, BGS, and CGC (calculated using their published grading rubrics). These scores help you understand how your card might score if sent out.', sectionId: 'pro-estimates' },
+    { id: 'insta-list', title: 'Insta-List on eBay', description: 'List your card directly to eBay with one click! We automatically include your graded images, DCM report, and pre-fill all the item details for you.', sectionId: 'insta-list' },
+  ]
+
+  const handleSectionToggle = useCallback((sectionId: string, open: boolean) => {
+    setSectionsOpen(prev => ({ ...prev, [sectionId]: open }))
+  }, [])
+
+  const handleTourComplete = useCallback(() => {
+    setTourActive(false)
+    AsyncStorage.setItem(TOUR_COMPLETED_KEY, 'true').catch(() => {})
+  }, [])
+
+  // Auto-trigger the tour the first time a user lands on a card detail
+  // page after grading their first card. We gate on the COMPLETED key
+  // (set when the user finishes or skips the tour) so re-visits don't
+  // re-launch it. Card-count check ensures the tour doesn't run on
+  // existing users who already had cards before this feature shipped.
+  useEffect(() => {
+    if (!card?.id || !session?.user?.id) return
+    let cancelled = false
+    ;(async () => {
+      const completed = await AsyncStorage.getItem(TOUR_COMPLETED_KEY).catch(() => null)
+      if (completed === 'true' || cancelled) return
+      const { count } = await supabase
+        .from('cards')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', session.user.id)
+        .not('conversational_whole_grade', 'is', null)
+      if (cancelled) return
+      if ((count ?? 0) <= 1) setTourActive(true)
+    })()
+    return () => { cancelled = true }
+  }, [card?.id, session?.user?.id])
+
   // Label export state — opens a hidden WebView that runs the canvas/PDF generators on the web
   // and posts back base64 files; mobile then previews them with explicit Download/Print buttons.
   const [labelSheetOpen, setLabelSheetOpen] = useState(false)
@@ -341,7 +410,8 @@ export default function CardDetailScreen() {
   }
 
   return (
-    <ScrollView style={s.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCard() }} tintColor={Colors.purple[600]} />}>
+    <View style={{ flex: 1 }}>
+    <ScrollView ref={scrollRef} style={s.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCard() }} tintColor={Colors.purple[600]} />}>
 
       {/* Image Zoom Modal — uses a WebView so the browser handles pinch-to-zoom natively
           on both iOS and Android (no extra deps). Double-tap also zooms in browsers. */}
@@ -888,7 +958,7 @@ export default function CardDetailScreen() {
       </Modal>
 
       {/* ══════ SLAB PREVIEW ══════ */}
-      <View style={s.slabSection}>
+      <View ref={tourRefs['card-images']} collapsable={false} style={s.slabSection}>
         <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
         <View style={s.slabContainer} {...slabPanResponder.panHandlers}>
           <SlabCard
@@ -922,7 +992,7 @@ export default function CardDetailScreen() {
       </View>
 
       {/* ══════ GRADE + SUBGRADES ══════ */}
-      <View style={s.gradeArea}>
+      <View ref={tourRefs['grade-score']} collapsable={false} style={s.gradeArea}>
         <GradeBadge grade={grade} size="lg" showLabel />
         <View style={s.gradeMetaRow}>
           <Text style={s.metaText}>Uncertainty: {card.conversational_grade_uncertainty || '±0'}</Text>
@@ -932,7 +1002,7 @@ export default function CardDetailScreen() {
 
       {/* 4 Subgrade Boxes */}
       {sub && (sub.centering != null || sub.corners != null) && (
-        <View style={s.subgradeGrid}>
+        <View ref={tourRefs['subgrades']} collapsable={false} style={s.subgradeGrid}>
           {[
             { label: 'Centering', icon: '🎯', score: sub.centering },
             { label: 'Corners', icon: '📐', score: sub.corners },
@@ -960,7 +1030,7 @@ export default function CardDetailScreen() {
 
       {/* Overall Condition Summary */}
       {(card.conversational_front_summary || gradingJson?.final_grade?.summary) && (
-        <View style={s.summaryCard}>
+        <View ref={tourRefs['condition-summary']} collapsable={false} style={s.summaryCard}>
           <Text style={s.summaryTitle}>Overall Card Condition Summary</Text>
           <Text style={s.summaryText}>{gradingJson?.final_grade?.summary || card.conversational_front_summary}</Text>
         </View>
@@ -1080,7 +1150,7 @@ export default function CardDetailScreen() {
 
       {/* Owner controls: Visibility */}
       {isOwner && (
-        <View style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, marginBottom: 8 }}>
+        <View ref={tourRefs['visibility-toggle']} collapsable={false} style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, marginBottom: 8 }}>
           <TouchableOpacity
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: card.visibility === 'public' ? Colors.green[500] : Colors.gray[300], backgroundColor: card.visibility === 'public' ? Colors.green[50] : Colors.gray[50] }}
             onPress={async () => {
@@ -1096,7 +1166,7 @@ export default function CardDetailScreen() {
       )}
 
       {/* Share + Copy + Labels */}
-      <View style={s.shareRow}>
+      <View ref={tourRefs['download-buttons']} collapsable={false} style={s.shareRow}>
         <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
           <Ionicons name="share-social" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Share</Text>
@@ -1119,6 +1189,18 @@ export default function CardDetailScreen() {
           <Text style={s.shareBtnText}>Labels</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Manual Page Tour trigger — clears the completed flag and re-runs */}
+      <TouchableOpacity
+        onPress={async () => {
+          await AsyncStorage.removeItem(TOUR_COMPLETED_KEY).catch(() => {})
+          setTourActive(true)
+        }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'center', paddingVertical: 4, marginBottom: 8 }}
+      >
+        <Ionicons name="help-circle-outline" size={14} color={Colors.purple[600]} />
+        <Text style={{ fontSize: 12, color: Colors.purple[600], fontWeight: '600' }}>Page Tour</Text>
+      </TouchableOpacity>
 
       <View style={{ paddingHorizontal: 12, paddingBottom: 40 }}>
 
@@ -1144,7 +1226,13 @@ export default function CardDetailScreen() {
           </View>
         )}
 
-        <CollapsibleSection title="Card Information" icon="information-circle">
+        <View ref={tourRefs['card-info']} collapsable={false}>
+        <CollapsibleSection
+          title="Card Information"
+          icon="information-circle"
+          open={!!sectionsOpen['card-info']}
+          onOpenChange={(o) => handleSectionToggle('card-info', o)}
+        >
           <InfoRow label="Card Name" value={cardName} />
           <InfoRow label="Set" value={setName} />
           <InfoRow label="Card Number" value={cardNumber} />
@@ -1184,9 +1272,16 @@ export default function CardDetailScreen() {
             </TouchableOpacity>
           )}
         </CollapsibleSection>
+        </View>
 
         {/* ══════ 2. CENTERING ANALYSIS ══════ */}
-        <CollapsibleSection title={`Centering Analysis${sub?.centering != null ? `  ${Math.round(sub.centering)}/10` : ''}`} icon="resize">
+        <View ref={tourRefs['centering']} collapsable={false}>
+        <CollapsibleSection
+          title={`Centering Analysis${sub?.centering != null ? `  ${Math.round(sub.centering)}/10` : ''}`}
+          icon="resize"
+          open={!!sectionsOpen['centering']}
+          onOpenChange={(o) => handleSectionToggle('centering', o)}
+        >
           {cen ? (
             <>
               {/* Front and Back centering cards */}
@@ -1298,6 +1393,7 @@ export default function CardDetailScreen() {
             <Text style={s.naText}>No centering data available</Text>
           )}
         </CollapsibleSection>
+        </View>
 
         {/* ══════ 3. CORNERS, EDGES & SURFACE ANALYSIS ══════ */}
         <CollapsibleSection title="Corners, Edges & Surface Analysis" icon="cube">
@@ -1525,7 +1621,13 @@ export default function CardDetailScreen() {
         </CollapsibleSection>
 
         {/* ══════ 4. DCM OPTIC™ CONFIDENCE SCORE ══════ */}
-        <CollapsibleSection title={`DCM Optic™ Confidence Score${confidence ? `  ${confidence}` : ''}`} icon="shield-checkmark">
+        <View ref={tourRefs['optic-score']} collapsable={false}>
+        <CollapsibleSection
+          title={`DCM Optic™ Confidence Score${confidence ? `  ${confidence}` : ''}`}
+          icon="shield-checkmark"
+          open={!!sectionsOpen['optic-score']}
+          onOpenChange={(o) => handleSectionToggle('optic-score', o)}
+        >
           {/* Confidence bar */}
           <View style={s.confBarContainer}>
             <View style={[s.confBarFill, { width: `${confidence === 'A' ? 100 : confidence === 'B' ? 75 : confidence === 'C' ? 50 : 25}%`, backgroundColor: ConfidenceColors[confidence]?.text || Colors.gray[400] }]} />
@@ -1552,9 +1654,16 @@ export default function CardDetailScreen() {
           )}
           <InfoRow label="Image Quality Grade" value={confidence || 'N/A'} />
         </CollapsibleSection>
+        </View>
 
         {/* ══════ 5. MARKET VALUE ══════ */}
-        <CollapsibleSection title={`Market Value${card.dcm_price_estimate ? `  ~$${card.dcm_price_estimate.toFixed(2)}` : ''}`} icon="trending-up">
+        <View ref={tourRefs['market-value']} collapsable={false}>
+        <CollapsibleSection
+          title={`Market Value${card.dcm_price_estimate ? `  ~$${card.dcm_price_estimate.toFixed(2)}` : ''}`}
+          icon="trending-up"
+          open={!!sectionsOpen['market-value']}
+          onOpenChange={(o) => handleSectionToggle('market-value', o)}
+        >
           {(() => {
             const cached = card.dcm_cached_prices
             const prices = cached?.prices
@@ -1768,10 +1877,17 @@ export default function CardDetailScreen() {
             )
           })()}
         </CollapsibleSection>
+        </View>
 
         {/* ══════ 6. ESTIMATED MAIL-AWAY GRADES ══════ */}
         {card.estimated_professional_grades && (
-          <CollapsibleSection title="Estimated Mail-Away Grade Scores" icon="ribbon">
+          <View ref={tourRefs['pro-estimates']} collapsable={false}>
+          <CollapsibleSection
+            title="Estimated Mail-Away Grade Scores"
+            icon="ribbon"
+            open={!!sectionsOpen['pro-estimates']}
+            onOpenChange={(o) => handleSectionToggle('pro-estimates', o)}
+          >
             {['PSA', 'BGS', 'SGC', 'CGC'].map(company => {
               const est = (card.estimated_professional_grades as any)?.[company]
               if (!est) return null
@@ -1795,11 +1911,18 @@ export default function CardDetailScreen() {
             })}
             <Text style={s.disclaimer}>These are estimated projections based on DCM's AI grading analysis. They are not official grades from PSA, BGS, SGC, or CGC. Actual grades may vary.</Text>
           </CollapsibleSection>
+          </View>
         )}
 
         {/* ══════ 7. INSTA-LIST ON EBAY ══════ */}
         {isOwner && (
-          <CollapsibleSection title="Insta-List on eBay" icon="pricetag">
+          <View ref={tourRefs['insta-list']} collapsable={false}>
+          <CollapsibleSection
+            title="Insta-List on eBay"
+            icon="pricetag"
+            open={!!sectionsOpen['insta-list']}
+            onOpenChange={(o) => handleSectionToggle('insta-list', o)}
+          >
             <Text style={s.ebayInfo}>Automatically includes front & back card images with DCM grade labels, mini grading report, and pre-filled title.</Text>
             <TouchableOpacity style={s.ebayButton} onPress={() => {
               router.push({ pathname: '/pages/ebay-list' as any, params: { cardId: card.id } })
@@ -1808,6 +1931,7 @@ export default function CardDetailScreen() {
               <Text style={s.ebayButtonText}>List on eBay</Text>
             </TouchableOpacity>
           </CollapsibleSection>
+          </View>
         )}
 
         {/* ══════ 8. DCM OPTIC™ REPORT ══════ */}
@@ -2084,6 +2208,15 @@ export default function CardDetailScreen() {
         )}
       </View>
     </ScrollView>
+    <OnboardingTour
+      isActive={tourActive}
+      steps={TOUR_STEPS}
+      targets={tourRefs}
+      parentScrollRef={scrollRef}
+      onSectionToggle={handleSectionToggle}
+      onComplete={handleTourComplete}
+    />
+    </View>
   )
 }
 
