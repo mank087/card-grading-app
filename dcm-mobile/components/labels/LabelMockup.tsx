@@ -689,8 +689,11 @@ function SlabMockup({ cardImageUrl, width, labelProps, side, slabStyle, emblems,
 
 // ============================================================================
 // One-Touch — photo 314×457
+// Avery 6871 (2.375" × 1.25", folds at horizontal center → visible half is
+// 2.375" × 0.625", aspect 3.8:1). Mirrors web's OneTouchMockup
+// (src/components/labels/LabelMockup.tsx:555-635) — NOT the slab label.
 // ============================================================================
-function OneTouchMockup({ cardImageUrl, width, labelProps, side, emblems }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
+function OneTouchMockup({ cardImageUrl, width, labelProps, side }: { cardImageUrl?: string | null; width: number; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
   const height = (width * 457) / 314
   const labelWidth = width * 0.65
   const cardTop = height * 0.13, cardLeft = width * 0.11, cardW = width * 0.78, cardH = height * 0.76
@@ -708,17 +711,64 @@ function OneTouchMockup({ cardImageUrl, width, labelProps, side, emblems }: { ca
       <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
         <View style={s.foldCrease} />
         {side === 'front'
-          ? <SlabFrontInline width={labelWidth} labelProps={labelProps} slabStyle="modern" />
-          : <SlabBackInline width={labelWidth} labelProps={labelProps} slabStyle="modern" emblems={emblems} />}
+          ? <OneTouchFrontInline width={labelWidth} labelProps={labelProps} />
+          : <OneTouchBackInline width={labelWidth} labelProps={labelProps} />}
       </View>
+    </View>
+  )
+}
+
+/** One-Touch FRONT: DCM logo · card info (name/set/features/serial) · grade.
+ *  Layout matches web LabelMockup.tsx:596-620 (aspect 3.8:1, white bg). */
+function OneTouchFrontInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
+  const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
+  const height = width / 3.8
+  const condition = labelProps?.isAlteredAuthentic && labelProps?.grade === null
+    ? 'AUTHENTIC' : (labelProps?.condition || '').toUpperCase()
+  const pad = Math.max(2, width * 0.012)
+  const logoSize = Math.max(10, width * 0.07)
+  return (
+    <View style={{ width, height, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', paddingHorizontal: pad, gap: pad, overflow: 'hidden' }}>
+      <Image source={require('@/assets/images/dcm-logo.png')} style={{ width: logoSize, height: logoSize }} resizeMode="contain" />
+      <View style={{ flex: 1, minWidth: 0, justifyContent: 'center' }}>
+        <Text numberOfLines={1} style={{ fontSize: width * 0.038, fontWeight: '600', color: '#111827', lineHeight: width * 0.046 }}>{labelProps?.displayName || 'Card Name'}</Text>
+        {!!labelProps?.setLineText && <Text numberOfLines={1} style={{ fontSize: width * 0.028, color: '#6b7280', lineHeight: width * 0.034 }}>{labelProps.setLineText}</Text>}
+        {labelProps?.features && labelProps.features.length > 0 && (
+          <Text numberOfLines={1} style={{ fontSize: width * 0.028, fontWeight: '500', color: '#2563eb', lineHeight: width * 0.034 }}>{labelProps.features.join(' • ')}</Text>
+        )}
+        {!!labelProps?.serial && <Text numberOfLines={1} style={{ fontSize: width * 0.024, fontFamily: 'Courier', color: '#9ca3af', lineHeight: width * 0.030 }}>{labelProps.serial}</Text>}
+      </View>
+      <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: pad }}>
+        <Text style={{ fontSize: width * 0.07, fontWeight: 'bold', lineHeight: width * 0.07, color: '#7c3aed' }}>{grade}</Text>
+        <View style={{ width: width * 0.06, height: 1, backgroundColor: '#7c3aed', marginTop: 1 }} />
+        {!!condition && <Text numberOfLines={1} style={{ fontSize: width * 0.024, fontWeight: 'bold', textTransform: 'uppercase', color: '#6b46c1', marginTop: 1 }}>{condition}</Text>}
+      </View>
+    </View>
+  )
+}
+
+/** One-Touch BACK: centered QR with faded DCM logo. Web LabelMockup.tsx:622-628. */
+function OneTouchBackInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
+  const height = width / 3.8
+  const qrSize = height * 0.85
+  const logoSize = height * 0.6
+  return (
+    <View style={{ width, height, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: width * 0.02, overflow: 'hidden' }}>
+      <RealQR qrUrl={labelProps?.qrUrl} size={qrSize} />
+      <Image source={require('@/assets/images/dcm-logo.png')} style={{ width: logoSize, height: logoSize, opacity: 0.25 }} resizeMode="contain" />
     </View>
   )
 }
 
 // ============================================================================
 // Toploader — photo 451×588
+// Front+back variant: Avery 8167 (1.75" × 0.5", aspect 3.5:1) — compact
+// strip with [accent | logo | name | divider | grade], NOT the slab label.
+// Foldover variant: same physical 1.75" × 0.5" but folded vertically →
+// visible half is 0.875" × 0.5" (aspect 1.75:1) with just grade or QR.
+// Mirrors web LabelMockup.tsx:434-543.
 // ============================================================================
-function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side, emblems }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
+function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side }: { cardImageUrl?: string | null; width: number; variant: 'front-back' | 'foldover'; labelProps?: LabelInlineProps; side: 'front' | 'back'; emblems?: LabelEmblems }) {
   const height = (width * 588) / 451
   const labelWidth = width * (variant === 'foldover' ? 0.29 : 0.58)
   const cardTop = height * 0.045, cardLeft = width * 0.07, cardW = width * 0.86, cardH = height * 0.90
@@ -736,19 +786,115 @@ function ToploaderMockup({ cardImageUrl, width, variant, labelProps, side, emble
       {variant === 'foldover' ? (
         <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
           <View style={s.foldCrease} />
-          <View style={{ width: '100%', aspectRatio: 1.75, overflow: 'hidden' }}>
-            {side === 'front'
-              ? <SlabFrontInline width={labelWidth} labelProps={labelProps} slabStyle="modern" />
-              : <SlabBackInline width={labelWidth} labelProps={labelProps} slabStyle="modern" emblems={emblems} />}
-          </View>
+          {side === 'front'
+            ? <FoldoverFrontInline width={labelWidth} labelProps={labelProps} />
+            : <FoldoverBackInline width={labelWidth} labelProps={labelProps} />}
         </View>
       ) : (
         <View style={[s.slot, { top: 0, left: labelLeft, width: labelWidth }]}>
           {side === 'front'
-            ? <SlabFrontInline width={labelWidth} labelProps={labelProps} slabStyle="modern" />
-            : <SlabBackInline width={labelWidth} labelProps={labelProps} slabStyle="modern" emblems={emblems} />}
+            ? <ToploaderFrontInline width={labelWidth} labelProps={labelProps} />
+            : <ToploaderBackInline width={labelWidth} labelProps={labelProps} />}
         </View>
       )}
+    </View>
+  )
+}
+
+/** Toploader 8167 FRONT: purple accent bar | logo | name truncated | divider | grade.
+ *  Aspect 3.5:1, white bg. Web LabelMockup.tsx:509-526. */
+function ToploaderFrontInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
+  const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
+  const height = width / 3.5
+  const condition = labelProps?.isAlteredAuthentic && labelProps?.grade === null
+    ? 'AUTHENTIC' : (labelProps?.condition || '').toUpperCase()
+  const accentW = Math.max(2, width * 0.018)
+  const logoSize = Math.max(10, width * 0.085)
+  return (
+    <View style={{ width, height, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'stretch', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', overflow: 'hidden' }}>
+      {/* Purple accent bar */}
+      <View style={{ width: accentW, backgroundColor: '#7c3aed' }} />
+      {/* DCM logo */}
+      <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: width * 0.012 }}>
+        <Image source={require('@/assets/images/dcm-logo.png')} style={{ width: logoSize, height: logoSize }} resizeMode="contain" />
+      </View>
+      {/* Card name (truncated) */}
+      <View style={{ flex: 1, minWidth: 0, alignItems: 'flex-start', justifyContent: 'center', paddingHorizontal: width * 0.008 }}>
+        <Text numberOfLines={1} style={{ fontSize: width * 0.038, fontWeight: '500', color: '#374151' }}>{labelProps?.displayName || 'Card Name'}</Text>
+      </View>
+      {/* Vertical divider */}
+      <View style={{ width: StyleSheet.hairlineWidth, backgroundColor: 'rgba(124,58,237,0.3)', marginVertical: height * 0.15 }} />
+      {/* Grade + condition */}
+      <View style={{ alignItems: 'center', justifyContent: 'center', paddingHorizontal: width * 0.018 }}>
+        <Text style={{ fontSize: width * 0.07, fontWeight: 'bold', lineHeight: width * 0.07, color: '#7c3aed' }}>{grade}</Text>
+        <View style={{ width: width * 0.04, height: 1, backgroundColor: '#7c3aed', marginTop: 1 }} />
+        {!!condition && <Text numberOfLines={1} style={{ fontSize: width * 0.024, fontWeight: 'bold', textTransform: 'uppercase', color: '#6b46c1' }}>{condition}</Text>}
+      </View>
+    </View>
+  )
+}
+
+/** Toploader 8167 BACK: dense logo grid behind a centered QR.
+ *  Aspect 3.5:1, white bg. Web LabelMockup.tsx:529-535. */
+function ToploaderBackInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
+  const height = width / 3.5
+  const qrSize = height * 0.85
+  return (
+    <View style={{ width, height, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth, borderColor: '#e5e7eb', overflow: 'hidden' }}>
+      <DCMLogoTile width={width} height={height} />
+      <RealQR qrUrl={labelProps?.qrUrl} size={qrSize} />
+    </View>
+  )
+}
+
+/** Foldover FRONT: just grade + condition centered. Aspect 1.75:1, light bg.
+ *  Web LabelMockup.tsx:481-491. */
+function FoldoverFrontInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
+  const grade = gradeStr(labelProps?.grade ?? null, labelProps?.isAlteredAuthentic)
+  const height = width / 1.75
+  const condition = labelProps?.isAlteredAuthentic && labelProps?.grade === null
+    ? 'AUTHENTIC' : (labelProps?.condition || '').toUpperCase()
+  return (
+    <LinearGradient
+      colors={['#ffffff', '#f9fafb']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 0, y: 1 }}
+      style={{ width, height, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+    >
+      <DCMLogoTile width={width} height={height} opacity={0.06} />
+      <Text style={{ fontSize: width * 0.32, fontWeight: 'bold', lineHeight: width * 0.32, color: '#7c3aed' }}>{grade}</Text>
+      {!!condition && <Text numberOfLines={1} style={{ fontSize: width * 0.07, fontWeight: 'bold', textTransform: 'uppercase', color: '#6b46c1', marginTop: width * 0.02 }}>{condition}</Text>}
+    </LinearGradient>
+  )
+}
+
+/** Foldover BACK: just QR centered. Aspect 1.75:1, white bg.
+ *  Web LabelMockup.tsx:494-498. */
+function FoldoverBackInline({ width, labelProps }: { width: number; labelProps?: LabelInlineProps }) {
+  const height = width / 1.75
+  const qrSize = Math.min(width, height) * 0.7
+  return (
+    <View style={{ width, height, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <DCMLogoTile width={width} height={height} opacity={0.06} />
+      <RealQR qrUrl={labelProps?.qrUrl} size={qrSize} />
+    </View>
+  )
+}
+
+/** Watermark layer — sparse low-opacity DCM logos, used as background on
+ *  toploader-back and foldover labels. Mirrors web's WatermarkPattern /
+ *  DenseLogoGrid (LabelMockup.tsx:69-93) without trying to replicate the
+ *  exact CSS grid layout. */
+function DCMLogoTile({ width, height, opacity = 0.08 }: { width: number; height: number; opacity?: number }) {
+  const cell = Math.max(8, Math.round(Math.min(width, height) * 0.18))
+  const cols = Math.max(1, Math.floor(width / cell))
+  const rows = Math.max(1, Math.floor(height / cell))
+  const total = cols * rows
+  return (
+    <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, width, height, flexDirection: 'row', flexWrap: 'wrap', opacity, alignContent: 'center', justifyContent: 'center' }}>
+      {Array.from({ length: total }).map((_, i) => (
+        <Image key={i} source={require('@/assets/images/dcm-logo.png')} style={{ width: cell * 0.6, height: cell * 0.6, margin: cell * 0.15 }} resizeMode="contain" />
+      ))}
     </View>
   )
 }
