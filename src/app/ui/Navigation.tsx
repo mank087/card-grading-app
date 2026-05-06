@@ -3,11 +3,26 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { getStoredSession, signOut, AUTH_STATE_CHANGE_EVENT } from "@/lib/directAuth";
 import { useCredits } from "@/contexts/CreditsContext";
 
+// Routes that render in a fullscreen modal/WebView from the mobile app —
+// they should not show the site nav. Mobile InAppPage already injects CSS
+// to hide nav/footer, but external browsers (SFSafariViewController on iOS,
+// Chrome Custom Tab on Android) can't run that injection so the nav leaks
+// through. Returning null here covers both cases at the source.
+const FULLSCREEN_ROUTES = ['/label-export', '/label-preview'];
+
 export default function Navigation() {
+  const pathname = usePathname();
+  if (pathname && FULLSCREEN_ROUTES.some(p => pathname.startsWith(p))) {
+    return null;
+  }
+  return <NavigationInner />;
+}
+
+function NavigationInner() {
   const [user, setUser] = useState<any>(null);
   const [authChecked, setAuthChecked] = useState(false); // Track if initial auth check is done
   const [searchSerial, setSearchSerial] = useState("");

@@ -30,6 +30,7 @@ import LabelWebRenderer, { type LabelConfig, type LabelCardData } from '@/compon
 import ColorPickerModal from '@/components/labels/ColorPickerModal'
 import LabelMockup, { type LabelTypeId } from '@/components/labels/LabelMockup'
 import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
+import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 
@@ -642,13 +643,18 @@ export default function LabelStudioScreen() {
   // generates the PDF via jsPDF and triggers a real browser download — file
   // goes straight to the device's Downloads folder. User stays in the app
   // context (browser dismisses to mobile app on close).
-  const openWebDownload = useCallback(async (exportType: string, format?: 'duplex' | 'foldover') => {
+  const openWebDownload = useCallback(async (
+    exportType: string,
+    opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number },
+  ) => {
     if (!selectedCard?.id || !session?.access_token) return
     const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
     const params = new URLSearchParams()
     params.set('token', session.access_token)
     params.set('type', exportType)
-    if (format) params.set('format', format)
+    if (opts?.format) params.set('format', opts.format)
+    if (opts?.position != null) params.set('position', String(opts.position))
+    if (opts?.position2 != null) params.set('position2', String(opts.position2))
     params.set('labelStyle', config.style || 'modern')
     params.set('download', '1')
 
@@ -702,6 +708,11 @@ export default function LabelStudioScreen() {
 
   // Gallery's per-tile Download button — uses the in-app web browser
   // approach so the user gets the same download UX as mobile web.
+  // Avery-sticker label types (onetouch / toploader / foldover) need the
+  // user to pick which slot on the sheet to print into; they go through
+  // LabelPositionPicker first. Slab labels prompt for duplex vs foldover.
+  const [galleryPositionPicker, setGalleryPositionPicker] = useState<{ exportType: string; title: string; sheet: AverySheet } | null>(null)
+
   const handleGalleryDownload = useCallback((labelType: typeof LABEL_GALLERY[number]) => {
     if (!selectedCard?.id) {
       Alert.alert('Select a card', 'Pick a card above before downloading a label.')
@@ -711,6 +722,16 @@ export default function LabelStudioScreen() {
     // pipeline expects 'slab-custom'.
     const exportType = labelType.id === 'custom' ? 'slab-custom' : labelType.id
 
+    // Avery-sticker types — open the sheet position picker first.
+    if (labelType.id === 'onetouch') {
+      setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery6871' })
+      return
+    }
+    if (labelType.id === 'toploader' || labelType.id === 'foldover') {
+      setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery8167' })
+      return
+    }
+
     // Slab labels print in duplex (front+back separate pages) or fold-over
     // (one page that folds at the center). Prompt the user once per download.
     if (labelType.needsFormat) {
@@ -719,8 +740,8 @@ export default function LabelStudioScreen() {
         'Choose print format:',
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Duplex (front+back)', onPress: () => openWebDownload(exportType, 'duplex') },
-          { text: 'Fold-over', onPress: () => openWebDownload(exportType, 'foldover') },
+          { text: 'Duplex (front+back)', onPress: () => openWebDownload(exportType, { format: 'duplex' }) },
+          { text: 'Fold-over', onPress: () => openWebDownload(exportType, { format: 'foldover' }) },
         ],
       )
       return
@@ -805,6 +826,24 @@ export default function LabelStudioScreen() {
         onSelectColor={handlePickerSelect}
         onClose={() => setPickerVisible(false)}
         cardImageUrl={frontUrl}
+      />
+
+      <LabelPositionPicker
+        visible={!!galleryPositionPicker}
+        title={galleryPositionPicker?.title || ''}
+        sheet={galleryPositionPicker?.sheet || 'avery8167'}
+        onCancel={() => setGalleryPositionPicker(null)}
+        onConfirm={(pos) => {
+          const task = galleryPositionPicker
+          setGalleryPositionPicker(null)
+          if (!task) return
+          // Toploader prints front + back as a pair on the 8167 sheet —
+          // back goes in the next slot. Foldover and one-touch are
+          // single-slot prints.
+          const opts: { position?: number; position2?: number } = { position: pos }
+          if (task.exportType === 'toploader') opts.position2 = pos + 1
+          openWebDownload(task.exportType, opts)
+        }}
       />
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
@@ -1416,8 +1455,8 @@ export default function LabelStudioScreen() {
                     'Choose print format:',
                     [
                       { text: 'Cancel', style: 'cancel' },
-                      { text: 'Duplex (front+back)', onPress: () => openWebDownload('slab-custom', 'duplex') },
-                      { text: 'Fold-over', onPress: () => openWebDownload('slab-custom', 'foldover') },
+                      { text: 'Duplex (front+back)', onPress: () => openWebDownload('slab-custom', { format: 'duplex' }) },
+                      { text: 'Fold-over', onPress: () => openWebDownload('slab-custom', { format: 'foldover' }) },
                     ],
                   )
                 }}

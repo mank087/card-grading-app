@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
+
+// Mirror of FULLSCREEN_ROUTES in Navigation.tsx — these download/preview
+// routes should render edge-to-edge with no site chrome.
+const FULLSCREEN_ROUTES = ['/label-export', '/label-preview'];
 
 export default function Footer() {
+  const pathname = usePathname();
+  if (pathname && FULLSCREEN_ROUTES.some(p => pathname.startsWith(p))) {
+    return null;
+  }
   const currentYear = new Date().getFullYear();
 
   return (
