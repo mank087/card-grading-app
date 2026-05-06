@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity, Platform } from 'react-native'
+import { View, Text, StyleSheet, ActivityIndicator, TouchableOpacity } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useRouter } from 'expo-router'
 import { useState, useEffect, useRef } from 'react'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
 
@@ -21,6 +22,7 @@ interface InAppPageProps {
  */
 export default function InAppPage({ path, title }: InAppPageProps) {
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<{ access_token: string; refresh_token: string; user: any } | null>(null)
   const [ready, setReady] = useState(false)
@@ -130,16 +132,18 @@ export default function InAppPage({ path, title }: InAppPageProps) {
     <View style={styles.container}>
       {/* In-app top bar — always visible regardless of Stack header config.
           Gives the user an unmistakable way back to the app even when the
-          web page renders full-bleed. */}
-      <View style={styles.topBar}>
+          web page renders full-bleed. paddingTop uses the actual device
+          safe-area inset (status bar / notch / dynamic island) so the back
+          button is fully tappable on every iPhone. */}
+      <View style={[styles.topBar, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity
           onPress={handleBack}
           style={styles.backBtn}
-          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          hitSlop={{ top: 12, right: 16, bottom: 12, left: 16 }}
           accessibilityLabel="Back to app"
           accessibilityRole="button"
         >
-          <Ionicons name="chevron-back" size={22} color={Colors.purple[600]} />
+          <Ionicons name="chevron-back" size={24} color={Colors.purple[600]} />
           <Text style={styles.backText}>Back</Text>
         </TouchableOpacity>
         <Text style={styles.topBarTitle} numberOfLines={1}>{title || 'DCM Grading'}</Text>
@@ -182,8 +186,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 12,
-    paddingVertical: 10,
-    paddingTop: Platform.OS === 'ios' ? 50 : 12, // clear iOS status bar
+    paddingBottom: 10,
+    // paddingTop is set inline from useSafeAreaInsets so it adapts to
+    // notch/dynamic island/no-notch devices.
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
     borderBottomColor: Colors.gray[200],
@@ -191,7 +196,11 @@ const styles = StyleSheet.create({
   backBtn: {
     flexDirection: 'row',
     alignItems: 'center',
+    // 44pt minimum tap target (Apple HIG); the button area now extends
+    // below the icon/label baseline so the whole region is clickable.
     minWidth: 80,
+    minHeight: 44,
+    paddingVertical: 6,
   },
   backText: {
     fontSize: 16,
