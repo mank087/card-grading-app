@@ -43,6 +43,7 @@ import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/onboarding/OnboardingTour'
+import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 
 export default function CardDetailScreen() {
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
@@ -143,9 +144,8 @@ export default function CardDetailScreen() {
   // and posts back base64 files; mobile then previews them with explicit Download/Print buttons.
   const [labelSheetOpen, setLabelSheetOpen] = useState(false)
   const [reportSheetOpen, setReportSheetOpen] = useState(false)
-  const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover'; title?: string; position?: number } | null>(null)
-  const [positionPicker, setPositionPicker] = useState<{ type: string; title: string; sheet: 'avery6871' | 'avery8167' } | null>(null)
-  const [pickerPosition, setPickerPosition] = useState(0)
+  const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover'; title?: string; position?: number; position2?: number } | null>(null)
+  const [positionPicker, setPositionPicker] = useState<{ type: string; title: string; sheet: AverySheet } | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<string>('')
   type ExportFile = { name: string; mime: string; dataUrl: string; localPath: string }
@@ -185,6 +185,7 @@ export default function CardDetailScreen() {
         type: exportType,
         format: opts?.format,
         position: opts?.position,
+        position2: opts?.position2,
         title: opts?.title,
       })
       return
@@ -527,12 +528,14 @@ export default function CardDetailScreen() {
                     // ?position= and renders the sheet position correctly.
                     if (item.id === 'onetouch') {
                       setPositionPicker({ type: item.id, title: item.name, sheet: 'avery6871' })
-                      AsyncStorage.getItem('dcm_avery6871_last_pos').then(p => setPickerPosition(p ? parseInt(p, 10) || 0 : 0))
                       return
                     }
-                    if (item.id === 'toploader' || item.id === 'foldover') {
-                      setPositionPicker({ type: item.id, title: item.name, sheet: 'avery8167' })
-                      AsyncStorage.getItem('dcm_avery8167_last_pos').then(p => setPickerPosition(p ? parseInt(p, 10) || 0 : 0))
+                    if (item.id === 'toploader') {
+                      setPositionPicker({ type: item.id, title: item.name, sheet: 'avery8167-pair' })
+                      return
+                    }
+                    if (item.id === 'foldover') {
+                      setPositionPicker({ type: item.id, title: item.name, sheet: 'avery8167-foldover' })
                       return
                     }
                     if ((item as any).needsFormat) {
@@ -569,88 +572,22 @@ export default function CardDetailScreen() {
         </Pressable>
       </Modal>
 
-      {/* Position picker — Avery 6871 (12 labels, 3×4) or 8167 (80 labels, 4×20).
-          Mirrors the web's AveryLabelModal / Avery8167LabelModal so users can pick
-          where on a partially-used sheet the new label should print. */}
-      <Modal visible={!!positionPicker} transparent animationType="slide" onRequestClose={() => setPositionPicker(null)}>
-        <Pressable style={s.editBackdrop} onPress={() => setPositionPicker(null)}>
-          <Pressable style={s.editSheet} onPress={e => e.stopPropagation()}>
-            <View style={s.editHandle} />
-            {positionPicker && (() => {
-              const cfg = positionPicker.sheet === 'avery6871'
-                ? { rows: 4, cols: 3, total: 12, label: 'Avery 6871 (3 × 4 = 12 labels)', storageKey: 'dcm_avery6871_last_pos' }
-                : { rows: 20, cols: 4, total: 80, label: 'Avery 8167 (4 × 20 = 80 labels)', storageKey: 'dcm_avery8167_last_pos' }
-              return (
-                <>
-                  <Text style={s.editTitle}>Choose Starting Position</Text>
-                  <Text style={s.editSubtitle}>{positionPicker.title} · {cfg.label}</Text>
-                  <Text style={[s.helperText, { marginTop: 6, marginBottom: 10 }]}>
-                    Tap the position where the next available label is on your sheet. Position is remembered for next time.
-                  </Text>
-                  {/* Grid */}
-                  <ScrollView style={{ maxHeight: 320 }}>
-                    <View style={{ alignSelf: 'center', flexDirection: 'column', gap: 4, padding: 4 }}>
-                      {Array.from({ length: cfg.rows }).map((_, r) => (
-                        <View key={r} style={{ flexDirection: 'row', gap: 4 }}>
-                          {Array.from({ length: cfg.cols }).map((_, c) => {
-                            const idx = r * cfg.cols + c
-                            const sel = idx === pickerPosition
-                            // Smaller cells for the dense Avery 8167 grid
-                            const cellSize = positionPicker.sheet === 'avery8167' ? 28 : 56
-                            return (
-                              <TouchableOpacity
-                                key={c}
-                                onPress={() => setPickerPosition(idx)}
-                                style={{
-                                  width: cellSize,
-                                  height: cellSize * 0.7,
-                                  borderRadius: 4,
-                                  borderWidth: sel ? 2 : 1,
-                                  borderColor: sel ? Colors.purple[600] : Colors.gray[300],
-                                  backgroundColor: sel ? Colors.purple[50] : '#fff',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                }}
-                              >
-                                <Text style={{ fontSize: positionPicker.sheet === 'avery8167' ? 8 : 12, fontWeight: '700', color: sel ? Colors.purple[700] : Colors.gray[500] }}>
-                                  {idx + 1}
-                                </Text>
-                              </TouchableOpacity>
-                            )
-                          })}
-                        </View>
-                      ))}
-                    </View>
-                  </ScrollView>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-                    <TouchableOpacity style={[s.editBtn, s.editBtnCancel]} onPress={() => setPositionPicker(null)}>
-                      <Text style={s.editBtnCancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[s.editBtn, s.editBtnSave]}
-                      onPress={async () => {
-                        await AsyncStorage.setItem(cfg.storageKey, String(pickerPosition))
-                        const taskType = positionPicker.type
-                        const pos = pickerPosition
-                        setPositionPicker(null)
-                        // Browser-direct download with the chosen sheet position.
-                        // For the toploader front+back pair, web's label-export
-                        // page accepts &position2= to place the back at the next
-                        // sheet slot; default is position+1.
-                        const opts: { position?: number; position2?: number } = { position: pos }
-                        if (taskType === 'toploader') opts.position2 = pos + 1
-                        openWebDownload(taskType, opts)
-                      }}
-                    >
-                      <Text style={s.editBtnSaveText}>Use Position {pickerPosition + 1}</Text>
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )
-            })()}
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* Position picker — shared component used by label studio too. Picker
+          knows about pair sheets (toploader front+back) vs single-slot
+          sheets (one-touch, foldover) and returns the correct front/back
+          slot indices for the download URL. */}
+      <LabelPositionPicker
+        visible={!!positionPicker}
+        title={positionPicker?.title || ''}
+        sheet={positionPicker?.sheet || 'avery8167-pair'}
+        onCancel={() => setPositionPicker(null)}
+        onConfirm={(position, position2) => {
+          const task = positionPicker
+          setPositionPicker(null)
+          if (!task) return
+          openWebDownload(task.type, { position, position2 })
+        }}
+      />
 
       {/* Label-export modal — generation → preview with Download / Print buttons */}
       <Modal visible={!!exportTask} transparent animationType="fade" onRequestClose={() => { setExportTask(null); setExportError(null); setExportFiles([]) }}>
@@ -829,7 +766,7 @@ export default function CardDetailScreen() {
               <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 }}>
                 <WebView
                   source={{
-                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.type === 'toploader' && exportTask.position != null ? `&position2=${exportTask.position + 1}` : ''}`,
+                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
                   }}
                   originWhitelist={['*']}
                   javaScriptEnabled

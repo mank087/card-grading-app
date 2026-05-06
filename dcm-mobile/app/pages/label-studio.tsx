@@ -722,13 +722,20 @@ export default function LabelStudioScreen() {
     // pipeline expects 'slab-custom'.
     const exportType = labelType.id === 'custom' ? 'slab-custom' : labelType.id
 
-    // Avery-sticker types — open the sheet position picker first.
+    // Avery-sticker types — open the sheet position picker first. The
+    // toploader pair claims 2 adjacent slots per card so it uses the
+    // 'avery8167-pair' picker mode (40 card cells); foldover uses 1 slot
+    // per card so it uses the raw 80-slot grid.
     if (labelType.id === 'onetouch') {
       setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery6871' })
       return
     }
-    if (labelType.id === 'toploader' || labelType.id === 'foldover') {
-      setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery8167' })
+    if (labelType.id === 'toploader') {
+      setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery8167-pair' })
+      return
+    }
+    if (labelType.id === 'foldover') {
+      setGalleryPositionPicker({ exportType, title: labelType.name, sheet: 'avery8167-foldover' })
       return
     }
 
@@ -831,18 +838,16 @@ export default function LabelStudioScreen() {
       <LabelPositionPicker
         visible={!!galleryPositionPicker}
         title={galleryPositionPicker?.title || ''}
-        sheet={galleryPositionPicker?.sheet || 'avery8167'}
+        sheet={galleryPositionPicker?.sheet || 'avery8167-pair'}
         onCancel={() => setGalleryPositionPicker(null)}
-        onConfirm={(pos) => {
+        onConfirm={(position, position2) => {
           const task = galleryPositionPicker
           setGalleryPositionPicker(null)
           if (!task) return
-          // Toploader prints front + back as a pair on the 8167 sheet —
-          // back goes in the next slot. Foldover and one-touch are
-          // single-slot prints.
-          const opts: { position?: number; position2?: number } = { position: pos }
-          if (task.exportType === 'toploader') opts.position2 = pos + 1
-          openWebDownload(task.exportType, opts)
+          // Picker has already mapped the user's "card" pick to the
+          // correct front/back raw-slot indices for the toploader pair.
+          // Single-slot sheets (foldover, one-touch) just pass `position`.
+          openWebDownload(task.exportType, { position, position2 })
         }}
       />
 
