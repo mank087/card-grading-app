@@ -1,5 +1,5 @@
 import InAppPage from '@/components/ui/InAppPage'
 
 export default function Page() {
-  return <InAppPage path="/grading-rubric" />
+  return <InAppPage path="/grading-rubric" title="Grading Rubric" />
 }

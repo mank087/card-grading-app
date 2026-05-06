@@ -1,5 +1,5 @@
 import InAppPage from '@/components/ui/InAppPage'
 
 export default function Page() {
-  return <InAppPage path="/why-dcm" />
+  return <InAppPage path="/why-dcm" title="Why DCM?" />
 }

@@ -1,5 +1,5 @@
 import InAppPage from '@/components/ui/InAppPage'
 
 export default function Page() {
-  return <InAppPage path="/market-pricing" />
+  return <InAppPage path="/market-pricing" title="Market Pricing" />
 }

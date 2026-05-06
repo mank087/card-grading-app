@@ -1,5 +1,5 @@
 import InAppPage from '@/components/ui/InAppPage'
 
 export default function Page() {
-  return <InAppPage path="/faq" />
+  return <InAppPage path="/faq" title="FAQ" />
 }

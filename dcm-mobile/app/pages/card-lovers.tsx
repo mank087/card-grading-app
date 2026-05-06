@@ -1,5 +1,5 @@
 import InAppPage from '@/components/ui/InAppPage'
 
 export default function Page() {
-  return <InAppPage path="/card-lovers" />
+  return <InAppPage path="/card-lovers" title="Card Lovers" />
 }

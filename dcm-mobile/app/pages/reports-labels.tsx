@@ -1,5 +1,5 @@
 import InAppPage from '@/components/ui/InAppPage'
 
 export default function Page() {
-  return <InAppPage path="/reports-and-labels" />
+  return <InAppPage path="/reports-and-labels" title="Reports & Labels" />
 }
