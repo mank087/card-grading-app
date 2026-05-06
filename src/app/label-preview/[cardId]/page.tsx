@@ -253,6 +253,17 @@ export default function LabelPreviewPage() {
       const cfg = parsed.config as CustomLabelConfig | undefined;
       const sideOverride = parsed.side as 'front' | 'back' | undefined;
       if (!cfg) return;
+      // Optional emblem override piped from the RN host's EmblemsContext.
+      // When the user toggles a badge in the mobile picker we receive a
+      // new config message with updated emblem flags; mutate the cached
+      // slab data so the next canvas render reflects them. Without this,
+      // the preview kept using the snapshot loaded once on mount.
+      const e = parsed.emblems as { showFounderEmblem?: boolean; showVipEmblem?: boolean; showCardLoversEmblem?: boolean } | undefined;
+      if (e && slabDataRef.current) {
+        (slabDataRef.current as any).showFounderEmblem = !!e.showFounderEmblem;
+        (slabDataRef.current as any).showVipEmblem = !!e.showVipEmblem;
+        (slabDataRef.current as any).showCardLoversEmblem = !!e.showCardLoversEmblem;
+      }
       doRender({ ...cfg, side: sideOverride || cfg.side || 'front' });
     }
     window.addEventListener('message', onMessage);

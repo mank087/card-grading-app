@@ -20,6 +20,7 @@ try {
 }
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
+import { EmblemsProvider } from '@/contexts/EmblemsContext'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
@@ -178,6 +179,7 @@ export default function RootLayout() {
     <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.dcmgrading">
     <AuthProvider>
       <CreditsProvider>
+        <EmblemsProvider>
         <GradingQueueProvider>
           <GradingPollerHost />
           <GradingStatusBar />
@@ -208,6 +210,7 @@ export default function RootLayout() {
           <ConditionalHelpBot />
         </AuthGate>
         </GradingQueueProvider>
+        </EmblemsProvider>
       </CreditsProvider>
     </AuthProvider>
     </StripeProvider>

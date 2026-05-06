@@ -22,6 +22,7 @@ import { useRef, useEffect, useState } from 'react'
 import { View, StyleSheet } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUserEmblems } from '@/hooks/useUserEmblems'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -83,6 +84,7 @@ export default function LabelWebRenderer({
   type = 'slab-custom',
 }: LabelWebRendererProps) {
   const { session } = useAuth()
+  const emblems = useUserEmblems()
   const webViewRef = useRef<WebView>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const readyRef = useRef(false)
@@ -107,22 +109,33 @@ export default function LabelWebRenderer({
     ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
     : ''
 
-  // Send config updates to the page (re-renders canvas without reload)
+  // Send config updates to the page (re-renders canvas without reload).
+  // Emblems flow through the same message: when the user toggles a badge
+  // in LabelBadgesPicker the EmblemsContext updates synchronously; this
+  // effect's dep on showFounder/showVip/showCardLovers re-fires and the
+  // /label-preview page picks up the new flags before re-rendering.
   useEffect(() => {
     if (!config || !cardData || !pageReady) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       if (!webViewRef.current || !readyRef.current) return
-      // The page listens for 'message' events on window. Dispatch one with
-      // our new config; page re-renders.
-      const payload = JSON.stringify({ type: 'preview-config', config, side })
+      const payload = JSON.stringify({
+        type: 'preview-config',
+        config,
+        side,
+        emblems: {
+          showFounderEmblem: !!emblems.showFounder,
+          showVipEmblem: !!emblems.showVip,
+          showCardLoversEmblem: !!emblems.showCardLovers,
+        },
+      })
       const escaped = payload.replace(/\\/g, '\\\\').replace(/'/g, "\\'")
       webViewRef.current.injectJavaScript(
         `window.dispatchEvent(new MessageEvent('message', { data: '${escaped}' })); true;`
       )
     }, 250)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [config, cardData, side, pageReady])
+  }, [config, cardData, side, pageReady, emblems.showFounder, emblems.showVip, emblems.showCardLovers])
 
   const handleMessage = (event: { nativeEvent: { data: string } }) => {
     try {

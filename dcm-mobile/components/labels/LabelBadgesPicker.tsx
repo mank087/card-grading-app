@@ -1,9 +1,6 @@
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
-import { useEffect, useState, useCallback } from 'react'
 import { Colors } from '@/lib/constants'
-import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/contexts/AuthContext'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 
 /**
@@ -24,43 +21,16 @@ type EmblemKey = 'founder' | 'vip' | 'card_lover'
 const MAX_BADGES = 2
 
 export default function LabelBadgesPicker() {
-  const { user } = useAuth()
   const emblems = useUserEmblems()
-  const [selected, setSelected] = useState<Set<EmblemKey>>(new Set())
-  const [loaded, setLoaded] = useState(false)
-
-  // Hydrate from the entitlements hook once it loads
-  useEffect(() => {
-    if (!emblems.loading && !loaded) {
-      setSelected(new Set(emblems.selectedEmblems as EmblemKey[]))
-      setLoaded(true)
-    }
-  }, [emblems.loading, emblems.selectedEmblems, loaded])
-
-  const persist = useCallback(async (next: Set<EmblemKey>) => {
-    if (!user?.id) return
-    const csv = Array.from(next).join(',')
-    const { error } = await supabase
-      .from('user_credits')
-      .update({ preferred_label_emblem: csv || 'none' })
-      .eq('user_id', user.id)
-    if (error) console.warn('[LabelBadgesPicker] save error:', error.message)
-  }, [user?.id])
+  const selected = new Set(emblems.selectedEmblems as EmblemKey[])
 
   const toggle = (key: EmblemKey, entitled: boolean) => {
     if (!entitled) return
-    const next = new Set(selected)
-    if (next.has(key)) {
-      next.delete(key)
-    } else {
-      if (next.size >= MAX_BADGES) {
-        Alert.alert('Maximum reached', `You can apply at most ${MAX_BADGES} badges to a label. Deselect one to choose a different badge.`)
-        return
-      }
-      next.add(key)
+    const isOn = selected.has(key)
+    const applied = emblems.setEmblemSelected(key, !isOn)
+    if (!applied) {
+      Alert.alert('Maximum reached', `You can apply at most ${MAX_BADGES} badges to a label. Deselect one to choose a different badge.`)
     }
-    setSelected(next)
-    persist(next)
   }
 
   const atLimit = selected.size >= MAX_BADGES
