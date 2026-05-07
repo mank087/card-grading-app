@@ -21,6 +21,7 @@ import {
 } from '@/lib/ebayApi'
 
 import MobileTabBar from '@/components/MobileTabBar'
+import AppHeaderBar from '@/components/AppHeaderBar'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
@@ -415,6 +416,7 @@ export default function EbayListScreen() {
 
   return (
     <View style={st.container}>
+      <AppHeaderBar showBack title="List on eBay" />
       {/* OAuth WebView Modal */}
       <Modal visible={showOAuth} animationType="slide" onRequestClose={() => setShowOAuth(false)}>
         <View style={{ flex: 1 }}>

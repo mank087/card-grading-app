@@ -32,6 +32,7 @@ import LabelMockup, { type LabelTypeId } from '@/components/labels/LabelMockup'
 import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import MobileTabBar from '@/components/MobileTabBar'
+import AppHeaderBar from '@/components/AppHeaderBar'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 
@@ -816,6 +817,7 @@ export default function LabelStudioScreen() {
 
   return (
     <View style={s.container}>
+      <AppHeaderBar showBack title="Label Studio" />
       {/* Hidden label renderer — loads /label-preview which uses the same
           renderFrontCanvas / renderBackCanvas as the download PDF, so the
           live preview matches the downloaded file exactly. */}

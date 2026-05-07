@@ -188,15 +188,12 @@ export default function RootLayout() {
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="(auth)" />
             <Stack.Screen name="(tabs)" />
+            {/* card/[id] renders AppHeaderBar inline so it gets the
+                shared chrome (DCM logo + credit balance) like every other
+                screen — disable the Stack header to avoid stacking. */}
             <Stack.Screen
               name="card/[id]"
-              options={{
-                headerShown: true,
-                title: 'Card Details',
-                headerTintColor: Colors.purple[600],
-                headerBackTitle: 'Back',
-                headerStyle: { backgroundColor: Colors.white },
-              }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="grade"

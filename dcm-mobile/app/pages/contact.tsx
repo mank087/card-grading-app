@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
 import MobileTabBar from '@/components/MobileTabBar'
+import AppHeaderBar from '@/components/AppHeaderBar'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
@@ -49,6 +50,7 @@ export default function ContactPage() {
   if (sent) {
     return (
       <View style={{ flex: 1 }}>
+        <AppHeaderBar showBack title="Contact Us" />
         <View style={styles.successContainer}>
           <Text style={styles.successIcon}>✓</Text>
           <Text style={styles.successTitle}>Message Sent!</Text>
@@ -62,6 +64,7 @@ export default function ContactPage() {
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <AppHeaderBar showBack title="Contact Us" />
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Contact Us</Text>
         <Text style={styles.subtitle}>Have a question or need help? Send us a message and we'll respond via email.</Text>

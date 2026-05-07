@@ -33,11 +33,11 @@ export default function PagesLayout() {
       <Stack.Screen name="terms" options={{ headerShown: false }} />
       <Stack.Screen name="privacy" options={{ headerShown: false }} />
 
-      {/* Native screens — keep the Stack header so they retain their
-          existing back-button + title chrome. */}
-      <Stack.Screen name="label-studio" options={{ title: 'Label Studio' }} />
-      <Stack.Screen name="ebay-list" options={{ title: 'List on eBay' }} />
-      <Stack.Screen name="contact" options={{ title: 'Contact Us' }} />
+      {/* Native screens — render their own AppHeaderBar inline so the
+          shared header chrome (DCM logo + credits) shows everywhere. */}
+      <Stack.Screen name="label-studio" options={{ headerShown: false }} />
+      <Stack.Screen name="ebay-list" options={{ headerShown: false }} />
+      <Stack.Screen name="contact" options={{ headerShown: false }} />
     </Stack>
   )
 }

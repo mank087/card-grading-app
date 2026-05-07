@@ -45,6 +45,7 @@ import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/onboarding/OnboardingTour'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import MobileTabBar from '@/components/MobileTabBar'
+import AppHeaderBar from '@/components/AppHeaderBar'
 
 export default function CardDetailScreen() {
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
@@ -417,6 +418,7 @@ export default function CardDetailScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+    <AppHeaderBar showBack title="Card Details" />
     <ScrollView
       ref={scrollRef}
       style={s.container}

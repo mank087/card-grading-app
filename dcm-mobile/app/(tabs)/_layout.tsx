@@ -1,67 +1,12 @@
 import React from 'react'
-import { Tabs, useRouter } from 'expo-router'
+import { Tabs } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native'
+import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
-import { useCredits } from '@/contexts/CreditsContext'
-
-/**
- * Custom header matching web nav — DCM logo left, quick links + credit badge right
- */
-function AppHeader() {
-  const router = useRouter()
-  const { balance } = useCredits()
-  const insets = useSafeAreaInsets()
-
-  // Credit badge color: green if 3+, amber if 1-2, red if 0
-  const creditColor = balance >= 3 ? Colors.green[600] : balance >= 1 ? Colors.amber[600] : Colors.red[600]
-  const creditBg = balance >= 3 ? Colors.green[50] : balance >= 1 ? Colors.amber[50] : Colors.red[50]
-
-  return (
-    <View style={[styles.header, { paddingTop: insets.top + 4 }]}>
-      {/* Left: DCM Logo */}
-      <TouchableOpacity
-        style={styles.logoContainer}
-        onPress={() => router.push('/(tabs)/grade')}
-        activeOpacity={0.8}
-        accessibilityLabel="DCM Grading home"
-        accessibilityRole="button"
-        accessibilityHint="Opens the grade-a-card screen"
-      >
-        <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
-      </TouchableOpacity>
-
-      {/* Right: Grade CTA + Credits */}
-      <View style={styles.headerRight}>
-        <TouchableOpacity
-          style={styles.gradeBtn}
-          onPress={() => router.push('/(tabs)/grade')}
-          activeOpacity={0.85}
-          accessibilityLabel="Grade a card"
-          accessibilityRole="button"
-        >
-          <Ionicons name="add-circle" size={16} color="#fff" />
-          <Text style={styles.gradeBtnText}>Grade</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.creditBadge, { backgroundColor: creditBg }]}
-          onPress={() => router.push('/pages/credits' as any)}
-          activeOpacity={0.7}
-          accessibilityLabel={`${balance} grading credits remaining. Tap to purchase more.`}
-          accessibilityRole="button"
-        >
-          <Ionicons name="diamond" size={13} color={creditColor} />
-          <Text style={[styles.creditBadgeText, { color: creditColor }]}>{balance}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  )
-}
+import AppHeaderBar from '@/components/AppHeaderBar'
 
 export default function TabLayout() {
-  const { balance } = useCredits()
   const insets = useSafeAreaInsets()
 
   return (
@@ -79,7 +24,7 @@ export default function TabLayout() {
           fontSize: 11,
           fontWeight: '600',
         },
-        header: () => <AppHeader />,
+        header: () => <AppHeaderBar showGrade />,
       }}
     >
       <Tabs.Screen
@@ -149,56 +94,3 @@ export default function TabLayout() {
     </Tabs>
   )
 }
-
-const styles = StyleSheet.create({
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    backgroundColor: Colors.white,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.gray[200],
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 36,
-    height: 36,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  gradeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingVertical: 7,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: Colors.purple[600],
-  },
-  gradeBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  creditBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
-  },
-  creditBadgeText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
-})
