@@ -28,12 +28,22 @@ async function clearAppCaches(userId: string | undefined) {
   }
 }
 
+interface SignUpResult {
+  error: any
+  /** Supabase silently returns success when signUp is called with an
+   *  email that already exists (anti-enumeration behavior). The signal is
+   *  `data.user.identities` being empty. We surface that here so the UI
+   *  can route the user to the login screen instead of telling them to
+   *  check their inbox for a confirmation that won't arrive. */
+  existingAccount: boolean
+}
+
 interface AuthContextType {
   user: User | null
   session: Session | null
   isLoading: boolean
   signIn: (email: string, password: string) => Promise<{ error: any }>
-  signUp: (email: string, password: string) => Promise<{ error: any }>
+  signUp: (email: string, password: string) => Promise<SignUpResult>
   signOut: () => Promise<void>
 }
 
@@ -42,7 +52,7 @@ const AuthContext = createContext<AuthContextType>({
   session: null,
   isLoading: true,
   signIn: async () => ({ error: null }),
-  signUp: async () => ({ error: null }),
+  signUp: async () => ({ error: null, existingAccount: false }),
   signOut: async () => {},
 })
 
@@ -74,9 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error }
   }
 
-  const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({ email, password })
-    return { error }
+  const signUp = async (email: string, password: string): Promise<SignUpResult> => {
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    // Supabase 2.x: existing user → no error, but identities array is
+    // empty (the user object is a stub for anti-enumeration). New user →
+    // identities has at least one entry. Either way, surface the signal.
+    const existingAccount = !error && Array.isArray(data?.user?.identities) && data.user.identities.length === 0
+    return { error, existingAccount }
   }
 
   const signOut = async () => {

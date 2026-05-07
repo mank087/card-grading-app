@@ -70,11 +70,18 @@ export default function RegisterScreen() {
     setOauthLoading(provider)
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
+      // Force the provider's account picker so a stale system-browser
+      // session doesn't sign the user in as someone else without asking.
+      // Google: `prompt=select_account`. Facebook: `auth_type=reauthenticate`.
+      const queryParams: Record<string, string> = provider === 'google'
+        ? { prompt: 'select_account' }
+        : { auth_type: 'reauthenticate' }
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: redirectUrl,
           skipBrowserRedirect: true,
+          queryParams,
         },
       })
 
@@ -85,7 +92,13 @@ export default function RegisterScreen() {
       }
 
       if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
+        // prefersEphemeralWebBrowserSession=true gives us an in-app web
+        // session that does NOT share cookies with Safari / Chrome. Without
+        // it, the user can land on the OAuth screen already signed in as
+        // a different DCM account from their system browser.
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
+          preferEphemeralSession: true,
+        })
         if (result.type === 'success' && result.url) {
           const url = new URL(result.url)
           const params = new URLSearchParams(url.hash?.substring(1) || url.search?.substring(1))
@@ -133,20 +146,27 @@ export default function RegisterScreen() {
     setError(null)
     setLoading(true)
     const trimmedEmail = email.trim()
-    const { error: authError } = await signUp(trimmedEmail, password)
+    const { error: authError, existingAccount } = await signUp(trimmedEmail, password)
     setLoading(false)
+
+    // Existing-account detection — two channels:
+    //   1) Supabase returned an explicit error matching "already registered"
+    //      etc. (rare; only happens when anti-enumeration is off in Supabase
+    //      auth settings).
+    //   2) Supabase silently succeeded but the returned user has no
+    //      identities (anti-enumeration default). The AuthContext surfaces
+    //      this as `existingAccount`.
+    // In both cases route to login with the email pre-filled.
+    if (existingAccount || (authError && isExistingAccountError(authError.message || ''))) {
+      router.replace({
+        pathname: '/(auth)/login',
+        params: { existingEmail: trimmedEmail },
+      } as any)
+      return
+    }
+
     if (authError) {
-      const msg = authError.message || ''
-      if (isExistingAccountError(msg)) {
-        // Hand the entered email off to the login screen with a flag so
-        // it can show "this account already exists, sign in" messaging.
-        router.replace({
-          pathname: '/(auth)/login',
-          params: { existingEmail: trimmedEmail },
-        } as any)
-        return
-      }
-      setError(msg || 'Registration failed')
+      setError(authError.message || 'Registration failed')
     } else {
       Alert.alert(
         'Check your email',

@@ -92,11 +92,17 @@ export default function LoginScreen() {
     setOauthLoading(provider)
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
+      // Force the provider's account picker so a stale system-browser
+      // session doesn't sign the user in as someone else without asking.
+      const queryParams: Record<string, string> = provider === 'google'
+        ? { prompt: 'select_account' }
+        : { auth_type: 'reauthenticate' }
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
           redirectTo: redirectUrl,
           skipBrowserRedirect: true,
+          queryParams,
         },
       })
 
@@ -107,7 +113,13 @@ export default function LoginScreen() {
       }
 
       if (data?.url) {
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
+        // preferEphemeralSession=true gives us an in-app web session that
+        // does NOT share cookies with Safari / Chrome. Without it the
+        // user can land on the OAuth screen already signed in as someone
+        // else from their system browser.
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
+          preferEphemeralSession: true,
+        })
         if (result.type === 'success' && result.url) {
           // Extract tokens from the redirect URL
           const url = new URL(result.url)
