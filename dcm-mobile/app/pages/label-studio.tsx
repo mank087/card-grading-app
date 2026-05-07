@@ -33,6 +33,7 @@ import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
+import { useSegments } from 'expo-router'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 
@@ -104,6 +105,13 @@ export default function LabelStudioScreen() {
   const router = useRouter()
   const { session } = useAuth()
   const userEmblems = useUserEmblems()
+  // (tabs)/labels.tsx re-exports this screen so the Labels tab and the
+  // /pages/label-studio route share one implementation. When mounted as
+  // a tab, the (tabs) layout already provides the AppHeaderBar (top) +
+  // tab bar (bottom), so suppress our inline chrome to avoid stacking
+  // two of each.
+  const segments = useSegments()
+  const isTabContext = segments[0] === '(tabs)'
   const [cards, setCards] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [selectedCard, setSelectedCard] = useState<any | null>(null)
@@ -817,7 +825,7 @@ export default function LabelStudioScreen() {
 
   return (
     <View style={s.container}>
-      <AppHeaderBar showBack title="Label Studio" />
+      {!isTabContext && <AppHeaderBar showBack title="Label Studio" />}
       {/* Hidden label renderer — loads /label-preview which uses the same
           renderFrontCanvas / renderBackCanvas as the download PDF, so the
           live preview matches the downloaded file exactly. */}
@@ -1547,7 +1555,7 @@ export default function LabelStudioScreen() {
           </>
         )}
       </ScrollView>
-      <MobileTabBar />
+      {!isTabContext && <MobileTabBar />}
     </View>
   )
 }

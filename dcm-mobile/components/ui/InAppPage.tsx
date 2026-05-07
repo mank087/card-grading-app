@@ -1,6 +1,6 @@
 import { View, StyleSheet, ActivityIndicator } from 'react-native'
 import { WebView } from 'react-native-webview'
-import { useRouter } from 'expo-router'
+import { useRouter, useSegments } from 'expo-router'
 import { useState, useEffect, useRef } from 'react'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
@@ -22,6 +22,12 @@ interface InAppPageProps {
  */
 export default function InAppPage({ path, title }: InAppPageProps) {
   const router = useRouter()
+  // Some tabs (e.g. Pricing) re-export an InAppPage-backed /pages screen
+  // so the tab and the standalone route share one implementation. When
+  // mounted as a tab, the (tabs) layout already provides AppHeaderBar +
+  // tab bar, so suppress our inline chrome to avoid stacking two of each.
+  const segments = useSegments()
+  const isTabContext = segments[0] === '(tabs)'
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<{ access_token: string; refresh_token: string; user: any } | null>(null)
   const [ready, setReady] = useState(false)
@@ -132,8 +138,9 @@ export default function InAppPage({ path, title }: InAppPageProps) {
       {/* Shared header — DCM logo + page title + credits badge. The back
           handler walks WebView history first, then exits to the previous
           app screen, so users can step back through SPA navigations
-          without leaving the page entirely. */}
-      <AppHeaderBar showBack title={title} onBack={handleBack} />
+          without leaving the page entirely. Skipped in tab context — the
+          tab's own header already provides the same chrome. */}
+      {!isTabContext && <AppHeaderBar showBack title={title} onBack={handleBack} />}
       {loading && (
         <View style={styles.loader}>
           <ActivityIndicator size="large" color={Colors.purple[600]} />
@@ -160,7 +167,7 @@ export default function InAppPage({ path, title }: InAppPageProps) {
         // Share cookies/storage within the app
         sharedCookiesEnabled
       />
-      <MobileTabBar />
+      {!isTabContext && <MobileTabBar />}
     </View>
   )
 }
