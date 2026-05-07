@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
+import MobileTabBar from '@/components/MobileTabBar'
 
 const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
@@ -175,6 +176,7 @@ export default function InAppPage({ path, title }: InAppPageProps) {
         // Share cookies/storage within the app
         sharedCookiesEnabled
       />
+      <MobileTabBar />
     </View>
   )
 }

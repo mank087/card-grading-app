@@ -3,6 +3,7 @@ import { View, Text, TextInput, StyleSheet, ScrollView, Alert, KeyboardAvoidingV
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
+import MobileTabBar from '@/components/MobileTabBar'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
@@ -47,11 +48,14 @@ export default function ContactPage() {
 
   if (sent) {
     return (
-      <View style={styles.successContainer}>
-        <Text style={styles.successIcon}>✓</Text>
-        <Text style={styles.successTitle}>Message Sent!</Text>
-        <Text style={styles.successText}>We'll get back to you as soon as possible at {email}</Text>
-        <Button title="Send Another" variant="secondary" onPress={() => setSent(false)} style={{ marginTop: 16 }} />
+      <View style={{ flex: 1 }}>
+        <View style={styles.successContainer}>
+          <Text style={styles.successIcon}>✓</Text>
+          <Text style={styles.successTitle}>Message Sent!</Text>
+          <Text style={styles.successText}>We'll get back to you as soon as possible at {email}</Text>
+          <Button title="Send Another" variant="secondary" onPress={() => setSent(false)} style={{ marginTop: 16 }} />
+        </View>
+        <MobileTabBar />
       </View>
     )
   }
@@ -88,6 +92,7 @@ export default function ContactPage() {
 
         <Text style={styles.directEmail}>Or email us directly: admin@dcmgrading.com</Text>
       </ScrollView>
+      <MobileTabBar />
     </KeyboardAvoidingView>
   )
 }

@@ -31,6 +31,7 @@ import ColorPickerModal from '@/components/labels/ColorPickerModal'
 import LabelMockup, { type LabelTypeId } from '@/components/labels/LabelMockup'
 import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
+import MobileTabBar from '@/components/MobileTabBar'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 
@@ -1544,6 +1545,7 @@ export default function LabelStudioScreen() {
           </>
         )}
       </ScrollView>
+      <MobileTabBar />
     </View>
   )
 }

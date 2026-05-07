@@ -20,6 +20,8 @@ import {
   type EbayConnectionStatus, type CreateListingRequest,
 } from '@/lib/ebayApi'
 
+import MobileTabBar from '@/components/MobileTabBar'
+
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
 type Step = 'connect' | 'details' | 'specifics' | 'shipping' | 'review' | 'publishing' | 'success' | 'error'
@@ -1029,6 +1031,7 @@ export default function EbayListScreen() {
           )}
         </View>
       )}
+      <MobileTabBar />
     </View>
   )
 }

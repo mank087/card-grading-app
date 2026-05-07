@@ -32,17 +32,17 @@ function AppHeader() {
         <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
       </TouchableOpacity>
 
-      {/* Right: Quick links + Credits */}
+      {/* Right: Grade CTA + Credits */}
       <View style={styles.headerRight}>
         <TouchableOpacity
-          style={styles.headerLink}
-          onPress={() => router.push('/pages/label-studio' as any)}
-          activeOpacity={0.7}
-          accessibilityLabel="Open Label Studio"
+          style={styles.gradeBtn}
+          onPress={() => router.push('/(tabs)/grade')}
+          activeOpacity={0.85}
+          accessibilityLabel="Grade a card"
           accessibilityRole="button"
         >
-          <Ionicons name="pricetags-outline" size={18} color={Colors.gray[600]} />
-          <Text style={styles.headerLinkText}>Labels</Text>
+          <Ionicons name="add-circle" size={16} color="#fff" />
+          <Text style={styles.gradeBtnText}>Grade</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -175,19 +175,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
   },
-  headerLink: {
+  gradeBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: Colors.gray[50],
+    backgroundColor: Colors.purple[600],
   },
-  headerLinkText: {
+  gradeBtnText: {
     fontSize: 13,
-    fontWeight: '600',
-    color: Colors.gray[600],
+    fontWeight: '700',
+    color: '#fff',
   },
   creditBadge: {
     flexDirection: 'row',
