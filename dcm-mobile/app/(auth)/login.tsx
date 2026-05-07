@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
 import { supabase } from '@/lib/supabase'
+import { completeOAuthFromUrl } from '@/lib/oauthComplete'
 import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 import * as AppleAuthentication from 'expo-apple-authentication'
@@ -113,23 +114,16 @@ export default function LoginScreen() {
       }
 
       if (data?.url) {
-        // preferEphemeralSession=true gives us an in-app web session that
-        // does NOT share cookies with Safari / Chrome. Without it the
-        // user can land on the OAuth screen already signed in as someone
-        // else from their system browser.
+        // preferEphemeralSession=true (iOS) gives us an in-app web
+        // session that does NOT share cookies with Safari. Without it
+        // the user can land on the OAuth screen already signed in as
+        // someone else from their system browser.
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
           preferEphemeralSession: true,
         })
         if (result.type === 'success' && result.url) {
-          // Extract tokens from the redirect URL
-          const url = new URL(result.url)
-          const params = new URLSearchParams(url.hash?.substring(1) || url.search?.substring(1))
-          const accessToken = params.get('access_token')
-          const refreshToken = params.get('refresh_token')
-
-          if (accessToken && refreshToken) {
-            await supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
-          }
+          const ok = await completeOAuthFromUrl(result.url, supabase)
+          if (!ok.ok) setError(ok.error || 'Sign in failed. Please try again.')
         }
       }
     } catch (err: any) {
