@@ -19,19 +19,32 @@ export interface CompressedImage {
 
 /**
  * Compress an image for upload.
- * Resizes to max 3000px wide, JPEG at 0.85 quality.
+ *
+ * Resizes to max 2048px on the long edge at JPEG 0.85. The previous cap
+ * was 3000px; OpenAI's vision API rescales any input to 2048px on the
+ * long edge before the model sees it (see OpenAI vision docs for "high"
+ * detail mode), so anything larger is wasted upload bandwidth + a longer
+ * model decode step. 2048px keeps every card detail visible at full
+ * model resolution while cutting payload size by ~55% vs 3000px.
+ *
  * Handles both Android (file://) and iOS (ph://) URIs.
  */
+const MAX_LONG_EDGE = 2048
+
 export async function compressImage(uri: string): Promise<CompressedImage> {
   // First get original dimensions without modifying
   const original = await ImageManipulator.manipulateAsync(uri, [], {
     format: ImageManipulator.SaveFormat.JPEG,
   })
 
-  // Only resize if wider than 3000px
+  // Resize so the long edge is no more than MAX_LONG_EDGE. Resize on the
+  // longer dimension preserves aspect; ImageManipulator's `resize:{width}`
+  // / `resize:{height}` keeps the other dimension proportional.
   const actions: ImageManipulator.Action[] = []
-  if (original.width > 3000) {
-    actions.push({ resize: { width: 3000 } })
+  if (original.width >= original.height && original.width > MAX_LONG_EDGE) {
+    actions.push({ resize: { width: MAX_LONG_EDGE } })
+  } else if (original.height > original.width && original.height > MAX_LONG_EDGE) {
+    actions.push({ resize: { height: MAX_LONG_EDGE } })
   }
 
   const result = await ImageManipulator.manipulateAsync(uri, actions, {

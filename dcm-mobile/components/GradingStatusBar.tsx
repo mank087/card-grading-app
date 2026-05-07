@@ -15,7 +15,7 @@ const STAGE_CONFIG: Record<GradingStage, { label: string; short: string; tint: s
   grading:     { label: 'DCM Optic™ Analyzing',       short: 'Analyzing', tint: '#c084fc' },
   calculating: { label: 'Calculating Grade',          short: 'Calculate', tint: '#818cf8' },
   saving:      { label: 'Saving Results',             short: 'Save',      tint: '#22d3ee' },
-  slow:        { label: 'Taking Longer…',             short: 'Slow',      tint: '#fbbf24' },
+  slow:        { label: 'Still working…',             short: 'Working',   tint: '#fbbf24' },
   completed:   { label: 'Complete',                   short: 'Done',      tint: '#34d399' },
   error:       { label: 'Error',                      short: 'Error',     tint: '#f87171' },
 }
@@ -28,7 +28,7 @@ function getStageMessage(stage: GradingStage, cardName?: string): string {
     case 'grading':     return 'DCM Optic™ analyzing condition…'
     case 'calculating': return 'Computing final grade…'
     case 'saving':      return 'Saving results…'
-    case 'slow':        return 'Still processing — taking longer than usual…'
+    case 'slow':        return 'Still working — DCM Optic™ is analyzing your card…'
     case 'completed':   return 'Grading complete!'
     case 'error':       return 'Took too long — your card may be ready in My Collection.'
   }
