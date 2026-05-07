@@ -118,10 +118,31 @@
         }
       ],
       "@sentry/react-native",
-      "expo-localization"
+      "expo-localization",
+      [
+        "react-native-fbsdk-next",
+        {
+          "appID": "1495646468404956",
+          "clientToken": "7f5eb81d094a4f33e9cfda0e3c970af5",
+          "displayName": "DCM Grading",
+          "scheme": "fb1495646468404956",
+          "advertiserIDCollectionEnabled": false,
+          "autoLogAppEventsEnabled": false,
+          "isAutoInitEnabled": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "root": "./app"
+      },
+      "eas": {
+        "projectId": "382e423a-3284-4156-b21a-e9578f2a2f99"
+      }
+    },
+    "owner": "dcm_grading"
   }
 }

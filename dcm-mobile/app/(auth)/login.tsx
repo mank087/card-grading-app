@@ -12,6 +12,16 @@ import { makeRedirectUri } from 'expo-auth-session'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Crypto from 'expo-crypto'
 
+// Facebook native SDK — installed as react-native-fbsdk-next. Wrapped in a
+// try/catch so JS-only environments (web preview, tests) don't crash on
+// the missing native module.
+let LoginManager: any, AccessToken: any
+try {
+  const fbsdk = require('react-native-fbsdk-next')
+  LoginManager = fbsdk.LoginManager
+  AccessToken = fbsdk.AccessToken
+} catch { /* native module not available */ }
+
 WebBrowser.maybeCompleteAuthSession()
 
 export default function LoginScreen() {
@@ -88,23 +98,50 @@ export default function LoginScreen() {
     }
   }
 
+  const handleFacebook = async () => {
+    setError(null)
+    setOauthLoading('facebook')
+    try {
+      if (!LoginManager || !AccessToken) {
+        setError('Facebook SDK not available. Are you running a development build?')
+        return
+      }
+      // Native Facebook SDK login — no in-app browser, no display=touch
+      // workaround. Returns a Facebook access token which Supabase can
+      // accept via signInWithIdToken when we pass it as `access_token`.
+      const result = await LoginManager.logInWithPermissions(['public_profile', 'email'])
+      console.log('[OAuth] facebook native result:', result)
+      if (result.isCancelled) return
+      const tokenData = await AccessToken.getCurrentAccessToken()
+      if (!tokenData?.accessToken) {
+        setError('Facebook sign-in failed: no access token returned.')
+        return
+      }
+      const { error: authError } = await supabase.auth.signInWithIdToken({
+        provider: 'facebook',
+        token: tokenData.accessToken,
+        access_token: tokenData.accessToken,
+      } as any)
+      if (authError) setError(authError.message)
+    } catch (err: any) {
+      setError(err?.message || 'Facebook sign-in failed.')
+    } finally {
+      setOauthLoading(null)
+    }
+  }
+
   const handleOAuth = async (provider: 'google' | 'facebook') => {
+    if (provider === 'facebook') return handleFacebook()
     setError(null)
     setOauthLoading(provider)
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
       console.log('[OAuth]', provider, 'redirectUrl:', redirectUrl)
-      // Provider-specific OAuth params:
-      //   Google: prompt=select_account → forces account picker even when
-      //           the system browser has an existing Google session.
-      //   Facebook: display=touch → forces the mobile web OAuth dialog
-      //           instead of trying to hand off to the installed Facebook
-      //           app. Without this, FB's mobile flow tries to deep-link
-      //           into the FB app, which silently fails when the FB app
-      //           can't redirect back to our custom URL scheme.
-      const queryParams: Record<string, string> = provider === 'google'
-        ? { prompt: 'select_account' }
-        : { display: 'touch' }
+      // Google: prompt=select_account → forces account picker even when
+      // the system browser has an existing session.
+      // (Facebook is handled by handleFacebook() above using the native
+      // SDK — never reaches this URL-based path.)
+      const queryParams: Record<string, string> = { prompt: 'select_account' }
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
