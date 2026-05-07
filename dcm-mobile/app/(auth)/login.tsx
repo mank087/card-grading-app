@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image, TouchableOpacity } from 'react-native'
-import { Link } from 'expo-router'
+import { Link, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
@@ -15,13 +15,19 @@ WebBrowser.maybeCompleteAuthSession()
 
 export default function LoginScreen() {
   const { signIn } = useAuth()
-  const [email, setEmail] = useState('')
+  // When a user tries to sign up with an email that already exists, the
+  // register screen redirects here with ?existingEmail=… — pre-fill the
+  // form and show an inline notice so the user can just enter their
+  // password instead of re-typing the email.
+  const params = useLocalSearchParams<{ existingEmail?: string }>()
+  const [email, setEmail] = useState(params.existingEmail || '')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [oauthLoading, setOauthLoading] = useState<string | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [appleAvailable, setAppleAvailable] = useState(false)
+  const [showExistingAccountNotice, setShowExistingAccountNotice] = useState(!!params.existingEmail)
 
   useEffect(() => {
     if (Platform.OS === 'ios') {
@@ -134,6 +140,20 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.form}>
+          {showExistingAccountNotice && (
+            <View style={styles.noticeBox}>
+              <Ionicons name="information-circle" size={20} color={Colors.amber[600]} style={{ marginTop: 1 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.noticeTitle}>Account already exists</Text>
+                <Text style={styles.noticeText}>
+                  An account with this email already exists. Enter your password to sign in, or use one of the social buttons above.
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setShowExistingAccountNotice(false)} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
+                <Ionicons name="close" size={18} color={Colors.amber[700]} />
+              </TouchableOpacity>
+            </View>
+          )}
           {error && (
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>{error}</Text>
@@ -271,6 +291,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  noticeBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: Colors.amber[50],
+    borderWidth: 1,
+    borderColor: Colors.amber[100],
+    borderRadius: 10,
+    padding: 12,
+  },
+  noticeTitle: { fontSize: 13, fontWeight: '700', color: Colors.amber[600], marginBottom: 2 },
+  noticeText: { fontSize: 12, color: Colors.amber[700], lineHeight: 16 },
   errorBox: {
     backgroundColor: Colors.red[50],
     borderWidth: 1,

@@ -104,6 +104,19 @@ export default function RegisterScreen() {
     }
   }
 
+  // Mirrors src/app/login/page.tsx isExistingAccountError. Supabase
+  // surfaces a few different phrasings depending on which step in the
+  // signup flow detected the dup; the strings are stable enough to
+  // pattern-match.
+  const isExistingAccountError = (errorMsg: string) => {
+    const lower = errorMsg.toLowerCase()
+    return lower.includes('already registered') ||
+           lower.includes('already exists') ||
+           lower.includes('user already') ||
+           lower.includes('email already') ||
+           lower.includes('duplicate')
+  }
+
   const handleRegister = async () => {
     if (!email.trim() || !password) {
       setError('Please fill in all fields')
@@ -119,10 +132,21 @@ export default function RegisterScreen() {
     }
     setError(null)
     setLoading(true)
-    const { error: authError } = await signUp(email.trim(), password)
+    const trimmedEmail = email.trim()
+    const { error: authError } = await signUp(trimmedEmail, password)
     setLoading(false)
     if (authError) {
-      setError(authError.message || 'Registration failed')
+      const msg = authError.message || ''
+      if (isExistingAccountError(msg)) {
+        // Hand the entered email off to the login screen with a flag so
+        // it can show "this account already exists, sign in" messaging.
+        router.replace({
+          pathname: '/(auth)/login',
+          params: { existingEmail: trimmedEmail },
+        } as any)
+        return
+      }
+      setError(msg || 'Registration failed')
     } else {
       Alert.alert(
         'Check your email',
