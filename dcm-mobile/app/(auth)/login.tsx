@@ -158,7 +158,7 @@ export default function LoginScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={styles.noticeTitle}>Account already exists</Text>
                 <Text style={styles.noticeText}>
-                  An account with this email already exists. Enter your password to sign in, or use one of the social buttons above.
+                  An account with this email already exists. Enter your password to sign in, or use one of the social buttons below.
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setShowExistingAccountNotice(false)} hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}>
