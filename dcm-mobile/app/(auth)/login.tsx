@@ -94,9 +94,17 @@ export default function LoginScreen() {
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
       console.log('[OAuth]', provider, 'redirectUrl:', redirectUrl)
+      // Provider-specific OAuth params:
+      //   Google: prompt=select_account → forces account picker even when
+      //           the system browser has an existing Google session.
+      //   Facebook: display=touch → forces the mobile web OAuth dialog
+      //           instead of trying to hand off to the installed Facebook
+      //           app. Without this, FB's mobile flow tries to deep-link
+      //           into the FB app, which silently fails when the FB app
+      //           can't redirect back to our custom URL scheme.
       const queryParams: Record<string, string> = provider === 'google'
         ? { prompt: 'select_account' }
-        : {} // Facebook errors on reauthenticate without app-side handling
+        : { display: 'touch' }
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
