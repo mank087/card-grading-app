@@ -71,12 +71,10 @@ export default function RegisterScreen() {
     setOauthLoading(provider)
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
-      // Force the provider's account picker so a stale system-browser
-      // session doesn't sign the user in as someone else without asking.
-      // Google: `prompt=select_account`. Facebook: `auth_type=reauthenticate`.
+      console.log('[OAuth]', provider, 'redirectUrl:', redirectUrl)
       const queryParams: Record<string, string> = provider === 'google'
         ? { prompt: 'select_account' }
-        : { auth_type: 'reauthenticate' }
+        : {}
       const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
@@ -85,6 +83,7 @@ export default function RegisterScreen() {
           queryParams,
         },
       })
+      console.log('[OAuth]', provider, 'signInWithOAuth →', { error: oauthError?.message, hasUrl: !!data?.url, url: data?.url?.slice(0, 120) })
 
       if (oauthError) {
         setError(oauthError.message)
@@ -92,22 +91,25 @@ export default function RegisterScreen() {
         return
       }
 
-      if (data?.url) {
-        // preferEphemeralSession=true (iOS) gives us an in-app web
-        // session that does NOT share cookies with Safari. Without it
-        // the user can land on the OAuth screen already signed in as
-        // a different DCM account from their system browser.
-        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
-          preferEphemeralSession: true,
-        })
-        // 'cancel' = user dismissed the sheet — no error UI needed.
-        // 'success' = redirect happened; parse + complete via the helper
-        // that handles both PKCE (code) and implicit (tokens) flows AND
-        // surfaces provider error params instead of silently failing.
-        if (result.type === 'success' && result.url) {
-          const ok = await completeOAuthFromUrl(result.url, supabase)
-          if (!ok.ok) setError(ok.error || 'Sign in failed. Please try again.')
-        }
+      if (!data?.url) {
+        setError(`${provider} sign-in failed: no auth URL returned. The provider may not be enabled in Supabase.`)
+        setOauthLoading(null)
+        return
+      }
+
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
+        preferEphemeralSession: true,
+      })
+      console.log('[OAuth]', provider, 'WebBrowser result type:', result.type, 'url:', (result as any).url?.slice(0, 200))
+
+      if (result.type === 'success' && result.url) {
+        const ok = await completeOAuthFromUrl(result.url, supabase)
+        console.log('[OAuth]', provider, 'completeOAuth →', ok)
+        if (!ok.ok) setError(ok.error || 'Sign in failed. Please try again.')
+      } else if (result.type === 'cancel' || result.type === 'dismiss') {
+        // No-op — user backed out of the sheet
+      } else {
+        setError(`${provider} sign-in didn't complete (${result.type}). Try again.`)
       }
     } catch (err: any) {
       setError(err.message || 'OAuth sign up failed')
