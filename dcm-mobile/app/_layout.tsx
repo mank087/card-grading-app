@@ -147,12 +147,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 
 // Hide HelpBot on:
 //   - WebView pages (pages/*) — web has its own HelpBot, would duplicate
-//   - Grade flow (grade/*) and Grade tab — the floating button overlaps
-//     the camera capture UI and adds visual noise to a focused task flow
+//   - Grade flow (grade/*) and Grade tab — focused task; floating button
+//     overlaps the camera capture UI
+//   - Auth screens ((auth)/*) — user isn't signed in, can't open a
+//     ticket or get personalized help anyway
+//   - Onboarding carousel (no segment, AuthGate intercepts) — see AuthGate
 function ConditionalHelpBot() {
   const segments = useSegments()
   const top = segments[0]
-  if (top === 'pages' || top === 'grade') return null
+  if (top === 'pages' || top === 'grade' || top === '(auth)') return null
   // (tabs)/grade — hide while in the grade tab too
   if (top === '(tabs)' && segments[1] === 'grade') return null
   return <HelpBot />
