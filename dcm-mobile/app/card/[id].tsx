@@ -77,6 +77,10 @@ export default function CardDetailScreen() {
   // Refs are attached to wrapper Views around each section so the tour can
   // measure them with View.measure(). Order matches TOUR_STEPS below.
   const scrollRef = useRef<ScrollView | null>(null)
+  // Tracks the ScrollView's current scroll offset; OnboardingTour reads
+  // this so it can compute absolute scrollTo Y positions when bringing
+  // each step's target into view.
+  const scrollOffsetRef = useRef(0)
   const tourRefs = {
     'card-images': useRef<View | null>(null),
     'visibility-toggle': useRef<View | null>(null),
@@ -412,7 +416,13 @@ export default function CardDetailScreen() {
 
   return (
     <View style={{ flex: 1 }}>
-    <ScrollView ref={scrollRef} style={s.container} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCard() }} tintColor={Colors.purple[600]} />}>
+    <ScrollView
+      ref={scrollRef}
+      style={s.container}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCard() }} tintColor={Colors.purple[600]} />}
+      onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y }}
+      scrollEventThrottle={16}
+    >
 
       {/* Image Zoom Modal — uses a WebView so the browser handles pinch-to-zoom natively
           on both iOS and Android (no extra deps). Double-tap also zooms in browsers. */}
@@ -2150,6 +2160,7 @@ export default function CardDetailScreen() {
       steps={TOUR_STEPS}
       targets={tourRefs}
       parentScrollRef={scrollRef}
+      scrollOffsetRef={scrollOffsetRef}
       onSectionToggle={handleSectionToggle}
       onComplete={handleTourComplete}
       onGradeAnother={() => router.push('/pages/credits' as any)}

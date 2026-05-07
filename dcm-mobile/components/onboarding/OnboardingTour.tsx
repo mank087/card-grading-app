@@ -33,7 +33,6 @@ import {
   Animated,
   Easing,
   Modal,
-  findNodeHandle,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
@@ -58,6 +57,13 @@ interface OnboardingTourProps {
   targets: Record<string, React.RefObject<any>>
   /** Outer scroll container so the tour can bring targets into view. */
   parentScrollRef: React.RefObject<ScrollView | null>
+  /** Live scroll offset of the parent ScrollView. Required so the tour
+   *  can compute absolute scroll-to positions: scrollTo() takes an
+   *  absolute content Y, but measure() returns a screen-relative pageY,
+   *  so we need (offset + pageY - viewportTop) to bridge the two frames
+   *  of reference. Parent should update this ref from ScrollView's
+   *  onScroll handler. */
+  scrollOffsetRef: React.MutableRefObject<number>
   /** Imperative open/close for collapsible sections. Tour calls
    *  toggle(sectionId, true) before measuring; on tour end it closes any
    *  section it expanded. */
@@ -77,6 +83,7 @@ export function OnboardingTour({
   steps,
   targets,
   parentScrollRef,
+  scrollOffsetRef,
   onSectionToggle,
   onComplete,
   onGradeAnother,
@@ -154,36 +161,41 @@ export function OnboardingTour({
       expandedSectionRef.current = null
     }
 
-    const scrollNode = findNodeHandle(parentScrollRef.current)
     const desiredOnScreenY = TOUR_CARD_HEIGHT + 24
 
     const doScrollAndHighlight = () => {
       if (!targetRef.current) return
-      // Scroll the target into view using its offset within the scroll
-      // content (NOT pageY, which is screen-relative).
-      if (scrollNode != null && (targetRef.current as any).measureLayout) {
-        ;(targetRef.current as any).measureLayout(
-          scrollNode,
-          (_x: number, contentY: number, _w: number, h: number) => {
-            const targetScrollY = Math.max(0, contentY - desiredOnScreenY)
-            parentScrollRef.current?.scrollTo({ y: targetScrollY, animated: true })
-            // Once the smooth scroll settles, re-measure the page rect for
-            // the highlight ring/cutout.
+      // Bridge the two frames of reference: measure() gives page-relative
+      // pageY, but scrollTo() wants absolute content offset. Measure both
+      // the ScrollView itself (its viewport top in page coords) and the
+      // target, then:
+      //   targetWithinViewport = targetPageY - scrollViewPageY
+      //   currentScrollOffset is tracked via the parent's onScroll
+      //   newScrollOffset = currentScrollOffset + targetWithinViewport - desiredOnScreenY
+      const sv = parentScrollRef.current as any
+      if (sv?.measure && targetRef.current.measure) {
+        sv.measure((_sx: number, _sy: number, _sw: number, _sh: number, _spx: number, scrollViewPageY: number) => {
+          targetRef.current?.measure?.((_tx: number, _ty: number, tw: number, th: number, tpageX: number, tpageY: number) => {
+            // Paint the initial highlight at the current position; the
+            // post-scroll re-measure below will refine it.
+            setHighlightRect({ x: tpageX, y: tpageY, w: tw, h: th })
+
+            const targetWithinViewport = tpageY - scrollViewPageY
+            const delta = targetWithinViewport - desiredOnScreenY
+            const newScrollY = Math.max(0, scrollOffsetRef.current + delta)
+            parentScrollRef.current?.scrollTo({ y: newScrollY, animated: true })
+
+            // Re-measure after the smooth scroll settles so the highlight
+            // ring lands on the section's new on-screen position.
             setTimeout(() => {
               targetRef.current?.measure?.((__x: number, __y: number, w2: number, h2: number, pageX2: number, pageY2: number) => {
                 setHighlightRect({ x: pageX2, y: pageY2, w: w2, h: h2 })
               })
             }, 420)
-          },
-          () => {
-            // measureLayout failure — fall back to page measure (no scroll)
-            targetRef.current?.measure?.((_x: number, _y: number, w: number, h: number, pageX: number, pageY: number) => {
-              setHighlightRect({ x: pageX, y: pageY, w, h })
-            })
-          },
-        )
+          })
+        })
       } else {
-        // No scroll-view handle yet — just paint the highlight where it is
+        // Fallback — no scroll, just paint the highlight where it is
         targetRef.current.measure?.((_x: number, _y: number, w: number, h: number, pageX: number, pageY: number) => {
           setHighlightRect({ x: pageX, y: pageY, w, h })
         })
@@ -196,7 +208,7 @@ export function OnboardingTour({
     requestAnimationFrame(() => {
       requestAnimationFrame(doScrollAndHighlight)
     })
-  }, [step, targets, parentScrollRef, onSectionToggle, currentStep, steps.length])
+  }, [step, targets, parentScrollRef, scrollOffsetRef, onSectionToggle, currentStep, steps.length])
 
   // Reset state when tour is (re-)activated
   useEffect(() => {
