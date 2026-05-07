@@ -170,10 +170,12 @@ export default function ReviewScreen() {
       }
       refreshCredits()
 
-      // Add to the global grading queue and bounce the user back to the
-      // collection. The persistent status bar at the top of the app handles
-      // progress; the user can keep grading more cards or browse the app
-      // while this one finishes.
+      // Add to the global grading queue (the persistent status bar at
+      // the top of the app reads from this) AND route to the dedicated
+      // /grade/processing screen which shows the scanning animation,
+      // progress steps, and Grade Another / My Collection actions.
+      // Users can leave that screen at any time to browse the app — the
+      // status bar follows them.
       addToQueue({
         cardId,
         category,
@@ -181,7 +183,10 @@ export default function ReviewScreen() {
         status: 'processing',
         cardName: undefined,
       })
-      router.replace('/(tabs)/collection' as any)
+      router.replace({
+        pathname: '/grade/processing',
+        params: { cardId, category, frontUri: params.frontUri },
+      } as any)
     } catch (err: any) {
       console.error('[Upload] Submit error:', err)
       Alert.alert('Submission Failed', err.message || 'Please try again.')

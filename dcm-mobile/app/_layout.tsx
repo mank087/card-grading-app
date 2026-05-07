@@ -195,9 +195,14 @@ export default function RootLayout() {
               name="card/[id]"
               options={{ headerShown: false }}
             />
+            {/* No fullScreenModal — that would cover the persistent
+                GradingStatusBar that lives in the layout chrome above
+                AuthGate. Users want to see grading progress for cards
+                already in the queue while submitting/processing the
+                next one. */}
             <Stack.Screen
               name="grade"
-              options={{ headerShown: false, presentation: 'fullScreenModal' }}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="pages"
