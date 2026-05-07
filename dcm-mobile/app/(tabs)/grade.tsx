@@ -1,30 +1,23 @@
 import { useState, useEffect } from 'react'
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image, Modal, Pressable } from 'react-native'
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
-import { Colors, CardCategories } from '@/lib/constants'
+import { Colors } from '@/lib/constants'
 import { useCredits } from '@/contexts/CreditsContext'
 import { purchaseCredits, CREDIT_TIERS } from '@/lib/stripe'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
-
-const OTHER_SUB_CATEGORIES_GROUPED = {
-  'TCG': ['Digimon', 'Dragon Ball', 'Flesh and Blood', 'Cardfight!! Vanguard', 'Weiss Schwarz', 'MetaZoo', 'Force of Will', 'Final Fantasy TCG', 'Universus', 'Battle Spirits', 'Shadowverse Evolve', 'Union Arena'],
-  'Entertainment': ['Star Wars', 'Marvel', 'DC Comics', 'Disney', 'Garbage Pail Kids', 'Wacky Packages', 'WWE / Wrestling', 'Movie / TV', 'Music', 'Anime'],
-  'Vintage': ['Non-Sport Vintage', 'Art Cards', 'Promotional', 'Racing', 'Historical'],
-  'Other': ['Other'],
-}
-const OTHER_SUB_CATEGORIES = Object.values(OTHER_SUB_CATEGORIES_GROUPED).flat()
+import CategoryPicker from '@/components/CategoryPicker'
 
 export default function GradeScreen() {
   const router = useRouter()
   const { balance, refresh } = useCredits()
-  const [selectedCategory, setSelectedCategory] = useState('Sports')
+  const [selectedCategory, setSelectedCategory] = useState('')
   const [subCategory, setSubCategory] = useState('')
-  const [showSubCategories, setShowSubCategories] = useState(false)
-  const [subCategoryDropdownOpen, setSubCategoryDropdownOpen] = useState(false)
 
-  const canGrade = balance >= 1 && (selectedCategory !== 'Other' || subCategory !== '')
+  const canGrade = balance >= 1
+    && selectedCategory !== ''
+    && (selectedCategory !== 'Other' || subCategory !== '')
 
   // Pro Tip modal — gates the Camera/Gallery tap so the tips show before the
   // capture screen. Once dismissed, navigate to /grade/capture in the chosen mode.
@@ -49,7 +42,13 @@ export default function GradeScreen() {
 
   const handleStart = (mode: 'camera' | 'gallery') => {
     if (!canGrade) {
-      if (balance < 1) Alert.alert('Insufficient Credits', 'You need at least 1 credit to grade a card.')
+      if (balance < 1) {
+        Alert.alert('Insufficient Credits', 'You need at least 1 credit to grade a card.')
+      } else if (selectedCategory === '') {
+        Alert.alert('Select Card Type', 'Choose a card type before uploading photos so we can grade it correctly.')
+      } else if (selectedCategory === 'Other' && subCategory === '') {
+        Alert.alert('Select Sub-Category', 'Pick a sub-category for "Other" so we know what kind of card you\'re grading.')
+      }
       return
     }
     if (shouldGateOnTips && tipsLoaded) {
@@ -81,79 +80,17 @@ export default function GradeScreen() {
         </View>
       </View>
 
-      {/* Category Dropdown */}
+      {/* Card Type — required dropdown. No default selection so users
+          have to pick before they can move on (sports was being
+          auto-graded as the wrong category). */}
       <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Card Type</Text>
-        <View style={styles.categoryDropdown}>
-          {CardCategories.map((cat) => (
-            <TouchableOpacity
-              key={cat.key}
-              style={[
-                styles.categoryPill,
-                selectedCategory === cat.key && styles.categoryPillActive,
-              ]}
-              onPress={() => {
-                setSelectedCategory(cat.key)
-                setSubCategory('')
-                setShowSubCategories(cat.key === 'Other')
-              }}
-            >
-              <Text style={[
-                styles.categoryPillText,
-                selectedCategory === cat.key && styles.categoryPillTextActive,
-              ]}>
-                {cat.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Sub-category for Other — dropdown matches the web's grouped select */}
-        {selectedCategory === 'Other' && (
-          <View style={styles.subCategoryContainer}>
-            <Text style={styles.subCategoryLabel}>Sub-Category <Text style={{ color: Colors.red[500] }}>*</Text></Text>
-            <TouchableOpacity
-              style={[styles.subDropdown, !subCategory && styles.subDropdownPlaceholder]}
-              onPress={() => setSubCategoryDropdownOpen(true)}
-            >
-              <Text style={[styles.subDropdownText, !subCategory && styles.subDropdownTextPlaceholder]}>
-                {subCategory || 'Select sub-category…'}
-              </Text>
-              <Ionicons name="chevron-down" size={18} color={Colors.gray[500]} />
-            </TouchableOpacity>
-          </View>
-        )}
+        <CategoryPicker
+          category={selectedCategory}
+          subCategory={subCategory}
+          onCategoryChange={setSelectedCategory}
+          onSubCategoryChange={setSubCategory}
+        />
       </View>
-
-      {/* Sub-category dropdown modal */}
-      <Modal visible={subCategoryDropdownOpen} transparent animationType="slide" onRequestClose={() => setSubCategoryDropdownOpen(false)}>
-        <Pressable style={styles.dropdownBackdrop} onPress={() => setSubCategoryDropdownOpen(false)}>
-          <Pressable style={styles.dropdownSheet} onPress={e => e.stopPropagation()}>
-            <View style={styles.dropdownHandle} />
-            <Text style={styles.dropdownTitle}>Select Sub-Category</Text>
-            <ScrollView style={{ maxHeight: 480 }}>
-              {(Object.entries(OTHER_SUB_CATEGORIES_GROUPED) as Array<[string, string[]]>).map(([group, items]) => (
-                <View key={group} style={{ marginBottom: 12 }}>
-                  <Text style={styles.dropdownGroupLabel}>{group}</Text>
-                  {items.map(sub => {
-                    const isSelected = subCategory === sub
-                    return (
-                      <TouchableOpacity
-                        key={sub}
-                        style={[styles.dropdownItem, isSelected && styles.dropdownItemSelected]}
-                        onPress={() => { setSubCategory(sub); setSubCategoryDropdownOpen(false) }}
-                      >
-                        <Text style={[styles.dropdownItemText, isSelected && styles.dropdownItemTextSelected]}>{sub}</Text>
-                        {isSelected && <Ionicons name="checkmark" size={18} color={Colors.purple[600]} />}
-                      </TouchableOpacity>
-                    )
-                  })}
-                </View>
-              ))}
-            </ScrollView>
-          </Pressable>
-        </Pressable>
-      </Modal>
 
       {/* Upload Actions */}
       <View style={styles.section}>

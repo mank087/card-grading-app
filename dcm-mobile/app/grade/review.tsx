@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import * as Crypto from 'expo-crypto'
 import { Colors, CardCategories } from '@/lib/constants'
+import CategoryPicker from '@/components/CategoryPicker'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
@@ -41,7 +42,8 @@ export default function ReviewScreen() {
   const { addToQueue } = useGradingQueue()
 
   const [step, setStep] = useState(1)
-  const [category, setCategory] = useState(params.category || 'Sports')
+  // Pre-fill from the previous screen's selection — never default to Sports.
+  const [category, setCategory] = useState(params.category || '')
   const [subCategory, setSubCategory] = useState(params.subCategory || '')
   const [noDefects, setNoDefects] = useState(false)
   const [conditionReport, setConditionReport] = useState<ConditionReportData>(EMPTY_REPORT)
@@ -235,50 +237,23 @@ export default function ReviewScreen() {
         ))}
       </View>
 
-      {/* STEP 1: Category */}
+      {/* STEP 1: Category — dropdown pre-filled with the user's prior pick. */}
       {step === 1 && (
         <View style={styles.stepContent}>
           <Text style={styles.stepTitle}>Confirm Card Category</Text>
-          <View style={styles.categoryList}>
-            {CardCategories.map(cat => (
-              <TouchableOpacity
-                key={cat.key}
-                style={[styles.categoryOption, category === cat.key && styles.categoryOptionActive]}
-                onPress={() => setCategory(cat.key)}
-              >
-                <Text style={[styles.categoryOptionText, category === cat.key && styles.categoryOptionTextActive]}>
-                  {cat.label}
-                </Text>
-                {category === cat.key && <Ionicons name="checkmark-circle" size={20} color={Colors.purple[600]} />}
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {category === 'Other' && (
-            <View style={styles.subCategorySection}>
-              <Text style={styles.subCategoryLabel}>Sub-Category *</Text>
-              {Object.entries(OTHER_SUB_CATEGORIES).map(([group, items]) => (
-                <View key={group}>
-                  <Text style={styles.subCategoryGroup}>{group}</Text>
-                  {items.map(item => (
-                    <TouchableOpacity
-                      key={item}
-                      style={[styles.subCategoryOption, subCategory === item && styles.subCategoryOptionActive]}
-                      onPress={() => setSubCategory(item)}
-                    >
-                      <Text style={styles.subCategoryOptionText}>{item}</Text>
-                      {subCategory === item && <Ionicons name="checkmark" size={16} color={Colors.purple[600]} />}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              ))}
-            </View>
-          )}
-
+          <Text style={styles.stepHint}>
+            We use this to apply the right grading rubric. Tap to change if needed.
+          </Text>
+          <CategoryPicker
+            category={category}
+            subCategory={subCategory}
+            onCategoryChange={setCategory}
+            onSubCategoryChange={setSubCategory}
+          />
           <Button
             title="Continue to Photos"
             onPress={() => setStep(2)}
-            disabled={category === 'Other' && !subCategory}
+            disabled={!category || (category === 'Other' && !subCategory)}
             style={{ marginTop: 16 }}
           />
         </View>
@@ -459,6 +434,7 @@ const styles = StyleSheet.create({
   stepLabelActive: { color: Colors.purple[600], fontWeight: '600' },
   stepContent: {},
   stepTitle: { fontSize: 20, fontWeight: '700', color: Colors.gray[900], marginBottom: 4 },
+  stepHint: { fontSize: 13, color: Colors.gray[500], marginBottom: 14 },
   stepSubtitle: { fontSize: 13, color: Colors.gray[500], marginBottom: 16 },
   categoryList: { gap: 6 },
   categoryOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: Colors.gray[200], backgroundColor: Colors.white },

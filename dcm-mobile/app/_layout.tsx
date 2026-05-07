@@ -145,12 +145,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
 
-// Hide HelpBot on WebView pages (pages/* routes) to avoid duplicate with web's HelpBot
+// Hide HelpBot on:
+//   - WebView pages (pages/*) — web has its own HelpBot, would duplicate
+//   - Grade flow (grade/*) and Grade tab — the floating button overlaps
+//     the camera capture UI and adds visual noise to a focused task flow
 function ConditionalHelpBot() {
   const segments = useSegments()
-  // WebView pages are under the 'pages' segment — hide mobile HelpBot there
-  const isWebViewPage = segments[0] === 'pages'
-  if (isWebViewPage) return null
+  const top = segments[0]
+  if (top === 'pages' || top === 'grade') return null
+  // (tabs)/grade — hide while in the grade tab too
+  if (top === '(tabs)' && segments[1] === 'grade') return null
   return <HelpBot />
 }
 
