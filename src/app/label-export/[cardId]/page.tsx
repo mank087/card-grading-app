@@ -60,6 +60,29 @@ function sanitize(text: string): string {
   return text.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 60) || 'card';
 }
 
+/** Rotate a base64 image 180° using a canvas. Used for the Avery 6871
+ *  one-touch label where the top half (QR + logo) prints upside-down so
+ *  it reads right-side-up after the user folds the label over the case.
+ *  Mirrors the same helper in src/components/reports/DownloadReportButton. */
+async function rotateImage180(dataUrl: string): Promise<string> {
+  const img = new window.Image();
+  img.src = dataUrl;
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error('rotateImage180: image failed to load'));
+  });
+  const canvas = document.createElement('canvas');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return dataUrl;
+  ctx.translate(canvas.width / 2, canvas.height / 2);
+  ctx.rotate(Math.PI);
+  ctx.translate(-canvas.width / 2, -canvas.height / 2);
+  ctx.drawImage(img, 0, 0);
+  return canvas.toDataURL('image/png');
+}
+
 function getConditionLabel(grade: number): string {
   if (grade >= 10) return 'Pristine';
   if (grade >= 9) return 'Gem Mint';
@@ -398,6 +421,15 @@ export default function LabelExportPage() {
             generateQRCodeWithLogo(cardUrl).catch(() => ''),
             loadLogoAsBase64().catch(() => ''),
           ]);
+          // Top half of the 6871 label prints upside-down so it reads
+          // right-side-up after the user folds the label over the case.
+          // averyLabelGenerator.ts:195 expects pre-rotated images per its
+          // contract; web's DownloadReportButton does this and so must
+          // we when generating from the export route (mobile path).
+          const [rotatedQr, rotatedLogo] = await Promise.all([
+            qrCodeDataUrl ? rotateImage180(qrCodeDataUrl).catch(() => qrCodeDataUrl) : Promise.resolve(''),
+            logoDataUrl ? rotateImage180(logoDataUrl).catch(() => undefined) : Promise.resolve(undefined),
+          ]);
           const fold: FoldableLabelData = {
             cardName: labelData.primaryName,
             setName: labelData.setName || '',
@@ -410,9 +442,10 @@ export default function LabelExportPage() {
             conditionLabel: labelData.condition,
             subgrades: subScores,
             overallSummary: card.conversational_final_grade_summary || '',
-            qrCodeDataUrl,
+            qrCodeDataUrl: rotatedQr,
             cardUrl,
             logoDataUrl,
+            rotatedLogoDataUrl: rotatedLogo,
           };
           const blob = await generateAveryLabel(fold, position);
           blobs.push({ name: `DCM-OneTouch-${namePrefix}.pdf`, mime: 'application/pdf', dataUrl: await blobToDataUrl(blob) });
