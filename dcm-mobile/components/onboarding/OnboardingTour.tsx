@@ -33,6 +33,7 @@ import {
   Animated,
   Easing,
   Modal,
+  findNodeHandle,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
@@ -62,6 +63,10 @@ interface OnboardingTourProps {
    *  section it expanded. */
   onSectionToggle?: (sectionId: string, open: boolean) => void
   onComplete: () => void
+  /** Optional handler for the "Grade Another Card" CTA in the final
+   *  modal — typically routes the user to the credits page so they can
+   *  buy more credits before grading again. */
+  onGradeAnother?: () => void
 }
 
 const TOUR_CARD_HEIGHT = 200 // approximate; card sits at top
@@ -74,6 +79,7 @@ export function OnboardingTour({
   parentScrollRef,
   onSectionToggle,
   onComplete,
+  onGradeAnother,
 }: OnboardingTourProps) {
   const [currentStep, setCurrentStep] = useState(0)
   const [highlightRect, setHighlightRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null)
@@ -106,17 +112,22 @@ export function OnboardingTour({
 
   // Measure target and scroll it into view. Called whenever currentStep
   // changes. If target ref isn't mounted yet (collapsed section just
-  // expanding), retry up to 6× with a 200ms gap before skipping.
+  // expanding), retry up to 8× with a 200ms gap before skipping.
+  //
+  // Scroll math: scrollTo() takes an absolute scroll-content offset, NOT
+  // a delta or a screen-relative position. We need the target's offset
+  // from the ScrollView's content origin — measure() gives page-relative
+  // pageY, which is the wrong frame of reference. Use measureLayout
+  // against the ScrollView's underlying node to get the correct offset.
   const focusTarget = useCallback(() => {
     if (!step) return
     const targetRef = targets[step.id]
     if (!targetRef?.current) {
-      if (measureRetryRef.current < 6) {
+      if (measureRetryRef.current < 8) {
         measureRetryRef.current++
         setTimeout(focusTarget, 200)
         return
       }
-      // Target genuinely missing — skip ahead
       measureRetryRef.current = 0
       if (currentStep < steps.length - 1) {
         setCurrentStep(s => s + 1)
@@ -128,36 +139,62 @@ export function OnboardingTour({
 
     measureRetryRef.current = 0
 
-    // Expand collapsible section if needed (and remember to close it later)
+    // Expand the section that contains this step's target — collapse the
+    // previously-expanded one first so we don't accumulate open sections.
     if (step.sectionId && onSectionToggle && expandedSectionRef.current !== step.sectionId) {
       if (expandedSectionRef.current) {
         onSectionToggle(expandedSectionRef.current, false)
       }
       onSectionToggle(step.sectionId, true)
       expandedSectionRef.current = step.sectionId
+    } else if (!step.sectionId && expandedSectionRef.current && onSectionToggle) {
+      // Target lives outside any collapsible — close any section we
+      // expanded earlier so the highlighted area is actually visible.
+      onSectionToggle(expandedSectionRef.current, false)
+      expandedSectionRef.current = null
     }
 
-    // Wait one frame for layout to settle after expand, then measure
+    const scrollNode = findNodeHandle(parentScrollRef.current)
+    const desiredOnScreenY = TOUR_CARD_HEIGHT + 24
+
+    const doScrollAndHighlight = () => {
+      if (!targetRef.current) return
+      // Scroll the target into view using its offset within the scroll
+      // content (NOT pageY, which is screen-relative).
+      if (scrollNode != null && (targetRef.current as any).measureLayout) {
+        ;(targetRef.current as any).measureLayout(
+          scrollNode,
+          (_x: number, contentY: number, _w: number, h: number) => {
+            const targetScrollY = Math.max(0, contentY - desiredOnScreenY)
+            parentScrollRef.current?.scrollTo({ y: targetScrollY, animated: true })
+            // Once the smooth scroll settles, re-measure the page rect for
+            // the highlight ring/cutout.
+            setTimeout(() => {
+              targetRef.current?.measure?.((__x: number, __y: number, w2: number, h2: number, pageX2: number, pageY2: number) => {
+                setHighlightRect({ x: pageX2, y: pageY2, w: w2, h: h2 })
+              })
+            }, 420)
+          },
+          () => {
+            // measureLayout failure — fall back to page measure (no scroll)
+            targetRef.current?.measure?.((_x: number, _y: number, w: number, h: number, pageX: number, pageY: number) => {
+              setHighlightRect({ x: pageX, y: pageY, w, h })
+            })
+          },
+        )
+      } else {
+        // No scroll-view handle yet — just paint the highlight where it is
+        targetRef.current.measure?.((_x: number, _y: number, w: number, h: number, pageX: number, pageY: number) => {
+          setHighlightRect({ x: pageX, y: pageY, w, h })
+        })
+      }
+    }
+
+    // Two rAFs let the section's expand animation actually push layout
+    // through before we measure — one rAF is sometimes not enough on
+    // Android where LayoutAnimation runs on the next frame after state.
     requestAnimationFrame(() => {
-      targetRef.current?.measure?.((_x: number, _y: number, w: number, h: number, pageX: number, pageY: number) => {
-        setHighlightRect({ x: pageX, y: pageY, w, h })
-
-        // Scroll so target ends up below the tour card.
-        // measure gives us the page-relative position; the ScrollView's
-        // current scroll offset is implicit. We want target's pageY to be
-        // around (TOUR_CARD_HEIGHT + 16) on screen, so we scroll by
-        // (currentY - desiredY).
-        const desiredOnScreenY = TOUR_CARD_HEIGHT + 24
-        const delta = pageY - desiredOnScreenY
-        parentScrollRef.current?.scrollTo({ y: Math.max(0, delta), animated: true })
-
-        // Re-measure after scroll completes (crude; 350ms covers smooth scroll)
-        setTimeout(() => {
-          targetRef.current?.measure?.((__x: number, __y: number, w2: number, h2: number, pageX2: number, pageY2: number) => {
-            setHighlightRect({ x: pageX2, y: pageY2, w: w2, h: h2 })
-          })
-        }, 380)
-      })
+      requestAnimationFrame(doScrollAndHighlight)
     })
   }, [step, targets, parentScrollRef, onSectionToggle, currentStep, steps.length])
 
@@ -237,8 +274,26 @@ export function OnboardingTour({
                 <Text style={styles.achievementSub}>Achievement unlocked</Text>
               </View>
             </View>
-            <TouchableOpacity style={styles.finalPrimaryBtn} onPress={handleFinalClose}>
-              <Text style={styles.finalPrimaryBtnText}>Return to Card Details</Text>
+            {onGradeAnother && (
+              <TouchableOpacity
+                style={styles.finalPrimaryBtn}
+                onPress={() => {
+                  collapseExpandedSection()
+                  setShowFinalModal(false)
+                  onGradeAnother()
+                  onComplete()
+                }}
+              >
+                <Text style={styles.finalPrimaryBtnText}>Grade Another Card</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={[styles.finalSecondaryBtn, !onGradeAnother && styles.finalPrimaryBtn]}
+              onPress={handleFinalClose}
+            >
+              <Text style={[styles.finalSecondaryBtnText, !onGradeAnother && styles.finalPrimaryBtnText]}>
+                Return to Card Details
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -452,6 +507,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+    marginBottom: 8,
   },
   finalPrimaryBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  finalSecondaryBtn: {
+    backgroundColor: Colors.gray[100],
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  finalSecondaryBtnText: { color: Colors.gray[700], fontWeight: '600', fontSize: 14 },
 })

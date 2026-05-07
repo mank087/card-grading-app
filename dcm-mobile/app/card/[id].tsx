@@ -2152,6 +2152,7 @@ export default function CardDetailScreen() {
       parentScrollRef={scrollRef}
       onSectionToggle={handleSectionToggle}
       onComplete={handleTourComplete}
+      onGradeAnother={() => router.push('/pages/credits' as any)}
     />
     </View>
   )
