@@ -11,14 +11,7 @@ import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Crypto from 'expo-crypto'
-
-// Facebook native SDK — see /(auth)/login.tsx for full notes.
-let LoginManager: any, AccessToken: any
-try {
-  const fbsdk = require('react-native-fbsdk-next')
-  LoginManager = fbsdk.LoginManager
-  AccessToken = fbsdk.AccessToken
-} catch { /* native module not available */ }
+import { Linking } from 'react-native'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -78,27 +71,30 @@ export default function RegisterScreen() {
     setError(null)
     setOauthLoading('facebook')
     try {
-      if (!LoginManager || !AccessToken) {
-        setError('Facebook SDK not available. Are you running a development build?')
-        return
-      }
-      const result = await LoginManager.logInWithPermissions(['public_profile', 'email'])
-      console.log('[OAuth] facebook native result:', result)
-      if (result.isCancelled) return
-      const tokenData = await AccessToken.getCurrentAccessToken()
-      if (!tokenData?.accessToken) {
-        setError('Facebook sign-in failed: no access token returned.')
-        return
-      }
-      const { error: authError } = await supabase.auth.signInWithIdToken({
+      const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'facebook',
-        token: tokenData.accessToken,
-        access_token: tokenData.accessToken,
-      } as any)
-      if (authError) setError(authError.message)
+        options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
+      })
+      console.log('[OAuth] facebook auth URL:', data?.url?.slice(0, 120))
+      if (oauthError) throw oauthError
+      if (!data?.url) throw new Error('Supabase returned no auth URL — is the Facebook provider enabled?')
+
+      // See /(auth)/login.tsx for design notes — open Facebook auth in
+      // the system browser, listen for the dcmgrading:// deep link back.
+      const sub = Linking.addEventListener('url', async (event) => {
+        console.log('[OAuth] facebook deep link:', event.url?.slice(0, 200))
+        sub.remove()
+        const ok = await completeOAuthFromUrl(event.url, supabase)
+        if (!ok.ok) setError(ok.error || 'Facebook sign-in failed.')
+        setOauthLoading(null)
+      })
+      setTimeout(() => { sub.remove(); setOauthLoading(prev => prev === 'facebook' ? null : prev) }, 5 * 60 * 1000)
+
+      await Linking.openURL(data.url)
     } catch (err: any) {
+      console.warn('[OAuth] facebook error:', err)
       setError(err?.message || 'Facebook sign-in failed.')
-    } finally {
       setOauthLoading(null)
     }
   }

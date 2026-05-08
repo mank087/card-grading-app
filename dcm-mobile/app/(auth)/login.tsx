@@ -5,22 +5,13 @@ import { Ionicons } from '@expo/vector-icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
+import { Linking } from 'react-native'
 import { supabase } from '@/lib/supabase'
 import { completeOAuthFromUrl } from '@/lib/oauthComplete'
 import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Crypto from 'expo-crypto'
-
-// Facebook native SDK — installed as react-native-fbsdk-next. Wrapped in a
-// try/catch so JS-only environments (web preview, tests) don't crash on
-// the missing native module.
-let LoginManager: any, AccessToken: any
-try {
-  const fbsdk = require('react-native-fbsdk-next')
-  LoginManager = fbsdk.LoginManager
-  AccessToken = fbsdk.AccessToken
-} catch { /* native module not available */ }
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -102,30 +93,37 @@ export default function LoginScreen() {
     setError(null)
     setOauthLoading('facebook')
     try {
-      if (!LoginManager || !AccessToken) {
-        setError('Facebook SDK not available. Are you running a development build?')
-        return
-      }
-      // Native Facebook SDK login — no in-app browser, no display=touch
-      // workaround. Returns a Facebook access token which Supabase can
-      // accept via signInWithIdToken when we pass it as `access_token`.
-      const result = await LoginManager.logInWithPermissions(['public_profile', 'email'])
-      console.log('[OAuth] facebook native result:', result)
-      if (result.isCancelled) return
-      const tokenData = await AccessToken.getCurrentAccessToken()
-      if (!tokenData?.accessToken) {
-        setError('Facebook sign-in failed: no access token returned.')
-        return
-      }
-      const { error: authError } = await supabase.auth.signInWithIdToken({
+      const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
+      const { data, error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'facebook',
-        token: tokenData.accessToken,
-        access_token: tokenData.accessToken,
-      } as any)
-      if (authError) setError(authError.message)
+        options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
+      })
+      console.log('[OAuth] facebook auth URL:', data?.url?.slice(0, 120))
+      if (oauthError) throw oauthError
+      if (!data?.url) throw new Error('Supabase returned no auth URL — is the Facebook provider enabled?')
+
+      // System-browser approach: open the auth URL in Chrome (or whichever
+      // is set as the default browser). Facebook treats system browsers as
+      // legitimate and lets the OAuth dialog through — unlike the embedded
+      // Custom Tab session, which it silently rejects on mobile. After auth
+      // Facebook redirects to Supabase's callback URL, Supabase redirects
+      // to dcmgrading://, and Android's intent system pops the user back
+      // into the app with the URL — caught by the Linking listener below.
+      const sub = Linking.addEventListener('url', async (event) => {
+        console.log('[OAuth] facebook deep link:', event.url?.slice(0, 200))
+        sub.remove()
+        const ok = await completeOAuthFromUrl(event.url, supabase)
+        if (!ok.ok) setError(ok.error || 'Facebook sign-in failed.')
+        setOauthLoading(null)
+      })
+      // Safety net: if the user backs out of Chrome without completing
+      // auth, the listener never fires — clear loading after 5 minutes.
+      setTimeout(() => { sub.remove(); setOauthLoading(prev => prev === 'facebook' ? null : prev) }, 5 * 60 * 1000)
+
+      await Linking.openURL(data.url)
     } catch (err: any) {
+      console.warn('[OAuth] facebook error:', err)
       setError(err?.message || 'Facebook sign-in failed.')
-    } finally {
       setOauthLoading(null)
     }
   }
