@@ -238,17 +238,16 @@ export default function LoginScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.oauthButton, styles.facebookButton]}
-            onPress={() => handleOAuth('facebook')}
-            disabled={!!oauthLoading}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
-            <Text style={styles.oauthText}>
-              {oauthLoading === 'facebook' ? 'Signing in...' : 'Continue with Facebook'}
-            </Text>
-          </TouchableOpacity>
+          {/* Facebook button intentionally omitted on mobile.
+              Facebook's mobile OAuth doesn't play nicely with embedded
+              browsers (custom-tab dismiss bounce) or system browsers
+              (deep-link dispatch never fires back), and the native FB
+              SDK route requires a server-side token-exchange Edge
+              Function we haven't built yet. Web continues to support
+              Facebook normally; users who specifically want it can
+              sign in once on web and then sign into the app with email
+              or Apple/Google. Revisit after launch if there's
+              meaningful demand. */}
 
           {/* Divider */}
           <View style={styles.divider}>

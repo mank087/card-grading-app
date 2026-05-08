@@ -255,17 +255,9 @@ export default function RegisterScreen() {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.oauthButton, styles.facebookButton]}
-            onPress={() => handleOAuth('facebook')}
-            disabled={!!oauthLoading}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="logo-facebook" size={20} color="#1877F2" />
-            <Text style={styles.oauthText}>
-              {oauthLoading === 'facebook' ? 'Connecting...' : 'Continue with Facebook'}
-            </Text>
-          </TouchableOpacity>
+          {/* Facebook button intentionally omitted on mobile — see
+              /(auth)/login.tsx for the full reasoning. Web still
+              supports Facebook signup normally. */}
 
           <View style={styles.divider}>
             <View style={styles.dividerLine} />
