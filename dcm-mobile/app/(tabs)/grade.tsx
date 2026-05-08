@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Image } from 'react-native'
-import { useRouter } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
 import { useCredits } from '@/contexts/CreditsContext'
-import { purchaseCredits, CREDIT_TIERS } from '@/lib/stripe'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 import CategoryPicker from '@/components/CategoryPicker'
@@ -12,6 +11,12 @@ import CategoryPicker from '@/components/CategoryPicker'
 export default function GradeScreen() {
   const router = useRouter()
   const { balance, refresh } = useCredits()
+
+  // Refresh the credit balance whenever the screen comes into focus —
+  // covers the case where the user just bought credits via /pages/credits
+  // and tapped Back to return here. The web's Stripe webhook adds credits
+  // server-side; this picks them up without requiring a manual reload.
+  useFocusEffect(useCallback(() => { refresh() }, [refresh]))
   const [selectedCategory, setSelectedCategory] = useState('')
   const [subCategory, setSubCategory] = useState('')
 
@@ -136,7 +141,10 @@ export default function GradeScreen() {
         </View>
       </View>
 
-      {/* Credit Packages — shown when low or always accessible */}
+      {/* Credit purchase CTA — routes to /pages/credits which loads the
+          web's credits page in a WebView. Stripe checkout there is
+          already battle-tested and webhook-driven; reusing it instead of
+          maintaining a parallel native PaymentSheet integration. */}
       {balance < 3 && (
         <View style={styles.creditsSection}>
           {balance < 1 && (
@@ -146,31 +154,18 @@ export default function GradeScreen() {
               <Text style={styles.noCreditsText}>You need at least 1 credit to grade a card</Text>
             </View>
           )}
-          <Text style={[styles.sectionLabel, { marginTop: 16 }]}>Purchase Credits</Text>
-          <View style={styles.tierGrid}>
-            {CREDIT_TIERS.map(tier => (
-              <TouchableOpacity
-                key={tier.id}
-                style={[styles.tierCard, tier.popular && styles.tierCardPopular]}
-                onPress={async () => {
-                  const result = await purchaseCredits(tier.id)
-                  if (result.success) {
-                    Alert.alert('Payment Successful!', `${result.credits} credits added to your account.${result.discountLabel ? `\n${result.discountLabel} applied.` : ''}`)
-                    refresh()
-                  } else if (result.error) {
-                    Alert.alert('Payment Failed', result.error)
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                {tier.popular && <View style={styles.popularBadge}><Text style={styles.popularText}>Popular</Text></View>}
-                <Text style={styles.tierCredits}>{tier.credits}</Text>
-                <Text style={styles.tierCreditsLabel}>credit{tier.credits > 1 ? 's' : ''}</Text>
-                <Text style={styles.tierPrice}>${tier.price.toFixed(2)}</Text>
-                <Text style={styles.tierPerCredit}>{tier.perCredit}/grade</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={styles.purchaseBtn}
+            onPress={() => router.push('/pages/credits' as any)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="diamond" size={18} color="#fff" />
+            <Text style={styles.purchaseBtnText}>Purchase Grading Credits</Text>
+            <Ionicons name="chevron-forward" size={18} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.purchaseHint}>
+            Choose a package and pay securely. Credits added instantly when payment completes.
+          </Text>
         </View>
       )}
 
@@ -264,20 +259,14 @@ const styles = StyleSheet.create({
   uploadButtonTitleDisabled: { color: Colors.gray[400] },
   uploadButtonSubtitle: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
 
-  // No credits
+  // Credits CTA — routes to /pages/credits (web checkout)
   creditsSection: { marginHorizontal: 16, marginTop: 12 },
-  noCredits: { backgroundColor: Colors.amber[50], borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.amber[200] },
+  noCredits: { backgroundColor: Colors.amber[50], borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: Colors.amber[200], marginBottom: 12 },
   noCreditsTitle: { fontSize: 16, fontWeight: '700', color: Colors.amber[700], marginTop: 8 },
   noCreditsText: { fontSize: 13, color: Colors.amber[600], marginTop: 4 },
-  tierGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 },
-  tierCard: { width: '47%' as any, backgroundColor: Colors.white, borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 2, borderColor: Colors.gray[200] },
-  tierCardPopular: { borderColor: Colors.purple[500], backgroundColor: Colors.purple[50] },
-  popularBadge: { position: 'absolute', top: -10, backgroundColor: Colors.purple[600], paddingHorizontal: 10, paddingVertical: 3, borderRadius: 10 },
-  popularText: { color: Colors.white, fontSize: 10, fontWeight: '700' },
-  tierCredits: { fontSize: 24, fontWeight: '800', color: Colors.purple[600], marginTop: 4 },
-  tierCreditsLabel: { fontSize: 11, color: Colors.gray[500] },
-  tierPrice: { fontSize: 16, fontWeight: '700', color: Colors.gray[900], marginTop: 6 },
-  tierPerCredit: { fontSize: 11, color: Colors.gray[500], marginTop: 2 },
+  purchaseBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.purple[600], paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12 },
+  purchaseBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', flex: 1, textAlign: 'center' },
+  purchaseHint: { fontSize: 12, color: Colors.gray[500], textAlign: 'center', marginTop: 8, paddingHorizontal: 8 },
 
   // Tips
   tipsSection: { marginHorizontal: 16, marginTop: 24, backgroundColor: Colors.white, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: Colors.gray[200] },
