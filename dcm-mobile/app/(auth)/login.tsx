@@ -99,31 +99,28 @@ export default function LoginScreen() {
         options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
       })
       console.log('[OAuth] facebook auth URL:', data?.url?.slice(0, 120))
+      console.log('[OAuth] facebook redirectUrl:', redirectUrl)
       if (oauthError) throw oauthError
       if (!data?.url) throw new Error('Supabase returned no auth URL — is the Facebook provider enabled?')
 
-      // System-browser approach: open the auth URL in Chrome (or whichever
-      // is set as the default browser). Facebook treats system browsers as
-      // legitimate and lets the OAuth dialog through — unlike the embedded
-      // Custom Tab session, which it silently rejects on mobile. After auth
-      // Facebook redirects to Supabase's callback URL, Supabase redirects
-      // to dcmgrading://, and Android's intent system pops the user back
-      // into the app with the URL — caught by the Linking listener below.
-      const sub = Linking.addEventListener('url', async (event) => {
-        console.log('[OAuth] facebook deep link:', event.url?.slice(0, 200))
-        sub.remove()
-        const ok = await completeOAuthFromUrl(event.url, supabase)
+      // Use WebBrowser.openAuthSessionAsync — Custom Tab on Android, ASWeb
+      // on iOS. Returns the redirect URL via Promise resolution, more
+      // reliable than depending on the Android intent system to dispatch
+      // dcmgrading:// back to our app. The Custom Tab follows redirects
+      // through Facebook → Supabase callback → dcmgrading:// and resolves
+      // when it sees the URL prefix matches `redirectUrl`.
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
+      console.log('[OAuth] facebook WebBrowser result type:', result.type, 'url:', (result as any).url?.slice(0, 200))
+      if (result.type === 'success' && result.url) {
+        const ok = await completeOAuthFromUrl(result.url, supabase)
         if (!ok.ok) setError(ok.error || 'Facebook sign-in failed.')
-        setOauthLoading(null)
-      })
-      // Safety net: if the user backs out of Chrome without completing
-      // auth, the listener never fires — clear loading after 5 minutes.
-      setTimeout(() => { sub.remove(); setOauthLoading(prev => prev === 'facebook' ? null : prev) }, 5 * 60 * 1000)
-
-      await Linking.openURL(data.url)
+      } else if (result.type !== 'cancel' && result.type !== 'dismiss') {
+        setError(`Facebook sign-in didn't complete (${result.type}).`)
+      }
     } catch (err: any) {
       console.warn('[OAuth] facebook error:', err)
       setError(err?.message || 'Facebook sign-in failed.')
+    } finally {
       setOauthLoading(null)
     }
   }

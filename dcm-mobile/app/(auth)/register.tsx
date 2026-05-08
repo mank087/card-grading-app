@@ -77,24 +77,24 @@ export default function RegisterScreen() {
         options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
       })
       console.log('[OAuth] facebook auth URL:', data?.url?.slice(0, 120))
+      console.log('[OAuth] facebook redirectUrl:', redirectUrl)
       if (oauthError) throw oauthError
       if (!data?.url) throw new Error('Supabase returned no auth URL — is the Facebook provider enabled?')
 
-      // See /(auth)/login.tsx for design notes — open Facebook auth in
-      // the system browser, listen for the dcmgrading:// deep link back.
-      const sub = Linking.addEventListener('url', async (event) => {
-        console.log('[OAuth] facebook deep link:', event.url?.slice(0, 200))
-        sub.remove()
-        const ok = await completeOAuthFromUrl(event.url, supabase)
+      // See /(auth)/login.tsx for design notes — Custom Tab via
+      // openAuthSessionAsync, result URL via Promise.
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
+      console.log('[OAuth] facebook WebBrowser result type:', result.type, 'url:', (result as any).url?.slice(0, 200))
+      if (result.type === 'success' && result.url) {
+        const ok = await completeOAuthFromUrl(result.url, supabase)
         if (!ok.ok) setError(ok.error || 'Facebook sign-in failed.')
-        setOauthLoading(null)
-      })
-      setTimeout(() => { sub.remove(); setOauthLoading(prev => prev === 'facebook' ? null : prev) }, 5 * 60 * 1000)
-
-      await Linking.openURL(data.url)
+      } else if (result.type !== 'cancel' && result.type !== 'dismiss') {
+        setError(`Facebook sign-in didn't complete (${result.type}).`)
+      }
     } catch (err: any) {
       console.warn('[OAuth] facebook error:', err)
       setError(err?.message || 'Facebook sign-in failed.')
+    } finally {
       setOauthLoading(null)
     }
   }
