@@ -252,8 +252,12 @@ const styles = StyleSheet.create({
   uploadActions: { flexDirection: 'row', gap: 12 },
   uploadButton: { flex: 1, backgroundColor: Colors.white, borderRadius: 16, padding: 20, alignItems: 'center', borderWidth: 2, borderColor: Colors.gray[200] },
   uploadButtonDisabled: { opacity: 0.5 },
-  cameraButton: { borderColor: Colors.purple[200] },
-  galleryButton: { borderColor: Colors.blue[200] },
+  // cameraButton and galleryButton intentionally have NO borderColor
+  // override — both inherit Colors.gray[200] from uploadButton above so
+  // the two cards look visually balanced. The icon color inside each
+  // button still distinguishes them (purple camera vs blue gallery).
+  cameraButton: {},
+  galleryButton: {},
   uploadIconContainer: { width: 64, height: 64, borderRadius: 32, backgroundColor: Colors.gray[50], alignItems: 'center', justifyContent: 'center', marginBottom: 10 },
   uploadButtonTitle: { fontSize: 16, fontWeight: '700', color: Colors.gray[900] },
   uploadButtonTitleDisabled: { color: Colors.gray[400] },
