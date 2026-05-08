@@ -269,7 +269,12 @@ export default function LoginScreen() {
             autoComplete="email"
           />
 
-          <Text style={styles.label}>Password</Text>
+          <View style={styles.passwordLabelRow}>
+            <Text style={styles.label}>Password</Text>
+            <Link href="/(auth)/forgot-password" style={styles.forgotLink}>
+              Forgot password?
+            </Link>
+          </View>
           <View style={styles.passwordContainer}>
             <TextInput
               style={styles.passwordInput}
@@ -313,6 +318,8 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 15, color: Colors.gray[500], marginTop: 4 },
   form: { gap: 12 },
   label: { fontSize: 14, fontWeight: '600', color: Colors.gray[700] },
+  passwordLabelRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  forgotLink: { fontSize: 13, fontWeight: '600', color: Colors.purple[600] },
   input: {
     backgroundColor: Colors.white,
     borderWidth: 1,
