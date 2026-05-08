@@ -5,6 +5,7 @@ import {
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
 
 const { width: W, height: H } = Dimensions.get('window')
@@ -74,6 +75,7 @@ interface Props {
 export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   const [activeIndex, setActiveIndex] = useState(0)
   const flatListRef = useRef<FlatList>(null)
+  const insets = useSafeAreaInsets()
 
   // Auto-scroll animations for Panel 1
   const row1Anim = useRef(new Animated.Value(0)).current
@@ -161,8 +163,10 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
       />
 
-      {/* Bottom: dots + buttons */}
-      <View style={st.bottomArea}>
+      {/* Bottom: dots + buttons. paddingBottom uses the device's safe-area
+          inset so the Sign In link doesn't sit underneath the home
+          indicator / Android nav buttons. */}
+      <View style={[st.bottomArea, { paddingBottom: Math.max(insets.bottom + 8, 32) }]}>
         <View style={st.dots}>
           {PANELS.map((_, i) => (
             <View key={i} style={[st.dot, i === activeIndex && st.dotActive]} />
