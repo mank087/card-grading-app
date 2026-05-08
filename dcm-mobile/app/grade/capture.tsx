@@ -159,7 +159,10 @@ export default function CaptureScreen() {
     setIsCapturing(true)
 
     try {
-      const photo = await cameraRef.current.takePictureAsync({ quality: 0.92 })
+      // shutterSound: false suppresses the system camera click on
+       // capture. Note: Japanese/Korean Android devices force the
+       // shutter sound on by law, so this flag is ignored there.
+      const photo = await cameraRef.current.takePictureAsync({ quality: 0.92, shutterSound: false })
       if (!photo?.uri) throw new Error('Capture failed')
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
