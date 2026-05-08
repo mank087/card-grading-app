@@ -174,8 +174,8 @@ export default function RegisterScreen() {
       setError('Passwords do not match')
       return
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (password.length < 10) {
+      setError('Password must be at least 10 characters')
       return
     }
     setError(null)
@@ -291,7 +291,7 @@ export default function RegisterScreen() {
               style={styles.passwordInput}
               value={password}
               onChangeText={setPassword}
-              placeholder="At least 6 characters"
+              placeholder="At least 10 characters"
               placeholderTextColor={Colors.gray[400]}
               secureTextEntry={!showPassword}
             />

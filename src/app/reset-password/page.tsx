@@ -42,8 +42,8 @@ export default function ResetPasswordPage() {
     }
 
     // Validate password length
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters')
+    if (password.length < 10) {
+      setError('Password must be at least 10 characters')
       return
     }
 
@@ -175,7 +175,7 @@ export default function ResetPasswordPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={10}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                     placeholder="Enter new password"
                   />
@@ -191,7 +191,7 @@ export default function ResetPasswordPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    minLength={6}
+                    minLength={10}
                     className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
                     placeholder="Confirm new password"
                   />

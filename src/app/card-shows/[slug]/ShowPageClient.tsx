@@ -368,7 +368,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="Password"
                           required
-                          minLength={6}
+                          minLength={10}
                           className="w-full px-4 py-2.5 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
                         />
                         {error && <p className="text-red-400 text-xs text-center">{error}</p>}

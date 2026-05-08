@@ -360,9 +360,9 @@ function FloatingCtaBar({
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Password (6+ characters)"
+                    placeholder="Password (10+ characters)"
                     required
-                    minLength={6}
+                    minLength={10}
                     className="w-full px-3 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                   {error && <p className="text-red-400 text-xs">{error}</p>}
@@ -699,7 +699,7 @@ export default function WhyDcmPage() {
                         <form onSubmit={handleHeroEmail} className="space-y-3">
                           <input type="email" value={heroEmail} onChange={(e) => setHeroEmail(e.target.value)} placeholder="you@example.com" required
                             className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm" />
-                          <input type="password" value={heroPassword} onChange={(e) => setHeroPassword(e.target.value)} placeholder="Password (6+ chars)" required minLength={6}
+                          <input type="password" value={heroPassword} onChange={(e) => setHeroPassword(e.target.value)} placeholder="Password (10+ chars)" required minLength={10}
                             className="w-full px-4 py-3 bg-gray-50 border-2 border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent text-sm" />
                           {heroError && <p className="text-red-500 text-xs">{heroError}</p>}
                           <button type="submit" disabled={heroLoading}

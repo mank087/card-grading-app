@@ -1307,7 +1307,7 @@ export default function AccountPage() {
             ) : (
               <>
                 <p className="text-gray-600 mb-4">
-                  Enter your new password below. It must be at least 6 characters long.
+                  Enter your new password below. It must be at least 10 characters long.
                 </p>
 
                 {passwordError && (
