@@ -69,7 +69,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="market-pricing"
         options={{
-          title: 'Pricing',
+          title: 'Portfolio',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cash" size={size} color={color} />
           ),

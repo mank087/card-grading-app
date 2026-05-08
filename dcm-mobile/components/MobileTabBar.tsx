@@ -46,7 +46,7 @@ const TABS: TabDef[] = [
   },
   { key: 'collection',     href: '/(tabs)/collection',     label: 'Collection', icon: (c, s) => <Ionicons name="grid"      size={s} color={c} /> },
   { key: 'labels',         href: '/(tabs)/labels',         label: 'Labels',     icon: (c, s) => <Ionicons name="pricetags" size={s} color={c} /> },
-  { key: 'market-pricing', href: '/(tabs)/market-pricing', label: 'Pricing',    icon: (c, s) => <Ionicons name="cash"      size={s} color={c} /> },
+  { key: 'market-pricing', href: '/(tabs)/market-pricing', label: 'Portfolio', icon: (c, s) => <Ionicons name="cash"      size={s} color={c} /> },
   { key: 'account',        href: '/(tabs)/account',        label: 'Menu',       icon: (c, s) => <Ionicons name="menu"      size={s} color={c} /> },
 ]
 
