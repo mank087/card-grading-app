@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "168028796355",
+    "project_id": "dcm-grading-app",
+    "storage_bucket": "dcm-grading-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:168028796355:android:1c28fe67e278a65a0c7976",
+        "android_client_info": {
+          "package_name": "com.dcmgrading.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDHbQ-AExxxLdntyU9AgMVVa-7HrYSua9o"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -7,6 +7,7 @@ import { useCredits } from '@/contexts/CreditsContext'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 import CategoryPicker from '@/components/CategoryPicker'
+import { trackCreditsPurchaseInitiated } from '@/lib/analytics'
 
 export default function GradeScreen() {
   const router = useRouter()
@@ -156,7 +157,10 @@ export default function GradeScreen() {
           )}
           <TouchableOpacity
             style={styles.purchaseBtn}
-            onPress={() => router.push('/pages/credits' as any)}
+            onPress={() => {
+              trackCreditsPurchaseInitiated()
+              router.push('/pages/credits' as any)
+            }}
             activeOpacity={0.85}
           >
             <Ionicons name="diamond" size={18} color="#fff" />

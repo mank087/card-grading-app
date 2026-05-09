@@ -8,6 +8,7 @@ import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
 import Button from '@/components/ui/Button'
 import BenefitCarousel from '@/components/BenefitCarousel'
+import { trackGradeCompleted } from '@/lib/analytics'
 
 const CATEGORY_ROUTES: Record<string, string> = {
   Sports: 'sports', Pokemon: 'pokemon', MTG: 'mtg',
@@ -104,6 +105,7 @@ export default function ProcessingScreen() {
       setGrade(g)
       setCurrentStep(STEPS.length - 1)
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      trackGradeCompleted(params.category || 'unknown', g)
       if (pollRef.current) clearInterval(pollRef.current)
     }
 

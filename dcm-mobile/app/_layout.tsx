@@ -36,6 +36,16 @@ const OnboardingCarousel = lazy(() => import('@/components/OnboardingCarousel'))
 import HelpBot from '@/components/HelpBot'
 import GradingStatusBar from '@/components/GradingStatusBar'
 import OfflineBanner from '@/components/OfflineBanner'
+import { Platform } from 'react-native'
+
+// expo-tracking-transparency — wrapped in try/catch like Stripe / Sentry
+// so Expo Go (which lacks the native module) doesn't crash on import.
+let trackingTransparency: any = null
+try {
+  trackingTransparency = require('expo-tracking-transparency')
+} catch {
+  /* Expo Go path */
+}
 
 const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || ''
@@ -181,6 +191,34 @@ function GradingPollerHost() {
   return null
 }
 
+// Asks the iOS user for tracking permission once, on first launch after
+// install. Without consent, IDFA is unavailable — Meta + Google Ads
+// attribution falls back to aggregate methods (SKAdNetwork) with much
+// lower fidelity. Android has no equivalent prompt; AAID is allowed by
+// default subject to user opt-out in OS settings.
+function ATTPromptHost() {
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return
+    if (!trackingTransparency) return // Expo Go — skip
+    let cancelled = false
+    // Defer past splash screen + first paint so the prompt doesn't
+    // collide with launch animations or the welcome carousel render.
+    const t = setTimeout(async () => {
+      try {
+        const { status } = await trackingTransparency.getTrackingPermissionsAsync()
+        if (cancelled) return
+        if (status === 'undetermined') {
+          await trackingTransparency.requestTrackingPermissionsAsync()
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[ATT] prompt failed:', e)
+      }
+    }, 1500)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [])
+  return null
+}
+
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -203,6 +241,7 @@ export default function RootLayout() {
         <EmblemsProvider>
         <GradingQueueProvider>
           <GradingPollerHost />
+          <ATTPromptHost />
           <GradingStatusBar />
           <OfflineBanner />
         <AuthGate>

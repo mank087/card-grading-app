@@ -18,6 +18,7 @@
       "bundleIdentifier": "com.dcmgrading.app",
       "buildNumber": "1",
       "usesAppleSignIn": true,
+      "googleServicesFile": "./GoogleService-Info.plist",
       "associatedDomains": [
         "applinks:dcmgrading.com",
         "applinks:www.dcmgrading.com"
@@ -49,20 +50,73 @@
             ]
           }
         ],
-        "NSPrivacyTracking": false,
-        "NSPrivacyTrackingDomains": [],
-        "NSPrivacyCollectedDataTypes": []
+        "NSPrivacyTracking": true,
+        "NSPrivacyTrackingDomains": [
+          "app-measurement.com",
+          "firebase-settings.crashlytics.com",
+          "firebaseinstallations.googleapis.com",
+          "graph.facebook.com",
+          "connect.facebook.net"
+        ],
+        "NSPrivacyCollectedDataTypes": [
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypePerformanceData",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality",
+              "NSPrivacyCollectedDataTypePurposeAnalytics"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeOtherDiagnosticData",
+            "NSPrivacyCollectedDataTypeLinked": false,
+            "NSPrivacyCollectedDataTypeTracking": false,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeProductInteraction",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": true,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAnalytics",
+              "NSPrivacyCollectedDataTypePurposeProductPersonalization",
+              "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising"
+            ]
+          },
+          {
+            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeDeviceID",
+            "NSPrivacyCollectedDataTypeLinked": true,
+            "NSPrivacyCollectedDataTypeTracking": true,
+            "NSPrivacyCollectedDataTypePurposes": [
+              "NSPrivacyCollectedDataTypePurposeAnalytics",
+              "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising"
+            ]
+          }
+        ]
       },
       "infoPlist": {
         "NSCameraUsageDescription": "DCM Grading needs camera access to photograph your trading cards for AI-powered professional grading.",
         "NSPhotoLibraryUsageDescription": "DCM Grading needs access to your photo library so you can upload existing card photos for grading.",
         "NSPhotoLibraryAddOnlyUsageDescription": "DCM Grading needs permission to save downloaded labels and graded card images to your photos.",
+        "NSUserTrackingUsageDescription": "We use this to measure how DCM Grading ads perform and to improve your experience. You can change this anytime in Settings.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.dcmgrading.app",
       "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#262628"
@@ -129,6 +183,13 @@
           "advertiserIDCollectionEnabled": false,
           "autoLogAppEventsEnabled": false,
           "isAutoInitEnabled": true
+        }
+      ],
+      "@react-native-firebase/app",
+      [
+        "expo-tracking-transparency",
+        {
+          "userTrackingPermission": "We use this to measure how DCM Grading ads perform and to improve your experience. You can change this anytime in Settings."
         }
       ]
     ],

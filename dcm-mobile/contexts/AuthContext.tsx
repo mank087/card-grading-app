@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useMemo } from '
 import { Session, User } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
+import { setUserId as setAnalyticsUserId } from '@/lib/analytics'
 
 // App-owned cache keys cleared on sign-out so account-switching on a shared
 // device doesn't leak the previous user's collection, label preferences, or
@@ -67,6 +68,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
+      // Tag analytics with the Supabase user ID so GA4 can compute
+      // cohorts and Meta can attribute conversions to this user.
+      setAnalyticsUserId(session?.user?.id ?? null)
     })
 
     // Listen for auth changes
@@ -74,6 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
+      setAnalyticsUserId(session?.user?.id ?? null)
     })
 
     return () => subscription.unsubscribe()
