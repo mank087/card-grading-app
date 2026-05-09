@@ -56,6 +56,9 @@ const EBAY_LISTINGS = [
 // ─── Panel definitions ───
 const PANELS = [
   {
+    // Panel 1 renders the DCM logo (image) instead of an Ionicon —
+    // see special case in renderPanel. The icon name here is unused
+    // but kept non-null to satisfy the shared type.
     id: '1',
     icon: 'diamond' as const,
     headline: 'The Power of Card Grading\nin Your Hands',
@@ -63,7 +66,7 @@ const PANELS = [
   },
   {
     id: '2',
-    icon: 'layers' as const,
+    icon: 'diamond' as const,
     headline: 'Grade Any Card Type',
     subtitle: 'Sports, Pokemon, Magic, Yu-Gi-Oh, One Piece, Star Wars, Lorcana and more — all supported.',
   },
@@ -160,7 +163,16 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
         {/* Content — bottom */}
         <View style={st.contentArea}>
           <View style={st.iconCircle}>
-            <Ionicons name={item.icon} size={28} color={Colors.purple[600]} />
+            {item.id === '1' ? (
+              <Image
+                source={require('@/assets/images/dcm-logo.png')}
+                style={{ width: 32, height: 32 }}
+                resizeMode="contain"
+                tintColor="#fff"
+              />
+            ) : (
+              <Ionicons name={item.icon} size={28} color={Colors.purple[600]} />
+            )}
           </View>
           <Text style={st.headline}>{item.headline}</Text>
           <Text style={st.subtitle}>{item.subtitle}</Text>
