@@ -115,30 +115,32 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
     const cardSlot = 108
     const setW = ROW1_CARDS.length * cardSlot
 
-    // Row 1 (leftward): 0 → -setW, then loop snaps back to 0. At -setW the
-    // second copy is at the left edge; at 0 the first copy is at the left
-    // edge. Both are identical → seamless.
+    // Capture each loop handle so cleanup can stop them. Without .stop()
+    // on unmount, the JS-side loop scheduler keeps re-firing native
+    // animations after the carousel leaves the tree (e.g. when the user
+    // signs in and we route into the app), which costs battery on Android.
     row1Anim.setValue(0)
-    Animated.loop(
+    const loop1 = Animated.loop(
       Animated.timing(row1Anim, { toValue: -setW, duration: 20000, easing: Easing.linear, useNativeDriver: true })
-    ).start()
+    )
+    loop1.start()
 
-    // Row 2 (rightward): start at -setW (second copy visible), animate
-    // to 0 (first copy visible). On loop, snaps 0 → -setW — identical
-    // visually because every copy of the array is identical content.
     row2Anim.setValue(-setW)
-    Animated.loop(
+    const loop2 = Animated.loop(
       Animated.timing(row2Anim, { toValue: 0, duration: 25000, easing: Easing.linear, useNativeDriver: true })
-    ).start()
+    )
+    loop2.start()
 
-    // EBAY_LISTINGS_TOTAL_H is computed inside the visual component (kept
-    // colocated there so card sizing tweaks live in one place); we just
-    // need to drive an unbounded translateY upward and let the inner
-    // component apply modulo wrap. Run from 0 → -1 over 28s and the
-    // visual component scales it by its own measured content height.
-    Animated.loop(
+    const loopE = Animated.loop(
       Animated.timing(ebayAnim, { toValue: 1, duration: 28000, easing: Easing.linear, useNativeDriver: true })
-    ).start()
+    )
+    loopE.start()
+
+    return () => {
+      loop1.stop()
+      loop2.stop()
+      loopE.stop()
+    }
   }, [])
 
   const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
@@ -207,7 +209,11 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
         </TouchableOpacity>
       )}
 
-      {/* Panels */}
+      {/* Panels — virtualized so a cold welcome screen doesn't decode all
+          5 panels' images at once on a mid-range Android. windowSize=3
+          renders the active panel + 1 on each side, which keeps swipes
+          smooth (next panel is pre-mounted by the time the user gets to
+          it) while cutting first-paint image decodes from ~57 to ~25. */}
       <FlatList
         ref={flatListRef}
         data={PANELS}
@@ -220,6 +226,9 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
         decelerationRate="fast"
         onViewableItemsChanged={onViewableItemsChanged}
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
+        initialNumToRender={1}
+        maxToRenderPerBatch={1}
+        windowSize={3}
       />
 
       {/* Bottom: dots + buttons. paddingBottom uses the device's safe-area

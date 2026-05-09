@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect } from '@react-navigation/native'
 import { useAuth } from '@/contexts/AuthContext'
@@ -218,8 +218,19 @@ export function useLabelStyle() {
     }
   }, [session?.access_token, labelStyle, customStyles])
 
-  const activeConfig = customStyles.find(s => s.id === labelStyle)?.config || null
-  const colorOverrides = extractColorOverrides(activeConfig)
+  // Memoize so the returned object references are stable across renders.
+  // Without this, every consumer that passes `colorOverrides` to a
+  // memoized child (notably SlabCard in the collection grid) re-renders
+  // on every parent render — defeating React.memo and causing the entire
+  // grid to reflow on every keystroke in the search box.
+  const activeConfig = useMemo(
+    () => customStyles.find(s => s.id === labelStyle)?.config || null,
+    [customStyles, labelStyle],
+  )
+  const colorOverrides = useMemo(
+    () => extractColorOverrides(activeConfig),
+    [activeConfig],
+  )
 
   return { labelStyle, customStyles, activeConfig, colorOverrides, loading, switchStyle, saveCustomStyle, deleteCustomStyle, renameCustomStyle }
 }

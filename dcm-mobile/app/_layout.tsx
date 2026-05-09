@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, lazy, Suspense } from 'react'
 // StripeProvider wrapped in try/catch — fails gracefully in Expo Go
 let StripeProvider: any
 try {
@@ -25,7 +25,14 @@ import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
-import OnboardingCarousel from '@/components/OnboardingCarousel'
+// Lazy-load the welcome carousel — its module evaluates 27 require()d
+// PNGs (welcome card strips, slabs, label studio shots, eBay listings)
+// at module-load time. Static-importing here means every authenticated
+// cold-start pays that cost even though only unauthenticated users see
+// the carousel. React.lazy in RN defers MODULE EVALUATION (not bundle
+// delivery — the bundle is monolithic), which is exactly the cost we
+// want to skip for the 95% authenticated case.
+const OnboardingCarousel = lazy(() => import('@/components/OnboardingCarousel'))
 import HelpBot from '@/components/HelpBot'
 import GradingStatusBar from '@/components/GradingStatusBar'
 import OfflineBanner from '@/components/OfflineBanner'
@@ -138,7 +145,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   if (!isLoading && !user) {
     const inAuthGroup = segments[0] === '(auth)'
     if (!inAuthGroup) {
-      return <OnboardingCarousel onGetStarted={handleGetStarted} onSignIn={handleSignIn} />
+      // Suspense fallback matches the carousel's bg color (#0f0a1a) so
+      // the 1-frame load gap looks like the carousel is just appearing,
+      // not a flash of white.
+      return (
+        <Suspense fallback={<View style={{ flex: 1, backgroundColor: '#0f0a1a' }} />}>
+          <OnboardingCarousel onGetStarted={handleGetStarted} onSignIn={handleSignIn} />
+        </Suspense>
+      )
     }
   }
 
