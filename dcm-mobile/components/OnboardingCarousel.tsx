@@ -104,13 +104,28 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   const ebayAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
-    const cardW = 108
-    const totalW = ROW1_CARDS.length * cardW
+    // Each card slot = 100px width + 8px marginRight = 108px (must match
+    // the styling in ScrollingCardsVisual). One "set" is the width of
+    // ROW*_CARDS.length cards. Content is tripled in the visual, so when
+    // translateX wraps from end-of-loop back to start, the next copy of
+    // the array is already in the same visible position → no visible jump.
+    const cardSlot = 108
+    const setW = ROW1_CARDS.length * cardSlot
+
+    // Row 1 (leftward): 0 → -setW, then loop snaps back to 0. At -setW the
+    // second copy is at the left edge; at 0 the first copy is at the left
+    // edge. Both are identical → seamless.
+    row1Anim.setValue(0)
     Animated.loop(
-      Animated.timing(row1Anim, { toValue: -totalW, duration: 20000, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(row1Anim, { toValue: -setW, duration: 20000, easing: Easing.linear, useNativeDriver: true })
     ).start()
+
+    // Row 2 (rightward): start at -setW (second copy visible), animate
+    // to 0 (first copy visible). On loop, snaps 0 → -setW — identical
+    // visually because every copy of the array is identical content.
+    row2Anim.setValue(-setW)
     Animated.loop(
-      Animated.timing(row2Anim, { toValue: totalW / 2, duration: 25000, easing: Easing.linear, useNativeDriver: true })
+      Animated.timing(row2Anim, { toValue: 0, duration: 25000, easing: Easing.linear, useNativeDriver: true })
     ).start()
 
     // EBAY_LISTINGS_TOTAL_H is computed inside the visual component (kept
@@ -234,7 +249,7 @@ function ScrollingCardsVisual({ row1Anim, row2Anim }: { row1Anim: Animated.Value
           <Image key={`r1-${i}`} source={src} style={{ width: cardW, height: cardH, borderRadius: 8, marginRight: 8 }} resizeMode="cover" />
         ))}
       </Animated.View>
-      <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: row2Anim }], marginLeft: -200 }}>
+      <Animated.View style={{ flexDirection: 'row', transform: [{ translateX: row2Anim }] }}>
         {tripled2.map((src, i) => (
           <Image key={`r2-${i}`} source={src} style={{ width: cardW, height: cardH, borderRadius: 8, marginRight: 8 }} resizeMode="cover" />
         ))}
