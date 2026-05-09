@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
 import Button from '@/components/ui/Button'
+import BenefitCarousel from '@/components/BenefitCarousel'
 
 const CATEGORY_ROUTES: Record<string, string> = {
   Sports: 'sports', Pokemon: 'pokemon', MTG: 'mtg',
@@ -166,6 +167,11 @@ export default function ProcessingScreen() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+      {/* Cycling DCM benefits — fills the dead space at the top of the
+          screen during the long-running grading wait. Replaces the old
+          static "Grading" Stack header. */}
+      <BenefitCarousel />
+
       {/* Navigation Options */}
       <View style={styles.navButtons}>
         <Button title="Grade Another" variant="secondary" size="sm" onPress={handleGradeAnother} style={{ flex: 1 }} />

@@ -12,7 +12,11 @@ export default function GradeLayout() {
     >
       <Stack.Screen name="capture" options={{ title: 'Capture Card', headerShown: false }} />
       <Stack.Screen name="review" options={{ title: 'Review & Submit' }} />
-      <Stack.Screen name="processing" options={{ title: 'Grading', headerBackVisible: false }} />
+      {/* Processing screen renders its own benefits carousel at the top
+          in lieu of the Stack header — keeps the user engaged during the
+          ~60-180s GPT-5.1 vision call instead of staring at a static
+          "Grading" title. */}
+      <Stack.Screen name="processing" options={{ headerShown: false }} />
     </Stack>
   )
 }

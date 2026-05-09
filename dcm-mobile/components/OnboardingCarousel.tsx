@@ -39,6 +39,20 @@ const SLAB_DRAKE = require('@/assets/images/onboarding/slab-drake.png')
 const LABEL_STUDIO_IMG = require('@/assets/images/onboarding/label-studio.png')
 const LABEL_SLAB_IMG = require('@/assets/images/onboarding/label-slab.png')
 
+// ─── eBay sold-listing screenshots for Panel 5 (in numbered order) ───
+const EBAY_LISTINGS = [
+  require('@/assets/images/onboarding/ebay/ebay-1.png'),
+  require('@/assets/images/onboarding/ebay/ebay-2.png'),
+  require('@/assets/images/onboarding/ebay/ebay-3.png'),
+  require('@/assets/images/onboarding/ebay/ebay-4.png'),
+  require('@/assets/images/onboarding/ebay/ebay-5.png'),
+  require('@/assets/images/onboarding/ebay/ebay-6.png'),
+  require('@/assets/images/onboarding/ebay/ebay-7.png'),
+  require('@/assets/images/onboarding/ebay/ebay-8.png'),
+  require('@/assets/images/onboarding/ebay/ebay-9.png'),
+  require('@/assets/images/onboarding/ebay/ebay-10.png'),
+]
+
 // ─── Panel definitions ───
 const PANELS = [
   {
@@ -65,6 +79,12 @@ const PANELS = [
     headline: "Track Your Collection's Value",
     subtitle: 'Real-time market pricing, eBay integration, and portfolio tracking for every card you grade.',
   },
+  {
+    id: '5',
+    icon: 'cart' as const,
+    headline: 'Insta-List to eBay',
+    subtitle: 'List graded cards to eBay in seconds — graded labels on the images, optimized titles + descriptions with grade and subgrades, and a full condition report sent to the winning bidder. All included with every grade.',
+  },
 ]
 
 interface Props {
@@ -80,6 +100,8 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   // Auto-scroll animations for Panel 1
   const row1Anim = useRef(new Animated.Value(0)).current
   const row2Anim = useRef(new Animated.Value(0)).current
+  // Vertical auto-scroll for Panel 5 (eBay listings feed)
+  const ebayAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     const cardW = 108
@@ -89,6 +111,15 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
     ).start()
     Animated.loop(
       Animated.timing(row2Anim, { toValue: totalW / 2, duration: 25000, easing: Easing.linear, useNativeDriver: true })
+    ).start()
+
+    // EBAY_LISTINGS_TOTAL_H is computed inside the visual component (kept
+    // colocated there so card sizing tweaks live in one place); we just
+    // need to drive an unbounded translateY upward and let the inner
+    // component apply modulo wrap. Run from 0 → -1 over 28s and the
+    // visual component scales it by its own measured content height.
+    Animated.loop(
+      Animated.timing(ebayAnim, { toValue: 1, duration: 28000, easing: Easing.linear, useNativeDriver: true })
     ).start()
   }, [])
 
@@ -105,6 +136,7 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
           {index === 1 && <SlabCollageVisual />}
           {index === 2 && <LabelStudioVisual />}
           {index === 3 && <ChartVisual />}
+          {index === 4 && <EbayInstaListVisual scrollAnim={ebayAnim} />}
 
           {/* Gradient fade to dark */}
           <LinearGradient colors={['transparent', '#0f0a1a']} style={st.gradientFade} />
@@ -320,6 +352,58 @@ function ChartVisual() {
           style={{ height: 2, borderRadius: 1, opacity: 0.5 }}
         />
       </View>
+    </View>
+  )
+}
+
+// ════════════════════════════════════════════════
+// Panel 5: eBay Insta-List — auto-scrolling sold-listings feed
+// ════════════════════════════════════════════════
+
+function EbayInstaListVisual({ scrollAnim }: { scrollAnim: Animated.Value }) {
+  // Each listing screenshot is ~333x195 (1.7:1). We render the column
+  // at 88% of screen width so it reads like a real eBay feed card.
+  const cardW = W * 0.88
+  const cardH = cardW * (195 / 333)
+  const gap = 10
+  const itemH = cardH + gap
+
+  // Duplicate the array so when translateY hits -(setH) the second
+  // copy is already in the same visual position as the first → seamless loop.
+  const setH = EBAY_LISTINGS.length * itemH
+  const doubled = [...EBAY_LISTINGS, ...EBAY_LISTINGS]
+
+  // scrollAnim drives 0 → 1 over 28s (from parent). Map it to 0 → -setH
+  // so one full pass through the 10 listings = one loop iteration.
+  const translateY = scrollAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -setH],
+  })
+
+  return (
+    <View style={{ flex: 1, alignItems: 'center', overflow: 'hidden', paddingTop: 8 }}>
+      <Animated.View style={{ transform: [{ translateY }] }}>
+        {doubled.map((src, i) => (
+          <View
+            key={i}
+            style={{
+              width: cardW,
+              height: cardH,
+              marginBottom: gap,
+              borderRadius: 10,
+              overflow: 'hidden',
+              backgroundColor: '#fff',
+              shadowColor: '#000',
+              shadowOpacity: 0.35,
+              shadowRadius: 8,
+              shadowOffset: { width: 0, height: 4 },
+              elevation: 6,
+            }}
+          >
+            <Image source={src} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          </View>
+        ))}
+      </Animated.View>
     </View>
   )
 }
