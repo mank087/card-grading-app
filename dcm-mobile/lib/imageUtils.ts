@@ -170,11 +170,18 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
 
   score = Math.max(0, Math.min(100, score))
 
+  // Thresholds match web's src/utils/imageQuality.ts:172-185 (95/80/60).
+  // Conservative on purpose: handheld phone cameras under household
+  // lighting almost never hit the A bar, and that's intentional —
+  // calling a slightly soft photo "A — Excellent!" sets the user up for
+  // disappointment when the server's actual confidence comes back B or C.
+  // The ±0.25/±0.5/±1.0/±1.5 uncertainty bakes in margin so users with
+  // borderline image quality understand the grade has wiggle room.
   const grade: QualityResult['grade'] =
-    score >= 85 ? 'A' : score >= 70 ? 'B' : score >= 55 ? 'C' : 'D'
+    score >= 95 ? 'A' : score >= 80 ? 'B' : score >= 60 ? 'C' : 'D'
 
   const uncertainty =
-    grade === 'A' ? '±0.25' : grade === 'B' ? '±0.5' : grade === 'C' ? '±1' : '±1.5'
+    grade === 'A' ? '±0.25' : grade === 'B' ? '±0.5' : grade === 'C' ? '±1.0' : '±1.5'
 
   // More descriptive labels
   let blurLabel = 'Good'
