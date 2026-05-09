@@ -404,21 +404,29 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         else if (type === 'mini-report-pdf') {
           setStatus(`Generating ${cardIds.length} mini-report PDFs…`);
+          // Same fix as mini-report (JPG): build a real FoldableLabelData
+          // (subgrades, not subScores; setName + overallSummary were
+          // missing too — generator dereferences both).
           const labelDataArray: FoldableLabelData[] = perCard.map(({ card, labelData, subScores, grade, qrCodeDataUrl }) => ({
             cardName: labelData.primaryName,
-            contextLine: labelData.contextLine || '',
+            setName: (labelData as any).setName || '',
+            cardNumber: (labelData as any).cardNumber || undefined,
+            year: (labelData as any).year || undefined,
             specialFeatures: labelData.featuresLine || undefined,
             serial: labelData.serial,
+            englishName: card.featured || card.pokemon_featured || undefined,
             grade,
             conditionLabel: labelData.condition || getConditionLabel(grade),
+            subgrades: subScores,
+            overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
             cardUrl: `${window.location.origin}/verify/${card.serial}`,
             qrCodeDataUrl,
             logoDataUrl,
-            subScores,
-            showFounderEmblem,
-            showVipEmblem,
-            showCardLoversEmblem,
-          })) as any[];
+            // Note: founder/vip/cardlovers emblems are slab-label flags;
+            // foldableLabelGenerator does not consume them on the
+            // mini-report path. Keep them out of this payload to keep
+            // the FoldableLabelData type honest.
+          }));
           const blob = await generateBatchFoldableLabels(labelDataArray);
           blobs.push({
             name: `DCM-MiniReports-${cardIds.length}cards.pdf`,
@@ -433,20 +441,33 @@ function BatchLabelExportInner() {
         else if (type === 'mini-report') {
           setStatus(`Generating ${cardIds.length} mini-report JPGs…`);
           for (let i = 0; i < perCard.length; i++) {
-            const { card, labelData, subScores, grade, cardUrl } = perCard[i];
-            const frontUrl = signedByPath.get(card.front_path) || '';
+            const { card, labelData, subScores, grade, cardUrl, qrCodeDataUrl } = perCard[i];
             const namePrefix = sanitize(labelData.primaryName || `card-${card.serial}`);
-            const blob = await generateMiniReportJpg({
+            // Mirrors the single-card builder in
+            // src/app/label-export/[cardId]/page.tsx:400-415. The previous
+            // version passed `subScores` (and was cast to `as any` which
+            // silenced the type error) — but the generator reads
+            // `data.subgrades.centering`, so it crashed with "Cannot read
+            // properties of undefined (reading 'centering')". Build a
+            // properly-typed FoldableLabelData and let TypeScript catch
+            // future drift.
+            const fold: FoldableLabelData = {
               cardName: labelData.primaryName,
-              contextLine: labelData.contextLine || '',
+              setName: (labelData as any).setName || '',
+              cardNumber: (labelData as any).cardNumber || undefined,
+              year: (labelData as any).year || undefined,
               specialFeatures: labelData.featuresLine || undefined,
               serial: labelData.serial,
+              englishName: card.featured || card.pokemon_featured || undefined,
               grade,
               conditionLabel: labelData.condition || getConditionLabel(grade),
+              subgrades: subScores,
+              overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
+              qrCodeDataUrl,
               cardUrl,
-              cardImageUrl: frontUrl,
-              subScores,
-            } as any);
+              logoDataUrl,
+            };
+            const blob = await generateMiniReportJpg(fold);
             blobs.push({
               name: `DCM-MiniReport-${namePrefix}.jpg`,
               mime: 'image/jpeg',
