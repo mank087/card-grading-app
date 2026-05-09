@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react'
-import { View, Text, StyleSheet, Image, Animated, Easing } from 'react-native'
+import { View, Text, StyleSheet, Image, Animated, Easing, ScrollView } from 'react-native'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
@@ -32,6 +32,7 @@ export default function ProcessingScreen() {
   const scanAnim = useRef(new Animated.Value(0)).current
   const pulseAnim = useRef(new Animated.Value(1)).current
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const scrollRef = useRef<ScrollView>(null)
 
   // Scanning animation
   useEffect(() => {
@@ -166,7 +167,22 @@ export default function ProcessingScreen() {
   })
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 8 }]}>
+    <ScrollView
+      ref={scrollRef}
+      style={styles.container}
+      contentContainerStyle={[
+        styles.scrollContent,
+        // Keep the last button (View Full Results / Go to Collection) clear
+        // of the home indicator on iOS and the gesture nav bar on Android.
+        { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 24 },
+      ]}
+      showsVerticalScrollIndicator={false}
+      // When the grade reveal appears at the bottom, scroll there so the
+      // "View Full Results" button is in view without manual scrolling.
+      onContentSizeChange={() => {
+        if (isComplete) scrollRef.current?.scrollToEnd({ animated: true })
+      }}
+    >
       {/* Cycling DCM benefits — fills the dead space at the top of the
           screen during the long-running grading wait. Replaces the old
           static "Grading" Stack header. */}
@@ -270,12 +286,15 @@ export default function ProcessingScreen() {
           <Button title="Grade Another Card" variant="secondary" onPress={handleGradeAnother} style={{ marginTop: 8 }} />
         </View>
       )}
-    </View>
+    </ScrollView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: Colors.gray[900], padding: 16 },
+  container: { flex: 1, backgroundColor: Colors.gray[900] },
+  // ScrollView needs padding on its content container, not on the ScrollView
+  // itself, otherwise the padding scrolls with the content.
+  scrollContent: { padding: 16 },
 
   // Nav
   navButtons: { flexDirection: 'row', gap: 8, marginBottom: 20 },
