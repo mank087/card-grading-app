@@ -48,6 +48,27 @@ import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+/**
+ * Resolve the grade uncertainty string for display. Prefers the
+ * server-provided `conversational_grade_uncertainty` field; falls back to
+ * the canonical letter-based mapping from
+ * `src/lib/gradeDisplayUtils.ts:getUncertaintyFromConfidence`
+ * (A=±0, B=±1, C=±2, D=±3 — whole-number system).
+ */
+function resolveUncertainty(
+  serverValue: string | null | undefined,
+  confidenceLetter: string | null | undefined,
+): string {
+  if (serverValue) return serverValue
+  switch ((confidenceLetter || '').toUpperCase().trim()) {
+    case 'A': return '±0'
+    case 'B': return '±1'
+    case 'C': return '±2'
+    case 'D': return '±3'
+    default: return '±1'
+  }
+}
+
 export default function CardDetailScreen() {
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
   const router = useRouter()
@@ -947,7 +968,7 @@ export default function CardDetailScreen() {
       <View ref={tourRefs['grade-score']} collapsable={false} style={s.gradeArea}>
         <GradeBadge grade={grade} size="lg" showLabel />
         <View style={s.gradeMetaRow}>
-          <Text style={s.metaText}>Uncertainty: {card.conversational_grade_uncertainty || '±0'}</Text>
+          <Text style={s.metaText}>Uncertainty: {resolveUncertainty(card.conversational_grade_uncertainty, confidence)}</Text>
           <Text style={s.metaText}>Confidence Score: {confidence}</Text>
         </View>
       </View>
@@ -1590,13 +1611,16 @@ export default function CardDetailScreen() {
             </Text>
           </View>
           <Text style={s.confDescription}>
-            {confidence === 'A'
-              ? `Excellent image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±0'} — the assigned grade is highly reliable.`
-              : confidence === 'B'
-              ? `Good image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±0.5'} — the assigned grade is reliable with minor margin.`
-              : confidence === 'C'
-              ? `Fair image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±1.0'} — consider retaking photos for a more accurate grade.`
-              : `Poor image quality. Grade uncertainty ${card.conversational_grade_uncertainty || '±1.5'} — we recommend retaking clearer photos for reliable grading.`}
+            {(() => {
+              const u = resolveUncertainty(card.conversational_grade_uncertainty, confidence)
+              return confidence === 'A'
+                ? `Excellent image quality. Grade uncertainty ${u} — the assigned grade is highly reliable.`
+                : confidence === 'B'
+                ? `Good image quality. Grade uncertainty ${u} — the assigned grade is reliable with minor margin.`
+                : confidence === 'C'
+                ? `Fair image quality. Grade uncertainty ${u} — consider retaking photos for a more accurate grade.`
+                : `Poor image quality. Grade uncertainty ${u} — we recommend retaking clearer photos for reliable grading.`
+            })()}
           </Text>
           {card.conversational_case_detection?.case_type && card.conversational_case_detection.case_type !== 'none' && (
             <InfoRow label="Protective Case" value={card.conversational_case_detection.case_type.replace('_', ' ')} />
@@ -2112,7 +2136,7 @@ export default function CardDetailScreen() {
                   {gradingJson.final_grade.decimal_grade != null && (
                     <InfoRow label="Decimal Grade" value={String(gradingJson.final_grade.decimal_grade)} />
                   )}
-                  <InfoRow label="Grade Range" value={card.conversational_grade_uncertainty || '±0'} />
+                  <InfoRow label="Grade Range" value={resolveUncertainty(card.conversational_grade_uncertainty, confidence)} />
                 </View>
               </View>
               {gradingJson.final_grade.summary && (
