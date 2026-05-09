@@ -66,7 +66,12 @@ export default function ProcessingScreen() {
     return () => clearInterval(timer)
   }, [])
 
-  const [pollCount, setPollCount] = useState(0)
+  // Poll count + completion flag tracked via refs (not state) so that
+  // bumping them every 5s doesn't re-render the entire processing
+  // screen — the carousel, scan animation, and step list don't change
+  // between polls, only the dev console log does.
+  const pollCountRef = useRef(0)
+  const isCompleteRef = useRef(false)
   const [gradingError, setGradingError] = useState(false)
 
   // Trigger grading API (fire-and-forget — don't await)
@@ -83,15 +88,29 @@ export default function ProcessingScreen() {
     })
   }, [params.cardId, params.category])
 
-  // Poll for grading completion
+  // Poll for grading completion. Effect deps deliberately exclude
+  // `isComplete` — when grade is found we clear the interval inline
+  // (line below), so we don't need React to tear down + re-mount the
+  // effect just to bail out. The 5-min timeout uses isCompleteRef
+  // (not state) to avoid the same stale-closure issue.
   useEffect(() => {
-    if (!params.cardId || isComplete) return
+    if (!params.cardId) return
 
     console.log('[Processing] Starting poll for card:', params.cardId)
 
+    const markComplete = (g: number) => {
+      isCompleteRef.current = true
+      setIsComplete(true)
+      setGrade(g)
+      setCurrentStep(STEPS.length - 1)
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+
     pollRef.current = setInterval(async () => {
+      if (isCompleteRef.current) return
       try {
-        setPollCount(prev => prev + 1)
+        pollCountRef.current += 1
         const { data, error } = await supabase
           .from('cards')
           .select('conversational_whole_grade, conversational_condition_label, conversational_grading')
@@ -106,11 +125,7 @@ export default function ProcessingScreen() {
         // Check if grade is set
         if (data?.conversational_whole_grade) {
           console.log('[Processing] Grade found:', data.conversational_whole_grade)
-          setIsComplete(true)
-          setGrade(data.conversational_whole_grade)
-          setCurrentStep(STEPS.length - 1)
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-          if (pollRef.current) clearInterval(pollRef.current)
+          markComplete(data.conversational_whole_grade)
           return
         }
 
@@ -121,25 +136,23 @@ export default function ProcessingScreen() {
             const extractedGrade = json.final_grade?.whole_grade || json.grading_passes?.averaged_rounded?.final
             if (extractedGrade) {
               console.log('[Processing] Grade found in JSON but not in column:', extractedGrade)
-              setIsComplete(true)
-              setGrade(Math.round(extractedGrade))
-              setCurrentStep(STEPS.length - 1)
-              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-              if (pollRef.current) clearInterval(pollRef.current)
+              markComplete(Math.round(extractedGrade))
               return
             }
           } catch { /* JSON parse failed, continue polling */ }
         }
 
-        console.log('[Processing] Poll #' + (pollCount + 1) + ' — no grade yet')
+        console.log('[Processing] Poll #' + pollCountRef.current + ' — no grade yet')
       } catch (err) {
         console.log('[Processing] Poll exception:', err)
       }
     }, 5000)
 
-    // Timeout after 5 minutes — show error state
+    // Timeout after 5 minutes — show error state. Reads from
+    // isCompleteRef so we always see the latest value (not the
+    // false captured at effect-mount time).
     const timeout = setTimeout(() => {
-      if (!isComplete) {
+      if (!isCompleteRef.current) {
         console.log('[Processing] Timeout reached — grading may have failed')
         setGradingError(true)
         if (pollRef.current) clearInterval(pollRef.current)
@@ -150,7 +163,7 @@ export default function ProcessingScreen() {
       if (pollRef.current) clearInterval(pollRef.current)
       clearTimeout(timeout)
     }
-  }, [params.cardId, isComplete])
+  }, [params.cardId])
 
   const handleViewResults = () => {
     const catRoute = CATEGORY_ROUTES[params.category || 'other'] || 'other'
@@ -270,7 +283,6 @@ export default function ProcessingScreen() {
       {!isComplete && !gradingError && (
         <Text style={styles.timingText}>
           This typically takes 1-2 minutes. You can grade another card or view your collection while waiting.
-          {pollCount > 0 && `\n\nChecking... (${pollCount})`}
         </Text>
       )}
 

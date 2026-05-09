@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Animated, Keyboard, KeyboardAvoidingView, Platform } from 'react-native'
+import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Animated, Keyboard, KeyboardAvoidingView, Platform, AppState } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { useRouter } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -70,17 +70,33 @@ export default function HelpBot() {
   const pulseAnim = useRef(new Animated.Value(1)).current
   const listRef = useRef<FlatList>(null)
 
-  // Pulse animation on button
+  // Pulse animation on the FAB. Only run while the FAB is actually
+  // visible (bot closed) AND the app is foregrounded — otherwise it's
+  // just constant battery drain firing native frames every ~30ms.
   useEffect(() => {
+    if (isOpen) return // FAB hidden → don't animate
+
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, { toValue: 1.1, duration: 1500, useNativeDriver: true }),
         Animated.timing(pulseAnim, { toValue: 1, duration: 1500, useNativeDriver: true }),
       ])
     )
-    pulse.start()
-    return () => pulse.stop()
-  }, [])
+
+    const start = () => pulse.start()
+    const stop = () => pulse.stop()
+
+    if (AppState.currentState === 'active') start()
+    const sub = AppState.addEventListener('change', state => {
+      if (state === 'active') start()
+      else stop()
+    })
+
+    return () => {
+      stop()
+      sub.remove()
+    }
+  }, [isOpen, pulseAnim])
 
   const open = () => {
     if (messages.length === 0) {

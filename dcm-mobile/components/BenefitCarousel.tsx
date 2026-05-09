@@ -8,7 +8,7 @@
  * 30+ seconds and there's nothing else for them to do.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Colors } from '@/lib/constants'
@@ -71,22 +71,36 @@ export default function BenefitCarousel() {
   const router = useRouter()
   const [idx, setIdx] = useState(0)
   const [visible, setVisible] = useState(true)
+  // Track the inner fade timeouts so unmount cleans them up.
+  // Without this, a setTimeout fired mid-fade would still call setIdx
+  // on an unmounted component when the user navigates away during the
+  // 400ms fade window — RN warns and the closure holds memory until fire.
+  const fadeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => {
       setVisible(false)
-      setTimeout(() => {
+      fadeTimeoutRef.current = setTimeout(() => {
         setIdx(prev => (prev + 1) % SLIDES.length)
         setVisible(true)
+        fadeTimeoutRef.current = null
       }, FADE_MS)
     }, ROTATE_MS)
-    return () => clearInterval(t)
+    return () => {
+      clearInterval(t)
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current)
+    }
   }, [])
 
   const jumpTo = (i: number) => {
     if (i === idx) return
+    if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current)
     setVisible(false)
-    setTimeout(() => { setIdx(i); setVisible(true) }, FADE_MS)
+    fadeTimeoutRef.current = setTimeout(() => {
+      setIdx(i)
+      setVisible(true)
+      fadeTimeoutRef.current = null
+    }, FADE_MS)
   }
 
   const slide = SLIDES[idx]
