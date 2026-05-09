@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, useEffect } from 'react'
+import { createContext, useContext, useState, useCallback, useEffect, useMemo } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 const STORAGE_KEY = 'dcm_grading_queue'
@@ -110,8 +110,13 @@ export function GradingQueueProvider({ children }: { children: React.ReactNode }
     setQueue(q => q.filter(c => c.status !== 'completed' && c.status !== 'error'))
   }, [])
 
+  const value = useMemo(
+    () => ({ queue, addToQueue, updateCardStatus, removeFromQueue, clearCompleted }),
+    [queue, addToQueue, updateCardStatus, removeFromQueue, clearCompleted],
+  )
+
   return (
-    <GradingQueueContext.Provider value={{ queue, addToQueue, updateCardStatus, removeFromQueue, clearCompleted }}>
+    <GradingQueueContext.Provider value={value}>
       {children}
     </GradingQueueContext.Provider>
   )

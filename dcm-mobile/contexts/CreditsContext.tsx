@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react'
 import { useAuth } from './AuthContext'
 import { supabase } from '@/lib/supabase'
 
@@ -51,8 +51,13 @@ export function CreditsProvider({ children }: { children: React.ReactNode }) {
     refresh()
   }, [refresh])
 
+  const value = useMemo(
+    () => ({ balance, isLoading, refresh }),
+    [balance, isLoading, refresh],
+  )
+
   return (
-    <CreditsContext.Provider value={{ balance, isLoading, refresh }}>
+    <CreditsContext.Provider value={value}>
       {children}
     </CreditsContext.Provider>
   )

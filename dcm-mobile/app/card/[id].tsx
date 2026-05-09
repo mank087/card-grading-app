@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { View, Text, ScrollView, Image, StyleSheet, ActivityIndicator, TouchableOpacity, Linking, Share, Alert, RefreshControl, Modal, Dimensions, Pressable, TextInput, KeyboardAvoidingView, Platform, PanResponder } from 'react-native'
 import { Image as ExpoImage } from 'expo-image'
 import * as Clipboard from 'expo-clipboard'
@@ -106,20 +106,38 @@ export default function CardDetailScreen() {
   // this so it can compute absolute scrollTo Y positions when bringing
   // each step's target into view.
   const scrollOffsetRef = useRef(0)
-  const tourRefs = {
-    'card-images': useRef<View | null>(null),
-    'visibility-toggle': useRef<View | null>(null),
-    'grade-score': useRef<View | null>(null),
-    'subgrades': useRef<View | null>(null),
-    'condition-summary': useRef<View | null>(null),
-    'download-buttons': useRef<View | null>(null),
-    'card-info': useRef<View | null>(null),
-    'centering': useRef<View | null>(null),
-    'optic-score': useRef<View | null>(null),
-    'market-value': useRef<View | null>(null),
-    'pro-estimates': useRef<View | null>(null),
-    'insta-list': useRef<View | null>(null),
-  }
+  // Each useRef returns a stable object across renders, but the wrapping
+  // record literal here was being rebuilt on every render — passing a new
+  // `targets` reference to <OnboardingTour> and re-firing its
+  // focusTarget effect on every parent render (this screen re-renders on
+  // every scroll via onScroll → scrollOffsetRef). useMemo with empty
+  // deps stabilizes the record because the underlying refs are stable.
+  const cardImagesRef = useRef<View | null>(null)
+  const visibilityToggleRef = useRef<View | null>(null)
+  const gradeScoreRef = useRef<View | null>(null)
+  const subgradesRef = useRef<View | null>(null)
+  const conditionSummaryRef = useRef<View | null>(null)
+  const downloadButtonsRef = useRef<View | null>(null)
+  const cardInfoRef = useRef<View | null>(null)
+  const centeringRef = useRef<View | null>(null)
+  const opticScoreRef = useRef<View | null>(null)
+  const marketValueRef = useRef<View | null>(null)
+  const proEstimatesRef = useRef<View | null>(null)
+  const instaListRef = useRef<View | null>(null)
+  const tourRefs = useMemo(() => ({
+    'card-images': cardImagesRef,
+    'visibility-toggle': visibilityToggleRef,
+    'grade-score': gradeScoreRef,
+    'subgrades': subgradesRef,
+    'condition-summary': conditionSummaryRef,
+    'download-buttons': downloadButtonsRef,
+    'card-info': cardInfoRef,
+    'centering': centeringRef,
+    'optic-score': opticScoreRef,
+    'market-value': marketValueRef,
+    'pro-estimates': proEstimatesRef,
+    'insta-list': instaListRef,
+  }), [])
   const [tourActive, setTourActive] = useState(false)
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({})
 
@@ -447,7 +465,10 @@ export default function CardDetailScreen() {
       style={s.container}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchCard() }} tintColor={Colors.purple[600]} />}
       onScroll={(e) => { scrollOffsetRef.current = e.nativeEvent.contentOffset.y }}
-      scrollEventThrottle={16}
+      // 32ms (≈30fps) is plenty for the tour's "where is the user
+      // looking" use case; 16ms (60fps) was bridging events at twice
+      // the rate the consumer needs.
+      scrollEventThrottle={32}
     >
 
       {/* Image Zoom Modal — uses a WebView so the browser handles pinch-to-zoom natively

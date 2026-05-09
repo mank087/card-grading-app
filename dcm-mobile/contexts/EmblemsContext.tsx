@@ -11,7 +11,7 @@
  * cards) re-renders with the new selection on the next frame.
  */
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback, useMemo, ReactNode } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -169,8 +169,13 @@ export function EmblemsProvider({ children }: { children: ReactNode }) {
     return applied
   }, [user?.id])
 
+  const value = useMemo(
+    () => ({ ...state, setEmblemSelected, refresh: fetchFromServer }),
+    [state, setEmblemSelected, fetchFromServer],
+  )
+
   return (
-    <EmblemsContext.Provider value={{ ...state, setEmblemSelected, refresh: fetchFromServer }}>
+    <EmblemsContext.Provider value={value}>
       {children}
     </EmblemsContext.Provider>
   )

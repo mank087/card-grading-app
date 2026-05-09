@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react'
 import { Session, User } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
@@ -98,8 +98,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut()
   }
 
+  // Memoize the context value so consumers don't re-render every time
+  // an unrelated parent state changes — only when the actual auth
+  // primitives change. signIn/signUp/signOut are stable closures
+  // recreated each render, but they only matter for their identity
+  // when consumers depend on it; consumers of this context are the
+  // entire app, so cheap stability here cuts the cascade significantly.
+  const value = useMemo(
+    () => ({ user, session, isLoading, signIn, signUp, signOut }),
+    [user, session, isLoading],
+  )
+
   return (
-    <AuthContext.Provider value={{ user, session, isLoading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   )
