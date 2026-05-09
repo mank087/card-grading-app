@@ -631,6 +631,60 @@ RULES FOR USING THESE HINTS (MANDATORY - DO NOT SKIP):
 // ═══════════════════════════════════════════════════════════════════════
 
 /**
+ * Resolve a usable ProcessedConditionReport from whatever the client wrote
+ * to the cards row.
+ *
+ * Web (`src/app/upload/page.tsx`) runs `processConditionReport()` before
+ * insert, so `user_condition_processed` is already the canonical shape.
+ * Mobile (`dcm-mobile/app/grade/review.tsx`) currently writes the raw
+ * form input to BOTH columns because it can't import this module.
+ *
+ * This helper makes the grading routes platform-agnostic: if processed
+ * already has the canonical shape (detected via processor_version), use
+ * it; otherwise reprocess from the raw input. Either path yields a real
+ * ProcessedConditionReport that visionGrader can consume.
+ *
+ * Returns undefined if there's nothing usable (no defects + no notes) so
+ * the result can drop straight into gradeCardConversational, which types
+ * `userConditionReport` as optional (undefined-only, not null).
+ */
+export function ensureProcessedConditionReport(
+  raw: unknown,
+  processed: unknown
+): ProcessedConditionReport | undefined {
+  // Already processed — use as-is.
+  if (
+    processed &&
+    typeof processed === 'object' &&
+    typeof (processed as any).processor_version === 'string'
+  ) {
+    return processed as ProcessedConditionReport;
+  }
+
+  // Mobile's "no defects" payload: { noDefectsConfirmed: true, cardDescription }.
+  // Treat as nothing to grade against.
+  if (
+    raw &&
+    typeof raw === 'object' &&
+    (raw as any).noDefectsConfirmed === true &&
+    !(raw as any).front
+  ) {
+    return undefined;
+  }
+
+  // Raw input from a client that didn't process — validate then process.
+  if (raw && typeof raw === 'object') {
+    const validation = validateConditionReportInput(raw);
+    if (validation.valid) {
+      return processConditionReport(raw as UserConditionReportInput);
+    }
+    console.warn('[ensureProcessedConditionReport] raw input failed validation:', validation.errors);
+  }
+
+  return undefined;
+}
+
+/**
  * Validate a condition report input (basic sanity checks)
  */
 export function validateConditionReportInput(

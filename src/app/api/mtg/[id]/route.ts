@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational } from "@/lib/visionGrader";
+import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // Scryfall API imports (for future use when ENABLE_SCRYFALL_API = true)
@@ -596,7 +597,10 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
         console.log(`[MTG CONVERSATIONAL AI v4.2] 🎯 Starting PRIMARY grading with MTG-specific prompt...`);
 
         // Check if user provided condition report hints
-        const userConditionReport = card.user_condition_processed || null;
+        const userConditionReport = ensureProcessedConditionReport(
+          card.user_condition_report,
+          card.user_condition_processed,
+        );
         if (userConditionReport) {
           console.log(`[GET /api/mtg/${cardId}] 📋 User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
         }

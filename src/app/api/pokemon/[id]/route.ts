@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational } from "@/lib/visionGrader";
+import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // SET IDENTIFICATION: Local Supabase database lookup (external Pokemon TCG API is disabled)
@@ -731,7 +732,14 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         console.log(`[POKEMON CONVERSATIONAL AI v4.2] 🎯 Starting PRIMARY grading with Pokemon-specific prompt...`);
 
         // Check if user provided condition report hints
-        const userConditionReport = card.user_condition_processed || null;
+        // Mobile clients can't run processConditionReport (it lives in
+        // src/lib), so they write raw form input to both columns.
+        // ensureProcessedConditionReport returns the canonical processed
+        // shape regardless of which client wrote the row.
+        const userConditionReport = ensureProcessedConditionReport(
+          card.user_condition_report,
+          card.user_condition_processed,
+        );
         if (userConditionReport) {
           console.log(`[GET /api/pokemon/${cardId}] 📋 User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
         }

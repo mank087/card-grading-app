@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational } from "@/lib/visionGrader";
+import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
@@ -537,7 +538,10 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
         console.log(`[YU-GI-OH CONVERSATIONAL AI v4.2] Starting PRIMARY grading with Yu-Gi-Oh-specific prompt...`);
 
         // Check if user provided condition report hints
-        const userConditionReport = card.user_condition_processed || null;
+        const userConditionReport = ensureProcessedConditionReport(
+          card.user_condition_report,
+          card.user_condition_processed,
+        );
         if (userConditionReport) {
           console.log(`[GET /api/yugioh/${cardId}] User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
         }

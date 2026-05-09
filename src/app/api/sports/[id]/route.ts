@@ -3,6 +3,7 @@ import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches other card type flows)
 import { gradeCardConversational } from "@/lib/visionGrader";
+import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
@@ -515,7 +516,13 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         console.log(`[SPORTS CONVERSATIONAL AI ${versionLabel}] 🎯 Starting PRIMARY grading with Sports-specific prompt...`);
 
         // Check if user provided condition report hints
-        const userConditionReport = card.user_condition_processed || null;
+        // Process raw input on demand if a client (mobile) couldn't
+        // run processConditionReport before insert. See
+        // src/lib/conditionReportProcessor.ts for the rationale.
+        const userConditionReport = ensureProcessedConditionReport(
+          card.user_condition_report,
+          card.user_condition_processed,
+        );
         if (userConditionReport) {
           console.log(`[GET /api/sports/${cardId}] 📋 User condition report found: ${userConditionReport.total_defects_reported || 0} defects reported`);
         }

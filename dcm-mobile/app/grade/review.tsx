@@ -128,9 +128,16 @@ export default function ReviewScreen() {
         category,
         ...(category === 'Other' && subCategory ? { sub_category: subCategory } : {}),
         visibility: 'public',
+        // Mobile writes the raw form input to user_condition_report only.
+        // The web's grading routes call ensureProcessedConditionReport()
+        // which runs sanitization + defect parsing server-side, so we
+        // intentionally leave user_condition_processed null here. (See
+        // src/lib/conditionReportProcessor.ts.) This keeps mobile a "dumb
+        // sender" — no need to port 600+ lines of security-critical
+        // sanitization into the React Native bundle.
         ...(conditionPayload ? {
           user_condition_report: conditionPayload,
-          user_condition_processed: conditionPayload,
+          user_condition_processed: null,
           has_user_condition_report: true,
         } : {}),
       })
