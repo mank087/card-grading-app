@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Ionicons } from '@expo/vector-icons'
 import * as WebBrowser from 'expo-web-browser'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
@@ -47,6 +48,7 @@ interface CardItem {
 export default function CollectionScreen() {
   const { session } = useAuth()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { labelStyle, customStyles, colorOverrides, switchStyle } = useLabelStyle()
   const [cards, setCards] = useState<CardItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -565,7 +567,7 @@ export default function CollectionScreen() {
       {/* Batch action bar — shows when at least one card is selected.
           Two buttons mirror web's "Print" + "Download" dropdowns. */}
       {selectionMode && selectedIds.size > 0 && (
-        <View style={st.batchBar}>
+        <View style={[st.batchBar, { paddingBottom: insets.bottom + 10 }]}>
           <TouchableOpacity
             style={[st.batchBtn, st.batchBtnPrint]}
             onPress={() => setBatchSheetOpen('print')}
@@ -591,7 +593,7 @@ export default function CollectionScreen() {
           Mirrors the web's two dropdowns from src/app/collection/page.tsx. */}
       <Modal visible={!!batchSheetOpen} transparent animationType="slide" onRequestClose={() => setBatchSheetOpen(null)}>
         <Pressable style={st.sheetBackdrop} onPress={() => setBatchSheetOpen(null)}>
-          <Pressable style={st.sheet} onPress={e => e.stopPropagation()}>
+          <Pressable style={[st.sheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
             <View style={st.sheetHandle} />
             <Text style={st.sheetTitle}>
               {batchSheetOpen === 'print' ? 'Print Labels' : 'Download Reports'}
@@ -667,7 +669,7 @@ export default function CollectionScreen() {
           Persists last-used start position per Avery type. */}
       <Modal visible={!!positionPicker} transparent animationType="slide" onRequestClose={() => setPositionPicker(null)}>
         <Pressable style={st.sheetBackdrop} onPress={() => setPositionPicker(null)}>
-          <Pressable style={st.sheet} onPress={e => e.stopPropagation()}>
+          <Pressable style={[st.sheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
             <View style={st.sheetHandle} />
             {positionPicker && (() => {
               const cfg = positionPicker.sheet === 'avery6871'

@@ -46,10 +46,12 @@ import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 export default function CardDetailScreen() {
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
   const router = useRouter()
+  const insets = useSafeAreaInsets()
   const { session } = useAuth()
   const { labelStyle, customStyles, colorOverrides } = useLabelStyle()
   const emblems = useUserEmblems()
@@ -464,7 +466,7 @@ export default function CardDetailScreen() {
           Full Grading Report (PDF), Mini-Report (PDF), Mini-Report Image (JPG). */}
       <Modal visible={reportSheetOpen} transparent animationType="slide" onRequestClose={() => setReportSheetOpen(false)}>
         <Pressable style={s.editBackdrop} onPress={() => setReportSheetOpen(false)}>
-          <Pressable style={[s.editSheet, { paddingBottom: 28 }]} onPress={e => e.stopPropagation()}>
+          <Pressable style={[s.editSheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
             <View style={s.editHandle} />
             <Text style={s.editTitle}>Download Reports</Text>
             <Text style={s.editSubtitle}>Same formats as web. Generated on the fly using your card's grading data.</Text>
@@ -498,7 +500,7 @@ export default function CardDetailScreen() {
       {/* Label picker bottom-sheet — mirrors the web's LABEL_TYPES gallery */}
       <Modal visible={labelSheetOpen} transparent animationType="slide" onRequestClose={() => setLabelSheetOpen(false)}>
         <Pressable style={s.editBackdrop} onPress={() => setLabelSheetOpen(false)}>
-          <Pressable style={[s.editSheet, { paddingBottom: 28 }]} onPress={e => e.stopPropagation()}>
+          <Pressable style={[s.editSheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
             <View style={s.editHandle} />
             <Text style={s.editTitle}>Download Labels & Images</Text>
             <Text style={s.editSubtitle}>Same options as web. Tap any item to generate and share.</Text>
@@ -605,7 +607,7 @@ export default function CardDetailScreen() {
       {/* Label-export modal — generation → preview with Download / Print buttons */}
       <Modal visible={!!exportTask} transparent animationType="fade" onRequestClose={() => { setExportTask(null); setExportError(null); setExportFiles([]) }}>
         <Pressable style={s.editBackdrop} onPress={() => { setExportTask(null); setExportError(null); setExportFiles([]) }}>
-          <Pressable style={[s.editSheet, { paddingVertical: 16 }]} onPress={e => e.stopPropagation()}>
+          <Pressable style={[s.editSheet, { paddingTop: 16, paddingBottom: insets.bottom + 16 }]} onPress={e => e.stopPropagation()}>
             <View style={s.editHandle} />
             {exportError ? (
               <View style={{ alignItems: 'center', paddingVertical: 8 }}>
@@ -832,7 +834,7 @@ export default function CardDetailScreen() {
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
           <Pressable style={s.editBackdrop} onPress={() => setEditOpen(false)}>
-            <Pressable style={s.editSheet} onPress={e => e.stopPropagation()}>
+            <Pressable style={[s.editSheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
               <View style={s.editHandle} />
               <Text style={s.editTitle}>Edit Card Info</Text>
               <Text style={s.editSubtitle}>Updates appear on the slab label, collection, and downloadable labels.</Text>
