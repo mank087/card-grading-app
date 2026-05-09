@@ -4,6 +4,24 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
 import { setUserId as setAnalyticsUserId } from '@/lib/analytics'
 
+// Sentry — wrapped in try/catch like everywhere else (Expo Go lacks the
+// native module). When available, tag every captured exception with the
+// Supabase user ID so crashes can be triaged per-user without PII.
+let Sentry: any = null
+try {
+  Sentry = require('@sentry/react-native')
+} catch {
+  /* Expo Go path */
+}
+function setSentryUser(userId: string | null) {
+  if (!Sentry?.setUser) return
+  try {
+    Sentry.setUser(userId ? { id: userId } : null)
+  } catch (e) {
+    if (__DEV__) console.warn('[Sentry] setUser failed:', e)
+  }
+}
+
 // App-owned cache keys cleared on sign-out so account-switching on a shared
 // device doesn't leak the previous user's collection, label preferences, or
 // queued grades. Supabase's own `sb-*-auth-token` keys are managed by its SDK
@@ -69,8 +87,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       setIsLoading(false)
       // Tag analytics with the Supabase user ID so GA4 can compute
-      // cohorts and Meta can attribute conversions to this user.
+      // cohorts and Meta can attribute conversions to this user. Same
+      // ID flows to Sentry so crash reports carry the affected user.
       setAnalyticsUserId(session?.user?.id ?? null)
+      setSentryUser(session?.user?.id ?? null)
     })
 
     // Listen for auth changes
@@ -79,6 +99,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null)
       setIsLoading(false)
       setAnalyticsUserId(session?.user?.id ?? null)
+      setSentryUser(session?.user?.id ?? null)
     })
 
     return () => subscription.unsubscribe()
