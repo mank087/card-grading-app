@@ -20,16 +20,20 @@ export interface CompressedImage {
 /**
  * Compress an image for upload.
  *
- * Resizes to max 2048px on the long edge at JPEG 0.85. The previous cap
- * was 3000px; OpenAI's vision API rescales any input to 2048px on the
- * long edge before the model sees it (see OpenAI vision docs for "high"
- * detail mode), so anything larger is wasted upload bandwidth + a longer
- * model decode step. 2048px keeps every card detail visible at full
- * model resolution while cutting payload size by ~55% vs 3000px.
+ * Resizes to max 3000px on the long edge at JPEG 0.85, matching web's
+ * src/lib/imageCompression.ts. OpenAI's vision API caps inputs at
+ * ~2048px before the model sees them, so the extra resolution does NOT
+ * affect grading. The 3000px source is preserved on Supabase for
+ * downstream uses where higher fidelity helps:
+ *   - card-detail pinch-to-zoom inspection
+ *   - label export / slab PDF rendering
+ *   - eBay listing image generation
+ *   - any future re-grading or feature work that benefits from a
+ *     better archived source than what the model originally consumed
  *
  * Handles both Android (file://) and iOS (ph://) URIs.
  */
-const MAX_LONG_EDGE = 2048
+const MAX_LONG_EDGE = 3000
 
 export async function compressImage(uri: string): Promise<CompressedImage> {
   // First get original dimensions without modifying
