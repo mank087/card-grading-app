@@ -165,6 +165,7 @@
           }
         }
       ],
+      "./plugins/with-firebase-podfile-fix",
       [
         "expo-router",
         {
