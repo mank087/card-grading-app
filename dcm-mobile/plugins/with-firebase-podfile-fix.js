@@ -1,36 +1,31 @@
 /**
- * Custom Expo config plugin — patches the iOS Podfile so the React
- * Native Firebase bridge can include React-Core's non-modular headers
- * inside framework modules (which static-framework builds reject by
- * default with -Werror).
+ * Custom Expo config plugin — adds `use_modular_headers!` near the top
+ * of the iOS Podfile so Firebase's Swift pods (FirebaseCoreInternal)
+ * can import C-header pods (GoogleUtilities) which would otherwise
+ * fail with:
  *
- * Without this, EAS iOS builds fail in the Xcode compile phase with:
- *   "include of non-modular header inside framework module
- *    'RNFBApp.RCTConvert_FIRApp'"
+ *   "The Swift pod `FirebaseCoreInternal` depends upon `GoogleUtilities`,
+ *    which does not define modules."
  *
- * Implementation: injects an `installer.pods_project.targets.each`
- * loop at the START of the existing `post_install do |installer|`
- * block. Critically: CocoaPods rejects two `post_install` blocks in
- * the same Podfile, so this plugin MUST find the existing one (added
- * by Expo's autolinking) rather than create a new one.
+ * This is one of the two CocoaPods-recommended fixes for that error
+ * (the other is `useFrameworks: 'static'`). For our combination —
+ * Expo SDK 54 + new architecture (required by Reanimated 4) +
+ * @react-native-firebase v24 — useFrameworks:'static' triggers a
+ * cascade of Xcode compile errors when RNFirebase's bridge files
+ * reference React-Core macros. `use_modular_headers!` keeps the
+ * default dynamic frameworks but forces every pod to expose its
+ * headers as a Clang module, satisfying both Firebase's Swift
+ * imports AND the new architecture's stricter module rules.
+ *
+ * This file lives at dcm-mobile/plugins/with-firebase-podfile-fix.js
+ * and is wired in app.json plugins array.
  */
 
 const { withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
 
-const INJECTED_BLOCK = `
-  # @injected by plugins/with-firebase-podfile-fix.js — required for
-  # @react-native-firebase + useFrameworks:static. See the plugin
-  # source for context.
-  installer.pods_project.targets.each do |target|
-    target.build_configurations.each do |config|
-      config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-    end
-  end
-`;
-
-const POST_INSTALL_MARKER = /post_install do \|installer\|\s*\n/;
+const DIRECTIVE = 'use_modular_headers!';
 
 module.exports = function withFirebasePodfileFix(config) {
   return withDangerousMod(config, [
@@ -40,28 +35,22 @@ module.exports = function withFirebasePodfileFix(config) {
       let contents = fs.readFileSync(podfilePath, 'utf8');
 
       // Idempotent — bail if already applied.
-      if (contents.includes('CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES')) {
+      if (contents.includes(DIRECTIVE)) {
         return config;
       }
 
-      // Inject INTO the existing post_install block. We match
-      // `post_install do |installer|` (a fixed pattern Expo always
-      // emits) and prepend our targets loop right after that line.
-      // Adding a second post_install block is unsupported by
-      // CocoaPods so we never want to create one.
-      if (POST_INSTALL_MARKER.test(contents)) {
-        contents = contents.replace(POST_INSTALL_MARKER, (match) => `${match}${INJECTED_BLOCK}`);
-        fs.writeFileSync(podfilePath, contents);
+      // Inject right after the `platform :ios, ...` line, which is the
+      // canonical location for global Podfile directives in Expo's
+      // generated Podfile. If that line isn't found (template change),
+      // fall back to inserting at the top of the file.
+      const platformLine = /^platform :ios.*$/m;
+      if (platformLine.test(contents)) {
+        contents = contents.replace(platformLine, (match) => `${match}\n${DIRECTIVE}`);
       } else {
-        // Surface a clear error rather than silently creating a
-        // second post_install (the previous failure mode).
-        throw new Error(
-          '[with-firebase-podfile-fix] Could not find a `post_install do |installer|` ' +
-          'block in the generated Podfile. The Expo template may have changed — ' +
-          'update plugins/with-firebase-podfile-fix.js to match.'
-        );
+        contents = `${DIRECTIVE}\n${contents}`;
       }
 
+      fs.writeFileSync(podfilePath, contents);
       return config;
     },
   ]);

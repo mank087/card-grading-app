@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "dcmgrading",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -157,14 +157,6 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      [
-        "expo-build-properties",
-        {
-          "ios": {
-            "useFrameworks": "static"
-          }
-        }
-      ],
       "./plugins/with-firebase-podfile-fix",
       [
         "expo-router",
