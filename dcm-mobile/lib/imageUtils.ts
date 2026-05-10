@@ -67,12 +67,22 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
 }
 
 /**
- * Crop image to match the camera guide overlay, plus 5% padding.
+ * Crop image to the card aspect ratio (2.5:3.5 portrait / 3.5:2.5 landscape),
+ * keeping as much of the captured frame as possible.
  *
- * The guide overlay is 70% of the camera view width with a card aspect ratio
- * (2.5:3.5), centered. The camera sensor captures a wider frame than what
- * the guide covers. This crops to match the guide region so background
- * behind the card is removed.
+ * Earlier versions cropped tightly to "70% (guide width) + 5% padding ×2 =
+ * 80% of the frame", on the assumption that the captured frame matched the
+ * camera preview 1:1. That assumption breaks on iOS, where the CameraView
+ * preview applies aspect-fill — the preview shows only the center band of
+ * the sensor (typically 80-90% of the sensor width). takePictureAsync then
+ * returns the FULL sensor frame, and an "80% crop of the full frame" ends
+ * up being significantly tighter than the 70% guide the user aligned the
+ * card to. Result: card appears noticeably zoomed-in vs what the user saw.
+ *
+ * Now: crop only enforces card aspect ratio without shrinking. The longer
+ * axis is preserved at 100%; the shorter axis is trimmed just enough to
+ * match the card's 2.5:3.5 ratio. The card ends up at roughly the same
+ * relative size in the captured image as it appeared in the preview.
  */
 export async function cropToCardAspect(
   uri: string,
@@ -85,24 +95,19 @@ export async function cropToCardAspect(
 
   const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
 
-  // The guide overlay is 70% of the camera view width.
-  // The camera frame maps to the full CameraView area.
-  // We crop to 70% + 5% padding = 75% of the frame, maintaining card AR.
-  const guideScale = 0.70
-  const padding = 0.05
-  const targetScale = guideScale + padding * 2 // 0.80
-
   let cropWidth: number, cropHeight: number
 
-  // Fit the card AR within the target scale of the captured frame
+  // Enforce card aspect ratio with NO scale reduction. The longer axis
+  // stays at full size; the shorter axis is whatever the longer axis ÷
+  // cardAspect demands. Centered on the original frame.
   const imgAspect = width / height
   if (imgAspect > cardAspect) {
-    // Image wider than card — height is the constraint
-    cropHeight = Math.round(height * targetScale)
+    // Image wider than card — height is full, trim sides to card AR
+    cropHeight = height
     cropWidth = Math.round(cropHeight * cardAspect)
   } else {
-    // Image taller than card — width is the constraint
-    cropWidth = Math.round(width * targetScale)
+    // Image taller than card — width is full, trim top/bottom to card AR
+    cropWidth = width
     cropHeight = Math.round(cropWidth / cardAspect)
   }
 
