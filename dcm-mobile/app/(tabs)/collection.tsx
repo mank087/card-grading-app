@@ -16,6 +16,7 @@ import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import LabelStylePicker from '@/components/labels/LabelStylePicker'
 import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
+import ExportRunner, { type ExportSource } from '@/components/exports/ExportRunner'
 
 // Star Wars was retired as a top-level category and is now an "Other" sub-category.
 const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Other']
@@ -93,6 +94,10 @@ export default function CollectionScreen() {
   //                      per page (4×20), one label per card.
   const [positionPicker, setPositionPicker] = useState<null | { type: string; sheet: 'avery6871' | 'avery8167-pairs' | 'avery8167'; format?: 'duplex' | 'foldover' }>(null)
   const [pickerStartPosition, setPickerStartPosition] = useState(0)
+  // iOS-only: drives the hidden-WebView ExportRunner that receives generated
+  // files via postMessage. Set by openBatchDownload on iOS; null on Android
+  // (which still uses WebBrowser + native download manager).
+  const [exportSource, setExportSource] = useState<ExportSource | null>(null)
 
   const enterSelectionMode = useCallback((firstId?: string) => {
     setSelectionMode(true)
@@ -282,36 +287,40 @@ export default function CollectionScreen() {
     // from the SlabLabelOptionsSheet. The web batch handler decodes it
     // and applies the colors/gradient/border to every selected card.
     if (opts?.customConfig) params.set('customConfig', opts.customConfig)
-    params.set('download', '1')
-    const url = `${API_BASE}/label-export/batch?${params.toString()}`
 
-    // iOS modal-conflict fix: openBrowserAsync is called from inside
-    // callbacks that ALSO dismiss the parent sheet (SlabLabelOptionsSheet,
-    // position picker, or batch type picker). If both happen synchronously,
-    // iOS opens the browser WHILE the modal is mid-dismiss-animation and
-    // the view-controller stack gets confused — on return from the browser
-    // the app appears frozen because there's a phantom modal layer eating
-    // touches. Deferring the open by 350ms lets the modal finish dismissing
-    // first, leaving a clean root for the browser to present from.
-    //
-    // Android doesn't have this issue (its Custom Tab plays nicely with RN
-    // Modals), so the defer is iOS-only.
-    const doOpen = async () => {
-      try {
-        await WebBrowser.openBrowserAsync(url, {
-          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-          controlsColor: Colors.purple[600],
-          toolbarColor: '#ffffff',
-        })
-      } catch (err: any) {
-        Alert.alert('Could not open download', err?.message || 'Try again.')
-      }
+    // iOS: load /label-export/batch in a hidden WebView via ExportRunner.
+    // The page detects ReactNativeWebView and posts files back as base64,
+    // which we save to the app's Documents folder (visible in Files app
+    // under "On My iPhone → DCM Grading"). The previous WebBrowser flow
+    // showed the page in SFSafariViewController where data-URL anchor
+    // downloads silently fail. The 350ms defer lets parent sheets finish
+    // dismissing before the runner modal opens.
+    if (Platform.OS === 'ios') {
+      const urlNoDownload = `${API_BASE}/label-export/batch?${params.toString()}`
+      const title = type === 'full-report' ? 'Full Reports'
+        : type === 'mini-report-pdf' ? 'Mini-Reports (PDF)'
+        : type === 'mini-report' ? 'Mini-Reports'
+        : type.startsWith('card-image') ? 'Card Images'
+        : type === 'onetouch' ? 'One-Touch Labels'
+        : type === 'toploader' ? 'Toploader Labels'
+        : type === 'foldover' ? 'Fold-Over Labels'
+        : 'Slab Labels'
+      setTimeout(() => setExportSource({ url: urlNoDownload, title }), 350)
+      return
     }
 
-    if (Platform.OS === 'ios') {
-      setTimeout(doOpen, 350)
-    } else {
-      await doOpen()
+    // Android: Chrome Custom Tab's download manager handles data-URL
+    // anchor clicks reliably, so keep the existing flow with download=1.
+    params.set('download', '1')
+    const url = `${API_BASE}/label-export/batch?${params.toString()}`
+    try {
+      await WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        controlsColor: Colors.purple[600],
+        toolbarColor: '#ffffff',
+      })
+    } catch (err: any) {
+      Alert.alert('Could not open download', err?.message || 'Try again.')
     }
   }, [session?.access_token, selectedIds])
 
@@ -824,6 +833,11 @@ export default function CollectionScreen() {
           openBatchDownload(type, { format, customConfig: customConfigB64 })
         }}
       />
+
+      {/* iOS-only: hidden-WebView export runner. The web batch page detects
+          ReactNativeWebView and posts files back as base64; we save them to
+          Documents (visible in Files app) and offer Share. */}
+      <ExportRunner source={exportSource} onClose={() => setExportSource(null)} />
     </View>
   )
 }

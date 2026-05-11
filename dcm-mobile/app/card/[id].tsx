@@ -7,24 +7,13 @@ import * as Sharing from 'expo-sharing'
 import * as WebBrowser from 'expo-web-browser'
 import { WebView } from 'react-native-webview'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { persistBase64ToCache as persistBase64, saveToDocuments, presentSaveSuccess } from '@/lib/downloads'
 
 // Optional deps — `npx expo install expo-print expo-intent-launcher` lights them up.
 let Print: any = null
 let IntentLauncher: any = null
 try { Print = require('expo-print') } catch {}
 try { IntentLauncher = require('expo-intent-launcher') } catch {}
-
-/**
- * Persist a base64 file to the cache directory and return its file:// path so we
- * can preview, print, or share it. The actual user-facing save / share happens
- * later via the dedicated buttons in the export modal.
- */
-async function persistBase64(name: string, base64: string): Promise<string> {
-  const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory
-  const path = `${dir}${name}`
-  await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' as any })
-  return path
-}
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -769,43 +758,40 @@ export default function CardDetailScreen() {
                       console.log('[Export Download] tapped — localPath:', cur.localPath, 'mime:', cur.mime)
                       setExportActionBusy('download')
                       try {
-                        if (!(await Sharing.isAvailableAsync())) {
-                          Alert.alert('Saved', `File saved at ${cur.localPath}`)
-                          return
-                        }
-                        const localPath = cur.localPath
+                        // Copy from the (private) cache into the app's Documents
+                        // folder. On iOS, Documents is exposed to the Files app
+                        // under "On My iPhone → DCM Grading" via UIFileSharingEnabled
+                        // so the user can actually find what they downloaded.
+                        const savedPath = await saveToDocuments(cur.name, cur.localPath)
                         const mime = cur.mime
                         const name = cur.name
-                        // iOS modal-over-modal gotcha: UIActivityViewController
-                        // can silently fail to present when it's invoked from
-                        // inside a transparent React Native Modal — the system
-                        // gets confused about which view controller is topmost.
-                        // Workaround: tear down our modal first, then call
-                        // Sharing.shareAsync on the next tick so the OS has a
-                        // clean root to present from.
                         if (Platform.OS === 'ios') {
+                          // Modal-over-modal gotcha: dismiss our preview modal
+                          // first so the system Alert / share sheet has a clean
+                          // root to present from.
                           setExportTask(null)
                           setExportFiles([])
                           setExportActionBusy(null)
-                          setTimeout(async () => {
-                            try {
-                              await Sharing.shareAsync(localPath, {
-                                mimeType: mime,
-                                dialogTitle: name,
-                                UTI: mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
-                              })
-                            } catch (err: any) {
-                              Alert.alert('Download failed', err?.message || 'Could not open share sheet')
-                            }
+                          setTimeout(() => {
+                            presentSaveSuccess({
+                              fileName: name,
+                              filePath: savedPath,
+                              mime,
+                              onShareError: (err: any) => Alert.alert('Share failed', err?.message || 'Could not open share sheet'),
+                            })
                           }, 350)
                           return
                         }
                         // Android — share sheet works fine from within the modal
-                        await Sharing.shareAsync(localPath, {
-                          mimeType: mime,
-                          dialogTitle: name,
-                          UTI: mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
-                        })
+                        if (await Sharing.isAvailableAsync()) {
+                          await Sharing.shareAsync(savedPath, {
+                            mimeType: mime,
+                            dialogTitle: name,
+                            UTI: mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+                          })
+                        } else {
+                          Alert.alert('Saved', `File saved at ${savedPath}`)
+                        }
                       } catch (err: any) {
                         Alert.alert('Download failed', err?.message || 'Could not save file')
                       } finally { setExportActionBusy(null) }

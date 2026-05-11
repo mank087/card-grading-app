@@ -112,7 +112,9 @@
         "NSPhotoLibraryAddOnlyUsageDescription": "DCM Grading needs permission to save downloaded labels and graded card images to your photos.",
         "NSUserTrackingUsageDescription": "We use this to measure how DCM Grading ads perform and to improve your experience. You can change this anytime in Settings.",
         "ITSAppUsesNonExemptEncryption": false,
-        "FirebaseAutomaticScreenReportingEnabled": false
+        "FirebaseAutomaticScreenReportingEnabled": false,
+        "UIFileSharingEnabled": true,
+        "LSSupportsOpeningDocumentsInPlace": true
       }
     },
     "android": {

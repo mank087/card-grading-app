@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, TextInput,
-  ActivityIndicator, useWindowDimensions, FlatList, Alert, Share,
+  ActivityIndicator, useWindowDimensions, FlatList, Alert, Share, Platform,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -33,6 +33,8 @@ import LabelBadgesPicker from '@/components/labels/LabelBadgesPicker'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
+import ExportRunner, { type ExportSource } from '@/components/exports/ExportRunner'
+import { saveToDocuments, presentSaveSuccess } from '@/lib/downloads'
 import { useSegments } from 'expo-router'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
@@ -709,6 +711,28 @@ export default function LabelStudioScreen() {
       }
     }
 
+    // iOS: load /label-export/[cardId] in a hidden WebView via ExportRunner.
+    // The page detects ReactNativeWebView and posts files back as base64,
+    // which we save to the app's Documents folder (visible in Files app
+    // under "On My iPhone → DCM Grading"). The 350ms defer covers the case
+    // where this is called from a parent sheet's onPress.
+    if (Platform.OS === 'ios') {
+      // Strip download=1 — the page would otherwise try the anchor-click
+      // path which doesn't work inside RN WebView. With it absent + the
+      // ReactNativeWebView bridge present, the page postMessages back.
+      params.delete('download')
+      const url = `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
+      const title = exportType === 'slab-custom' ? 'Custom Slab Label'
+        : exportType === 'slab' ? 'Slab Label'
+        : exportType === 'onetouch' ? 'One-Touch Label'
+        : exportType === 'toploader' ? 'Toploader Label'
+        : exportType === 'foldover' ? 'Fold-Over Label'
+        : exportType === 'card-image' ? 'Card Image'
+        : 'Label'
+      setTimeout(() => setExportSource({ url, title }), 350)
+      return
+    }
+
     const url = `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
     try {
       await WebBrowser.openBrowserAsync(url, {
@@ -727,6 +751,10 @@ export default function LabelStudioScreen() {
   // user to pick which slot on the sheet to print into; they go through
   // LabelPositionPicker first. Slab labels prompt for duplex vs foldover.
   const [galleryPositionPicker, setGalleryPositionPicker] = useState<{ exportType: string; title: string; sheet: AverySheet } | null>(null)
+  // iOS-only: drives the hidden-WebView ExportRunner. The web /label-export
+  // page detects ReactNativeWebView and posts files back as base64, so we
+  // sidestep SFSafariViewController's broken data-URL download behavior.
+  const [exportSource, setExportSource] = useState<ExportSource | null>(null)
 
   const handleGalleryDownload = useCallback((labelType: typeof LABEL_GALLERY[number]) => {
     if (!selectedCard?.id) {
@@ -790,17 +818,32 @@ export default function LabelStudioScreen() {
   }, [])
 
   // ---- Download/Share ----
+  // Locally-rendered preview download. Write to cache first, then copy into
+  // Documents (visible in Files app under "On My iPhone → DCM Grading" on
+  // iOS) and show the standard saved-location alert. Android falls through
+  // to the share sheet so users pick their own destination.
   const handleShare = useCallback(async () => {
     if (!labelPreviewUrl) return
     try {
       const base64 = labelPreviewUrl.split(',')[1]
       if (!base64) return
-      const fileUri = FileSystem.cacheDirectory + `dcm-label-${Date.now()}.png`
-      await FileSystem.writeAsStringAsync(fileUri, base64, { encoding: FileSystem.EncodingType.Base64 })
+      const fileName = `dcm-label-${Date.now()}.png`
+      const cacheUri = FileSystem.cacheDirectory + fileName
+      await FileSystem.writeAsStringAsync(cacheUri, base64, { encoding: FileSystem.EncodingType.Base64 })
+      const savedPath = await saveToDocuments(fileName, cacheUri)
+      if (Platform.OS === 'ios') {
+        presentSaveSuccess({
+          fileName,
+          filePath: savedPath,
+          mime: 'image/png',
+          onShareError: (err: any) => Alert.alert('Share failed', err?.message || 'Could not open share sheet'),
+        })
+        return
+      }
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, { mimeType: 'image/png', dialogTitle: 'Download Label' })
+        await Sharing.shareAsync(savedPath, { mimeType: 'image/png', dialogTitle: 'Download Label' })
       } else {
-        Alert.alert('Sharing not available on this device')
+        Alert.alert('Saved', `File saved at ${savedPath}`)
       }
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to share label')
@@ -866,6 +909,11 @@ export default function LabelStudioScreen() {
           openWebDownload(task.exportType, { position, position2 })
         }}
       />
+
+      {/* iOS-only hidden-WebView export runner. The web export page detects
+          ReactNativeWebView and posts files back as base64; we save to
+          Documents (visible in Files app) and offer Share. */}
+      <ExportRunner source={exportSource} onClose={() => setExportSource(null)} />
 
       <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
         {/* ============ Card Selector ============ */}
