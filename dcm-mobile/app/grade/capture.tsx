@@ -10,6 +10,7 @@ import { Colors } from '@/lib/constants'
 import { compressImage, cropToCardAspect, assessQuality, hashImage, QualityResult, CompressedImage } from '@/lib/imageUtils'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
+import { useResponsive } from '@/hooks/useResponsive'
 
 export default function CaptureScreen() {
   const router = useRouter()
@@ -20,6 +21,7 @@ export default function CaptureScreen() {
   const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front')
   const [isCapturing, setIsCapturing] = useState(false)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
+  const { isTablet } = useResponsive()
 
   // Captured images
   const [frontUri, setFrontUri] = useState<string | null>(null)
@@ -350,23 +352,28 @@ export default function CaptureScreen() {
       </View>
 
       {mode === 'camera' ? (
-        /* Camera live view */
-        <View style={styles.cameraContainer}>
-          <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
-          <View style={styles.guideContainer} pointerEvents="none">
-            <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
-              <View style={[styles.corner, styles.cornerTL]} />
-              <View style={[styles.corner, styles.cornerTR]} />
-              <View style={[styles.corner, styles.cornerBL]} />
-              <View style={[styles.corner, styles.cornerBR]} />
-              <Text style={styles.guideLabel}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
+        /* Camera live view — on tablet, center the camera + guide in a
+           ~520px-wide column so the user isn't staring at a huge stretched
+           preview and aiming at a giant guide rectangle. The black sides
+           give the cropped look intentionally. */
+        <View style={styles.cameraOuter}>
+          <View style={[styles.cameraContainer, isTablet && styles.cameraContainerTablet]}>
+            <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
+            <View style={styles.guideContainer} pointerEvents="none">
+              <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
+                <View style={[styles.corner, styles.cornerTL]} />
+                <View style={[styles.corner, styles.cornerTR]} />
+                <View style={[styles.corner, styles.cornerBL]} />
+                <View style={[styles.corner, styles.cornerBR]} />
+                <Text style={styles.guideLabel}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
+              </View>
             </View>
           </View>
         </View>
       ) : (
         /* Gallery picker view */
         <View style={styles.galleryContainer}>
-          <View style={styles.galleryCard}>
+          <View style={[styles.galleryCard, isTablet && styles.galleryCardTablet]}>
             <Ionicons name="images-outline" size={56} color={Colors.purple[400]} />
             <Text style={styles.galleryTitle}>Select {currentSide === 'front' ? 'Front' : 'Back'} Image</Text>
             <Text style={styles.gallerySubtitle}>
@@ -473,6 +480,7 @@ const styles = StyleSheet.create({
   // Gallery view
   galleryContainer: { flex: 1, backgroundColor: Colors.gray[900], padding: 24, justifyContent: 'center' },
   galleryCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 28, borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)', alignItems: 'center', gap: 12 },
+  galleryCardTablet: { width: '100%', maxWidth: 480, alignSelf: 'center' },
   galleryTitle: { fontSize: 18, fontWeight: '700', color: '#fff' },
   gallerySubtitle: { fontSize: 12, color: Colors.gray[400], textAlign: 'center' },
   galleryPickBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.purple[600], paddingHorizontal: 22, paddingVertical: 12, borderRadius: 10, marginTop: 8 },
@@ -490,7 +498,11 @@ const styles = StyleSheet.create({
   headerSide: { color: Colors.white, fontSize: 16, fontWeight: '700', letterSpacing: 1 },
 
   // Camera
-  cameraContainer: { flex: 1 },
+  // Outer wrapper provides black bars on tablet when the inner container
+  // is constrained. On phone, both layers stretch to fill.
+  cameraOuter: { flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  cameraContainer: { flex: 1, width: '100%' },
+  cameraContainerTablet: { width: '100%', maxWidth: 520 },
   camera: { flex: 1 },
 
   // Guide (absolute overlay on camera)

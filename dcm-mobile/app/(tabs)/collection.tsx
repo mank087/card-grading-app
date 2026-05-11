@@ -6,6 +6,7 @@ import { Ionicons } from '@expo/vector-icons'
 import * as WebBrowser from 'expo-web-browser'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useResponsive } from '@/hooks/useResponsive'
 import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import GradeBadge from '@/components/ui/GradeBadge'
@@ -49,6 +50,11 @@ export default function CollectionScreen() {
   const { session } = useAuth()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { width: screenWidth } = useResponsive()
+  // Target ~200px per grid item — gives 2 cols on phone, 3 on iPad
+  // portrait, 5 on iPad landscape / Pro portrait, 6 on iPad Pro 12.9
+  // landscape. Min 2 so phones never collapse to 1 column.
+  const gridColumns = Math.max(2, Math.floor(screenWidth / 200))
   const { labelStyle, customStyles, colorOverrides, switchStyle } = useLabelStyle()
   const [cards, setCards] = useState<CardItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -544,8 +550,11 @@ export default function CollectionScreen() {
         data={filteredCards}
         keyExtractor={(item) => item.id}
         renderItem={viewMode === 'list' ? renderListItem : renderGridItem}
-        numColumns={viewMode === 'grid' ? 2 : 1}
-        key={viewMode}
+        numColumns={viewMode === 'grid' ? gridColumns : 1}
+        // Key includes column count so FlatList re-mounts cleanly when
+        // the user rotates iPad / changes to/from grid view. Without this,
+        // FlatList errors out with "numColumns cannot be changed".
+        key={`${viewMode}-${gridColumns}`}
         refreshing={refreshing}
         onRefresh={onRefresh}
         removeClippedSubviews

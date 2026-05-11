@@ -13,6 +13,7 @@ import { uriToArrayBuffer } from '@/lib/imageUtils'
 import { ConditionReportData, EMPTY_REPORT, SURFACE_LABELS, CORNER_LABELS, EDGE_LABELS, STRUCTURAL_LABELS, FACTORY_LABELS, countDefects } from '@/lib/conditionReport'
 import Button from '@/components/ui/Button'
 import { trackGradeStarted } from '@/lib/analytics'
+import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
@@ -232,6 +233,7 @@ export default function ReviewScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ResponsiveContainer maxWidth={720}>
       {/* Progress Steps */}
       <View style={styles.progressBar}>
         {[1, 2, 3].map(s => (
@@ -417,6 +419,7 @@ export default function ReviewScreen() {
           />
         </View>
       )}
+      </ResponsiveContainer>
     </ScrollView>
   )
 }

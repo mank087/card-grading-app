@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import Button from '@/components/ui/Button'
 import BenefitCarousel from '@/components/BenefitCarousel'
 import { trackGradeCompleted } from '@/lib/analytics'
+import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
 const CATEGORY_ROUTES: Record<string, string> = {
   Sports: 'sports', Pokemon: 'pokemon', MTG: 'mtg',
@@ -198,6 +199,7 @@ export default function ProcessingScreen() {
         if (isComplete) scrollRef.current?.scrollToEnd({ animated: true })
       }}
     >
+      <ResponsiveContainer maxWidth={720}>
       {/* Cycling DCM benefits — fills the dead space at the top of the
           screen during the long-running grading wait. Replaces the old
           static "Grading" Stack header. */}
@@ -300,6 +302,7 @@ export default function ProcessingScreen() {
           <Button title="Grade Another Card" variant="secondary" onPress={handleGradeAnother} style={{ marginTop: 8 }} />
         </View>
       )}
+      </ResponsiveContainer>
     </ScrollView>
   )
 }

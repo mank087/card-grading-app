@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
+import { useResponsive } from '@/hooks/useResponsive'
 
 const { width: W, height: H } = Dimensions.get('window')
 
@@ -99,6 +100,7 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   const [activeIndex, setActiveIndex] = useState(0)
   const flatListRef = useRef<FlatList>(null)
   const insets = useSafeAreaInsets()
+  const { isTablet } = useResponsive()
 
   // Auto-scroll animations for Panel 1
   const row1Anim = useRef(new Animated.Value(0)).current
@@ -148,36 +150,43 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   }).current
 
   const renderPanel = ({ item, index }: { item: typeof PANELS[0]; index: number }) => {
+    // Tablet: constrain panel content to a centered ~640px column so
+    // illustrations + copy don't stretch silly-wide on iPad. Background
+    // stays #0f0a1a so the empty side-area looks intentional. Panel
+    // itself still spans full width so swipe gestures work edge-to-edge.
+    const innerStyle = isTablet ? st.panelInnerTablet : st.panelInner
     return (
       <View style={st.panel}>
-        {/* Visual area — top ~55% */}
-        <View style={st.visualArea}>
-          {index === 0 && <ScrollingCardsVisual row1Anim={row1Anim} row2Anim={row2Anim} />}
-          {index === 1 && <SlabCollageVisual />}
-          {index === 2 && <LabelStudioVisual />}
-          {index === 3 && <ChartVisual />}
-          {index === 4 && <EbayInstaListVisual scrollAnim={ebayAnim} />}
+        <View style={innerStyle}>
+          {/* Visual area — top ~55% */}
+          <View style={st.visualArea}>
+            {index === 0 && <ScrollingCardsVisual row1Anim={row1Anim} row2Anim={row2Anim} />}
+            {index === 1 && <SlabCollageVisual />}
+            {index === 2 && <LabelStudioVisual />}
+            {index === 3 && <ChartVisual />}
+            {index === 4 && <EbayInstaListVisual scrollAnim={ebayAnim} />}
 
-          {/* Gradient fade to dark */}
-          <LinearGradient colors={['transparent', '#0f0a1a']} style={st.gradientFade} />
-        </View>
-
-        {/* Content — bottom */}
-        <View style={st.contentArea}>
-          <View style={st.iconCircle}>
-            {item.id === '1' ? (
-              <Image
-                source={require('@/assets/images/dcm-logo.png')}
-                style={{ width: 32, height: 32 }}
-                resizeMode="contain"
-                tintColor="#fff"
-              />
-            ) : (
-              <Ionicons name={item.icon} size={28} color={Colors.purple[600]} />
-            )}
+            {/* Gradient fade to dark */}
+            <LinearGradient colors={['transparent', '#0f0a1a']} style={st.gradientFade} />
           </View>
-          <Text style={st.headline}>{item.headline}</Text>
-          <Text style={st.subtitle}>{item.subtitle}</Text>
+
+          {/* Content — bottom */}
+          <View style={st.contentArea}>
+            <View style={st.iconCircle}>
+              {item.id === '1' ? (
+                <Image
+                  source={require('@/assets/images/dcm-logo.png')}
+                  style={{ width: 32, height: 32 }}
+                  resizeMode="contain"
+                  tintColor="#fff"
+                />
+              ) : (
+                <Ionicons name={item.icon} size={28} color={Colors.purple[600]} />
+              )}
+            </View>
+            <Text style={st.headline}>{item.headline}</Text>
+            <Text style={st.subtitle}>{item.subtitle}</Text>
+          </View>
         </View>
       </View>
     )
@@ -233,8 +242,9 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
 
       {/* Bottom: dots + buttons. paddingBottom uses the device's safe-area
           inset so the Sign In link doesn't sit underneath the home
-          indicator / Android nav buttons. */}
-      <View style={[st.bottomArea, { paddingBottom: Math.max(insets.bottom + 8, 32) }]}>
+          indicator / Android nav buttons. On tablet, constrained to the
+          same 640px column as the panel content above. */}
+      <View style={[st.bottomArea, isTablet && st.bottomAreaTablet, { paddingBottom: Math.max(insets.bottom + 8, 32) }]}>
         <View style={st.dots}>
           {PANELS.map((_, i) => (
             <View key={i} style={[st.dot, i === activeIndex && st.dotActive]} />
@@ -461,6 +471,9 @@ const st = StyleSheet.create({
   arrowRight: { right: 6 },
 
   panel: { width: W, flex: 1 },
+  // Inner wrapper — full-bleed on phone, constrained-and-centered on tablet.
+  panelInner: { flex: 1, width: '100%' },
+  panelInnerTablet: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center' },
   visualArea: { flex: 0.55, overflow: 'hidden', position: 'relative' },
   gradientFade: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 120 },
   contentArea: { flex: 0.45, alignItems: 'center', paddingHorizontal: 28, paddingTop: 4 },
@@ -470,6 +483,7 @@ const st = StyleSheet.create({
   subtitle: { fontSize: 13, color: Colors.gray[400], textAlign: 'center', lineHeight: 19 },
 
   bottomArea: { paddingHorizontal: 24, paddingBottom: 32 },
+  bottomAreaTablet: { width: '100%', maxWidth: 640, alignSelf: 'center' },
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, marginBottom: 20 },
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.gray[600] },
   dotActive: { width: 24, borderRadius: 4, backgroundColor: Colors.purple[600] },
