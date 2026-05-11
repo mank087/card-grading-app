@@ -22,7 +22,7 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { EmblemsProvider } from '@/contexts/EmblemsContext'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
-import { WelcomeTourProvider } from '@/contexts/WelcomeTourContext'
+import { WelcomeTourProvider, useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import WelcomeTour from '@/components/onboarding/WelcomeTour'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
@@ -179,9 +179,15 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 //   - Auth screens ((auth)/*) — user isn't signed in, can't open a
 //     ticket or get personalized help anyway
 //   - Onboarding carousel (no segment, AuthGate intercepts) — see AuthGate
+//   - Active welcome tour — its tooltip card sits in the bottom-right
+//     corner area too; the FAB's Android elevation can stack above the
+//     card and the "Next" button gets covered. Also a distraction
+//     during a guided walkthrough.
 function ConditionalHelpBot() {
   const segments = useSegments()
+  const tour = useWelcomeTour()
   const top = segments[0]
+  if (tour.active) return null
   if (top === 'pages' || top === 'grade' || top === '(auth)') return null
   // (tabs)/grade — hide while in the grade tab too
   if (top === '(tabs)' && segments[1] === 'grade') return null
