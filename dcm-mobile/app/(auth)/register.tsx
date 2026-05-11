@@ -315,6 +315,29 @@ export default function RegisterScreen() {
             style={{ marginTop: 8 }}
           />
 
+          {/* Legal acknowledgment — soft App Store privacy requirement.
+              Apple recommends explicit acknowledgment at sign-up that
+              users have access to the Terms + Privacy Policy. Links
+              open the in-app WebView routes that wrap the public web
+              pages. */}
+          <Text style={styles.legalText}>
+            By creating an account, you agree to our{' '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push('/pages/terms' as any)}
+            >
+              Terms and Conditions
+            </Text>
+            {' '}and{' '}
+            <Text
+              style={styles.legalLink}
+              onPress={() => router.push('/pages/privacy' as any)}
+            >
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+
           <View style={styles.footer}>
             <Text style={styles.footerText}>Already have an account? </Text>
             <Link href="/(auth)/login" style={styles.footerLink}>
@@ -412,4 +435,6 @@ const styles = StyleSheet.create({
   footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 20 },
   footerText: { color: Colors.gray[500], fontSize: 14 },
   footerLink: { color: Colors.purple[600], fontWeight: '600', fontSize: 14 },
+  legalText: { color: Colors.gray[500], fontSize: 12, lineHeight: 17, textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
+  legalLink: { color: Colors.purple[600], fontWeight: '600', textDecorationLine: 'underline' },
 })
