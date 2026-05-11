@@ -362,7 +362,7 @@ export default function LabelExportPage() {
             overallSummary: card.conversational_final_grade_summary || undefined,
             generatedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
             reportId: card.id.substring(0, 8).toUpperCase(),
-          } as any;
+          };
 
           const pdfBlob = await pdf(<CardGradingReport cardData={reportCardData} />).toBlob();
           blobs.push({ name: `DCM-Report-${namePrefix}-${card.serial}.pdf`, mime: 'application/pdf', dataUrl: await blobToDataUrl(pdfBlob) });

@@ -257,7 +257,7 @@ function BatchLabelExportInner() {
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
-          })) as any[];
+          }));
           const blob = format === 'foldover'
             ? await generateBatchFoldOverSlabLabels(slabPayloads, slabStyle)
             : await generateBatchSlabLabels(slabPayloads, slabStyle);
@@ -298,7 +298,7 @@ function BatchLabelExportInner() {
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
-          })) as any[];
+          }));
           const blob = format === 'foldover'
             ? await generateBatchFoldOverCustomLabels(slabPayloads, config)
             : await generateBatchCustomSlabLabels(slabPayloads, config);
@@ -577,7 +577,7 @@ function BatchLabelExportInner() {
               overallSummary: card.conversational_final_grade_summary || undefined,
               generatedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
               reportId: card.id.substring(0, 8).toUpperCase(),
-            } as any);
+            });
           }
           setStatus(`Rendering ${cardIds.length}-card PDF…`);
           const blob = await pdf(<BatchCardGradingReport cardDataArray={reportCards} />).toBlob();
@@ -615,7 +615,7 @@ function BatchLabelExportInner() {
               showFounderEmblem,
               showVipEmblem,
               showCardLoversEmblem,
-            } as any;
+            };
             const { front, back } = await generateCardImages(imageData);
             blobs.push({ name: `DCM-CardImage-${namePrefix}-front.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(front) });
             blobs.push({ name: `DCM-CardImage-${namePrefix}-back.jpg`, mime: 'image/jpeg', dataUrl: await blobToDataUrl(back) });
