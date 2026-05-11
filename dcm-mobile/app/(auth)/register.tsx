@@ -315,13 +315,21 @@ export default function RegisterScreen() {
             style={{ marginTop: 8 }}
           />
 
-          {/* Legal acknowledgment — soft App Store privacy requirement.
-              Apple recommends explicit acknowledgment at sign-up that
-              users have access to the Terms + Privacy Policy. Links
-              open the in-app WebView routes that wrap the public web
-              pages. */}
+          <View style={styles.footer}>
+            <Text style={styles.footerText}>Already have an account? </Text>
+            <Link href="/(auth)/login" style={styles.footerLink}>
+              Sign In
+            </Link>
+          </View>
+
+          {/* Legal acknowledgment at the very bottom so it applies to
+              every sign-up method above (Apple, Google, and email).
+              Soft App Store privacy requirement — Apple recommends
+              explicit acknowledgment of Terms + Privacy at sign-up.
+              Links open the in-app WebView routes that wrap the
+              public web pages. */}
           <Text style={styles.legalText}>
-            By creating an account, you agree to our{' '}
+            By signing up with Apple, Google, or email, you agree to our{' '}
             <Text
               style={styles.legalLink}
               onPress={() => router.push('/pages/terms' as any)}
@@ -337,13 +345,6 @@ export default function RegisterScreen() {
             </Text>
             .
           </Text>
-
-          <View style={styles.footer}>
-            <Text style={styles.footerText}>Already have an account? </Text>
-            <Link href="/(auth)/login" style={styles.footerLink}>
-              Sign In
-            </Link>
-          </View>
         </View>
         </ResponsiveContainer>
       </ScrollView>
