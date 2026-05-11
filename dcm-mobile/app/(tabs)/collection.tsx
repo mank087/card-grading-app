@@ -1,4 +1,4 @@
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Modal, Pressable, Alert } from 'react-native'
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Modal, Pressable, Alert, Platform } from 'react-native'
 import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useEffect, useState, useCallback, useMemo } from 'react'
@@ -284,14 +284,34 @@ export default function CollectionScreen() {
     if (opts?.customConfig) params.set('customConfig', opts.customConfig)
     params.set('download', '1')
     const url = `${API_BASE}/label-export/batch?${params.toString()}`
-    try {
-      await WebBrowser.openBrowserAsync(url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        controlsColor: Colors.purple[600],
-        toolbarColor: '#ffffff',
-      })
-    } catch (err: any) {
-      Alert.alert('Could not open download', err?.message || 'Try again.')
+
+    // iOS modal-conflict fix: openBrowserAsync is called from inside
+    // callbacks that ALSO dismiss the parent sheet (SlabLabelOptionsSheet,
+    // position picker, or batch type picker). If both happen synchronously,
+    // iOS opens the browser WHILE the modal is mid-dismiss-animation and
+    // the view-controller stack gets confused — on return from the browser
+    // the app appears frozen because there's a phantom modal layer eating
+    // touches. Deferring the open by 350ms lets the modal finish dismissing
+    // first, leaving a clean root for the browser to present from.
+    //
+    // Android doesn't have this issue (its Custom Tab plays nicely with RN
+    // Modals), so the defer is iOS-only.
+    const doOpen = async () => {
+      try {
+        await WebBrowser.openBrowserAsync(url, {
+          presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+          controlsColor: Colors.purple[600],
+          toolbarColor: '#ffffff',
+        })
+      } catch (err: any) {
+        Alert.alert('Could not open download', err?.message || 'Try again.')
+      }
+    }
+
+    if (Platform.OS === 'ios') {
+      setTimeout(doOpen, 350)
+    } else {
+      await doOpen()
     }
   }, [session?.access_token, selectedIds])
 
