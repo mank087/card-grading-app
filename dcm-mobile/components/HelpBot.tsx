@@ -34,6 +34,8 @@ const KB: KBEntry[] = [
   { id: '13', q: 'What is the confidence score?', a: 'The confidence score (A/B/C/D) reflects image quality. A = excellent visibility, D = poor. Low confidence increases grade uncertainty but does NOT lower the grade itself.', keywords: ['confidence', 'score', 'image quality', 'A B C D'], cat: 'grading' },
   { id: '14', q: 'What is Card Lovers?', a: 'Card Lovers is a subscription plan ($49.99/mo or $449/yr) that includes credits, 20% off purchases, market pricing access, and exclusive features.', keywords: ['card lovers', 'subscription', 'monthly'], cat: 'pricing' },
   { id: '15', q: 'How do I contact support?', a: 'Go to Menu > Contact Us, or email admin@dcmgrading.com directly. We respond within 24 hours.', keywords: ['contact', 'support', 'help', 'email'], cat: 'account' },
+  { id: '16', q: "I'm new to DCM. How do I get started?", a: "Welcome! 👋 Tap Grade at the bottom of the screen to grade your first card. Pick your card's category, snap photos of the front and back, and DCM Optic™ does the rest in under 2 minutes. Want a guided walkthrough? Open Account → tap Replay Welcome Tour.", keywords: ['new', 'start', 'getting started', 'how to', 'first', 'begin', 'tutorial'], cat: 'account' },
+  { id: '17', q: 'How do I see the welcome tour again?', a: "You can replay the full welcome tour anytime — open the Account tab and tap Replay Welcome Tour at the top of the menu. We'll walk you through each main screen again.", keywords: ['welcome', 'tour', 'walkthrough', 'replay', 'again', 'onboarding'], cat: 'account' },
 ]
 
 function searchKB(query: string): KBEntry[] {

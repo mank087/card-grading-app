@@ -5,6 +5,7 @@ import Constants from 'expo-constants'
 import { Colors } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
+import { useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import { purchaseCredits } from '@/lib/stripe'
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0'
@@ -50,6 +51,7 @@ export default function AccountScreen() {
   const router = useRouter()
   const { user, signOut } = useAuth()
   const { balance } = useCredits()
+  const { start: startWelcomeTour } = useWelcomeTour()
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -79,6 +81,17 @@ export default function AccountScreen() {
           </View>
         </View>
       </View>
+
+      {/* Welcome tour — visible at the top so users can revisit anytime
+          they want a refresher on what each tab does. */}
+      <MenuSection title="Getting Started">
+        <MenuItem
+          icon="play"
+          label="Replay Welcome Tour"
+          onPress={startWelcomeTour}
+          color={Colors.purple[600]}
+        />
+      </MenuSection>
 
       {/* Grading */}
       <MenuSection title="Grading">
