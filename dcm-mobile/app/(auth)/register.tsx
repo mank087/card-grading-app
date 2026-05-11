@@ -13,6 +13,7 @@ import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Crypto from 'expo-crypto'
 import { Linking } from 'react-native'
 import { trackSignUp } from '@/lib/analytics'
+import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -221,6 +222,7 @@ export default function RegisterScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ResponsiveContainer maxWidth={480}>
         <View style={styles.header}>
           <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Create Account</Text>
@@ -320,6 +322,7 @@ export default function RegisterScreen() {
             </Link>
           </View>
         </View>
+        </ResponsiveContainer>
       </ScrollView>
     </KeyboardAvoidingView>
   )

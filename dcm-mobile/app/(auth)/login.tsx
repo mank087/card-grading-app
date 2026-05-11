@@ -13,6 +13,7 @@ import { makeRedirectUri } from 'expo-auth-session'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Crypto from 'expo-crypto'
 import { trackLogin } from '@/lib/analytics'
+import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
 WebBrowser.maybeCompleteAuthSession()
 
@@ -191,6 +192,7 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ResponsiveContainer maxWidth={480}>
         <View style={styles.header}>
           <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>Dynamic Collectibles Management</Text>
@@ -309,6 +311,7 @@ export default function LoginScreen() {
             </Link>
           </View>
         </View>
+        </ResponsiveContainer>
       </ScrollView>
     </KeyboardAvoidingView>
   )

@@ -20,6 +20,7 @@ import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
 import { Colors } from '@/lib/constants'
 import Button from '@/components/ui/Button'
+import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
 const WEB_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
@@ -51,6 +52,7 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <ResponsiveContainer maxWidth={480}>
         <View style={styles.header}>
           <Image source={require('@/assets/images/dcm-logo.png')} style={styles.logo} resizeMode="contain" />
           <Text style={styles.title}>DCM Grading</Text>
@@ -126,6 +128,7 @@ export default function ForgotPasswordScreen() {
         <Text style={styles.help}>
           Need help? <Text style={styles.helpLink} onPress={() => {/* could open mailto */}}>Contact support</Text>
         </Text>
+        </ResponsiveContainer>
       </ScrollView>
     </KeyboardAvoidingView>
   )
