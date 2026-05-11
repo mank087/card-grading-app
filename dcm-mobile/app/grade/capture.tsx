@@ -150,23 +150,11 @@ export default function CaptureScreen() {
     }
   }
 
-  if (!permission) return <View style={styles.container} />
-
-  if (!permission.granted) {
-    return (
-      <View style={styles.permissionContainer}>
-        <Ionicons name="camera-outline" size={64} color={Colors.gray[400]} />
-        <Text style={styles.permissionTitle}>Camera Access Required</Text>
-        <Text style={styles.permissionText}>We need camera access to photograph your card for grading.</Text>
-        <Button title="Grant Camera Access" onPress={requestPermission} />
-      </View>
-    )
-  }
-
   // When the camera initializes, query supported picture sizes and pick the
   // largest by total pixel count. Sizes come back as strings like "1920x1080"
   // or "3840x2160"; we parse, rank, and apply. Silently no-op if the device
   // returns an empty list (rare — has happened on some older Androids).
+  // Defined before early returns to keep hook order stable across renders.
   const handleCameraReady = useCallback(async () => {
     if (!cameraRef.current || pictureSize) return
     try {
@@ -185,6 +173,19 @@ export default function CaptureScreen() {
       // just at the camera's stock resolution.
     }
   }, [pictureSize])
+
+  if (!permission) return <View style={styles.container} />
+
+  if (!permission.granted) {
+    return (
+      <View style={styles.permissionContainer}>
+        <Ionicons name="camera-outline" size={64} color={Colors.gray[400]} />
+        <Text style={styles.permissionTitle}>Camera Access Required</Text>
+        <Text style={styles.permissionText}>We need camera access to photograph your card for grading.</Text>
+        <Button title="Grant Camera Access" onPress={requestPermission} />
+      </View>
+    )
+  }
 
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing) return
