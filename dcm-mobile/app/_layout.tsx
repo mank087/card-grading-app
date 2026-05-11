@@ -22,6 +22,8 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { EmblemsProvider } from '@/contexts/EmblemsContext'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
+import { WelcomeTourProvider } from '@/contexts/WelcomeTourContext'
+import WelcomeTour from '@/components/onboarding/WelcomeTour'
 import { useGradingPoller } from '@/hooks/useGradingPoller'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
@@ -266,6 +268,7 @@ export default function RootLayout() {
       <CreditsProvider>
         <EmblemsProvider>
         <GradingQueueProvider>
+        <WelcomeTourProvider>
           <GradingPollerHost />
           <ATTPromptHost />
           <ScreenViewTracker />
@@ -297,7 +300,13 @@ export default function RootLayout() {
             />
           </Stack>
           <ConditionalHelpBot />
+          {/* Welcome tour overlay — visibility controlled by
+              WelcomeTourContext. Sits above all routes so it can render
+              the intro / completion panels and the per-step tooltip
+              card on whichever tab the tour is currently navigating. */}
+          <WelcomeTour />
         </AuthGate>
+        </WelcomeTourProvider>
         </GradingQueueProvider>
         </EmblemsProvider>
       </CreditsProvider>
