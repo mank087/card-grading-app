@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import LabelStylePicker from '@/components/labels/LabelStylePicker'
+import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
 
 // Star Wars was retired as a top-level category and is now an "Other" sub-category.
 const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Other']
@@ -74,6 +75,11 @@ export default function CollectionScreen() {
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [batchSheetOpen, setBatchSheetOpen] = useState<null | 'print' | 'reports'>(null)
+  // Batch slab label options sheet — opened when user picks the single
+  // "Graded Slab Label" entry from the batch print menu. Mirrors the
+  // single-card flow from card/[id].tsx so style + format selection
+  // works the same way for one card or many.
+  const [slabOptionsOpen, setSlabOptionsOpen] = useState(false)
   // Avery sheet variants:
   //   avery6871        — one-touch (Avery 6871) — 18 labels per page (3×6),
   //                      one label per card.
@@ -246,7 +252,7 @@ export default function CollectionScreen() {
   // download manager).
   const openBatchDownload = useCallback(async (
     type: string,
-    opts?: { format?: 'duplex' | 'foldover'; positions?: number[] }
+    opts?: { format?: 'duplex' | 'foldover'; positions?: number[]; customConfig?: string }
   ) => {
     if (!session?.access_token) { Alert.alert('Not signed in'); return }
     if (selectedIds.size === 0) { Alert.alert('Select cards first'); return }
@@ -271,6 +277,11 @@ export default function CollectionScreen() {
     params.set('type', type)
     if (opts?.format) params.set('format', opts.format)
     if (opts?.positions && opts.positions.length > 0) params.set('positions', opts.positions.join(','))
+    // customConfig is a base64 JSON CustomLabelConfig — only set for
+    // type='slab-custom' when the user picked a specific custom-N style
+    // from the SlabLabelOptionsSheet. The web batch handler decodes it
+    // and applies the colors/gradient/border to every selected card.
+    if (opts?.customConfig) params.set('customConfig', opts.customConfig)
     params.set('download', '1')
     const url = `${API_BASE}/label-export/batch?${params.toString()}`
     try {
@@ -615,6 +626,13 @@ export default function CollectionScreen() {
                   style={st.sheetItem}
                   onPress={() => {
                     setBatchSheetOpen(null)
+                    // Slab label: hand off to the unified options sheet
+                    // (style + format in one step). Same UX as the
+                    // single-card flow.
+                    if (item.opensSlabOptions) {
+                      setSlabOptionsOpen(true)
+                      return
+                    }
                     // Avery types prompt for starting position first
                     if (item.id === 'onetouch') {
                       setPositionPicker({ type: item.id, sheet: 'avery6871' })
@@ -631,15 +649,6 @@ export default function CollectionScreen() {
                       // Foldover = 80 single labels per page
                       setPositionPicker({ type: item.id, sheet: 'avery8167' })
                       AsyncStorage.getItem('dcm_avery8167_last_pos').then(p => setPickerStartPosition(p ? parseInt(p, 10) || 0 : 0))
-                      return
-                    }
-                    // Slab labels prompt for duplex vs foldover
-                    if (item.needsFormat) {
-                      Alert.alert(item.name, 'Choose print format', [
-                        { text: 'Cancel', style: 'cancel' },
-                        { text: 'Duplex (front+back)', onPress: () => openBatchDownload(item.id, { format: 'duplex' }) },
-                        { text: 'Fold-Over', onPress: () => openBatchDownload(item.id, { format: 'foldover' }) },
-                      ])
                       return
                     }
                     openBatchDownload(item.id)
@@ -760,17 +769,52 @@ export default function CollectionScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Batch slab label options — style (Modern / Traditional / Custom)
+          + format (Duplex / Fold-Over) applied to every selected card.
+          Same component used on the single-card flow in card/[id].tsx;
+          here it routes through openBatchDownload with customConfig
+          base64-encoded if the user picks a saved custom-N. */}
+      <SlabLabelOptionsSheet
+        visible={slabOptionsOpen}
+        onClose={() => setSlabOptionsOpen(false)}
+        customStyles={customStyles}
+        defaultStyleId={labelStyle}
+        onGenerate={(type, format, customLabelStyleId) => {
+          let customConfigB64: string | undefined
+          if (type === 'slab-custom' && customLabelStyleId) {
+            // Resolve the picked custom-N to its saved config and
+            // base64-encode for the customConfig URL param. The web
+            // batch handler decodes it via atob and applies to every
+            // selected card.
+            const cs = customStyles.find(s => s.id === customLabelStyleId)
+            if (cs?.config) {
+              try {
+                const json = JSON.stringify(cs.config)
+                // btoa is polyfilled in React Native (0.74+); falls back
+                // to Buffer.from if anything goes wrong.
+                customConfigB64 = typeof btoa === 'function'
+                  ? btoa(unescape(encodeURIComponent(json)))
+                  : Buffer.from(json, 'utf-8').toString('base64')
+              } catch (e) {
+                console.warn('[BatchSlab] failed to encode customConfig:', e)
+              }
+            }
+          }
+          openBatchDownload(type, { format, customConfig: customConfigB64 })
+        }}
+      />
     </View>
   )
 }
 
 // Batch print types — mirror web's collection page Print dropdown
-// (src/app/collection/page.tsx). Slab variants prompt for format; Avery
-// variants prompt for sheet starting position.
-const BATCH_PRINT_TYPES: Array<{ id: string; name: string; desc: string; icon: string; needsFormat?: boolean }> = [
-  { id: 'slab-modern',         name: 'Graded Slab — Modern',      desc: 'Dark gradient label PDF (2.8" × 0.8")', icon: 'card', needsFormat: true },
-  { id: 'slab-traditional',    name: 'Graded Slab — Traditional', desc: 'Light/white classic slab label PDF', icon: 'card-outline', needsFormat: true },
-  { id: 'slab-custom',         name: 'Graded Slab — Custom',      desc: 'Use your saved custom label style', icon: 'color-palette', needsFormat: true },
+// (src/app/collection/page.tsx). The single "Graded Slab Label" entry
+// opens SlabLabelOptionsSheet for style + format selection (same UX
+// as the single-card flow on card/[id].tsx); Avery variants prompt
+// for sheet starting position; card-image variants are direct.
+const BATCH_PRINT_TYPES: Array<{ id: string; name: string; desc: string; icon: string; opensSlabOptions?: boolean }> = [
+  { id: 'slab-options',        name: 'Graded Slab Label',         desc: 'Pick style + format (Modern / Traditional / Custom · Duplex / Fold-Over)', icon: 'card', opensSlabOptions: true },
   { id: 'onetouch',            name: 'Magnetic One-Touch',        desc: 'Avery 6871 — pick starting position', icon: 'magnet' },
   { id: 'toploader',           name: 'Toploader Front + Back',    desc: 'Avery 8167 — pick starting position', icon: 'copy' },
   { id: 'foldover',            name: 'Fold-Over Toploader',       desc: 'Avery 8167 fold-over — pick start position', icon: 'reader' },
