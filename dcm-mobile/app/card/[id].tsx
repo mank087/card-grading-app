@@ -44,6 +44,7 @@ import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
 import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/onboarding/OnboardingTour'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
+import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -190,8 +191,13 @@ export default function CardDetailScreen() {
   // Label export state — opens a hidden WebView that runs the canvas/PDF generators on the web
   // and posts back base64 files; mobile then previews them with explicit Download/Print buttons.
   const [labelSheetOpen, setLabelSheetOpen] = useState(false)
+  // Mirrors web's BatchSlabLabelModal — single dialog where the user
+  // picks Modern / Traditional / any custom-N style AND duplex vs
+  // fold-over format in one step. Replaces the older three-separate-
+  // entries + Alert.alert pattern.
+  const [slabOptionsOpen, setSlabOptionsOpen] = useState(false)
   const [reportSheetOpen, setReportSheetOpen] = useState(false)
-  const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover'; title?: string; position?: number; position2?: number } | null>(null)
+  const [exportTask, setExportTask] = useState<{ type: string; format?: 'duplex' | 'foldover'; title?: string; position?: number; position2?: number; labelStyle?: string } | null>(null)
   const [positionPicker, setPositionPicker] = useState<{ type: string; title: string; sheet: AverySheet } | null>(null)
   const [exportError, setExportError] = useState<string | null>(null)
   const [exportStatus, setExportStatus] = useState<string>('')
@@ -223,7 +229,7 @@ export default function CardDetailScreen() {
   // reliably without the data-URL size issues iOS has.
   const openWebDownload = useCallback(async (
     exportType: string,
-    opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number; title?: string }
+    opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number; title?: string; labelStyle?: string }
   ) => {
     if (!card?.id || !session?.access_token) return
 
@@ -234,6 +240,7 @@ export default function CardDetailScreen() {
         position: opts?.position,
         position2: opts?.position2,
         title: opts?.title,
+        labelStyle: opts?.labelStyle,
       })
       return
     }
@@ -243,7 +250,10 @@ export default function CardDetailScreen() {
     params.set('token', session.access_token)
     params.set('type', exportType)
     if (opts?.format) params.set('format', opts.format)
-    params.set('labelStyle', labelStyle || 'modern')
+    // opts.labelStyle wins over the user's global preference — used by
+    // the SlabLabelOptionsSheet so users can pick any custom-N just for
+    // this download without changing their saved default.
+    params.set('labelStyle', opts?.labelStyle || labelStyle || 'modern')
     if (opts?.position != null) params.set('position', String(opts.position))
     if (opts?.position2 != null) params.set('position2', String(opts.position2))
     params.set('download', '1')
@@ -548,30 +558,20 @@ export default function CardDetailScreen() {
             <Text style={s.editSubtitle}>Same options as web. Tap any item to generate and share.</Text>
             <ScrollView style={{ maxHeight: 480 }}>
               {(() => {
-                const activeCustom = labelStyle && labelStyle.startsWith('custom-')
-                  ? customStyles.find(s => s.id === labelStyle)
-                  : null
-                const items: Array<{ id: string; name: string; desc: string; icon: string; needsFormat?: boolean }> = []
-                // Show the user's active custom slab first when they have one selected
-                if (activeCustom) {
-                  items.push({
-                    id: 'slab-custom',
-                    name: `Graded Slab — ${activeCustom.name}`,
-                    desc: 'Custom slab label PDF using the style currently selected on your card details page.',
-                    icon: 'color-palette',
-                    needsFormat: true,
-                  })
-                }
-                items.push(
-                  { id: 'slab-modern', name: 'Graded Slab — Modern', desc: 'Dark-gradient slab label PDF (2.8" × 0.8")', icon: 'card', needsFormat: true },
-                  { id: 'slab-traditional', name: 'Graded Slab — Traditional', desc: 'Light/white classic slab label PDF', icon: 'card-outline', needsFormat: true },
+                // ONE consolidated slab entry — tapping it opens the
+                // SlabLabelOptionsSheet which exposes every style
+                // (Modern / Traditional / each saved custom-N) and
+                // both formats (Duplex / Fold-Over). Mirrors web's
+                // single "Label for Graded Slab" menu item.
+                const items: Array<{ id: string; name: string; desc: string; icon: string; opensSlabOptions?: boolean }> = [
+                  { id: 'slab-options', name: 'Graded Slab Label', desc: 'Pick style + format (Modern / Traditional / Custom · Duplex / Fold-Over)', icon: 'card', opensSlabOptions: true },
                   { id: 'onetouch', name: 'Magnetic One-Touch', desc: 'Avery 6871 PDF for magnetic cases', icon: 'magnet' },
                   { id: 'toploader', name: 'Toploader Front+Back', desc: 'Avery 8167 — front grade + back QR', icon: 'copy' },
                   { id: 'foldover', name: 'Fold-Over Toploader', desc: 'Avery 8167 — single label, fold over tab', icon: 'reader' },
                   { id: 'card-image-modern', name: 'Card Image — Modern', desc: 'JPG with modern dark slab label', icon: 'image' },
                   { id: 'card-image-traditional', name: 'Card Image — Traditional', desc: 'JPG with traditional light slab label', icon: 'image-outline' },
                   { id: 'mini-report', name: 'Mini Grade Report', desc: 'Foldable summary card with QR + sub-grades', icon: 'document-text' },
-                )
+                ]
                 return items
               })().map(item => (
                 <TouchableOpacity
@@ -579,6 +579,12 @@ export default function CardDetailScreen() {
                   style={[s.editField, { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 10, marginBottom: 8 }]}
                   onPress={() => {
                     setLabelSheetOpen(false)
+                    // Slab label: hand off to the unified options sheet
+                    // (style + format in one step).
+                    if ((item as any).opensSlabOptions) {
+                      setSlabOptionsOpen(true)
+                      return
+                    }
                     // Avery sheet types — show position picker first; on
                     // confirm, the picker calls openWebDownload with the
                     // chosen position. The web /label-export page picks up
@@ -595,15 +601,7 @@ export default function CardDetailScreen() {
                       setPositionPicker({ type: item.id, title: item.name, sheet: 'avery8167-foldover' })
                       return
                     }
-                    if ((item as any).needsFormat) {
-                      Alert.alert(item.name, 'Choose print format', [
-                        { text: 'Duplex (front/back on one sheet)', onPress: () => openWebDownload(item.id, { format: 'duplex' }) },
-                        { text: 'Fold-Over (single side)', onPress: () => openWebDownload(item.id, { format: 'foldover' }) },
-                        { text: 'Cancel', style: 'cancel' },
-                      ])
-                    } else {
-                      openWebDownload(item.id)
-                    }
+                    openWebDownload(item.id)
                   }}
                 >
                   <Ionicons name={item.icon as any} size={20} color={Colors.purple[600]} />
@@ -643,6 +641,20 @@ export default function CardDetailScreen() {
           setPositionPicker(null)
           if (!task) return
           openWebDownload(task.type, { position, position2 })
+        }}
+      />
+
+      {/* Graded slab label options — style (Modern / Traditional / Custom)
+          + format (Duplex / Fold-Over). Replaces the previous flow that
+          listed three separate slab entries and used Alert.alert for
+          format choice. Mirrors web's BatchSlabLabelModal. */}
+      <SlabLabelOptionsSheet
+        visible={slabOptionsOpen}
+        onClose={() => setSlabOptionsOpen(false)}
+        customStyles={customStyles}
+        defaultStyleId={labelStyle}
+        onGenerate={(type, format, customLabelStyle) => {
+          openWebDownload(type, { format, labelStyle: customLabelStyle })
         }}
       />
 
@@ -823,7 +835,7 @@ export default function CardDetailScreen() {
               <View pointerEvents="none" style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden', top: -10000, left: -10000 }}>
                 <WebView
                   source={{
-                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
+                    uri: `${process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'}/label-export/${card.id}?token=${encodeURIComponent(session.access_token)}&type=${exportTask.type}${exportTask.format ? `&format=${exportTask.format}` : ''}&labelStyle=${exportTask.labelStyle || labelStyle}${exportTask.position != null ? `&position=${exportTask.position}` : ''}${exportTask.position2 != null ? `&position2=${exportTask.position2}` : ''}`,
                   }}
                   originWhitelist={['*']}
                   javaScriptEnabled
