@@ -7,13 +7,25 @@ import * as Sharing from 'expo-sharing'
 import * as WebBrowser from 'expo-web-browser'
 import { WebView } from 'react-native-webview'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { persistBase64ToCache as persistBase64, saveToDocuments, presentSaveSuccess } from '@/lib/downloads'
+import { saveToDocuments, presentSaveSuccess } from '@/lib/downloads'
 
 // Optional deps — `npx expo install expo-print expo-intent-launcher` lights them up.
 let Print: any = null
 let IntentLauncher: any = null
 try { Print = require('expo-print') } catch {}
 try { IntentLauncher = require('expo-intent-launcher') } catch {}
+
+/**
+ * Persist a base64 file to the cache directory and return its file:// path so we
+ * can preview, print, or share it. The actual user-facing save / share happens
+ * later via the Download button → saveToDocuments helper.
+ */
+async function persistBase64(name: string, base64: string): Promise<string> {
+  const dir = (FileSystem as any).cacheDirectory || (FileSystem as any).documentDirectory
+  const path = `${dir}${name}`
+  await FileSystem.writeAsStringAsync(path, base64, { encoding: 'base64' as any })
+  return path
+}
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -695,16 +707,26 @@ export default function CardDetailScreen() {
                     if (!cur) return null
                     const isImage = cur.mime?.startsWith('image/')
                     if (isImage) {
-                      return <Image source={{ uri: cur.dataUrl }} style={{ width: '100%', height: 360 }} resizeMode="contain" />
+                      // Load from the on-disk file path, not the data URL.
+                      // Large base64 strings in RN's Image bridge cause memory
+                      // spikes that can crash the app on iOS.
+                      return <Image source={{ uri: cur.localPath }} style={{ width: '100%', height: 360 }} resizeMode="contain" />
                     }
-                    // PDF — render via WebView. iOS WebKit renders PDFs natively from the
-                    // data URL; Android System WebView can't, so we show a fallback card.
+                    // PDF — render via WebView from the on-disk file:// path,
+                    // not the in-memory data URL. WKWebView can blow past its
+                    // memory budget and silently crash the host app when it
+                    // tries to load a multi-MB data: URI; file:// URIs stream
+                    // off disk instead. Android System WebView can't preview
+                    // PDFs at all so we show a fallback card there.
                     if (Platform.OS === 'ios') {
                       return (
                         <WebView
                           originWhitelist={['*']}
-                          source={{ uri: cur.dataUrl }}
+                          source={{ uri: cur.localPath }}
                           style={{ width: '100%', height: 380, backgroundColor: '#fff' }}
+                          allowFileAccess
+                          allowFileAccessFromFileURLs
+                          allowUniversalAccessFromFileURLs
                         />
                       )
                     }

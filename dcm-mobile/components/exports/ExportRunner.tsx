@@ -172,9 +172,22 @@ export default function ExportRunner({ source, onClose }: Props) {
               )}
               <View style={s.previewBox}>
                 {cur.mime?.startsWith('image/') ? (
-                  <Image source={{ uri: cur.dataUrl }} style={{ width: '100%', height: 360 }} resizeMode="contain" />
+                  // file:// path beats data: URL — RN's Image bridge spikes
+                  // memory on multi-MB base64 strings and the app can crash
+                  // silently on iOS.
+                  <Image source={{ uri: cur.localPath }} style={{ width: '100%', height: 360 }} resizeMode="contain" />
                 ) : Platform.OS === 'ios' ? (
-                  <WebView originWhitelist={['*']} source={{ uri: cur.dataUrl }} style={{ width: '100%', height: 380, backgroundColor: '#fff' }} />
+                  // WKWebView can blow past its memory budget on multi-MB
+                  // data: URIs and bring the host app down; streaming from
+                  // the on-disk file is safe.
+                  <WebView
+                    originWhitelist={['*']}
+                    source={{ uri: cur.localPath }}
+                    style={{ width: '100%', height: 380, backgroundColor: '#fff' }}
+                    allowFileAccess
+                    allowFileAccessFromFileURLs
+                    allowUniversalAccessFromFileURLs
+                  />
                 ) : (
                   <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 32, gap: 8 }}>
                     <Ionicons name="document-text" size={64} color={Colors.purple[600]} />
