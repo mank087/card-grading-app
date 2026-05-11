@@ -37,10 +37,19 @@ module.exports = function withDisableFirebaseAutoScreensAndroid(config) {
     )
     if (existing) return config
 
+    // tools:replace is required because react-native-firebase_analytics
+    // ships its own AndroidManifest with this same meta-data set to
+    // value=true. Without tools:replace, Android's manifest merger sees
+    // the conflict and refuses to build. tools:replace="android:value"
+    // explicitly tells the merger our value wins.
+    //
+    // The xmlns:tools="..." namespace is automatically declared on the
+    // manifest root by Expo's prebuild, so we just reference it here.
     application['meta-data'].push({
       $: {
         'android:name': META_NAME,
         'android:value': 'false',
+        'tools:replace': 'android:value',
       },
     })
 
