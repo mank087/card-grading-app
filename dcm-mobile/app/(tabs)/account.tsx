@@ -7,6 +7,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import { useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import { purchaseCredits } from '@/lib/stripe'
+import { supabase } from '@/lib/supabase'
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0'
 
@@ -58,6 +61,81 @@ export default function AccountScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: signOut },
     ])
+  }
+
+  /**
+   * In-app account deletion — Apple + Google both require apps with
+   * account creation to also offer in-app deletion. Two-step
+   * confirmation: scary alert + an actual confirmation. Once confirmed
+   * the endpoint hard-deletes cards (rows + storage objects), user
+   * credits, transactions, affiliate data, and the auth user.
+   *
+   * Note: doesn't ask for a password — supports OAuth users (Apple/
+   * Google Sign In) who don't have one. The endpoint accepts password
+   * optionally and falls back to JWT-only auth, with the typed-
+   * confirmation alert as the second factor.
+   */
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      "This permanently deletes your account and all of your graded cards, card images, credits, and history. This cannot be undone.\n\nYou will lose access to:\n• All graded cards in your collection\n• Any remaining grading credits\n• Subscription benefits (Card Lovers / VIP)\n• Affiliate earnings and links\n\nAre you sure?",
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => {
+            // Second confirmation — required by best-practice for any
+            // destructive irreversible action.
+            Alert.alert(
+              'Final confirmation',
+              'Tap "Yes, delete forever" to permanently remove your account. We cannot recover it after this.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Yes, delete forever',
+                  style: 'destructive',
+                  onPress: async () => {
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession()
+                      if (!session?.access_token) {
+                        Alert.alert('Not signed in', 'Please sign in again and retry.')
+                        return
+                      }
+                      const res = await fetch(`${API_BASE}/api/account/delete`, {
+                        method: 'DELETE',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({}),
+                      })
+                      const json = await res.json().catch(() => ({} as any))
+                      if (!res.ok || !json.success) {
+                        throw new Error(json.error || `Delete failed (HTTP ${res.status})`)
+                      }
+                      // Auth user is gone server-side — sign out locally
+                      // clears the cached session and routes back to the
+                      // welcome carousel via AuthGate.
+                      await signOut()
+                      Alert.alert(
+                        'Account deleted',
+                        'Your account and data have been permanently removed. Thanks for trying DCM.',
+                      )
+                    } catch (err: any) {
+                      Alert.alert(
+                        'Delete failed',
+                        err?.message || 'Something went wrong. Please contact support@dcmgrading.com to delete your account manually.',
+                      )
+                    }
+                  },
+                },
+              ],
+            )
+          },
+        },
+      ],
+    )
   }
 
   const nav = (page: string) => router.push(`/pages/${page}` as any)
@@ -141,6 +219,15 @@ export default function AccountScreen() {
         <MenuItem icon="mail" label="Contact Us" onPress={() => nav('contact')} color={Colors.blue[600]} />
         <MenuItem icon="document" label="Terms & Conditions" onPress={() => nav('terms')} />
         <MenuItem icon="shield" label="Privacy Policy" onPress={() => nav('privacy')} />
+        {/* In-app account deletion — required by both App Store
+            (guideline 5.1.1(v)) and Play Store (effective May 2024) for
+            apps that offer account creation. */}
+        <MenuItem
+          icon="trash"
+          label="Delete My Account"
+          onPress={handleDeleteAccount}
+          color={Colors.red[600]}
+        />
       </MenuSection>
 
       {/* Sign Out */}
