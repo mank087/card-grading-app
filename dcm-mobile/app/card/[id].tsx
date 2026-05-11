@@ -48,6 +48,7 @@ import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useResponsive } from '@/hooks/useResponsive'
 
 /**
  * Resolve the grade uncertainty string for display. Prefers the
@@ -74,6 +75,12 @@ export default function CardDetailScreen() {
   const { id, openLabel, format: openFormat } = useLocalSearchParams<{ id: string; openLabel?: string; format?: string }>()
   const router = useRouter()
   const insets = useSafeAreaInsets()
+  const { isTablet, isLandscape } = useResponsive()
+  // Two-pane layout: only when iPad/Android-tablet IS in landscape. Tablet
+  // portrait still uses the single scrolling column (just centered with
+  // wider max-width). The slab + grade + subgrades become a sticky-feeling
+  // left summary panel; everything else scrolls on the right.
+  const isTwoPane = isTablet && isLandscape
   const { session } = useAuth()
   const { labelStyle, customStyles, colorOverrides } = useLabelStyle()
   const emblems = useUserEmblems()
@@ -1002,6 +1009,13 @@ export default function CardDetailScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Two-pane wrapper — on tablet landscape, the slab + grade
+          summary sits on the left while the analysis/market sections
+          scroll on the right. On phone and tablet portrait, this is a
+          no-op pass-through View. */}
+      <View style={isTwoPane ? s.twoPaneRow : undefined}>
+      <View style={isTwoPane ? s.twoPaneLeft : undefined}>
+
       {/* ══════ SLAB PREVIEW ══════ */}
       <View ref={tourRefs['card-images']} collapsable={false} style={s.slabSection}>
         <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
@@ -1064,6 +1078,9 @@ export default function CardDetailScreen() {
           })}
         </View>
       )}
+
+      </View>{/* close twoPaneLeft */}
+      <View style={isTwoPane ? s.twoPaneRight : undefined}>
 
       {/* ══════ ESTIMATED VALUE + SUMMARY ══════ */}
       {(card.ebay_price_median || card.dcm_price_estimate) && (
@@ -2255,6 +2272,8 @@ export default function CardDetailScreen() {
           </TouchableOpacity>
         )}
       </View>
+      </View>{/* close twoPaneRight */}
+      </View>{/* close twoPaneRow */}
     </ScrollView>
     <MobileTabBar />
     <OnboardingTour
@@ -2338,6 +2357,17 @@ function DefectSection({ side, defects }: { side: string; defects: any }) {
 const s = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.gray[50] },
   loading: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[50] },
+
+  // Tablet landscape two-pane wrappers — slab + grade summary on the
+  // left (sticky-feeling because it's at the top of a single ScrollView
+  // and visible until the user scrolls past it), detail sections on
+  // the right. Single ScrollView so they scroll as one, which keeps
+  // the implementation simple and avoids RN's nested-ScrollView
+  // gesture conflicts. iPad landscape is tall enough that the slab
+  // section fits in view for most of the user's scrolling.
+  twoPaneRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16, paddingHorizontal: 0 },
+  twoPaneLeft: { width: '38%', borderRightWidth: 1, borderColor: Colors.gray[200], paddingRight: 8 },
+  twoPaneRight: { flex: 1, paddingLeft: 8 },
 
   // Slab
   slabSection: { backgroundColor: Colors.gray[900], paddingBottom: 12 },
