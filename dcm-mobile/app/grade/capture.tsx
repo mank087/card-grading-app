@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Platform } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter, useLocalSearchParams } from 'expo-router'
@@ -22,6 +22,13 @@ export default function CaptureScreen() {
   const [isCapturing, setIsCapturing] = useState(false)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
   const { isTablet } = useResponsive()
+  // expo-camera's default pictureSize is conservative (often 1920x1080 or
+  // lower). On large screens like iPad that looks visibly soft. After the
+  // camera is ready we ask the device for its full list of available sizes
+  // and pin pictureSize to the highest one. Undefined on first render so
+  // the camera initializes with its safe default; flips to the max once
+  // onCameraReady fires.
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined)
 
   // Captured images
   const [frontUri, setFrontUri] = useState<string | null>(null)
@@ -156,14 +163,41 @@ export default function CaptureScreen() {
     )
   }
 
+  // When the camera initializes, query supported picture sizes and pick the
+  // largest by total pixel count. Sizes come back as strings like "1920x1080"
+  // or "3840x2160"; we parse, rank, and apply. Silently no-op if the device
+  // returns an empty list (rare — has happened on some older Androids).
+  const handleCameraReady = useCallback(async () => {
+    if (!cameraRef.current || pictureSize) return
+    try {
+      const sizes = await cameraRef.current.getAvailablePictureSizesAsync()
+      if (!sizes || sizes.length === 0) return
+      const ranked = sizes
+        .map(label => {
+          const m = /^(\d+)x(\d+)$/.exec(label)
+          return { label, px: m ? Number(m[1]) * Number(m[2]) : 0 }
+        })
+        .sort((a, b) => b.px - a.px)
+      const best = ranked[0]?.label
+      if (best) setPictureSize(best)
+    } catch {
+      // Fall back to default if querying fails — capture still works,
+      // just at the camera's stock resolution.
+    }
+  }, [pictureSize])
+
   const handleCapture = async () => {
     if (!cameraRef.current || isCapturing) return
     setIsCapturing(true)
 
     try {
-      // shutterSound: false suppresses the system camera click on
-       // capture. Note: Japanese/Korean Android devices force the
-       // shutter sound on by law, so this flag is ignored there.
+      // iPad rear cameras autofocus more slowly than iPhone; if the user
+      // taps shutter mid-focus-sweep the result is blurry. Give the lens
+      // ~200ms to settle before the actual exposure. Negligible on iPhone,
+      // material on iPad. shutterSound: false suppresses the system camera
+      // click on capture (Japanese/Korean Android devices force it on by
+      // law, so the flag is ignored there).
+      if (isTablet) await new Promise(r => setTimeout(r, 200))
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.92, shutterSound: false })
       if (!photo?.uri) throw new Error('Capture failed')
 
@@ -358,7 +392,15 @@ export default function CaptureScreen() {
            give the cropped look intentionally. */
         <View style={styles.cameraOuter}>
           <View style={[styles.cameraContainer, isTablet && styles.cameraContainerTablet]}>
-            <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
+            <CameraView
+              ref={cameraRef}
+              style={styles.camera}
+              facing={facing}
+              autofocus="on"
+              zoom={0}
+              pictureSize={pictureSize}
+              onCameraReady={handleCameraReady}
+            />
             <View style={styles.guideContainer} pointerEvents="none">
               <View style={[styles.guide, { aspectRatio: orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5 }]}>
                 <View style={[styles.corner, styles.cornerTL]} />
