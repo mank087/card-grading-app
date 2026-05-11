@@ -176,7 +176,7 @@ export default function LabelStudioScreen() {
     if (!session?.user) return
     const { data, error } = await supabase
       .from('cards')
-      .select('id, serial, front_path, card_name, featured, category, card_set, release_date, card_number, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
+      .select('id, serial, front_path, back_path, card_name, featured, category, card_set, release_date, card_number, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
       .eq('user_id', session.user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
