@@ -759,24 +759,46 @@ export default function CardDetailScreen() {
                     onPress={async () => {
                       const cur = exportFiles[exportPreviewIdx]
                       if (!cur) return
+                      console.log('[Export Download] tapped — localPath:', cur.localPath, 'mime:', cur.mime)
                       setExportActionBusy('download')
                       try {
-                        // Unified flow on both Android + iOS — open the system share
-                        // sheet directly. On Android 10+ it includes "Save to Files",
-                        // "Save in Drive", "Save to Downloads", etc. as one-tap
-                        // primary actions; on iOS it shows "Save to Files" prominently
-                        // (which routes to Files > Downloads or wherever the user
-                        // picks). Same UX as a mobile-web download — one tap and the
-                        // file is on the device, no folder picker dialog first.
-                        if (await Sharing.isAvailableAsync()) {
-                          await Sharing.shareAsync(cur.localPath, {
-                            mimeType: cur.mime,
-                            dialogTitle: cur.name,
-                            UTI: cur.mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
-                          })
-                        } else {
+                        if (!(await Sharing.isAvailableAsync())) {
                           Alert.alert('Saved', `File saved at ${cur.localPath}`)
+                          return
                         }
+                        const localPath = cur.localPath
+                        const mime = cur.mime
+                        const name = cur.name
+                        // iOS modal-over-modal gotcha: UIActivityViewController
+                        // can silently fail to present when it's invoked from
+                        // inside a transparent React Native Modal — the system
+                        // gets confused about which view controller is topmost.
+                        // Workaround: tear down our modal first, then call
+                        // Sharing.shareAsync on the next tick so the OS has a
+                        // clean root to present from.
+                        if (Platform.OS === 'ios') {
+                          setExportTask(null)
+                          setExportFiles([])
+                          setExportActionBusy(null)
+                          setTimeout(async () => {
+                            try {
+                              await Sharing.shareAsync(localPath, {
+                                mimeType: mime,
+                                dialogTitle: name,
+                                UTI: mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+                              })
+                            } catch (err: any) {
+                              Alert.alert('Download failed', err?.message || 'Could not open share sheet')
+                            }
+                          }, 350)
+                          return
+                        }
+                        // Android — share sheet works fine from within the modal
+                        await Sharing.shareAsync(localPath, {
+                          mimeType: mime,
+                          dialogTitle: name,
+                          UTI: mime === 'application/pdf' ? 'com.adobe.pdf' : undefined,
+                        })
                       } catch (err: any) {
                         Alert.alert('Download failed', err?.message || 'Could not save file')
                       } finally { setExportActionBusy(null) }
@@ -792,10 +814,27 @@ export default function CardDetailScreen() {
                     onPress={async () => {
                       const cur = exportFiles[exportPreviewIdx]
                       if (!cur) return
+                      console.log('[Export Print] tapped — localPath:', cur.localPath)
                       setExportActionBusy('print')
                       try {
                         if (Print && typeof Print.printAsync === 'function') {
-                          // Native print dialog — works for both PDFs and images
+                          // Native print dialog — works for both PDFs and images.
+                          // Same iOS modal-over-modal concern as Download: dismiss
+                          // our modal first so the print sheet has a clean root.
+                          if (Platform.OS === 'ios') {
+                            const localPath = cur.localPath
+                            setExportTask(null)
+                            setExportFiles([])
+                            setExportActionBusy(null)
+                            setTimeout(async () => {
+                              try {
+                                await Print.printAsync({ uri: localPath })
+                              } catch (err: any) {
+                                Alert.alert('Print failed', err?.message || 'Could not open print dialog')
+                              }
+                            }, 350)
+                            return
+                          }
                           await Print.printAsync({ uri: cur.localPath })
                         } else {
                           // Fallback: share sheet has a Print action on both iOS and Android
