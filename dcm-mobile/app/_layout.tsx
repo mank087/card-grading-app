@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useCallback, lazy, Suspense } from 'react'
+import { useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 // StripeProvider wrapped in try/catch — fails gracefully in Expo Go
 let StripeProvider: any
 try {
@@ -37,6 +37,7 @@ import HelpBot from '@/components/HelpBot'
 import GradingStatusBar from '@/components/GradingStatusBar'
 import OfflineBanner from '@/components/OfflineBanner'
 import { Platform } from 'react-native'
+import { logScreenView, segmentsToScreenName } from '@/lib/analytics'
 
 // expo-tracking-transparency — wrapped in try/catch like Stripe / Sentry
 // so Expo Go (which lacks the native module) doesn't crash on import.
@@ -191,6 +192,31 @@ function GradingPollerHost() {
   return null
 }
 
+// Logs a friendly screen_view to Firebase/GA4 on every Expo Router
+// route change. Without this, Firebase's automatic screen reporting
+// captures the underlying native view controller class names
+// (RNSScreen, UIViewController, RCTFabricModalHostViewController,
+// PHPickerViewController, etc.) which are useless for user-facing
+// analytics. We've also disabled the automatic reporting on iOS via
+// `FirebaseAutomaticScreenReportingEnabled: false` in app.json's
+// infoPlist so we get ONLY our friendly names in GA4.
+function ScreenViewTracker() {
+  // Expo Router types `useSegments()` as a tuple of known segments
+  // when typedRoutes is enabled — cast to string[] for our generic
+  // segments → screen name mapper, which doesn't need the precise type.
+  const segments = useSegments() as readonly string[]
+  const lastKeyRef = useRef<string>('')
+  useEffect(() => {
+    if (!segments || segments.length === 0) return
+    const key = segments.join('/')
+    if (key === lastKeyRef.current) return
+    lastKeyRef.current = key
+    const { name, className } = segmentsToScreenName(segments)
+    logScreenView(name, className)
+  }, [segments])
+  return null
+}
+
 // Asks the iOS user for tracking permission once, on first launch after
 // install. Without consent, IDFA is unavailable — Meta + Google Ads
 // attribution falls back to aggregate methods (SKAdNetwork) with much
@@ -242,6 +268,7 @@ export default function RootLayout() {
         <GradingQueueProvider>
           <GradingPollerHost />
           <ATTPromptHost />
+          <ScreenViewTracker />
           <GradingStatusBar />
           <OfflineBanner />
         <AuthGate>

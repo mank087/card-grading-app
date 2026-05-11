@@ -129,6 +129,90 @@ export async function logScreenView(screenName: string, screenClass?: string): P
   }
 }
 
+/**
+ * Map an expo-router segment array (from useSegments()) to a friendly
+ * screen name + class for GA4 reporting. Without this, Firebase's
+ * automatic screen reporting on iOS reports the underlying native
+ * UIViewController class names (RNSScreen, RCTFabricModalHostViewController,
+ * etc.) which are useless for user-facing analytics.
+ *
+ * Segments are the Expo Router file-system path. Examples:
+ *   ['(tabs)', 'grade']                     → "Grade Tab"
+ *   ['(tabs)', 'collection']                → "Collection"
+ *   ['(auth)', 'login']                     → "Login"
+ *   ['card', '[id]']                        → "Card Detail"
+ *   ['grade', 'capture']                    → "Grade — Capture"
+ *   ['pages', 'credits']                    → "Credits (Web)"
+ *
+ * Add new mappings here as new screens are added; unknown segment
+ * combinations fall through to a generic "Unknown: <segments>" label
+ * so they're visible in GA4 and easy to spot for follow-up.
+ */
+export function segmentsToScreenName(segments: readonly string[]): { name: string; className: string } {
+  if (!segments || segments.length === 0) {
+    return { name: 'Home', className: 'Home' }
+  }
+
+  const group = segments[0]
+  const route = segments[1] ?? ''
+
+  // (tabs) group — main bottom-nav screens.
+  if (group === '(tabs)') {
+    const tabMap: Record<string, string> = {
+      grade: 'Grade Tab',
+      collection: 'Collection',
+      labels: 'Label Studio',
+      'market-pricing': 'Portfolio',
+      account: 'Account',
+    }
+    const friendly = tabMap[route] || `Tab: ${route}`
+    return { name: friendly, className: friendly }
+  }
+
+  // (auth) group — pre-login screens.
+  if (group === '(auth)') {
+    const authMap: Record<string, string> = {
+      login: 'Login',
+      register: 'Register',
+      'forgot-password': 'Forgot Password',
+    }
+    const friendly = authMap[route] || `Auth: ${route}`
+    return { name: friendly, className: friendly }
+  }
+
+  // Card detail (dynamic [id] route).
+  if (group === 'card') {
+    return { name: 'Card Detail', className: 'Card Detail' }
+  }
+
+  // Grade flow.
+  if (group === 'grade') {
+    const gradeMap: Record<string, string> = {
+      capture: 'Grade — Capture',
+      review: 'Grade — Review',
+      processing: 'Grade — Processing',
+    }
+    const friendly = gradeMap[route] || `Grade: ${route}`
+    return { name: friendly, className: friendly }
+  }
+
+  // WebView pages — anything under pages/ is a web page loaded in
+  // SFSafariViewController-like context. Suffix with (Web) to
+  // distinguish from native screens of the same name.
+  if (group === 'pages') {
+    if (!route) return { name: 'Web Pages', className: 'Web Pages' }
+    const title = route
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
+    return { name: `${title} (Web)`, className: `${title} (Web)` }
+  }
+
+  // Fallback — surface the path so unknown screens are visible in GA4.
+  const fallback = segments.filter(s => !!s).join('/') || 'Unknown'
+  return { name: `Unknown: ${fallback}`, className: 'Unknown' }
+}
+
 // ─── Domain helpers (one per high-value event) ─────────────────────
 // Wrappers that enforce the param shape so individual screens don't
 // need to remember the exact key names.

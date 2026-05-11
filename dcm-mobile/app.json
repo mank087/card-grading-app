@@ -111,7 +111,8 @@
         "NSPhotoLibraryUsageDescription": "DCM Grading needs access to your photo library so you can upload existing card photos for grading.",
         "NSPhotoLibraryAddOnlyUsageDescription": "DCM Grading needs permission to save downloaded labels and graded card images to your photos.",
         "NSUserTrackingUsageDescription": "We use this to measure how DCM Grading ads perform and to improve your experience. You can change this anytime in Settings.",
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "FirebaseAutomaticScreenReportingEnabled": false
       }
     },
     "android": {
@@ -159,6 +160,7 @@
     },
     "plugins": [
       "./plugins/with-firebase-podfile-fix",
+      "./plugins/with-disable-firebase-auto-screens-android",
       [
         "expo-router",
         {
