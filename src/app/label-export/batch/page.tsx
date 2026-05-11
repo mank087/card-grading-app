@@ -46,7 +46,7 @@ import {
   generateBatchFoldOverCustomLabels,
 } from '@/lib/customSlabLabelGenerator';
 import { generateAveryLabelSheetMultiPage } from '@/lib/averyLabelGenerator';
-import { generateToploaderLabelSheetMultiPage, generateFoldOverLabelSheet } from '@/lib/avery8167LabelGenerator';
+import { generateToploaderLabelSheetMultiPage, generateFoldOverLabelSheet, type ToploaderLabelData } from '@/lib/avery8167LabelGenerator';
 import { generateBatchFoldableLabels, generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
@@ -352,23 +352,20 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         else if (type === 'toploader') {
           setStatus(`Generating ${cardIds.length} toploader label pairs…`);
-          const labelDataArray = perCard.map(({ card, labelData, subScores, grade, qrCodeDataUrl }) => ({
+          // ToploaderLabelData has 4 fields: grade, conditionLabel,
+          // qrCodeUrl, cardName?. Previous version was over-stuffing the
+          // payload with FoldableLabelData fields AND missing the
+          // required qrCodeUrl — caused a "Cannot read properties of
+          // undefined (reading 'getContext')" inside the QR library's
+          // canvas init at runtime.
+          const labelDataArray: ToploaderLabelData[] = perCard.map(({ card, labelData, grade }) => ({
             cardName: labelData.primaryName,
-            contextLine: labelData.contextLine || '',
-            specialFeatures: labelData.featuresLine || undefined,
-            serial: labelData.serial,
             grade,
             conditionLabel: labelData.condition || getConditionLabel(grade),
-            cardUrl: `${window.location.origin}/verify/${card.serial}`,
-            qrCodeDataUrl,
-            logoDataUrl,
-            subScores,
-            showFounderEmblem,
-            showVipEmblem,
-            showCardLoversEmblem,
+            qrCodeUrl: `${window.location.origin}/verify/${card.serial}`,
           }));
           const globalPositions = positions.length === labelDataArray.length ? positions : undefined;
-          const blob = await generateToploaderLabelSheetMultiPage(labelDataArray as any, calibrationOffsets, globalPositions);
+          const blob = await generateToploaderLabelSheetMultiPage(labelDataArray, calibrationOffsets, globalPositions);
           blobs.push({
             name: `DCM-Toploader-Avery8167-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
@@ -381,26 +378,21 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         else if (type === 'foldover' || type === 'toploader-foldover') {
           setStatus(`Generating ${cardIds.length} fold-over toploader labels…`);
-          const labelDataArray = perCard.map(({ card, labelData, subScores, grade, qrCodeDataUrl }) => ({
+          // Same shape fix as 'toploader' above: ToploaderLabelData
+          // expects grade + conditionLabel + qrCodeUrl. Previously
+          // missing qrCodeUrl, causing the QR library to crash in its
+          // canvas-init step.
+          const labelDataArray: ToploaderLabelData[] = perCard.map(({ card, labelData, grade }) => ({
             cardName: labelData.primaryName,
-            contextLine: labelData.contextLine || '',
-            specialFeatures: labelData.featuresLine || undefined,
-            serial: labelData.serial,
             grade,
             conditionLabel: labelData.condition || getConditionLabel(grade),
-            cardUrl: `${window.location.origin}/verify/${card.serial}`,
-            qrCodeDataUrl,
-            logoDataUrl,
-            subScores,
-            showFounderEmblem,
-            showVipEmblem,
-            showCardLoversEmblem,
+            qrCodeUrl: `${window.location.origin}/verify/${card.serial}`,
           }));
           // generateFoldOverLabelSheet takes startPosition (single number) and
           // auto-fills the rest sequentially. Use the first position from the
           // array if provided, otherwise start at 0.
           const startPosition = positions.length > 0 ? positions[0] : 0;
-          const blob = await generateFoldOverLabelSheet(labelDataArray as any, undefined, startPosition);
+          const blob = await generateFoldOverLabelSheet(labelDataArray, undefined, startPosition);
           blobs.push({
             name: `DCM-FoldOver-Avery8167-${cardIds.length}cards.pdf`,
             mime: 'application/pdf',
