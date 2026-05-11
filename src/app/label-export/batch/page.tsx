@@ -314,21 +314,30 @@ function BatchLabelExportInner() {
         // ------------------------------------------------------------
         else if (type === 'onetouch') {
           setStatus(`Generating ${cardIds.length} one-touch labels…`);
+          // Build a real FoldableLabelData. The previous version
+          // passed `contextLine` and skipped setName/cardNumber/year,
+          // then cast to `as any[]` to silence TypeScript. Avery 6871
+          // labels read all three of those fields to render the
+          // "Set • Number • Year" line under the card name — so users
+          // were getting cards with name + grade but the set/year line
+          // entirely missing in bulk prints. Mirrors the single-card
+          // builder in src/app/label-export/[cardId]/page.tsx:433-449.
           const labelDataArray: FoldableLabelData[] = perCard.map(({ card, labelData, subScores, grade, qrCodeDataUrl }) => ({
             cardName: labelData.primaryName,
-            contextLine: labelData.contextLine || '',
+            setName: (labelData as any).setName || '',
+            cardNumber: (labelData as any).cardNumber || undefined,
+            year: (labelData as any).year || undefined,
             specialFeatures: labelData.featuresLine || undefined,
             serial: labelData.serial,
+            englishName: card.featured || card.pokemon_featured || undefined,
             grade,
             conditionLabel: labelData.condition || getConditionLabel(grade),
+            subgrades: subScores,
+            overallSummary: card.conversational_final_grade_summary || '',
             cardUrl: `${window.location.origin}/verify/${card.serial}`,
             qrCodeDataUrl,
             logoDataUrl,
-            subScores,
-            showFounderEmblem,
-            showVipEmblem,
-            showCardLoversEmblem,
-          })) as any[];
+          }));
           const globalPositions = positions.length === labelDataArray.length ? positions : undefined;
           const blob = await generateAveryLabelSheetMultiPage(labelDataArray, calibrationOffsets, globalPositions);
           blobs.push({
