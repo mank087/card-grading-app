@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import {
   View, Text, TextInput, TouchableOpacity, Modal, StyleSheet,
-  ScrollView, Image, LayoutChangeEvent, Dimensions,
+  ScrollView, Image, LayoutChangeEvent, useWindowDimensions,
 } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { Colors } from '@/lib/constants'
@@ -102,7 +102,8 @@ interface ColorPickerModalProps {
 // Component
 // ---------------------------------------------------------------------------
 
-const SCREEN_W = Dimensions.get('window').width
+// SCREEN_W moved inside the component via useWindowDimensions() so it
+// re-renders on iPad rotation + split-screen resizing.
 
 export default function ColorPickerModal({
   visible,
@@ -116,6 +117,7 @@ export default function ColorPickerModal({
   const [sat, setSat] = useState(0)
   const [val, setVal] = useState(0)
   const [hexInput, setHexInput] = useState(currentColor)
+  const { width: SCREEN_W } = useWindowDimensions()
   const [pendingColor, setPendingColor] = useState(currentColor)
 
   const hueBarLayout = useRef({ x: 0, y: 0, width: 1 })
@@ -329,8 +331,11 @@ export default function ColorPickerModal({
 // ---------------------------------------------------------------------------
 
 const st = StyleSheet.create({
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
-  container: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end', alignItems: 'center' },
+  // alignSelf+maxWidth caps the bottom-sheet width on tablet so it
+  // doesn't stretch to 1366px on iPad landscape — keeps the picker
+  // visually compact and usable.
+  container: { backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '85%', width: '100%', maxWidth: 600, alignSelf: 'center' },
 
   header: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 16, borderBottomWidth: 1, borderBottomColor: Colors.gray[200] },
   previewSwatch: { width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: Colors.gray[300] },

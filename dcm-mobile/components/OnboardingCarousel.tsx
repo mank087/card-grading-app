@@ -1,6 +1,6 @@
 import { useRef, useEffect, useState } from 'react'
 import {
-  View, Text, Image, StyleSheet, Dimensions, FlatList, TouchableOpacity,
+  View, Text, Image, StyleSheet, useWindowDimensions, FlatList, TouchableOpacity,
   Animated, Easing,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -9,7 +9,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
 import { useResponsive } from '@/hooks/useResponsive'
 
-const { width: W, height: H } = Dimensions.get('window')
+// W and H are now derived per-render via useWindowDimensions() inside
+// the component so the carousel adapts to iPad rotation + iPad
+// split-screen resizing (capturing dimensions once at module-load was
+// breaking the panel snap-interval on tablet rotate).
 
 // ─── Card images for scrolling strip (Panel 1) ───
 const ROW1_CARDS = [
@@ -101,6 +104,8 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
   const flatListRef = useRef<FlatList>(null)
   const insets = useSafeAreaInsets()
   const { isTablet } = useResponsive()
+  // Live dimensions — re-render on rotation / iPad split-screen resize.
+  const { width: W, height: H } = useWindowDimensions()
 
   // Auto-scroll animations for Panel 1
   const row1Anim = useRef(new Animated.Value(0)).current
@@ -156,7 +161,7 @@ export default function OnboardingCarousel({ onGetStarted, onSignIn }: Props) {
     // itself still spans full width so swipe gestures work edge-to-edge.
     const innerStyle = isTablet ? st.panelInnerTablet : st.panelInner
     return (
-      <View style={st.panel}>
+      <View style={[st.panel, { width: W }]}>
         <View style={innerStyle}>
           {/* Visual area — top ~55% */}
           <View style={st.visualArea}>
@@ -294,6 +299,7 @@ function ScrollingCardsVisual({ row1Anim, row2Anim }: { row1Anim: Animated.Value
 // ════════════════════════════════════════════════
 
 function SlabCollageVisual() {
+  const { width: W } = useWindowDimensions()
   // Positions: Judge center-front, others around it
   const slabs = [
     { src: SLAB_DRAKE,    left: '2%',  top: '8%',  rotate: '-10deg', zIndex: 1 },
@@ -335,6 +341,7 @@ function SlabCollageVisual() {
 // ════════════════════════════════════════════════
 
 function LabelStudioVisual() {
+  const { height: H } = useWindowDimensions()
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 12 }}>
       <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
@@ -364,6 +371,7 @@ function LabelStudioVisual() {
 // ════════════════════════════════════════════════
 
 function ChartVisual() {
+  const { width: W } = useWindowDimensions()
   const barHeights = [40, 65, 50, 80, 55, 90, 70, 100, 85, 95, 75, 110]
 
   return (
@@ -407,9 +415,11 @@ function ChartVisual() {
 // ════════════════════════════════════════════════
 
 function EbayInstaListVisual({ scrollAnim }: { scrollAnim: Animated.Value }) {
+  const { width: W } = useWindowDimensions()
   // Each listing screenshot is ~333x195 (1.7:1). We render the column
-  // at 88% of screen width so it reads like a real eBay feed card.
-  const cardW = W * 0.88
+  // at 88% of screen width on phone; cap at ~560px on tablet so the
+  // listings don't look ridiculously wide.
+  const cardW = Math.min(W * 0.88, 560)
   const cardH = cardW * (195 / 333)
   const gap = 10
   const itemH = cardH + gap
@@ -470,7 +480,9 @@ const st = StyleSheet.create({
   arrowLeft: { left: 6 },
   arrowRight: { right: 6 },
 
-  panel: { width: W, flex: 1 },
+  // Width applied inline via <View style={[st.panel, { width: W }]}> so
+  // it tracks useWindowDimensions on iPad rotation.
+  panel: { flex: 1 },
   // Inner wrapper — full-bleed on phone, constrained-and-centered on tablet.
   panelInner: { flex: 1, width: '100%' },
   panelInnerTablet: { flex: 1, width: '100%', maxWidth: 640, alignSelf: 'center' },

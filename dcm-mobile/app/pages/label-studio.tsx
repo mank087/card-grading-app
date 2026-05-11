@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, TextInput,
-  ActivityIndicator, Dimensions, FlatList, Alert, Share,
+  ActivityIndicator, useWindowDimensions, FlatList, Alert, Share,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -37,7 +37,9 @@ import { useSegments } from 'expo-router'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 
-const { width: SCREEN_W } = Dimensions.get('window')
+// SCREEN_W is now read per-render via useWindowDimensions() inside the
+// component so the FlatList snap interval tracks iPad rotation +
+// split-screen resizing.
 
 // Label gallery — matches LABEL_TYPES on web. Each item has a holder type
 // (slab / one-touch / toploader / digital) so the mockup tile renders the
@@ -105,6 +107,9 @@ export default function LabelStudioScreen() {
   const router = useRouter()
   const { session } = useAuth()
   const userEmblems = useUserEmblems()
+  // Live screen width — re-renders on iPad rotation so the FlatList
+  // snap interval and item width track the new viewport.
+  const { width: SCREEN_W } = useWindowDimensions()
   // (tabs)/labels.tsx re-exports this screen so the Labels tab and the
   // /pages/label-studio route share one implementation. When mounted as
   // a tab, the (tabs) layout already provides the AppHeaderBar (top) +
