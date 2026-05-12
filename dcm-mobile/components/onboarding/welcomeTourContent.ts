@@ -1,3 +1,5 @@
+import { Platform } from 'react-native'
+
 /**
  * Welcome tour content — single source of truth for both the
  * WelcomeTourContext (which uses step counts to drive navigation) and
@@ -7,6 +9,11 @@
  * Edit this file to tweak tour copy. No code changes needed elsewhere
  * unless you add or remove steps for a screen.
  */
+
+// iOS App Store Reader-app compliance: don't show specific pricing or
+// pitch a non-IAP subscription in onboarding. Android keeps the
+// original copy since Stripe checkout is the established flow there.
+const IS_IOS = Platform.OS === 'ios'
 
 export type TourScreenId =
   | 'welcome'
@@ -140,11 +147,15 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
     },
     {
       title: 'Buy grading credits',
-      body: 'Top up anytime with Basic ($2.99/1), Pro ($9.99/5), Elite ($19.99/20), or VIP ($99/150).',
+      body: IS_IOS
+        ? 'Top up your credit balance from here whenever you run low.'
+        : 'Top up anytime with Basic ($2.99/1), Pro ($9.99/5), Elite ($19.99/20), or VIP ($99/150).',
     },
     {
-      title: 'Save with Card Lovers',
-      body: '$49.99/mo for 70 credits + the full market pricing dashboard. Annual saves more.',
+      title: 'Card Lovers benefits',
+      body: IS_IOS
+        ? 'Premium members get bonus credits, the full market pricing dashboard, and member-only label emblems.'
+        : '$49.99/mo for 70 credits + the full market pricing dashboard. Annual saves more.',
     },
     {
       title: 'Settings & support',

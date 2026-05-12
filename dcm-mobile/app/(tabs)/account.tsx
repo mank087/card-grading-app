@@ -1,9 +1,10 @@
-import { View, Text, ScrollView, StyleSheet, Alert, Linking, TouchableOpacity, Image } from 'react-native'
+import { View, Text, ScrollView, StyleSheet, Alert, Linking, TouchableOpacity, Image, Platform } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import Constants from 'expo-constants'
 import { Colors } from '@/lib/constants'
 import { useAuth } from '@/contexts/AuthContext'
+import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { useCredits } from '@/contexts/CreditsContext'
 import { useWelcomeTour } from '@/contexts/WelcomeTourContext'
 import { purchaseCredits } from '@/lib/stripe'
@@ -61,6 +62,12 @@ export default function AccountScreen() {
   const { user, signOut } = useAuth()
   const { balance } = useCredits()
   const { start: startWelcomeTour } = useWelcomeTour()
+  const { isCardLover } = useUserEmblems()
+  // Apple App Store Reader-app compliance: iOS users cannot see a path
+  // that promotes / leads to a non-IAP subscription purchase. Members
+  // who already subscribed via web still get to see their member status;
+  // non-members on iOS get no entry point.
+  const showCardLoversMenuItem = Platform.OS !== 'ios' || isCardLover
 
   const handleSignOut = () => {
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -202,8 +209,17 @@ export default function AccountScreen() {
           badge={`${balance}`}
           color={Colors.purple[600]}
         />
-        <MenuItem icon="heart" label="Card Lovers Subscription" onPress={() => nav('card-lovers')} color={Colors.purple[600]} />
-        <MenuItem icon="ribbon" label="VIP Package" onPress={() => nav('vip')} color={Colors.amber[600]} />
+        {showCardLoversMenuItem && (
+          <MenuItem
+            icon="heart"
+            label={Platform.OS === 'ios' && isCardLover ? 'Card Lovers Member' : 'Card Lovers Subscription'}
+            onPress={() => nav('card-lovers')}
+            color={Colors.purple[600]}
+          />
+        )}
+        {Platform.OS !== 'ios' && (
+          <MenuItem icon="ribbon" label="VIP Package" onPress={() => nav('vip')} color={Colors.amber[600]} />
+        )}
       </MenuSection>
 
       {/* Information */}
