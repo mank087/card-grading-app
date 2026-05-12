@@ -239,20 +239,35 @@ function ATTPromptHost() {
   // disabled — Apple's ATT rule is about IDFA collection, not framework
   // init, so this is compliant. The ATT prompt below flips the tracking
   // flag once the user grants permission.
+  //
+  // Critical: initializeSDK() must come FIRST. Some fbsdk-next versions
+  // throw an NSException when other Settings methods are called on an
+  // uninitialized SDK, and that NSException trips up the React Native
+  // bridge's error conversion, taking the app down via Hermes.
   useEffect(() => {
+    let fbsdk: any
+    try { fbsdk = require('react-native-fbsdk-next') }
+    catch (e) {
+      if (__DEV__) console.warn('[fbsdk] module require failed:', e)
+      return
+    }
     try {
-      const fbsdk = require('react-native-fbsdk-next')
       if (fbsdk?.Settings?.initializeSDK) {
-        // setAdvertiserTrackingEnabled is iOS-only; calling on Android
-        // is a no-op. Defaulting to false on iOS is the conservative
-        // pre-ATT-grant stance.
-        if (Platform.OS === 'ios' && fbsdk.Settings.setAdvertiserTrackingEnabled) {
-          fbsdk.Settings.setAdvertiserTrackingEnabled(false)
-        }
         fbsdk.Settings.initializeSDK()
       }
     } catch (e) {
-      if (__DEV__) console.warn('[fbsdk] init failed:', e)
+      if (__DEV__) console.warn('[fbsdk] initializeSDK failed:', e)
+    }
+    // Now that the SDK is initialized, set the tracking flag. iOS-only —
+    // setAdvertiserTrackingEnabled is a no-op on Android.
+    if (Platform.OS === 'ios') {
+      try {
+        if (fbsdk?.Settings?.setAdvertiserTrackingEnabled) {
+          fbsdk.Settings.setAdvertiserTrackingEnabled(false)
+        }
+      } catch (e) {
+        if (__DEV__) console.warn('[fbsdk] setAdvertiserTrackingEnabled failed:', e)
+      }
     }
   }, [])
 
