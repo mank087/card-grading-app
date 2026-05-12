@@ -28,6 +28,7 @@
     },
     "simulator": {
       "distribution": "internal",
+      "environment": "preview",
       "ios": {
         "simulator": true
       },
@@ -37,6 +38,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "environment": "production",
       "ios": {
         "autoIncrement": "buildNumber"
       },
