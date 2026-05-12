@@ -231,46 +231,6 @@ function ScreenViewTracker() {
 // lower fidelity. Android has no equivalent prompt; AAID is allowed by
 // default subject to user opt-out in OS settings.
 function ATTPromptHost() {
-  // Initialize the Meta SDK synchronously on mount — BEFORE any auth or
-  // analytics code can race it. With isAutoInitEnabled: false in app.json,
-  // the SDK does not self-init, so any code calling AppEventsLogger.setUserID
-  // (which AuthContext does on cold-start session restore) would crash on
-  // iOS if the SDK wasn't initialized first. We default tracking to
-  // disabled — Apple's ATT rule is about IDFA collection, not framework
-  // init, so this is compliant. The ATT prompt below flips the tracking
-  // flag once the user grants permission.
-  //
-  // Critical: initializeSDK() must come FIRST. Some fbsdk-next versions
-  // throw an NSException when other Settings methods are called on an
-  // uninitialized SDK, and that NSException trips up the React Native
-  // bridge's error conversion, taking the app down via Hermes.
-  useEffect(() => {
-    let fbsdk: any
-    try { fbsdk = require('react-native-fbsdk-next') }
-    catch (e) {
-      if (__DEV__) console.warn('[fbsdk] module require failed:', e)
-      return
-    }
-    try {
-      if (fbsdk?.Settings?.initializeSDK) {
-        fbsdk.Settings.initializeSDK()
-      }
-    } catch (e) {
-      if (__DEV__) console.warn('[fbsdk] initializeSDK failed:', e)
-    }
-    // Now that the SDK is initialized, set the tracking flag. iOS-only —
-    // setAdvertiserTrackingEnabled is a no-op on Android.
-    if (Platform.OS === 'ios') {
-      try {
-        if (fbsdk?.Settings?.setAdvertiserTrackingEnabled) {
-          fbsdk.Settings.setAdvertiserTrackingEnabled(false)
-        }
-      } catch (e) {
-        if (__DEV__) console.warn('[fbsdk] setAdvertiserTrackingEnabled failed:', e)
-      }
-    }
-  }, [])
-
   useEffect(() => {
     if (Platform.OS !== 'ios') return
     if (!trackingTransparency) return // Expo Go — skip
@@ -287,10 +247,12 @@ function ATTPromptHost() {
           if (cancelled) return
           status = res.status
         }
-        // Only flip the tracking flag — SDK already initialized in the
-        // effect above. With ATT granted, the SDK starts using IDFA; with
-        // ATT denied, IDFA stays off and Meta falls back to SKAdNetwork
-        // aggregate attribution.
+        // Only flip the tracking flag — the Meta SDK self-initialized
+        // at app launch (isAutoInitEnabled: true in app.json). With ATT
+        // granted, the SDK starts using IDFA; with ATT denied, IDFA stays
+        // off and Meta falls back to SKAdNetwork aggregate attribution.
+        // advertiserIDCollectionEnabled: false in the plugin config means
+        // the SDK never collects IDFA without this explicit grant flip.
         try {
           const fbsdk = require('react-native-fbsdk-next')
           if (fbsdk?.Settings?.setAdvertiserTrackingEnabled) {

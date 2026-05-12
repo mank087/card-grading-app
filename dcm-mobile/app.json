@@ -188,7 +188,7 @@
           "scheme": "fb1495646468404956",
           "advertiserIDCollectionEnabled": false,
           "autoLogAppEventsEnabled": false,
-          "isAutoInitEnabled": false
+          "isAutoInitEnabled": true
         }
       ],
       "@react-native-firebase/app",
