@@ -125,16 +125,23 @@ export default function CollectionScreen() {
   // the cached cards still render).
   useEffect(() => {
     if (!cacheKey) return
-    AsyncStorage.getItem(cacheKey).then(raw => {
-      if (!raw) return
-      try {
-        const parsed = JSON.parse(raw)
-        if (parsed?.cards && Array.isArray(parsed.cards)) {
-          setCards(parsed.cards)
-          setIsLoading(false)
-        }
-      } catch { /* ignore corrupt cache */ }
-    })
+    // AsyncStorage on Android can throw under memory pressure (storage
+    // module process unavailable, disk full, etc.). A bare .then() with
+    // no catch leaves that as an unhandled promise rejection, which RN
+    // surfaces as a redbox in dev and a Sentry crash in production.
+    // Treat any failure as "no cache" and fall through to the network fetch.
+    AsyncStorage.getItem(cacheKey)
+      .then(raw => {
+        if (!raw) return
+        try {
+          const parsed = JSON.parse(raw)
+          if (parsed?.cards && Array.isArray(parsed.cards)) {
+            setCards(parsed.cards)
+            setIsLoading(false)
+          }
+        } catch { /* ignore corrupt cache */ }
+      })
+      .catch(err => { console.warn('[collection] cache hydrate failed:', err?.message) })
   }, [cacheKey])
 
   const fetchCollection = useCallback(async () => {
@@ -526,15 +533,30 @@ export default function CollectionScreen() {
             returnKeyType="search"
           />
           {search !== '' && (
-            <TouchableOpacity onPress={() => setSearch('')}>
+            <TouchableOpacity
+              onPress={() => setSearch('')}
+              accessibilityLabel="Clear search"
+              accessibilityRole="button"
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
               <Ionicons name="close-circle" size={18} color={Colors.gray[400]} />
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity onPress={() => setShowSort(!showSort)} style={st.viewToggle}>
+        <TouchableOpacity
+          onPress={() => setShowSort(!showSort)}
+          style={st.viewToggle}
+          accessibilityLabel={showSort ? 'Hide sort options' : 'Show sort options'}
+          accessibilityRole="button"
+        >
           <Ionicons name="swap-vertical" size={20} color={Colors.purple[600]} />
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => setViewMode(v => v === 'list' ? 'grid' : 'list')} style={st.viewToggle}>
+        <TouchableOpacity
+          onPress={() => setViewMode(v => v === 'list' ? 'grid' : 'list')}
+          style={st.viewToggle}
+          accessibilityLabel={viewMode === 'list' ? 'Switch to grid view' : 'Switch to list view'}
+          accessibilityRole="button"
+        >
           <Ionicons name={viewMode === 'list' ? 'grid' : 'list'} size={20} color={Colors.purple[600]} />
         </TouchableOpacity>
       </View>

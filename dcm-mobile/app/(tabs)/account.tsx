@@ -24,7 +24,13 @@ interface MenuItemProps {
 
 function MenuItem({ icon, label, onPress, color = Colors.gray[700], badge, showArrow = true }: MenuItemProps) {
   return (
-    <TouchableOpacity style={styles.menuItem} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity
+      style={styles.menuItem}
+      onPress={onPress}
+      activeOpacity={0.7}
+      accessibilityLabel={badge ? `${label}, ${badge}` : label}
+      accessibilityRole="button"
+    >
       <View style={styles.menuItemLeft}>
         <Ionicons name={icon} size={20} color={color} />
         <Text style={[styles.menuItemLabel, { color }]}>{label}</Text>
@@ -232,7 +238,13 @@ export default function AccountScreen() {
 
       {/* Sign Out */}
       <View style={styles.signOutSection}>
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.signOutButton}
+          onPress={handleSignOut}
+          activeOpacity={0.7}
+          accessibilityLabel="Sign out of DCM Grading"
+          accessibilityRole="button"
+        >
           <Ionicons name="log-out" size={20} color={Colors.red[600]} />
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>

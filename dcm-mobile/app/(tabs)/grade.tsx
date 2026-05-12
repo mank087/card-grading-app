@@ -109,6 +109,10 @@ export default function GradeScreen() {
             onPress={handleCamera}
             disabled={!canGrade}
             activeOpacity={0.7}
+            accessibilityLabel="Take photos with camera"
+            accessibilityHint="Opens the camera to capture front and back of your card"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canGrade }}
           >
             <View style={styles.uploadIconContainer}>
               <Ionicons name="camera" size={32} color={canGrade ? Colors.purple[600] : Colors.gray[400]} />
@@ -122,6 +126,10 @@ export default function GradeScreen() {
             onPress={handleGallery}
             disabled={!canGrade || galleryStep !== 'idle'}
             activeOpacity={0.7}
+            accessibilityLabel="Choose photos from gallery"
+            accessibilityHint="Selects existing front and back photos of your card from the photo library"
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !canGrade || galleryStep !== 'idle', busy: galleryStep !== 'idle' }}
           >
             <View style={styles.uploadIconContainer}>
               <Ionicons
@@ -162,6 +170,8 @@ export default function GradeScreen() {
               router.push('/pages/credits' as any)
             }}
             activeOpacity={0.85}
+            accessibilityLabel="Purchase credits"
+            accessibilityRole="button"
           >
             <Ionicons name="diamond" size={18} color="#fff" />
             <Text style={styles.purchaseBtnText}>Purchase Grading Credits</Text>

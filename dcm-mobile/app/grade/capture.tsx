@@ -334,11 +334,21 @@ export default function CaptureScreen() {
         </View>
 
         <View style={[styles.previewActions, { paddingBottom: insets.bottom + 12 }]}>
-          <TouchableOpacity style={styles.retakeButton} onPress={handleRetake}>
+          <TouchableOpacity
+            style={styles.retakeButton}
+            onPress={handleRetake}
+            accessibilityLabel="Retake photo"
+            accessibilityRole="button"
+          >
             <Ionicons name="refresh" size={20} color={Colors.gray[700]} />
             <Text style={styles.retakeText}>Retake</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={[styles.useButton, { backgroundColor: gradeColor }]} onPress={handleUseImage}>
+          <TouchableOpacity
+            style={[styles.useButton, { backgroundColor: gradeColor }]}
+            onPress={handleUseImage}
+            accessibilityLabel={currentSide === 'front' ? 'Use this front photo and continue to back' : 'Use this back photo and continue to review'}
+            accessibilityRole="button"
+          >
             <Ionicons name="checkmark" size={20} color={Colors.white} />
             <Text style={styles.useText}>
               {currentSide === 'front' ? 'Use This — Capture Back \u203A' : 'Use This — Review \u203A'}
@@ -354,7 +364,13 @@ export default function CaptureScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.cameraHeader, { paddingTop: insets.top + 8 }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          style={styles.headerButton}
+          accessibilityLabel="Cancel and go back"
+          accessibilityRole="button"
+          hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+        >
           <Ionicons name="close" size={28} color={Colors.white} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
@@ -362,7 +378,13 @@ export default function CaptureScreen() {
           <Text style={styles.headerSide}>{currentSide === 'front' ? 'FRONT' : 'BACK'}</Text>
         </View>
         {mode === 'camera' ? (
-          <TouchableOpacity onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')} style={styles.headerButton}>
+          <TouchableOpacity
+            onPress={() => setFacing(f => f === 'back' ? 'front' : 'back')}
+            style={styles.headerButton}
+            accessibilityLabel={facing === 'back' ? 'Switch to front-facing camera' : 'Switch to rear camera'}
+            accessibilityRole="button"
+            hitSlop={{ top: 12, right: 12, bottom: 12, left: 12 }}
+          >
             <Ionicons name="camera-reverse" size={28} color={Colors.white} />
           </TouchableOpacity>
         ) : <View style={styles.headerButton} />}
@@ -373,6 +395,9 @@ export default function CaptureScreen() {
         <TouchableOpacity
           style={[styles.methodTab, mode === 'camera' && styles.methodTabActive]}
           onPress={() => setMode('camera')}
+          accessibilityLabel="Camera mode"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: mode === 'camera' }}
         >
           <Ionicons name="camera" size={16} color={mode === 'camera' ? '#fff' : Colors.gray[400]} />
           <Text style={[styles.methodTabText, mode === 'camera' && styles.methodTabTextActive]}>Camera</Text>
@@ -380,6 +405,9 @@ export default function CaptureScreen() {
         <TouchableOpacity
           style={[styles.methodTab, mode === 'gallery' && styles.methodTabActive]}
           onPress={() => setMode('gallery')}
+          accessibilityLabel="Gallery mode"
+          accessibilityRole="tab"
+          accessibilityState={{ selected: mode === 'gallery' }}
         >
           <Ionicons name="images" size={16} color={mode === 'gallery' ? '#fff' : Colors.gray[400]} />
           <Text style={[styles.methodTabText, mode === 'gallery' && styles.methodTabTextActive]}>Gallery</Text>
@@ -426,6 +454,9 @@ export default function CaptureScreen() {
               style={styles.galleryPickBtn}
               onPress={requestGallery}
               disabled={isProcessing}
+              accessibilityLabel={`Choose ${currentSide} photo from gallery`}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: isProcessing, busy: isProcessing }}
             >
               <Ionicons name="folder-open" size={20} color="#fff" />
               <Text style={styles.galleryPickText}>{isProcessing ? 'Processing…' : 'Choose Photo'}</Text>
@@ -457,6 +488,8 @@ export default function CaptureScreen() {
           <TouchableOpacity
             onPress={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
             style={styles.controlButton}
+            accessibilityLabel={orientation === 'portrait' ? 'Switch guide to landscape' : 'Switch guide to portrait'}
+            accessibilityRole="button"
           >
             <Ionicons name="phone-landscape" size={22} color={Colors.white} />
           </TouchableOpacity>
@@ -466,6 +499,9 @@ export default function CaptureScreen() {
             onPress={requestCapture}
             disabled={isCapturing || isProcessing}
             activeOpacity={0.7}
+            accessibilityLabel={`Capture ${currentSide} photo`}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isCapturing || isProcessing, busy: isCapturing || isProcessing }}
           >
             <View style={[styles.captureInner, (isCapturing || isProcessing) && { opacity: 0.5 }]} />
           </TouchableOpacity>
@@ -473,6 +509,8 @@ export default function CaptureScreen() {
           <TouchableOpacity
             onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')}
             style={styles.controlButton}
+            accessibilityLabel={`Switch to capturing the ${currentSide === 'front' ? 'back' : 'front'} of the card`}
+            accessibilityRole="button"
           >
             <Ionicons name="swap-horizontal" size={22} color={Colors.white} />
             <Text style={styles.controlLabel}>{currentSide === 'front' ? 'Back' : 'Front'}</Text>
@@ -481,7 +519,12 @@ export default function CaptureScreen() {
       )}
       {mode === 'gallery' && (
         <View style={[styles.galleryControls, { paddingBottom: insets.bottom + 12 }]}>
-          <TouchableOpacity onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')} style={styles.gallerySwitchBtn}>
+          <TouchableOpacity
+            onPress={() => setCurrentSide(s => s === 'front' ? 'back' : 'front')}
+            style={styles.gallerySwitchBtn}
+            accessibilityLabel={`Switch to selecting the ${currentSide === 'front' ? 'back' : 'front'} of the card`}
+            accessibilityRole="button"
+          >
             <Ionicons name="swap-horizontal" size={18} color={Colors.white} />
             <Text style={styles.gallerySwitchText}>Switch to {currentSide === 'front' ? 'Back' : 'Front'}</Text>
           </TouchableOpacity>

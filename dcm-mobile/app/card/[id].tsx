@@ -300,19 +300,31 @@ export default function CardDetailScreen() {
   const [hideMarkers, setHideMarkers] = useState(false)
   const [refreshingPrice, setRefreshingPrice] = useState(false)
 
+  // Tracks whether this screen is still mounted so async fetch+signed-URL
+  // chains don't setState after the user has navigated away. Strict Mode and
+  // future React versions will treat post-unmount setState as a hard error.
+  const isMountedRef = useRef(true)
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => { isMountedRef.current = false }
+  }, [])
+
   const fetchCard = useCallback(async () => {
     if (!id) return
     const { data, error } = await supabase.from('cards').select('*').eq('id', id).single()
+    if (!isMountedRef.current) return
     if (error || !data) { setIsLoading(false); setRefreshing(false); return }
     setCard(data as Card)
     const paths = [data.front_path, data.back_path].filter(Boolean)
     if (paths.length > 0) {
       const { data: urls } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
+      if (!isMountedRef.current) return
       urls?.forEach(u => {
         if (u.path === data.front_path) setFrontUrl(u.signedUrl)
         if (u.path === data.back_path) setBackUrl(u.signedUrl)
       })
     }
+    if (!isMountedRef.current) return
     setIsLoading(false); setRefreshing(false)
   }, [id])
 
@@ -469,8 +481,13 @@ export default function CardDetailScreen() {
     Alert.alert('Delete Card', 'Are you sure? This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: async () => {
-        await supabase.from('cards').delete().eq('id', card.id)
-        router.back()
+        try {
+          const { error } = await supabase.from('cards').delete().eq('id', card.id)
+          if (error) throw error
+          router.back()
+        } catch (err: any) {
+          Alert.alert('Delete failed', err?.message || 'Could not delete this card. Please try again.')
+        }
       }},
     ])
   }
@@ -1223,10 +1240,22 @@ export default function CardDetailScreen() {
         <View ref={tourRefs['visibility-toggle']} collapsable={false} style={{ flexDirection: 'row', gap: 8, paddingHorizontal: 12, marginBottom: 8 }}>
           <TouchableOpacity
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, borderRadius: 8, borderWidth: 1, borderColor: card.visibility === 'public' ? Colors.green[500] : Colors.gray[300], backgroundColor: card.visibility === 'public' ? Colors.green[50] : Colors.gray[50] }}
+            accessibilityLabel={card.visibility === 'public' ? 'Card is public, tap to make private' : 'Card is private, tap to make public'}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: card.visibility === 'public' }}
             onPress={async () => {
-              const newVis = card.visibility === 'public' ? 'private' : 'public'
-              await supabase.from('cards').update({ visibility: newVis }).eq('id', card.id)
+              const prevVis = card.visibility
+              const newVis = prevVis === 'public' ? 'private' : 'public'
+              // Optimistic update — flip immediately, roll back on error so
+              // the UI never shows a state the server doesn't actually have.
               setCard((prev: any) => prev ? { ...prev, visibility: newVis } : prev)
+              try {
+                const { error } = await supabase.from('cards').update({ visibility: newVis }).eq('id', card.id)
+                if (error) throw error
+              } catch (err: any) {
+                setCard((prev: any) => prev ? { ...prev, visibility: prevVis } : prev)
+                Alert.alert('Could not update visibility', err?.message || 'Please try again.')
+              }
             }}
           >
             <Ionicons name={card.visibility === 'public' ? 'eye' : 'eye-off'} size={14} color={card.visibility === 'public' ? Colors.green[600] : Colors.gray[500]} />
@@ -1237,24 +1266,44 @@ export default function CardDetailScreen() {
 
       {/* Share + Copy + Labels */}
       <View ref={tourRefs['download-buttons']} collapsable={false} style={s.shareRow}>
-        <TouchableOpacity style={s.shareBtn} onPress={handleShare}>
+        <TouchableOpacity
+          style={s.shareBtn}
+          onPress={handleShare}
+          accessibilityLabel="Share this card"
+          accessibilityRole="button"
+        >
           <Ionicons name="share-social" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Share</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={async () => {
-          const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
-          const url = `https://dcmgrading.com/${catPath}/${card.id}`
-          await Clipboard.setStringAsync(url)
-          Alert.alert('Link Copied', url)
-        }}>
+        <TouchableOpacity
+          style={s.shareBtn}
+          onPress={async () => {
+            const catPath = card.category?.toLowerCase().replace(' ', '') || 'other'
+            const url = `https://dcmgrading.com/${catPath}/${card.id}`
+            await Clipboard.setStringAsync(url)
+            Alert.alert('Link Copied', url)
+          }}
+          accessibilityLabel="Copy public link to clipboard"
+          accessibilityRole="button"
+        >
           <Ionicons name="copy" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Copy Link</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => setReportSheetOpen(true)}>
+        <TouchableOpacity
+          style={s.shareBtn}
+          onPress={() => setReportSheetOpen(true)}
+          accessibilityLabel="Open grading reports menu"
+          accessibilityRole="button"
+        >
           <Ionicons name="document-text" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Reports</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.shareBtn} onPress={() => setLabelSheetOpen(true)}>
+        <TouchableOpacity
+          style={s.shareBtn}
+          onPress={() => setLabelSheetOpen(true)}
+          accessibilityLabel="Open labels menu"
+          accessibilityRole="button"
+        >
           <Ionicons name="pricetags" size={16} color={Colors.purple[600]} />
           <Text style={s.shareBtnText}>Labels</Text>
         </TouchableOpacity>

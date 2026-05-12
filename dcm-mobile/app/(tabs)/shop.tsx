@@ -37,6 +37,9 @@ export default function ShopScreen() {
           style={styles.productCard}
           onPress={() => WebBrowser.openBrowserAsync(product.link)}
           activeOpacity={0.7}
+          accessibilityLabel={`${product.name} on Amazon`}
+          accessibilityHint={product.description}
+          accessibilityRole="link"
         >
           <View style={styles.imageContainer}>
             <Image source={product.image} style={styles.productImage} resizeMode="contain" />
