@@ -232,6 +232,17 @@ function ScreenViewTracker() {
 // default subject to user opt-out in OS settings.
 function ATTPromptHost() {
   useEffect(() => {
+    // Android has no ATT; initialize the Meta SDK directly at app start
+    // (auto-init is disabled in app.json so we always init explicitly).
+    if (Platform.OS === 'android') {
+      try {
+        const fbsdk = require('react-native-fbsdk-next')
+        fbsdk?.Settings?.initializeSDK?.()
+      } catch (e) {
+        if (__DEV__) console.warn('[fbsdk] android init failed:', e)
+      }
+      return
+    }
     if (Platform.OS !== 'ios') return
     if (!trackingTransparency) return // Expo Go — skip
     let cancelled = false
@@ -239,10 +250,28 @@ function ATTPromptHost() {
     // collide with launch animations or the welcome carousel render.
     const t = setTimeout(async () => {
       try {
-        const { status } = await trackingTransparency.getTrackingPermissionsAsync()
+        const cur = await trackingTransparency.getTrackingPermissionsAsync()
         if (cancelled) return
+        let status = cur.status
         if (status === 'undetermined') {
-          await trackingTransparency.requestTrackingPermissionsAsync()
+          const res = await trackingTransparency.requestTrackingPermissionsAsync()
+          if (cancelled) return
+          status = res.status
+        }
+        // Initialize Meta SDK only AFTER ATT has resolved. With
+        // isAutoInitEnabled: false in app.json, the SDK does NOT network
+        // or collect IDs on app start; it only starts after this call,
+        // and only collects the advertiser ID if the user granted ATT.
+        try {
+          const fbsdk = require('react-native-fbsdk-next')
+          if (fbsdk?.Settings?.initializeSDK) {
+            if (fbsdk.Settings.setAdvertiserTrackingEnabled) {
+              await fbsdk.Settings.setAdvertiserTrackingEnabled(status === 'granted')
+            }
+            fbsdk.Settings.initializeSDK()
+          }
+        } catch (e) {
+          if (__DEV__) console.warn('[ATT] fbsdk init failed:', e)
         }
       } catch (e) {
         if (__DEV__) console.warn('[ATT] prompt failed:', e)

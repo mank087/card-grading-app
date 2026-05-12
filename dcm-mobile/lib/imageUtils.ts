@@ -35,19 +35,33 @@ export interface CompressedImage {
  */
 const MAX_LONG_EDGE = 3000
 
-export async function compressImage(uri: string): Promise<CompressedImage> {
-  // First get original dimensions without modifying
-  const original = await ImageManipulator.manipulateAsync(uri, [], {
-    format: ImageManipulator.SaveFormat.JPEG,
-  })
+/**
+ * Compress + optionally resize. If `knownDims` is provided we skip the
+ * probe roundtrip — callers that just cropped the photo already know the
+ * dimensions, so we save one ImageManipulator pass (and one temp JPEG)
+ * per capture. On the iPad capture path this halves disk + memory churn.
+ */
+export async function compressImage(
+  uri: string,
+  knownDims?: { width: number; height: number }
+): Promise<CompressedImage> {
+  let probedW = knownDims?.width
+  let probedH = knownDims?.height
+  if (probedW == null || probedH == null) {
+    const original = await ImageManipulator.manipulateAsync(uri, [], {
+      format: ImageManipulator.SaveFormat.JPEG,
+    })
+    probedW = original.width
+    probedH = original.height
+  }
 
   // Resize so the long edge is no more than MAX_LONG_EDGE. Resize on the
   // longer dimension preserves aspect; ImageManipulator's `resize:{width}`
   // / `resize:{height}` keeps the other dimension proportional.
   const actions: ImageManipulator.Action[] = []
-  if (original.width >= original.height && original.width > MAX_LONG_EDGE) {
+  if (probedW >= probedH && probedW > MAX_LONG_EDGE) {
     actions.push({ resize: { width: MAX_LONG_EDGE } })
-  } else if (original.height > original.width && original.height > MAX_LONG_EDGE) {
+  } else if (probedH > probedW && probedH > MAX_LONG_EDGE) {
     actions.push({ resize: { height: MAX_LONG_EDGE } })
   }
 
@@ -87,7 +101,7 @@ export async function compressImage(uri: string): Promise<CompressedImage> {
 export async function cropToCardAspect(
   uri: string,
   orientation: 'portrait' | 'landscape' = 'portrait'
-): Promise<string> {
+): Promise<{ uri: string; width: number; height: number }> {
   const original = await ImageManipulator.manipulateAsync(uri, [], {
     format: ImageManipulator.SaveFormat.JPEG,
   })
@@ -119,20 +133,18 @@ export async function cropToCardAspect(
   const originX = Math.max(0, Math.round((width - cropWidth) / 2))
   const originY = Math.max(0, Math.round((height - cropHeight) / 2))
 
+  const finalW = Math.min(cropWidth, width - originX)
+  const finalH = Math.min(cropHeight, height - originY)
+
   const cropped = await ImageManipulator.manipulateAsync(
     uri,
-    [{
-      crop: {
-        originX,
-        originY,
-        width: Math.min(cropWidth, width - originX),
-        height: Math.min(cropHeight, height - originY),
-      }
-    }],
+    [{ crop: { originX, originY, width: finalW, height: finalH } }],
     { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
   )
 
-  return cropped.uri
+  // Return dims so compressImage can skip its own probe pass — saves one
+  // ImageManipulator roundtrip + one temp JPEG per capture.
+  return { uri: cropped.uri, width: cropped.width, height: cropped.height }
 }
 
 /**

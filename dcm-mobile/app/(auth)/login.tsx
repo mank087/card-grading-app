@@ -103,8 +103,10 @@ export default function LoginScreen() {
         provider: 'facebook',
         options: { redirectTo: redirectUrl, skipBrowserRedirect: true },
       })
-      console.log('[OAuth] facebook auth URL:', data?.url?.slice(0, 120))
-      console.log('[OAuth] facebook redirectUrl:', redirectUrl)
+      if (__DEV__) {
+        console.log('[OAuth] facebook auth URL:', data?.url?.slice(0, 120))
+        console.log('[OAuth] facebook redirectUrl:', redirectUrl)
+      }
       if (oauthError) throw oauthError
       if (!data?.url) throw new Error('Supabase returned no auth URL — is the Facebook provider enabled?')
 
@@ -115,7 +117,8 @@ export default function LoginScreen() {
       // through Facebook → Supabase callback → dcmgrading:// and resolves
       // when it sees the URL prefix matches `redirectUrl`.
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl)
-      console.log('[OAuth] facebook WebBrowser result type:', result.type, 'url:', (result as any).url?.slice(0, 200))
+      // Result URL contains the OAuth code/state — never log in production.
+      if (__DEV__) console.log('[OAuth] facebook WebBrowser result type:', result.type, 'url:', (result as any).url?.slice(0, 200))
       if (result.type === 'success' && result.url) {
         const ok = await completeOAuthFromUrl(result.url, supabase)
         if (!ok.ok) setError(ok.error || 'Facebook sign-in failed.')
@@ -136,7 +139,7 @@ export default function LoginScreen() {
     setOauthLoading(provider)
     try {
       const redirectUrl = makeRedirectUri({ scheme: 'dcmgrading' })
-      console.log('[OAuth]', provider, 'redirectUrl:', redirectUrl)
+      if (__DEV__) console.log('[OAuth]', provider, 'redirectUrl:', redirectUrl)
       // Google: prompt=select_account → forces account picker even when
       // the system browser has an existing session.
       // (Facebook is handled by handleFacebook() above using the native
@@ -150,7 +153,7 @@ export default function LoginScreen() {
           queryParams,
         },
       })
-      console.log('[OAuth]', provider, 'signInWithOAuth →', { error: error?.message, hasUrl: !!data?.url, url: data?.url?.slice(0, 120) })
+      if (__DEV__) console.log('[OAuth]', provider, 'signInWithOAuth →', { error: error?.message, hasUrl: !!data?.url, url: data?.url?.slice(0, 120) })
 
       if (error) {
         setError(error.message)
@@ -167,11 +170,12 @@ export default function LoginScreen() {
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectUrl, {
         preferEphemeralSession: true,
       })
-      console.log('[OAuth]', provider, 'WebBrowser result type:', result.type, 'url:', (result as any).url?.slice(0, 200))
+      // Result URL contains the OAuth code/state — never log in production.
+      if (__DEV__) console.log('[OAuth]', provider, 'WebBrowser result type:', result.type, 'url:', (result as any).url?.slice(0, 200))
 
       if (result.type === 'success' && result.url) {
         const ok = await completeOAuthFromUrl(result.url, supabase)
-        console.log('[OAuth]', provider, 'completeOAuth →', ok)
+        if (__DEV__) console.log('[OAuth]', provider, 'completeOAuth →', ok)
         if (!ok.ok) setError(ok.error || 'Sign in failed. Please try again.')
         else if (provider === 'google') trackLogin('google')
       } else if (result.type === 'cancel' || result.type === 'dismiss') {

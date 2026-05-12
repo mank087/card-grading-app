@@ -43,7 +43,7 @@ export async function purchaseCredits(tier: string): Promise<{
       return { error: 'Please sign in to purchase credits' }
     }
 
-    console.log('[Stripe] Creating payment intent for tier:', tier)
+    if (__DEV__) console.log('[Stripe] Creating payment intent for tier:', tier)
 
     // Step 1: Create PaymentIntent on server
     const response = await fetch(`${API_BASE}/api/stripe/create-payment-intent`, {
@@ -62,7 +62,7 @@ export async function purchaseCredits(tier: string): Promise<{
     }
 
     const data = await response.json()
-    console.log('[Stripe] PaymentIntent created:', {
+    if (__DEV__) console.log('[Stripe] PaymentIntent created:', {
       tier: data.tier,
       credits: data.totalCredits,
       price: data.price,
@@ -89,7 +89,7 @@ export async function purchaseCredits(tier: string): Promise<{
 
     if (presentError) {
       if (presentError.code === 'Canceled') {
-        console.log('[Stripe] User cancelled payment')
+        if (__DEV__) console.log('[Stripe] User cancelled payment')
         return { error: undefined } // Not an error, just cancelled
       }
       console.error('[Stripe] Payment error:', presentError)
@@ -97,7 +97,7 @@ export async function purchaseCredits(tier: string): Promise<{
     }
 
     // Step 4: Payment succeeded — webhook will grant credits
-    console.log('[Stripe] Payment successful!')
+    if (__DEV__) console.log('[Stripe] Payment successful!')
 
     return {
       success: true,

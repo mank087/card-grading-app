@@ -957,7 +957,12 @@ export default function CardDetailScreen() {
 
       {/* Edit Card Info Modal */}
       <Modal visible={editOpen} transparent animationType="slide" onRequestClose={() => setEditOpen(false)}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+        {/* iOS uses 'padding' so the bottom sheet lifts above the keyboard.
+            Android historically lifted automatically via softInputMode but
+            that breaks on edge-to-edge layouts where the input gets covered;
+            'height' shrinks the layout to the area above the keyboard so
+            the bottom form fields stay reachable. */}
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
           <Pressable style={s.editBackdrop} onPress={() => setEditOpen(false)}>
             <Pressable style={[s.editSheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
               <View style={s.editHandle} />

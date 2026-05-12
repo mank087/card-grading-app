@@ -167,7 +167,14 @@ export default function CollectionScreen() {
       if (data && data.length > 0) {
         const paths = data.map(c => c.front_path).filter(Boolean)
         if (paths.length > 0) {
-          const { data: urls } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
+          // Check both the destructured error AND the urls array — a network
+          // hiccup here used to silently leave every card with a null
+          // front_url and an empty placeholder. Warn so the issue shows up
+          // in Sentry, and fall through with whatever URLs we did get.
+          const { data: urls, error: signErr } = await supabase.storage.from('cards').createSignedUrls(paths, 3600)
+          if (signErr) {
+            console.warn('[collection] createSignedUrls failed:', signErr.message)
+          }
           const urlMap = new Map<string, string>()
           urls?.forEach(u => { if (u.signedUrl && u.path) urlMap.set(u.path, u.signedUrl) })
           data.forEach((c: any) => { c.front_url = urlMap.get(c.front_path) || null })

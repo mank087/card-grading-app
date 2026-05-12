@@ -74,8 +74,8 @@ export default function CaptureScreen() {
   const processImage = async (rawUri: string) => {
     setIsProcessing(true)
     try {
-      const croppedUri = await cropToCardAspect(rawUri, orientation)
-      const compressed = await compressImage(croppedUri)
+      const cropped = await cropToCardAspect(rawUri, orientation)
+      const compressed = await compressImage(cropped.uri, { width: cropped.width, height: cropped.height })
       const quality = assessQuality(compressed)
       const hash = await hashImage(compressed.uri)
 
@@ -206,10 +206,10 @@ export default function CaptureScreen() {
       setIsProcessing(true)
 
       // Crop to card aspect ratio
-      const croppedUri = await cropToCardAspect(photo.uri, orientation)
+      const cropped = await cropToCardAspect(photo.uri, orientation)
 
-      // Compress
-      const compressed = await compressImage(croppedUri)
+      // Compress — pass dims so compressImage skips its probe pass
+      const compressed = await compressImage(cropped.uri, { width: cropped.width, height: cropped.height })
 
       // Quality assessment
       const quality = assessQuality(compressed)
@@ -253,7 +253,7 @@ export default function CaptureScreen() {
   const handleUseImage = () => {
     if (currentSide === 'front') {
       // Front just captured — advance to back camera
-      console.log('[Capture] Front captured, advancing to back')
+      if (__DEV__) console.log('[Capture] Front captured, advancing to back')
       setCurrentSide('back')
       setPreviewUri(null)
       setPreviewQuality(null)
@@ -262,9 +262,11 @@ export default function CaptureScreen() {
       // Use previewUri for the back since state may not have flushed yet
       const finalFrontUri = frontUri!
       const finalBackUri = previewUri!
-      console.log('[Capture] Both captured, navigating to review')
-      console.log('[Capture] Front URI:', finalFrontUri?.substring(0, 50))
-      console.log('[Capture] Back URI:', finalBackUri?.substring(0, 50))
+      if (__DEV__) {
+        console.log('[Capture] Both captured, navigating to review')
+        console.log('[Capture] Front URI:', finalFrontUri?.substring(0, 50))
+        console.log('[Capture] Back URI:', finalBackUri?.substring(0, 50))
+      }
 
       router.push({
         pathname: '/grade/review',

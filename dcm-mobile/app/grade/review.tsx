@@ -69,19 +69,27 @@ export default function ReviewScreen() {
       const frontPath = `${user.id}/${cardId}/front.jpg`
       const backPath = `${user.id}/${cardId}/back.jpg`
 
-      console.log('[Upload] Starting upload for card:', cardId)
-      console.log('[Upload] Front URI:', params.frontUri.substring(0, 60))
-      console.log('[Upload] Back URI:', params.backUri.substring(0, 60))
+      if (__DEV__) {
+        console.log('[Upload] Starting upload for card:', cardId)
+        console.log('[Upload] Front URI:', params.frontUri.substring(0, 60))
+        console.log('[Upload] Back URI:', params.backUri.substring(0, 60))
+      }
 
       // Convert images to ArrayBuffer for Supabase upload
       const frontBuffer = await uriToArrayBuffer(params.frontUri)
       const backBuffer = await uriToArrayBuffer(params.backUri)
 
-      console.log('[Upload] Front buffer size:', frontBuffer.byteLength)
-      console.log('[Upload] Back buffer size:', backBuffer.byteLength)
+      if (__DEV__) {
+        console.log('[Upload] Front buffer size:', frontBuffer.byteLength)
+        console.log('[Upload] Back buffer size:', backBuffer.byteLength)
+      }
 
-      // Upload to Supabase Storage
-      const [frontUpload, backUpload] = await Promise.all([
+      // Upload to Supabase Storage. allSettled (not Promise.all) so a
+      // network drop mid-flight surfaces BOTH error messages instead of
+      // one rejection killing the batch — easier to debug + user gets a
+      // useful "couldn't upload front and back" rather than a hidden
+      // partial failure.
+      const [frontSettled, backSettled] = await Promise.allSettled([
         supabase.storage.from('cards').upload(frontPath, frontBuffer, {
           contentType: 'image/jpeg',
           upsert: false,
@@ -92,16 +100,22 @@ export default function ReviewScreen() {
         }),
       ])
 
-      if (frontUpload.error) {
-        console.error('[Upload] Front upload error:', frontUpload.error)
-        throw new Error(`Front upload failed: ${frontUpload.error.message}`)
-      }
-      if (backUpload.error) {
-        console.error('[Upload] Back upload error:', backUpload.error)
-        throw new Error(`Back upload failed: ${backUpload.error.message}`)
+      const frontErr = frontSettled.status === 'rejected'
+        ? (frontSettled.reason as any)?.message || 'upload threw'
+        : frontSettled.value.error?.message
+      const backErr = backSettled.status === 'rejected'
+        ? (backSettled.reason as any)?.message || 'upload threw'
+        : backSettled.value.error?.message
+
+      if (frontErr || backErr) {
+        if (frontErr) console.error('[Upload] Front upload error:', frontErr)
+        if (backErr) console.error('[Upload] Back upload error:', backErr)
+        const which = frontErr && backErr ? 'Front and back uploads' : frontErr ? 'Front upload' : 'Back upload'
+        const msg = frontErr && backErr ? `${frontErr} | ${backErr}` : (frontErr || backErr)
+        throw new Error(`${which} failed: ${msg}`)
       }
 
-      console.log('[Upload] Images uploaded successfully')
+      if (__DEV__) console.log('[Upload] Images uploaded successfully')
 
       // Get serial number
       let serial = String(Date.now()).slice(-6) + String(Math.floor(Math.random() * 10000)).padStart(4, '0')
@@ -113,7 +127,7 @@ export default function ReviewScreen() {
         }
       } catch { /* use fallback serial */ }
 
-      console.log('[Upload] Serial:', serial)
+      if (__DEV__) console.log('[Upload] Serial:', serial)
 
       // Build condition report payload
       const conditionPayload = noDefects
@@ -149,7 +163,7 @@ export default function ReviewScreen() {
         throw new Error(`Database error: ${dbError.message}`)
       }
 
-      console.log('[Upload] Card record created')
+      if (__DEV__) console.log('[Upload] Card record created')
 
       // Deduct credit via API (same as web — handles tracking)
       try {
@@ -163,7 +177,7 @@ export default function ReviewScreen() {
           },
           body: JSON.stringify({ cardId }),
         })
-        console.log('[Upload] Credit deducted via API')
+        if (__DEV__) console.log('[Upload] Credit deducted via API')
       } catch (creditErr) {
         console.warn('[Upload] API credit deduction failed, falling back to direct:', creditErr)
         // Fallback: direct Supabase update

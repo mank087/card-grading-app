@@ -75,6 +75,12 @@ export default function ProcessingScreen() {
   const pollCountRef = useRef(0)
   const isCompleteRef = useRef(false)
   const [gradingError, setGradingError] = useState(false)
+  // Tracks whether the trigger fetch failed (network OR non-OK status).
+  // Polling continues in the background regardless — sometimes the backend
+  // picks up the card via a separate worker — but we surface a banner so
+  // the user knows something looked off and can re-fire the trigger.
+  const [triggerFailed, setTriggerFailed] = useState(false)
+  const [triggerNonce, setTriggerNonce] = useState(0)
 
   // Trigger grading API (fire-and-forget — don't await)
   useEffect(() => {
@@ -82,13 +88,18 @@ export default function ProcessingScreen() {
     const endpoint = CATEGORY_ROUTES[params.category] || 'other'
     const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
     const url = `${API_BASE}/api/${endpoint}/${params.cardId}`
-    console.log('[Processing] Triggering grading API:', url)
-    fetch(url).then(r => {
-      console.log('[Processing] Grading API response:', r.status)
-    }).catch(err => {
-      console.warn('[Processing] Grading API error (will poll anyway):', err.message)
-    })
-  }, [params.cardId, params.category])
+    if (__DEV__) console.log('[Processing] Triggering grading API:', url)
+    setTriggerFailed(false)
+    fetch(url)
+      .then(r => {
+        if (__DEV__) console.log('[Processing] Grading API response:', r.status)
+        if (!r.ok) setTriggerFailed(true)
+      })
+      .catch(err => {
+        if (__DEV__) console.warn('[Processing] Grading API error (will poll anyway):', err?.message)
+        setTriggerFailed(true)
+      })
+  }, [params.cardId, params.category, triggerNonce])
 
   // Poll for grading completion. Effect deps deliberately exclude
   // `isComplete` — when grade is found we clear the interval inline
@@ -98,7 +109,7 @@ export default function ProcessingScreen() {
   useEffect(() => {
     if (!params.cardId) return
 
-    console.log('[Processing] Starting poll for card:', params.cardId)
+    if (__DEV__) console.log('[Processing] Starting poll for card:', params.cardId)
 
     const markComplete = (g: number) => {
       isCompleteRef.current = true
@@ -121,13 +132,13 @@ export default function ProcessingScreen() {
           .single()
 
         if (error) {
-          console.log('[Processing] Poll error:', error.message)
+          if (__DEV__) console.log('[Processing] Poll error:', error.message)
           return
         }
 
         // Check if grade is set
         if (data?.conversational_whole_grade) {
-          console.log('[Processing] Grade found:', data.conversational_whole_grade)
+          if (__DEV__) console.log('[Processing] Grade found:', data.conversational_whole_grade)
           markComplete(data.conversational_whole_grade)
           return
         }
@@ -138,16 +149,16 @@ export default function ProcessingScreen() {
             const json = JSON.parse(data.conversational_grading)
             const extractedGrade = json.final_grade?.whole_grade || json.grading_passes?.averaged_rounded?.final
             if (extractedGrade) {
-              console.log('[Processing] Grade found in JSON but not in column:', extractedGrade)
+              if (__DEV__) console.log('[Processing] Grade found in JSON but not in column:', extractedGrade)
               markComplete(Math.round(extractedGrade))
               return
             }
           } catch { /* JSON parse failed, continue polling */ }
         }
 
-        console.log('[Processing] Poll #' + pollCountRef.current + ' — no grade yet')
+        if (__DEV__) console.log('[Processing] Poll #' + pollCountRef.current + ' — no grade yet')
       } catch (err) {
-        console.log('[Processing] Poll exception:', err)
+        if (__DEV__) console.log('[Processing] Poll exception:', err)
       }
     }, 5000)
 
@@ -156,7 +167,7 @@ export default function ProcessingScreen() {
     // false captured at effect-mount time).
     const timeout = setTimeout(() => {
       if (!isCompleteRef.current) {
-        console.log('[Processing] Timeout reached — grading may have failed')
+        if (__DEV__) console.log('[Processing] Timeout reached — grading may have failed')
         setGradingError(true)
         if (pollRef.current) clearInterval(pollRef.current)
       }
@@ -283,6 +294,18 @@ export default function ProcessingScreen() {
         </View>
       )}
 
+      {/* Trigger-failure banner — polling continues but warn the user
+          something looked off + offer to re-fire the trigger. */}
+      {!isComplete && !gradingError && triggerFailed && (
+        <View style={styles.warnContainer}>
+          <Ionicons name="warning" size={20} color={Colors.amber[400]} />
+          <Text style={styles.warnText}>
+            We couldn{'’'}t confirm the grading job started. Still checking in case it kicked off anyway.
+          </Text>
+          <Button title="Retry" variant="secondary" size="sm" onPress={() => setTriggerNonce(n => n + 1)} />
+        </View>
+      )}
+
       {/* Timing info */}
       {!isComplete && !gradingError && (
         <Text style={styles.timingText}>
@@ -373,4 +396,8 @@ const styles = StyleSheet.create({
   errorContainer: { alignItems: 'center', backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 16, padding: 24, marginTop: 16, borderWidth: 1, borderColor: 'rgba(245,158,11,0.3)' },
   errorTitle: { fontSize: 16, fontWeight: '700', color: Colors.amber[500], marginTop: 8, textAlign: 'center' },
   errorText: { fontSize: 13, color: Colors.gray[400], textAlign: 'center', marginTop: 8, lineHeight: 18 },
+
+  // Trigger-failure banner (less severe than full timeout)
+  warnContainer: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(245,158,11,0.10)', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)' },
+  warnText: { flex: 1, fontSize: 12, color: Colors.gray[300], lineHeight: 17 },
 })
