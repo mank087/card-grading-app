@@ -210,6 +210,12 @@
         "projectId": "382e423a-3284-4156-b21a-e9578f2a2f99"
       }
     },
+    "updates": {
+      "enabled": false
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "owner": "dcm_grading"
   }
 }
