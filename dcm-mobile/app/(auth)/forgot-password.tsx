@@ -126,7 +126,7 @@ export default function ForgotPasswordScreen() {
         </View>
 
         <Text style={styles.help}>
-          Need help? <Text style={styles.helpLink} onPress={() => Linking.openURL('mailto:support@dcmgrading.com?subject=Password%20reset%20help')}>Contact support</Text>
+          Need help? <Text style={styles.helpLink} onPress={() => Linking.openURL('mailto:admin@dcmgrading.com?subject=Password%20reset%20help')}>Contact support</Text>
         </Text>
         </ResponsiveContainer>
       </ScrollView>
