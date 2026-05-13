@@ -14,7 +14,7 @@
  */
 
 import { useState } from 'react'
-import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image, TouchableOpacity } from 'react-native'
+import { View, Text, TextInput, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, Image, TouchableOpacity, Linking } from 'react-native'
 import { Link, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
@@ -126,7 +126,7 @@ export default function ForgotPasswordScreen() {
         </View>
 
         <Text style={styles.help}>
-          Need help? <Text style={styles.helpLink} onPress={() => {/* could open mailto */}}>Contact support</Text>
+          Need help? <Text style={styles.helpLink} onPress={() => Linking.openURL('mailto:support@dcmgrading.com?subject=Password%20reset%20help')}>Contact support</Text>
         </Text>
         </ResponsiveContainer>
       </ScrollView>
