@@ -635,7 +635,7 @@ export default function LabelStudioScreen() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ customFields: payload }),
       })
       if (!res.ok) {
         const body = await res.json().catch(() => ({} as any))
