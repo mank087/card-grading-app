@@ -176,11 +176,11 @@ export default function LabelStudioScreen() {
     if (!session?.user) return
     const { data, error } = await supabase
       .from('cards')
-      .select('id, serial, front_path, back_path, card_name, featured, category, card_set, release_date, card_number, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
+      .select('id, serial, front_path, back_path, card_name, featured, category, card_set, release_date, card_number, manufacturer_name, conversational_whole_grade, conversational_condition_label, conversational_card_info, conversational_weighted_sub_scores, conversational_sub_scores, card_colors, custom_label_data')
       .eq('user_id', session.user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(1000)
 
     if (!error && data) setCards(data)
     setIsLoading(false)
@@ -851,14 +851,26 @@ export default function LabelStudioScreen() {
   }, [labelPreviewUrl])
 
   // ---- Filter cards ----
+  // Matches the collection tab's search behavior: searches across every
+  // user-visible field (name, set, number, year, category, manufacturer,
+  // serial, featured emblem, plus the AI-extracted card_name and player).
+  // No result cap — FlatList virtualizes, so a 1000-row list is cheap.
   const filtered = useMemo(() => {
-    if (!search.trim()) return cards.slice(0, 20)
+    if (!search.trim()) return cards
     const q = search.toLowerCase()
-    return cards.filter(c =>
-      (c.card_name || '').toLowerCase().includes(q) ||
-      (c.serial || '').toLowerCase().includes(q) ||
-      (c.featured || '').toLowerCase().includes(q)
-    ).slice(0, 20)
+    return cards.filter(c => {
+      const ci = c.conversational_card_info
+      return (c.card_name || '').toLowerCase().includes(q) ||
+        (c.featured || '').toLowerCase().includes(q) ||
+        (c.serial || '').toLowerCase().includes(q) ||
+        (c.card_set || '').toLowerCase().includes(q) ||
+        (c.card_number || '').toLowerCase().includes(q) ||
+        (c.release_date || '').toLowerCase().includes(q) ||
+        (c.manufacturer_name || '').toLowerCase().includes(q) ||
+        (c.category || '').toLowerCase().includes(q) ||
+        (ci?.card_name || '').toLowerCase().includes(q) ||
+        (ci?.player_or_character || '').toLowerCase().includes(q)
+    })
   }, [cards, search])
 
   // ---- Loading ----
