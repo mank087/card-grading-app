@@ -17,7 +17,6 @@
       "supportsTablet": true,
       "requireFullScreen": false,
       "bundleIdentifier": "com.dcmgrading.app",
-      "buildNumber": "1",
       "usesAppleSignIn": true,
       "googleServicesFile": "./GoogleService-Info.plist",
       "associatedDomains": [
