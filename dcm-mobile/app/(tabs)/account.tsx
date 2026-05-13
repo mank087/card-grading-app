@@ -138,7 +138,7 @@ export default function AccountScreen() {
                     } catch (err: any) {
                       Alert.alert(
                         'Delete failed',
-                        err?.message || 'Something went wrong. Please contact support@dcmgrading.com to delete your account manually.',
+                        err?.message || 'Something went wrong. Please contact admin@dcmgrading.com to delete your account manually.',
                       )
                     }
                   },
