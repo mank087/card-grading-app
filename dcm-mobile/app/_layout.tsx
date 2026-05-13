@@ -153,11 +153,14 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   }, [router])
 
   // Unauthenticated users always see the welcome carousel as the home
-  // screen, except when they've explicitly navigated to login/register.
-  // Logging out drops them back here.
+  // screen, except when they've explicitly navigated to login/register
+  // or to a public legal page (terms / privacy) reachable from the
+  // sign-up acknowledgment links. Logging out drops them back here.
   if (!isLoading && !user) {
     const inAuthGroup = segments[0] === '(auth)'
-    if (!inAuthGroup) {
+    const isPublicLegalPage =
+      segments[0] === 'pages' && (segments[1] === 'terms' || segments[1] === 'privacy')
+    if (!inAuthGroup && !isPublicLegalPage) {
       // Suspense fallback matches the carousel's bg color (#0f0a1a) so
       // the 1-frame load gap looks like the carousel is just appearing,
       // not a flash of white.
