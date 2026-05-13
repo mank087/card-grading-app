@@ -275,15 +275,26 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     ...FontAwesome.font,
   })
+
+  // Hide the splash as soon as fonts load, fonts error, or a 2-second
+  // safety timeout fires. Background: a production iOS build (v1.0 build
+  // 6) hung indefinitely on the splash screen on iPad — JS launched and
+  // native init finished, but useFonts never resolved, so the previous
+  // `if (!loaded) return null` kept the entire tree unmounted forever.
+  // System fonts are an acceptable fallback; better to show a slightly
+  // unstyled app than a frozen splash forever.
   useEffect(() => {
-    if (error) throw error
+    if (loaded || error) {
+      SplashScreen.hideAsync()
+      return
+    }
+    const t = setTimeout(() => { SplashScreen.hideAsync() }, 2000)
+    return () => clearTimeout(t)
+  }, [loaded, error])
+
+  useEffect(() => {
+    if (error && __DEV__) console.warn('[RootLayout] useFonts error:', error)
   }, [error])
-
-  useEffect(() => {
-    if (loaded) SplashScreen.hideAsync()
-  }, [loaded])
-
-  if (!loaded) return null
 
   return (
     <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.dcmgrading">
