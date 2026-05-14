@@ -196,7 +196,8 @@
         {
           "userTrackingPermission": "We use this to measure how DCM Grading ads perform and to improve your experience. You can change this anytime in Settings."
         }
-      ]
+      ],
+      "react-native-iap"
     ],
     "experiments": {
       "typedRoutes": true
