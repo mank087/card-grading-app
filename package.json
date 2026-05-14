@@ -11,6 +11,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@apple/app-store-server-library": "^3.1.0",
     "@react-pdf/renderer": "^4.3.1",
     "@stripe/stripe-js": "^8.5.3",
     "@supabase/auth-ui-react": "^0.4.7",
@@ -21,6 +22,7 @@
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.2.3",
     "ebay-api": "^9.4.0",
+    "googleapis": "^171.4.0",
     "heic2any": "^0.0.4",
     "jspdf": "^3.0.4",
     "next": "^15.5.9",
