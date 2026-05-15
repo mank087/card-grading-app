@@ -2,11 +2,11 @@
  * Native credits purchase screen — replaces the previous WebView wrapper
  * that pointed at /credits on the web. Required by Apple guideline 3.1.1
  * (digital content must use StoreKit IAP, not external web checkout).
- * Android uses the equivalent Google Play Billing path through the same
- * react-native-iap wrapper.
  *
- * UI: list of credit packs. Tap one → native store sheet appears → user
- * confirms → backend verifies → CreditsContext refreshes.
+ * UI: a list of credit packs, each rendered as a branded banner image
+ * (Basic / Pro / Elite / VIP) with the live store price below. Tap a
+ * pack → native store sheet appears → user confirms → backend verifies
+ * → CreditsContext refreshes.
  *
  * The web /credits page continues to handle desktop / browser users on
  * dcmgrading.com — Stripe checkout unchanged.
@@ -21,6 +21,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
@@ -39,10 +40,16 @@ import {
   purchaseCreditPack,
   restorePurchases,
   formatProductPrice,
-  getProductDisplayName,
   getProductNumericPrice,
 } from '@/lib/iap'
 import type { Product } from 'react-native-iap'
+
+const PACK_IMAGES: Record<IAPProductId, any> = {
+  'dcm.credits.basic': require('@/assets/images/credits/basic.png'),
+  'dcm.credits.pro': require('@/assets/images/credits/pro.png'),
+  'dcm.credits.elite': require('@/assets/images/credits/elite.png'),
+  'dcm.credits.vip': require('@/assets/images/credits/vip.png'),
+}
 
 export default function CreditsScreen() {
   const router = useRouter()
@@ -74,8 +81,8 @@ export default function CreditsScreen() {
         setLoadingProducts(false)
       }
 
-      // Wire purchase listeners — these fire when StoreKit/Play Billing
-      // hands back a completed transaction (the user finished the native dialog).
+      // Wire purchase listeners — these fire when StoreKit hands back a
+      // completed transaction (the user finished the native dialog).
       cleanup = attachPurchaseListeners({
         onSuccess: async (creditsGranted) => {
           setPurchasing(null)
@@ -91,6 +98,9 @@ export default function CreditsScreen() {
           setPurchasing(null)
           setErrorMessage(msg)
         },
+        onCancel: () => {
+          setPurchasing(null)
+        },
       })
     })()
 
@@ -98,7 +108,6 @@ export default function CreditsScreen() {
       cleanup?.()
       // Don't disconnect on unmount — other screens may also use IAP.
       // The connection is cheap to keep alive for the app lifecycle.
-      // disconnect() is reserved for app-level teardown if we ever need it.
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -143,9 +152,10 @@ export default function CreditsScreen() {
     }
   }, [refreshCredits])
 
-  // Map store-returned products by id for quick lookup. Falls back to
-  // CREDIT_PACKS metadata for credits + label if the store hasn't returned
-  // the product yet (still loading or unavailable in this storefront).
+  const openTerms = () => router.push('/pages/terms' as any)
+  const openPrivacy = () => router.push('/pages/privacy' as any)
+
+  // Map store-returned products by id for quick lookup.
   const productById = new Map(products.map((p) => [p.id, p]))
 
   return (
@@ -176,8 +186,8 @@ export default function CreditsScreen() {
           <View style={st.emptyBox}>
             <Ionicons name="alert-circle-outline" size={24} color={Colors.gray[500]} />
             <Text style={st.emptyText}>
-              Credit packs are not available right now. Please check your App Store / Play Store
-              account and try again.
+              Credit packs are not available right now. Please make sure you are signed in to
+              the App Store and try again.
             </Text>
           </View>
         )}
@@ -186,15 +196,15 @@ export default function CreditsScreen() {
           CREDIT_PACKS.map((pack) => {
             const storeProduct = productById.get(pack.productId)
             // Only show packs the store actually returned (i.e. approved + live).
-            // During first-time setup before Apple/Google approve the IAPs,
-            // this gracefully hides un-approved products.
+            // During first-time setup before Apple approves the IAPs, this
+            // gracefully hides un-approved products.
             if (!storeProduct) return null
             const isPurchasing = purchasing === pack.productId
             const isAnyPurchasing = purchasing !== null
             const numericPrice = getProductNumericPrice(storeProduct)
             const perCredit =
-              pack.credits > 0 && numericPrice > 0
-                ? `$${(numericPrice / pack.credits).toFixed(2)}/credit`
+              pack.credits > 1 && numericPrice > 0
+                ? `$${(numericPrice / pack.credits).toFixed(2)} per credit`
                 : ''
             return (
               <TouchableOpacity
@@ -206,34 +216,30 @@ export default function CreditsScreen() {
                 ]}
                 onPress={() => handlePurchase(pack.productId)}
                 disabled={isAnyPurchasing}
+                activeOpacity={0.85}
                 accessibilityRole="button"
                 accessibilityLabel={`Buy ${pack.credits} credits for ${formatProductPrice(storeProduct)}`}
               >
-                <View style={st.packLeft}>
-                  <Text style={st.packCredits}>
-                    {pack.credits} {pack.credits === 1 ? 'Credit' : 'Credits'}
-                  </Text>
-                  <Text style={st.packLabel}>
-                    {getProductDisplayName(storeProduct, pack.label)}
-                  </Text>
-                  {perCredit !== '' && pack.credits > 1 && (
-                    <Text style={st.packPerCredit}>{perCredit}</Text>
-                  )}
-                  {pack.highlighted && (
-                    <View style={st.bestValueBadge}>
-                      <Text style={st.bestValueText}>BEST VALUE</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={st.packRight}>
-                  {isPurchasing ? (
-                    <ActivityIndicator size="small" color={Colors.purple[600]} />
-                  ) : (
-                    <>
-                      <Text style={st.packPrice}>{formatProductPrice(storeProduct)}</Text>
-                      <Ionicons name="chevron-forward" size={18} color={Colors.gray[400]} />
-                    </>
-                  )}
+                <Image
+                  source={PACK_IMAGES[pack.productId]}
+                  style={st.packImage}
+                  resizeMode="cover"
+                />
+                <View style={st.packFooter}>
+                  <View style={st.packFooterLeft}>
+                    <Text style={st.packPrice}>{formatProductPrice(storeProduct)}</Text>
+                    {perCredit !== '' && <Text style={st.packPerCredit}>{perCredit}</Text>}
+                  </View>
+                  <View style={st.packFooterRight}>
+                    {isPurchasing ? (
+                      <ActivityIndicator size="small" color={Colors.purple[600]} />
+                    ) : (
+                      <View style={st.buyChip}>
+                        <Text style={st.buyChipText}>Buy</Text>
+                        <Ionicons name="chevron-forward" size={14} color="#fff" />
+                      </View>
+                    )}
+                  </View>
                 </View>
               </TouchableOpacity>
             )
@@ -248,12 +254,20 @@ export default function CreditsScreen() {
 
         <View style={st.fineprint}>
           <Text style={st.fineprintText}>
-            Payment will be charged to your{' '}
-            {/* Platform-aware label */}
-            App Store / Play Store account. Purchases are processed by Apple or Google;
-            DCM Grading receives the order and grants credits to your account immediately.
-            Credits never expire and are shared across web and mobile.
+            Payment will be charged to your Apple ID at confirmation of purchase. Credits are
+            added to your account immediately and never expire. Credits and purchases are shared
+            between the DCM Grading app and dcmgrading.com.
           </Text>
+        </View>
+
+        <View style={st.legalLinks}>
+          <TouchableOpacity onPress={openTerms} accessibilityRole="link">
+            <Text style={st.legalLink}>Terms of Service</Text>
+          </TouchableOpacity>
+          <Text style={st.legalSep}>·</Text>
+          <TouchableOpacity onPress={openPrivacy} accessibilityRole="link">
+            <Text style={st.legalLink}>Privacy Policy</Text>
+          </TouchableOpacity>
         </View>
 
         <TouchableOpacity
@@ -335,37 +349,45 @@ const st = StyleSheet.create({
   emptyText: { flex: 1, fontSize: 13, color: Colors.gray[700], lineHeight: 18 },
 
   packCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 10,
+    borderRadius: 14,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: Colors.gray[200],
+    overflow: 'hidden',
   },
   packCardHighlighted: {
-    borderColor: Colors.purple[600],
+    borderColor: Colors.purple[400],
     borderWidth: 2,
-    backgroundColor: Colors.purple[50],
   },
   packCardDimmed: { opacity: 0.5 },
-  packLeft: { flex: 1 },
-  packCredits: { fontSize: 17, fontWeight: '700', color: Colors.gray[900] },
-  packLabel: { fontSize: 13, color: Colors.gray[500], marginTop: 2 },
-  packPerCredit: { fontSize: 11, color: Colors.gray[400], marginTop: 4 },
-  bestValueBadge: {
-    backgroundColor: Colors.purple[600],
-    alignSelf: 'flex-start',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginTop: 6,
+  packImage: {
+    width: '100%',
+    aspectRatio: 3 / 2,
+    backgroundColor: Colors.gray[100],
   },
-  bestValueText: { color: '#fff', fontSize: 9, fontWeight: '800', letterSpacing: 1 },
-
-  packRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  packPrice: { fontSize: 16, fontWeight: '700', color: Colors.purple[700] },
+  packFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+  },
+  packFooterLeft: { flex: 1 },
+  packFooterRight: { marginLeft: 12 },
+  packPrice: { fontSize: 20, fontWeight: '800', color: Colors.gray[900] },
+  packPerCredit: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
+  buyChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: Colors.purple[600],
+    paddingVertical: 8,
+    paddingLeft: 14,
+    paddingRight: 10,
+    borderRadius: 999,
+  },
+  buyChipText: { color: '#fff', fontSize: 14, fontWeight: '700' },
 
   errorBox: {
     flexDirection: 'row',
@@ -382,6 +404,21 @@ const st = StyleSheet.create({
 
   fineprint: { marginTop: 16, paddingHorizontal: 4 },
   fineprintText: { fontSize: 11, color: Colors.gray[500], lineHeight: 16, textAlign: 'center' },
+
+  legalLinks: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 10,
+  },
+  legalLink: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.purple[600],
+    textDecorationLine: 'underline',
+  },
+  legalSep: { fontSize: 12, color: Colors.gray[400] },
 
   restoreBtn: {
     flexDirection: 'row',

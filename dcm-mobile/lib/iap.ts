@@ -107,6 +107,10 @@ export async function fetchProducts(): Promise<Product[]> {
 export interface PurchaseCallbacks {
   onSuccess: (creditsGranted: number) => void
   onError: (error: string) => void
+  /** User dismissed the native sheet without buying. Distinct from onError
+   *  so the screen can clear its purchasing spinner without showing a
+   *  red error banner. */
+  onCancel?: () => void
 }
 
 /**
@@ -133,7 +137,10 @@ export function attachPurchaseListeners(callbacks: PurchaseCallbacks): () => voi
 
   purchaseErrorSubscription = purchaseErrorListener((err: PurchaseError) => {
     console.warn('[IAP] Purchase error:', err.code, err.message)
-    if (err.code === ErrorCode.UserCancelled) return
+    if (err.code === ErrorCode.UserCancelled) {
+      callbacks.onCancel?.()
+      return
+    }
     callbacks.onError(err.message || 'Purchase failed')
   })
 

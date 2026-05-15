@@ -67,9 +67,12 @@ export async function POST(request: NextRequest) {
   // Security check: appAccountToken (set on the client at purchase time to
   // the Supabase user id) must match the authenticated user. Without this
   // a malicious client could forward someone else's receipt to claim credits.
-  if (payload.appAccountToken && payload.appAccountToken !== userId) {
-    console.warn('[apple/verify] appAccountToken mismatch', {
-      receiptUser: payload.appAccountToken,
+  // We require its presence — every purchase the mobile app initiates sets
+  // it. A missing token means the receipt didn't originate from our app's
+  // current purchase flow and should not be trusted to grant credits.
+  if (!payload.appAccountToken || payload.appAccountToken !== userId) {
+    console.warn('[apple/verify] appAccountToken mismatch or missing', {
+      receiptUser: payload.appAccountToken ?? '(none)',
       authUser: userId,
     })
     return NextResponse.json({ error: 'Receipt does not belong to this user' }, { status: 403 })

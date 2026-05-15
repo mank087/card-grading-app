@@ -69,13 +69,12 @@ export async function recordIAPTransaction(input: RecordIAPInput): Promise<Recor
     if (input.statusOverride && input.statusOverride !== existing.status) {
       await supabaseAdmin
         .from('iap_transactions')
-        .update({
-          status: input.statusOverride,
-          notification_count: supabaseAdmin.rpc as any,
-        })
+        .update({ status: input.statusOverride })
         .eq('id', existing.id)
       // Note: refund handling (reversing credits) is intentionally NOT in v1.
       // We log the status change so the data is there for an admin tool later.
+      // notification_count is bumped via a Postgres trigger (TODO) — leaving
+      // it out here avoids a races between the previous-value read and the write.
     }
     return { success: true, alreadyGranted: true, creditsGranted: 0, transactionRowId: existing.id }
   }
