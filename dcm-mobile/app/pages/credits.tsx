@@ -1,18 +1,17 @@
 /**
- * Native credits purchase screen — replaces the previous WebView wrapper
- * that pointed at /credits on the web. Required by Apple guideline 3.1.1
- * (digital content must use StoreKit IAP, not external web checkout).
+ * Native credits purchase screen — mirrors the web /credits page card
+ * layout (Basic / Pro / Elite / VIP) but uses StoreKit IAP instead of
+ * Stripe Checkout. Required by Apple guideline 3.1.1.
  *
- * UI: a list of credit packs, each rendered as a branded banner image
- * (Basic / Pro / Elite / VIP) with the live store price below. Tap a
- * pack → native store sheet appears → user confirms → backend verifies
- * → CreditsContext refreshes.
+ * Connection + listener lifecycle is managed by the v15 `useIAP` hook
+ * (the supported pattern in the Nitro architecture — survives screen
+ * remounts and reliably fires onPurchaseSuccess / onPurchaseError).
  *
  * The web /credits page continues to handle desktop / browser users on
  * dcmgrading.com — Stripe checkout unchanged.
  */
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   View,
   Text,
@@ -21,11 +20,13 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Image,
 } from 'react-native'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useIAP, ErrorCode } from 'react-native-iap'
+import type { Purchase, PurchaseError } from 'react-native-iap'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCredits } from '@/contexts/CreditsContext'
 import { Colors } from '@/lib/constants'
@@ -33,22 +34,21 @@ import AppHeaderBar from '@/components/AppHeaderBar'
 import MobileTabBar from '@/components/MobileTabBar'
 import {
   CREDIT_PACKS,
+  CreditPack,
+  IAP_PRODUCT_IDS,
   IAPProductId,
-  connect,
-  fetchProducts,
-  attachPurchaseListeners,
-  purchaseCreditPack,
-  restorePurchases,
+  BASE_PRICE_PER_CREDIT,
+  getPackByProductId,
   formatProductPrice,
   getProductNumericPrice,
+  verifyAndFinishPurchase,
 } from '@/lib/iap'
-import type { Product } from 'react-native-iap'
 
-const PACK_IMAGES: Record<IAPProductId, any> = {
-  'dcm.credits.basic': require('@/assets/images/credits/basic.png'),
-  'dcm.credits.pro': require('@/assets/images/credits/pro.png'),
-  'dcm.credits.elite': require('@/assets/images/credits/elite.png'),
-  'dcm.credits.vip': require('@/assets/images/credits/vip.png'),
+const TIER_ACCENT: Record<CreditPack['colorKey'], { text: string; bg: string; border: string }> = {
+  blue:   { text: '#2563eb', bg: '#eff6ff', border: '#dbeafe' },
+  purple: { text: '#7c3aed', bg: '#faf5ff', border: '#e9d5ff' },
+  amber:  { text: '#d97706', bg: '#fffbeb', border: '#fef3c7' },
+  silver: { text: '#4b5563', bg: '#f3f4f6', border: '#e5e7eb' },
 }
 
 export default function CreditsScreen() {
@@ -57,194 +57,152 @@ export default function CreditsScreen() {
   const { user } = useAuth()
   const { balance, refresh: refreshCredits } = useCredits()
 
-  const [products, setProducts] = useState<Product[]>([])
-  const [loadingProducts, setLoadingProducts] = useState(true)
   const [purchasing, setPurchasing] = useState<IAPProductId | null>(null)
-  const [restoring, setRestoring] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [verifying, setVerifying] = useState(false)
+  const [restoring, setRestoring] = useState(false)
 
-  // Connect to store + load products on mount. Cleanup listeners on unmount.
-  useEffect(() => {
-    let cleanup: (() => void) | null = null
-
-    ;(async () => {
+  const handlePurchaseSuccess = useCallback(
+    async (purchase: Purchase) => {
+      setVerifying(true)
       try {
-        await connect()
-        const fetched = await fetchProducts()
-        setProducts(fetched)
-      } catch (err: any) {
-        console.error('[Credits] Failed to load products:', err)
-        setErrorMessage(
-          'Could not load credit packs. Please make sure you are signed in to the App Store and try again.',
+        const creditsGranted = await verifyAndFinishPurchase(purchase)
+        await refreshCredits()
+        Alert.alert(
+          'Purchase complete',
+          creditsGranted > 0
+            ? `${creditsGranted} ${creditsGranted === 1 ? 'credit' : 'credits'} added to your account.`
+            : 'Your purchase was processed.',
         )
+      } catch (err: any) {
+        console.error('[Credits] Verify failed:', err)
+        setErrorMessage(err?.message || 'Could not verify purchase. Please contact support.')
       } finally {
-        setLoadingProducts(false)
+        setPurchasing(null)
+        setVerifying(false)
       }
+    },
+    [refreshCredits],
+  )
 
-      // Wire purchase listeners — these fire when StoreKit hands back a
-      // completed transaction (the user finished the native dialog).
-      cleanup = attachPurchaseListeners({
-        onSuccess: async (creditsGranted) => {
-          setPurchasing(null)
-          await refreshCredits()
-          Alert.alert(
-            'Purchase complete',
-            creditsGranted > 0
-              ? `${creditsGranted} ${creditsGranted === 1 ? 'credit' : 'credits'} added to your account.`
-              : 'Your purchase was processed.',
-          )
-        },
-        onError: (msg) => {
-          setPurchasing(null)
-          setErrorMessage(msg)
-        },
-        onCancel: () => {
-          setPurchasing(null)
-        },
-      })
-    })()
-
-    return () => {
-      cleanup?.()
-      // Don't disconnect on unmount — other screens may also use IAP.
-      // The connection is cheap to keep alive for the app lifecycle.
+  const handlePurchaseError = useCallback((err: PurchaseError) => {
+    console.warn('[Credits] Purchase error:', err.code, err.message)
+    setPurchasing(null)
+    if (err.code === ErrorCode.UserCancelled) {
+      // User dismissed the native sheet — no error UI.
+      return
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    setErrorMessage(err.message || 'Purchase failed. Please try again.')
   }, [])
 
-  const handlePurchase = useCallback(
-    async (productId: IAPProductId) => {
+  const {
+    connected,
+    products,
+    fetchProducts,
+    requestPurchase,
+    restorePurchases,
+  } = useIAP({
+    onPurchaseSuccess: handlePurchaseSuccess,
+    onPurchaseError: handlePurchaseError,
+  })
+
+  // Once connected, fetch the four credit-pack products from the store.
+  useEffect(() => {
+    if (!connected) return
+    fetchProducts({ skus: [...IAP_PRODUCT_IDS], type: 'in-app' }).catch((err) => {
+      console.error('[Credits] fetchProducts failed:', err)
+      setErrorMessage(
+        'Could not load credit packs. Please make sure you are signed in to the App Store and try again.',
+      )
+    })
+  }, [connected, fetchProducts])
+
+  const productById = useMemo(() => {
+    const map = new Map<string, (typeof products)[number]>()
+    for (const p of products) map.set(p.id, p)
+    return map
+  }, [products])
+
+  const handleBuy = useCallback(
+    async (pack: CreditPack) => {
       if (!user) {
         Alert.alert('Sign in required', 'Please sign in to purchase credits.')
         return
       }
+      if (!connected) {
+        setErrorMessage('Store is still connecting. Please try again in a moment.')
+        return
+      }
       setErrorMessage(null)
-      setPurchasing(productId)
+      setPurchasing(pack.productId)
       try {
-        await purchaseCreditPack(productId, user.id)
+        await requestPurchase({
+          request: {
+            apple: {
+              sku: pack.productId,
+              appAccountToken: user.id,
+              andDangerouslyFinishTransactionAutomatically: false,
+            },
+            google: {
+              skus: [pack.productId],
+              obfuscatedAccountId: user.id,
+            },
+          },
+          type: 'in-app',
+        })
+        // Result arrives via onPurchaseSuccess / onPurchaseError.
       } catch (err: any) {
-        // Purchase initiation failed (user_cancelled handled by listener)
+        console.error('[Credits] requestPurchase threw:', err)
         setPurchasing(null)
-        if (err?.code !== 'E_USER_CANCELLED') {
+        if (err?.code !== ErrorCode.UserCancelled) {
           setErrorMessage(err?.message || 'Could not start the purchase.')
         }
       }
     },
-    [user],
+    [user, connected, requestPurchase],
   )
 
   const handleRestore = useCallback(async () => {
     setRestoring(true)
     setErrorMessage(null)
     try {
-      const { processed } = await restorePurchases()
-      Alert.alert(
-        'Restore complete',
-        processed > 0
-          ? `${processed} ${processed === 1 ? 'transaction' : 'transactions'} processed.`
-          : 'No unfinished purchases to restore. Your balance is up to date.',
-      )
+      await restorePurchases()
       await refreshCredits()
+      Alert.alert('Restore complete', 'Your purchase history has been checked. Your balance is up to date.')
     } catch (err: any) {
       setErrorMessage(err?.message || 'Could not restore purchases.')
     } finally {
       setRestoring(false)
     }
-  }, [refreshCredits])
+  }, [restorePurchases, refreshCredits])
 
   const openTerms = () => router.push('/pages/terms' as any)
   const openPrivacy = () => router.push('/pages/privacy' as any)
 
-  // Map store-returned products by id for quick lookup.
-  const productById = new Map(products.map((p) => [p.id, p]))
+  const loadingProducts = connected && products.length === 0
+  const anyPurchaseInFlight = purchasing !== null || verifying
 
   return (
     <View style={st.container}>
       <AppHeaderBar showBack title="Buy Credits" />
 
-      <ScrollView style={st.scroll} contentContainerStyle={st.scrollContent}>
-        <View style={st.balanceCard}>
-          <Text style={st.balanceLabel}>Your Balance</Text>
-          <Text style={st.balanceValue}>
-            {balance} {balance === 1 ? 'credit' : 'credits'}
-          </Text>
+      <ScrollView
+        style={st.scroll}
+        contentContainerStyle={st.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Header */}
+        <Text style={st.title}>Purchase Grading Credits</Text>
+        <Text style={st.subtitle}>Get professional DCM Optic™ card grading in seconds</Text>
+
+        {/* Current balance pill */}
+        <View style={st.balancePill}>
+          <Text style={st.balancePillLabel}>Your Balance:</Text>
+          <Text style={st.balancePillValue}>{balance}</Text>
+          <Text style={st.balancePillLabel}>{balance === 1 ? 'credit' : 'credits'}</Text>
         </View>
 
-        <Text style={st.sectionTitle}>Credit Packs</Text>
-        <Text style={st.sectionSub}>
-          Each credit grades one trading card. Credits never expire.
-        </Text>
-
-        {loadingProducts && (
-          <View style={st.loadingBox}>
-            <ActivityIndicator size="small" color={Colors.purple[600]} />
-            <Text style={st.loadingText}>Loading credit packs…</Text>
-          </View>
-        )}
-
-        {!loadingProducts && products.length === 0 && (
-          <View style={st.emptyBox}>
-            <Ionicons name="alert-circle-outline" size={24} color={Colors.gray[500]} />
-            <Text style={st.emptyText}>
-              Credit packs are not available right now. Please make sure you are signed in to
-              the App Store and try again.
-            </Text>
-          </View>
-        )}
-
-        {!loadingProducts &&
-          CREDIT_PACKS.map((pack) => {
-            const storeProduct = productById.get(pack.productId)
-            // Only show packs the store actually returned (i.e. approved + live).
-            // During first-time setup before Apple approves the IAPs, this
-            // gracefully hides un-approved products.
-            if (!storeProduct) return null
-            const isPurchasing = purchasing === pack.productId
-            const isAnyPurchasing = purchasing !== null
-            const numericPrice = getProductNumericPrice(storeProduct)
-            const perCredit =
-              pack.credits > 1 && numericPrice > 0
-                ? `$${(numericPrice / pack.credits).toFixed(2)} per credit`
-                : ''
-            return (
-              <TouchableOpacity
-                key={pack.productId}
-                style={[
-                  st.packCard,
-                  pack.highlighted && st.packCardHighlighted,
-                  isAnyPurchasing && !isPurchasing && st.packCardDimmed,
-                ]}
-                onPress={() => handlePurchase(pack.productId)}
-                disabled={isAnyPurchasing}
-                activeOpacity={0.85}
-                accessibilityRole="button"
-                accessibilityLabel={`Buy ${pack.credits} credits for ${formatProductPrice(storeProduct)}`}
-              >
-                <Image
-                  source={PACK_IMAGES[pack.productId]}
-                  style={st.packImage}
-                  resizeMode="cover"
-                />
-                <View style={st.packFooter}>
-                  <View style={st.packFooterLeft}>
-                    <Text style={st.packPrice}>{formatProductPrice(storeProduct)}</Text>
-                    {perCredit !== '' && <Text style={st.packPerCredit}>{perCredit}</Text>}
-                  </View>
-                  <View style={st.packFooterRight}>
-                    {isPurchasing ? (
-                      <ActivityIndicator size="small" color={Colors.purple[600]} />
-                    ) : (
-                      <View style={st.buyChip}>
-                        <Text style={st.buyChipText}>Buy</Text>
-                        <Ionicons name="chevron-forward" size={14} color="#fff" />
-                      </View>
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )
-          })}
-
+        {/* Error banner */}
         {errorMessage && (
           <View style={st.errorBox}>
             <Ionicons name="alert-circle" size={18} color={Colors.red[600]} />
@@ -252,14 +210,156 @@ export default function CreditsScreen() {
           </View>
         )}
 
+        {/* Loading */}
+        {loadingProducts && (
+          <View style={st.loadingBox}>
+            <ActivityIndicator size="small" color={Colors.purple[600]} />
+            <Text style={st.loadingText}>Loading credit packs…</Text>
+          </View>
+        )}
+
+        {/* Empty state */}
+        {!loadingProducts && connected && products.length === 0 && (
+          <View style={st.emptyBox}>
+            <Ionicons name="alert-circle-outline" size={22} color={Colors.gray[500]} />
+            <Text style={st.emptyText}>
+              Credit packs are not available right now. Please make sure you are signed in to the
+              App Store and try again.
+            </Text>
+          </View>
+        )}
+
+        {/* Tier cards */}
+        {CREDIT_PACKS.map((pack) => {
+          const storeProduct = productById.get(pack.productId)
+          if (!storeProduct) return null
+          const accent = TIER_ACCENT[pack.colorKey]
+          const isPurchasing = purchasing === pack.productId
+          const numericPrice = getProductNumericPrice(storeProduct)
+          const savingsDollars =
+            pack.savingsPercent && numericPrice > 0
+              ? (BASE_PRICE_PER_CREDIT * pack.credits - numericPrice).toFixed(2)
+              : null
+
+          return (
+            <View
+              key={pack.productId}
+              style={[
+                st.card,
+                pack.popular && st.cardPopular,
+                pack.bestValue && st.cardBestValue,
+              ]}
+            >
+              {/* Gradient header */}
+              <LinearGradient
+                colors={pack.headerGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={st.cardHeader}
+              >
+                <View style={st.cardHeaderRow}>
+                  <View style={st.cardHeaderTitle}>
+                    <Text style={st.cardHeaderIcon}>{pack.icon}</Text>
+                    <Text style={st.cardHeaderName}>{pack.name}</Text>
+                  </View>
+                  {pack.savingsPercent ? (
+                    <View style={st.savingsBadge}>
+                      <Text style={st.savingsBadgeText}>Save {pack.savingsPercent}%</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {pack.popular && (
+                  <View style={st.popularBadge}>
+                    <Text style={st.popularBadgeText}>⭐ MOST POPULAR</Text>
+                  </View>
+                )}
+                {pack.bestValue && (
+                  <View style={st.bestValueBadge}>
+                    <Text style={st.bestValueBadgeText}>BEST VALUE</Text>
+                  </View>
+                )}
+              </LinearGradient>
+
+              {/* Body */}
+              <View style={st.cardBody}>
+                {/* Price */}
+                <View style={st.priceBlock}>
+                  <Text style={st.priceText}>{formatProductPrice(storeProduct)}</Text>
+                  <Text style={st.priceDescription}>{pack.description}</Text>
+                </View>
+
+                {/* Credits */}
+                <View style={st.creditsBox}>
+                  <Text style={[st.creditsValue, { color: accent.text }]}>{pack.credits}</Text>
+                  <Text style={st.creditsLabel}>
+                    {pack.credits === 1 ? 'credit' : 'credits'}
+                  </Text>
+                </View>
+
+                {/* Per-grade cost */}
+                <View
+                  style={[
+                    st.perGradeBox,
+                    { backgroundColor: accent.bg, borderColor: accent.border },
+                  ]}
+                >
+                  <View style={st.perGradeRow}>
+                    <Text style={st.perGradeLabel}>Cost per grade:</Text>
+                    <Text style={[st.perGradeValue, { color: accent.text }]}>
+                      ${pack.perGradeCost.toFixed(2)}
+                    </Text>
+                  </View>
+                  {savingsDollars ? (
+                    <Text style={st.perGradeSavings}>Save ${savingsDollars} vs Basic</Text>
+                  ) : (
+                    <Text style={st.perGradeStandard}>Standard rate</Text>
+                  )}
+                </View>
+
+                {/* CTA */}
+                <TouchableOpacity
+                  onPress={() => handleBuy(pack)}
+                  disabled={anyPurchaseInFlight || !connected}
+                  activeOpacity={0.85}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Buy ${pack.credits} credits for ${formatProductPrice(storeProduct)}`}
+                  style={[
+                    st.buyButton,
+                    (anyPurchaseInFlight || !connected) && st.buyButtonDisabled,
+                  ]}
+                >
+                  <LinearGradient
+                    colors={pack.headerGradient}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={st.buyButtonGradient}
+                  >
+                    {isPurchasing || (verifying && purchasing === null) ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={st.buyButtonText}>
+                        {pack.id === 'vip'
+                          ? 'Get VIP Package'
+                          : `Buy ${pack.credits} ${pack.credits === 1 ? 'Credit' : 'Credits'}`}
+                      </Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )
+        })}
+
+        {/* Fine print */}
         <View style={st.fineprint}>
           <Text style={st.fineprintText}>
             Payment will be charged to your Apple ID at confirmation of purchase. Credits are
-            added to your account immediately and never expire. Credits and purchases are shared
-            between the DCM Grading app and dcmgrading.com.
+            added to your account immediately and never expire. Credits are shared between the
+            DCM Grading app and dcmgrading.com.
           </Text>
         </View>
 
+        {/* Legal links */}
         <View style={st.legalLinks}>
           <TouchableOpacity onPress={openTerms} accessibilityRole="link">
             <Text style={st.legalLink}>Terms of Service</Text>
@@ -270,12 +370,12 @@ export default function CreditsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Restore */}
         <TouchableOpacity
           style={st.restoreBtn}
           onPress={handleRestore}
           disabled={restoring}
           accessibilityRole="button"
-          accessibilityLabel="Restore previous purchases"
         >
           {restoring ? (
             <ActivityIndicator size="small" color={Colors.purple[600]} />
@@ -287,7 +387,7 @@ export default function CreditsScreen() {
           )}
         </TouchableOpacity>
 
-        <View style={{ height: 12 + insets.bottom }} />
+        <View style={{ height: 16 + insets.bottom }} />
       </ScrollView>
 
       <MobileTabBar />
@@ -300,29 +400,54 @@ const st = StyleSheet.create({
   scroll: { flex: 1 },
   scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 80 },
 
-  balanceCard: {
-    backgroundColor: Colors.purple[600],
-    borderRadius: 12,
-    padding: 18,
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  balanceLabel: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-  },
-  balanceValue: { color: '#fff', fontSize: 32, fontWeight: '800', marginTop: 4 },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  title: {
+    fontSize: 22,
+    fontWeight: '800',
     color: Colors.gray[900],
-    marginBottom: 4,
+    textAlign: 'center',
+    marginTop: 4,
   },
-  sectionSub: { fontSize: 13, color: Colors.gray[500], marginBottom: 14 },
+  subtitle: {
+    fontSize: 13,
+    color: Colors.gray[600],
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 12,
+  },
+
+  balancePill: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: Colors.purple[200],
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+    marginBottom: 16,
+  },
+  balancePillLabel: { fontSize: 13, color: Colors.gray[600] },
+  balancePillValue: { fontSize: 20, fontWeight: '800', color: Colors.purple[600] },
+
+  errorBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    backgroundColor: Colors.red[50],
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: Colors.red[100],
+  },
+  errorText: { flex: 1, fontSize: 12, color: Colors.red[600], lineHeight: 16 },
 
   loadingBox: {
     flexDirection: 'row',
@@ -333,6 +458,7 @@ const st = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: Colors.gray[200],
+    marginBottom: 12,
   },
   loadingText: { fontSize: 13, color: Colors.gray[600] },
 
@@ -345,65 +471,120 @@ const st = StyleSheet.create({
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.gray[200],
+    marginBottom: 12,
   },
   emptyText: { flex: 1, fontSize: 13, color: Colors.gray[700], lineHeight: 18 },
 
-  packCard: {
+  // Tier card
+  card: {
     backgroundColor: '#fff',
-    borderRadius: 14,
-    marginBottom: 14,
-    borderWidth: 1,
-    borderColor: Colors.gray[200],
+    borderRadius: 16,
+    marginBottom: 16,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
-  packCardHighlighted: {
-    borderColor: Colors.purple[400],
-    borderWidth: 2,
+  cardPopular: {
+    borderWidth: 3,
+    borderColor: Colors.purple[500],
   },
-  packCardDimmed: { opacity: 0.5 },
-  packImage: {
-    width: '100%',
-    aspectRatio: 3 / 2,
-    backgroundColor: Colors.gray[100],
+  cardBestValue: {
+    borderWidth: 3,
+    borderColor: Colors.gray[300],
   },
-  packFooter: {
+
+  cardHeader: { paddingHorizontal: 18, paddingVertical: 14 },
+  cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+    justifyContent: 'space-between',
   },
-  packFooterLeft: { flex: 1 },
-  packFooterRight: { marginLeft: 12 },
-  packPrice: { fontSize: 20, fontWeight: '800', color: Colors.gray[900] },
-  packPerCredit: { fontSize: 12, color: Colors.gray[500], marginTop: 2 },
-  buyChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: Colors.purple[600],
-    paddingVertical: 8,
-    paddingLeft: 14,
-    paddingRight: 10,
+  cardHeaderTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  cardHeaderIcon: { fontSize: 22 },
+  cardHeaderName: { fontSize: 20, fontWeight: '800', color: '#fff' },
+  savingsBadge: {
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
     borderRadius: 999,
   },
-  buyChipText: { color: '#fff', fontSize: 14, fontWeight: '700' },
-
-  errorBox: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    backgroundColor: Colors.red[50],
-    borderRadius: 10,
-    padding: 12,
+  savingsBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  popularBadge: {
+    alignSelf: 'flex-start',
     marginTop: 8,
-    borderWidth: 1,
-    borderColor: Colors.red[100],
+    backgroundColor: '#fff',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
   },
-  errorText: { flex: 1, fontSize: 12, color: Colors.red[600], lineHeight: 16 },
+  popularBadgeText: { color: Colors.purple[600], fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+  bestValueBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: 'rgba(0,0,0,0.22)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+  },
+  bestValueBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
 
-  fineprint: { marginTop: 16, paddingHorizontal: 4 },
-  fineprintText: { fontSize: 11, color: Colors.gray[500], lineHeight: 16, textAlign: 'center' },
+  cardBody: { padding: 16 },
+
+  priceBlock: { alignItems: 'center', marginBottom: 12 },
+  priceText: { fontSize: 32, fontWeight: '800', color: Colors.gray[900] },
+  priceDescription: { fontSize: 12, color: Colors.gray[500], marginTop: 2, textAlign: 'center' },
+
+  creditsBox: {
+    backgroundColor: Colors.gray[50],
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  creditsValue: { fontSize: 22, fontWeight: '800' },
+  creditsLabel: { fontSize: 14, color: Colors.gray[600] },
+
+  perGradeBox: {
+    borderRadius: 10,
+    padding: 10,
+    borderWidth: 1,
+    marginBottom: 14,
+  },
+  perGradeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  perGradeLabel: { fontSize: 12, fontWeight: '500', color: Colors.gray[600] },
+  perGradeValue: { fontSize: 18, fontWeight: '800' },
+  perGradeSavings: { fontSize: 10, fontWeight: '700', color: Colors.green[600], marginTop: 2 },
+  perGradeStandard: { fontSize: 10, color: Colors.gray[400], marginTop: 2 },
+
+  buyButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  buyButtonDisabled: { opacity: 0.5 },
+  buyButtonGradient: {
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buyButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+
+  fineprint: { marginTop: 8, paddingHorizontal: 4 },
+  fineprintText: {
+    fontSize: 11,
+    color: Colors.gray[500],
+    lineHeight: 16,
+    textAlign: 'center',
+  },
 
   legalLinks: {
     flexDirection: 'row',
@@ -426,7 +607,7 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 12,
-    marginTop: 16,
+    marginTop: 14,
     borderRadius: 10,
     backgroundColor: '#fff',
     borderWidth: 1,
