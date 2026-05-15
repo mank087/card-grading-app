@@ -6,7 +6,7 @@ import { BlogPost, BlogCategory, BlogPostFormData } from '@/types/blog';
 import BlogImageUploader from './BlogImageUploader';
 import BlogCollageUploader from './BlogCollageUploader';
 import MarkdownToolbar from './MarkdownToolbar';
-import BlogPostContent from '@/components/blog/BlogPostContent';
+import WysiwygEditor from './WysiwygEditor';
 
 interface BlogPostFormProps {
   post?: BlogPost;
@@ -39,7 +39,6 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
 
   const [tagInput, setTagInput] = useState('');
   const [imageUploading, setImageUploading] = useState(false);
-  const [showPreview, setShowPreview] = useState(false);
   const [imageMode, setImageMode] = useState<'single' | 'collage'>('single');
   const contentRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -278,118 +277,31 @@ export default function BlogPostForm({ post, isEdit = false }: BlogPostFormProps
             </p>
           </div>
 
-          {/* Content */}
+          {/* Content — side-by-side WYSIWYG (left) + markdown source (right).
+              Both panes edit the same underlying markdown string. Raw HTML
+              dropped into the source pane is preserved end-to-end. */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-sm font-medium text-gray-700">
-                Content <span className="text-red-500">*</span>
-              </label>
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowPreview(false)}
-                  className={`px-3 py-1 text-sm font-medium transition-colors ${
-                    !showPreview
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Write
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowPreview(true)}
-                  className={`px-3 py-1 text-sm font-medium transition-colors border-l border-gray-300 ${
-                    showPreview
-                      ? 'bg-purple-600 text-white'
-                      : 'bg-white text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Preview
-                </button>
-              </div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Content <span className="text-red-500">*</span>
+            </label>
+            <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
+              <MarkdownToolbar
+                textareaRef={contentRef}
+                content={formData.content}
+                onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                onImageUpload={handleToolbarImageUpload}
+                imageUploading={imageUploading}
+              />
+              <WysiwygEditor
+                value={formData.content}
+                onChange={(content) => setFormData(prev => ({ ...prev, content }))}
+                textareaRef={contentRef}
+                placeholder="Write your blog post content using Markdown — or paste raw HTML."
+              />
             </div>
-
-            {showPreview ? (
-              <div className="border border-gray-300 rounded-lg overflow-hidden">
-                {/* Preview Header */}
-                {(formData.title || formData.subtitle) && (
-                  <div className="bg-white border-b border-gray-200 px-6 py-6">
-                    {formData.title && (
-                      <h1 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
-                        {formData.title}
-                      </h1>
-                    )}
-                    {formData.subtitle && (
-                      <p className="text-xl text-gray-600">{formData.subtitle}</p>
-                    )}
-                    <div className="flex items-center gap-3 mt-4 text-sm text-gray-500">
-                      <span className="font-medium text-gray-900">{formData.author_name || 'DCM Team'}</span>
-                      <span>·</span>
-                      <span>{new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
-                    </div>
-                  </div>
-                )}
-                {/* Preview Featured Image */}
-                {formData.featured_image_path && (
-                  <div className="bg-white px-6 py-4 border-b border-gray-200">
-                    <div className="aspect-[16/9] relative rounded-lg overflow-hidden">
-                      <img
-                        src={formData.featured_image_path}
-                        alt={formData.featured_image_alt || formData.title}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  </div>
-                )}
-                {/* Preview Content */}
-                <div className="bg-white p-6 min-h-[400px]">
-                  {formData.content ? (
-                    <BlogPostContent content={formData.content} />
-                  ) : (
-                    <p className="text-gray-400 italic">No content to preview. Switch to Write mode to add content.</p>
-                  )}
-                </div>
-                {/* Preview Tags */}
-                {formData.tags && formData.tags.length > 0 && (
-                  <div className="bg-white px-6 py-4 border-t border-gray-200">
-                    <div className="flex flex-wrap gap-2">
-                      {formData.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="border border-gray-300 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-purple-500 focus-within:border-transparent">
-                <MarkdownToolbar
-                  textareaRef={contentRef}
-                  content={formData.content}
-                  onChange={(content) => setFormData(prev => ({ ...prev, content }))}
-                  onImageUpload={handleToolbarImageUpload}
-                  imageUploading={imageUploading}
-                />
-                <textarea
-                  ref={contentRef}
-                  value={formData.content}
-                  onChange={(e) => setFormData(prev => ({ ...prev, content: e.target.value }))}
-                  rows={20}
-                  className="w-full px-4 py-3 font-mono text-sm border-0 focus:ring-0 focus:outline-none resize-y"
-                  placeholder="Write your blog post content using Markdown..."
-                  required
-                />
-              </div>
-            )}
             <p className="text-xs text-gray-500 mt-2">
-              {showPreview
-                ? 'This is how your post will look when published.'
-                : 'Use the toolbar above or type Markdown directly: **bold**, *italic*, [link](url), ## heading'}
+              Edit either side — changes sync live. Toolbar inserts at the cursor
+              in the source pane. Raw HTML in the source is preserved.
             </p>
             <input
               ref={imageInputRef}
