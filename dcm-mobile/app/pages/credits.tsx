@@ -250,6 +250,18 @@ export default function CreditsScreen() {
                 pack.bestValue && st.cardBestValue,
               ]}
             >
+              {/* Corner ribbon for popular / best value */}
+              {pack.popular && (
+                <View style={[st.ribbon, st.ribbonPopular]}>
+                  <Text style={st.ribbonText}>⭐ MOST POPULAR</Text>
+                </View>
+              )}
+              {pack.bestValue && (
+                <View style={[st.ribbon, st.ribbonBest]}>
+                  <Text style={st.ribbonText}>★ BEST VALUE</Text>
+                </View>
+              )}
+
               {/* Gradient header */}
               <LinearGradient
                 colors={pack.headerGradient}
@@ -268,16 +280,6 @@ export default function CreditsScreen() {
                     </View>
                   ) : null}
                 </View>
-                {pack.popular && (
-                  <View style={st.popularBadge}>
-                    <Text style={st.popularBadgeText}>⭐ MOST POPULAR</Text>
-                  </View>
-                )}
-                {pack.bestValue && (
-                  <View style={st.bestValueBadge}>
-                    <Text style={st.bestValueBadgeText}>BEST VALUE</Text>
-                  </View>
-                )}
               </LinearGradient>
 
               {/* Body */}
@@ -288,29 +290,26 @@ export default function CreditsScreen() {
                   <Text style={st.priceDescription}>{pack.description}</Text>
                 </View>
 
-                {/* Credits */}
-                <View style={st.creditsBox}>
-                  <Text style={[st.creditsValue, { color: accent.text }]}>{pack.credits}</Text>
-                  <Text style={st.creditsLabel}>
-                    {pack.credits === 1 ? 'credit' : 'credits'}
+                {/* Credits hero block — most prominent spec on the card */}
+                <View style={[st.creditsHero, { backgroundColor: accent.bg, borderColor: accent.border }]}>
+                  <Text style={[st.creditsHeroValue, { color: accent.text }]}>
+                    {pack.credits}
+                  </Text>
+                  <Text style={[st.creditsHeroLabel, { color: accent.text }]}>
+                    {pack.credits === 1 ? 'CREDIT' : 'CREDITS'}
                   </Text>
                 </View>
 
                 {/* Per-grade cost */}
-                <View
-                  style={[
-                    st.perGradeBox,
-                    { backgroundColor: accent.bg, borderColor: accent.border },
-                  ]}
-                >
+                <View style={st.perGradeBox}>
                   <View style={st.perGradeRow}>
-                    <Text style={st.perGradeLabel}>Cost per grade:</Text>
+                    <Text style={st.perGradeLabel}>Cost per grade</Text>
                     <Text style={[st.perGradeValue, { color: accent.text }]}>
                       ${pack.perGradeCost.toFixed(2)}
                     </Text>
                   </View>
                   {savingsDollars ? (
-                    <Text style={st.perGradeSavings}>Save ${savingsDollars} vs Basic</Text>
+                    <Text style={st.perGradeSavings}>You save ${savingsDollars} vs Basic</Text>
                   ) : (
                     <Text style={st.perGradeStandard}>Standard rate</Text>
                   )}
@@ -334,14 +333,17 @@ export default function CreditsScreen() {
                     end={{ x: 1, y: 1 }}
                     style={st.buyButtonGradient}
                   >
-                    {isPurchasing || (verifying && purchasing === null) ? (
+                    {isPurchasing || (verifying && purchasing === pack.productId) ? (
                       <ActivityIndicator size="small" color="#fff" />
                     ) : (
-                      <Text style={st.buyButtonText}>
-                        {pack.id === 'vip'
-                          ? 'Get VIP Package'
-                          : `Buy ${pack.credits} ${pack.credits === 1 ? 'Credit' : 'Credits'}`}
-                      </Text>
+                      <>
+                        <Text style={st.buyButtonText}>
+                          {pack.id === 'vip'
+                            ? 'Get VIP Package'
+                            : `Buy ${pack.credits} ${pack.credits === 1 ? 'Credit' : 'Credits'}`}
+                        </Text>
+                        <Ionicons name="chevron-forward" size={18} color="#fff" />
+                      </>
                     )}
                   </LinearGradient>
                 </TouchableOpacity>
@@ -478,105 +480,129 @@ const st = StyleSheet.create({
   // Tier card
   card: {
     backgroundColor: '#fff',
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 20,
+    marginBottom: 18,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 6,
   },
   cardPopular: {
     borderWidth: 3,
     borderColor: Colors.purple[500],
+    shadowColor: Colors.purple[500],
+    shadowOpacity: 0.25,
+    shadowRadius: 24,
   },
   cardBestValue: {
     borderWidth: 3,
-    borderColor: Colors.gray[300],
+    borderColor: Colors.gray[400],
+    shadowColor: Colors.gray[700],
+    shadowOpacity: 0.2,
+    shadowRadius: 24,
   },
 
-  cardHeader: { paddingHorizontal: 18, paddingVertical: 14 },
+  // Corner ribbon
+  ribbon: {
+    position: 'absolute',
+    top: 12,
+    right: -2,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderTopLeftRadius: 999,
+    borderBottomLeftRadius: 999,
+    zIndex: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  ribbonPopular: { backgroundColor: Colors.purple[600] },
+  ribbonBest: { backgroundColor: Colors.gray[800] },
+  ribbonText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+
+  cardHeader: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16 },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  cardHeaderTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  cardHeaderIcon: { fontSize: 22 },
-  cardHeaderName: { fontSize: 20, fontWeight: '800', color: '#fff' },
+  cardHeaderTitle: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardHeaderIcon: { fontSize: 28 },
+  cardHeaderName: { fontSize: 24, fontWeight: '800', color: '#fff', letterSpacing: 0.3 },
   savingsBadge: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
   },
   savingsBadgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
-  popularBadge: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    backgroundColor: '#fff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  popularBadgeText: { color: Colors.purple[600], fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
-  bestValueBadge: {
-    alignSelf: 'flex-start',
-    marginTop: 8,
-    backgroundColor: 'rgba(0,0,0,0.22)',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 999,
-  },
-  bestValueBadgeText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
 
-  cardBody: { padding: 16 },
+  cardBody: { paddingHorizontal: 18, paddingTop: 16, paddingBottom: 18 },
 
-  priceBlock: { alignItems: 'center', marginBottom: 12 },
-  priceText: { fontSize: 32, fontWeight: '800', color: Colors.gray[900] },
-  priceDescription: { fontSize: 12, color: Colors.gray[500], marginTop: 2, textAlign: 'center' },
+  priceBlock: { alignItems: 'center', marginBottom: 14 },
+  priceText: { fontSize: 40, fontWeight: '800', color: Colors.gray[900], letterSpacing: -0.5 },
+  priceDescription: { fontSize: 13, color: Colors.gray[500], marginTop: 4, textAlign: 'center' },
 
-  creditsBox: {
-    backgroundColor: Colors.gray[50],
-    borderRadius: 12,
-    paddingVertical: 12,
+  // Big credits hero — the headline spec on each card
+  creditsHero: {
+    borderRadius: 14,
+    paddingVertical: 18,
     alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
+    borderWidth: 1,
     marginBottom: 12,
   },
-  creditsValue: { fontSize: 22, fontWeight: '800' },
-  creditsLabel: { fontSize: 14, color: Colors.gray[600] },
+  creditsHeroValue: { fontSize: 44, fontWeight: '900', letterSpacing: -1, lineHeight: 48 },
+  creditsHeroLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1.5,
+    marginTop: 2,
+    opacity: 0.85,
+  },
 
   perGradeBox: {
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    backgroundColor: Colors.gray[50],
     borderWidth: 1,
-    marginBottom: 14,
+    borderColor: Colors.gray[100],
+    marginBottom: 16,
   },
   perGradeRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  perGradeLabel: { fontSize: 12, fontWeight: '500', color: Colors.gray[600] },
-  perGradeValue: { fontSize: 18, fontWeight: '800' },
-  perGradeSavings: { fontSize: 10, fontWeight: '700', color: Colors.green[600], marginTop: 2 },
-  perGradeStandard: { fontSize: 10, color: Colors.gray[400], marginTop: 2 },
+  perGradeLabel: { fontSize: 13, fontWeight: '600', color: Colors.gray[600] },
+  perGradeValue: { fontSize: 20, fontWeight: '800' },
+  perGradeSavings: { fontSize: 11, fontWeight: '700', color: Colors.green[600], marginTop: 3 },
+  perGradeStandard: { fontSize: 11, color: Colors.gray[400], marginTop: 3 },
 
   buyButton: {
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 4,
   },
   buyButtonDisabled: { opacity: 0.5 },
   buyButtonGradient: {
-    paddingVertical: 14,
+    paddingVertical: 16,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
-  buyButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  buyButtonText: { color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 0.3 },
 
   fineprint: { marginTop: 8, paddingHorizontal: 4 },
   fineprintText: {

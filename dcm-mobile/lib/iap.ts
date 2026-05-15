@@ -53,7 +53,24 @@ export interface CreditPack {
   perGradeCost: number
 }
 
+// Order matches the web /credits page: VIP first as a value anchor, then
+// Basic → Pro → Elite ascending. Pro sits in the visual middle so its
+// "Most Popular" highlight lands at the natural eye-stop on the page.
 export const CREDIT_PACKS: CreditPack[] = [
+  {
+    productId: 'dcm.credits.vip',
+    id: 'vip',
+    name: 'VIP',
+    credits: 150,
+    bonusCredits: 0,
+    description: '150 credits + VIP emblem',
+    bestValue: true,
+    icon: '◆',
+    colorKey: 'silver',
+    headerGradient: ['#9ca3af', '#6b7280'],
+    savingsPercent: 78,
+    perGradeCost: 0.66,
+  },
   {
     productId: 'dcm.credits.basic',
     id: 'basic',
@@ -92,20 +109,6 @@ export const CREDIT_PACKS: CreditPack[] = [
     headerGradient: ['#f59e0b', '#ea580c'],
     savingsPercent: 67,
     perGradeCost: 1.0,
-  },
-  {
-    productId: 'dcm.credits.vip',
-    id: 'vip',
-    name: 'VIP',
-    credits: 150,
-    bonusCredits: 0,
-    description: '150 credits + VIP emblem',
-    bestValue: true,
-    icon: '◆',
-    colorKey: 'silver',
-    headerGradient: ['#9ca3af', '#6b7280'],
-    savingsPercent: 78,
-    perGradeCost: 0.66,
   },
 ]
 
