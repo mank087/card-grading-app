@@ -44,11 +44,14 @@ import {
   verifyAndFinishPurchase,
 } from '@/lib/iap'
 
-const TIER_ACCENT: Record<CreditPack['colorKey'], { text: string; bg: string; border: string }> = {
-  blue:   { text: '#2563eb', bg: '#eff6ff', border: '#dbeafe' },
-  purple: { text: '#7c3aed', bg: '#faf5ff', border: '#e9d5ff' },
-  amber:  { text: '#d97706', bg: '#fffbeb', border: '#fef3c7' },
-  silver: { text: '#4b5563', bg: '#f3f4f6', border: '#e5e7eb' },
+const TIER_ACCENT: Record<
+  CreditPack['colorKey'],
+  { text: string; bg: string; border: string; shadow: string }
+> = {
+  blue:   { text: '#2563eb', bg: '#eff6ff', border: '#3b82f6', shadow: '#3b82f6' },
+  purple: { text: '#7c3aed', bg: '#faf5ff', border: '#a855f7', shadow: '#7c3aed' },
+  amber:  { text: '#d97706', bg: '#fffbeb', border: '#f59e0b', shadow: '#f59e0b' },
+  silver: { text: '#4b5563', bg: '#f3f4f6', border: '#9ca3af', shadow: '#374151' },
 }
 
 export default function CreditsScreen() {
@@ -246,22 +249,11 @@ export default function CreditsScreen() {
               key={pack.productId}
               style={[
                 st.card,
+                { borderColor: accent.border, shadowColor: accent.shadow },
                 pack.popular && st.cardPopular,
                 pack.bestValue && st.cardBestValue,
               ]}
             >
-              {/* Corner ribbon for popular / best value */}
-              {pack.popular && (
-                <View style={[st.ribbon, st.ribbonPopular]}>
-                  <Text style={st.ribbonText}>⭐ MOST POPULAR</Text>
-                </View>
-              )}
-              {pack.bestValue && (
-                <View style={[st.ribbon, st.ribbonBest]}>
-                  <Text style={st.ribbonText}>★ BEST VALUE</Text>
-                </View>
-              )}
-
               {/* Gradient header */}
               <LinearGradient
                 colors={pack.headerGradient}
@@ -280,6 +272,18 @@ export default function CreditsScreen() {
                     </View>
                   ) : null}
                 </View>
+                {/* Second row: MOST POPULAR / BEST VALUE pill, inset to the
+                    left so it reads as a label under the tier name. */}
+                {pack.popular && (
+                  <View style={st.headerPillPopular}>
+                    <Text style={st.headerPillPopularText}>⭐ MOST POPULAR</Text>
+                  </View>
+                )}
+                {pack.bestValue && (
+                  <View style={st.headerPillBest}>
+                    <Text style={st.headerPillBestText}>★ BEST VALUE</Text>
+                  </View>
+                )}
               </LinearGradient>
 
               {/* Body */}
@@ -477,52 +481,63 @@ const st = StyleSheet.create({
   },
   emptyText: { flex: 1, fontSize: 13, color: Colors.gray[700], lineHeight: 18 },
 
-  // Tier card
+  // Tier card — every card gets a 2px tier-accent border + tier-tinted
+  // shadow. Pro and VIP bump the border to 3px and intensify the shadow
+  // so the highlighted tiers still read as elevated.
   card: {
     backgroundColor: '#fff',
     borderRadius: 20,
     marginBottom: 18,
     overflow: 'hidden',
-    shadowColor: '#000',
+    borderWidth: 2,
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 20,
-    elevation: 6,
+    shadowOpacity: 0.18,
+    shadowRadius: 18,
+    elevation: 5,
   },
   cardPopular: {
     borderWidth: 3,
-    borderColor: Colors.purple[500],
-    shadowColor: Colors.purple[500],
-    shadowOpacity: 0.25,
-    shadowRadius: 24,
+    shadowOpacity: 0.32,
+    shadowRadius: 22,
   },
   cardBestValue: {
     borderWidth: 3,
-    borderColor: Colors.gray[400],
-    shadowColor: Colors.gray[700],
-    shadowOpacity: 0.2,
-    shadowRadius: 24,
+    shadowOpacity: 0.28,
+    shadowRadius: 22,
   },
 
-  // Corner ribbon
-  ribbon: {
-    position: 'absolute',
-    top: 12,
-    right: -2,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderTopLeftRadius: 999,
-    borderBottomLeftRadius: 999,
-    zIndex: 10,
+  // In-header pill below the title row. Matches the web /credits design.
+  // Sits inset on the left so it reads as a sub-label under the tier name.
+  headerPillPopular: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: '#fff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 2,
   },
-  ribbonPopular: { backgroundColor: Colors.purple[600] },
-  ribbonBest: { backgroundColor: Colors.gray[800] },
-  ribbonText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.6 },
+  headerPillPopularText: {
+    color: Colors.purple[700],
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+  },
+  headerPillBest: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  headerPillBestText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 },
 
   cardHeader: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 16 },
   cardHeaderRow: {
