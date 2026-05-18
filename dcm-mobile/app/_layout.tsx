@@ -3,15 +3,8 @@ import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
 import { useEffect, useCallback, useRef, lazy, Suspense } from 'react'
-// StripeProvider wrapped in try/catch — fails gracefully in Expo Go
-let StripeProvider: any
-try {
-  StripeProvider = require('@stripe/stripe-react-native').StripeProvider
-} catch {
-  StripeProvider = ({ children }: any) => children
-}
-// Sentry — wrapped in try/catch for the same reason as Stripe: native module
-// unavailable in Expo Go. captureException is a no-op when not initialized.
+// Sentry — wrapped in try/catch because the native module is unavailable
+// in Expo Go. captureException is a no-op when not initialized.
 let Sentry: any = { init: () => {}, captureException: () => {} }
 try {
   Sentry = require('@sentry/react-native')
@@ -50,7 +43,6 @@ try {
   /* Expo Go path */
 }
 
-const STRIPE_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || ''
 
 if (SENTRY_DSN && !__DEV__) {
@@ -300,7 +292,6 @@ export default function RootLayout() {
   }, [error])
 
   return (
-    <StripeProvider publishableKey={STRIPE_PUBLISHABLE_KEY} merchantIdentifier="merchant.com.dcmgrading">
     <AuthProvider>
       <CreditsProvider>
         <EmblemsProvider>
@@ -348,6 +339,5 @@ export default function RootLayout() {
         </EmblemsProvider>
       </CreditsProvider>
     </AuthProvider>
-    </StripeProvider>
   )
 }

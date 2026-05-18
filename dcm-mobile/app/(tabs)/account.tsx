@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { useCredits } from '@/contexts/CreditsContext'
 import { useWelcomeTour } from '@/contexts/WelcomeTourContext'
-import { purchaseCredits } from '@/lib/stripe'
 import { supabase } from '@/lib/supabase'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'

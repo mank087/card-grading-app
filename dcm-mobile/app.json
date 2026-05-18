@@ -170,12 +170,6 @@
       ],
       "expo-secure-store",
       "expo-web-browser",
-      [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.dcmgrading"
-        }
-      ],
       "@sentry/react-native",
       "expo-localization",
       [
