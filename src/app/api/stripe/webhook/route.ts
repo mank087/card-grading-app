@@ -125,6 +125,12 @@ export async function POST(request: NextRequest) {
         break;
       }
 
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        await handleInvoicePaymentFailed(invoice);
+        break;
+      }
+
       case 'customer.subscription.updated': {
         const subscription = event.data.object as Stripe.Subscription;
         await handleSubscriptionUpdated(subscription);
@@ -352,21 +358,39 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
 }
 
 /**
+ * Stripe SDK v20+ (API version 2025-03-31 and later) moved `subscription`
+ * from the top-level Invoice object to invoice.parent.subscription_details.
+ * Returns null for non-subscription invoices (one-time charges).
+ *
+ * This is the bug behind multiple silent Card Lovers renewal misses (see
+ * scripts/fix-*-renewal*.ts): the old `invoice.subscription` check was always
+ * undefined under the new schema, so every renewal hit the "not a subscription
+ * invoice" early-return and the user was never credited despite Stripe taking
+ * the payment.
+ */
+function getInvoiceSubscriptionId(invoice: Stripe.Invoice): string | null {
+  const fromParent = (invoice as any).parent?.subscription_details?.subscription;
+  const fromTop = (invoice as any).subscription;
+  const value = fromParent ?? fromTop;
+  if (!value) return null;
+  return typeof value === 'string' ? value : value.id;
+}
+
+/**
  * Handle invoice.paid event - processes subscription renewals
  */
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   console.log('Processing invoice.paid:', invoice.id);
 
   // Skip if not a subscription invoice
-  if (!invoice.subscription) {
+  const subscriptionId = getInvoiceSubscriptionId(invoice);
+  if (!subscriptionId) {
     console.log('Not a subscription invoice, skipping');
     return;
   }
 
   // Get the subscription to check if it's Card Lovers
-  const subscription = await stripe.subscriptions.retrieve(
-    typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription.id
-  );
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
   // Check if this is a Card Lovers subscription by checking price ID
   const priceId = subscription.items.data[0]?.price.id;
@@ -454,10 +478,116 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
         creditsAdded: result.creditsAdded,
         bonusCredits: result.bonusCredits,
       });
+      // Clear past-due flag set by handleInvoicePaymentFailed (if any).
+      // Non-fatal if the column doesn't exist yet.
+      try {
+        const supabase = getServiceClient();
+        await supabase
+          .from('user_credits')
+          .update({
+            card_lover_payment_failed_at: null,
+            card_lover_last_failed_invoice_id: null,
+          })
+          .eq('user_id', userId)
+          .not('card_lover_payment_failed_at', 'is', null);
+      } catch (err: any) {
+        console.warn('[handleInvoicePaid] Could not clear past-due flag (non-fatal):', err?.message || err);
+      }
     } else {
       console.error('Failed to process Card Lovers renewal:', result.error);
     }
   }
+}
+
+/**
+ * Handle invoice.payment_failed event - subscription renewal payment failed
+ * (declined card, expired card, insufficient funds, locked card, etc.).
+ *
+ * Stripe automatically retries via Smart Retries over the next ~1 week before
+ * marking the subscription unpaid/canceled. This handler records the failure
+ * so we can show a past-due banner on the account page and trigger a recovery
+ * email pointing to the Stripe Customer Portal where the user can update
+ * their payment method.
+ */
+async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+  console.log('Processing invoice.payment_failed:', invoice.id);
+
+  const subscriptionId = getInvoiceSubscriptionId(invoice);
+  if (!subscriptionId) {
+    console.log('Not a subscription invoice, skipping');
+    return;
+  }
+
+  // Confirm this is a Card Lovers subscription before flipping any flags
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const priceId = subscription.items.data[0]?.price.id;
+  const isCardLovers =
+    priceId === CARD_LOVERS_SUBSCRIPTION.monthly.priceId ||
+    priceId === CARD_LOVERS_SUBSCRIPTION.annual.priceId;
+  if (!isCardLovers) {
+    console.log('Not a Card Lovers subscription, skipping');
+    return;
+  }
+
+  // Resolve userId — metadata first, customer fallback (same pattern as
+  // handleInvoicePaid).
+  let userId = subscription.metadata?.userId;
+  if (!userId) {
+    const customerId = typeof subscription.customer === 'string'
+      ? subscription.customer
+      : subscription.customer?.id;
+    if (customerId) {
+      const found = await findUserIdByStripeCustomer(customerId);
+      if (found) userId = found;
+    }
+  }
+  if (!userId) {
+    console.error('[handleInvoicePaymentFailed] Missing userId; subscription:', subscription.id);
+    return;
+  }
+
+  const nextAttempt = (invoice as any).next_payment_attempt
+    ? new Date((invoice as any).next_payment_attempt * 1000).toISOString()
+    : null;
+
+  console.log('[handleInvoicePaymentFailed] Card Lovers payment failed:', {
+    userId,
+    subscriptionId,
+    invoiceId: invoice.id,
+    attemptCount: invoice.attempt_count,
+    nextPaymentAttempt: nextAttempt,
+  });
+
+  // Flip the past-due flag on user_credits so the account page can show a
+  // banner. Schema added by migrations/add_card_lover_payment_failed_at.sql.
+  const supabase = getServiceClient();
+  const { error: flagErr } = await supabase
+    .from('user_credits')
+    .update({
+      card_lover_payment_failed_at: new Date().toISOString(),
+      card_lover_last_failed_invoice_id: invoice.id,
+    })
+    .eq('user_id', userId);
+  if (flagErr) {
+    // Non-fatal — the column may not have been added yet. Log and move on so
+    // we still return 200 OK to Stripe and don't trigger retries.
+    console.warn('[handleInvoicePaymentFailed] Could not flip past-due flag (column may be missing):', flagErr.message);
+  }
+
+  // Audit row in subscription_events for visibility.
+  await supabase.from('subscription_events').insert({
+    user_id: userId,
+    event_type: 'payment_failed',
+    plan: priceId === CARD_LOVERS_SUBSCRIPTION.monthly.priceId ? 'monthly' : 'annual',
+    credits_added: 0,
+    bonus_credits: 0,
+    stripe_subscription_id: subscription.id,
+    stripe_invoice_id: invoice.id,
+    metadata: {
+      attempt_count: invoice.attempt_count,
+      next_payment_attempt: nextAttempt,
+    },
+  });
 }
 
 /**
