@@ -591,7 +591,14 @@ function NavigationInner() {
 
         {/* ============ MOBILE DROPDOWN MENU ============ */}
         {mobileMenuOpen && (
-          <div className="md:hidden pb-4 border-t border-gray-200 mt-2 mobile-menu">
+          // The parent <nav> is `sticky top-0`. When the logged-in dropdown
+          // is taller than the viewport, items below the fold (Pop Report,
+          // Logout) become unreachable because sticky keeps the nav pinned
+          // at top:0 and the page can't scroll inside the nav itself.
+          // Constrain the panel to `100dvh - 4rem` (nav header is h-16) and
+          // make it its own scroll container. overscroll-contain stops the
+          // bounce from unsticking the nav on iOS.
+          <div className="md:hidden pb-4 border-t border-gray-200 mt-2 mobile-menu max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
             <div className="flex flex-col space-y-1 pt-3">
 
               {/* Search */}
