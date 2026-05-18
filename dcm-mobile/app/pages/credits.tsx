@@ -42,6 +42,7 @@ import {
   formatProductPrice,
   getProductNumericPrice,
   verifyAndFinishPurchase,
+  recoverUnfinishedPurchases,
 } from '@/lib/iap'
 
 const TIER_ACCENT: Record<
@@ -63,7 +64,6 @@ export default function CreditsScreen() {
   const [purchasing, setPurchasing] = useState<IAPProductId | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [verifying, setVerifying] = useState(false)
-  const [restoring, setRestoring] = useState(false)
 
   const handlePurchaseSuccess = useCallback(
     async (purchase: Purchase) => {
@@ -103,7 +103,6 @@ export default function CreditsScreen() {
     products,
     fetchProducts,
     requestPurchase,
-    restorePurchases,
   } = useIAP({
     onPurchaseSuccess: handlePurchaseSuccess,
     onPurchaseError: handlePurchaseError,
@@ -119,6 +118,31 @@ export default function CreditsScreen() {
       )
     })
   }, [connected, fetchProducts])
+
+  // Apple guideline 3.1.1: we can't expose the native restorePurchases()
+  // flow for consumables. Instead, silently sweep any unfinished StoreKit
+  // receipts on mount — these are receipts where the user was charged but
+  // our backend POST or the local finishTransaction failed last time
+  // (network drop, app kill, crash). The verify endpoint is idempotent,
+  // so duplicates are safe; only newly-granted credits trigger the alert.
+  useEffect(() => {
+    if (!connected || !user) return
+    let cancelled = false
+    ;(async () => {
+      try {
+        const granted = await recoverUnfinishedPurchases()
+        if (cancelled || granted <= 0) return
+        await refreshCredits()
+        Alert.alert(
+          'Purchase recovered',
+          `${granted} ${granted === 1 ? 'credit was' : 'credits were'} added to your account from a previous purchase.`,
+        )
+      } catch (err: any) {
+        if (__DEV__) console.warn('[Credits] recoverUnfinishedPurchases failed:', err?.message || err)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [connected, user, refreshCredits])
 
   const productById = useMemo(() => {
     const map = new Map<string, (typeof products)[number]>()
@@ -164,20 +188,6 @@ export default function CreditsScreen() {
     },
     [user, connected, requestPurchase],
   )
-
-  const handleRestore = useCallback(async () => {
-    setRestoring(true)
-    setErrorMessage(null)
-    try {
-      await restorePurchases()
-      await refreshCredits()
-      Alert.alert('Restore complete', 'Your purchase history has been checked. Your balance is up to date.')
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Could not restore purchases.')
-    } finally {
-      setRestoring(false)
-    }
-  }, [restorePurchases, refreshCredits])
 
   const openTerms = () => router.push('/pages/terms' as any)
   const openPrivacy = () => router.push('/pages/privacy' as any)
@@ -375,23 +385,6 @@ export default function CreditsScreen() {
             <Text style={st.legalLink}>Privacy Policy</Text>
           </TouchableOpacity>
         </View>
-
-        {/* Restore */}
-        <TouchableOpacity
-          style={st.restoreBtn}
-          onPress={handleRestore}
-          disabled={restoring}
-          accessibilityRole="button"
-        >
-          {restoring ? (
-            <ActivityIndicator size="small" color={Colors.purple[600]} />
-          ) : (
-            <>
-              <Ionicons name="refresh-outline" size={16} color={Colors.purple[600]} />
-              <Text style={st.restoreText}>Restore Purchases</Text>
-            </>
-          )}
-        </TouchableOpacity>
 
         <View style={{ height: 16 + insets.bottom }} />
       </ScrollView>
@@ -641,18 +634,4 @@ const st = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   legalSep: { fontSize: 12, color: Colors.gray[400] },
-
-  restoreBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 12,
-    marginTop: 14,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: Colors.purple[200],
-  },
-  restoreText: { fontSize: 13, fontWeight: '600', color: Colors.purple[700] },
 })

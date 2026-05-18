@@ -13,7 +13,7 @@
  * Card Lovers subscriptions are intentionally NOT in v1. Credit packs only.
  */
 
-import { finishTransaction, type Product, type Purchase } from 'react-native-iap'
+import { finishTransaction, getAvailablePurchases, type Product, type Purchase } from 'react-native-iap'
 import { supabase } from '@/lib/supabase'
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
@@ -198,4 +198,45 @@ export async function verifyAndFinishPurchase(purchase: Purchase): Promise<numbe
   }
 
   return result.creditsGranted ?? 0
+}
+
+/**
+ * Apple's required "custom restore mechanism" for consumables.
+ *
+ * StoreKit's native restorePurchases() only restores non-consumables and
+ * subscriptions — Apple guideline 3.1.1 prohibits offering it as a UI
+ * affordance for consumable products. But there's still a legitimate
+ * recovery case: the store charged the user, but our backend POST or the
+ * local finishTransaction() failed (network drop, app kill, crash). In
+ * that case StoreKit holds the receipt as unfinished and re-delivers it
+ * via getAvailablePurchases().
+ *
+ * This walks any unfinished consumable receipts, re-verifies each with
+ * the DCM backend (idempotent — duplicates return creditsGranted=0), and
+ * finishes the transaction. Returns the total credits actually granted
+ * across all recovered receipts so the caller can surface a single
+ * "we recovered N credits" notice instead of repeating per-receipt.
+ *
+ * Silent-by-default: this is meant to run on credits-screen mount as
+ * background recovery. Errors are logged but not thrown — a failed
+ * recovery shouldn't break the purchase screen for the next attempt.
+ */
+export async function recoverUnfinishedPurchases(): Promise<number> {
+  let totalGranted = 0
+  try {
+    const purchases = await getAvailablePurchases()
+    if (!purchases || purchases.length === 0) return 0
+    for (const purchase of purchases) {
+      if (!IAP_PRODUCT_IDS.includes(purchase.productId as IAPProductId)) continue
+      try {
+        const granted = await verifyAndFinishPurchase(purchase)
+        totalGranted += granted
+      } catch (err: any) {
+        console.warn('[IAP] recoverUnfinishedPurchases: verify failed for', purchase.productId, err?.message || err)
+      }
+    }
+  } catch (err: any) {
+    console.warn('[IAP] recoverUnfinishedPurchases: getAvailablePurchases failed:', err?.message || err)
+  }
+  return totalGranted
 }
