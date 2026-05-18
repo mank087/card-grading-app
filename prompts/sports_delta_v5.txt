@@ -45,6 +45,7 @@ REQUIRED FIELDS (All Sports Cards)
 • Example: "2024", "2023", "1989"
 • Check card back for copyright date (© 2024)
 • If range shown (e.g., 2023-24 season), use first year: "2023"
+• **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set logo: return null. Do NOT guess based on the player, design era, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher
 • Official company name

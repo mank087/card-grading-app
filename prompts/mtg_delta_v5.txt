@@ -154,6 +154,7 @@ REQUIRED FIELDS (All MTG Cards)
 **year**: Release year
 • Check copyright text or use set identification
 • 4-digit year (e.g., "2024", "2023", "1993")
+• **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set symbol: return null. Do NOT guess based on the artwork, frame style, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher
 • "Wizards of the Coast" for all MTG cards

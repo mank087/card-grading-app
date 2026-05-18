@@ -138,6 +138,7 @@ DO NOT try to identify the set yourself based on your knowledge.
 • 4-digit year format
 • Example: "2024", "2023", "1999"
 • Check card back or bottom front for copyright date (© 2024)
+• **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set logo: return null. Do NOT guess based on the Pokémon, design era, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher
 • Pokemon Company, Wizards of the Coast, Nintendo

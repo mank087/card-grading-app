@@ -2162,15 +2162,21 @@ For ALL text-based fields (card_number, card_name, set_name, year, serial_number
 • Foreign/regional prints often have different numbering than English versions
 • If text is partially obscured, report visible portion with note
 
+**CRITICAL - UNCERTAINTY RULE (applies to ALL card_info fields):**
+• If a field cannot be determined with high confidence from visible markings on the card itself (copyright text, set logo, printed date, printed card number, etc.), return `null` for that field. DO NOT GUESS.
+• A blank/null value on the printed slab label is ALWAYS better than a wrong value. Customers can correct null; they cannot correct a confidently wrong value they don't notice.
+• This applies to `year`, `manufacturer`, `set_name`, `card_number`, `card_name`, `serial_number`, and all card-type-specific fields below.
+• Specific to YEAR: do NOT infer the year from the player's career, set lineage, design style, or "vibe." Only return a year that is printed on the card or directly identifiable from a visible copyright/set marking. If absent or illegible → null.
+
 **OUTPUT:**
 {
   "card_info": {
-    // Universal fields
-    "card_name": "string",
-    "set_name": "string",
-    "year": "string",
-    "manufacturer": "string",
-    "card_number": "string",  // EXACT as printed - do not modify
+    // Universal fields — any of these may be null if not confidently identifiable. Do not guess.
+    "card_name": "string|null",
+    "set_name": "string|null",
+    "year": "string|null",
+    "manufacturer": "string|null",
+    "card_number": "string|null",  // EXACT as printed - do not modify
     "authentic": true|false,
 
     // Card-type-specific fields (see delta files)

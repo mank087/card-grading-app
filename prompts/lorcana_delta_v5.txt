@@ -95,6 +95,7 @@ REQUIRED FIELDS (All Lorcana Cards)
 
 **year**: Release year
 • 4-digit year (e.g., "2023", "2024")
+• **If the year is not clearly visible from copyright text or an unambiguous set logo: return null. Do NOT guess based on the character or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher
 • "Ravensburger" for all Lorcana cards

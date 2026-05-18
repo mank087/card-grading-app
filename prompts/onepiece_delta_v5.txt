@@ -115,6 +115,7 @@ REQUIRED FIELDS (All One Piece Cards)
 **year**: Release year
 • 4-digit year based on set release
 • 2022 for early sets, 2023-2026 for recent
+• **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set code: return null. Do NOT guess based on the character, art style, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher
 • "Bandai" for all One Piece TCG cards

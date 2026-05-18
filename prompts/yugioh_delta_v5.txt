@@ -127,6 +127,7 @@ REQUIRED FIELDS (All Yu-Gi-Oh! Cards)
 **year**: Release year
 • 4-digit year based on set release
 • 2002 for earliest sets, through 2026
+• **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set code: return null. Do NOT guess based on the monster, art style, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher
 • "Konami" for all Yu-Gi-Oh! TCG cards
