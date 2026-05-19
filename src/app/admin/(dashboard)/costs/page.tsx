@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
@@ -82,6 +82,18 @@ export default function AdminCostsPage() {
   const [error, setError] = useState<string | null>(null)
   const [month, setMonth] = useState(defaultMonth())
   const [showEditor, setShowEditor] = useState(false)
+  const editorRef = useRef<HTMLDivElement>(null)
+
+  // When the editor opens, scroll it into view. The editor sits below the
+  // 12-month chart so without this clicking "Add some" or "Edit fixed costs"
+  // appears to do nothing — the new section is below the fold.
+  const openEditor = useCallback(() => {
+    setShowEditor(true)
+    // Defer one tick so the editor mounts before we scroll.
+    setTimeout(() => {
+      editorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }, [])
 
   const fetchSummary = useCallback(async () => {
     setLoading(true)
@@ -133,7 +145,7 @@ export default function AdminCostsPage() {
             Export CSV
           </a>
           <button
-            onClick={() => setShowEditor((v) => !v)}
+            onClick={() => showEditor ? setShowEditor(false) : openEditor()}
             className="bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium px-4 py-1.5 rounded border border-gray-300"
           >
             {showEditor ? 'Hide' : 'Edit'} fixed costs
@@ -183,7 +195,7 @@ export default function AdminCostsPage() {
           {data.fixed_by_category.length === 0 ? (
             <div className="text-sm text-gray-400 py-6 text-center">
               No fixed costs configured.{' '}
-              <button onClick={() => setShowEditor(true)} className="text-blue-600 hover:underline">Add some</button>
+              <button onClick={openEditor} className="text-blue-600 hover:underline">Add some</button>
             </div>
           ) : (
             <table className="min-w-full text-sm">
@@ -249,7 +261,9 @@ export default function AdminCostsPage() {
 
       {/* Fixed cost editor */}
       {showEditor && (
-        <FixedCostEditor onChanged={fetchSummary} />
+        <div ref={editorRef}>
+          <FixedCostEditor onChanged={fetchSummary} />
+        </div>
       )}
     </div>
   )
