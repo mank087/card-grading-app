@@ -156,10 +156,14 @@ async function loadStripeSubscriptions(from: Date, to: Date): Promise<UnifiedRow
 }
 
 async function loadIAPTransactions(from: Date, to: Date): Promise<UnifiedRow[]> {
+  // Filter to production environment ONLY — sandbox rows from TestFlight
+  // testers and Apple reviewers (e.g. ar_user* accounts) don't represent
+  // real money and would otherwise inflate the revenue dashboard.
   const { data } = await supabaseAdmin
     .from('iap_transactions')
-    .select('id, user_id, platform, product_id, product_type, raw_receipt, created_at, status')
+    .select('id, user_id, platform, product_id, product_type, raw_receipt, created_at, status, environment')
     .eq('status', 'active')
+    .eq('environment', 'production')
     .gte('created_at', from.toISOString())
     .lte('created_at', to.toISOString())
     .order('created_at', { ascending: false })

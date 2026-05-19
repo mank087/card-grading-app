@@ -148,10 +148,13 @@ async function computeMonth(start: Date, end: Date): Promise<MonthBreakdown> {
       .gte('created_at', startIso)
       .lt('created_at', endIso)
       .limit(10000),
+    // Production environment only — exclude TestFlight + Apple reviewer
+    // sandbox rows so the P&L reflects real money.
     supabaseAdmin
       .from('iap_transactions')
-      .select('platform, product_id, raw_receipt, status')
+      .select('platform, product_id, raw_receipt, status, environment')
       .eq('status', 'active')
+      .eq('environment', 'production')
       .gte('created_at', startIso)
       .lt('created_at', endIso)
       .limit(10000),

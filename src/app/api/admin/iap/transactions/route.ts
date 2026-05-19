@@ -84,6 +84,11 @@ export async function GET(request: NextRequest) {
     const emailQuery = (sp.get('email') || '').trim().toLowerCase()
     const fromParam = sp.get('from')
     const toParam = sp.get('to')
+    // Environment filter — defaults to 'production' so TestFlight + Apple
+    // reviewer sandbox rows don't clutter the default support-triage view.
+    // Pass ?environment=all to see everything, or ?environment=sandbox to
+    // isolate test transactions.
+    const environment = sp.get('environment') || 'production'
 
     // Build base query
     let query = supabaseAdmin
@@ -99,6 +104,9 @@ export async function GET(request: NextRequest) {
     }
     if (status !== 'all' && VALID_STATUSES.has(status)) {
       query = query.eq('status', status)
+    }
+    if (environment === 'production' || environment === 'sandbox') {
+      query = query.eq('environment', environment)
     }
     if (productId) {
       query = query.eq('product_id', productId)

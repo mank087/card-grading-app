@@ -82,6 +82,10 @@ export default function IapTransactionsPage() {
   const [email, setEmail] = useState<string>('')
   const [from, setFrom] = useState<string>('')
   const [to, setTo] = useState<string>('')
+  // Default to production so TestFlight + Apple reviewer sandbox rows don't
+  // clutter the default view. Toggle to 'sandbox' to triage testing flows,
+  // or 'all' to see everything.
+  const [environment, setEnvironment] = useState<string>('production')
 
   const [detail, setDetail] = useState<DetailResponse | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -100,6 +104,7 @@ export default function IapTransactionsPage() {
       if (email.trim()) sp.set('email', email.trim())
       if (from) sp.set('from', from)
       if (to) sp.set('to', to)
+      sp.set('environment', environment)
       const res = await fetch(`/api/admin/iap/transactions?${sp}`)
       if (!res.ok) throw new Error((await res.json()).error || `HTTP ${res.status}`)
       setData(await res.json())
@@ -108,14 +113,14 @@ export default function IapTransactionsPage() {
     } finally {
       setLoading(false)
     }
-  }, [page, platform, status, productId, email, from, to])
+  }, [page, platform, status, productId, email, from, to, environment])
 
   useEffect(() => { fetchList() }, [fetchList])
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
     setPage(1)
-  }, [platform, status, productId, email, from, to])
+  }, [platform, status, productId, email, from, to, environment])
 
   const openDetail = async (id: string) => {
     setDetailLoading(true)
@@ -144,7 +149,18 @@ export default function IapTransactionsPage() {
       </div>
 
       {/* Filters */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="bg-white rounded-lg border border-gray-200 p-4 grid grid-cols-1 md:grid-cols-3 lg:grid-cols-7 gap-3">
+        <Field label="Environment">
+          <select
+            value={environment}
+            onChange={(e) => setEnvironment(e.target.value)}
+            className="w-full border border-gray-300 rounded px-2 py-1.5 text-sm"
+          >
+            <option value="production">Production</option>
+            <option value="sandbox">Sandbox (test)</option>
+            <option value="all">All</option>
+          </select>
+        </Field>
         <Field label="Platform">
           <select
             value={platform}
