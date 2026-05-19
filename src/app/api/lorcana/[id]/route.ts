@@ -15,6 +15,7 @@ import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Lorcana cards
 import { lookupLorcanaCard, extractSetCodeFromCardNumber, searchByName as searchLorcanaByName, type LorcanaCard } from "@/lib/lorcanaCardMatcher";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
+import { resolveGradedFrom } from "@/lib/platformAttribution";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -1175,6 +1176,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
     };
     const labelData = generateLabelData(cardForLabel);
     (updateData as any).label_data = labelData;
+    (updateData as any).graded_from = resolveGradedFrom(request);
 
     console.log(`[GET /api/lorcana/${cardId}] Generated label data:`, {
       primaryName: labelData.primaryName,

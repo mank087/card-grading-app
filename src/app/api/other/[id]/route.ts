@@ -12,6 +12,7 @@ import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
+import { resolveGradedFrom } from "@/lib/platformAttribution";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -759,6 +760,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         conversational_card_info: parsedCardInfo,
         processing_time: processingTime,
         label_data: labelData,
+        graded_from: resolveGradedFrom(request),
         ...(subCategory ? { sub_category: subCategory } : {}),
         ...gradingData,
         ...otherFields

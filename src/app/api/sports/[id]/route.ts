@@ -14,6 +14,8 @@ import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
 import { getUserCredits } from "@/lib/credits";
 // Color extraction for color-matched labels
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
+// Platform attribution — tags cards.graded_from with 'web' | 'ios_app' | 'android_app'
+import { resolveGradedFrom } from "@/lib/platformAttribution";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -945,6 +947,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
     };
     const labelData = generateLabelData(cardForLabel);
     (updateData as any).label_data = labelData;
+    (updateData as any).graded_from = resolveGradedFrom(request);
 
     console.log(`[GET /api/sports/${cardId}] Generated label data:`, {
       primaryName: labelData.primaryName,

@@ -17,6 +17,7 @@ import { getUserCredits } from "@/lib/credits";
 // 🃏 CARD IDENTIFICATION: Local Supabase database lookup for MTG cards
 import { lookupMtgCard, type MtgCard } from "@/lib/mtgCardMatcher";
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
+import { resolveGradedFrom } from "@/lib/platformAttribution";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -1150,6 +1151,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     };
     const labelData = generateLabelData(cardForLabel);
     (updateData as any).label_data = labelData;
+    (updateData as any).graded_from = resolveGradedFrom(request);
 
     console.log(`[GET /api/mtg/${cardId}] Generated label data:`, {
       primaryName: labelData.primaryName,
