@@ -5,6 +5,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from '@/app/sports-grading/HeroGradingAnimation'
+import AppStoreBadge from '@/components/AppStoreBadge'
 import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart'
 import GradeDistributionChart from '@/components/market-pricing/GradeDistributionChart'
 import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart'
@@ -725,6 +726,96 @@ export default function WhyDcmPage() {
                 </Link>
               </div>
             )}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================ */}
+      {/* APP STORE LAUNCH — placed right after hero so it gets seen by */}
+      {/* paid-media traffic before the marketing content kicks in.       */}
+      {/* ================================================================ */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 py-12 sm:py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid md:grid-cols-2 gap-10 md:gap-12 items-center">
+
+            {/* LEFT: copy + bullets + badge */}
+            <div className="text-white order-2 md:order-1">
+              <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-3 py-1 mb-4 border border-white/20">
+                <span aria-hidden>📱</span>
+                <span className="text-xs sm:text-sm font-semibold uppercase tracking-wider">New — Now Live</span>
+              </div>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold mb-4 leading-tight">
+                Now Available on the App Store
+              </h2>
+              <p className="text-base sm:text-lg text-gray-200 mb-6">
+                Grade your collection from anywhere. The DCM Grading app brings full
+                DCM Optic™ AI grading to your iPhone or iPad — same accurate grades,
+                same instant reports, now in your pocket.
+              </p>
+              <ul className="space-y-2 mb-6 text-sm sm:text-base text-gray-200">
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
+                  <span>Native camera with guided card capture</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
+                  <span>Design custom slab labels right on your phone</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
+                  <span>List graded cards to eBay in two taps</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400 flex-shrink-0 mt-0.5">✓</span>
+                  <span>Your collection syncs with dcmgrading.com</span>
+                </li>
+              </ul>
+
+              <AppStoreBadge variant="white" height={52} />
+
+              <p className="text-xs sm:text-sm text-gray-400 mt-5 max-w-md">
+                Prefer to use a computer? Grade on <span className="text-white font-semibold">dcmgrading.com</span> from any browser —
+                full feature parity, no app required. <span className="italic">Android coming soon.</span>
+              </p>
+            </div>
+
+            {/* RIGHT: phone mockup wrapping the onboarding screenshot. CSS-only
+                bezel — no extra asset, scales cleanly. Frame uses a thick
+                rounded border + camera notch + side buttons. */}
+            <div className="order-1 md:order-2 flex justify-center">
+              <div
+                className="relative bg-gray-900 rounded-[2.5rem] sm:rounded-[3rem] p-2.5 sm:p-3 shadow-2xl"
+                style={{
+                  // Aspect ratio matches the 1290×2796 iPhone Pro Max screenshot
+                  // so the inner image fills exactly without cropping.
+                  width: 'min(280px, 80vw)',
+                }}
+              >
+                {/* Notch */}
+                <div
+                  className="absolute left-1/2 -translate-x-1/2 top-3 sm:top-4 w-24 sm:w-28 h-5 sm:h-6 bg-black rounded-full z-10"
+                  aria-hidden
+                />
+                {/* Side buttons (decorative) */}
+                <div className="absolute -left-0.5 top-20 w-1 h-8 bg-gray-700 rounded-l" aria-hidden />
+                <div className="absolute -left-0.5 top-32 w-1 h-12 bg-gray-700 rounded-l" aria-hidden />
+                <div className="absolute -left-0.5 top-48 w-1 h-12 bg-gray-700 rounded-l" aria-hidden />
+                <div className="absolute -right-0.5 top-28 w-1 h-16 bg-gray-700 rounded-r" aria-hidden />
+
+                {/* Screen — clip the screenshot to the inner rounded rectangle */}
+                <div className="relative overflow-hidden rounded-[2rem] sm:rounded-[2.25rem] bg-black">
+                  <Image
+                    src="/mobile-screenshots/onboarding-hero.png"
+                    alt="DCM Grading iPhone app showing the welcome screen"
+                    width={1290}
+                    height={2796}
+                    className="w-full h-auto"
+                    sizes="(max-width: 768px) 60vw, 280px"
+                  />
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>

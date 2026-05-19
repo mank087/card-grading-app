@@ -8,6 +8,7 @@ import { CreditsProvider } from '@/contexts/CreditsContext'
 import PersistentStatusBar from '@/components/PersistentStatusBar'
 import HelpBot from '@/components/helpbot/HelpBot'
 import ReferralTracker from '@/components/ReferralTracker'
+import LaunchBanner from '@/components/LaunchBanner'
 import { useBackgroundGrading } from '@/hooks/useBackgroundGrading'
 import { initSessionRefresh, cleanupSessionRefresh } from '@/lib/directAuth'
 
@@ -61,6 +62,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         />
         <PersistentStatusBar />
         <HelpBot />
+        {/* Site-wide launch banner — sits above the sticky Navigation
+            because it's rendered before {children}. Dismissible. */}
+        <LaunchBanner />
         {children}
       </GradingQueueProvider>
     </CreditsProvider>

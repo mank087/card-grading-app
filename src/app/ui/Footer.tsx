@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import AppStoreBadge from "@/components/AppStoreBadge";
 
 // Mirror of FULLSCREEN_ROUTES in Navigation.tsx — these download/preview
 // routes should render edge-to-edge with no site chrome.
@@ -39,6 +40,17 @@ export default function Footer() {
             <p className="text-gray-400 text-sm mb-4">
               Professional card grading and collection management service. Get detailed assessments of your trading card collection with DCM Optic™ technology.
             </p>
+
+            {/* App Store badge — uses the WHITE variant so it reads on the
+                dark footer. Apple's marketing rules require this exact asset
+                with no modifications. Android badge will sit alongside it
+                once the Play Store release lands. */}
+            <div className="mb-5">
+              <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Get the App</p>
+              <AppStoreBadge variant="white" height={44} />
+              <p className="text-xs text-gray-500 mt-2">Android coming soon</p>
+            </div>
+
             <div className="flex space-x-4">
               {/* Social Media Links */}
               <a href="https://www.facebook.com/dcmgrading" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors" aria-label="Facebook">

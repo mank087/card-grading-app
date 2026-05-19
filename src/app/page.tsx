@@ -7,6 +7,7 @@ import ScrollingCardBackground from './ui/ScrollingCardBackground'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
+import AppStoreBadge from '@/components/AppStoreBadge'
 
 // Helper functions to extract card info (matching collection page)
 const stripMarkdown = (text: string | null | undefined): string | null => {
@@ -199,16 +200,30 @@ export default function Home() {
             <p className="text-2xl md:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400 font-semibold mb-4">
               Free Bonus Credits for First-Time Graders!
             </p>
-            <p className="text-lg text-gray-300 mb-8 max-w-xl">
+            <p className="text-lg text-gray-300 mb-6 max-w-xl">
               Sign up today and receive bonus credits with your first purchase.
               Start grading your collection with DCM Optic™ AI technology at an unbeatable value.
             </p>
-            <Link
-              href="/login?mode=signup"
-              className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-8 py-4 rounded-lg font-bold text-lg hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg hover:shadow-orange-500/25 hover:shadow-xl"
-            >
-              Claim Your Bonus Credits
-            </Link>
+
+            {/* App Store launch callout — layered on top of the existing
+                offer copy so we keep the conversion-tested hero intact. */}
+            <p className="text-base sm:text-lg text-white font-semibold mb-6 max-w-xl">
+              <span aria-hidden>📱</span> Now available on iPhone &amp; iPad — Android coming soon.
+              <span className="block text-sm sm:text-base font-normal text-gray-300 mt-1">
+                Grade on the go, or right here on the web.
+              </span>
+            </p>
+
+            <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+              <Link
+                href="/login?mode=signup"
+                className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg hover:shadow-orange-500/25 hover:shadow-xl"
+              >
+                Claim Your Bonus Credits
+              </Link>
+              <AppStoreBadge variant="black" height={52} />
+            </div>
+
             <p className="text-gray-400 text-sm mt-6">
               No subscription required • Pay only for what you use
             </p>
