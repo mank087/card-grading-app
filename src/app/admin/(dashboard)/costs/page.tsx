@@ -494,6 +494,24 @@ function FixedCostEditor({ onChanged }: { onChanged: () => void }) {
     onChanged()
   }
 
+  const save = async (id: string, patch: Partial<FixedRow>) => {
+    const body: any = { id, ...patch }
+    if (body.amount_usd !== undefined) body.amount_usd = Number(body.amount_usd)
+    const res = await fetch('/api/admin/costs/fixed', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      alert(err.error || 'Update failed')
+      return false
+    }
+    await fetchRows()
+    onChanged()
+    return true
+  }
+
   return (
     <Panel title="Fixed cost rows">
       {/* Add form */}
@@ -580,36 +598,177 @@ function FixedCostEditor({ onChanged }: { onChanged: () => void }) {
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.id} className="border-b last:border-b-0">
-                  <td className="py-2 pr-3 text-gray-900 font-medium">{r.vendor}</td>
-                  <td className="py-2 pr-3 text-gray-700">{CATEGORY_LABELS[r.category] || r.category}</td>
-                  <td className="py-2 pr-3 text-right text-gray-900 font-semibold">{dollars(r.amount_usd)}</td>
-                  <td className="py-2 pr-3 text-xs text-gray-500">{r.cost_type}</td>
-                  <td className="py-2 pr-3 text-gray-500">{r.effective_from}</td>
-                  <td className="py-2 pr-3 text-gray-500">{r.effective_to || '—'}</td>
-                  <td className="py-2 pr-3 text-right space-x-2">
-                    {!r.effective_to && (
-                      <button
-                        onClick={() => archive(r.id, new Date().toISOString().slice(0, 10))}
-                        className="text-xs text-amber-600 hover:underline"
-                        title="Set effective_to to today"
-                      >
-                        Archive
-                      </button>
-                    )}
-                    <button
-                      onClick={() => remove(r.id)}
-                      className="text-xs text-red-600 hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                <FixedCostRow
+                  key={r.id}
+                  row={r}
+                  onSave={save}
+                  onArchive={archive}
+                  onDelete={remove}
+                />
               ))}
             </tbody>
           </table>
         </div>
       )}
     </Panel>
+  )
+}
+
+// ============================================================
+// One row in the fixed-cost editor — toggles between view and edit mode.
+// ============================================================
+function FixedCostRow({
+  row,
+  onSave,
+  onArchive,
+  onDelete,
+}: {
+  row: FixedRow
+  onSave: (id: string, patch: Partial<FixedRow>) => Promise<boolean>
+  onArchive: (id: string, effective_to: string) => Promise<void>
+  onDelete: (id: string) => Promise<void>
+}) {
+  const [editing, setEditing] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [draft, setDraft] = useState<Partial<FixedRow>>(row)
+
+  // If the parent re-fetches and gives us a fresh row, reset the draft in
+  // case we were in edit mode but values changed externally.
+  useEffect(() => { if (!editing) setDraft(row) }, [row, editing])
+
+  const cancel = () => {
+    setDraft(row)
+    setEditing(false)
+  }
+
+  const commit = async () => {
+    setSaving(true)
+    const patch: Partial<FixedRow> = {}
+    if (draft.vendor !== row.vendor) patch.vendor = draft.vendor
+    if (draft.category !== row.category) patch.category = draft.category
+    if (Number(draft.amount_usd) !== Number(row.amount_usd)) patch.amount_usd = Number(draft.amount_usd)
+    if (draft.cost_type !== row.cost_type) patch.cost_type = draft.cost_type
+    if (draft.effective_from !== row.effective_from) patch.effective_from = draft.effective_from
+    if ((draft.effective_to || null) !== (row.effective_to || null)) patch.effective_to = draft.effective_to || null
+    if ((draft.notes || null) !== (row.notes || null)) patch.notes = draft.notes || null
+
+    if (Object.keys(patch).length === 0) {
+      setEditing(false)
+      setSaving(false)
+      return
+    }
+    const ok = await onSave(row.id, patch)
+    setSaving(false)
+    if (ok) setEditing(false)
+  }
+
+  if (!editing) {
+    return (
+      <tr className="border-b last:border-b-0">
+        <td className="py-2 pr-3 text-gray-900 font-medium">{row.vendor}</td>
+        <td className="py-2 pr-3 text-gray-700">{CATEGORY_LABELS[row.category] || row.category}</td>
+        <td className="py-2 pr-3 text-right text-gray-900 font-semibold">{dollars(row.amount_usd)}</td>
+        <td className="py-2 pr-3 text-xs text-gray-500">{row.cost_type}</td>
+        <td className="py-2 pr-3 text-gray-500">{row.effective_from}</td>
+        <td className="py-2 pr-3 text-gray-500">{row.effective_to || '—'}</td>
+        <td className="py-2 pr-3 text-right space-x-2 whitespace-nowrap">
+          <button
+            onClick={() => setEditing(true)}
+            className="text-xs text-blue-600 hover:underline"
+          >
+            Edit
+          </button>
+          {!row.effective_to && (
+            <button
+              onClick={() => onArchive(row.id, new Date().toISOString().slice(0, 10))}
+              className="text-xs text-amber-600 hover:underline"
+              title="Set effective_to to today"
+            >
+              Archive
+            </button>
+          )}
+          <button
+            onClick={() => onDelete(row.id)}
+            className="text-xs text-red-600 hover:underline"
+          >
+            Delete
+          </button>
+        </td>
+      </tr>
+    )
+  }
+
+  return (
+    <tr className="border-b last:border-b-0 bg-blue-50">
+      <td className="py-2 pr-3">
+        <input
+          value={draft.vendor || ''}
+          onChange={(e) => setDraft((d) => ({ ...d, vendor: e.target.value }))}
+          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+        />
+      </td>
+      <td className="py-2 pr-3">
+        <select
+          value={draft.category || 'other'}
+          onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value }))}
+          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+        >
+          {CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
+        </select>
+      </td>
+      <td className="py-2 pr-3 text-right">
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={draft.amount_usd ?? 0}
+          onChange={(e) => setDraft((d) => ({ ...d, amount_usd: Number(e.target.value) }))}
+          className="w-24 border border-gray-300 rounded px-2 py-1 text-sm text-right"
+        />
+      </td>
+      <td className="py-2 pr-3">
+        <select
+          value={draft.cost_type || 'recurring'}
+          onChange={(e) => setDraft((d) => ({ ...d, cost_type: e.target.value as 'recurring' | 'one_time' }))}
+          className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+        >
+          <option value="recurring">recurring</option>
+          <option value="one_time">one_time</option>
+        </select>
+      </td>
+      <td className="py-2 pr-3">
+        <input
+          type="date"
+          value={draft.effective_from || ''}
+          onChange={(e) => setDraft((d) => ({ ...d, effective_from: e.target.value }))}
+          className="border border-gray-300 rounded px-2 py-1 text-sm"
+        />
+      </td>
+      <td className="py-2 pr-3">
+        <input
+          type="date"
+          value={draft.effective_to || ''}
+          onChange={(e) => setDraft((d) => ({ ...d, effective_to: e.target.value || null }))}
+          className="border border-gray-300 rounded px-2 py-1 text-sm"
+          placeholder="ongoing"
+        />
+      </td>
+      <td className="py-2 pr-3 text-right space-x-2 whitespace-nowrap">
+        <button
+          onClick={commit}
+          disabled={saving}
+          className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium px-2 py-1 rounded disabled:opacity-50"
+        >
+          {saving ? 'Saving…' : 'Save'}
+        </button>
+        <button
+          onClick={cancel}
+          disabled={saving}
+          className="text-xs text-gray-500 hover:underline"
+        >
+          Cancel
+        </button>
+      </td>
+    </tr>
   )
 }
