@@ -1,8 +1,33 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react'
+import { Platform } from 'react-native'
 import { Session, User } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
 import { setUserId as setAnalyticsUserId } from '@/lib/analytics'
+
+// Server-side handle_new_user() trigger reads this from raw_user_meta_data
+// and writes it to public.users.signup_source so the admin revenue/analytics
+// dashboards can show "X% of users came from mobile."
+const SIGNUP_PLATFORM = Platform.OS === 'ios' ? 'ios_app'
+  : Platform.OS === 'android' ? 'android_app'
+  : 'web' // expo web fallback
+
+const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+
+// Best-effort OAuth attribution upgrade. Idempotent + safe — the server
+// only flips signup_source if the row is still 'web' AND the user was
+// created within the last 60 minutes.
+async function tagSignupSource(accessToken: string): Promise<void> {
+  if (SIGNUP_PLATFORM === 'web') return // Expo Web — server defaults are correct
+  await fetch(`${API_BASE}/api/auth/tag-signup-source`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'X-Client-Platform': SIGNUP_PLATFORM,
+      'Content-Type': 'application/json',
+    },
+  })
+}
 
 // Sentry — wrapped in try/catch like everywhere else (Expo Go lacks the
 // native module). When available, tag every captured exception with the
@@ -94,12 +119,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
       setAnalyticsUserId(session?.user?.id ?? null)
       setSentryUser(session?.user?.id ?? null)
+
+      // OAuth sign-ups (Apple, Google, Facebook) can't pass user metadata
+      // through signInWithIdToken / signInWithOAuth, so the
+      // handle_new_user trigger defaults their signup_source to 'web'.
+      // The /api/auth/tag-signup-source endpoint upgrades it to
+      // ios_app/android_app, but only for users created in the last 60
+      // minutes — safe to spray on every SIGNED_IN event without harming
+      // long-time users who later sign into the mobile app.
+      if (event === 'SIGNED_IN' && session?.access_token) {
+        tagSignupSource(session.access_token).catch((err) => {
+          if (__DEV__) console.warn('[Auth] tag-signup-source failed:', err)
+        })
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -111,7 +149,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signUp = async (email: string, password: string): Promise<SignUpResult> => {
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { signup_platform: SIGNUP_PLATFORM } },
+    })
     // Supabase 2.x: existing user → no error, but identities array is
     // empty (the user object is a stub for anti-enumeration). New user →
     // identities has at least one entry. Either way, surface the signal.

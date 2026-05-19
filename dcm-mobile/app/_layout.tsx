@@ -11,7 +11,13 @@ try {
 } catch {
   // Expo Go path — keep the no-op shim
 }
+import { installPlatformHeaderFetchPatch } from '@/lib/fetchPlatformHeader'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+
+// Install the X-Client-Platform fetch interceptor at module-load time so the
+// header is present on the very first request (e.g. early Supabase auth
+// callbacks, color extraction). Idempotent — safe across HMR reloads.
+installPlatformHeaderFetchPatch()
 import { CreditsProvider } from '@/contexts/CreditsContext'
 import { EmblemsProvider } from '@/contexts/EmblemsContext'
 import { GradingQueueProvider } from '@/contexts/GradingQueueContext'
