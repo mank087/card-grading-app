@@ -47,7 +47,15 @@ export default function LaunchBanner() {
   }
 
   return (
-    <div className="bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 text-white relative z-[60]">
+    <div
+      // data-dcm-launch-banner is the stable selector the mobile app's
+      // InAppPage WebView uses to hide this banner — users browsing the
+      // website from inside the iOS/Android app don't need a "download
+      // the app" prompt. Don't rename without updating
+      // dcm-mobile/components/ui/InAppPage.tsx.
+      data-dcm-launch-banner
+      className="bg-gradient-to-r from-purple-700 via-purple-600 to-indigo-600 text-white relative z-[60]"
+    >
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-2 sm:py-2.5 flex items-center gap-2 sm:gap-3">
         <span className="text-base sm:text-lg flex-shrink-0" aria-hidden>🎉</span>
 

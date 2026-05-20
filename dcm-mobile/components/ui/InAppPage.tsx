@@ -97,6 +97,9 @@ export default function InAppPage({ path, title }: InAppPageProps) {
         // HelpBot floating button (fixed bottom-right, high z-index)
         '.fixed.bottom-6.right-6 { display: none !important; }',
         '[class*="fixed"][class*="bottom-6"][class*="right-6"] { display: none !important; }',
+        // Site-wide "Download the app" launch banner — redundant in-app.
+        // Selector is set on src/components/LaunchBanner.tsx (web).
+        '[data-dcm-launch-banner] { display: none !important; }',
       ].join('\\n');
       document.head.appendChild(style);
 
