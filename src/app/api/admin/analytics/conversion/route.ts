@@ -77,6 +77,26 @@ export async function GET(request: NextRequest) {
       throw purchasesError
     }
 
+    // Also pull IAP transactions — mobile users buying via Apple/Google
+    // don't have rows in credit_transactions.type='purchase'. Without this,
+    // every mobile purchaser would show as "free" in the conversion stats.
+    const { data: iapTxns } = await supabaseAdmin
+      .from('iap_transactions')
+      .select('user_id, created_at')
+      .eq('status', 'active')
+      .eq('environment', 'production') // exclude sandbox/TestFlight
+      .limit(100000)
+
+    // Pull signup_source from public.users so we can split conversions by
+    // platform of acquisition (web vs ios_app vs android_app). This is the
+    // "free vs paid by platform" cohort the admin asked for.
+    const { data: userPlatformRows } = await supabaseAdmin
+      .from('users')
+      .select('id, signup_source')
+      .limit(100000)
+    const platformByUser: Record<string, string> = {}
+    userPlatformRows?.forEach((u) => { platformByUser[u.id] = u.signup_source || 'web' })
+
     // Create lookup maps
     const userSignupMap: Record<string, Date> = {}
     users?.forEach(u => {
@@ -86,7 +106,7 @@ export async function GET(request: NextRequest) {
     // Get unique users who graded
     const usersWhoGraded = new Set(grades?.map(g => g.user_id) || [])
 
-    // Get first purchase per user
+    // Get first purchase per user (Stripe OR IAP)
     const firstPurchaseMap: Record<string, { date: Date; amount: number; description: string }> = {}
     purchases?.forEach(p => {
       if (!firstPurchaseMap[p.user_id] || new Date(p.created_at) < firstPurchaseMap[p.user_id].date) {
@@ -95,6 +115,13 @@ export async function GET(request: NextRequest) {
           amount: p.amount,
           description: p.description || ''
         }
+      }
+    })
+    iapTxns?.forEach((t) => {
+      const existing = firstPurchaseMap[t.user_id]
+      const txDate = new Date(t.created_at)
+      if (!existing || txDate < existing.date) {
+        firstPurchaseMap[t.user_id] = { date: txDate, amount: 0, description: 'IAP' }
       }
     })
 
@@ -232,7 +259,16 @@ export async function GET(request: NextRequest) {
         total_purchases: Object.values(packageCounts).reduce((a, b) => a + b, 0),
         total_revenue: Math.round(totalRevenue * 100) / 100
       },
-      weekly_trends: weeklyConversions
+      weekly_trends: weeklyConversions,
+      // Per-platform funnel: of users who signed up from each platform,
+      // how many graded a card and how many made a purchase. Includes
+      // both Stripe credit_transactions purchases and IAP transactions.
+      by_platform: buildPlatformFunnel(
+        platformByUser,
+        userSignupMap,
+        usersWhoGraded,
+        usersWhoPurchased,
+      ),
     }
 
     return NextResponse.json(analytics, { status: 200 })
@@ -243,4 +279,49 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
+}
+
+interface PlatformFunnelRow {
+  platform: 'web' | 'ios_app' | 'android_app'
+  signups: number
+  graded: number
+  purchased: number
+  graded_rate: number
+  purchase_rate: number
+  grader_to_buyer_rate: number
+}
+
+/**
+ * Build a comparison table: for each platform, how many signups → graded →
+ * purchased. Only counts users whose signup row exists in user_credits
+ * (which is what userSignupMap was built from); orphans are skipped.
+ */
+function buildPlatformFunnel(
+  platformByUser: Record<string, string>,
+  userSignupMap: Record<string, Date>,
+  usersWhoGraded: Set<string>,
+  usersWhoPurchased: Set<string>,
+): PlatformFunnelRow[] {
+  const platforms = ['web', 'ios_app', 'android_app'] as const
+  return platforms.map((platform) => {
+    let signups = 0
+    let graded = 0
+    let purchased = 0
+    for (const userId of Object.keys(userSignupMap)) {
+      const p = platformByUser[userId] || 'web'
+      if (p !== platform) continue
+      signups += 1
+      if (usersWhoGraded.has(userId)) graded += 1
+      if (usersWhoPurchased.has(userId)) purchased += 1
+    }
+    return {
+      platform,
+      signups,
+      graded,
+      purchased,
+      graded_rate: signups > 0 ? Math.round((graded / signups) * 1000) / 10 : 0,
+      purchase_rate: signups > 0 ? Math.round((purchased / signups) * 1000) / 10 : 0,
+      grader_to_buyer_rate: graded > 0 ? Math.round((purchased / graded) * 1000) / 10 : 0,
+    }
+  })
 }

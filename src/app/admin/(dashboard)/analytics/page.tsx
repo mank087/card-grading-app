@@ -37,6 +37,15 @@ interface ConversionAnalytics {
     total_revenue: number
   }
   weekly_trends: Array<{ week: string; signups: number; conversions: number; rate: number }>
+  by_platform: Array<{
+    platform: 'web' | 'ios_app' | 'android_app'
+    signups: number
+    graded: number
+    purchased: number
+    graded_rate: number
+    purchase_rate: number
+    grader_to_buyer_rate: number
+  }>
 }
 
 interface UserAnalytics {
@@ -48,8 +57,9 @@ interface UserAnalytics {
     engagement_rate: number
     users_with_cards: number
   }
-  growth: Array<{ date: string; new_users: number; total_users: number }>
-  weekly_acquisition: Array<{ week: string; users: number }>
+  by_platform: { web: number; ios_app: number; android_app: number }
+  growth: Array<{ date: string; web: number; ios_app: number; android_app: number; total: number; cumulative: number }>
+  weekly_acquisition: Array<{ week: string; web: number; ios_app: number; android_app: number; total: number }>
 }
 
 interface GradingAnalytics {
@@ -61,9 +71,10 @@ interface GradingAnalytics {
     high_grades_9_plus: number
     high_grade_rate: number
   }
+  by_platform: { web: number; ios_app: number; android_app: number }
   distribution: Array<{ grade: number; count: number; percentage: string }>
   by_category: Array<{ category: string; total_cards: number; average_grade: number }>
-  weekly_trends: Array<{ week: string; avg_grade: number; cards_graded: number }>
+  weekly_trends: Array<{ week: string; web: number; ios_app: number; android_app: number; total: number; avg_grade: number }>
 }
 
 interface CardAnalytics {
@@ -74,22 +85,14 @@ interface CardAnalytics {
     cards_last_7_days: number
     cards_last_30_days: number
   }
+  by_platform: { web: number; ios_app: number; android_app: number }
   by_category: Array<{ category: string; count: number; percentage: string }>
-  weekly_uploads: Array<{ week: string; uploads: number }>
+  weekly_uploads: Array<{ week: string; web: number; ios_app: number; android_app: number; total: number }>
 }
 
-interface FinancialAnalytics {
-  overview: {
-    total_estimated_cost: number
-    total_cards_graded: number
-    avg_cost_per_card: number
-    cost_last_30_days: number
-    projected_monthly: number
-    projected_annual: number
-  }
-  by_category: Array<{ category: string; total_cost: number; cards_graded: number }>
-  monthly_trend: Array<{ month: string; cost: number; cards: number }>
-}
+// FinancialAnalytics removed — superseded by /admin/costs (which pulls
+// actual OpenAI + Stripe + IAP fees + manual fixed costs and computes
+// real gross / net margin instead of the old cards-table cost estimate).
 
 const COLORS = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981', '#06b6d4', '#6366f1', '#f97316']
 const PACKAGE_COLORS: Record<string, string> = {
@@ -102,67 +105,85 @@ const PACKAGE_COLORS: Record<string, string> = {
   founders: '#fbbf24'
 }
 
+// Default range: last 30 days
+function defaultDateRange() {
+  const to = new Date()
+  const from = new Date(to.getTime() - 30 * 24 * 3600 * 1000)
+  return {
+    from: from.toISOString().slice(0, 10),
+    to: to.toISOString().slice(0, 10),
+  }
+}
+
+const PLATFORM_LABELS = {
+  web: 'Web',
+  ios_app: 'iOS',
+  android_app: 'Android',
+} as const
+
+const PLATFORM_COLORS = {
+  web: '#635bff',     // purple
+  ios_app: '#1f2937', // charcoal
+  android_app: '#34a853', // google green
+} as const
+
 export default function AdminAnalyticsPage() {
-  const [activeTab, setActiveTab] = useState<'users' | 'grading' | 'cards' | 'financial' | 'conversion'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'acquisition' | 'grading' | 'cards' | 'conversion'>('users')
   const [loading, setLoading] = useState(true)
   const [userAnalytics, setUserAnalytics] = useState<UserAnalytics | null>(null)
   const [gradingAnalytics, setGradingAnalytics] = useState<GradingAnalytics | null>(null)
   const [cardAnalytics, setCardAnalytics] = useState<CardAnalytics | null>(null)
-  const [financialAnalytics, setFinancialAnalytics] = useState<FinancialAnalytics | null>(null)
   const [conversionAnalytics, setConversionAnalytics] = useState<ConversionAnalytics | null>(null)
   const [conversionLoading, setConversionLoading] = useState(false)
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
 
-  useEffect(() => {
-    const fetchAnalytics = async () => {
-      setLoading(true)
-      try {
-        const [usersRes, gradingRes, cardsRes, financialRes] = await Promise.all([
-          fetch('/api/admin/analytics/users'),
-          fetch('/api/admin/analytics/grading'),
-          fetch('/api/admin/analytics/cards'),
-          fetch('/api/admin/analytics/financial')
-        ])
+  // Shared date range — applies to every tab. Default last 30 days.
+  const initial = defaultDateRange()
+  const [from, setFrom] = useState(initial.from)
+  const [to, setTo] = useState(initial.to)
 
-        if (usersRes.ok) setUserAnalytics(await usersRes.json())
-        if (gradingRes.ok) setGradingAnalytics(await gradingRes.json())
-        if (cardsRes.ok) setCardAnalytics(await cardsRes.json())
-        if (financialRes.ok) setFinancialAnalytics(await financialRes.json())
-      } catch (error) {
-        console.error('Error fetching analytics:', error)
-      } finally {
-        setLoading(false)
-      }
+  const fetchAll = useCallback(async () => {
+    setLoading(true)
+    try {
+      const qs = new URLSearchParams({ from, to }).toString()
+      const [usersRes, gradingRes, cardsRes] = await Promise.all([
+        fetch(`/api/admin/analytics/users?${qs}`),
+        fetch(`/api/admin/analytics/grading?${qs}`),
+        fetch(`/api/admin/analytics/cards?${qs}`),
+      ])
+      if (usersRes.ok) setUserAnalytics(await usersRes.json())
+      if (gradingRes.ok) setGradingAnalytics(await gradingRes.json())
+      if (cardsRes.ok) setCardAnalytics(await cardsRes.json())
+    } catch (error) {
+      console.error('Error fetching analytics:', error)
+    } finally {
+      setLoading(false)
     }
+  }, [from, to])
 
-    fetchAnalytics()
-  }, [])
+  useEffect(() => { fetchAll() }, [fetchAll])
 
-  // Fetch conversion analytics when tab is selected or date filters change
+  // Conversion is fetched lazily when the tab is opened (or when the date
+  // range changes while it's the active tab).
   const fetchConversionAnalytics = useCallback(async () => {
     setConversionLoading(true)
     try {
       const params = new URLSearchParams()
-      if (startDate) params.append('startDate', startDate)
-      if (endDate) params.append('endDate', endDate)
-
+      params.append('startDate', from)
+      params.append('endDate', to)
       const res = await fetch(`/api/admin/analytics/conversion?${params.toString()}`)
-      if (res.ok) {
-        setConversionAnalytics(await res.json())
-      }
+      if (res.ok) setConversionAnalytics(await res.json())
     } catch (error) {
       console.error('Error fetching conversion analytics:', error)
     } finally {
       setConversionLoading(false)
     }
-  }, [startDate, endDate])
+  }, [from, to])
 
   useEffect(() => {
-    if (activeTab === 'conversion' && !conversionAnalytics) {
+    if (activeTab === 'conversion') {
       fetchConversionAnalytics()
     }
-  }, [activeTab, conversionAnalytics, fetchConversionAnalytics])
+  }, [activeTab, fetchConversionAnalytics])
 
   if (loading) {
     return (
@@ -174,20 +195,44 @@ export default function AdminAnalyticsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Platform Analytics</h1>
-        <p className="text-gray-600 mt-1">Comprehensive insights into your platform's performance</p>
+      {/* Header + shared date range */}
+      <div className="flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Platform Analytics</h1>
+          <p className="text-gray-600 mt-1">
+            User acquisition, grading volume, and conversion — split by Web / iOS / Android.
+          </p>
+        </div>
+        <div className="flex items-end gap-2">
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">From</label>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-1.5 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500 mb-1">To</label>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-1.5 text-sm"
+            />
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
       <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex space-x-6 overflow-x-auto">
           {[
-            { key: 'users' as const, label: 'User Analytics', icon: '👥' },
-            { key: 'grading' as const, label: 'Grading Analytics', icon: '⭐' },
-            { key: 'cards' as const, label: 'Card Analytics', icon: '🎴' },
-            { key: 'financial' as const, label: 'Financial', icon: '💰' },
+            { key: 'users' as const, label: 'Users', icon: '👥' },
+            { key: 'acquisition' as const, label: 'Acquisition', icon: '🚀' },
+            { key: 'grading' as const, label: 'Grading', icon: '⭐' },
+            { key: 'cards' as const, label: 'Cards', icon: '🎴' },
             { key: 'conversion' as const, label: 'Conversion', icon: '📈' }
           ].map(tab => (
             <button
@@ -228,33 +273,124 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
 
-          {/* User Growth Chart */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">User Growth (Last 90 Days)</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={userAnalytics.growth.slice(-90)}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="total_users" stroke="#3b82f6" name="Total Users" />
-                <Line type="monotone" dataKey="new_users" stroke="#10b981" name="New Users" />
-              </LineChart>
-            </ResponsiveContainer>
+          {/* Platform split */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {(['web', 'ios_app', 'android_app'] as const).map((p) => (
+              <div key={p} className="bg-white rounded-lg shadow p-6 flex items-center gap-4">
+                <div
+                  className="w-12 h-12 rounded-full flex-shrink-0"
+                  style={{ background: PLATFORM_COLORS[p] }}
+                />
+                <div>
+                  <p className="text-sm text-gray-600">{PLATFORM_LABELS[p]} signups</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {userAnalytics.by_platform[p].toLocaleString()}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {userAnalytics.overview.total_users > 0
+                      ? ((userAnalytics.by_platform[p] / userAnalytics.overview.total_users) * 100).toFixed(1)
+                      : '0'}% of total
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
 
-          {/* Weekly Acquisition */}
+          {/* Weekly Acquisition — stacked by platform */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly User Acquisition</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Acquisition (by platform)</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={userAnalytics.weekly_acquisition}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis />
+                <Tooltip formatter={(v: number, name: string) => [v, PLATFORM_LABELS[name as keyof typeof PLATFORM_LABELS] || name]} />
+                <Legend formatter={(v) => PLATFORM_LABELS[v as keyof typeof PLATFORM_LABELS] || v} />
+                <Bar dataKey="web" stackId="users" fill={PLATFORM_COLORS.web} />
+                <Bar dataKey="ios_app" stackId="users" fill={PLATFORM_COLORS.ios_app} />
+                <Bar dataKey="android_app" stackId="users" fill={PLATFORM_COLORS.android_app} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Cumulative User Growth */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Cumulative User Growth (Last 90 Days)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={userAnalytics.growth.slice(-90)}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="date" tick={{ fontSize: 11 }} />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="users" fill="#3b82f6" name="New Users" />
+                <Legend />
+                <Line type="monotone" dataKey="cumulative" stroke="#3b82f6" name="Total Users" dot={false} />
+                <Line type="monotone" dataKey="total" stroke="#10b981" name="New Users (daily)" dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Acquisition Tab */}
+      {activeTab === 'acquisition' && userAnalytics && (
+        <div className="space-y-6">
+          {/* Platform headline cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {(['web', 'ios_app', 'android_app'] as const).map((p) => {
+              // New users in selected range, per platform
+              const inRange = userAnalytics.weekly_acquisition.reduce((s, w) => s + w[p], 0)
+              return (
+                <div key={p} className="bg-white rounded-lg shadow p-6 border-l-4" style={{ borderLeftColor: PLATFORM_COLORS[p] }}>
+                  <p className="text-sm text-gray-600">{PLATFORM_LABELS[p]} — new in range</p>
+                  <p className="text-3xl font-bold text-gray-900 mt-2">{inRange.toLocaleString()}</p>
+                  <p className="text-xs text-gray-400 mt-2">{userAnalytics.by_platform[p].toLocaleString()} total all-time</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Acquisition trend (stacked bars) */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Acquisition trend (in range)</h3>
+            <ResponsiveContainer width="100%" height={340}>
+              <BarChart data={userAnalytics.weekly_acquisition}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis />
+                <Tooltip formatter={(v: number, name: string) => [v, PLATFORM_LABELS[name as keyof typeof PLATFORM_LABELS] || name]} />
+                <Legend formatter={(v) => PLATFORM_LABELS[v as keyof typeof PLATFORM_LABELS] || v} />
+                <Bar dataKey="web" stackId="users" fill={PLATFORM_COLORS.web} />
+                <Bar dataKey="ios_app" stackId="users" fill={PLATFORM_COLORS.ios_app} />
+                <Bar dataKey="android_app" stackId="users" fill={PLATFORM_COLORS.android_app} />
               </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Platform share pie */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">All-time signup share by platform</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={(['web', 'ios_app', 'android_app'] as const).map((p) => ({
+                    name: PLATFORM_LABELS[p],
+                    value: userAnalytics.by_platform[p],
+                    platform: p,
+                  }))}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label
+                >
+                  {(['web', 'ios_app', 'android_app'] as const).map((p) => (
+                    <Cell key={p} fill={PLATFORM_COLORS[p]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -338,19 +474,48 @@ export default function AdminAnalyticsPage() {
             </ResponsiveContainer>
           </div>
 
-          {/* Weekly Trends */}
+          {/* Grading by platform — headline cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {(['web', 'ios_app', 'android_app'] as const).map((p) => (
+              <div key={p} className="bg-white rounded-lg shadow p-6 border-l-4" style={{ borderLeftColor: PLATFORM_COLORS[p] }}>
+                <p className="text-sm text-gray-600">{PLATFORM_LABELS[p]} — cards graded</p>
+                <p className="text-3xl font-bold text-gray-900 mt-2">{gradingAnalytics.by_platform[p].toLocaleString()}</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  {gradingAnalytics.overview.total_graded > 0
+                    ? ((gradingAnalytics.by_platform[p] / gradingAnalytics.overview.total_graded) * 100).toFixed(1)
+                    : '0'}% of total
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Weekly Grading Volume — stacked by platform */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Grading Trends</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Grading Volume (by platform)</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={gradingAnalytics.weekly_trends}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis />
+                <Tooltip formatter={(v: number, name: string) => [v, PLATFORM_LABELS[name as keyof typeof PLATFORM_LABELS] || name]} />
+                <Legend formatter={(v) => PLATFORM_LABELS[v as keyof typeof PLATFORM_LABELS] || v} />
+                <Bar dataKey="web" stackId="cards" fill={PLATFORM_COLORS.web} />
+                <Bar dataKey="ios_app" stackId="cards" fill={PLATFORM_COLORS.ios_app} />
+                <Bar dataKey="android_app" stackId="cards" fill={PLATFORM_COLORS.android_app} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Weekly Average Grade */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Average Grade</h3>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={gradingAnalytics.weekly_trends}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                <YAxis yAxisId="left" domain={[0, 10]} />
-                <YAxis yAxisId="right" orientation="right" />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 10]} />
                 <Tooltip />
-                <Legend />
-                <Line yAxisId="left" type="monotone" dataKey="avg_grade" stroke="#8b5cf6" name="Avg Grade" />
-                <Line yAxisId="right" type="monotone" dataKey="cards_graded" stroke="#3b82f6" name="Cards Graded" />
+                <Line type="monotone" dataKey="avg_grade" stroke="#8b5cf6" name="Avg Grade" />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -427,91 +592,48 @@ export default function AdminAnalyticsPage() {
             </div>
           </div>
 
-          {/* Upload Trends */}
+          {/* Platform split for cards */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Upload Trends</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Cards by Platform</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={(['web', 'ios_app', 'android_app'] as const).map((p) => ({
+                    name: PLATFORM_LABELS[p],
+                    value: cardAnalytics.by_platform[p],
+                  }))}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={100}
+                  label
+                >
+                  {(['web', 'ios_app', 'android_app'] as const).map((p) => (
+                    <Cell key={p} fill={PLATFORM_COLORS[p]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Upload Trends — stacked by platform */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Weekly Uploads (by platform)</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={cardAnalytics.weekly_uploads}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                <XAxis dataKey="week" tick={{ fontSize: 11 }} />
                 <YAxis />
-                <Tooltip />
-                <Bar dataKey="uploads" fill="#8b5cf6" name="Uploads" />
+                <Tooltip formatter={(v: number, name: string) => [v, PLATFORM_LABELS[name as keyof typeof PLATFORM_LABELS] || name]} />
+                <Legend formatter={(v) => PLATFORM_LABELS[v as keyof typeof PLATFORM_LABELS] || v} />
+                <Bar dataKey="web" stackId="cards" fill={PLATFORM_COLORS.web} />
+                <Bar dataKey="ios_app" stackId="cards" fill={PLATFORM_COLORS.ios_app} />
+                <Bar dataKey="android_app" stackId="cards" fill={PLATFORM_COLORS.android_app} />
               </BarChart>
             </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* Financial Analytics Tab */}
-      {activeTab === 'financial' && financialAnalytics && (
-        <div className="space-y-6">
-          {/* Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Total API Cost</p>
-              <p className="text-3xl font-bold text-gray-900 mt-2">${financialAnalytics.overview.total_estimated_cost.toFixed(2)}</p>
-              <p className="text-xs text-gray-500 mt-1">Estimated</p>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Cost Per Card</p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">${financialAnalytics.overview.avg_cost_per_card.toFixed(3)}</p>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Monthly Projection</p>
-              <p className="text-3xl font-bold text-purple-600 mt-2">${financialAnalytics.overview.projected_monthly.toFixed(2)}</p>
-            </div>
-            <div className="bg-white rounded-lg shadow p-6">
-              <p className="text-sm text-gray-600">Annual Projection</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">${financialAnalytics.overview.projected_annual.toFixed(2)}</p>
-            </div>
-          </div>
-
-          {/* Cost by Category */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Cost by Category</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={financialAnalytics.by_category}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="category" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="total_cost" fill="#10b981" name="Total Cost ($)" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Monthly Trend */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Cost Trend</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={financialAnalytics.monthly_trend}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                <YAxis yAxisId="left" />
-                <YAxis yAxisId="right" orientation="right" />
-                <Tooltip />
-                <Legend />
-                <Line yAxisId="left" type="monotone" dataKey="cost" stroke="#8b5cf6" name="Cost ($)" />
-                <Line yAxisId="right" type="monotone" dataKey="cards" stroke="#3b82f6" name="Cards Graded" />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Note about estimates */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex">
-              <svg className="w-5 h-5 text-yellow-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div>
-                <p className="text-sm font-semibold text-yellow-800">Cost Estimates</p>
-                <p className="text-sm text-yellow-700 mt-1">
-                  Costs are estimated based on card gradings. For accurate tracking, integrate API usage logging into your grading functions.
-                  See the Monitoring dashboard for integration instructions.
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -519,51 +641,6 @@ export default function AdminAnalyticsPage() {
       {/* Conversion Analytics Tab */}
       {activeTab === 'conversion' && (
         <div className="space-y-6">
-          {/* Date Range Selector */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
-                />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={fetchConversionAnalytics}
-                  disabled={conversionLoading}
-                  className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-purple-700 disabled:opacity-50"
-                >
-                  {conversionLoading ? 'Loading...' : 'Apply Filter'}
-                </button>
-                {(startDate || endDate) && (
-                  <button
-                    onClick={() => {
-                      setStartDate('')
-                      setEndDate('')
-                      setTimeout(fetchConversionAnalytics, 0)
-                    }}
-                    className="ml-2 text-gray-600 hover:text-gray-900 text-sm underline"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
           {conversionLoading ? (
             <div className="flex items-center justify-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
@@ -593,6 +670,53 @@ export default function AdminAnalyticsPage() {
                   <p className="text-sm text-gray-500 mt-2">{conversionAnalytics.overview.converted_users} converted users</p>
                 </div>
               </div>
+
+              {/* Platform funnel comparison — "Free vs Paid by platform" */}
+              {conversionAnalytics.by_platform && conversionAnalytics.by_platform.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-1">Funnel by Platform</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    Of users who signed up from each platform, how many graded a card (used free credit) and how many made a purchase (Stripe or IAP).
+                  </p>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead>
+                        <tr className="text-left text-gray-500 border-b">
+                          <th className="py-2 pr-4 font-medium">Platform</th>
+                          <th className="py-2 pr-4 font-medium text-right">Signups</th>
+                          <th className="py-2 pr-4 font-medium text-right">Graded</th>
+                          <th className="py-2 pr-4 font-medium text-right">Purchased</th>
+                          <th className="py-2 pr-4 font-medium text-right">Graded %</th>
+                          <th className="py-2 pr-4 font-medium text-right">Purchase %</th>
+                          <th className="py-2 pr-4 font-medium text-right">Grader → Buyer %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {conversionAnalytics.by_platform.map((row) => (
+                          <tr key={row.platform} className="border-b last:border-b-0">
+                            <td className="py-2 pr-4">
+                              <span className="inline-flex items-center gap-2">
+                                <span className="w-3 h-3 rounded" style={{ background: PLATFORM_COLORS[row.platform] }} />
+                                <span className="font-medium text-gray-900">{PLATFORM_LABELS[row.platform]}</span>
+                              </span>
+                            </td>
+                            <td className="py-2 pr-4 text-right text-gray-900 font-semibold">{row.signups.toLocaleString()}</td>
+                            <td className="py-2 pr-4 text-right text-gray-700">{row.graded.toLocaleString()}</td>
+                            <td className="py-2 pr-4 text-right text-gray-900 font-semibold">{row.purchased.toLocaleString()}</td>
+                            <td className="py-2 pr-4 text-right text-gray-500">{row.graded_rate}%</td>
+                            <td className="py-2 pr-4 text-right text-emerald-700 font-semibold">{row.purchase_rate}%</td>
+                            <td className="py-2 pr-4 text-right text-gray-500">{row.grader_to_buyer_rate}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">
+                    Signups = users with a row in user_credits attributed to this platform via signup_source.
+                    Graded = used at least one credit. Purchased = at least one Stripe or production IAP transaction.
+                  </p>
+                </div>
+              )}
 
               {/* Time to Purchase Stats */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
