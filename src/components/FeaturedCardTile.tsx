@@ -74,12 +74,21 @@ export default function FeaturedCardTile({ card, hidePricing = false }: Featured
   }, [])
   const qrCodeUrl = origin ? `${origin}${cardLink}` : ''
 
-  // Sub-scores for the back label (flat weighted values)
-  const backLabelSubScores = subScores ? {
-    centering: subScores.centering?.weighted ?? 0,
-    corners: subScores.corners?.weighted ?? 0,
-    edges: subScores.edges?.weighted ?? 0,
-    surface: subScores.surface?.weighted ?? 0,
+  // Sub-scores for the back label (flat weighted values).
+  // Two possible storage shapes across grading-schema versions:
+  //   v3.x+ (current):  card.conversational_weighted_sub_scores =
+  //                     { centering_weighted, corners_weighted, edges_weighted, surface_weighted, ... }
+  //   v3.x+ alt path:   card.conversational_sub_scores.weighted = (same flat keys)
+  //   Legacy:           card.conversational_sub_scores.centering.weighted
+  // The previous code only handled the legacy nested-object case, so every
+  // current card silently fell through to the `?? 0` fallback and showed
+  // all-zero subgrades on featured tiles.
+  const flatWeighted = weightedScores || subScores?.weighted
+  const backLabelSubScores = flatWeighted ? {
+    centering: flatWeighted.centering_weighted ?? subScores?.centering?.weighted ?? 0,
+    corners:   flatWeighted.corners_weighted   ?? subScores?.corners?.weighted   ?? 0,
+    edges:     flatWeighted.edges_weighted     ?? subScores?.edges?.weighted     ?? 0,
+    surface:   flatWeighted.surface_weighted   ?? subScores?.surface?.weighted   ?? 0,
   } : undefined
 
   return (

@@ -24,10 +24,22 @@ export function SubScoresDisplay({
 }: SubScoresDisplayProps) {
   if (!subScores) return null
 
+  // Support all three subgrade storage shapes that have shipped:
+  //   1. Current flat:  weightedScores.centering_weighted (etc.)
+  //   2. Older flat:    weightedScores.centering
+  //   3. Legacy nested: subScores.centering.weighted / weighted_score
   const getScore = (key: string) => {
     const ws = weightedScores as any
     const ss = subScores[key]
-    return ws?.[key] ?? ss?.weighted ?? ss?.weighted_score ?? 0
+    return ws?.[`${key}_weighted`] ?? ws?.[key] ?? ss?.weighted ?? ss?.weighted_score ?? 0
+  }
+
+  // For the per-side (Front / Back) breakdown shown in non-compact mode,
+  // also support the current `raw` shape: subScores.raw.centering_front / _back
+  const getSide = (key: string, side: 'front' | 'back') => {
+    const ss = subScores[key]
+    const raw = (subScores as any)?.raw
+    return ss?.[`${side}_score`] ?? ss?.[side] ?? raw?.[`${key}_${side}`]
   }
 
   return (
@@ -39,9 +51,9 @@ export function SubScoresDisplay({
               {safeToFixed(getScore(key))}
             </div>
             <h3 className={`font-semibold ${compact ? 'text-xs' : 'text-sm'} text-gray-800`}>{label}</h3>
-            {!compact && subScores[key] && (
+            {!compact && (subScores[key] || (subScores as any)?.raw) && (
               <div className="text-xs text-gray-600 mt-0.5">
-                <p>F: <span className={`font-semibold ${textColor}`}>{safeToFixed(subScores[key]?.front_score ?? subScores[key]?.front)}</span> | B: <span className={`font-semibold ${textColor}`}>{safeToFixed(subScores[key]?.back_score ?? subScores[key]?.back)}</span></p>
+                <p>F: <span className={`font-semibold ${textColor}`}>{safeToFixed(getSide(key, 'front'))}</span> | B: <span className={`font-semibold ${textColor}`}>{safeToFixed(getSide(key, 'back'))}</span></p>
                 <p className={`font-semibold ${strongColor} mt-0.5`}>Score: {safeToFixed(getScore(key))}</p>
               </div>
             )}
