@@ -344,8 +344,11 @@ DECLARE
   v_daily jsonb;
 BEGIN
   SELECT count(*) INTO v_total FROM cards;
-  SELECT count(*) INTO v_public FROM cards WHERE is_public = true OR visibility = 'public';
-  v_private := v_total - v_public;
+  -- `visibility` is the source of truth. The legacy `is_public` boolean got
+  -- stuck at true for every row by the Oct 2025 visibility migration and is
+  -- no longer maintained. Using it here would always show 100% public.
+  SELECT count(*) INTO v_public  FROM cards WHERE visibility = 'public';
+  SELECT count(*) INTO v_private FROM cards WHERE visibility = 'private';
 
   SELECT count(*) INTO v_last_7  FROM cards WHERE created_at >= now() - interval '7 days';
   SELECT count(*) INTO v_last_30 FROM cards WHERE created_at >= now() - interval '30 days';
