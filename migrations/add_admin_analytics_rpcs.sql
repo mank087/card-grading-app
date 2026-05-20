@@ -568,23 +568,26 @@ BEGIN
   -- Package breakdown — same description-parsing logic as the JS endpoint
   WITH purch AS (
     SELECT
-      lower(coalesce(description, '')) AS desc,
+      lower(coalesce(description, '')) AS desc_lc,
       coalesce(metadata, '{}'::jsonb) AS meta,
       amount
     FROM credit_transactions
     WHERE type = 'purchase'
   ),
   classified AS (
+    -- Note: column from `purch` was originally named `desc` which is a
+    -- reserved word in PostgreSQL (ORDER BY x DESC). Postgres rejects it
+    -- as a column identifier even with lower case. Use desc_lc.
     SELECT
       CASE
-        WHEN desc LIKE '%founder%' OR meta->>'package' = 'founders' THEN 'founders'
-        WHEN desc LIKE '%vip%'     OR meta->>'package' = 'vip'      THEN 'vip'
-        WHEN meta->>'subscription' = 'card_lovers' OR desc LIKE '%card lovers%' THEN
-          CASE WHEN meta->>'plan' = 'annual' OR desc LIKE '%annual%'
+        WHEN desc_lc LIKE '%founder%' OR meta->>'package' = 'founders' THEN 'founders'
+        WHEN desc_lc LIKE '%vip%'     OR meta->>'package' = 'vip'      THEN 'vip'
+        WHEN meta->>'subscription' = 'card_lovers' OR desc_lc LIKE '%card lovers%' THEN
+          CASE WHEN meta->>'plan' = 'annual' OR desc_lc LIKE '%annual%'
                THEN 'card_lovers_annual' ELSE 'card_lovers_monthly' END
-        WHEN desc LIKE '%elite%' OR meta->>'tier' = 'elite' OR amount = 20 THEN 'elite'
-        WHEN desc LIKE '%pro%'   OR meta->>'tier' = 'pro'   OR amount = 5  THEN 'pro'
-        WHEN desc LIKE '%basic%' OR meta->>'tier' = 'basic' OR amount = 1  THEN 'basic'
+        WHEN desc_lc LIKE '%elite%' OR meta->>'tier' = 'elite' OR amount = 20 THEN 'elite'
+        WHEN desc_lc LIKE '%pro%'   OR meta->>'tier' = 'pro'   OR amount = 5  THEN 'pro'
+        WHEN desc_lc LIKE '%basic%' OR meta->>'tier' = 'basic' OR amount = 1  THEN 'basic'
         ELSE NULL
       END AS bucket
     FROM purch
