@@ -45,8 +45,10 @@ const IAP_PRICE_FALLBACK_USD: Record<string, number> = {
   'dcm.credits.elite': 19.99, 'dcm.credits.vip': 99.0,
 }
 
-// Token estimates for OpenAI fallback when we don't have actuals yet.
-// Mirrors src/app/api/admin/analytics/financial/route.ts.
+// Token estimates for OpenAI fallback when no row exists in openai_daily_costs
+// yet (very first runs before the nightly sync populates). Once an actual
+// cost is recorded, the fallback path is bypassed. Token counts here are
+// approximate based on observed GPT-5.1 traffic per category.
 const ESTIMATED_TOKENS = {
   sports: { input: 8000, output: 8000, images: 2 },
   pokemon: { input: 7500, output: 7500, images: 2 },
