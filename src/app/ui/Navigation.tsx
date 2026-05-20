@@ -178,7 +178,11 @@ function NavigationInner() {
           </div>
 
           {/* ============ DESKTOP NAVIGATION ============ */}
-          <div className="hidden md:flex items-center flex-1 justify-between ml-8">
+          {/* Desktop nav shows at lg (≥1024px). Below that — including iPad
+              portrait (768-1023px) — we render the hamburger menu instead,
+              because the 9-link logged-out variant overflows the right edge
+              at md widths. */}
+          <div className="hidden lg:flex items-center flex-1 justify-between ml-8">
 
             {/* Left Section - Navigation Links */}
             <div className="flex items-center space-x-1 min-h-[40px]">
@@ -522,7 +526,7 @@ function NavigationInner() {
           </div>
 
           {/* ============ MOBILE NAVIGATION ============ */}
-          <div className="flex md:hidden items-center space-x-2">
+          <div className="flex lg:hidden items-center space-x-2">
 
             {!authChecked ? (
               /* Skeleton placeholders for mobile */
@@ -598,7 +602,7 @@ function NavigationInner() {
           // Constrain the panel to `100dvh - 4rem` (nav header is h-16) and
           // make it its own scroll container. overscroll-contain stops the
           // bounce from unsticking the nav on iOS.
-          <div className="md:hidden pb-4 border-t border-gray-200 mt-2 mobile-menu max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
+          <div className="lg:hidden pb-4 border-t border-gray-200 mt-2 mobile-menu max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
             <div className="flex flex-col space-y-1 pt-3">
 
               {/* Search */}
