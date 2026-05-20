@@ -421,9 +421,15 @@ BEGIN
     ),
     'by_platform', v_by_platform,
     'by_category', v_by_category,
-    'top_categories', (SELECT jsonb_agg(c) FROM (
-      SELECT * FROM jsonb_array_elements(v_by_category) c LIMIT 5
-    ) t),
+    -- top 5 categories — pull the first 5 elements out of the by_category array
+    'top_categories', (
+      SELECT coalesce(jsonb_agg(elem), '[]'::jsonb)
+      FROM (
+        SELECT elem
+        FROM jsonb_array_elements(v_by_category) AS elem
+        LIMIT 5
+      ) t
+    ),
     'weekly_uploads', v_weekly,
     'daily_uploads', v_daily,
     'visibility', jsonb_build_object(
@@ -837,30 +843,29 @@ BEGIN
   v_headline := jsonb_build_object(
     'total_revenue', round(coalesce(v_total_revenue, 0) * 100) / 100,
     'total_transactions', coalesce(v_total_txn, 0),
-    'today', (SELECT round(coalesce(sum(amount_usd),0) * 100) / 100
-              FROM (
-                SELECT amount_usd FROM (
-                  SELECT amount_usd, created_at FROM credit_transactions WHERE type = 'purchase' AND stripe_payment_intent_id IS NOT NULL
-                    AND created_at >= date_trunc('day', now())
-                  UNION ALL
-                  SELECT (CASE WHEN lower(coalesce(plan,'')) = 'annual' THEN 449.0 ELSE 49.99 END), created_at
-                    FROM subscription_events
-                    WHERE event_type IN ('subscribed','renewed') AND stripe_subscription_id IS NOT NULL
-                      AND created_at >= date_trunc('day', now())
-                  UNION ALL
-                  SELECT (CASE
-                    WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-                      THEN (raw_receipt->>'price')::numeric / 100
-                    WHEN product_id = 'dcm.credits.basic' THEN 2.99
-                    WHEN product_id = 'dcm.credits.pro'   THEN 9.99
-                    WHEN product_id = 'dcm.credits.elite' THEN 19.99
-                    WHEN product_id = 'dcm.credits.vip'   THEN 99.0
-                    ELSE 0 END), created_at
-                  FROM iap_transactions WHERE status='active' AND environment='production'
-                    AND created_at >= date_trunc('day', now())
-                ) t
-                CROSS JOIN LATERAL (SELECT 1) lat
-              ) src),
+    'today', (SELECT round(coalesce(sum(a), 0) * 100) / 100 FROM (
+      SELECT _revenue_amount(description, NULL, NULL, NULL) AS a
+        FROM credit_transactions
+        WHERE type = 'purchase' AND stripe_payment_intent_id IS NOT NULL
+          AND created_at >= date_trunc('day', now())
+      UNION ALL
+      SELECT CASE WHEN lower(coalesce(plan,'')) = 'annual' THEN 449.0 ELSE 49.99 END
+        FROM subscription_events
+        WHERE event_type IN ('subscribed','renewed') AND stripe_subscription_id IS NOT NULL
+          AND created_at >= date_trunc('day', now())
+      UNION ALL
+      SELECT CASE
+        WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
+          THEN (raw_receipt->>'price')::numeric / 100
+        WHEN product_id = 'dcm.credits.basic' THEN 2.99
+        WHEN product_id = 'dcm.credits.pro'   THEN 9.99
+        WHEN product_id = 'dcm.credits.elite' THEN 19.99
+        WHEN product_id = 'dcm.credits.vip'   THEN 99.0
+        ELSE 0 END
+        FROM iap_transactions
+        WHERE status='active' AND environment='production'
+          AND created_at >= date_trunc('day', now())
+    ) t),
     'last_7_days', (SELECT round(coalesce(sum(a), 0) * 100) / 100 FROM (
       SELECT _revenue_amount(ct.description, NULL, NULL, NULL) AS a
         FROM credit_transactions ct WHERE type='purchase' AND stripe_payment_intent_id IS NOT NULL
