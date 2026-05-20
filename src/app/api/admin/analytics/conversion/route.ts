@@ -1,327 +1,40 @@
+/**
+ * GET /api/admin/analytics/conversion
+ *
+ * Thin wrapper over get_conversion_analytics(). See
+ * migrations/add_admin_analytics_rpcs.sql.
+ *
+ * Accepts ?startDate / ?endDate for the cohort filter (matches the
+ * original endpoint's query-param names).
+ */
+
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminSession } from '@/lib/admin/adminAuth'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify admin session
     const token = request.cookies.get('admin_token')?.value
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+    if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const admin = await verifyAdminSession(token)
-    if (!admin) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Get date range from query params
     const searchParams = request.nextUrl.searchParams
-    const startDate = searchParams.get('startDate')
-    const endDate = searchParams.get('endDate')
+    const startDate = searchParams.get('startDate') || null
+    const endDate = searchParams.get('endDate') || null
 
-    // Build date filter
-    let dateFilter = {}
-    if (startDate) {
-      dateFilter = { ...dateFilter, gte: startDate }
-    }
-    if (endDate) {
-      dateFilter = { ...dateFilter, lte: endDate }
-    }
-
-    // Get all users (with optional date filter on signup)
-    // Explicit limit to bypass Supabase 1000 default
-    let usersQuery = supabaseAdmin
-      .from('user_credits')
-      .select('user_id, created_at, is_founder, total_purchased, first_purchase_bonus_claimed')
-
-    if (startDate) {
-      usersQuery = usersQuery.gte('created_at', startDate)
-    }
-    if (endDate) {
-      usersQuery = usersQuery.lte('created_at', endDate)
-    }
-
-    const { data: users, error: usersError } = await usersQuery.limit(100000)
-
-    if (usersError) {
-      console.error('Error fetching users:', usersError)
-      throw usersError
-    }
-
-    // Get all grade transactions (users who used credits)
-    // Explicit limit to bypass Supabase 1000 default
-    const gradesQuery = supabaseAdmin
-      .from('credit_transactions')
-      .select('user_id, created_at')
-      .eq('type', 'grade')
-
-    const { data: grades, error: gradesError } = await gradesQuery.limit(100000)
-
-    if (gradesError) {
-      console.error('Error fetching grades:', gradesError)
-      throw gradesError
-    }
-
-    // Get all purchase transactions
-    // Explicit limit to bypass Supabase 1000 default
-    const purchasesQuery = supabaseAdmin
-      .from('credit_transactions')
-      .select('user_id, created_at, amount, description, metadata')
-      .eq('type', 'purchase')
-
-    const { data: purchases, error: purchasesError } = await purchasesQuery.limit(100000)
-
-    if (purchasesError) {
-      console.error('Error fetching purchases:', purchasesError)
-      throw purchasesError
-    }
-
-    // Also pull IAP transactions — mobile users buying via Apple/Google
-    // don't have rows in credit_transactions.type='purchase'. Without this,
-    // every mobile purchaser would show as "free" in the conversion stats.
-    const { data: iapTxns } = await supabaseAdmin
-      .from('iap_transactions')
-      .select('user_id, created_at')
-      .eq('status', 'active')
-      .eq('environment', 'production') // exclude sandbox/TestFlight
-      .limit(100000)
-
-    // Pull signup_source from public.users so we can split conversions by
-    // platform of acquisition (web vs ios_app vs android_app). This is the
-    // "free vs paid by platform" cohort the admin asked for.
-    const { data: userPlatformRows } = await supabaseAdmin
-      .from('users')
-      .select('id, signup_source')
-      .limit(100000)
-    const platformByUser: Record<string, string> = {}
-    userPlatformRows?.forEach((u) => { platformByUser[u.id] = u.signup_source || 'web' })
-
-    // Create lookup maps
-    const userSignupMap: Record<string, Date> = {}
-    users?.forEach(u => {
-      userSignupMap[u.user_id] = new Date(u.created_at)
+    const { data, error } = await supabaseAdmin.rpc('get_conversion_analytics', {
+      p_start: startDate ? new Date(startDate).toISOString() : null,
+      p_end: endDate ? new Date(endDate).toISOString() : null,
     })
-
-    // Get unique users who graded
-    const usersWhoGraded = new Set(grades?.map(g => g.user_id) || [])
-
-    // Get first purchase per user (Stripe OR IAP)
-    const firstPurchaseMap: Record<string, { date: Date; amount: number; description: string }> = {}
-    purchases?.forEach(p => {
-      if (!firstPurchaseMap[p.user_id] || new Date(p.created_at) < firstPurchaseMap[p.user_id].date) {
-        firstPurchaseMap[p.user_id] = {
-          date: new Date(p.created_at),
-          amount: p.amount,
-          description: p.description || ''
-        }
-      }
-    })
-    iapTxns?.forEach((t) => {
-      const existing = firstPurchaseMap[t.user_id]
-      const txDate = new Date(t.created_at)
-      if (!existing || txDate < existing.date) {
-        firstPurchaseMap[t.user_id] = { date: txDate, amount: 0, description: 'IAP' }
-      }
-    })
-
-    const usersWhoPurchased = new Set(Object.keys(firstPurchaseMap))
-
-    // Users who graded AND purchased
-    const convertedUsers = [...usersWhoGraded].filter(u => usersWhoPurchased.has(u))
-
-    // Calculate time to purchase for each converted user
-    const timeToPurchase: number[] = []
-    convertedUsers.forEach(userId => {
-      const signup = userSignupMap[userId]
-      const purchase = firstPurchaseMap[userId]?.date
-      if (signup && purchase) {
-        const days = (purchase.getTime() - signup.getTime()) / (1000 * 60 * 60 * 24)
-        timeToPurchase.push(days)
-      }
-    })
-
-    // Sort for percentile calculations
-    timeToPurchase.sort((a, b) => a - b)
-
-    // Time buckets
-    const sameDay = timeToPurchase.filter(d => d < 1).length
-    const within3Days = timeToPurchase.filter(d => d <= 3).length
-    const within7Days = timeToPurchase.filter(d => d <= 7).length
-    const within30Days = timeToPurchase.filter(d => d <= 30).length
-    const over30Days = timeToPurchase.filter(d => d > 30).length
-
-    // Package breakdown (includes all package types)
-    const packageCounts: Record<string, number> = { basic: 0, pro: 0, elite: 0, vip: 0, card_lovers_monthly: 0, card_lovers_annual: 0, founders: 0 }
-    const packageRevenue: Record<string, number> = { basic: 0, pro: 0, elite: 0, vip: 0, card_lovers_monthly: 0, card_lovers_annual: 0, founders: 0 }
-
-    purchases?.forEach(p => {
-      const desc = (p.description || '').toLowerCase()
-      const meta = p.metadata || {}
-
-      if (desc.includes('founder') || meta.package === 'founders') {
-        packageCounts.founders++
-        packageRevenue.founders += 99
-      } else if (desc.includes('vip') || meta.package === 'vip') {
-        packageCounts.vip++
-        packageRevenue.vip += 99
-      } else if (meta.subscription === 'card_lovers' || desc.includes('card lovers')) {
-        if (meta.plan === 'annual' || desc.includes('annual')) {
-          packageCounts.card_lovers_annual++
-          packageRevenue.card_lovers_annual += 449
-        } else {
-          packageCounts.card_lovers_monthly++
-          packageRevenue.card_lovers_monthly += 49.99
-        }
-      } else if (desc.includes('elite') || meta.tier === 'elite' || p.amount === 20) {
-        packageCounts.elite++
-        packageRevenue.elite += 19.99
-      } else if (desc.includes('pro') || meta.tier === 'pro' || p.amount === 5) {
-        packageCounts.pro++
-        packageRevenue.pro += 9.99
-      } else if (desc.includes('basic') || meta.tier === 'basic' || p.amount === 1) {
-        packageCounts.basic++
-        packageRevenue.basic += 2.99
-      }
-    })
-
-    // Weekly conversion trend (last 12 weeks)
-    const weeklyConversions: Array<{ week: string; signups: number; conversions: number; rate: number }> = []
-    for (let i = 11; i >= 0; i--) {
-      const weekStart = new Date()
-      weekStart.setDate(weekStart.getDate() - (i * 7))
-      weekStart.setHours(0, 0, 0, 0)
-
-      const weekEnd = new Date(weekStart)
-      weekEnd.setDate(weekEnd.getDate() + 7)
-
-      const weekSignups = users?.filter(u => {
-        const signupDate = new Date(u.created_at)
-        return signupDate >= weekStart && signupDate < weekEnd
-      }) || []
-
-      const weekSignupIds = new Set(weekSignups.map(u => u.user_id))
-      const weekConversions = [...weekSignupIds].filter(id => usersWhoPurchased.has(id)).length
-
-      weeklyConversions.push({
-        week: `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`,
-        signups: weekSignups.length,
-        conversions: weekConversions,
-        rate: weekSignups.length > 0 ? Math.round((weekConversions / weekSignups.length) * 1000) / 10 : 0
-      })
+    if (error) {
+      console.error('[admin/analytics/conversion] RPC error:', error)
+      return NextResponse.json({ error: 'Query failed', details: error.message }, { status: 500 })
     }
 
-    // Founder count
-    const founderCount = users?.filter(u => u.is_founder).length || 0
-
-    // Get actual total user count from users table (user_credits may not have all users)
-    const { count: actualTotalUsers } = await supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-    const totalUsers = actualTotalUsers || users?.length || 0
-    const totalRevenue = Object.values(packageRevenue).reduce((a, b) => a + b, 0)
-
-    const analytics = {
-      overview: {
-        total_users: totalUsers,
-        users_used_free_credit: usersWhoGraded.size,
-        users_made_purchase: usersWhoPurchased.size,
-        converted_users: convertedUsers.length,
-        conversion_rate: usersWhoGraded.size > 0
-          ? Math.round((convertedUsers.length / usersWhoGraded.size) * 1000) / 10
-          : 0,
-        overall_purchase_rate: totalUsers > 0
-          ? Math.round((usersWhoPurchased.size / totalUsers) * 1000) / 10
-          : 0,
-        total_founders: founderCount
-      },
-      time_to_purchase: {
-        average_days: timeToPurchase.length > 0
-          ? Math.round(timeToPurchase.reduce((a, b) => a + b, 0) / timeToPurchase.length * 10) / 10
-          : 0,
-        median_days: timeToPurchase.length > 0
-          ? Math.round(timeToPurchase[Math.floor(timeToPurchase.length / 2)] * 10) / 10
-          : 0,
-        min_days: timeToPurchase.length > 0 ? Math.round(timeToPurchase[0] * 10) / 10 : 0,
-        max_days: timeToPurchase.length > 0 ? Math.round(timeToPurchase[timeToPurchase.length - 1] * 10) / 10 : 0
-      },
-      purchase_timing: {
-        same_day: sameDay,
-        within_3_days: within3Days,
-        within_7_days: within7Days,
-        within_30_days: within30Days,
-        over_30_days: over30Days,
-        total: timeToPurchase.length
-      },
-      package_breakdown: {
-        counts: packageCounts,
-        revenue: packageRevenue,
-        total_purchases: Object.values(packageCounts).reduce((a, b) => a + b, 0),
-        total_revenue: Math.round(totalRevenue * 100) / 100
-      },
-      weekly_trends: weeklyConversions,
-      // Per-platform funnel: of users who signed up from each platform,
-      // how many graded a card and how many made a purchase. Includes
-      // both Stripe credit_transactions purchases and IAP transactions.
-      by_platform: buildPlatformFunnel(
-        platformByUser,
-        userSignupMap,
-        usersWhoGraded,
-        usersWhoPurchased,
-      ),
-    }
-
-    return NextResponse.json(analytics, { status: 200 })
-  } catch (error) {
+    return NextResponse.json(data)
+  } catch (error: any) {
     console.error('Error fetching conversion analytics:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error', details: error?.message }, { status: 500 })
   }
-}
-
-interface PlatformFunnelRow {
-  platform: 'web' | 'ios_app' | 'android_app'
-  signups: number
-  graded: number
-  purchased: number
-  graded_rate: number
-  purchase_rate: number
-  grader_to_buyer_rate: number
-}
-
-/**
- * Build a comparison table: for each platform, how many signups → graded →
- * purchased. Only counts users whose signup row exists in user_credits
- * (which is what userSignupMap was built from); orphans are skipped.
- */
-function buildPlatformFunnel(
-  platformByUser: Record<string, string>,
-  userSignupMap: Record<string, Date>,
-  usersWhoGraded: Set<string>,
-  usersWhoPurchased: Set<string>,
-): PlatformFunnelRow[] {
-  const platforms = ['web', 'ios_app', 'android_app'] as const
-  return platforms.map((platform) => {
-    let signups = 0
-    let graded = 0
-    let purchased = 0
-    for (const userId of Object.keys(userSignupMap)) {
-      const p = platformByUser[userId] || 'web'
-      if (p !== platform) continue
-      signups += 1
-      if (usersWhoGraded.has(userId)) graded += 1
-      if (usersWhoPurchased.has(userId)) purchased += 1
-    }
-    return {
-      platform,
-      signups,
-      graded,
-      purchased,
-      graded_rate: signups > 0 ? Math.round((graded / signups) * 1000) / 10 : 0,
-      purchase_rate: signups > 0 ? Math.round((purchased / signups) * 1000) / 10 : 0,
-      grader_to_buyer_rate: graded > 0 ? Math.round((purchased / graded) * 1000) / 10 : 0,
-    }
-  })
 }
