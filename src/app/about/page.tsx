@@ -44,7 +44,7 @@ export default function AboutPage() {
               Like many of you, we've been frustrated by the limitations of online marketplaces. eBay, TCGPlayer, and similar platforms rely on self-reported condition descriptions that can be... let's just say, optimistic. "Near Mint" can mean anything from pristine to pretty rough, depending on who's selling.
             </p>
             <p className="text-gray-700 mb-4">
-              Sure, traditional grading services like PSA, BGS, and CGC exist — but they require mailing your cards away and waiting weeks for results. The cost adds up quickly, especially if you're grading multiple cards. The turnaround time can stretch from weeks to months. And sometimes, after all that waiting and expense, the grade comes back lower than you hoped, leaving you wondering if it was worth it.
+              Traditional grading services like PSA, BGS, and CGC exist, but they want your cards in a box for weeks (sometimes months). Costs add up fast if you're grading more than one. And after all the waiting, you might get back a grade that's lower than you hoped and wonder if it was worth it.
             </p>
             <p className="text-gray-700 mb-4">
               We thought: there has to be a better way.
@@ -54,26 +54,26 @@ export default function AboutPage() {
           <div className="bg-white rounded-2xl shadow-md p-8 mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">The Solution</h2>
             <p className="text-gray-700 mb-4">
-              That's why we built DCM. We wanted a tool that could give us quick, accurate, detailed assessments of our cards without the wait, the cost, or the commitment of professional grading. Something we could use to:
+              That's why we built DCM. We wanted a tool that could grade our cards in seconds, not months, with the same rigor a human grader would apply. Something we could use to:
             </p>
             <ul className="list-disc list-inside text-gray-700 space-y-2 mb-4 ml-4">
-              <li>Get a professional grade on any card instantly — no mailing, no waiting</li>
-              <li>Get a realistic sense of condition before listing cards for sale</li>
-              <li>Organize our collections with consistent, objective grades</li>
-              <li>Satisfy our curiosity about that card we just pulled</li>
+              <li>Get a grade on any card instantly, without mailing it anywhere</li>
+              <li>Know the real condition of a card before listing it for sale</li>
+              <li>Organize a collection with consistent, objective grades across every card</li>
+              <li>Settle the "what would this grade?" question the moment you pull the card</li>
             </ul>
             <p className="text-gray-700 mb-4">
-              Using DCM Optic™ technology, we built a system that evaluates cards the same way the pros do, examining centering, corners, edges, and surface condition with meticulous detail. The difference? You get your results in under 2 minutes, not 2 months.
+              DCM Optic™ is the system we built to do it. It evaluates centering, corners, edges, and surface condition the same way human graders do, then averages three independent passes for consistency. Results take under two minutes.
             </p>
           </div>
 
           <div className="bg-white rounded-2xl shadow-md p-8 mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">For Hobbyists, By Hobbyists</h2>
             <p className="text-gray-700 mb-4">
-              We built DCM for ourselves first, and we think you'll love it too. Whether you're a weekend warrior cracking packs at your local card shop, a seasoned collector with thousands of cards to organize, or someone who just wants to know if that childhood collection is worth anything, DCM is here to help.
+              We built DCM for ourselves first. If you're cracking packs at your local card shop on the weekend, or you've got thousands of cards from the last 30 years stacked in binders, or you just dug out your childhood collection and want to know what's actually in there, DCM works the same way for all of it.
             </p>
             <p className="text-gray-700 mb-4">
-              Our grading assessments are powered by proprietary DCM Optic™ AI technology, providing fast, professional-grade evaluations of your cards. Whether you&apos;re managing your collection, preparing for a sale, or simply want to know what your cards grade at — DCM Grading delivers accurate, consistent results without the wait or cost of mail-away services.
+              Our grading runs on DCM Optic™, our own AI built specifically for trading cards. Use it to manage a collection, price out a sale, or just answer the question that started this whole thing for us: what would this grade?
             </p>
           </div>
 

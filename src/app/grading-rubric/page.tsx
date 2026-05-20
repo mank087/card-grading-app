@@ -38,10 +38,10 @@ export default function GradingRubricPage() {
           <div className="bg-purple-600 text-white rounded-2xl p-8 shadow-xl">
             <h2 className="text-3xl font-bold mb-4">The DCM Difference</h2>
             <p className="text-lg mb-4">
-              Traditional grading services can take weeks or months. DCM Optic™ combines advanced artificial intelligence with decades of industry grading standards to deliver accurate, consistent results in under 60 seconds.
+              Mail-away grading takes weeks or months. DCM Optic™ uses computer vision trained on industry-standard grading criteria to deliver a full grade in under 60 seconds.
             </p>
             <p className="text-lg">
-              Every card receives the same meticulous multi-point evaluation with our revolutionary <strong>three-pass consensus technology</strong>. This means your card is analyzed three independent times, with results averaged and cross-validated to eliminate errors and ensure the highest possible accuracy.
+              Every card goes through the same multi-point evaluation, then through it twice more. Our <strong>three-pass consensus system</strong> evaluates each card three independent times and averages the results, so the grade you get is more stable than any single-pass system can produce.
             </p>
           </div>
         </section>
@@ -56,7 +56,7 @@ export default function GradingRubricPage() {
               <h2 className="text-3xl font-bold text-gray-900">Three-Pass Consensus Technology</h2>
             </div>
             <p className="text-lg text-gray-700 mb-6">
-              Unlike single-pass grading systems, DCM Optic™ performs <strong>three complete, independent evaluations</strong> of every card. This revolutionary approach significantly improves grading accuracy and reliability.
+              Unlike single-pass grading systems, DCM Optic™ performs <strong>three complete, independent evaluations</strong> of every card. Averaging three passes produces tighter, more reliable grades than any single pass can.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -108,20 +108,20 @@ export default function GradingRubricPage() {
                   <svg className="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
-                  <span><strong>Mimics professional services:</strong> Top grading companies use multiple evaluators — our three-pass system achieves the same rigor</span>
+                  <span><strong>Mimics how the pros grade:</strong> Top grading companies put multiple human graders on the same card. Three passes gives us the same effect, automated.</span>
                 </li>
               </ul>
             </div>
           </div>
         </section>
 
-        {/* Comprehensive Inspection Protocol */}
+        {/* Inspection Protocol */}
         <section className="mb-16">
           <h2 className="text-3xl font-bold text-gray-900 mb-8 text-center">
-            Comprehensive Inspection Protocol
+            How a Card Gets Graded
           </h2>
           <p className="text-center text-gray-600 mb-8 max-w-3xl mx-auto">
-            Every card undergoes a rigorous multi-phase evaluation examining dozens of individual inspection points across corners, edges, surface, and centering — all performed three times for maximum accuracy.
+            Every card runs through a multi-phase evaluation covering dozens of inspection points across corners, edges, surface, and centering. Then we do it twice more.
           </p>
 
           <div className="space-y-6">
@@ -328,7 +328,7 @@ export default function GradingRubricPage() {
 
           <div className="bg-white rounded-xl shadow-md p-8">
             <p className="text-gray-700 mb-6">
-              DCM uses a 10-point whole number scale, aligned with industry-standard grading criteria from PSA, BGS, and CGC. Our evidence-based protocol ensures every deduction is documented and justified.
+              DCM uses a 10-point whole-number scale, aligned with industry grading criteria from PSA, BGS, and CGC. Every deduction we make is documented and justified, so you can always see what the AI saw.
             </p>
 
             <div className="space-y-3">
@@ -389,7 +389,7 @@ export default function GradingRubricPage() {
 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
               <p className="text-sm text-blue-800">
-                <strong>Grade Caps:</strong> Structural damage (creases, corner lift, tears) triggers automatic grade caps regardless of other component scores. This ensures consistency with professional grading standards.
+                <strong>Grade Caps:</strong> Structural damage (creases, corner lift, tears) triggers an automatic grade cap regardless of how clean the rest of the card is. PSA, BGS, and SGC all apply the same rule.
               </p>
             </div>
           </div>
@@ -559,7 +559,7 @@ export default function GradingRubricPage() {
               Powered by DCM Optic™
             </h2>
             <p className="text-lg text-gray-700 mb-4">
-              DCM Optic™ is our proprietary grading engine that combines advanced AI vision technology with industry-standard evaluation criteria. Our evidence-based protocol ensures every assessment is backed by observable, documented findings — no assumptions, no guesswork.
+              DCM Optic™ is our grading engine, built specifically for trading cards. It applies the same evaluation criteria PSA, BGS, and SGC use, but every deduction has to be backed by something visible in your photos. No assumptions, no guessing.
             </p>
             <p className="text-lg text-gray-700 mb-4">
               With our revolutionary three-pass consensus system, every card receives not just one evaluation, but three independent analyses that are averaged and cross-validated. This delivers the most accurate and reliable grades possible from photo-based grading.
@@ -592,7 +592,7 @@ export default function GradingRubricPage() {
               Have Questions?
             </h2>
             <p className="text-lg text-gray-600 mb-6 max-w-2xl mx-auto">
-              Visit our comprehensive FAQ for answers about three-pass grading, image quality tips, pricing, supported card types, and more.
+              The FAQ covers three-pass grading, image quality tips, pricing, supported card types, and a lot more.
             </p>
             <a
               href="/faq"

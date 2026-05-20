@@ -49,13 +49,13 @@ const faqs: FAQItem[] = [
     answer: (
       <>
         <p className="mb-3">
-          Simply upload clear photos of your card's front and back. Our DCM Optic™ AI engine performs a comprehensive multi-phase evaluation examining corners, edges, surface condition, and centering.
+          Upload clear photos of the front and back of your card. DCM Optic™ examines corners, edges, surface, and centering on both sides.
         </p>
         <p className="mb-3">
-          What makes us unique is our <strong>three-pass consensus system</strong> — every card is evaluated three independent times, with results averaged and cross-validated. This eliminates errors and ensures the most accurate grade possible.
+          Then it does it twice more. Our <strong>three-pass consensus system</strong> evaluates every card three independent times and averages the results. A defect has to show up in at least two of the three passes to affect your grade, which keeps false positives out and produces a more stable grade than any single pass would.
         </p>
         <p>
-          Within seconds, you'll receive a detailed grade report including component scores, defect documentation, and a confidence rating based on your image quality.
+          You get a full grade report in seconds, including component scores, marked defects, and a confidence rating tied to your photo quality.
         </p>
       </>
     ),
@@ -66,12 +66,11 @@ const faqs: FAQItem[] = [
     question: 'Why should I use DCM instead of traditional grading services?',
     answer: (
       <>
-        <p className="mb-3"><strong>Speed:</strong> Get results in under 60 seconds, not weeks or months.</p>
-        <p className="mb-3"><strong>Cost:</strong> Grade cards for a fraction of the cost of traditional services.</p>
-        <p className="mb-3"><strong>Convenience:</strong> Grade from anywhere, anytime — no shipping required.</p>
-        <p className="mb-3"><strong>Accuracy:</strong> Our three-pass consensus system delivers highly accurate, consistent grades.</p>
-        <p className="mb-3"><strong>Card Evaluation:</strong> Use DCM to get a fast, professional grade on any card in your collection — no mailing required, no weeks of waiting.</p>
-        <p><strong>Transparency:</strong> See exactly why your card received its grade with detailed defect documentation.</p>
+        <p className="mb-3"><strong>Speed:</strong> Results in under 60 seconds, not weeks or months.</p>
+        <p className="mb-3"><strong>Cost:</strong> A fraction of what mail-away grading costs.</p>
+        <p className="mb-3"><strong>Convenience:</strong> Grade from anywhere. No shipping, no insurance, no return label.</p>
+        <p className="mb-3"><strong>Accuracy:</strong> Three-pass consensus produces consistent, repeatable grades.</p>
+        <p><strong>Transparency:</strong> Every grade comes with defect documentation. You can see exactly why your card scored what it did.</p>
       </>
     ),
     category: 'Getting Started',
@@ -105,10 +104,10 @@ const faqs: FAQItem[] = [
           Three-pass consensus grading means every card is evaluated <strong>three complete, independent times</strong>. Each pass examines all corners, edges, surface, and centering as if seeing the card for the first time.
         </p>
         <p className="mb-3">
-          After all three passes, we average the results and apply consensus rules: a defect must be detected in at least 2 of 3 passes to affect your final grade. This eliminates false positives and ensures only real, verifiable defects impact your score.
+          After the three passes, we average the results and apply a consensus rule: a defect has to be detected by at least 2 of 3 passes to count against your grade. This keeps phantom defects out and only real, verifiable issues affect your score.
         </p>
         <p>
-          This approach mimics how top professional grading companies use multiple human evaluators, delivering the same level of rigor in an automated system.
+          It's the same approach top grading companies use when they put multiple human graders on a single card, just automated.
         </p>
       </>
     ),
@@ -119,10 +118,10 @@ const faqs: FAQItem[] = [
     question: 'Why does three-pass grading improve accuracy?',
     answer: (
       <>
-        <p className="mb-3"><strong>Reduces Variance:</strong> Averaging three independent evaluations produces more consistent, reliable grades than a single pass.</p>
-        <p className="mb-3"><strong>Catches Errors:</strong> If one pass misses a defect, the other two passes are likely to catch it.</p>
-        <p className="mb-3"><strong>Eliminates False Positives:</strong> By requiring 2+ passes to confirm a defect, we prevent phantom defects from affecting your grade.</p>
-        <p><strong>Provides Confidence Metric:</strong> When all three passes agree closely, you can be highly confident in the grade. Higher variance indicates areas of uncertainty.</p>
+        <p className="mb-3"><strong>Reduces variance:</strong> Averaging three independent evaluations gives you a more stable grade than any single pass.</p>
+        <p className="mb-3"><strong>Catches misses:</strong> A defect that one pass missed will usually get picked up by the other two.</p>
+        <p className="mb-3"><strong>Filters phantom defects:</strong> Requiring two of three passes to agree keeps false positives out of your grade.</p>
+        <p><strong>Tells you when to trust the grade:</strong> When all three passes agree closely, you can trust the result. When they diverge, the confidence score warns you.</p>
       </>
     ),
     category: 'Three-Pass Technology',
@@ -132,11 +131,11 @@ const faqs: FAQItem[] = [
     question: 'What does the consistency score mean?',
     answer: (
       <>
-        <p className="mb-3">The consistency score shows how well all three evaluation passes agreed:</p>
+        <p className="mb-3">The consistency score shows how closely the three evaluation passes agreed:</p>
         <ul className="list-disc list-inside space-y-2">
-          <li><strong>High Consistency:</strong> All 3 passes agree within ±0.5 points — highest confidence in the grade</li>
-          <li><strong>Moderate Consistency:</strong> Passes vary by 0.5-1.0 points — good confidence, some areas of uncertainty</li>
-          <li><strong>Low Consistency:</strong> Passes vary by more than 1.0 point — consider resubmitting with better images</li>
+          <li><strong>High consistency:</strong> All 3 passes within ±0.5 points. Trust the grade.</li>
+          <li><strong>Moderate consistency:</strong> Passes vary by 0.5-1.0 points. The grade is solid but there's some judgment-call territory.</li>
+          <li><strong>Low consistency:</strong> Passes vary by more than 1.0 point. Worth resubmitting with better photos.</li>
         </ul>
       </>
     ),
@@ -176,7 +175,7 @@ const faqs: FAQItem[] = [
           <li><strong>Surface:</strong> Scratches, print defects, stains, structural damage</li>
         </ul>
         <p className="mb-3">Front and back are weighted 55%/45% respectively, with the front given more weight as it's the primary display side.</p>
-        <p><strong>Weakest Link Rule:</strong> Your final grade cannot exceed your lowest component score. This ensures consistency with professional grading standards.</p>
+        <p><strong>Weakest Link Rule:</strong> Your final grade can't exceed your lowest component score, matching how PSA, BGS, and SGC assign final grades.</p>
       </>
     ),
     category: 'Grading Process',
@@ -310,14 +309,14 @@ const faqs: FAQItem[] = [
     question: 'How accurate are DCM grades?',
     answer: (
       <>
-        <p className="mb-3">DCM delivers highly accurate grades through several mechanisms:</p>
+        <p className="mb-3">A few things keep DCM grades tight:</p>
         <ul className="list-disc list-inside space-y-1 mb-3">
-          <li><strong>Three-pass consensus:</strong> Reduces variance and catches errors</li>
-          <li><strong>Evidence-based grading:</strong> Every deduction requires observable proof</li>
-          <li><strong>PSA-aligned criteria:</strong> Same standards used by professionals</li>
-          <li><strong>Continuous improvement:</strong> Our AI learns from millions of evaluations</li>
+          <li><strong>Three-pass consensus:</strong> Reduces variance, catches single-pass errors.</li>
+          <li><strong>Evidence-based grading:</strong> Every deduction is backed by an observable defect, not an assumption.</li>
+          <li><strong>PSA-aligned criteria:</strong> The same standards professional graders work from.</li>
+          <li><strong>Continuous improvement:</strong> The model is regularly retrained on new card sets and edge cases.</li>
         </ul>
-        <p>Accuracy depends on image quality. With Grade A images (clear, well-lit photos), our grades typically align closely with what professional services would assign. Lower quality images increase uncertainty.</p>
+        <p>Accuracy is bounded by your photo quality. Grade A images (clear, well-lit, in focus) produce grades that align closely with what professional services would assign. Blurry or poorly-lit photos widen the uncertainty range.</p>
       </>
     ),
     category: 'Accuracy & Comparison',
@@ -327,7 +326,7 @@ const faqs: FAQItem[] = [
     question: 'What does "evidence-based grading" mean?',
     answer: (
       <>
-        <p className="mb-3">Evidence-based grading means every defect or pristine assessment must be backed by observable evidence in your images. We don't assume defects exist — we only deduct for what we can actually see and document.</p>
+        <p className="mb-3">Evidence-based grading means every defect we call out has to be backed by something visible in your photos. We don't assume; if we can't see and document it, we don't deduct for it.</p>
         <p className="mb-3">For every finding, we record:</p>
         <ul className="list-disc list-inside space-y-1">
           <li>Specific location on the card</li>

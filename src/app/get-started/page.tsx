@@ -72,7 +72,7 @@ export default function GetStartedPage() {
                   </svg>
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">Instant Results</h3>
-                <p className="text-gray-600">Get comprehensive grading analysis in under 60 seconds. No waiting weeks or months.</p>
+                <p className="text-gray-600">Full grade in under 60 seconds. No mailing, no waiting weeks or months.</p>
               </div>
 
               <div className="text-center p-6 rounded-2xl bg-gray-50">
@@ -429,7 +429,7 @@ export default function GetStartedPage() {
             What You Get
           </h2>
           <p className="text-lg text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            Every DCM grading includes comprehensive reports and downloadable assets.
+            Every grade comes with the full breakdown and downloadable reports, slab labels, and certificates.
           </p>
 
           <div className="max-w-5xl mx-auto grid md:grid-cols-2 gap-8">
@@ -580,11 +580,11 @@ export default function GetStartedPage() {
             {[
               {
                 q: "Is DCM grading the same as PSA, BGS, or CGC grading?",
-                a: "DCM provides a fast, professional alternative to traditional mail-away grading — delivering accurate condition assessments in seconds instead of weeks. Our DCM Optic™ AI evaluates the same factors as traditional grading companies, giving you a professional grade without shipping your cards."
+                a: "DCM applies the same evaluation criteria as PSA, BGS, and SGC, but does it from your photos in seconds instead of taking weeks via mail. The grade you get is independent and not officially recognized by those companies, but the methodology is the same and many collectors use DCM grades alongside or in place of mail-away grading."
               },
               {
                 q: "How accurate is DCM's AI grading?",
-                a: "DCM Optic™ analyzes 30+ condition factors using advanced computer vision. Whether you're grading for your collection, preparing listings for sale, or simply curious about your card's condition, DCM delivers professional results instantly."
+                a: "DCM Optic™ analyzes 30+ condition factors using computer vision, then averages three independent passes to keep the grade stable. Accuracy is bounded by your photo quality — clear, well-lit photos produce grades that align closely with what professional services would assign."
               },
               {
                 q: "Do I need to ship my cards?",
@@ -600,7 +600,7 @@ export default function GetStartedPage() {
               },
               {
                 q: "How long does grading take?",
-                a: "DCM delivers results in under 60 seconds. Upload your photos and get your comprehensive grade report almost instantly."
+                a: "Most cards are graded in 30-60 seconds. Upload your photos and the full grade report is back almost instantly."
               }
             ].map((faq, index) => (
               <div key={index} className="bg-white rounded-xl p-6 shadow-sm">

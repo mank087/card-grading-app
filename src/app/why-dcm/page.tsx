@@ -630,7 +630,7 @@ export default function WhyDcmPage() {
                 <span className="bg-gradient-to-r from-emerald-400 to-teal-300 bg-clip-text text-transparent">In Your Hands</span>
               </h1>
               <p className="text-base sm:text-lg text-gray-400 mb-8 max-w-xl mx-auto xl:mx-0 leading-relaxed">
-                DCM Grading puts the power of card grading in the hands of collectors. Instant results, detailed reports, market pricing, and custom labels — no mailing your cards, no waiting weeks.
+                Grade any trading card in seconds. Full reports, live market pricing, and custom slab labels, all without mailing your cards anywhere or waiting weeks for results.
               </p>
 
               {/* Trust signals */}
@@ -947,7 +947,7 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="How It Works" subtitle="From photo to professional grade in minutes — not weeks" />
+          <SectionHeading title="How It Works" subtitle="Photo in. Full grade out. Under 60 seconds." />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">
             <StepCard number={1} title="Upload" description="Snap a photo of your card's front and back"
               icon={<svg className="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
@@ -1059,7 +1059,7 @@ export default function WhyDcmPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-white text-sm">Four Sub-Grade Categories</h3>
-                  <p className="text-gray-400 text-xs mt-1">Centering, corners, edges, and surface — each scored for front and back. Final grade is the weakest category.</p>
+                  <p className="text-gray-400 text-xs mt-1">Centering, corners, edges, and surface, each scored on both sides. Final grade matches the weakest category.</p>
                 </div>
               </div>
               <div className="flex gap-3">
@@ -1145,7 +1145,7 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Detailed Card Reports" subtitle="Every grade comes with a full breakdown — not just a number" />
+          <SectionHeading title="Detailed Card Reports" subtitle="Every grade comes with a full breakdown, not just a number" />
 
           {/* Desktop: 3-column (left cards | center text | right cards), Mobile: stacked */}
           <div className="grid lg:grid-cols-3 gap-8 lg:gap-6 items-center">
@@ -1170,7 +1170,7 @@ export default function WhyDcmPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900">Sub-Grade Breakdown</h3>
-                  <p className="text-gray-600 text-sm mt-0.5">Centering, corners, edges, and surface — each scored for front and back with a weighted composite.</p>
+                  <p className="text-gray-600 text-sm mt-0.5">Centering, corners, edges, and surface, each scored on both sides with a weighted composite.</p>
                 </div>
               </div>
               <div className="flex gap-4">
@@ -1192,7 +1192,7 @@ export default function WhyDcmPage() {
                 </div>
                 <div>
                   <h3 className="font-bold text-gray-900">Condition Label</h3>
-                  <p className="text-gray-600 text-sm mt-0.5">Every grade includes a human-readable condition label — from &quot;Poor&quot; to &quot;Gem Mint&quot; — so there&apos;s no confusion.</p>
+                  <p className="text-gray-600 text-sm mt-0.5">Every grade includes a plain-English condition label, from &quot;Poor&quot; to &quot;Gem Mint,&quot; so there&apos;s no guessing what a 7.5 means.</p>
                 </div>
               </div>
               <div className="flex gap-4">
@@ -1238,7 +1238,7 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="Accurate Card Identification" subtitle="Comprehensive internal databases covering thousands of cards across every major game type" />
+          <SectionHeading title="Accurate Card Identification" subtitle="Internal databases covering hundreds of thousands of cards across every major game" />
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
             {[
               { name: 'Pokemon', img: '/why-dcm/pikachu-graded-card.png', sub: 'English + Japanese' },
@@ -1403,7 +1403,7 @@ export default function WhyDcmPage() {
       {/* ================================================================ */}
       <section className="py-16 sm:py-24 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <SectionHeading title="List to eBay in Seconds" subtitle="Professional listings created automatically — connect your account and sell with one click" />
+          <SectionHeading title="List to eBay in Seconds" subtitle="Auto-generated listings with photos, title, and condition report. Connect your account and post in one click." />
           <div className="grid md:grid-cols-2 gap-10 items-center">
             <div className="space-y-4">
               {[
@@ -1475,7 +1475,7 @@ export default function WhyDcmPage() {
           </div>
           <div className="bg-gradient-to-r from-purple-600 to-rose-500 rounded-2xl p-6 sm:p-8 text-center text-white">
             <h3 className="font-bold text-xl mb-2">♥ Card Lovers Subscription</h3>
-            <p className="text-rose-100 mb-4">For serious collectors — 70+ credits monthly, 20% discount on purchases, portfolio tracking, and loyalty bonuses</p>
+            <p className="text-rose-100 mb-4">For serious collectors. 70+ credits a month, 20% off all purchases, portfolio tracking, and loyalty bonuses that scale with your tenure.</p>
             <div className="flex justify-center gap-4">
               <div className="bg-white/10 border border-white/20 rounded-xl px-5 py-3">
                 <div className="font-bold text-lg">$49.99<span className="text-sm font-normal">/mo</span></div>

@@ -262,8 +262,8 @@ export default function VipPage() {
                     <div>
                       <h3 className="font-bold text-gray-900 mb-1">150 Grading Credits</h3>
                       <p className="text-gray-600 text-sm">
-                        Grade up to 150 cards — Pokemon, Sports, MTG, Lorcana, One Piece, or any trading card.
-                        At $0.66 per grade, this is our best value for one-time purchases.
+                        Grade up to 150 cards: Pokemon, Sports, MTG, Lorcana, One Piece, or any trading card.
+                        At $0.66 per grade, this is the best value for a one-time purchase.
                       </p>
                     </div>
                   </div>
@@ -359,7 +359,7 @@ export default function VipPage() {
             </div>
 
             <p className="mt-6 text-gray-500 text-sm">
-              The best value for serious collectors — save 78% compared to Basic!
+              78% cheaper per card than Basic. Best value for serious collectors.
             </p>
           </div>
         </div>

@@ -415,7 +415,7 @@ export default function CardLoversPage() {
                   <div>
                     <h3 className="font-bold text-gray-900 mb-1">Monthly Credits</h3>
                     <p className="text-gray-600 text-sm">
-                      Get 70 grading credits every month. Credits roll over indefinitely — they never expire.
+                      70 grading credits every month. Credits roll over and never expire.
                     </p>
                   </div>
                 </div>
@@ -489,7 +489,7 @@ export default function CardLoversPage() {
                   <div>
                     <h3 className="font-bold text-gray-900 mb-1">Market Pricing Dashboard</h3>
                     <p className="text-gray-600 text-sm">
-                      Track your entire collection&apos;s market value with interactive charts, grade and value breakdowns, top cards rankings, and price change tracking since grading. Filter by category, refresh prices on demand, and manage eBay listings — all in one place.
+                      Track your collection&apos;s market value with interactive charts, grade and value breakdowns, top-card rankings, and price change tracking since grading. Filter by category, refresh prices on demand, and manage eBay listings, all from one dashboard.
                     </p>
                     <Link href="/market-pricing" className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium mt-2">
                       View Market Pricing
