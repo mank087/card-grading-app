@@ -11,7 +11,7 @@
  *   2. In Play Console → Monetize → Subscriptions and products → RTDN,
  *      paste the topic name
  *   3. In Pub/Sub, add a push subscription with endpoint
- *      https://www.dcmgrading.com/api/iap/google/webhook?token=<SECRET>
+ *      https://dcmgrading.com/api/iap/google/webhook?token=<SECRET>
  *   4. Set `GOOGLE_RTDN_VERIFY_TOKEN` in Vercel env to the same secret
  *
  * Auth: URL token (Pub/Sub push subscriptions don't natively sign messages

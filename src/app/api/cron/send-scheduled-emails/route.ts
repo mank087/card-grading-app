@@ -120,7 +120,7 @@ async function processScheduledEmail(
   }
 
   // Build unsubscribe URL
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.dcmgrading.com';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://dcmgrading.com';
   const unsubscribeUrl = `${baseUrl}/api/unsubscribe/${unsubscribeToken}`;
 
   // Get email content based on type

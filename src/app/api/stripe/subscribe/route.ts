@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
     const requestOrigin = request.headers.get('origin');
     const origin = requestOrigin && allowedOrigins.includes(requestOrigin)
       ? requestOrigin
-      : 'https://www.dcmgrading.com';
+      : 'https://dcmgrading.com';
 
     // Look up affiliate if ref_code provided
     let affiliateCode: string | undefined;

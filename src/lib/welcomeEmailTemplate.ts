@@ -74,14 +74,14 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td width="130" style="padding: 12px 0 12px 20px;" valign="middle">
-                    <a href="https://www.dcmgrading.com/?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-logo" style="text-decoration: none;">
-                      <img src="https://www.dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;">
+                    <a href="https://dcmgrading.com/?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-logo" style="text-decoration: none;">
+                      <img src="https://dcmgrading.com/DCM%20Logo%20white.png" alt="DCM Grading" width="110" style="display: block; width: 110px;">
                     </a>
                   </td>
                   <td align="right" class="nav-td" style="padding: 12px 20px 12px 0;" valign="middle">
-                    <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-credits" style="color: #34d399; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Pricing</a>
-                    <a href="https://www.dcmgrading.com/faq?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-faq" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">FAQ</a>
-                    <a href="https://www.dcmgrading.com/blog?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-blog" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Blog</a>
+                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-credits" style="color: #34d399; font-size: 12px; text-decoration: none; padding: 0 8px; font-weight: 700;">Pricing</a>
+                    <a href="https://dcmgrading.com/faq?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-faq" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">FAQ</a>
+                    <a href="https://dcmgrading.com/blog?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=nav-blog" style="color: #d1d5db; font-size: 12px; text-decoration: none; padding: 0 8px;">Blog</a>
                   </td>
                 </tr>
               </table>
@@ -93,8 +93,8 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td width="90" align="center" valign="middle" class="hero-cards-col" style="padding: 20px 0 20px 8px;">
-                    <img src="https://www.dcmgrading.com/why-dcm/pikachu-graded-card.png" alt="" width="70" style="display: block; width: 70px; height: auto; opacity: 0.35; border-radius: 4px; transform: rotate(-6deg);">
-                    <img src="https://www.dcmgrading.com/why-dcm/lorcana-graded-card.png" alt="" width="65" style="display: block; width: 65px; height: auto; opacity: 0.25; border-radius: 4px; margin-top: 8px; transform: rotate(4deg);">
+                    <img src="https://dcmgrading.com/why-dcm/pikachu-graded-card.png" alt="" width="70" style="display: block; width: 70px; height: auto; opacity: 0.35; border-radius: 4px; transform: rotate(-6deg);">
+                    <img src="https://dcmgrading.com/why-dcm/lorcana-graded-card.png" alt="" width="65" style="display: block; width: 65px; height: auto; opacity: 0.25; border-radius: 4px; margin-top: 8px; transform: rotate(4deg);">
                   </td>
                   <td align="center" style="padding: 40px 15px 35px 15px;">
                     <h1 class="hero-h1" style="color: #ffffff; font-size: 30px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Welcome to<br><span style="color: #34d399;">DCM Grading!</span></h1>
@@ -102,7 +102,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 24px 0;">DCM Optic&trade; multi-pass grading &bull; Detailed reports &bull; Market pricing &bull; Custom labels</p>
 
               <!--[if mso]>
-              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=hero-cta" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="15%" strokecolor="#059669" fillcolor="#059669">
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=hero-cta" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="15%" strokecolor="#059669" fillcolor="#059669">
               <w:anchorlock/>
               <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:17px;font-weight:bold;">Start Grading Now &rarr;</center>
               </v:roundrect>
@@ -111,7 +111,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
               <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;">
                 <tr>
                   <td align="center" bgcolor="#059669" style="border-radius: 8px;">
-                    <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=hero-cta" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 15px 40px; font-weight: 700; font-size: 17px; font-family: Arial, Helvetica, sans-serif;">
+                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=hero-cta" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 15px 40px; font-weight: 700; font-size: 17px; font-family: Arial, Helvetica, sans-serif;">
                       Start Grading Now &rarr;
                     </a>
                   </td>
@@ -121,8 +121,8 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
               <p style="color: #4b5563; font-size: 12px; margin: 12px 0 0 0;">Your first grade is free &bull; No credit card required</p>
                   </td>
                   <td width="90" align="center" valign="middle" class="hero-cards-col" style="padding: 20px 8px 20px 0;">
-                    <img src="https://www.dcmgrading.com/why-dcm/drake-maye-graded-card.png" alt="" width="70" style="display: block; width: 70px; height: auto; opacity: 0.35; border-radius: 4px; transform: rotate(5deg);">
-                    <img src="https://www.dcmgrading.com/why-dcm/monkey-luffy-graded-card.png" alt="" width="65" style="display: block; width: 65px; height: auto; opacity: 0.25; border-radius: 4px; margin-top: 8px; transform: rotate(-3deg);">
+                    <img src="https://dcmgrading.com/why-dcm/drake-maye-graded-card.png" alt="" width="70" style="display: block; width: 70px; height: auto; opacity: 0.35; border-radius: 4px; transform: rotate(5deg);">
+                    <img src="https://dcmgrading.com/why-dcm/monkey-luffy-graded-card.png" alt="" width="65" style="display: block; width: 65px; height: auto; opacity: 0.25; border-radius: 4px; margin-top: 8px; transform: rotate(-3deg);">
                   </td>
                 </tr>
               </table>
@@ -131,7 +131,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
 
           <tr>
             <td bgcolor="#059669" style="padding: 0;">
-              <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=free-credits-banner" style="display: block; text-decoration: none; padding: 14px 20px;">
+              <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=free-credits-banner" style="display: block; text-decoration: none; padding: 14px 20px;">
                 <p style="color: #ffffff; font-size: 15px; font-weight: 700; margin: 0; text-align: center;">&#127881; You have a FREE credit waiting &mdash; grade your first card on us!</p>
               </a>
             </td>
@@ -148,7 +148,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                     <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 0 auto;">
                       <tr>
                         <td bgcolor="#065f46" style="padding: 0; border-radius: 8px;">
-                          <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=promo-code-button" style="display: inline-block; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace; text-decoration: none; padding: 12px 28px;">Grade10</a>
+                          <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=promo-code-button" style="display: inline-block; color: #ffffff; font-size: 24px; font-weight: 800; letter-spacing: 3px; font-family: 'Courier New', Courier, monospace; text-decoration: none; padding: 12px 28px;">Grade10</a>
                         </td>
                       </tr>
                     </table>
@@ -366,23 +366,23 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                 <tr>
                   <td class="card-img-col" width="25%" align="center" valign="top" style="padding: 4px;">
-                    <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-pikachu" style="text-decoration: none;">
-                      <img src="https://www.dcmgrading.com/why-dcm/pikachu-graded-card.png" alt="Pikachu Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
+                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-pikachu" style="text-decoration: none;">
+                      <img src="https://dcmgrading.com/why-dcm/pikachu-graded-card.png" alt="Pikachu Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
                     </a>
                   </td>
                   <td class="card-img-col" width="25%" align="center" valign="top" style="padding: 4px;">
-                    <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-drake" style="text-decoration: none;">
-                      <img src="https://www.dcmgrading.com/why-dcm/drake-maye-graded-card.png" alt="Drake Maye Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
+                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-drake" style="text-decoration: none;">
+                      <img src="https://dcmgrading.com/why-dcm/drake-maye-graded-card.png" alt="Drake Maye Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
                     </a>
                   </td>
                   <td class="card-img-col" width="25%" align="center" valign="top" style="padding: 4px;">
-                    <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-luffy" style="text-decoration: none;">
-                      <img src="https://www.dcmgrading.com/why-dcm/monkey-luffy-graded-card.png" alt="Monkey D. Luffy Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
+                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-luffy" style="text-decoration: none;">
+                      <img src="https://dcmgrading.com/why-dcm/monkey-luffy-graded-card.png" alt="Monkey D. Luffy Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
                     </a>
                   </td>
                   <td class="card-img-col" width="25%" align="center" valign="top" style="padding: 4px;">
-                    <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-mtg" style="text-decoration: none;">
-                      <img src="https://www.dcmgrading.com/why-dcm/magic-the-gathering-graded-card.png" alt="MTG Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
+                    <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-mtg" style="text-decoration: none;">
+                      <img src="https://dcmgrading.com/why-dcm/magic-the-gathering-graded-card.png" alt="MTG Graded Card" width="130" style="display: block; width: 100%; max-width: 130px; height: auto; border-radius: 6px;">
                     </a>
                   </td>
                 </tr>
@@ -434,7 +434,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
               <h2 style="color: #1f2937; font-size: 18px; margin: 0 0 6px 0; text-align: center; font-weight: 600;">Simple, Affordable Pricing</h2>
               <p style="color: #6b7280; font-size: 13px; text-align: center; margin: 0 0 18px 0;">Credits never expire. Buy what you need, grade when you&rsquo;re ready.</p>
 
-              <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=pricing-table" style="text-decoration: none;">
+              <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=pricing-table" style="text-decoration: none;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
                 <tr>
                   <td width="25%" bgcolor="#f9fafb" class="cmp-cell" style="padding: 10px 8px; border-bottom: 2px solid #e5e7eb;">
@@ -478,7 +478,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
               </a>
               <p style="text-align: center; color: #059669; font-size: 12px; margin: 10px 0 0 0; font-weight: 600;">VIP = Most Popular! 150 credits + VIP badge on all labels</p>
               <p style="text-align: center; margin: 4px 0 0 0;">
-                <a href="https://www.dcmgrading.com/card-lovers?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-lovers-link" style="color: #be185d; font-size: 12px; text-decoration: underline; font-family: Arial, Helvetica, sans-serif;">Looking for more? Check out Card Lovers &hearts; &mdash; 900 credits/yr at $0.50/grade</a>
+                <a href="https://dcmgrading.com/card-lovers?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=card-lovers-link" style="color: #be185d; font-size: 12px; text-decoration: underline; font-family: Arial, Helvetica, sans-serif;">Looking for more? Check out Card Lovers &hearts; &mdash; 900 credits/yr at $0.50/grade</a>
               </p>
             </td>
           </tr>
@@ -493,7 +493,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                       Upload a photo, get your grade in minutes.<br>Your first credit is on us &mdash; no card required.
                     </p>
                     <!--[if mso]>
-                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=mid-cta" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="15%" strokecolor="#059669" fillcolor="#059669">
+                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=mid-cta" style="height:52px;v-text-anchor:middle;width:280px;" arcsize="15%" strokecolor="#059669" fillcolor="#059669">
                     <w:anchorlock/>
                     <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:17px;font-weight:bold;">Get Credits &amp; Start Grading &rarr;</center>
                     </v:roundrect>
@@ -502,7 +502,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                     <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;">
                       <tr>
                         <td align="center" bgcolor="#059669" style="border-radius: 8px;">
-                          <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=mid-cta" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 15px 44px; font-weight: 700; font-size: 17px; font-family: Arial, Helvetica, sans-serif;">
+                          <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=mid-cta" style="display: inline-block; color: #ffffff; text-decoration: none; padding: 15px 44px; font-weight: 700; font-size: 17px; font-family: Arial, Helvetica, sans-serif;">
                             Get Credits &amp; Start Grading &rarr;
                           </a>
                         </td>
@@ -528,7 +528,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                       Detailed reports &bull; Custom labels &bull; Market pricing<br>All from $0.50 per grade. First grade free.
                     </p>
                     <!--[if mso]>
-                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=bottom-cta" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="17%" strokecolor="#ffffff" fillcolor="#ffffff">
+                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=bottom-cta" style="height:48px;v-text-anchor:middle;width:280px;" arcsize="17%" strokecolor="#ffffff" fillcolor="#ffffff">
                     <w:anchorlock/>
                     <center style="color:#065f46;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Browse Credit Packages &rarr;</center>
                     </v:roundrect>
@@ -537,7 +537,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                     <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" class="cta-wrap" style="margin: 0 auto;">
                       <tr>
                         <td align="center" bgcolor="#ffffff" style="border-radius: 8px;">
-                          <a href="https://www.dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=bottom-cta" style="display: inline-block; color: #065f46; text-decoration: none; padding: 14px 36px; font-weight: 700; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">
+                          <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=bottom-cta" style="display: inline-block; color: #065f46; text-decoration: none; padding: 14px 36px; font-weight: 700; font-size: 16px; font-family: Arial, Helvetica, sans-serif;">
                             Browse Credit Packages &rarr;
                           </a>
                         </td>

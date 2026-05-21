@@ -8,7 +8,7 @@ export const metadata: Metadata = {
     title: 'Population Report | DCM Grading',
     description:
       'See every card graded by DCM — broken down by category, set, and card with full grade distributions.',
-    url: 'https://www.dcmgrading.com/pop',
+    url: 'https://dcmgrading.com/pop',
     siteName: 'DCM Grading',
     type: 'website',
   },

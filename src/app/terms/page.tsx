@@ -110,7 +110,7 @@ export default function TermsPage() {
             <p>You may delete your account at any time through one of these methods:</p>
             <ul className="list-disc list-inside ml-4 space-y-2 mt-4">
               <li><strong>In the mobile app:</strong> Open the Account tab and tap <em>Delete My Account</em>, then confirm.</li>
-              <li><strong>On the website:</strong> Visit <a href="https://www.dcmgrading.com/account" className="text-blue-600 hover:underline">dcmgrading.com/account</a> and use the account-deletion option.</li>
+              <li><strong>On the website:</strong> Visit <a href="https://dcmgrading.com/account" className="text-blue-600 hover:underline">dcmgrading.com/account</a> and use the account-deletion option.</li>
               <li><strong>By email:</strong> Send a deletion request to admin@dcmgrading.com from the email address associated with your account.</li>
             </ul>
             <p className="mt-4">

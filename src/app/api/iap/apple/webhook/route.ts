@@ -7,7 +7,7 @@
  *
  * Configured in App Store Connect:
  *   App Information → App Store Server Notifications → Production URL =
- *   https://www.dcmgrading.com/api/iap/apple/webhook
+ *   https://dcmgrading.com/api/iap/apple/webhook
  *
  * Auth: the JWS signature on the payload IS the auth — only Apple's
  * private keys can sign it, and we verify against Apple's root cert chain.

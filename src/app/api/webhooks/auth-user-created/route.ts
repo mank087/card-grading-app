@@ -11,7 +11,7 @@
  *     Name: auth-user-created
  *     Table: auth.users
  *     Events: Insert
- *     URL: https://www.dcmgrading.com/api/webhooks/auth-user-created
+ *     URL: https://dcmgrading.com/api/webhooks/auth-user-created
  *     HTTP Method: POST
  *     HTTP Headers:
  *       Authorization: Bearer <SUPABASE_WEBHOOK_SECRET>

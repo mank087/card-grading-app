@@ -653,11 +653,11 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                 "addressCountry": show.country
               }
             },
-            "image": show.hero_image_url || show.thumbnail_url || show.logo_url || "https://www.dcmgrading.com/DCM-logo.png",
+            "image": show.hero_image_url || show.thumbnail_url || show.logo_url || "https://dcmgrading.com/DCM-logo.png",
             "description": show.description || generateMetaDescription(show),
             "offers": {
               "@type": "Offer",
-              "url": show.website_url || `https://www.dcmgrading.com/card-shows/${show.slug}`,
+              "url": show.website_url || `https://dcmgrading.com/card-shows/${show.slug}`,
               "availability": "https://schema.org/InStock",
               "price": "0",
               "priceCurrency": "USD",
@@ -670,7 +670,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
             "organizer": {
               "@type": "Organization",
               "name": "DCM Grading",
-              "url": "https://www.dcmgrading.com"
+              "url": "https://dcmgrading.com"
             }
           })
         }}

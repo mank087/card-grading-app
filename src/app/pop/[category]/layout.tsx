@@ -16,7 +16,7 @@ export async function generateMetadata({
     openGraph: {
       title: `${name} Population Report | DCM Grading`,
       description: `Complete grade distribution data for all ${name} cards graded by DCM.`,
-      url: `https://www.dcmgrading.com/pop/${category}`,
+      url: `https://dcmgrading.com/pop/${category}`,
       siteName: 'DCM Grading',
       type: 'website',
     },

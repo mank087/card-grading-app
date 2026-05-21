@@ -79,7 +79,7 @@ export async function generateMetadata({
       title,
       description,
       type: 'website',
-      url: `https://www.dcmgrading.com/card-shows/${show.slug}`,
+      url: `https://dcmgrading.com/card-shows/${show.slug}`,
       siteName: 'DCM Grading',
       images: show.hero_image_url ? [
         {
@@ -90,7 +90,7 @@ export async function generateMetadata({
         }
       ] : [
         {
-          url: 'https://www.dcmgrading.com/og-image.png',
+          url: 'https://dcmgrading.com/og-image.png',
           width: 1200,
           height: 630,
           alt: 'DCM Grading - AI Card Grading',
@@ -101,10 +101,10 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title,
       description,
-      images: show.hero_image_url ? [show.hero_image_url] : ['https://www.dcmgrading.com/og-image.png'],
+      images: show.hero_image_url ? [show.hero_image_url] : ['https://dcmgrading.com/og-image.png'],
     },
     alternates: {
-      canonical: `https://www.dcmgrading.com/card-shows/${show.slug}`,
+      canonical: `https://dcmgrading.com/card-shows/${show.slug}`,
     },
     robots: {
       index: true,

@@ -94,7 +94,7 @@ export async function signUp(email: string, password: string): Promise<AuthRespo
     // Use Supabase client for signup to properly handle emailRedirectTo
     const redirectTo = typeof window !== 'undefined'
       ? `${window.location.origin}/auth/callback`
-      : 'https://www.dcmgrading.com/auth/callback'
+      : 'https://dcmgrading.com/auth/callback'
 
     const { data, error } = await supabaseClient.auth.signUp({
       email,
@@ -468,7 +468,7 @@ export async function resetPasswordForEmail(email: string): Promise<{ error?: st
   try {
     const redirectTo = typeof window !== 'undefined'
       ? `${window.location.origin}/reset-password`
-      : 'https://www.dcmgrading.com/reset-password'
+      : 'https://dcmgrading.com/reset-password'
 
     const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
       redirectTo

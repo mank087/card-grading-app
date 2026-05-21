@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
     // Validate origin against allowlist, default to production domain
     const origin = requestOrigin && allowedOrigins.includes(requestOrigin)
       ? requestOrigin
-      : 'https://www.dcmgrading.com';
+      : 'https://dcmgrading.com';
 
     // Set success and cancel URLs based on package type
     // VIP uses credits success page (not founders success page)

@@ -87,7 +87,7 @@ async function sendAnomalyAlert(detail: { yesterday: number; rolling_avg: number
       average of <strong>$${detail.rolling_avg.toFixed(2)}</strong>.</p>
       <p>This may be normal volume or it may indicate a runaway grading loop /
       prompt regression. Investigate at
-      <a href="https://www.dcmgrading.com/admin/costs">/admin/costs</a>.</p>
+      <a href="https://dcmgrading.com/admin/costs">/admin/costs</a>.</p>
     `,
   }
   try {

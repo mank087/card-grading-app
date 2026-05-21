@@ -3,7 +3,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
 import { POP_CATEGORIES } from '@/lib/popReport';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://www.dcmgrading.com';
+  const baseUrl = 'https://dcmgrading.com';
   const supabase = supabaseServer();
 
   // Static pages with their priorities and change frequencies

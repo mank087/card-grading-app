@@ -99,7 +99,7 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
       })
     : '';
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.dcmgrading.com';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://dcmgrading.com';
   const postUrl = `${baseUrl}/blog/${post.slug}`;
 
   // JSON-LD structured data for SEO
