@@ -8,6 +8,7 @@ import { getConditionFromGrade } from '@/lib/conditionAssessment'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
 import AppStoreBadge from '@/components/AppStoreBadge'
+import GooglePlayBadge from '@/components/GooglePlayBadge'
 
 // Helper functions to extract card info (matching collection page)
 const stripMarkdown = (text: string | null | undefined): string | null => {
@@ -208,7 +209,7 @@ export default function Home() {
             {/* App Store launch callout — layered on top of the existing
                 offer copy so we keep the conversion-tested hero intact. */}
             <p className="text-base sm:text-lg text-white font-semibold mb-6 max-w-xl">
-              <span aria-hidden>📱</span> Now available on iPhone &amp; iPad — Android coming soon.
+              <span aria-hidden>📱</span> Now available on iPhone, iPad &amp; Android.
               <span className="block text-sm sm:text-base font-normal text-gray-300 mt-1">
                 Grade on the go, or right here on the web.
               </span>
@@ -222,6 +223,7 @@ export default function Home() {
                 Claim Your Bonus Credits
               </Link>
               <AppStoreBadge variant="black" height={52} />
+              <GooglePlayBadge height={52} />
             </div>
 
             <p className="text-gray-400 text-sm mt-6">

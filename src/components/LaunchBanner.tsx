@@ -1,11 +1,11 @@
 /**
  * Site-wide dismissible launch banner. Appears at the very top of every page
- * (above the sticky <Navigation>) announcing the iOS App Store launch.
+ * (above the sticky <Navigation>) announcing the iOS + Google Play launches.
  *
  * Mobile-first responsive — shorter copy below ~640px. Dismissal persists
  * across sessions via localStorage. Key includes a version suffix so we can
- * force-show the banner again when the message changes (e.g. when Android
- * launches, flip 'v1-ios' → 'v2-ios-android' and everyone sees the update).
+ * force-show the banner again when the message changes — bump the version
+ * whenever the announcement copy changes materially.
  *
  * Mounted once in src/components/ClientLayout.tsx so it appears site-wide
  * without each page wiring it in.
@@ -15,8 +15,9 @@
 
 import { useEffect, useState } from 'react'
 import { APP_STORE_URL } from './AppStoreBadge'
+import { GOOGLE_PLAY_URL } from './GooglePlayBadge'
 
-const DISMISS_KEY = 'dcm-launch-banner-dismissed-v1-ios'
+const DISMISS_KEY = 'dcm-launch-banner-dismissed-v2-ios-android'
 
 export default function LaunchBanner() {
   // Render nothing on the initial server-side mount so hydration doesn't
@@ -61,32 +62,49 @@ export default function LaunchBanner() {
 
         {/* Mobile copy (≤ sm) */}
         <span className="text-xs sm:hidden flex-1 min-w-0">
-          <strong>Now on the App Store!</strong>{' '}
+          <strong>Now on iOS &amp; Android!</strong>{' '}
           <a
             href={APP_STORE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline font-semibold whitespace-nowrap"
           >
-            Download
+            App Store
+          </a>
+          {' · '}
+          <a
+            href={GOOGLE_PLAY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-semibold whitespace-nowrap"
+          >
+            Google Play
           </a>
         </span>
 
         {/* Desktop / tablet copy */}
         <span className="hidden sm:flex flex-1 min-w-0 items-center flex-wrap gap-x-2 text-sm">
-          <strong className="whitespace-nowrap">DCM Grading is now on the App Store!</strong>
+          <strong className="whitespace-nowrap">DCM Grading is now on iPhone &amp; Android!</strong>
           <a
             href={APP_STORE_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="underline font-semibold whitespace-nowrap"
           >
-            Download for iPhone &amp; iPad
+            App Store
+          </a>
+          <span className="opacity-80">·</span>
+          <a
+            href={GOOGLE_PLAY_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline font-semibold whitespace-nowrap"
+          >
+            Google Play
           </a>
           <span className="opacity-80 whitespace-nowrap">
             — grade cards on the go, or keep using the web.
           </span>
-          <span className="opacity-60 italic whitespace-nowrap">(Android coming soon)</span>
         </span>
 
         <button

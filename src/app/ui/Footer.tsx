@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import AppStoreBadge from "@/components/AppStoreBadge";
+import GooglePlayBadge from "@/components/GooglePlayBadge";
 
 // Mirror of FULLSCREEN_ROUTES in Navigation.tsx — these download/preview
 // routes should render edge-to-edge with no site chrome.
@@ -41,14 +42,16 @@ export default function Footer() {
               Professional card grading and collection management service. Get detailed assessments of your trading card collection with DCM Optic™ technology.
             </p>
 
-            {/* App Store badge — uses the WHITE variant so it reads on the
-                dark footer. Apple's marketing rules require this exact asset
-                with no modifications. Android badge will sit alongside it
-                once the Play Store release lands. */}
+            {/* Store badges — Apple uses the WHITE variant to read on the
+                dark footer; Google's badge is single-tone and works on any
+                background. Both brand guidelines require the assets be used
+                as-is with no color or proportion modifications. */}
             <div className="mb-5">
               <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Get the App</p>
-              <AppStoreBadge variant="white" height={44} />
-              <p className="text-xs text-gray-500 mt-2">Android coming soon</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <AppStoreBadge variant="white" height={44} />
+                <GooglePlayBadge height={44} />
+              </div>
             </div>
 
             <div className="flex space-x-4">

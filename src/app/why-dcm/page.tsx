@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { getStoredSession, signInWithOAuth, signUp } from '@/lib/directAuth'
 import HeroGradingAnimation from '@/app/sports-grading/HeroGradingAnimation'
 import AppStoreBadge from '@/components/AppStoreBadge'
+import GooglePlayBadge from '@/components/GooglePlayBadge'
 import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart'
 import GradeDistributionChart from '@/components/market-pricing/GradeDistributionChart'
 import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart'
@@ -771,11 +772,14 @@ export default function WhyDcmPage() {
                 </li>
               </ul>
 
-              <AppStoreBadge variant="white" height={52} />
+              <div className="flex flex-wrap items-center gap-3">
+                <AppStoreBadge variant="white" height={52} />
+                <GooglePlayBadge height={52} />
+              </div>
 
               <p className="text-xs sm:text-sm text-gray-400 mt-5 max-w-md">
                 Prefer to use a computer? Grade on <span className="text-white font-semibold">dcmgrading.com</span> from any browser —
-                full feature parity, no app required. <span className="italic">Android coming soon.</span>
+                full feature parity, no app required.
               </p>
             </div>
 

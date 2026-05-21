@@ -9,8 +9,7 @@
  *
  * Single source of truth for the App Store URL — every placement on the
  * marketing site (homepage, /why-dcm, footer, banner) routes through this
- * component so when Android launches we flip to a side-by-side "iOS + Google
- * Play" presentation in one place.
+ * component. Pairs with GooglePlayBadge.tsx in all four placements.
  */
 
 import Image from 'next/image'
