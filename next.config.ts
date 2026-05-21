@@ -80,6 +80,28 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    return [
+      {
+        // Apple Universal Links file has no extension — Vercel would default to
+        // application/octet-stream, which Apple rejects. Force application/json.
+        source: '/.well-known/apple-app-site-association',
+        headers: [
+          { key: 'Content-Type', value: 'application/json' },
+          { key: 'Cache-Control', value: 'public, max-age=3600' },
+        ],
+      },
+      {
+        // Android App Links: the .json extension already yields application/json,
+        // but pin Cache-Control so the CDN doesn't serve a stale negative cache.
+        source: '/.well-known/assetlinks.json',
+        headers: [
+          { key: 'Content-Type', value: 'application/json' },
+          { key: 'Cache-Control', value: 'public, max-age=3600' },
+        ],
+      },
+    ]
+  },
 };
 
 export default nextConfig;

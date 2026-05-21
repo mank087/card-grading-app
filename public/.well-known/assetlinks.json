@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.dcmgrading.app",
+      "sha256_cert_fingerprints": [
+        "E2:AC:F3:8C:91:7E:14:D4:70:CE:CE:4D:26:59:5C:CF:92:35:EC:72:20:78:0F:7C:B9:87:28:57:1F:CA:CD:05"
+      ]
+    }
+  }
+]

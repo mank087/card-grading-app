@@ -1,0 +1,15 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["2V543N5YNF.com.dcmgrading.app"],
+        "components": [
+          { "/": "/api/*", "exclude": true },
+          { "/": "/admin/*", "exclude": true },
+          { "/": "/.well-known/*", "exclude": true },
+          { "/": "*" }
+        ]
+      }
+    ]
+  }
+}
