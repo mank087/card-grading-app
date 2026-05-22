@@ -820,7 +820,7 @@ BEGIN
         -- $9.99 -> 9990, divide by 1000 to get dollars. Earlier version
         -- divided by 100 which yielded ~$99.90 for every Pro IAP.
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 1000
+          THEN (raw_receipt->>'price')::numeric / 10000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -862,7 +862,7 @@ BEGIN
       UNION ALL
       SELECT CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -883,7 +883,7 @@ BEGIN
       UNION ALL
       SELECT CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -903,7 +903,7 @@ BEGIN
       UNION ALL
       SELECT CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -933,7 +933,7 @@ BEGIN
       CASE WHEN platform = 'apple' THEN 'apple_iap' ELSE 'google_iap' END AS source,
       CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -983,7 +983,7 @@ BEGIN
     SELECT 'ios',
       coalesce((SELECT sum(CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -996,7 +996,7 @@ BEGIN
     SELECT 'android',
       coalesce((SELECT sum(CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -1035,7 +1035,7 @@ BEGIN
     SELECT product_id,
       CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -1075,7 +1075,7 @@ BEGIN
                   AND date_trunc('day', created_at)::date = d.day), 0) AS stripe_subscription,
       coalesce((SELECT sum(CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -1084,7 +1084,7 @@ BEGIN
           AND date_trunc('day', created_at)::date = d.day), 0) AS apple_iap,
       coalesce((SELECT sum(CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -1114,7 +1114,7 @@ BEGIN
     UNION ALL
     SELECT user_id, CASE
       WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-        THEN (raw_receipt->>'price')::numeric / 100
+        THEN (raw_receipt->>'price')::numeric / 1000
       WHEN product_id = 'dcm.credits.basic' THEN 2.99
       WHEN product_id = 'dcm.credits.pro'   THEN 9.99
       WHEN product_id = 'dcm.credits.elite' THEN 19.99
@@ -1165,7 +1165,7 @@ BEGIN
       user_id,
       CASE
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id='dcm.credits.basic' THEN 2.99
         WHEN product_id='dcm.credits.pro'   THEN 9.99
         WHEN product_id='dcm.credits.elite' THEN 19.99
