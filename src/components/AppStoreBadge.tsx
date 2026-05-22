@@ -15,7 +15,7 @@
 import Image from 'next/image'
 
 // Universal short URL — Apple auto-redirects to the user's country store.
-export const APP_STORE_URL = 'https://apps.apple.com/app/id6768663163'
+export const APP_STORE_URL = 'https://apps.apple.com/us/app/dcm-grading/id6768663163'
 
 interface Props {
   variant?: 'black' | 'white'

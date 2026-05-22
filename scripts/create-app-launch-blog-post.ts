@@ -39,7 +39,7 @@ This was important to us. We did not want to force anyone to commit to one platf
 
 Both apps are free to install:
 
-- [Apple App Store](https://apps.apple.com/app/id6768663163) for iPhone and iPad
+- [Apple App Store](https://apps.apple.com/us/app/dcm-grading/id6768663163) for iPhone and iPad
 - [Google Play](https://play.google.com/store/apps/details?id=com.dcmgrading.app) for Android phones and tablets
 
 If you already have credits in your account, they carry over. New users get a free first grade when they sign up.
