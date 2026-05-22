@@ -816,8 +816,11 @@ BEGIN
       CASE WHEN platform = 'apple' THEN 'ios'       ELSE 'android'    END AS platform,
       user_id,
       CASE
+        -- Apple JWS-decoded transaction.price is in millicents (1000 = $1.00).
+        -- $9.99 -> 9990, divide by 1000 to get dollars. Earlier version
+        -- divided by 100 which yielded ~$99.90 for every Pro IAP.
         WHEN raw_receipt ? 'price' AND jsonb_typeof(raw_receipt->'price') = 'number'
-          THEN (raw_receipt->>'price')::numeric / 100
+          THEN (raw_receipt->>'price')::numeric / 1000
         WHEN product_id = 'dcm.credits.basic' THEN 2.99
         WHEN product_id = 'dcm.credits.pro'   THEN 9.99
         WHEN product_id = 'dcm.credits.elite' THEN 19.99
