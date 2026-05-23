@@ -615,7 +615,13 @@ export default function CollectionScreen() {
         key={`${viewMode}-${gridColumns}`}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        removeClippedSubviews
+        // removeClippedSubviews is intentionally OFF (default on Android is
+        // true, which aggressively unmounts off-screen items and causes
+        // expo-image's transition to restart on remount — images visibly
+        // pop in/out during fast scroll). windowSize=5 +
+        // maxToRenderPerBatch=10 already cap memory usage; we don't need
+        // the extra optimization at the cost of jank.
+        removeClippedSubviews={false}
         maxToRenderPerBatch={10}
         windowSize={5}
         initialNumToRender={8}
