@@ -3,7 +3,6 @@ import { Image } from 'expo-image'
 import { useRouter } from 'expo-router'
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { Ionicons } from '@expo/vector-icons'
-import * as WebBrowser from 'expo-web-browser'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
@@ -94,9 +93,11 @@ export default function CollectionScreen() {
   //                      per page (4×20), one label per card.
   const [positionPicker, setPositionPicker] = useState<null | { type: string; sheet: 'avery6871' | 'avery8167-pairs' | 'avery8167'; format?: 'duplex' | 'foldover' }>(null)
   const [pickerStartPosition, setPickerStartPosition] = useState(0)
-  // iOS-only: drives the hidden-WebView ExportRunner that receives generated
-  // files via postMessage. Set by openBatchDownload on iOS; null on Android
-  // (which still uses WebBrowser + native download manager).
+  // Drives the hidden-WebView ExportRunner that receives generated files
+  // via postMessage. Used by openBatchDownload on both platforms — Android
+  // used to route through WebBrowser.openBrowserAsync, but App Links
+  // verification (2026-05-22) made the OS intercept those URLs back into
+  // the app, breaking the flow. The in-app WebView avoids that.
   const [exportSource, setExportSource] = useState<ExportSource | null>(null)
 
   const enterSelectionMode = useCallback((firstId?: string) => {
@@ -302,40 +303,28 @@ export default function CollectionScreen() {
     // and applies the colors/gradient/border to every selected card.
     if (opts?.customConfig) params.set('customConfig', opts.customConfig)
 
-    // iOS: load /label-export/batch in a hidden WebView via ExportRunner.
-    // The page detects ReactNativeWebView and posts files back as base64,
-    // which we save to the app's Documents folder (visible in Files app
-    // under "On My iPhone → DCM Grading"). The previous WebBrowser flow
-    // showed the page in SFSafariViewController where data-URL anchor
-    // downloads silently fail. The 350ms defer lets parent sheets finish
-    // dismissing before the runner modal opens.
-    if (Platform.OS === 'ios') {
-      const urlNoDownload = `${API_BASE}/label-export/batch?${params.toString()}`
-      const title = type === 'full-report' ? 'Full Reports'
-        : type === 'mini-report-pdf' ? 'Mini-Reports (PDF)'
-        : type === 'mini-report' ? 'Mini-Reports'
-        : type.startsWith('card-image') ? 'Card Images'
-        : type === 'onetouch' ? 'One-Touch Labels'
-        : type === 'toploader' ? 'Toploader Labels'
-        : type === 'foldover' ? 'Fold-Over Labels'
-        : 'Slab Labels'
-      setTimeout(() => setExportSource({ url: urlNoDownload, title }), 350)
-      return
-    }
-
-    // Android: Chrome Custom Tab's download manager handles data-URL
-    // anchor clicks reliably, so keep the existing flow with download=1.
-    params.set('download', '1')
-    const url = `${API_BASE}/label-export/batch?${params.toString()}`
-    try {
-      await WebBrowser.openBrowserAsync(url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        controlsColor: Colors.purple[600],
-        toolbarColor: '#ffffff',
-      })
-    } catch (err: any) {
-      Alert.alert('Could not open download', err?.message || 'Try again.')
-    }
+    // Both iOS and Android: load /label-export/batch in a hidden WebView via
+    // ExportRunner. The page detects ReactNativeWebView and posts files back
+    // as base64, which we save locally and surface via Sharing.shareAsync /
+    // Print.printAsync from the preview modal.
+    //
+    // Android used to use WebBrowser.openBrowserAsync(url, ...) here, but
+    // after enabling Android App Links verification (2026-05-22), Android
+    // intercepts all https://dcmgrading.com/* URLs and routes them back into
+    // the DCM app — which has no /label-export route, so expo-router
+    // rendered +not-found ("the screen doesn't exist"). The in-app WebView
+    // sidesteps that by loading the URL internally instead of asking the
+    // OS to handle it externally.
+    const urlNoDownload = `${API_BASE}/label-export/batch?${params.toString()}`
+    const title = type === 'full-report' ? 'Full Reports'
+      : type === 'mini-report-pdf' ? 'Mini-Reports (PDF)'
+      : type === 'mini-report' ? 'Mini-Reports'
+      : type.startsWith('card-image') ? 'Card Images'
+      : type === 'onetouch' ? 'One-Touch Labels'
+      : type === 'toploader' ? 'Toploader Labels'
+      : type === 'foldover' ? 'Fold-Over Labels'
+      : 'Slab Labels'
+    setTimeout(() => setExportSource({ url: urlNoDownload, title }), 350)
   }, [session?.access_token, selectedIds])
 
   // Avery types need a starting position. Mirrors the single-card position

@@ -7,7 +7,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
-import * as WebBrowser from 'expo-web-browser'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
@@ -711,38 +710,33 @@ export default function LabelStudioScreen() {
       }
     }
 
-    // iOS: load /label-export/[cardId] in a hidden WebView via ExportRunner.
-    // The page detects ReactNativeWebView and posts files back as base64,
-    // which we save to the app's Documents folder (visible in Files app
-    // under "On My iPhone → DCM Grading"). The 350ms defer covers the case
-    // where this is called from a parent sheet's onPress.
-    if (Platform.OS === 'ios') {
-      // Strip download=1 — the page would otherwise try the anchor-click
-      // path which doesn't work inside RN WebView. With it absent + the
-      // ReactNativeWebView bridge present, the page postMessages back.
-      params.delete('download')
-      const url = `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
-      const title = exportType === 'slab-custom' ? 'Custom Slab Label'
-        : exportType === 'slab' ? 'Slab Label'
-        : exportType === 'onetouch' ? 'One-Touch Label'
-        : exportType === 'toploader' ? 'Toploader Label'
-        : exportType === 'foldover' ? 'Fold-Over Label'
-        : exportType === 'card-image' ? 'Card Image'
-        : 'Label'
-      setTimeout(() => setExportSource({ url, title }), 350)
-      return
-    }
-
+    // Both iOS and Android: load /label-export/[cardId] in a hidden WebView
+    // via ExportRunner. The page detects ReactNativeWebView and posts files
+    // back as base64, which we save locally and surface via Sharing.shareAsync
+    // / Print.printAsync. The 350ms defer covers the case where this is
+    // called from a parent sheet's onPress.
+    //
+    // Android used to use WebBrowser.openBrowserAsync(url, ...) here, but
+    // after enabling Android App Links verification (2026-05-22), Android
+    // intercepts all https://dcmgrading.com/* URLs and routes them back into
+    // the DCM app — which has no /label-export route, so expo-router
+    // rendered +not-found ("the screen doesn't exist"). The in-app WebView
+    // sidesteps that by loading the URL internally instead of asking the
+    // OS to handle it externally.
+    //
+    // Strip download=1 — the page would otherwise try the anchor-click path
+    // which doesn't work inside RN WebView. With it absent + the
+    // ReactNativeWebView bridge present, the page postMessages back.
+    params.delete('download')
     const url = `${API_BASE}/label-export/${selectedCard.id}?${params.toString()}`
-    try {
-      await WebBrowser.openBrowserAsync(url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        controlsColor: Colors.purple[600],
-        toolbarColor: '#ffffff',
-      })
-    } catch (err: any) {
-      Alert.alert('Could not open download', err?.message || 'Try again.')
-    }
+    const title = exportType === 'slab-custom' ? 'Custom Slab Label'
+      : exportType === 'slab' ? 'Slab Label'
+      : exportType === 'onetouch' ? 'One-Touch Label'
+      : exportType === 'toploader' ? 'Toploader Label'
+      : exportType === 'foldover' ? 'Fold-Over Label'
+      : exportType === 'card-image' ? 'Card Image'
+      : 'Label'
+    setTimeout(() => setExportSource({ url, title }), 350)
   }, [selectedCard, session?.access_token, config])
 
   // Gallery's per-tile Download button — uses the in-app web browser

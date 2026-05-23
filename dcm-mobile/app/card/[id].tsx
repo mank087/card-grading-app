@@ -4,7 +4,6 @@ import { Image as ExpoImage } from 'expo-image'
 import * as Clipboard from 'expo-clipboard'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
-import * as WebBrowser from 'expo-web-browser'
 import { WebView } from 'react-native-webview'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { saveToDocuments, presentSaveSuccess } from '@/lib/downloads'
@@ -232,50 +231,33 @@ export default function CardDetailScreen() {
   // postMessage; modal shows a preview and a Download button → iOS share
   // sheet → Save to Files. PDF preview + native print also work in-app.
   //
-  // Android: in-app Chrome Custom Tab opens the export URL with download=1;
-  // Chrome's native download manager saves the file to /Downloads. Works
-  // reliably without the data-URL size issues iOS has.
+  // Both iOS and Android: setExportTask kicks off the hidden-WebView export
+  // pipeline. The web /label-export page detects ReactNativeWebView and
+  // posts files back as base64; we persist them locally and surface
+  // Sharing.shareAsync / Print.printAsync from the preview modal.
+  //
+  // Android used to use WebBrowser.openBrowserAsync(url) here, which worked
+  // until Android App Links verification was enabled (2026-05-22). After
+  // that, Android intercepted https://dcmgrading.com/* URLs and routed them
+  // back into the DCM app via the verified intent filter — but /label-export
+  // is not a registered expo-router route, so the app rendered +not-found
+  // ("the screen doesn't exist"). The in-app WebView avoids triggering
+  // App Links because the URL is loaded inside the WebView component, not
+  // dispatched to the OS as an external link.
   const openWebDownload = useCallback(async (
     exportType: string,
     opts?: { format?: 'duplex' | 'foldover'; position?: number; position2?: number; title?: string; labelStyle?: string }
   ) => {
     if (!card?.id || !session?.access_token) return
-
-    if (Platform.OS === 'ios') {
-      setExportTask({
-        type: exportType,
-        format: opts?.format,
-        position: opts?.position,
-        position2: opts?.position2,
-        title: opts?.title,
-        labelStyle: opts?.labelStyle,
-      })
-      return
-    }
-
-    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
-    const params = new URLSearchParams()
-    params.set('token', session.access_token)
-    params.set('type', exportType)
-    if (opts?.format) params.set('format', opts.format)
-    // opts.labelStyle wins over the user's global preference — used by
-    // the SlabLabelOptionsSheet so users can pick any custom-N just for
-    // this download without changing their saved default.
-    params.set('labelStyle', opts?.labelStyle || labelStyle || 'modern')
-    if (opts?.position != null) params.set('position', String(opts.position))
-    if (opts?.position2 != null) params.set('position2', String(opts.position2))
-    params.set('download', '1')
-    const url = `${API_BASE}/label-export/${card.id}?${params.toString()}`
-    try {
-      await WebBrowser.openBrowserAsync(url, {
-        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
-        controlsColor: Colors.purple[600],
-        toolbarColor: '#ffffff',
-      })
-    } catch (err: any) {
-      Alert.alert('Could not open download', err?.message || 'Try again.')
-    }
-  }, [card?.id, session?.access_token, labelStyle])
+    setExportTask({
+      type: exportType,
+      format: opts?.format,
+      position: opts?.position,
+      position2: opts?.position2,
+      title: opts?.title,
+      labelStyle: opts?.labelStyle,
+    })
+  }, [card?.id, session?.access_token])
 
   // Deep-link from the Label Studio gallery: ?openLabel=<type>&format=<duplex|foldover>
   // The gallery now opens the browser directly, but legacy deep-links may
