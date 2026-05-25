@@ -71,6 +71,10 @@ async function checkMtg() {
   const recentMissing = apiNotInDb
     .filter(s => s.released_at && new Date(s.released_at) >= cutoff)
     .sort((a, b) => (b.released_at || '').localeCompare(a.released_at || ''));
+  // Physical-only count for the summary line — digital-only sets aren't
+  // ones our importer pulls into mtg_cards, so flagging them as actionable
+  // generates noise (we intentionally skip them).
+  const recentMissingPhysical = recentMissing.filter(s => !s.digital);
 
   console.log(`\nMost recent DB set:  ${(dbSets[0]?.name || '?').padEnd(35)} ${dbSets[0]?.released_at || '?'}`);
   const newestApi = [...apiSets].sort((a, b) => (b.released_at || '').localeCompare(a.released_at || ''))[0];
@@ -94,7 +98,7 @@ async function checkMtg() {
     if (dbNotInApi.length > 5) console.log(`    ... and ${dbNotInApi.length - 5} more`);
   }
 
-  return { hasMissing: recentMissing.length > 0, count: recentMissing.length };
+  return { hasMissing: recentMissingPhysical.length > 0, count: recentMissingPhysical.length };
 }
 
 // ---------- Lorcana (Lorcast) ----------
@@ -159,10 +163,22 @@ async function checkOnePiece() {
     .select('id, name, set_type, total_cards')
     .order('id');
 
-  // OPTCG API doesn't have a sets endpoint — we derive sets from card data.
-  // Pull all booster cards in one go (the importer does the same).
-  const cards = await fetchJson('https://optcgapi.com/api/allSetCards/');
-  const apiCardArray = Array.isArray(cards) ? cards : (cards.data || []);
+  // OPTCG API doesn't have a /sets endpoint — we derive sets by aggregating
+  // card data from TWO live endpoints (the previously-active /allPromoCards/
+  // 404s now, retired some time after Jan 2026).
+  //
+  //   /allSetCards/  -> booster / expansion / premium booster sets
+  //   /allSTCards/   -> starter deck sets (ST-01 .. ST-NN)
+  //
+  // Pulling only one would massively undercount and flag legitimate starter
+  // decks as "missing from API" (which is what an earlier version did).
+  const [boosterRes, starterRes] = await Promise.all([
+    fetchJson('https://optcgapi.com/api/allSetCards/'),
+    fetchJson('https://optcgapi.com/api/allSTCards/'),
+  ]);
+  const boosterCards = Array.isArray(boosterRes) ? boosterRes : (boosterRes.data || []);
+  const starterCards = Array.isArray(starterRes) ? starterRes : (starterRes.data || []);
+  const apiCardArray = [...boosterCards, ...starterCards];
 
   // Group by set
   const apiSetsMap = new Map();
@@ -177,11 +193,16 @@ async function checkOnePiece() {
   const apiSets = Array.from(apiSetsMap.values());
 
   console.log(`Sets:  DB ${dbSetCount}  |  API ${apiSets.length}  |  Diff ${apiSets.length - dbSetCount}`);
-  console.log(`Cards: DB ${dbCardCount}  |  API (booster only) ${apiCardArray.length}`);
+  console.log(`Cards: DB ${dbCardCount}  |  API total ${apiCardArray.length} (booster: ${boosterCards.length}, starter: ${starterCards.length})`);
 
   const dbIds = new Set(dbSets.map(s => s.id));
   const apiIds = new Set(apiSets.map(s => s.id));
-  const apiNotInDb = apiSets.filter(s => !dbIds.has(s.id));
+  // OPTCG mixes IDs over time — recent hybrid IDs like "OP14-EB04" represent
+  // sets we already store under split IDs (OP-14 and EB-04). Treat a name
+  // match as equivalence so we don't keep flagging the same already-imported
+  // sets as "missing".
+  const dbNamesLc = new Set(dbSets.map(s => (s.name || '').toLowerCase().trim()).filter(Boolean));
+  const apiNotInDb = apiSets.filter(s => !dbIds.has(s.id) && !dbNamesLc.has((s.name || '').toLowerCase().trim()));
   const dbNotInApi = dbSets.filter(s => !apiIds.has(s.id));
 
   // One Piece sets follow naming like OP01, OP10, ST01, etc. Sort by id desc
