@@ -98,34 +98,61 @@ interface Recipient {
 }
 
 async function loadAudience(): Promise<Recipient[]> {
-  // Paginate over profiles where marketing is opted-in, joined with users for
-  // the email + first name. Bypass the 1000-row PostgREST cap by ranging.
+  // Paginate over profiles where marketing is opted-in. The handle_new_user
+  // trigger writes the same email to both public.users and public.profiles
+  // at signup, so profiles.email is sufficient — no join needed. We also
+  // pull users.full_name separately for {{firstName}} merge support
+  // (profiles.id is FK to auth.users; public.users is keyed off the same UUID
+  // but without an explicit FK, PostgREST can't infer the join).
   const recipients: Recipient[] = []
   const batchSize = 1000
   let from = 0
   for (;;) {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, email, unsubscribe_token, marketing_emails_enabled, users!inner(email, full_name)')
+      .select('id, email, unsubscribe_token')
       .eq('marketing_emails_enabled', true)
       .range(from, from + batchSize - 1)
     if (error) throw new Error(`profiles query failed: ${error.message}`)
     if (!data || data.length === 0) break
     for (const row of data as any[]) {
-      const email = row.users?.email || row.email
+      const email = row.email
       if (!email) continue
-      const fullName = row.users?.full_name || ''
-      const firstName = fullName.split(' ')[0] || 'there'
       recipients.push({
         user_id: row.id,
         email,
-        first_name: firstName,
+        first_name: 'there', // overridden by names lookup below if found
         unsubscribe_token: row.unsubscribe_token,
       })
     }
     if (data.length < batchSize) break
     from += batchSize
   }
+
+  // Best-effort second pass: enrich recipients with first_name from
+  // public.users.full_name. If users.full_name is missing for any row,
+  // recipient keeps its 'there' fallback. We do this in chunks to stay
+  // under the in() URL-length limit.
+  const userIds = recipients.map(r => r.user_id)
+  const namesById = new Map<string, string>()
+  for (let i = 0; i < userIds.length; i += 200) {
+    const chunk = userIds.slice(i, i + 200)
+    const { data: usersChunk } = await supabase
+      .from('users')
+      .select('id, full_name')
+      .in('id', chunk)
+    usersChunk?.forEach((u: any) => {
+      if (u.full_name) namesById.set(u.id, u.full_name)
+    })
+  }
+  for (const r of recipients) {
+    const fullName = namesById.get(r.user_id)
+    if (fullName) {
+      const first = String(fullName).trim().split(' ')[0]
+      if (first) r.first_name = first
+    }
+  }
+
   return recipients
 }
 
