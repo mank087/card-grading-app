@@ -244,6 +244,74 @@ async function checkOnePiece() {
   return { hasMissing: apiNotInDb.length > 0, count: apiNotInDb.length };
 }
 
+// ---------- Yu-Gi-Oh! (YGOPRODeck) ----------
+async function checkYugioh() {
+  divider('Yu-Gi-Oh! vs YGOPRODeck API');
+
+  const { count: dbSetCount } = await supabase
+    .from('yugioh_sets').select('set_code', { count: 'exact', head: true });
+  const { count: dbCardCount } = await supabase
+    .from('yugioh_cards').select('id', { count: 'exact', head: true });
+  const { count: dbPrintingCount } = await supabase
+    .from('yugioh_card_printings').select('id', { count: 'exact', head: true });
+
+  const { data: dbSets } = await supabase
+    .from('yugioh_sets')
+    .select('set_code, set_name, num_of_cards, tcg_date')
+    .order('tcg_date', { ascending: false });
+
+  // YGOPRODeck /cardsets.php returns a flat array of all sets.
+  const apiSets = await fetchJson('https://db.ygoprodeck.com/api/v7/cardsets.php');
+
+  console.log(`Sets:     DB ${dbSetCount}  |  API ${apiSets.length}`);
+  console.log(`Cards:    DB ${dbCardCount}`);
+  console.log(`Printings: DB ${dbPrintingCount}`);
+
+  // Diff by set_code (case-insensitive — YGOPRODeck is inconsistent on casing)
+  const dbCodes = new Set(dbSets.map(s => (s.set_code || '').toUpperCase()));
+  const apiSetsNormalized = apiSets.map(s => ({
+    ...s,
+    set_code: (s.set_code || '').toUpperCase(),
+  }));
+  const apiCodes = new Set(apiSetsNormalized.map(s => s.set_code));
+  const apiNotInDb = apiSetsNormalized.filter(s => !dbCodes.has(s.set_code));
+  const dbNotInApi = dbSets.filter(s => !apiCodes.has((s.set_code || '').toUpperCase()));
+
+  // 90-day cap for the "missing" list (Yu-Gi-Oh has ~1700 sets across 25
+  // years, only recent ones are relevant).
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 90);
+  const recentMissing = apiNotInDb
+    .filter(s => s.tcg_date && new Date(s.tcg_date) >= cutoff)
+    .sort((a, b) => (b.tcg_date || '').localeCompare(a.tcg_date || ''));
+
+  const newestDb = dbSets[0];
+  const newestApi = [...apiSetsNormalized]
+    .filter(s => s.tcg_date)
+    .sort((a, b) => (b.tcg_date || '').localeCompare(a.tcg_date || ''))[0];
+  console.log(`\nMost recent DB set:  ${(newestDb?.set_name || '?').padEnd(40)} ${newestDb?.tcg_date || '?'}`);
+  console.log(`Most recent API set: ${(newestApi?.set_name || '?').padEnd(40)} ${newestApi?.tcg_date || '?'}`);
+
+  console.log(`\nAPI sets missing from DB total: ${apiNotInDb.length}`);
+  console.log(`  (within last 90 days: ${recentMissing.length})`);
+  if (recentMissing.length > 0) {
+    recentMissing.slice(0, 15).forEach(s => {
+      console.log(`    ${s.tcg_date}  ${s.set_code.padEnd(10)} ${(s.set_name || '').padEnd(45)} ${s.num_of_cards || '?'} cards`);
+    });
+    if (recentMissing.length > 15) console.log(`    ... and ${recentMissing.length - 15} more`);
+  }
+
+  if (dbNotInApi.length > 0) {
+    console.log(`\nSets in DB but not in API: ${dbNotInApi.length}`);
+    dbNotInApi.slice(0, 5).forEach(s => {
+      console.log(`    ${s.tcg_date || '?'}  ${(s.set_code || '').padEnd(10)} ${s.set_name}`);
+    });
+    if (dbNotInApi.length > 5) console.log(`    ... and ${dbNotInApi.length - 5} more`);
+  }
+
+  return { hasMissing: recentMissing.length > 0, count: recentMissing.length };
+}
+
 async function main() {
   const results = {};
   try { results.mtg = await checkMtg(); }
@@ -252,12 +320,15 @@ async function main() {
   catch (e) { console.error('\nLorcana check failed:', e.message); results.lorcana = { error: e.message }; }
   try { results.onepiece = await checkOnePiece(); }
   catch (e) { console.error('\nOne Piece check failed:', e.message); results.onepiece = { error: e.message }; }
+  try { results.yugioh = await checkYugioh(); }
+  catch (e) { console.error('\nYu-Gi-Oh check failed:', e.message); results.yugioh = { error: e.message }; }
 
   divider('Summary');
   const actions = [];
   if (results.mtg?.hasMissing) actions.push(`MTG: ${results.mtg.count} recent sets missing -> node scripts/import-mtg-database.js`);
   if (results.lorcana?.hasMissing) actions.push(`Lorcana: ${results.lorcana.count} sets missing -> node scripts/import-lorcana-database.js`);
   if (results.onepiece?.hasMissing) actions.push(`One Piece: ${results.onepiece.count} sets missing -> node scripts/import-onepiece-database.js`);
+  if (results.yugioh?.hasMissing) actions.push(`Yu-Gi-Oh: ${results.yugioh.count} recent sets missing -> node scripts/import-yugioh-database.js`);
   if (actions.length === 0) {
     console.log('  All TCG databases are in sync with their respective APIs.');
   } else {
