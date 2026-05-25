@@ -52,6 +52,7 @@ const subject = getArg('subject')
 const fromAddr = getArg('from')
 const replyTo = getArg('reply-to') || 'admin@dcmgrading.com'
 const dryRun = getFlag('dry-run')
+const testMode = getFlag('test')
 const limit = Number(getArg('limit')) || undefined
 const sendOnlyTo = getArg('to')
 const rate = Number(getArg('rate')) || 5
@@ -206,16 +207,37 @@ async function sendOne(recipient: Recipient, html: string): Promise<void> {
 async function main() {
   const html = fs.readFileSync(templatePath!, 'utf8')
 
-  let audience = await loadAudience()
-  console.log(`Audience: ${audience.length} opted-in recipients`)
-
-  if (sendOnlyTo) {
-    audience = audience.filter(r => r.email.toLowerCase() === sendOnlyTo.toLowerCase())
-    if (audience.length === 0) {
-      console.error(`--to ${sendOnlyTo} did not match any opted-in profile. Aborting.`)
+  // --test bypasses the audience query entirely and sends to whatever --to
+  // is specified. Use for smoke tests where the test recipient is not a
+  // registered DCM user (e.g. admin@dcmgrading.com). The unsubscribe link
+  // will use a synthetic token that resolves to "invalid" on click, which
+  // is the right behavior for a non-real recipient.
+  let audience: Recipient[]
+  if (testMode) {
+    if (!sendOnlyTo) {
+      console.error('--test requires --to <email> to specify the test recipient.')
       process.exit(1)
     }
-    console.log(`Filtered to single recipient: ${audience[0].email}`)
+    audience = [{
+      user_id: 'test',
+      email: sendOnlyTo,
+      first_name: 'there',
+      unsubscribe_token: 'SMOKE_TEST_TOKEN_NOT_REAL_USED_FOR_RENDERING_CHECK_ONLY_' + Date.now(),
+    }]
+    console.log(`TEST MODE: sending one email to ${sendOnlyTo} (audience query skipped)`)
+  } else {
+    audience = await loadAudience()
+    console.log(`Audience: ${audience.length} opted-in recipients`)
+
+    if (sendOnlyTo) {
+      audience = audience.filter(r => r.email.toLowerCase() === sendOnlyTo.toLowerCase())
+      if (audience.length === 0) {
+        console.error(`--to ${sendOnlyTo} did not match any opted-in profile. Aborting.`)
+        console.error(`To send to a non-audience recipient (e.g. for smoke testing), add --test.`)
+        process.exit(1)
+      }
+      console.log(`Filtered to single recipient: ${audience[0].email}`)
+    }
   }
 
   const alreadySent = await loadAlreadySent()
