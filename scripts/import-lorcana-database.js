@@ -16,6 +16,9 @@
  *   - SUPABASE_SERVICE_ROLE_KEY
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+
 const { createClient } = require('@supabase/supabase-js');
 
 // Configuration
