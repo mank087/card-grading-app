@@ -240,11 +240,16 @@ async function main() {
     }
   }
 
-  const alreadySent = await loadAlreadySent()
-  if (alreadySent.size > 0) {
-    console.log(`Resuming: ${alreadySent.size} previously-sent emails will be skipped`)
+  // Resume-from-log only applies to real campaign runs. Smoke tests should
+  // be able to re-send to the same test address freely, so --test bypasses
+  // the dedup-against-log step.
+  if (!testMode) {
+    const alreadySent = await loadAlreadySent()
+    if (alreadySent.size > 0) {
+      console.log(`Resuming: ${alreadySent.size} previously-sent emails will be skipped`)
+    }
+    audience = audience.filter(r => !alreadySent.has(r.email))
   }
-  audience = audience.filter(r => !alreadySent.has(r.email))
 
   if (limit && audience.length > limit) {
     audience = audience.slice(0, limit)
