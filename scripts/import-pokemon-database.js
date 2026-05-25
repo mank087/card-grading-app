@@ -17,6 +17,9 @@
  *   - SUPABASE_SERVICE_ROLE_KEY
  */
 
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '..', '.env.local') });
+
 const { createClient } = require('@supabase/supabase-js');
 
 // Configuration
@@ -154,14 +157,35 @@ async function importCards(options = {}) {
   let totalErrors = 0;
   let hasMore = true;
 
-  // Build query for incremental imports
+  // Build query for incremental imports.
+  //
+  // The pokemontcg.io API doesn't support range queries on set.releaseDate
+  // from the /cards endpoint (returns 0 for dash format, 400 for slash). It
+  // does support filtering cards by exact set.id, so for --incremental we
+  // pull all sets, filter by date locally, then query cards by set.id OR.
   let query = '';
   if (incrementalDays) {
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - incrementalDays);
+    const setsResp = await fetchFromApi('/sets?orderBy=-releaseDate&pageSize=250');
+    const newSetIds = (setsResp.data || [])
+      .filter(s => {
+        if (!s.releaseDate) return false;
+        // API formats releaseDate as "2026/05/22"; new Date() parses that
+        // correctly in Node.
+        const d = new Date(s.releaseDate);
+        return !isNaN(d.getTime()) && d >= cutoffDate;
+      })
+      .map(s => s.id);
+
     const dateStr = cutoffDate.toISOString().split('T')[0];
-    query = `?q=set.releaseDate:[${dateStr} TO *]&orderBy=set.releaseDate`;
-    console.log(`Incremental import: Cards from sets released after ${dateStr}`);
+    if (newSetIds.length === 0) {
+      console.log(`Incremental import: no sets released after ${dateStr}`);
+      return { imported: 0, errors: 0 };
+    }
+    console.log(`Incremental import: ${newSetIds.length} set(s) released after ${dateStr}: ${newSetIds.join(', ')}`);
+    const setQuery = newSetIds.map(id => `set.id:${id}`).join(' OR ');
+    query = `?q=${encodeURIComponent(setQuery)}&orderBy=set.releaseDate`;
   } else {
     query = '?orderBy=set.releaseDate';
     console.log('Full import: All cards');
