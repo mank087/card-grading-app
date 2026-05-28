@@ -20,7 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 const CRON_SECRET = process.env.CRON_SECRET;
-const DAILY_CAP = 50;
+const DAILY_CAP = 300;
 const INACTIVITY_DAYS = 14;
 
 interface EligibleUser {
@@ -115,7 +115,7 @@ async function findEligibleUsers(limit: number): Promise<EligibleUser[]> {
     .from('user_credits')
     .select('user_id, total_purchased')
     .eq('total_purchased', 0)
-    .limit(500); // pull a generous batch; we filter further below
+    .limit(2000); // pull a generous batch; we filter further below to find DAILY_CAP eligible
 
   if (candErr || !candidates) {
     console.error('[WinbackCron] Candidate fetch failed:', candErr);
