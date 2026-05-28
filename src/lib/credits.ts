@@ -96,13 +96,13 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
     return null;
   }
 
-  // If no credits record exists, create one with 1 free signup credit
+  // If no credits record exists, create one with 2 free signup credits
   if (!data) {
     const { data: newCredits, error: createError } = await supabase
       .from('user_credits')
       .insert({
         user_id: userId,
-        balance: 1, // 1 free credit for signing up
+        balance: 2, // 2 free credits for signing up
         total_purchased: 0,
         total_used: 0,
         first_purchase_bonus_claimed: false,
@@ -123,9 +123,9 @@ export async function getUserCredits(userId: string): Promise<UserCredits | null
       const { error: transactionError } = await supabase.from('credit_transactions').insert({
         user_id: userId,
         type: 'bonus',
-        amount: 1,
-        balance_after: 1,
-        description: 'Welcome bonus - 1 free credit for signing up',
+        amount: 2,
+        balance_after: 2,
+        description: 'Welcome bonus - 2 free credits for signing up',
         metadata: { bonus_type: 'signup' },
       });
 

@@ -2,7 +2,7 @@ import { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'DCM - Grade Your First Card',
-  description: 'Learn how to grade your first trading card with DCM Grading. Get tips on photo quality, defect reporting, and see example grading results. Start with 1 free credit!',
+  description: 'Learn how to grade your first trading card with DCM Grading. Get tips on photo quality, defect reporting, and see example grading results. Start with 2 free credits!',
   openGraph: {
     title: 'Grade Your First Card | DCM Grading',
     description: 'Learn how to grade your first trading card with DCM Grading. Get tips on photo quality, defect reporting, and see example grading results.',

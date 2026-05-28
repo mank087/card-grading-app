@@ -108,6 +108,26 @@ function CreditsPageContent() {
     return () => window.removeEventListener('pageshow', handlePageShow)
   }, [])
 
+  // Fire credits_pricing_viewed once per page load. Lets us measure how often
+  // users reach the pricing surface vs. actually convert (handlePurchase fires
+  // begin_checkout below).
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if ((window as any).gtag) {
+        (window as any).gtag('event', 'credits_pricing_viewed', {
+          event_category: 'conversion',
+        })
+      }
+      if ((window as any).fbq) {
+        (window as any).fbq('track', 'ViewContent', {
+          content_type: 'pricing_page',
+          content_name: 'Credits Pricing',
+        })
+      }
+      console.log('[Credits] credits_pricing_viewed event tracked')
+    }
+  }, [])
+
   useEffect(() => {
     const session = getStoredSession()
     // Set authentication state but don't redirect - page works for everyone
@@ -402,7 +422,7 @@ function CreditsPageContent() {
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">1</div>
                       <p className="font-semibold">Create Your Account</p>
-                      <p className="text-sm text-white/70">Get 1 free credit</p>
+                      <p className="text-sm text-white/70">Get 2 free credits</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">2</div>
@@ -420,7 +440,7 @@ function CreditsPageContent() {
                     <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
-                    <span>Sign up and get 1 FREE credit to grade your first card!</span>
+                    <span>Sign up and get 2 FREE credits to grade your first cards!</span>
                   </div>
                 </div>
               </div>
@@ -447,7 +467,7 @@ function CreditsPageContent() {
                     Welcome to DCM Grading!
                   </h2>
                   <p className="text-lg text-white/90 mb-6 max-w-2xl mx-auto">
-                    Your account is ready with 1 free credit! Upload your first card to get started.
+                    Your account is ready with 2 free credits! Upload your first card to get started.
                     Our DCM Optic™ grading system analyzes centering, corners, edges, and surface quality.
                   </p>
 
@@ -455,8 +475,8 @@ function CreditsPageContent() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto mb-6">
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">1</div>
-                      <p className="font-semibold">Use Your Free Credit</p>
-                      <p className="text-sm text-white/70">You have 1 credit ready</p>
+                      <p className="font-semibold">Use Your Free Credits</p>
+                      <p className="text-sm text-white/70">You have 2 credits ready</p>
                     </div>
                     <div className="bg-white/10 rounded-xl p-4">
                       <div className="text-3xl mb-2">2</div>
@@ -474,7 +494,7 @@ function CreditsPageContent() {
                     <svg className="w-5 h-5 text-green-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
                     </svg>
-                    <span>Your free credit is ready - grade your first card now!</span>
+                    <span>Your free credits are ready - grade your first card now!</span>
                   </div>
                 </div>
               </div>

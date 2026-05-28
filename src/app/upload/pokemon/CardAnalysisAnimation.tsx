@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useGradingQueue } from '@/contexts/GradingQueueContext'
@@ -108,6 +108,7 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, 
   }, [showCarousel])
 
   // Auto-redirect when the uploaded card completes grading
+  const gradeCompleteFiredRef = useRef(false)
   useEffect(() => {
     if (!cardId || !category) return
 
@@ -116,6 +117,24 @@ export default function PokemonCardAnalysisAnimation({ frontImageUrl, cardName, 
 
     if (queueCard && queueCard.status === 'completed' && queueCard.resultUrl) {
       console.log('[PokemonCardAnalysisAnimation] Card grading completed! Auto-redirecting to:', queueCard.resultUrl)
+
+      // Fire grade_complete conversion event exactly once per card (see Sports variant for context).
+      if (!gradeCompleteFiredRef.current && typeof window !== 'undefined') {
+        gradeCompleteFiredRef.current = true
+        if ((window as any).gtag) {
+          (window as any).gtag('event', 'grade_complete', {
+            event_category: 'conversion',
+            card_category: category,
+            card_id: cardId,
+          })
+        }
+        if ((window as any).fbq) {
+          (window as any).fbq('trackCustom', 'GradeComplete', {
+            card_category: category,
+          })
+        }
+        console.log('[PokemonCardAnalysisAnimation] grade_complete event tracked:', category)
+      }
 
       // Redirect immediately for faster UX
       router.push(queueCard.resultUrl!)

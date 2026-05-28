@@ -995,6 +995,23 @@ function UniversalUploadPageContent() {
 
   // 💳 Show no-credits screen if user has 0 credits (block upload flow early)
   if (!creditsLoading && balance === 0 && !isUploading) {
+    // Fire paywall_seen for the full-page Credits Required block (distinct
+    // surface from the bottom banner — both fire so we can compare).
+    if (typeof window !== 'undefined' && !(window as any).__dcm_paywall_upload_fired) {
+      (window as any).__dcm_paywall_upload_fired = true
+      if ((window as any).gtag) {
+        (window as any).gtag('event', 'paywall_seen', {
+          event_category: 'conversion',
+          paywall_type: 'upload_blocked',
+        })
+      }
+      if ((window as any).fbq) {
+        (window as any).fbq('trackCustom', 'PaywallSeen', {
+          paywall_type: 'upload_blocked',
+        })
+      }
+      console.log('[Upload] paywall_seen (upload_blocked) tracked')
+    }
     return (
       <main className="flex min-h-screen flex-col items-center justify-center p-4 md:p-8 bg-gradient-to-br from-gray-50 to-purple-50">
         <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">

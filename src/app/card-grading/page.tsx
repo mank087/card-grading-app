@@ -315,7 +315,7 @@ export default function CardGradingLanding() {
                           <span className="text-2xl">🎁</span>
                           <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
                         </div>
-                        <p className="text-green-300 text-xs mt-1">1 free credit on signup</p>
+                        <p className="text-green-300 text-xs mt-1">2 free credits on signup</p>
                       </div>
                     </div>
 
@@ -554,7 +554,7 @@ export default function CardGradingLanding() {
                         <span className="text-2xl">🎁</span>
                         <span className="text-white font-bold text-xl">Grade Your First Card Free</span>
                       </div>
-                      <p className="text-green-300 text-xs mt-1">1 free credit on signup</p>
+                      <p className="text-green-300 text-xs mt-1">2 free credits on signup</p>
                     </div>
                   </div>
 
@@ -928,7 +928,7 @@ export default function CardGradingLanding() {
             <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-full px-5 py-2 shadow-lg">
                 <span className="text-lg">🎁</span>
-                <span className="font-semibold">1 Free Credit at Signup</span>
+                <span className="font-semibold">2 Free Credits at Signup</span>
               </div>
               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-full px-5 py-2 shadow-lg">
                 <span className="text-lg">🎉</span>

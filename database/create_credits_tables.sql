@@ -7,7 +7,7 @@
 CREATE TABLE IF NOT EXISTS user_credits (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
-  balance INTEGER DEFAULT 1 NOT NULL CHECK (balance >= 0),  -- Start with 1 free signup credit
+  balance INTEGER DEFAULT 2 NOT NULL CHECK (balance >= 0),  -- Start with 2 free signup credits
   total_purchased INTEGER DEFAULT 0 NOT NULL,
   total_used INTEGER DEFAULT 0 NOT NULL,
   first_purchase_bonus_claimed BOOLEAN DEFAULT FALSE,
@@ -80,19 +80,19 @@ CREATE TRIGGER trigger_update_user_credits_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_user_credits_updated_at();
 
--- Function to initialize credits for new users with 1 free signup credit
+-- Function to initialize credits for new users with 2 free signup credits
 -- IMPORTANT: Use public. schema prefix for tables
 CREATE OR REPLACE FUNCTION public.initialize_user_credits()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Insert user credits record with 1 free signup credit
+  -- Insert user credits record with 2 free signup credits
   INSERT INTO public.user_credits (user_id, balance, total_purchased, total_used)
-  VALUES (NEW.id, 1, 0, 0)
+  VALUES (NEW.id, 2, 0, 0)
   ON CONFLICT (user_id) DO NOTHING;
 
   -- Log the signup bonus transaction
   INSERT INTO public.credit_transactions (user_id, type, amount, balance_after, description, metadata)
-  VALUES (NEW.id, 'bonus', 1, 1, 'Welcome bonus - 1 free credit for signing up', '{"bonus_type": "signup"}'::jsonb);
+  VALUES (NEW.id, 'bonus', 2, 2, 'Welcome bonus - 2 free credits for signing up', '{"bonus_type": "signup"}'::jsonb);
 
   RETURN NEW;
 EXCEPTION WHEN OTHERS THEN

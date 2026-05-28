@@ -355,7 +355,7 @@ export default async function CardShowsPage() {
             Ready to Grade at Your Next Show?
           </h2>
           <p className="text-xl text-gray-300 mb-8 max-w-2xl mx-auto">
-            Sign up now and get 1 free credit to try DCM Grading at any card show.
+            Sign up now and get 2 free credits to try DCM Grading at any card show.
           </p>
           <Link
             href="/login?mode=signup&redirect=/credits"

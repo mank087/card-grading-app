@@ -50,7 +50,7 @@ export default function GradeYourFirstCardPage() {
               Welcome to DCM Grading!
             </h1>
             <p className="text-xl text-white/90 mb-6 max-w-2xl mx-auto">
-              You have <span className="font-bold text-yellow-300">1 free credit</span> to grade your first card.
+              You have <span className="font-bold text-yellow-300">2 free credits</span> to grade your first cards.
               Here&apos;s everything you need to know to get started.
             </p>
 
@@ -584,7 +584,7 @@ export default function GradeYourFirstCardPage() {
           <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-8 sm:p-12 text-white">
             <h2 className="text-2xl sm:text-3xl font-bold mb-4">Ready to Grade Your First Card?</h2>
             <p className="text-lg text-white/90 mb-8 max-w-xl mx-auto">
-              You have 1 free credit waiting. Select your card type and start grading in seconds!
+              You have 2 free credits waiting. Select your card type and start grading in seconds!
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link

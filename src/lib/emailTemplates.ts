@@ -19,7 +19,7 @@
  * 24-Hour Follow-Up Email Subject
  */
 export function getFollowUp24hEmailSubject(): string {
-  return "Your free credit is still waiting — plus 10% off inside";
+  return "Your free credits are still waiting — plus 10% off inside";
 }
 
 /**
@@ -37,7 +37,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="x-apple-disable-message-reformatting">
-  <title>Your Free Credit Is Still Waiting — DCM Grading</title>
+  <title>Your Free Credits Are Still Waiting — DCM Grading</title>
   <!--[if mso]>
   <noscript>
     <xml>
@@ -77,7 +77,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
 
   <!-- Preview text -->
   <div style="display: none; max-height: 0; overflow: hidden;">
-    Your free credit is still waiting &mdash; plus 10% off your first purchase with code Grade10.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
+    Your free credits are still waiting &mdash; plus 10% off your first purchase with code Grade10.&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;
   </div>
 
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f3f4f6;">
@@ -125,7 +125,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                   <!-- Center hero content -->
                   <td align="center" style="padding: 40px 15px 35px 15px;">
                     <p style="color: #34d399; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 10px 0;">&#9201; Don&rsquo;t Miss Out</p>
-                    <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Your Free Credit Is<br><span style="color: #34d399;">Still Waiting</span></h1>
+                    <h1 class="hero-h1" style="color: #ffffff; font-size: 28px; margin: 0 0 12px 0; font-weight: 800; line-height: 1.25;">Your Free Credits Are<br><span style="color: #34d399;">Still Waiting</span></h1>
                     <p style="color: #9ca3af; font-size: 15px; margin: 0 0 8px 0; line-height: 1.6;">Grade your first card in under 60 seconds.<br>No mailing. No waiting. Results in minutes.</p>
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 24px 0;">DCM Optic&trade; multi-pass grading &bull; Detailed reports &bull; Market pricing</p>
 
@@ -147,7 +147,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                 </tr>
               </table>
               <!--<![endif]-->
-              <p style="color: #4b5563; font-size: 12px; margin: 12px 0 0 0;">Your first credit is on us &bull; No card required</p>
+              <p style="color: #4b5563; font-size: 12px; margin: 12px 0 0 0;">Your first 2 credits are on us &bull; No card required</p>
                   </td>
                   <!-- Right cards (hidden on mobile) -->
                   <td width="90" align="center" valign="middle" class="hero-cards-col" style="padding: 20px 8px 20px 0;">
@@ -165,7 +165,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
           <tr>
             <td bgcolor="#059669" style="padding: 0;">
               <a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=free-credits-banner" style="display: block; text-decoration: none; padding: 14px 20px;">
-                <p style="color: #ffffff; font-size: 15px; font-weight: 700; margin: 0; text-align: center;">&#127881; You still have a FREE credit &mdash; use it anytime!</p>
+                <p style="color: #ffffff; font-size: 15px; font-weight: 700; margin: 0; text-align: center;">&#127881; You still have FREE credits &mdash; use them anytime!</p>
               </a>
             </td>
           </tr>
@@ -539,7 +539,7 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#065f46" style="border-radius: 10px;">
                 <tr>
                   <td align="center" class="pad-mobile" style="padding: 28px 30px;">
-                    <p style="color: #ffffff; font-size: 22px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Don&rsquo;t Let That Free Credit<br>Go to Waste!</p>
+                    <p style="color: #ffffff; font-size: 22px; margin: 0 0 8px 0; font-weight: 800; line-height: 1.3;">Don&rsquo;t Let Those Free Credits<br>Go to Waste!</p>
                     <p style="color: #d1fae5; font-size: 14px; margin: 0 0 6px 0; line-height: 1.5;">
                       Grade your first card in under 60 seconds.<br>Plus, save 10% on your first purchase with code <strong style="color: #ffffff;">Grade10</strong>.
                     </p>

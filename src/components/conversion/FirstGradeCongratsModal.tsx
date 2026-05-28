@@ -60,6 +60,25 @@ export function FirstGradeCongratsModal({
       await navigator.clipboard.writeText(PROMO_CODE)
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
+
+      // Fire promo_code_applied as a strong-intent signal — user actively
+      // grabbed the code, meaning they're at least considering purchase.
+      if (typeof window !== 'undefined') {
+        if ((window as any).gtag) {
+          (window as any).gtag('event', 'promo_code_applied', {
+            event_category: 'conversion',
+            promo_code: PROMO_CODE,
+            source: `congrats_modal_${variant}`,
+          })
+        }
+        if ((window as any).fbq) {
+          (window as any).fbq('trackCustom', 'PromoCodeApplied', {
+            promo_code: PROMO_CODE,
+            source: `congrats_modal_${variant}`,
+          })
+        }
+        console.log('[FirstGradeCongratsModal] promo_code_applied event tracked:', PROMO_CODE)
+      }
     } catch (err) {
       console.error('Failed to copy promo code:', err)
     }

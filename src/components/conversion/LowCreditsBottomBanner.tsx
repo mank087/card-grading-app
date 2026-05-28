@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 interface LowCreditsBottomBannerProps {
@@ -13,6 +13,7 @@ const BANNER_DISMISS_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
 export function LowCreditsBottomBanner({ balance, isFirstPurchase = false }: LowCreditsBottomBannerProps) {
   const [isDismissed, setIsDismissed] = useState(true) // Start hidden to prevent flash
+  const paywallFiredRef = useRef(false)
 
   useEffect(() => {
     // Check if banner was dismissed recently
@@ -31,6 +32,29 @@ export function LowCreditsBottomBanner({ balance, isFirstPurchase = false }: Low
       setIsDismissed(false)
     }
   }, [balance])
+
+  // Fire paywall_seen once per page lifetime when the banner actually renders.
+  // Tracked here (not just upload page) so we capture all 0-credit views across the app.
+  useEffect(() => {
+    if (isDismissed || balance > 0) return
+    if (paywallFiredRef.current) return
+    paywallFiredRef.current = true
+    if (typeof window !== 'undefined') {
+      if ((window as any).gtag) {
+        (window as any).gtag('event', 'paywall_seen', {
+          event_category: 'conversion',
+          paywall_type: 'low_credits_banner',
+          is_first_purchase: isFirstPurchase,
+        })
+      }
+      if ((window as any).fbq) {
+        (window as any).fbq('trackCustom', 'PaywallSeen', {
+          paywall_type: 'low_credits_banner',
+        })
+      }
+      console.log('[LowCreditsBottomBanner] paywall_seen event tracked')
+    }
+  }, [isDismissed, balance, isFirstPurchase])
 
   const handleDismiss = () => {
     localStorage.setItem(BANNER_DISMISSED_KEY, Date.now().toString())

@@ -132,7 +132,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
           <tr>
             <td bgcolor="#059669" style="padding: 0;">
               <a href="https://dcmgrading.com/credits?utm_source=email&utm_medium=email&utm_campaign=welcome&utm_content=free-credits-banner" style="display: block; text-decoration: none; padding: 14px 20px;">
-                <p style="color: #ffffff; font-size: 15px; font-weight: 700; margin: 0; text-align: center;">&#127881; You have a FREE credit waiting &mdash; grade your first card on us!</p>
+                <p style="color: #ffffff; font-size: 15px; font-weight: 700; margin: 0; text-align: center;">&#127881; You have 2 FREE credits waiting &mdash; grade your first cards on us!</p>
               </a>
             </td>
           </tr>
