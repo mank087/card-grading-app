@@ -16,9 +16,22 @@ import {
   markEmailFailed,
   markEmailSkipped,
   logEmailSend,
+  hasPurchased,
   ScheduledEmail
 } from '@/lib/emailScheduler';
 import { getFollowUp24hEmailHtml, getFollowUp24hEmailSubject } from '@/lib/emailTemplates';
+import {
+  getFirstGradeEducationHtml,
+  getFirstGradeEducationSubject,
+  getSocialProofEmailHtml,
+  getSocialProofEmailSubject,
+  getLastChanceEmailHtml,
+  getLastChanceEmailSubject,
+  getWinbackEmailHtml,
+  getWinbackEmailSubject,
+  categoryToRouteSlug,
+} from '@/lib/postGradeEmailTemplates';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -123,6 +136,18 @@ async function processScheduledEmail(
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://dcmgrading.com';
   const unsubscribeUrl = `${baseUrl}/api/unsubscribe/${unsubscribeToken}`;
 
+  // Audience filter for post-grade series: skip if user has already purchased.
+  // Cheaper to check once here than to send an email the user doesn't need.
+  const isPostGradeType = email.email_type.startsWith('first_grade_') || email.email_type === 'winback';
+  if (isPostGradeType) {
+    const purchased = await hasPurchased(email.user_id);
+    if (purchased) {
+      console.log(`[Cron] Skipping ${email.email_type} for ${email.user_email} (already purchased)`);
+      await markEmailSkipped(email.id, 'User already purchased');
+      return 'skipped';
+    }
+  }
+
   // Get email content based on type
   let subject: string;
   let html: string;
@@ -132,6 +157,54 @@ async function processScheduledEmail(
       subject = getFollowUp24hEmailSubject();
       html = getFollowUp24hEmailHtml(unsubscribeUrl);
       break;
+    case 'first_grade_education': {
+      const cardData = await fetchUserFirstGradedCard(email.user_id);
+      if (!cardData) {
+        console.warn(`[Cron] No graded card found for ${email.user_email} — skipping education email`);
+        await markEmailSkipped(email.id, 'No graded card found');
+        return 'skipped';
+      }
+      const balance = await fetchUserCreditBalance(email.user_id);
+      subject = getFirstGradeEducationSubject();
+      html = getFirstGradeEducationHtml({
+        front_image_url: cardData.front_image_url,
+        card_name: cardData.card_name,
+        final_grade: cardData.final_grade,
+        category_slug: categoryToRouteSlug(cardData.category),
+        card_id: cardData.card_id,
+        centering_score: cardData.centering,
+        corners_score: cardData.corners,
+        edges_score: cardData.edges,
+        surface_score: cardData.surface,
+        credits_remaining: balance,
+        unsubscribe_url: unsubscribeUrl,
+      });
+      break;
+    }
+    case 'first_grade_social_proof':
+      subject = getSocialProofEmailSubject();
+      html = getSocialProofEmailHtml({ unsubscribe_url: unsubscribeUrl });
+      break;
+    case 'first_grade_last_chance':
+      subject = getLastChanceEmailSubject();
+      html = getLastChanceEmailHtml({ unsubscribe_url: unsubscribeUrl });
+      break;
+    case 'winback': {
+      const cardData = await fetchUserFirstGradedCard(email.user_id);
+      if (!cardData) {
+        console.warn(`[Cron] No graded card found for ${email.user_email} — skipping winback`);
+        await markEmailSkipped(email.id, 'No graded card found');
+        return 'skipped';
+      }
+      subject = getWinbackEmailSubject();
+      html = getWinbackEmailHtml({
+        front_image_url: cardData.front_image_url,
+        card_name: cardData.card_name,
+        final_grade: cardData.final_grade,
+        unsubscribe_url: unsubscribeUrl,
+      });
+      break;
+    }
     default:
       console.error(`[Cron] Unknown email type: ${email.email_type}`);
       await markEmailFailed(email.id, `Unknown email type: ${email.email_type}`);
@@ -182,4 +255,83 @@ async function processScheduledEmail(
 // Also support POST for manual triggers (admin use)
 export async function POST(request: NextRequest) {
   return GET(request);
+}
+
+// ============================================================================
+// PERSONALIZATION HELPERS
+// Used by post-grade email types to fetch the user's first graded card and
+// generate a signed Supabase Storage URL for the card image in the email.
+// ============================================================================
+
+interface FirstGradedCard {
+  card_id: string;
+  card_name: string;
+  category: string;
+  front_image_url: string;
+  final_grade: number | string;
+  centering: number | string;
+  corners: number | string;
+  edges: number | string;
+  surface: number | string;
+}
+
+async function fetchUserFirstGradedCard(userId: string): Promise<FirstGradedCard | null> {
+  try {
+    const { data: card, error } = await supabaseAdmin
+      .from('cards')
+      .select('id, card_name, category, front_path, conversational_whole_grade, conversational_sub_scores')
+      .eq('user_id', userId)
+      .not('conversational_whole_grade', 'is', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !card) {
+      console.warn('[Cron] fetchUserFirstGradedCard found nothing for', userId, error?.message);
+      return null;
+    }
+
+    // Generate a 7-day signed URL for the front image so it's loadable
+    // when the user opens the email (Gmail/Apple Mail proxy + cache too).
+    let frontImageUrl = '';
+    if (card.front_path) {
+      const { data: signed } = await supabaseAdmin.storage
+        .from('cards')
+        .createSignedUrl(card.front_path, 60 * 60 * 24 * 7);
+      frontImageUrl = signed?.signedUrl || '';
+    }
+    if (!frontImageUrl) {
+      console.warn('[Cron] No signed URL for card', card.id);
+      return null;
+    }
+
+    const subs = (card.conversational_sub_scores ?? {}) as Record<string, { weighted?: number }>;
+    return {
+      card_id: card.id,
+      card_name: card.card_name || 'Your card',
+      category: card.category || 'Other',
+      front_image_url: frontImageUrl,
+      final_grade: card.conversational_whole_grade ?? '?',
+      centering: subs.centering?.weighted ?? '?',
+      corners: subs.corners?.weighted ?? '?',
+      edges: subs.edges?.weighted ?? '?',
+      surface: subs.surface?.weighted ?? '?',
+    };
+  } catch (err) {
+    console.error('[Cron] fetchUserFirstGradedCard error:', err);
+    return null;
+  }
+}
+
+async function fetchUserCreditBalance(userId: string): Promise<number> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('user_credits')
+      .select('balance')
+      .eq('user_id', userId)
+      .single();
+    return data?.balance ?? 0;
+  } catch {
+    return 0;
+  }
 }

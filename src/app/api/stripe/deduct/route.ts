@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { deductCredit, hasCredits } from '@/lib/credits';
 import { verifyAuth } from '@/lib/serverAuth';
+import { scheduleFirstGradeEmails } from '@/lib/emailScheduler';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +47,30 @@ export async function POST(request: NextRequest) {
         { error: result.error || 'Failed to deduct credit' },
         { status: 500 }
       );
+    }
+
+    // First-grade trigger: queue the 3-email post-grade series the moment a user
+    // grades their first card (totalUsed transitions 0 → 1). Fire-and-forget —
+    // we don't block the grade deduction on email scheduling.
+    // Skip for re-grades since those don't represent a new conversion event.
+    if (!isRegrade && result.totalUsed === 1) {
+      (async () => {
+        try {
+          let userEmail = authResult.user?.email;
+          if (!userEmail) {
+            // Fallback: look up email from auth.users if verifyAuth didn't include it.
+            const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(userId);
+            userEmail = authUser?.user?.email;
+          }
+          if (userEmail) {
+            await scheduleFirstGradeEmails(userId, userEmail);
+          } else {
+            console.warn('[Deduct] First grade trigger: no email available for user', userId);
+          }
+        } catch (err) {
+          console.error('[Deduct] First grade email scheduling failed:', err);
+        }
+      })();
     }
 
     return NextResponse.json({

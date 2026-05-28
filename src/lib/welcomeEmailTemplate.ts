@@ -569,6 +569,7 @@ export function getWelcomeEmailHtml(_params?: { name?: string | null }): string 
                 <tr>
                   <td align="center">
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0;">Questions? <a href="mailto:admin@dcmgrading.com" style="color: #059669; text-decoration: none;">admin@dcmgrading.com</a></p>
+                    <p style="color: #9ca3af; font-size: 12px; margin: 0 0 8px 0; line-height: 1.5;">If you grade a card, we&rsquo;ll send a few short follow-ups over the next two weeks, then stop.</p>
                     <p style="color: #9ca3af; font-size: 11px; margin: 0 0 10px 0;">&copy; 2026 DCM Grading. All rights reserved.</p>
                   </td>
                 </tr>

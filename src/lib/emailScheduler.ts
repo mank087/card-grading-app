@@ -64,6 +64,87 @@ export async function scheduleFollowUpEmail(
 }
 
 /**
+ * Schedule the three post-first-grade emails for a user.
+ * Idempotent: if rows already exist for this user/email_type, the unique
+ * constraint on email_schedule will reject duplicates and we treat that
+ * as success (the series is already queued).
+ *
+ * Win-back (email 5) is NOT scheduled here. It's driven by the daily
+ * send-winback-emails cron, which scans for inactive users that match
+ * the audience filter.
+ */
+export async function scheduleFirstGradeEmails(
+  userId: string,
+  userEmail: string
+): Promise<{ success: boolean; scheduledCount: number; error?: string }> {
+  try {
+    const now = new Date();
+    const rows = [
+      {
+        email_type: 'first_grade_education',
+        hours: 24,
+      },
+      {
+        email_type: 'first_grade_social_proof',
+        hours: 72,
+      },
+      {
+        email_type: 'first_grade_last_chance',
+        hours: 24 * 7,
+      },
+    ];
+
+    let scheduledCount = 0;
+    for (const row of rows) {
+      const scheduledFor = new Date(now);
+      scheduledFor.setHours(scheduledFor.getHours() + row.hours);
+      const { error } = await supabaseAdmin
+        .from('email_schedule')
+        .insert({
+          user_id: userId,
+          user_email: userEmail,
+          email_type: row.email_type,
+          scheduled_for: scheduledFor.toISOString(),
+          status: 'pending',
+        });
+      if (error) {
+        // 23505 = unique violation = already scheduled, treat as no-op
+        if (error.code === '23505') {
+          console.log(`[EmailScheduler] ${row.email_type} already queued for ${userEmail}`);
+          continue;
+        }
+        throw error;
+      }
+      scheduledCount++;
+    }
+    console.log(`[EmailScheduler] Queued ${scheduledCount} post-grade emails for ${userEmail}`);
+    return { success: true, scheduledCount };
+  } catch (error: any) {
+    console.error('[EmailScheduler] scheduleFirstGradeEmails error:', error);
+    return { success: false, scheduledCount: 0, error: error.message };
+  }
+}
+
+/**
+ * Has the user ever made a credit purchase? Used as an audience filter
+ * at SEND time: post-grade emails should skip users who already converted.
+ */
+export async function hasPurchased(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('user_credits')
+      .select('total_purchased')
+      .eq('user_id', userId)
+      .single();
+    if (error || !data) return false;
+    return (data.total_purchased ?? 0) > 0;
+  } catch (error) {
+    console.error('[EmailScheduler] hasPurchased error:', error);
+    return false;
+  }
+}
+
+/**
  * Get pending emails that are due to be sent
  */
 export async function getPendingEmails(limit: number = 50): Promise<ScheduledEmail[]> {
