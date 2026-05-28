@@ -70,6 +70,8 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
       .hero-h1 { font-size: 24px !important; }
       .feature-col { display: block !important; width: 100% !important; max-width: 100% !important; margin-bottom: 16px !important; }
       .step-col { display: block !important; width: 100% !important; text-align: center !important; margin-bottom: 20px !important; }
+      .badge-stack { display: block !important; width: 100% !important; text-align: center !important; }
+      .badge-stack td { display: inline-block !important; padding: 5px !important; }
     }
   </style>
 </head>
@@ -528,6 +530,34 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
               <p style="text-align: center; margin: 4px 0 0 0;">
                 <a href="https://dcmgrading.com/card-lovers?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=card-lovers-link" style="color: #be185d; font-size: 12px; text-decoration: underline; font-family: Arial, Helvetica, sans-serif;">Looking for more? Check out Card Lovers &hearts; &mdash; 900 credits/yr at $0.50/grade</a>
               </p>
+            </td>
+          </tr>
+
+          <!-- ============================================ -->
+          <!-- MOBILE APP CALLOUT                           -->
+          <!-- ============================================ -->
+          <tr>
+            <td style="padding: 24px 30px 24px 30px; background-color: #f9fafb;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td align="center">
+                    <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 6px 0;">&#128241; Web &middot; iPhone &middot; Android</p>
+                    <p style="color: #111827; font-size: 17px; font-weight: 800; margin: 0 0 6px 0; line-height: 1.3;">Grading is easier from your phone.</p>
+                    <p style="color: #6b7280; font-size: 13px; margin: 0 0 16px 0; line-height: 1.6;">Same account, same credits, same Label Studio. Snap a card and get your grade in minutes.</p>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="badge-stack" style="margin: 0 auto 10px auto;">
+                      <tr>
+                        <td align="center" valign="middle" style="padding: 0 6px;">
+                          <a href="https://apps.apple.com/us/app/dcm-grading/id6768663163?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=mobile-badge-apple" style="text-decoration: none;"><img src="https://dcmgrading.com/app-store-badge/Download_on_the_App_Store_Badge_US-UK_RGB_blk.png" alt="Download on the App Store" width="160" height="54" style="display: block; width: 160px; height: 54px;"></a>
+                        </td>
+                        <td align="center" valign="middle" style="padding: 0 6px;">
+                          <a href="https://play.google.com/store/apps/details?id=com.dcmgrading.app&utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=mobile-badge-google" style="text-decoration: none;"><img src="https://dcmgrading.com/app-store-badge/GetItOnGooglePlay_Badge_Web_color_English.png" alt="Get it on Google Play" width="160" height="48" style="display: block; width: 160px; height: 48px;"></a>
+                        </td>
+                      </tr>
+                    </table>
+                    <p style="color: #9ca3af; font-size: 11px; margin: 0; line-height: 1.5;">Prefer the browser? <a href="https://dcmgrading.com/upload?utm_source=email&utm_medium=email&utm_campaign=followup_24h&utm_content=mobile-web-link" style="color: #059669; text-decoration: underline; font-weight: 700;">Use DCM on the web</a></p>
+                  </td>
+                </tr>
+              </table>
             </td>
           </tr>
 

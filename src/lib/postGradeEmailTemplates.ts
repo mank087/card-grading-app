@@ -99,6 +99,8 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
       .hero-h1 { font-size: 24px !important; }
       .grade-card-col { display: block !important; width: 100% !important; max-width: 320px !important; margin: 0 auto 20px auto !important; }
       .sub-grade-col { display: block !important; width: 100% !important; margin-bottom: 12px !important; }
+      .badge-stack { display: block !important; width: 100% !important; text-align: center !important; }
+      .badge-stack td { display: inline-block !important; padding: 5px !important; }
     }
   </style>
 </head>
@@ -169,6 +171,11 @@ export function getFirstGradeEducationHtml(data: FirstGradeEducationData): strin
             <td width="33%" align="center" valign="top" class="sub-grade-col" style="padding: 0 6px;"><div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 18px 12px;"><p style="color: #059669; font-size: 28px; margin: 0 0 6px 0; font-weight: 800;">3</p><p style="color: #111827; font-size: 13px; font-weight: 700; margin: 0 0 4px 0;">Third Pass</p><p style="color: #4b5563; font-size: 12px; margin: 0; line-height: 1.5;">Final verification &amp; reconcile.</p></div></td>
           </tr></table>
         </td></tr>
+        ${renderMobileCallout({
+          headline: 'Better photos in your pocket.',
+          tagline: 'The DCM app uses your phone&rsquo;s camera with grading-specific framing guides. Sharper photos lead to more accurate grades.',
+          utmCampaign: 'post_grade_education',
+        })}
         <tr><td class="pad-mobile" style="padding: 10px 30px 0 30px;"><hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 0;"></td></tr>
         <tr><td class="pad-mobile" style="padding: 28px 30px 6px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Everything In Your Report</p>
@@ -235,6 +242,8 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
       .hero-h1 { font-size: 24px !important; }
       .feat-col { display: block !important; width: 100% !important; margin-bottom: 16px !important; }
       .tool-col { display: block !important; width: 100% !important; margin-bottom: 16px !important; }
+      .badge-stack { display: block !important; width: 100% !important; text-align: center !important; }
+      .badge-stack td { display: inline-block !important; padding: 5px !important; }
     }
   </style>
 </head>
@@ -297,6 +306,11 @@ export function getSocialProofEmailHtml(data: SocialProofEmailData): string {
             </tr>
           </table>
         </td></tr>
+        ${renderMobileCallout({
+          headline: 'Grade from anywhere.',
+          tagline: 'The DCM app has your full collection, your labels, and your eBay listings. Same account on web, iPhone, and Android.',
+          utmCampaign: 'post_grade_social',
+        })}
         <tr><td class="pad-mobile-sm" style="padding: 22px 30px 6px 30px;">
           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border: 2px dashed #34d399; border-radius: 12px; overflow: hidden;"><tr>
             <td bgcolor="#f0fdf4" style="padding: 22px 24px;" align="center">
@@ -363,6 +377,8 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
       .pack-col { display: block !important; width: 100% !important; margin-bottom: 12px !important; }
       .vip-left { display: block !important; width: 100% !important; padding-bottom: 16px !important; text-align: center !important; }
       .vip-right { display: block !important; width: 100% !important; text-align: center !important; }
+      .badge-stack { display: block !important; width: 100% !important; text-align: center !important; }
+      .badge-stack td { display: inline-block !important; padding: 5px !important; }
     }
   </style>
 </head>
@@ -463,6 +479,11 @@ export function getLastChanceEmailHtml(data: LastChanceEmailData): string {
             </td>
           </tr></table>
         </td></tr>
+        ${renderMobileCallout({
+          headline: 'Buy credits in the app too.',
+          tagline: 'GRADE20 works the same way. Same account, same balance, same Label Studio. Pick up where you left off on your phone.',
+          utmCampaign: 'post_grade_last_chance',
+        })}
         ${renderFooter('After this email you&rsquo;ll hear from us once more in a week, then we&rsquo;ll stop.', data.unsubscribe_url)}
       </table>
       <!--[if mso]></td></tr></table><![endif]-->
@@ -502,6 +523,8 @@ export function getWinbackEmailHtml(data: WinbackEmailData): string {
       .hero-h1 { font-size: 24px !important; }
       .saved-card-col { display: block !important; width: 100% !important; max-width: 320px !important; margin: 0 auto 20px auto !important; }
       .miss-col { display: block !important; width: 100% !important; margin-bottom: 12px !important; }
+      .badge-stack { display: block !important; width: 100% !important; text-align: center !important; }
+      .badge-stack td { display: inline-block !important; padding: 5px !important; }
     }
   </style>
 </head>
@@ -547,6 +570,11 @@ export function getWinbackEmailHtml(data: WinbackEmailData): string {
             <p style="color: #d1fae5; font-size: 13px; margin: 0; text-align: center;">Grade another card on us. No purchase required.</p>
           </a>
         </td></tr>
+        ${renderMobileCallout({
+          headline: 'Want to make coming back easy?',
+          tagline: 'The DCM app remembers everything. Open it, snap a card, get your grade in minutes.',
+          utmCampaign: 'post_grade_winback',
+        })}
         <tr><td class="pad-mobile" style="padding: 30px 30px 6px 30px;">
           <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 6px 0; font-weight: 700;">Things You Haven&rsquo;t Tried Yet</p>
           <h2 style="color: #111827; font-size: 22px; margin: 0 0 16px 0; font-weight: 800;">What&rsquo;s waiting in your collection</h2>
@@ -677,6 +705,40 @@ function renderMissCard(emoji: string, title: string, body: string): string {
       <p style="color: #6b7280; font-size: 12px; margin: 0; line-height: 1.6;">${body}</p>
     </div>
   </td>`;
+}
+
+/**
+ * Cross-platform mobile callout. Renders a soft-gray section with
+ * Web · iPhone · Android positioning, Apple + Google badge images
+ * (already hosted in /public/app-store-badge), and a text fallback row
+ * for clients that block images. Used by every email in the series.
+ */
+function renderMobileCallout(opts: {
+  headline: string;
+  tagline: string;
+  utmCampaign: string;
+}): string {
+  const apple = `https://apps.apple.com/us/app/dcm-grading/id6768663163`;
+  const google = `https://play.google.com/store/apps/details?id=com.dcmgrading.app`;
+  const utm = (c: string) => `utm_source=email&utm_medium=email&utm_campaign=${opts.utmCampaign}&utm_content=${c}`;
+  return `<tr><td class="pad-mobile" style="padding: 26px 30px 26px 30px; background-color: #f9fafb;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr>
+      <td align="center">
+        <p style="color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 700; margin: 0 0 6px 0;">&#128241; Web &middot; iPhone &middot; Android</p>
+        <p style="color: #111827; font-size: 17px; font-weight: 800; margin: 0 0 6px 0; line-height: 1.3;">${opts.headline}</p>
+        <p style="color: #6b7280; font-size: 13px; margin: 0 0 16px 0; line-height: 1.6;">${opts.tagline}</p>
+        <table role="presentation" cellspacing="0" cellpadding="0" border="0" class="badge-stack" style="margin: 0 auto 10px auto;"><tr>
+          <td align="center" valign="middle" style="padding: 0 6px;">
+            <a href="${apple}?${utm('mobile-badge-apple')}" style="text-decoration: none;"><img src="https://dcmgrading.com/app-store-badge/Download_on_the_App_Store_Badge_US-UK_RGB_blk.png" alt="Download on the App Store" width="160" height="54" style="display: block; width: 160px; height: 54px;"></a>
+          </td>
+          <td align="center" valign="middle" style="padding: 0 6px;">
+            <a href="${google}&${utm('mobile-badge-google')}" style="text-decoration: none;"><img src="https://dcmgrading.com/app-store-badge/GetItOnGooglePlay_Badge_Web_color_English.png" alt="Get it on Google Play" width="160" height="48" style="display: block; width: 160px; height: 48px;"></a>
+          </td>
+        </tr></table>
+        <p style="color: #9ca3af; font-size: 11px; margin: 0; line-height: 1.5;">Already in your browser? <a href="https://dcmgrading.com/upload?${utm('mobile-web-link')}" style="color: #059669; text-decoration: underline; font-weight: 700;">Use DCM on the web</a> &middot; <a href="${apple}?${utm('mobile-text-apple')}" style="color: #6b7280; text-decoration: underline;">App Store</a> &middot; <a href="${google}&${utm('mobile-text-google')}" style="color: #6b7280; text-decoration: underline;">Google Play</a></p>
+      </td>
+    </tr></table>
+  </td></tr>`;
 }
 
 function renderFooter(intro: string, unsubscribeUrl: string): string {
