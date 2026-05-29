@@ -2718,7 +2718,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         <section className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl shadow-sm p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row gap-5 items-center">
             <a
-              href="https://www.amazon.com/100-Trading-Baseball-Protectors-Position/dp/B0C369YLLB?crid=2ZI7KJFMHLCLP&dib=eyJ2IjoiMSJ9.BlYcX8UM51mGfxY15gjq5ggscmZs8o6M6w-aovlZ7ChlCmWFH5XkbiWloO5e8s_aFtzEeSTIYzjFsYCkCWyhKbuvvja0zH1013jY5L9By0HQDJYMIyCL0Vi5s4JSTQ1N5ezUqgmRfeaOAFV1wUbPm-CAYdAbP5GAlcVZykkWkL33LQKEhtJhUaC4kDFP5O9urGD8zSwLMApCNEe6jAqLJJ-7MVznY3xTU70B9w_Rq5EuqK5JdcMW-URuPNENEg0Y-eNf13mTzYDd77TMfV7iwQ-lDUWJNnpY8alOHclgeYk.bFW5shkmpgcX7E_QOWiShCd9VOf7xdGuylQ5qpn0Z9c&dib_tag=se&keywords=graded%2Bcard%2Bslab&qid=1776355006&sprefix=graded%2Bcard%2Bslab%2Caps%2C159&sr=8-7&th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
+              href="https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
               target="_blank"
               rel="noopener noreferrer sponsored"
               className="flex-shrink-0 w-32 h-32 bg-white rounded-lg shadow-md overflow-hidden flex items-center justify-center hover:shadow-lg transition-shadow"
@@ -2738,7 +2738,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
                 Get high-quality graded card slabs to professionally display your DCM-graded cards with custom labels.
               </p>
               <a
-                href="https://www.amazon.com/100-Trading-Baseball-Protectors-Position/dp/B0C369YLLB?crid=2ZI7KJFMHLCLP&dib=eyJ2IjoiMSJ9.BlYcX8UM51mGfxY15gjq5ggscmZs8o6M6w-aovlZ7ChlCmWFH5XkbiWloO5e8s_aFtzEeSTIYzjFsYCkCWyhKbuvvja0zH1013jY5L9By0HQDJYMIyCL0Vi5s4JSTQ1N5ezUqgmRfeaOAFV1wUbPm-CAYdAbP5GAlcVZykkWkL33LQKEhtJhUaC4kDFP5O9urGD8zSwLMApCNEe6jAqLJJ-7MVznY3xTU70B9w_Rq5EuqK5JdcMW-URuPNENEg0Y-eNf13mTzYDd77TMfV7iwQ-lDUWJNnpY8alOHclgeYk.bFW5shkmpgcX7E_QOWiShCd9VOf7xdGuylQ5qpn0Z9c&dib_tag=se&keywords=graded%2Bcard%2Bslab&qid=1776355006&sprefix=graded%2Bcard%2Bslab%2Caps%2C159&sr=8-7&th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
+                href="https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
                 target="_blank"
                 rel="noopener noreferrer sponsored"
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-semibold shadow-md hover:from-amber-600 hover:to-orange-600 transition-all text-sm"

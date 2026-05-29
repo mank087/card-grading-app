@@ -36,7 +36,7 @@ const products: Product[] = [
     name: 'Traditional Graded Slabs',
     description: 'Classic snap-fit graded card slabs in bulk. The standard case for displaying DCM-graded cards with custom labels. Fits standard trading cards with room for front and back labels. Great value at 100 per pack.',
     image: '/shop/traditional-graded-slab.jpg',
-    link: 'https://www.amazon.com/100-Trading-Baseball-Protectors-Position/dp/B0C369YLLB?crid=2ZI7KJFMHLCLP&dib=eyJ2IjoiMSJ9.BlYcX8UM51mGfxY15gjq5ggscmZs8o6M6w-aovlZ7ChlCmWFH5XkbiWloO5e8s_aFtzEeSTIYzjFsYCkCWyhKbuvvja0zH1013jY5L9By0HQDJYMIyCL0Vi5s4JSTQ1N5ezUqgmRfeaOAFV1wUbPm-CAYdAbP5GAlcVZykkWkL33LQKEhtJhUaC4kDFP5O9urGD8zSwLMApCNEe6jAqLJJ-7MVznY3xTU70B9w_Rq5EuqK5JdcMW-URuPNENEg0Y-eNf13mTzYDd77TMfV7iwQ-lDUWJNnpY8alOHclgeYk.bFW5shkmpgcX7E_QOWiShCd9VOf7xdGuylQ5qpn0Z9c&dib_tag=se&keywords=graded%2Bcard%2Bslab&qid=1776355006&sprefix=graded%2Bcard%2Bslab%2Caps%2C159&sr=8-7&th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl',
+    link: 'https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl',
     badge: 'Best Value',
   },
 ];
