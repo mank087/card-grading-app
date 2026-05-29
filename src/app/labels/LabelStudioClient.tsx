@@ -2718,7 +2718,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
         <section className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl shadow-sm p-5 sm:p-6">
           <div className="flex flex-col sm:flex-row gap-5 items-center">
             <a
-              href="https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
+              href="https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading03-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
               target="_blank"
               rel="noopener noreferrer sponsored"
               className="flex-shrink-0 w-32 h-32 bg-white rounded-lg shadow-md overflow-hidden flex items-center justify-center hover:shadow-lg transition-shadow"
@@ -2738,7 +2738,7 @@ export default function LabelStudioClient({ cards, isAuthenticated }: Props) {
                 Get high-quality graded card slabs to professionally display your DCM-graded cards with custom labels.
               </p>
               <a
-                href="https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
+                href="https://www.amazon.com/dp/B0C369YLLB?th=1&linkCode=ll2&tag=dcmgrading03-20&linkId=ff7b9f5641325f4b0a51fad3b2f4ae4c&language=en_US&ref_=as_li_ss_tl"
                 target="_blank"
                 rel="noopener noreferrer sponsored"
                 className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-lg font-semibold shadow-md hover:from-amber-600 hover:to-orange-600 transition-all text-sm"
