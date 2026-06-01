@@ -128,8 +128,9 @@ export async function generateQRCodeWithLogo(url: string): Promise<string> {
   // Load and draw DCM logo in center
   return new Promise((resolve) => {
     const logo = new Image();
-    logo.crossOrigin = 'anonymous';
-
+    // No crossOrigin: /DCM-logo.png is same-origin, and setting crossOrigin
+    // would make mobile WebViews demand CORS headers that Next.js doesn't add
+    // to /public assets — tainting the canvas and breaking toDataURL below.
     logo.onload = () => {
       // Calculate logo size (about 20% of QR code size)
       const logoSize = canvas.width * 0.2;
@@ -182,55 +183,43 @@ export async function generateQRCodePlain(url: string): Promise<string> {
 }
 
 /**
+ * Fetch a same-origin image and return it as a base64 data URL.
+ *
+ * Originally used `new Image()` + crossOrigin='anonymous' + canvas.toDataURL.
+ * That works on desktop browsers but fails inside Android WebView and iOS
+ * WKWebView: setting crossOrigin makes the WebView require explicit CORS
+ * headers on the response (which Next.js doesn't add to static /public
+ * assets even when same-origin), so the canvas read taints and throws.
+ * The label-export caller swallows the error via `.catch(() => undefined)`
+ * and the generator skips drawing the logo — which is why mobile-downloaded
+ * labels were missing the DCM logo while web downloads were fine.
+ *
+ * Fetch + FileReader avoids the canvas tainting path entirely.
+ */
+async function fetchAsDataUrl(path: string): Promise<string> {
+  const response = await fetch(path);
+  if (!response.ok) throw new Error(`Failed to fetch ${path}: ${response.status}`);
+  const blob = await response.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error ?? new Error('FileReader failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
  * Load DCM logo as base64 data URL
  */
 export async function loadLogoAsBase64(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } else {
-        reject(new Error('Failed to get canvas context'));
-      }
-    };
-
-    img.onerror = () => reject(new Error('Failed to load logo'));
-    img.src = '/DCM-logo.png';
-  });
+  return fetchAsDataUrl('/DCM-logo.png');
 }
 
 /**
  * Load white DCM logo as base64 data URL (for dark backgrounds)
  */
 export async function loadWhiteLogoAsBase64(): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        resolve(canvas.toDataURL('image/png'));
-      } else {
-        reject(new Error('Failed to get canvas context'));
-      }
-    };
-
-    img.onerror = () => reject(new Error('Failed to load white logo'));
-    img.src = '/DCM%20Logo%20white.png';
-  });
+  return fetchAsDataUrl('/DCM%20Logo%20white.png');
 }
 
 /**
