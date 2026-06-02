@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
         status,
         view_count,
         watch_count,
+        ebay_image_urls,
         published_at,
         ended_at,
         sold_at,
@@ -91,14 +92,23 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const normalized = (rows ?? []).map((r: any) => ({
+    const normalized = (rows ?? []).map((r: any) => {
+      // Prefer the eBay-uploaded labeled image — that's the one with the
+      // graded label header banner that the user expects to see. Falls back
+      // to the raw card image only when the listing pre-dates the image
+      // generation pipeline.
+      const ebayThumb = Array.isArray(r.ebay_image_urls) && r.ebay_image_urls.length > 0
+        ? r.ebay_image_urls[0]
+        : null;
+      const thumbnailUrl = ebayThumb ?? urlMap.get(r.cards?.front_path) ?? null;
+      return {
       id: r.id,
       cardId: r.card_id,
       cardName: r.cards?.card_name ?? 'Unknown card',
       cardCategory: r.cards?.category ?? null,
       cardSerial: r.cards?.serial ?? null,
       cardGrade: r.cards?.conversational_whole_grade ?? null,
-      thumbnailUrl: urlMap.get(r.cards?.front_path) ?? null,
+      thumbnailUrl,
       sku: r.sku,
       listingId: r.listing_id,
       listingUrl: r.listing_url,
@@ -118,7 +128,8 @@ export async function GET(request: NextRequest) {
       lastSyncedAt: r.last_synced_at,
       createdAt: r.created_at,
       updatedAt: r.updated_at,
-    }));
+    };
+    });
 
     return NextResponse.json({
       active: normalized.filter(l => l.status === 'active' || l.status === 'pending'),

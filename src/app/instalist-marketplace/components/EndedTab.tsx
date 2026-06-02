@@ -40,9 +40,9 @@ export default function EndedTab({ listings, onRelist }: Props) {
               <tr key={l.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-10 h-14 bg-gray-100 rounded overflow-hidden">
+                    <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
                       {l.thumbnailUrl ? (
-                        <img src={l.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                        <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
                       ) : null}
                     </div>
                     <div className="min-w-0">
