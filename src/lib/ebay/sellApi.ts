@@ -263,13 +263,16 @@ function parseTransactionsInline(xml: string): EbaySellingItem[] {
       parsed.currency = txPriceMatch[1];
       parsed.currentPrice = parseFloat(txPriceMatch[2]) || parsed.currentPrice;
     }
-    const qtyPurchased = tagNum(txXml, 'QuantityPurchased');
-    if (qtyPurchased !== undefined) {
-      parsed.quantitySold = (parsed.quantitySold ?? 0) + qtyPurchased;
-    } else {
-      parsed.quantitySold = parsed.quantitySold ?? 1;
+    // QuantitySold in SellingStatus is already the cumulative total of units
+    // sold for this listing across all buyers — DO NOT add the transaction's
+    // own QuantityPurchased on top. Doing so produced a classic double-count
+    // (quantitySold=2 for listings that sold only 1 unit). Only fall back to
+    // QuantityPurchased when SellingStatus didn't include QuantitySold.
+    if (parsed.quantitySold === undefined) {
+      parsed.quantitySold = tagNum(txXml, 'QuantityPurchased') ?? 1;
     }
-    // Transaction has a CreatedDate which is when the sale happened.
+    // Transaction's CreatedDate is the actual sale completion timestamp,
+    // more accurate than the listing's EndTime for ascertaining sold_at.
     const txCreated = tag(txXml, 'CreatedDate');
     if (txCreated) parsed.endTime = txCreated;
     items.push(parsed);

@@ -1,14 +1,37 @@
+import { useCallback } from 'react';
 import type { MarketplaceListing } from '../types';
+import { useSortableRows, SortableTh } from './useSortableRows';
 
 interface Props {
   listings: MarketplaceListing[];
 }
+
+type SoldCol = 'card' | 'title' | 'price' | 'qty' | 'soldAt' | 'url';
 
 /**
  * Sold tab. Shows GROSS sale price (v1 spec). Phase 4 will add net via
  * Sell Finances API to surface fees and final payout.
  */
 export default function SoldTab({ listings }: Props) {
+  const getValue = useCallback((row: MarketplaceListing, key: SoldCol) => {
+    switch (key) {
+      case 'card': return row.cardName ?? '';
+      case 'title': return row.title ?? '';
+      case 'price': return row.price * Math.max(1, row.quantitySold);
+      case 'qty': return row.quantitySold || 1;
+      case 'soldAt': return row.soldAt ? new Date(row.soldAt).getTime() : null;
+      case 'url': return row.listingUrl ?? '';
+      default: return null;
+    }
+  }, []);
+
+  const { sortedRows, toggleSort, sortIndicator } = useSortableRows<MarketplaceListing, SoldCol>(
+    listings,
+    getValue,
+    'soldAt',
+    'desc'
+  );
+
   if (listings.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
@@ -39,16 +62,16 @@ export default function SoldTab({ listings }: Props) {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <Th>Card</Th>
-                <Th>Title</Th>
-                <Th align="right">Sale price</Th>
-                <Th align="right">Qty sold</Th>
-                <Th>Sold</Th>
-                <Th align="right">View on eBay</Th>
+                <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+                <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+                <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Sale price</SortableTh>
+                <SortableTh col="qty" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Qty sold</SortableTh>
+                <SortableTh col="soldAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Sold</SortableTh>
+                <SortableTh col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {listings.map(l => (
+              {sortedRows.map(l => (
                 <tr key={l.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -90,14 +113,6 @@ export default function SoldTab({ listings }: Props) {
         </div>
       </div>
     </div>
-  );
-}
-
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return (
-    <th className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${align === 'right' ? 'text-right' : 'text-left'}`}>
-      {children}
-    </th>
   );
 }
 

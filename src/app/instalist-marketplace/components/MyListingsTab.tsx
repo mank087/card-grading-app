@@ -1,11 +1,32 @@
-import Link from 'next/link';
+import { useCallback } from 'react';
 import type { MarketplaceListing } from '../types';
+import { useSortableRows, SortableTh } from './useSortableRows';
 
 interface Props {
   listings: MarketplaceListing[];
 }
 
+type ActiveCol = 'card' | 'title' | 'price' | 'publishedAt' | 'url';
+
 export default function MyListingsTab({ listings }: Props) {
+  const getValue = useCallback((row: MarketplaceListing, key: ActiveCol) => {
+    switch (key) {
+      case 'card': return row.cardName ?? '';
+      case 'title': return row.title ?? '';
+      case 'price': return row.price;
+      case 'publishedAt': return row.publishedAt ? new Date(row.publishedAt).getTime() : null;
+      case 'url': return row.listingUrl ?? '';
+      default: return null;
+    }
+  }, []);
+
+  const { sortedRows, toggleSort, sortIndicator } = useSortableRows<MarketplaceListing, ActiveCol>(
+    listings,
+    getValue,
+    'publishedAt',
+    'desc'
+  );
+
   if (listings.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
@@ -23,15 +44,15 @@ export default function MyListingsTab({ listings }: Props) {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <Th>Card</Th>
-              <Th>Title</Th>
-              <Th align="right">Price</Th>
-              <Th>Published</Th>
-              <Th align="right">View on eBay</Th>
+              <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+              <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+              <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Price</SortableTh>
+              <SortableTh col="publishedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Published</SortableTh>
+              <SortableTh col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {listings.map(l => (
+            {sortedRows.map(l => (
               <tr key={l.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -78,14 +99,6 @@ export default function MyListingsTab({ listings }: Props) {
   );
 }
 
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return (
-    <th className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${align === 'right' ? 'text-right' : 'text-left'}`}>
-      {children}
-    </th>
-  );
-}
-
 function labelForDuration(d: string): string {
   switch (d) {
     case 'Days_3': case 'DAYS_3': return '3d';
@@ -106,4 +119,3 @@ function formatDate(iso: string | null): string {
     return iso;
   }
 }
-

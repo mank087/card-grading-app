@@ -1,9 +1,13 @@
+import { useCallback } from 'react';
 import type { MarketplaceListing } from '../types';
+import { useSortableRows, SortableTh } from './useSortableRows';
 
 interface Props {
   listings: MarketplaceListing[];
   onRelist: (cardId: string) => void;
 }
+
+type EndedCol = 'card' | 'title' | 'price' | 'endedAt';
 
 /**
  * Ended tab — listings that finished without selling. The Relist button
@@ -11,6 +15,23 @@ interface Props {
  * the navigation + modal open).
  */
 export default function EndedTab({ listings, onRelist }: Props) {
+  const getValue = useCallback((row: MarketplaceListing, key: EndedCol) => {
+    switch (key) {
+      case 'card': return row.cardName ?? '';
+      case 'title': return row.title ?? '';
+      case 'price': return row.price;
+      case 'endedAt': return row.endedAt ? new Date(row.endedAt).getTime() : null;
+      default: return null;
+    }
+  }, []);
+
+  const { sortedRows, toggleSort, sortIndicator } = useSortableRows<MarketplaceListing, EndedCol>(
+    listings,
+    getValue,
+    'endedAt',
+    'desc'
+  );
+
   if (listings.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
@@ -28,15 +49,15 @@ export default function EndedTab({ listings, onRelist }: Props) {
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <Th>Card</Th>
-              <Th>Title</Th>
-              <Th align="right">Last price</Th>
-              <Th>Ended</Th>
-              <Th align="right">Action</Th>
+              <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+              <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+              <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Last price</SortableTh>
+              <SortableTh col="endedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Ended</SortableTh>
+              <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {listings.map(l => (
+            {sortedRows.map(l => (
               <tr key={l.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
@@ -70,14 +91,6 @@ export default function EndedTab({ listings, onRelist }: Props) {
         </table>
       </div>
     </div>
-  );
-}
-
-function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
-  return (
-    <th className={`px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider ${align === 'right' ? 'text-right' : 'text-left'}`}>
-      {children}
-    </th>
   );
 }
 

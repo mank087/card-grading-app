@@ -106,7 +106,21 @@ export async function syncUser(
   for (const item of ebayState.sold) {
     const dbRow = dbByListingId.get(item.itemId);
     if (!dbRow) continue;
-    if (dbRow.status === 'sold') continue; // already correct
+    if (dbRow.status === 'sold') {
+      // Already marked sold — but eBay's truth might disagree with what we
+      // stored. Refresh quantity_sold and sold_at (only when eBay returned
+      // a real endTime; never overwrite a real timestamp with `now`).
+      const refresh: Record<string, any> = {
+        quantity_sold: item.quantitySold ?? 1,
+        last_synced_at: now,
+      };
+      if (item.endTime) refresh.sold_at = item.endTime;
+      await supabaseAdmin
+        .from('ebay_listings')
+        .update(refresh)
+        .eq('id', dbRow.id);
+      continue;
+    }
     await supabaseAdmin
       .from('ebay_listings')
       .update({
