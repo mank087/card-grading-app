@@ -4,8 +4,13 @@ import {
   hasActiveEbayConnection,
   isEbayConfigured,
   getEbayEnvironment,
+  getValidAccessToken,
+  getEbayUserInfo,
 } from '@/lib/ebay';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { verifyAuth } from '@/lib/serverAuth';
+
+const PLACEHOLDER_USERNAME = 'eBay User';
 
 /**
  * GET /api/ebay/status
@@ -42,7 +47,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get connection details
-    const connection = await getEbayConnection(user.id);
+    let connection = await getEbayConnection(user.id);
 
     if (!connection) {
       return NextResponse.json({
@@ -50,6 +55,32 @@ export async function GET(request: NextRequest) {
         connected: false,
         environment: getEbayEnvironment(),
       });
+    }
+
+    // If the stored username is the "eBay User" placeholder (i.e. the original
+    // OAuth flow couldn't read it from the Identity API at connect time),
+    // try once now to refresh it. Older connections made before the
+    // commerce.identity.readonly scope was granted commonly hit this path.
+    // We swallow failures and fall through to whatever we had cached.
+    if (connection.ebay_username === PLACEHOLDER_USERNAME || !connection.ebay_username) {
+      try {
+        const accessToken = await getValidAccessToken(user.id);
+        const fresh = await getEbayUserInfo(accessToken);
+        if (fresh.username && fresh.username !== PLACEHOLDER_USERNAME) {
+          await supabaseAdmin
+            .from('ebay_connections')
+            .update({
+              ebay_username: fresh.username,
+              ebay_user_id: fresh.userId || connection.ebay_user_id,
+            })
+            .eq('user_id', user.id);
+          connection = { ...connection, ebay_username: fresh.username, ebay_user_id: fresh.userId || connection.ebay_user_id };
+          console.log('[eBay Status] Refreshed placeholder username for', user.id, '→', fresh.username);
+        }
+      } catch (refreshErr) {
+        // Non-fatal — keep the placeholder. The UI degrades gracefully.
+        console.warn('[eBay Status] Username refresh failed:', refreshErr);
+      }
     }
 
     // Return connection status (without sensitive token data)

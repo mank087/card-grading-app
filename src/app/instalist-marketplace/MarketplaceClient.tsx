@@ -246,7 +246,9 @@ export default function MarketplaceClient() {
             {ebayUsername && (
               <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Connected as <strong>{ebayUsername}</strong>
+                {ebayUsername === 'eBay User'
+                  ? 'Connected to eBay'
+                  : <>Connected as <strong>{ebayUsername}</strong></>}
               </span>
             )}
             <button
