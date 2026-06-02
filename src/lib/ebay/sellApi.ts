@@ -72,7 +72,10 @@ export async function getMyEbaySelling(
 
   return {
     active: flags.active ? parseItemArray(extractContainer(responseXml, 'ActiveList')) : [],
-    sold: flags.sold ? parseItemArray(extractContainer(responseXml, 'SoldList')) : [],
+    // SoldList wraps Items inside OrderTransactionArray > OrderTransaction >
+    // Transaction > Item — completely different shape from the other two lists.
+    // We parse those Transaction nodes individually so we can lift the Item.
+    sold: flags.sold ? parseSoldList(extractContainer(responseXml, 'SoldList')) : [],
     unsold: flags.unsold ? parseItemArray(extractContainer(responseXml, 'UnsoldList')) : [],
   };
 }
@@ -90,12 +93,20 @@ function buildGetMyEbaySellingXml(args: {
 }): string {
   const container = (name: string, entries: number, sort: string) => {
     if (entries <= 0) return '';
+    // For Sold/Unsold lists, set DurationInDays to the max eBay allows (60)
+    // so we catch as many recent transitions as possible. ActiveList ignores
+    // DurationInDays (current listings aren't bounded by a window).
+    const durationField =
+      name === 'SoldList' || name === 'UnsoldList'
+        ? '<DurationInDays>60</DurationInDays>'
+        : '';
     return `<${name}>
       <Sort>${sort}</Sort>
       <Pagination>
         <EntriesPerPage>${entries}</EntriesPerPage>
         <PageNumber>1</PageNumber>
       </Pagination>
+      ${durationField}
       <Include>true</Include>
     </${name}>`;
   };
@@ -124,6 +135,7 @@ function extractContainer(xml: string, containerName: string): string {
 
 /**
  * Parse all <Item> blocks inside a container's <ItemArray>.
+ * Used for ActiveList and UnsoldList.
  */
 function parseItemArray(containerXml: string): EbaySellingItem[] {
   if (!containerXml) return [];
@@ -135,6 +147,53 @@ function parseItemArray(containerXml: string): EbaySellingItem[] {
   const itemMatches = itemArrayXml.matchAll(/<Item>([\s\S]*?)<\/Item>/gi);
   for (const m of itemMatches) {
     items.push(parseItem(m[1]));
+  }
+  return items;
+}
+
+/**
+ * Parse SoldList — wrapped in OrderTransactionArray > OrderTransaction >
+ * Transaction > Item. Each <Item> we extract represents one sold listing.
+ *
+ * We also lift the QuantityPurchased and TransactionPrice from the surrounding
+ * Transaction node so the dashboard can show actual sale price + quantity sold.
+ */
+function parseSoldList(containerXml: string): EbaySellingItem[] {
+  if (!containerXml) return [];
+  const orderArrayMatch = containerXml.match(/<OrderTransactionArray>([\s\S]*?)<\/OrderTransactionArray>/i);
+  if (!orderArrayMatch) {
+    // Some SoldList responses skip the OrderTransactionArray entirely and just
+    // emit <Transaction> nodes inline. Handle that gracefully too.
+    return parseTransactionsInline(containerXml);
+  }
+  return parseTransactionsInline(orderArrayMatch[1]);
+}
+
+function parseTransactionsInline(xml: string): EbaySellingItem[] {
+  const items: EbaySellingItem[] = [];
+  const txMatches = xml.matchAll(/<Transaction>([\s\S]*?)<\/Transaction>/gi);
+  for (const m of txMatches) {
+    const txXml = m[1];
+    const itemMatch = txXml.match(/<Item>([\s\S]*?)<\/Item>/i);
+    if (!itemMatch) continue;
+    const parsed = parseItem(itemMatch[1]);
+    // Override price with the actual transaction price if present (sale price
+    // > listing's current price for the dashboard).
+    const txPriceMatch = txXml.match(/<TransactionPrice[^>]*currencyID="([^"]+)"[^>]*>([^<]*)<\/TransactionPrice>/i);
+    if (txPriceMatch) {
+      parsed.currency = txPriceMatch[1];
+      parsed.currentPrice = parseFloat(txPriceMatch[2]) || parsed.currentPrice;
+    }
+    const qtyPurchased = tagNum(txXml, 'QuantityPurchased');
+    if (qtyPurchased !== undefined) {
+      parsed.quantitySold = (parsed.quantitySold ?? 0) + qtyPurchased;
+    } else {
+      parsed.quantitySold = parsed.quantitySold ?? 1;
+    }
+    // Transaction has a CreatedDate which is when the sale happened.
+    const txCreated = tag(txXml, 'CreatedDate');
+    if (txCreated) parsed.endTime = txCreated;
+    items.push(parsed);
   }
   return items;
 }
