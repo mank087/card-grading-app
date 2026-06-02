@@ -96,6 +96,47 @@ export async function syncUser(
 
   const orphans: { id: string; listing_id: string; last_synced_at: string | null }[] = [];
 
+  // -------- Pass 0: reconcile mistakenly-terminal rows --------
+  // Walk eBay's SoldList and UnsoldList directly so any DB row whose status
+  // disagrees with eBay's current truth gets healed — most commonly, rows
+  // we previously marked 'ended' (because GetItem returned null for a long-
+  // archived listing) that are actually visible in eBay's 60-day SoldList.
+  // This was the root cause of "I sold this through InstaList but DCM shows
+  // it as ended" reports.
+  for (const item of ebayState.sold) {
+    const dbRow = dbByListingId.get(item.itemId);
+    if (!dbRow) continue;
+    if (dbRow.status === 'sold') continue; // already correct
+    await supabaseAdmin
+      .from('ebay_listings')
+      .update({
+        status: 'sold',
+        quantity_sold: item.quantitySold ?? 1,
+        sold_at: item.endTime ?? now,
+        last_synced_at: now,
+      })
+      .eq('id', dbRow.id);
+    sold++;
+    // Update our in-memory state so the orphan pass doesn't re-touch this row.
+    dbByListingId.set(item.itemId, { ...dbRow, status: 'sold' });
+  }
+  for (const item of ebayState.unsold) {
+    const dbRow = dbByListingId.get(item.itemId);
+    if (!dbRow) continue;
+    // Don't downgrade sold → ended even if eBay lists it; sold takes precedence.
+    if (dbRow.status === 'sold' || dbRow.status === 'ended') continue;
+    await supabaseAdmin
+      .from('ebay_listings')
+      .update({
+        status: 'ended',
+        ended_at: item.endTime ?? now,
+        last_synced_at: now,
+      })
+      .eq('id', dbRow.id);
+    ended++;
+    dbByListingId.set(item.itemId, { ...dbRow, status: 'ended' });
+  }
+
   // -------- Pass 1: bulk reconciliation --------
   for (const [listingId, dbRow] of dbByListingId.entries()) {
     if (dbRow.status !== 'active') continue;
