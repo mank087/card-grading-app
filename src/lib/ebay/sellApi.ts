@@ -14,6 +14,85 @@ import { callTradingApi, type TradingApiConfig } from './tradingApi';
 
 const TRADING_API_VERSION = '1349';
 
+export interface EbayItemDetail {
+  itemId: string;
+  listingStatus: 'Active' | 'Completed' | 'Ended' | 'Custom' | 'Unknown';
+  quantitySold: number;
+  endTime: string | null;
+  hitCount: number | null;
+  watchCount: number | null;
+  currentPrice: number;
+  currency: string;
+}
+
+/**
+ * Trading API GetItem — fetches the real state of a single listing,
+ * regardless of how long ago it ended. Used as a fallback in the sync
+ * cron when a DB row is status='active' but doesn't appear in any of
+ * GetMyeBaySelling's lists (which are capped at ~60 days).
+ *
+ * Returns null if eBay can't find the item (typo, deleted, etc.).
+ */
+export async function getItemDetail(
+  config: TradingApiConfig,
+  itemId: string
+): Promise<EbayItemDetail | null> {
+  const xml = `<?xml version="1.0" encoding="utf-8"?>
+<GetItemRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <RequesterCredentials><eBayAuthToken>TOKEN_PLACEHOLDER</eBayAuthToken></RequesterCredentials>
+  <Version>${TRADING_API_VERSION}</Version>
+  <ItemID>${itemId}</ItemID>
+  <DetailLevel>ReturnAll</DetailLevel>
+  <IncludeWatchCount>true</IncludeWatchCount>
+</GetItemRequest>`;
+
+  let response: string;
+  try {
+    response = await callTradingApi(config, 'GetItem', xml);
+  } catch (err) {
+    console.error('[getItemDetail]', itemId, 'API call failed:', err);
+    return null;
+  }
+
+  // eBay returns a top-level <Ack> indicating success/failure.
+  const ack = response.match(/<Ack>([^<]*)<\/Ack>/i)?.[1] ?? '';
+  if (ack !== 'Success' && ack !== 'Warning') {
+    // Common case: <Errors><ErrorCode>17</ErrorCode> = item not found
+    return null;
+  }
+
+  const itemBlockMatch = response.match(/<Item>([\s\S]*?)<\/Item>/i);
+  if (!itemBlockMatch) return null;
+  const itemXml = itemBlockMatch[1];
+
+  // ListingStatus lives inside SellingStatus
+  const sellingStatusXml = itemXml.match(/<SellingStatus>([\s\S]*?)<\/SellingStatus>/i)?.[1] ?? '';
+  const rawStatus = tag(sellingStatusXml, 'ListingStatus') ?? 'Unknown';
+  const listingStatus: EbayItemDetail['listingStatus'] =
+    rawStatus === 'Active' ? 'Active' :
+    rawStatus === 'Completed' ? 'Completed' :
+    rawStatus === 'Ended' ? 'Ended' :
+    rawStatus === 'Custom' ? 'Custom' :
+    'Unknown';
+
+  // CurrentPrice is inside SellingStatus
+  const priceMatch = sellingStatusXml.match(/<CurrentPrice[^>]*currencyID="([^"]+)"[^>]*>([^<]*)<\/CurrentPrice>/i);
+
+  // EndTime is in ListingDetails (sometimes at item top level too)
+  const listingDetailsXml = itemXml.match(/<ListingDetails>([\s\S]*?)<\/ListingDetails>/i)?.[1] ?? '';
+
+  return {
+    itemId,
+    listingStatus,
+    quantitySold: tagNum(sellingStatusXml, 'QuantitySold') ?? 0,
+    endTime: tag(itemXml, 'EndTime') ?? tag(listingDetailsXml, 'EndTime') ?? null,
+    hitCount: tagNum(itemXml, 'HitCount') ?? null,
+    watchCount: tagNum(itemXml, 'WatchCount') ?? null,
+    currentPrice: priceMatch ? parseFloat(priceMatch[2]) : 0,
+    currency: priceMatch ? priceMatch[1] : 'USD',
+  };
+}
+
 export interface EbaySellingItem {
   itemId: string;
   title: string;

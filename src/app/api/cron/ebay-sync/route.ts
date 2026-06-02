@@ -19,10 +19,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getEbayConnection, getValidAccessToken } from '@/lib/ebay/auth';
-import { getMyEbaySelling, type EbaySellingItem } from '@/lib/ebay/sellApi';
+import { getMyEbaySelling, getItemDetail, type EbaySellingItem } from '@/lib/ebay/sellApi';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const MAX_USERS_PER_RUN = 50;
+// Hard cap on per-listing GetItem fallback calls per cron invocation.
+// Each GetItem takes ~500ms; 80 calls × 500ms = 40s, comfortably under the
+// 60s Vercel function timeout while still making meaningful progress on
+// users with lots of stale orphan rows.
+const MAX_GET_ITEM_CALLS_PER_RUN = 80;
 const USE_SANDBOX = process.env.EBAY_USE_SANDBOX === 'true';
 
 export async function GET(request: NextRequest) {
@@ -45,15 +50,17 @@ export async function GET(request: NextRequest) {
     let listingsUpdated = 0;
     let listingsMarkedSold = 0;
     let listingsMarkedEnded = 0;
+    let getItemCallsUsed = 0;
     let userFailures = 0;
 
     for (const userId of userIds) {
       try {
-        const result = await syncUser(userId);
+        const result = await syncUser(userId, MAX_GET_ITEM_CALLS_PER_RUN - getItemCallsUsed);
         usersProcessed++;
         listingsUpdated += result.updated;
         listingsMarkedSold += result.sold;
         listingsMarkedEnded += result.ended;
+        getItemCallsUsed += result.getItemCalls;
       } catch (err: any) {
         userFailures++;
         console.error(`[ebay-sync] User ${userId} failed:`, err.message || err);
@@ -64,7 +71,8 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[ebay-sync] Done: ${usersProcessed} users, ${listingsUpdated} updated, ` +
-                `${listingsMarkedSold} sold, ${listingsMarkedEnded} ended, ${userFailures} failures`);
+                `${listingsMarkedSold} sold, ${listingsMarkedEnded} ended, ` +
+                `${getItemCallsUsed} GetItem calls, ${userFailures} failures`);
 
     return NextResponse.json({
       success: true,
@@ -72,6 +80,7 @@ export async function GET(request: NextRequest) {
       listingsUpdated,
       listingsMarkedSold,
       listingsMarkedEnded,
+      getItemCallsUsed,
       userFailures,
     });
   } catch (err: any) {
@@ -120,7 +129,10 @@ async function pickUsersToSync(limit: number): Promise<string[]> {
  * For users with 10+ active listings this is cheaper than per-listing
  * GetItem calls and gives us status transitions for free.
  */
-async function syncUser(userId: string): Promise<{ updated: number; sold: number; ended: number }> {
+async function syncUser(
+  userId: string,
+  getItemBudget: number
+): Promise<{ updated: number; sold: number; ended: number; getItemCalls: number }> {
   const connection = await getEbayConnection(userId);
   if (!connection) {
     // User disconnected since we picked them — mark their listings synced
@@ -130,22 +142,26 @@ async function syncUser(userId: string): Promise<{ updated: number; sold: number
       .update({ last_synced_at: new Date().toISOString() })
       .eq('user_id', userId)
       .eq('status', 'active');
-    return { updated: 0, sold: 0, ended: 0 };
+    return { updated: 0, sold: 0, ended: 0, getItemCalls: 0 };
   }
 
   const accessToken = await getValidAccessToken(userId);
+  const apiConfig = { accessToken, sandbox: USE_SANDBOX };
   const ebayState = await getMyEbaySelling(
-    { accessToken, sandbox: USE_SANDBOX },
+    apiConfig,
     { activeEntries: 200, soldEntries: 200, unsoldEntries: 200 }
   );
 
-  // Pull this user's current DB rows so we can diff against eBay.
+  // Pull this user's current DB rows so we can diff against eBay. Include
+  // listing_id and listing_format so we know what was already 'active' vs.
+  // already terminal, and so the GetItem fallback can disambiguate sold
+  // (quantitySold > 0) from ended (quantitySold = 0).
   const { data: dbRows } = await supabaseAdmin
     .from('ebay_listings')
-    .select('id, listing_id, status')
+    .select('id, listing_id, status, last_synced_at')
     .eq('user_id', userId);
 
-  const dbByListingId = new Map<string, { id: string; status: string }>();
+  const dbByListingId = new Map<string, { id: string; status: string; last_synced_at: string | null }>();
   for (const row of dbRows ?? []) {
     if (row.listing_id) dbByListingId.set(row.listing_id, row);
   }
@@ -161,25 +177,31 @@ async function syncUser(userId: string): Promise<{ updated: number; sold: number
   let updated = 0;
   let sold = 0;
   let ended = 0;
+  let getItemCalls = 0;
 
-  // For each DB row that's currently active, decide its new state.
+  // Orphan rows = DB-active rows we couldn't match against any of the three
+  // GetMyeBaySelling lists. We resolve these with per-listing GetItem calls
+  // below, after the bulk pass, so we know the real budget left.
+  const orphans: { id: string; listing_id: string; last_synced_at: string | null }[] = [];
+
+  // ---------------- First pass: bulk-categorise via GetMyeBaySelling ----------------
   for (const [listingId, dbRow] of dbByListingId.entries()) {
-    if (dbRow.status !== 'active') continue; // Only re-evaluate active rows
+    if (dbRow.status !== 'active') continue;
 
     if (activeByListingId.has(listingId)) {
-      // Still active on eBay — refresh counters
       const item = activeByListingId.get(listingId)!;
       await supabaseAdmin
         .from('ebay_listings')
         .update({
-          view_count: item.hitCount ?? 0,
+          // HitCount isn't returned by GetMyeBaySelling — kept at 0 unless
+          // the GetItem fallback (below) refreshes it.
+          view_count: item.hitCount ?? undefined,
           watch_count: item.watchCount ?? 0,
           last_synced_at: now,
         })
         .eq('id', dbRow.id);
       updated++;
     } else if (soldByListingId.has(listingId)) {
-      // Migrated to SoldList — promote to 'sold'
       const item = soldByListingId.get(listingId)!;
       await supabaseAdmin
         .from('ebay_listings')
@@ -192,7 +214,6 @@ async function syncUser(userId: string): Promise<{ updated: number; sold: number
         .eq('id', dbRow.id);
       sold++;
     } else if (unsoldByListingId.has(listingId)) {
-      // Migrated to UnsoldList — ended without selling
       const item = unsoldByListingId.get(listingId)!;
       await supabaseAdmin
         .from('ebay_listings')
@@ -204,18 +225,77 @@ async function syncUser(userId: string): Promise<{ updated: number; sold: number
         .eq('id', dbRow.id);
       ended++;
     } else {
-      // Not in any of the three lists — eBay's response truncated
-      // (user has more than 200 in some bucket) or the listing was
-      // manually deleted on eBay. Just stamp last_synced_at so we
-      // try again next run.
-      await supabaseAdmin
-        .from('ebay_listings')
-        .update({ last_synced_at: now })
-        .eq('id', dbRow.id);
+      // Orphan — defer to GetItem pass.
+      orphans.push({ id: dbRow.id, listing_id: listingId, last_synced_at: dbRow.last_synced_at });
     }
   }
 
-  return { updated, sold, ended };
+  // ---------------- Second pass: per-listing GetItem for orphans ----------------
+  // Resolve orphans starting from the stalest first (never-synced rows ahead
+  // of recently-synced ones) so the longest-broken data heals first.
+  orphans.sort((a, b) => {
+    if (!a.last_synced_at && b.last_synced_at) return -1;
+    if (a.last_synced_at && !b.last_synced_at) return 1;
+    if (!a.last_synced_at && !b.last_synced_at) return 0;
+    return (a.last_synced_at as string).localeCompare(b.last_synced_at as string);
+  });
+
+  for (const orphan of orphans) {
+    if (getItemCalls >= getItemBudget) break;
+    const detail = await getItemDetail(apiConfig, orphan.listing_id);
+    getItemCalls++;
+
+    if (!detail) {
+      // eBay can't find the item (deleted long ago, typo, etc.). Stamp synced
+      // so we don't keep retrying it on every run.
+      await supabaseAdmin
+        .from('ebay_listings')
+        .update({ last_synced_at: now })
+        .eq('id', orphan.id);
+      continue;
+    }
+
+    if (detail.listingStatus === 'Active') {
+      // Truly still active — eBay's bulk list just truncated. Refresh counts.
+      await supabaseAdmin
+        .from('ebay_listings')
+        .update({
+          view_count: detail.hitCount ?? undefined,
+          watch_count: detail.watchCount ?? 0,
+          last_synced_at: now,
+        })
+        .eq('id', orphan.id);
+      updated++;
+    } else if (detail.listingStatus === 'Completed' && detail.quantitySold > 0) {
+      // Ended with at least one sale.
+      await supabaseAdmin
+        .from('ebay_listings')
+        .update({
+          status: 'sold',
+          quantity_sold: detail.quantitySold,
+          sold_at: detail.endTime ?? now,
+          last_synced_at: now,
+        })
+        .eq('id', orphan.id);
+      sold++;
+    } else {
+      // Completed without a sale, Ended (manually), Custom — treat as ended.
+      await supabaseAdmin
+        .from('ebay_listings')
+        .update({
+          status: 'ended',
+          ended_at: detail.endTime ?? now,
+          last_synced_at: now,
+        })
+        .eq('id', orphan.id);
+      ended++;
+    }
+
+    // Light pacing between GetItem calls.
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  return { updated, sold, ended, getItemCalls };
 }
 
 // POST is identical to GET — supports manual triggers from /admin
