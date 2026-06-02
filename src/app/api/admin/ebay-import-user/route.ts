@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getValidAccessToken } from '@/lib/ebay/auth';
 import { getMyEbaySelling, type EbaySellingItem } from '@/lib/ebay/sellApi';
+import { DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const USE_SANDBOX = process.env.EBAY_USE_SANDBOX === 'true';
@@ -37,6 +38,12 @@ const TITLE_FILTER = /dcm/i; // case-insensitive match anywhere in the title
 
 interface CardLite {
   id: string;
+  category: string | null;
+}
+
+function ebayCategoryFor(cardCategory: string | null | undefined): string {
+  if (!cardCategory) return EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS;
+  return DCM_TO_EBAY_CATEGORY[cardCategory] ?? EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS;
 }
 
 export async function POST(request: NextRequest) {
@@ -73,12 +80,15 @@ export async function POST(request: NextRequest) {
     const existingIds = new Set((existingRows ?? []).map(r => r.listing_id).filter(Boolean));
 
     // Cache cards by their first-8 ID prefix for fast SKU → card lookup.
+    // Pull category too so we can populate ebay_listings.category_id.
     const { data: userCards } = await supabaseAdmin
       .from('cards')
-      .select('id')
+      .select('id, category')
       .eq('user_id', userId);
+    const cardsById = new Map<string, CardLite>();
     const cardsByPrefix = new Map<string, CardLite[]>();
     for (const c of userCards ?? []) {
+      cardsById.set(c.id, c);
       const prefix = c.id.replace(/-/g, '').slice(0, 8).toLowerCase();
       const list = cardsByPrefix.get(prefix) ?? [];
       list.push(c);
@@ -140,6 +150,8 @@ export async function POST(request: NextRequest) {
       for (const { status, item, card_id } of toImport) {
         const insertSku = item.sku || `IMPORTED-${item.itemId}`;
         const listingFormat = item.listingFormat === 'FixedPriceItem' ? 'FIXED_PRICE' : 'AUCTION';
+        const card = cardsById.get(card_id);
+        const categoryId = ebayCategoryFor(card?.category);
 
         const row: Record<string, any> = {
           user_id: userId,
@@ -154,6 +166,7 @@ export async function POST(request: NextRequest) {
           quantity_sold: item.quantitySold ?? 0,
           listing_format: listingFormat,
           duration: 'GTC', // We don't have this from GetMyeBaySelling; safe default.
+          category_id: categoryId,
           status,
           ebay_image_urls: item.galleryUrl ? [item.galleryUrl] : [],
           published_at: item.startTime ?? null,
