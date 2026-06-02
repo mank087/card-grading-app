@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     // bounded; very few users will have that many lifetime listings.
     const { data: rows, error } = await supabase
       .from('ebay_listings')
-      .select('status, price, view_count, watch_count, sold_at')
+      .select('status, price, quantity_sold, view_count, watch_count, sold_at')
       .eq('user_id', user.id)
       .limit(5000);
 
@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
 
     for (const r of rows ?? []) {
       const price = Number(r.price) || 0;
+      const qtySold = Math.max(1, Number(r.quantity_sold) || 0);
       const views = Number(r.view_count) || 0;
       const watchers = Number(r.watch_count) || 0;
 
@@ -55,7 +56,9 @@ export async function GET(request: NextRequest) {
         totalWatchers += watchers;
       } else if (r.status === 'sold') {
         soldCount++;
-        grossRevenue += price;
+        // Gross = sale price * quantity sold. Matches the per-row math in
+        // SoldTab so the strip and the table tell the same story.
+        grossRevenue += price * qtySold;
       } else if (r.status === 'ended' || r.status === 'cancelled') {
         endedCount++;
       }
