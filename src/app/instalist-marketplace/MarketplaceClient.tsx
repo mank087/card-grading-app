@@ -61,6 +61,14 @@ export default function MarketplaceClient() {
   const [connecting, setConnecting] = useState(false);
   const [connectError, setConnectError] = useState<string | null>(null);
 
+  // On-demand sync state ("Syncing 47 listings..." pill)
+  const [syncState, setSyncState] = useState<
+    | { kind: 'idle' }
+    | { kind: 'syncing'; activeCount: number }
+    | { kind: 'done'; transitions: number }
+    | { kind: 'rate-limited'; retryAfterSec: number }
+  >({ kind: 'idle' });
+
   // -------------------------------- Loading --------------------------------
 
   const refreshAll = useCallback(async (token?: string) => {
@@ -148,6 +156,49 @@ export default function MarketplaceClient() {
     if (!stats) return;
     setActiveTab(stats.activeCount > 0 ? 'active' : 'list');
   }, [pageState, stats, activeTab]);
+
+  // Fire the on-demand sync once when the marketplace renders. The endpoint
+  // self-rate-limits (3-min window), so this is safe to run on every fresh
+  // page load — it'll return skipped=true if a recent sync already covered it.
+  // Once it completes, refetch the lists + stats so transitions surface
+  // without a manual refresh.
+  const fireSyncMe = useCallback(async () => {
+    if (!accessToken) return;
+    if (syncState.kind === 'syncing') return; // already in flight
+    setSyncState({ kind: 'syncing', activeCount: stats?.activeCount ?? 0 });
+    try {
+      const res = await fetch('/api/ebay/sync-me', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const j = await res.json();
+      if (j.skipped && j.retryAfterSec) {
+        setSyncState({ kind: 'rate-limited', retryAfterSec: j.retryAfterSec });
+        // Auto-dismiss after a few seconds.
+        setTimeout(() => setSyncState({ kind: 'idle' }), 4000);
+        return;
+      }
+      const transitions = (j.sold ?? 0) + (j.ended ?? 0);
+      setSyncState({ kind: 'done', transitions });
+      // Refresh dashboard data so the user sees the new state immediately.
+      await refreshAll();
+      // Auto-dismiss the "done" pill after a few seconds.
+      setTimeout(() => setSyncState({ kind: 'idle' }), 4000);
+    } catch (e) {
+      console.error('[Marketplace] sync-me failed', e);
+      setSyncState({ kind: 'idle' });
+    }
+  }, [accessToken, refreshAll, stats?.activeCount, syncState.kind]);
+
+  useEffect(() => {
+    if (pageState !== 'marketplace') return;
+    // Fire once when state first becomes marketplace. The effect re-runs
+    // if pageState changes (which is fine; the rate limiter handles dupe calls).
+    fireSyncMe();
+    // We intentionally only depend on pageState here — adding fireSyncMe to
+    // deps would cause the sync to refire each render due to its own deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageState]);
 
   const handleListingPublished = useCallback(() => {
     setModalCard(null);
@@ -251,6 +302,7 @@ export default function MarketplaceClient() {
                   : <>Connected as <strong>{ebayUsername}</strong></>}
               </span>
             )}
+            <SyncStatusPill syncState={syncState} />
             <button
               onClick={() => refreshAll()}
               disabled={refreshing}
@@ -355,6 +407,45 @@ function Count({ value }: { value: number }) {
   return (
     <span className="ml-1.5 inline-flex items-center justify-center px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-700">
       {value}
+    </span>
+  );
+}
+
+function SyncStatusPill({ syncState }: { syncState:
+  | { kind: 'idle' }
+  | { kind: 'syncing'; activeCount: number }
+  | { kind: 'done'; transitions: number }
+  | { kind: 'rate-limited'; retryAfterSec: number }
+}) {
+  if (syncState.kind === 'idle') return null;
+  if (syncState.kind === 'syncing') {
+    return (
+      <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-indigo-700 bg-indigo-50 border border-indigo-200 px-3 py-1.5 rounded-full">
+        <span className="inline-block w-3 h-3 rounded-full border-2 border-indigo-600 border-t-transparent animate-spin" />
+        Syncing {syncState.activeCount > 0 ? `${syncState.activeCount} listing${syncState.activeCount === 1 ? '' : 's'}` : 'listings'}&hellip;
+      </span>
+    );
+  }
+  if (syncState.kind === 'done') {
+    if (syncState.transitions === 0) {
+      return (
+        <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full">
+          <span className="text-emerald-600">&#10003;</span>
+          Already up to date
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+        <span>&#10003;</span>
+        Synced &middot; {syncState.transitions} status change{syncState.transitions === 1 ? '' : 's'}
+      </span>
+    );
+  }
+  // rate-limited
+  return (
+    <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-gray-600 bg-gray-50 border border-gray-200 px-3 py-1.5 rounded-full">
+      Sync available again in {syncState.retryAfterSec}s
     </span>
   );
 }
