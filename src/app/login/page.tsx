@@ -28,15 +28,29 @@ function LoginPageContent() {
 
   // Default to signup mode, unless mode=login is specified in URL
   const modeParam = searchParams.get('mode')
+  // Honor ?redirect=/some/path so pages like /instalist-marketplace can
+  // round-trip the user back to themselves after sign-in. Falls through to
+  // /collection if not provided (existing default).
+  const redirectParam = searchParams.get('redirect')
   const [isSignUp, setIsSignUp] = useState(modeParam !== 'login')
+
+  // Mirror the redirect into localStorage so the OAuth callback flow
+  // (src/app/auth/callback/page.tsx reads auth_redirect) honors it too —
+  // Google/Apple/Facebook sign-ins bounce through the provider and come back
+  // through that page rather than this one.
+  useEffect(() => {
+    if (typeof window !== 'undefined' && redirectParam) {
+      localStorage.setItem('auth_redirect', redirectParam)
+    }
+  }, [redirectParam])
 
   useEffect(() => {
     // Check if user is already signed in
     const session = getStoredSession()
     if (session && session.user) {
-      router.push('/collection')
+      router.push(redirectParam || '/collection')
     }
-  }, [router])
+  }, [router, redirectParam])
 
   // Update mode when URL parameter changes
   useEffect(() => {
@@ -121,8 +135,12 @@ function LoginPageContent() {
           const now = Date.now()
           const isNewUser = (now - createdAt) < 60000
 
-          // New users go to credits page for onboarding, existing users go to collection
-          if (isNewUser) {
+          // New users go to credits page for onboarding (unless a custom
+          // redirect was provided, in which case respect that — the calling
+          // page knows where it wants them).
+          if (redirectParam) {
+            router.push(redirectParam)
+          } else if (isNewUser) {
             router.push('/credits?welcome=true')
           } else {
             router.push('/collection')
