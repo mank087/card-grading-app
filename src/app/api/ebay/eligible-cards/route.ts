@@ -37,52 +37,14 @@ export async function GET(request: NextRequest) {
 
     const excludeIds = new Set((activeListings ?? []).map(r => r.card_id).filter(Boolean));
 
-    // Select the full set of conversational + card fields the
-    // EbayListingModal reads. Mirrors what the per-category card-detail
-    // APIs return for the same modal so the listing flow behaves identically.
+    // SELECT * to mirror the per-category card-detail APIs (e.g.
+    // /api/sports/[id]) — they also select '*' so the EbayListingModal
+    // always sees the same shape regardless of where the user opens it
+    // from. Avoids 500s if any conversational_* / item-specifics column
+    // is added or removed from the cards schema later.
     let query = supabase
       .from('cards')
-      .select(`
-        id,
-        serial,
-        card_name,
-        category,
-        front_path,
-        back_path,
-        featured,
-        pokemon_featured,
-        card_set,
-        card_number,
-        release_date,
-        manufacturer_name,
-        conversational_whole_grade,
-        conversational_decimal_grade,
-        conversational_condition_label,
-        conversational_card_info,
-        conversational_sub_scores,
-        conversational_weighted_sub_scores,
-        conversational_final_grade_summary,
-        conversational_summary,
-        conversational_image_confidence,
-        conversational_limiting_factor,
-        is_foil,
-        foil_type,
-        is_double_faced,
-        mtg_rarity,
-        holofoil,
-        serial_numbering,
-        rarity_tier,
-        rarity_description,
-        autographed,
-        autograph_type,
-        memorabilia_type,
-        rookie_card,
-        first_print_rookie,
-        dcm_price_estimate,
-        ebay_price_median,
-        scryfall_price_usd,
-        created_at
-      `)
+      .select('*')
       .eq('user_id', user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
