@@ -364,7 +364,10 @@ export default function MarketplaceClient() {
         <MarketplaceInfo variant="footer" />
       </div>
 
-      {/* Listing modal — reuses the same EbayListingModal as the card-detail page */}
+      {/* Listing modal — reuses the same EbayListingModal as the card-detail page.
+          We pass the raw card record (snake_case + signed front/back URLs) so the
+          modal's image generation + item-specifics logic finds the same field
+          shape it sees from the card-detail flow. */}
       {modalCard && (
         <EbayListingModal
           isOpen={true}

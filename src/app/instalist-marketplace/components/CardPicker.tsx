@@ -12,6 +12,10 @@ interface Props {
  * Left-rail card grid for the List a Card tab. Filters out cards that
  * already have active listings (the /api/ebay/eligible-cards endpoint
  * does the exclusion server-side, so everything in `cards` is fair game).
+ *
+ * Reads the raw snake_case card record (same shape the EbayListingModal
+ * consumes), so we use card.card_name, card.conversational_whole_grade,
+ * card.front_url, etc. directly.
  */
 export default function CardPicker({ cards, onSelect }: Props) {
   const [query, setQuery] = useState('');
@@ -29,7 +33,7 @@ export default function CardPicker({ cards, onSelect }: Props) {
     const q = query.trim().toLowerCase();
     if (q) {
       result = result.filter(c =>
-        (c.cardName || '').toLowerCase().includes(q) ||
+        (c.card_name || '').toLowerCase().includes(q) ||
         (c.serial || '').toLowerCase().includes(q)
       );
     }
@@ -37,12 +41,12 @@ export default function CardPicker({ cards, onSelect }: Props) {
       result = result.filter(c => c.category === categoryFilter);
     }
     const sorted = [...result];
-    if (sort === 'name') sorted.sort((a, b) => (a.cardName || '').localeCompare(b.cardName || ''));
-    else if (sort === 'grade') sorted.sort((a, b) => (b.grade ?? 0) - (a.grade ?? 0));
+    if (sort === 'name') sorted.sort((a, b) => (a.card_name || '').localeCompare(b.card_name || ''));
+    else if (sort === 'grade') sorted.sort((a, b) => (b.conversational_whole_grade ?? 0) - (a.conversational_whole_grade ?? 0));
     else if (sort === 'value') {
       sorted.sort((a, b) => {
-        const av = a.ebayPriceMedian ?? a.dcmPriceEstimate ?? 0;
-        const bv = b.ebayPriceMedian ?? b.dcmPriceEstimate ?? 0;
+        const av = a.ebay_price_median ?? a.dcm_price_estimate ?? 0;
+        const bv = b.ebay_price_median ?? b.dcm_price_estimate ?? 0;
         return bv - av;
       });
     } // 'recent' = default order from the API
@@ -99,26 +103,26 @@ export default function CardPicker({ cards, onSelect }: Props) {
                 className="w-full flex items-center gap-3 p-3 hover:bg-indigo-50 text-left transition-colors"
               >
                 <div className="flex-shrink-0 w-12 h-16 bg-gray-100 rounded overflow-hidden">
-                  {card.thumbnailUrl ? (
-                    <img src={card.thumbnailUrl} alt={card.cardName} className="w-full h-full object-cover" />
+                  {card.front_url ? (
+                    <img src={card.front_url} alt={card.card_name ?? ''} className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">N/A</div>
                   )}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{card.cardName}</p>
+                  <p className="text-sm font-semibold text-gray-900 truncate">{card.card_name}</p>
                   <p className="text-xs text-gray-500 mt-0.5">
                     {card.category}{card.serial ? ` · #${card.serial}` : ''}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
-                    {card.grade != null && (
+                    {card.conversational_whole_grade != null && (
                       <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-bold rounded bg-emerald-100 text-emerald-800">
-                        Grade {card.grade}
+                        Grade {card.conversational_whole_grade}
                       </span>
                     )}
-                    {(card.ebayPriceMedian ?? card.dcmPriceEstimate) != null && (
+                    {(card.ebay_price_median ?? card.dcm_price_estimate) != null && (
                       <span className="text-xs text-gray-600">
-                        ~${(card.ebayPriceMedian ?? card.dcmPriceEstimate ?? 0).toFixed(2)}
+                        ~${(card.ebay_price_median ?? card.dcm_price_estimate ?? 0).toFixed(2)}
                       </span>
                     )}
                   </div>

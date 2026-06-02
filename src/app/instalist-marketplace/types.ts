@@ -46,18 +46,32 @@ export interface MarketplaceListing {
   updatedAt: string;
 }
 
+/**
+ * Raw card record returned by /api/ebay/eligible-cards. Snake-case on
+ * purpose — this is the same shape the per-category card-detail APIs
+ * use and the EbayListingModal expects. Don't transform to camelCase
+ * here or the modal will read undefined for everything it needs.
+ *
+ * Indexed type instead of an exhaustive interface because the modal
+ * accesses ~30 different card fields and any future addition (item
+ * specifics, new grading scores, etc.) should flow through without
+ * a parallel type bump here.
+ */
 export interface MarketplaceCard {
+  // Always present (selected explicitly in the eligible-cards route)
   id: string;
-  cardName: string;
+  card_name: string | null;
   category: string | null;
   serial: string | null;
-  grade: number | null;
-  conditionLabel: string | null;
-  subScores: any;
-  dcmPriceEstimate: number | null;
-  ebayPriceMedian: number | null;
-  thumbnailUrl: string | null;
-  frontPath: string | null;
-  backPath: string | null;
-  createdAt: string;
+  front_path: string | null;
+  back_path: string | null;
+  front_url: string | null; // signed URL for the modal's image pipeline
+  back_url: string | null;
+  conversational_whole_grade: number | null;
+  dcm_price_estimate: number | null;
+  ebay_price_median: number | null;
+  created_at: string;
+  // Plus everything else the modal accesses — kept as an open
+  // index so the type doesn't need to enumerate ~30 fields.
+  [key: string]: any;
 }
