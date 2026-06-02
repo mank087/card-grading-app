@@ -148,7 +148,13 @@ export async function POST(request: NextRequest) {
 
     if (!dryRun) {
       for (const { status, item, card_id } of toImport) {
-        const insertSku = item.sku || `IMPORTED-${item.itemId}`;
+        // eBay reuses SKUs across relistings (the "Sell similar" / "Relist"
+        // flows preserve the original SKU on every resulting ItemID), so
+        // ours has to be disambiguated by listing_id. The listing_id IS
+        // the natural unique key for an eBay listing; the original SKU is
+        // preserved as a prefix for traceability.
+        const baseSku = item.sku || 'IMPORTED';
+        const insertSku = `${baseSku}-${item.itemId}`;
         const listingFormat = item.listingFormat === 'FixedPriceItem' ? 'FIXED_PRICE' : 'AUCTION';
         const card = cardsById.get(card_id);
         const categoryId = ebayCategoryFor(card?.category);
