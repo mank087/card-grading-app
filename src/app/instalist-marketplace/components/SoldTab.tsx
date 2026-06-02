@@ -47,14 +47,9 @@ export default function SoldTab({ listings }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Lifetime gross</p>
-          <p className="mt-1 text-2xl font-bold text-gray-900">${totalGross.toFixed(2)}</p>
-        </div>
-        <p className="text-xs text-gray-500 max-w-[260px] text-right">
-          Gross sale price before eBay fees and shipping costs. Net payout breakdown coming in Phase 4.
-        </p>
+      <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
+        <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Lifetime gross</p>
+        <p className="mt-1 text-2xl font-bold text-gray-900">${totalGross.toFixed(2)}</p>
       </div>
 
       <div className="overflow-hidden bg-white border border-gray-200 rounded-xl">
