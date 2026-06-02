@@ -24,10 +24,10 @@ import { getMyEbaySelling, getItemDetail, type EbaySellingItem } from '@/lib/eba
 const CRON_SECRET = process.env.CRON_SECRET;
 const MAX_USERS_PER_RUN = 50;
 // Hard cap on per-listing GetItem fallback calls per cron invocation.
-// Each GetItem takes ~500ms; 80 calls × 500ms = 40s, comfortably under the
-// 60s Vercel function timeout while still making meaningful progress on
-// users with lots of stale orphan rows.
-const MAX_GET_ITEM_CALLS_PER_RUN = 80;
+// Each GetItem takes ~500ms; 200 calls × 500ms ≈ 100s, well under Vercel Pro's
+// 300s cron timeout. Big enough that even users with hundreds of stale
+// listings converge in 2-3 cron runs.
+const MAX_GET_ITEM_CALLS_PER_RUN = 200;
 const USE_SANDBOX = process.env.EBAY_USE_SANDBOX === 'true';
 
 export async function GET(request: NextRequest) {
@@ -246,12 +246,27 @@ async function syncUser(
     getItemCalls++;
 
     if (!detail) {
-      // eBay can't find the item (deleted long ago, typo, etc.). Stamp synced
-      // so we don't keep retrying it on every run.
+      // GetItem returned null — eBay couldn't find the item. This happens
+      // when:
+      //   - The listing ended so long ago that eBay archived it (most common
+      //     for fixed-duration listings older than ~60–120 days)
+      //   - The seller manually deleted it on eBay
+      //   - The itemId in our DB is stale or wrong
+      //
+      // None of those scenarios are "still actively live for sale," so we
+      // promote the row to 'ended'. If a future ground-truth disagrees,
+      // user can refresh or we can correct via a follow-up. Keeping it
+      // 'active' was the worse default — it kept stale rows on the My
+      // Listings tab forever.
       await supabaseAdmin
         .from('ebay_listings')
-        .update({ last_synced_at: now })
+        .update({
+          status: 'ended',
+          ended_at: now,
+          last_synced_at: now,
+        })
         .eq('id', orphan.id);
+      ended++;
       continue;
     }
 
