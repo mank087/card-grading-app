@@ -196,6 +196,7 @@ export default function AccountScreen() {
       <MenuSection title="Tools">
         <MenuItem icon="pricetags" label="Label Studio" onPress={() => nav('label-studio')} />
         <MenuItem icon="cash" label="Market Pricing" onPress={() => nav('market-pricing')} color={Colors.green[600]} />
+        <MenuItem icon="storefront" label="InstaList Marketplace" onPress={() => nav('instalist-marketplace')} color={Colors.purple[600]} />
         <MenuItem icon="bag" label="Shop" onPress={() => router.push('/(tabs)/shop')} />
       </MenuSection>
 
