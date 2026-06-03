@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image, StyleSheet,
-  Modal, ScrollView,
+  Modal,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
@@ -38,7 +38,6 @@ export default function CardPicker({
   cards, truncated, searchInFlight, onSelect, onRefresh, refreshing, onSearchQueryChange,
 }: Props) {
   const [query, setQuery] = useState('')
-  const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [sort, setSort] = useState<SortKey>('recent')
   const [showSortSheet, setShowSortSheet] = useState(false)
 
@@ -57,12 +56,6 @@ export default function CardPicker({
     }
   }, [query, onSearchQueryChange])
 
-  const categories = useMemo(() => {
-    const s = new Set<string>()
-    cards.forEach(c => c.category && s.add(c.category))
-    return ['all', ...Array.from(s).sort()]
-  }, [cards])
-
   const filtered = useMemo(() => {
     // Server already filtered by query when search is active; we keep
     // a thin local re-filter so the picker stays instant while the
@@ -75,9 +68,6 @@ export default function CardPicker({
         (c.serial || '').toLowerCase().includes(q),
       )
     }
-    if (categoryFilter !== 'all') {
-      result = result.filter(c => c.category === categoryFilter)
-    }
     const sorted = [...result]
     if (sort === 'name') sorted.sort((a, b) => (a.card_name || '').localeCompare(b.card_name || ''))
     else if (sort === 'grade') sorted.sort((a, b) => (b.conversational_whole_grade ?? 0) - (a.conversational_whole_grade ?? 0))
@@ -89,7 +79,7 @@ export default function CardPicker({
       })
     }
     return sorted
-  }, [cards, query, categoryFilter, sort])
+  }, [cards, query, sort])
 
   return (
     <View style={styles.container}>
@@ -134,30 +124,6 @@ export default function CardPicker({
           <Text style={styles.sortButtonText}>Sort</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Category filter pills */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.filterRow}
-        contentContainerStyle={styles.filterContent}
-      >
-        {categories.map(c => {
-          const active = categoryFilter === c
-          return (
-            <TouchableOpacity
-              key={c}
-              onPress={() => setCategoryFilter(c)}
-              style={[styles.filterPill, active && styles.filterPillActive]}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
-                {c === 'all' ? 'All' : c}
-              </Text>
-            </TouchableOpacity>
-          )
-        })}
-      </ScrollView>
 
       {/* Sort bottom sheet — light-weight, no extra deps */}
       <Modal
@@ -279,17 +245,6 @@ const styles = StyleSheet.create({
     borderRadius: 10, paddingHorizontal: 12,
   },
   sortButtonText: { fontSize: 13, fontWeight: '600', color: Colors.purple[700] },
-  filterRow: { maxHeight: 40 },
-  filterContent: { paddingHorizontal: 12, gap: 6, paddingBottom: 8 },
-  filterPill: {
-    paddingHorizontal: 12, paddingVertical: 5,
-    backgroundColor: Colors.white,
-    borderColor: Colors.gray[200], borderWidth: 1,
-    borderRadius: 999,
-  },
-  filterPillActive: { backgroundColor: Colors.purple[600], borderColor: Colors.purple[600] },
-  filterPillText: { fontSize: 12, fontWeight: '600', color: Colors.gray[700] },
-  filterPillTextActive: { color: Colors.white },
   resultCount: {
     fontSize: 11, fontWeight: '600', color: Colors.gray[500],
     paddingHorizontal: 12, paddingVertical: 8, textTransform: 'uppercase', letterSpacing: 0.4,

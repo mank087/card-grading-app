@@ -146,7 +146,7 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
   instalist: [
     {
       title: 'Sell on eBay in seconds',
-      body: "When you're ready to sell, the InstaList tab publishes your DCM-graded cards to eBay — front + back labels, mini report, smart pricing all auto-filled.",
+      body: "When you're ready to sell, the InstaList tab publishes your DCM-graded cards to eBay with front and back label images, your mini grading report, and the certification fields all filled in for you.",
     },
     {
       title: 'Connect once, list anywhere',

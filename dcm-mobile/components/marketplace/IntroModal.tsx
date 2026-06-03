@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
-  View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity, Image,
+  View, Text, Modal, ScrollView, StyleSheet, TouchableOpacity,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -18,7 +18,10 @@ import { Colors } from '@/lib/constants'
  * meaningfully change the copy or feature scope.
  */
 
-const STORAGE_KEY_VERSION = 'v1'
+// Bumped from v1 → v2 when the benefit copy was rewritten to match the
+// web marketplace's feature list. Users who already dismissed v1 will see
+// v2 on their next visit so they catch the updated value-prop.
+const STORAGE_KEY_VERSION = 'v2'
 const storageKey = (userId: string | null | undefined) =>
   `dcm_instalist_intro_seen_${STORAGE_KEY_VERSION}_${userId ?? 'anon'}`
 
@@ -26,26 +29,33 @@ interface Props {
   userId: string | null | undefined
 }
 
+// Mirrors the benefit list shown on the web /instalist-marketplace
+// marketing section, so mobile + web tell the same story.
 const BENEFITS = [
   {
-    icon: 'images' as const,
-    title: 'Auto-generated photos',
-    body: 'Front + back graded labels and a DCM mini grading report — assembled in seconds, no photo-editing required.',
+    emoji: '🖼️',
+    title: 'Auto-generated listing images',
+    body: 'Front + back graded label images, your mini grading report, and the raw photos of your card. Add gallery uploads if you want more.',
   },
   {
-    icon: 'pricetag' as const,
-    title: 'Smart pricing',
-    body: 'We seed your listing title and price from live eBay market data so you start at the right number.',
+    emoji: '🏷️',
+    title: 'Grade baked into eBay specifics',
+    body: "DCM grader certification, grade, and certification number populate eBay's required graded-card fields for you.",
   },
   {
-    icon: 'swap-horizontal' as const,
-    title: 'Reorder your gallery',
-    body: 'Drag any image into position 1 — the first picture is the one buyers see in eBay search results.',
+    emoji: '📊',
+    title: 'Live performance dashboard',
+    body: 'Active listings, sold history, ended (unsold), revenue, view counts, watchers. All in one view, refreshed every 15 minutes.',
   },
   {
-    icon: 'analytics' as const,
-    title: 'Track everything',
-    body: 'Active, sold, and ended listings all in one place — pull-to-refresh and tap any row to jump to eBay.',
+    emoji: '🔄',
+    title: 'One-click relist',
+    body: 'When a listing ends without selling, relist it with the same details and updated price in one click.',
+  },
+  {
+    emoji: '🎁',
+    title: 'Complimentary for DCM users',
+    body: 'No referral fees, no markup, no commission. InstaList is part of your DCM account. You list, you keep all the proceeds.',
   },
 ]
 
@@ -90,14 +100,14 @@ export default function IntroModal({ userId }: Props) {
 
             <Text style={styles.title}>Welcome to InstaList Marketplace</Text>
             <Text style={styles.subtitle}>
-              The fastest way to list your DCM-graded cards on eBay — and track everything that comes after.
+              The fastest way to list your DCM-graded cards on eBay. Track every active and sold listing in one place.
             </Text>
 
             <View style={styles.benefits}>
               {BENEFITS.map(b => (
                 <View key={b.title} style={styles.benefit}>
                   <View style={styles.benefitIcon}>
-                    <Ionicons name={b.icon} size={18} color={Colors.purple[600]} />
+                    <Text style={styles.benefitEmoji}>{b.emoji}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.benefitTitle}>{b.title}</Text>
@@ -108,8 +118,8 @@ export default function IntroModal({ userId }: Props) {
             </View>
 
             <Text style={styles.fineprint}>
-              Listings go live on your eBay seller account. Payments are processed by eBay — DCM
-              never sees buyer funds.
+              Listings go live on your eBay seller account. Payments are processed by eBay,
+              and DCM never sees buyer funds.
             </Text>
           </ScrollView>
 
@@ -120,7 +130,7 @@ export default function IntroModal({ userId }: Props) {
             accessibilityRole="button"
             accessibilityLabel="Got it, take me to the marketplace"
           >
-            <Text style={styles.ctaText}>Got it — let&rsquo;s list a card</Text>
+            <Text style={styles.ctaText}>Got it, let&rsquo;s list a card</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -161,6 +171,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.purple[50],
     alignItems: 'center', justifyContent: 'center',
   },
+  benefitEmoji: { fontSize: 22, lineHeight: 26 },
   benefitTitle: { fontSize: 14, fontWeight: '700', color: Colors.gray[900], marginBottom: 2 },
   benefitBody: { fontSize: 13, color: Colors.gray[600], lineHeight: 18 },
   fineprint: {
