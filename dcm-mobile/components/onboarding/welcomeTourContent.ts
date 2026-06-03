@@ -21,6 +21,7 @@ export type TourScreenId =
   | 'collection'
   | 'labels'
   | 'portfolio'
+  | 'instalist'
   | 'account'
   | 'complete'
 
@@ -40,6 +41,7 @@ export const TOUR_SCREEN_ORDER: TourScreenId[] = [
   'collection',
   'labels',
   'portfolio',
+  'instalist',
   'account',
   'complete',
 ]
@@ -54,6 +56,7 @@ export const TOUR_SCREEN_ROUTE: Record<TourScreenId, string> = {
   collection: '/(tabs)/collection',
   labels: '/(tabs)/labels',
   portfolio: '/(tabs)/market-pricing',
+  instalist: '/(tabs)/instalist-marketplace',
   account: '/(tabs)/account',
   complete: '/(tabs)/grade',
 }
@@ -138,6 +141,20 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
     {
       title: 'Unlock full pricing dashboard',
       body: 'Card Lovers members get historical price trends, bulk valuation tools, and the complete market dashboard.',
+    },
+  ],
+  instalist: [
+    {
+      title: 'Sell on eBay in seconds',
+      body: "When you're ready to sell, the InstaList tab publishes your DCM-graded cards to eBay — front + back labels, mini report, smart pricing all auto-filled.",
+    },
+    {
+      title: 'Connect once, list anywhere',
+      body: "Sign in to your eBay seller account a single time. After that, every card you grade is one tap away from being a live listing.",
+    },
+    {
+      title: 'Track every listing',
+      body: 'Active, sold, and ended listings all sync here. See revenue at a glance and relist anything that ends without selling.',
     },
   ],
   account: [

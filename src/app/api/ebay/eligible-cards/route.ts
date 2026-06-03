@@ -27,6 +27,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
     }
 
+    // Optional server-side text search. When `?q=` is present we narrow
+    // at the database level (ILIKE on card_name OR serial) so even users
+    // with thousands of cards can find a specific one without the client
+    // ever pulling the whole list.
+    const url = new URL(request.url);
+    const q = (url.searchParams.get('q') || '').trim();
+
     // Exclude cards that currently have an active listing — the user already
     // listed them via InstaList, no need to surface them again.
     const { data: activeListings } = await supabase
@@ -43,17 +50,28 @@ export async function GET(request: NextRequest) {
     // from. Avoids 500s if any conversational_* / item-specifics column
     // is added or removed from the cards schema later.
     //
-    // Hard limit kept conservative — the picker is browsing UI, not bulk
-    // export. Users with >500 graded cards see a truncation notice and
-    // can use search/filter to find specific cards.
-    const HARD_LIMIT = 500;
-    const { data: cards, error } = await supabase
+    // Default limit bumped to 2000 (was 500) — most users have <500
+    // graded cards; power users can have 500-2000+. With a server-side
+    // search escape hatch above, the cap is now a safety net rather
+    // than a functional limit.
+    const HARD_LIMIT = q ? 100 : 2000;
+    let query = supabase
       .from('cards')
       .select('*')
       .eq('user_id', user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
       .limit(HARD_LIMIT);
+
+    if (q) {
+      // Escape the % and _ wildcards so users searching for literal
+      // characters don't accidentally match everything. Then wrap with
+      // %…% for substring match. .or() takes a PostgREST filter string.
+      const safe = q.replace(/[%_]/g, ch => `\\${ch}`);
+      query = query.or(`card_name.ilike.%${safe}%,serial.ilike.%${safe}%`);
+    }
+
+    const { data: cards, error } = await query;
 
     if (error) {
       console.error('[eligible-cards] DB error:', error);
@@ -65,6 +83,11 @@ export async function GET(request: NextRequest) {
     // into the request URL and breaks (HTTP 414) for power users with many
     // active listings. JS-side filtering scales without that risk.
     const eligibleRows = (cards ?? []).filter(c => !excludeIds.has(c.id));
+
+    // (cards.length === HARD_LIMIT) means we hit the cap. For search
+    // queries hitting the cap is normal (means "100+ matches, refine
+    // further"); for unfiltered fetches it means "2000+ cards exist".
+    const hitCap = (cards?.length ?? 0) >= HARD_LIMIT;
 
     // Batch-sign both front AND back paths so the modal has working URLs
     // for its image generation pipeline without making per-card storage calls.
@@ -92,9 +115,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       cards: enriched,
       alreadyListedCount: excludeIds.size,
-      // Signals that we hit the hard cap — UI can show "Showing your N most
-      // recent cards" so a power user understands why old cards are missing.
-      truncated: (cards?.length ?? 0) >= HARD_LIMIT,
+      // Signals UI behavior: truncated=true means we hit the cap. For
+      // unfiltered fetches that's "2000+ cards exist, refine to find
+      // older ones." For search queries that's "100+ matches, narrow it."
+      truncated: hitCap,
+      query: q || undefined,
     });
   } catch (err: any) {
     console.error('[eligible-cards] unexpected error:', err);

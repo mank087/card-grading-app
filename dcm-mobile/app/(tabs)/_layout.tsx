@@ -5,6 +5,7 @@ import { View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
 import AppHeaderBar from '@/components/AppHeaderBar'
+import EbayWordmark from '@/components/marketplace/EbayWordmark'
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets()
@@ -72,6 +73,18 @@ export default function TabLayout() {
           title: 'Portfolio',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="cash" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="instalist-marketplace"
+        options={{
+          // Shorter label to keep the 6-tab bar from getting cramped on
+          // 360pt-wide Android devices. The eBay wordmark icon is the
+          // primary visual cue; this label clarifies what eBay is for.
+          title: 'InstaList',
+          tabBarIcon: ({ color, size, focused }) => (
+            <EbayWordmark color={color} size={size} focused={focused} />
           ),
         }}
       />

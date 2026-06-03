@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   View, Text, FlatList, TextInput, TouchableOpacity, Image, StyleSheet,
   Modal, ScrollView,
@@ -19,9 +19,14 @@ const SORT_LABELS: Record<SortKey, string> = {
 interface Props {
   cards: EligibleCard[]
   truncated?: boolean
+  /** True while a debounced server fetch is in flight for a search query. */
+  searchInFlight?: boolean
   onSelect: (card: EligibleCard) => void
   onRefresh: () => void
   refreshing: boolean
+  /** Fires after a 250ms debounce of the search input — parent runs the
+   *  server fetch with `?q=`. Empty string clears the search. */
+  onSearchQueryChange?: (q: string) => void
 }
 
 /**
@@ -29,11 +34,28 @@ interface Props {
  * web CardPicker's search/filter/sort surface but adapts to mobile (sort
  * is a bottom sheet, category filter is a horizontal pill row).
  */
-export default function CardPicker({ cards, truncated, onSelect, onRefresh, refreshing }: Props) {
+export default function CardPicker({
+  cards, truncated, searchInFlight, onSelect, onRefresh, refreshing, onSearchQueryChange,
+}: Props) {
   const [query, setQuery] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
   const [sort, setSort] = useState<SortKey>('recent')
   const [showSortSheet, setShowSortSheet] = useState(false)
+
+  // Debounce the query → server fetch. 250ms feels snappy without
+  // hammering the API. Cancel on every keystroke so we only fire the
+  // request once the user pauses typing.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!onSearchQueryChange) return
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      onSearchQueryChange(query.trim())
+    }, 250)
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [query, onSearchQueryChange])
 
   const categories = useMemo(() => {
     const s = new Set<string>()
@@ -42,6 +64,9 @@ export default function CardPicker({ cards, truncated, onSelect, onRefresh, refr
   }, [cards])
 
   const filtered = useMemo(() => {
+    // Server already filtered by query when search is active; we keep
+    // a thin local re-filter so the picker stays instant while the
+    // debounced fetch is in flight (no flicker of unfiltered cards).
     let result = cards
     const q = query.trim().toLowerCase()
     if (q) {
@@ -72,7 +97,9 @@ export default function CardPicker({ cards, truncated, onSelect, onRefresh, refr
         <View style={styles.truncatedBanner}>
           <Ionicons name="information-circle" size={14} color={Colors.amber[600]} />
           <Text style={styles.truncatedText}>
-            Showing your 500 most recent cards. Older ones aren&rsquo;t in this picker — use search to narrow down.
+            {query.trim()
+              ? `100+ matches. Refine your search to narrow it down.`
+              : `Showing your 2000 most recently graded cards. Use search to find older ones.`}
           </Text>
         </View>
       )}
@@ -83,7 +110,7 @@ export default function CardPicker({ cards, truncated, onSelect, onRefresh, refr
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search by name or serial"
+            placeholder="Search across your collection"
             placeholderTextColor={Colors.gray[400]}
             style={styles.searchInput}
             autoCorrect={false}
@@ -91,6 +118,11 @@ export default function CardPicker({ cards, truncated, onSelect, onRefresh, refr
             returnKeyType="search"
             clearButtonMode="while-editing"
           />
+          {searchInFlight && (
+            <View style={{ marginLeft: 4 }}>
+              <Ionicons name="ellipsis-horizontal" size={14} color={Colors.gray[400]} />
+            </View>
+          )}
         </View>
         <TouchableOpacity
           style={styles.sortButton}

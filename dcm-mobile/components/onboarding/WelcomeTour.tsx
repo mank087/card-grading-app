@@ -33,7 +33,7 @@ const WELCOME_BENEFITS = [
   { icon: '🔬', title: 'Triple-pass AI grading', body: 'Every card is analyzed 3 independent times and averaged for maximum accuracy. PSA-aligned scoring.' },
   { icon: '💰', title: 'Real market pricing', body: "See what your card is worth based on its grade — pulled from live eBay sales + PriceCharting data." },
   { icon: '🏷️', title: 'Custom slab labels', body: 'Design and print labels for your slabs, magnetic one-touch holders, and toploaders.' },
-  { icon: '🛒', title: 'List to eBay in seconds', body: 'Auto-generated photos and descriptions for your graded cards — including a full condition report sent to the winning bidder.' },
+  { icon: '🛒', title: 'List to eBay from the InstaList tab', body: 'Publish graded cards to your eBay store in seconds — auto-generated labels, mini grading report, and smart pricing. Track active and sold listings without leaving DCM.' },
 ] as const
 
 export default function WelcomeTour() {

@@ -50,9 +50,17 @@ export interface EligibleCardsResponse {
   truncated?: boolean
 }
 
-export async function fetchEligibleCards(): Promise<EligibleCardsResponse> {
+/**
+ * Fetch eligible cards. With `q`, the server runs an ILIKE search on
+ * card_name + serial and returns up to 100 matches. Without it, returns
+ * the user's 2000 most recent cards.
+ */
+export async function fetchEligibleCards(q?: string): Promise<EligibleCardsResponse> {
   const headers = await authHeaders()
-  const res = await fetch(`${API_BASE}/api/ebay/eligible-cards`, { headers })
+  const url = q && q.trim()
+    ? `${API_BASE}/api/ebay/eligible-cards?q=${encodeURIComponent(q.trim())}`
+    : `${API_BASE}/api/ebay/eligible-cards`
+  const res = await fetch(url, { headers })
   if (!res.ok) throw new Error(`Couldn't load your graded cards (HTTP ${res.status})`)
   const json = await res.json()
   return {

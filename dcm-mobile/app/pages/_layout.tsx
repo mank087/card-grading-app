@@ -37,7 +37,6 @@ export default function PagesLayout() {
           shared header chrome (DCM logo + credits) shows everywhere. */}
       <Stack.Screen name="label-studio" options={{ headerShown: false }} />
       <Stack.Screen name="ebay-list" options={{ headerShown: false }} />
-      <Stack.Screen name="instalist-marketplace" options={{ headerShown: false }} />
       <Stack.Screen name="contact" options={{ headerShown: false }} />
     </Stack>
   )

@@ -17,13 +17,12 @@ import {
 } from '@/lib/marketplaceApi'
 import { checkEbayStatus, getOAuthUrl, type EbayConnectionStatus } from '@/lib/ebayApi'
 
-import AppHeaderBar from '@/components/AppHeaderBar'
-import MobileTabBar from '@/components/MobileTabBar'
 import StatsStrip from '@/components/marketplace/StatsStrip'
 import SyncStatusPill, { type SyncState } from '@/components/marketplace/SyncStatusPill'
 import InfoView from '@/components/marketplace/InfoView'
 import CardPicker from '@/components/marketplace/CardPicker'
 import ListingsTab from '@/components/marketplace/ListingsTab'
+import IntroModal from '@/components/marketplace/IntroModal'
 
 type PageState = 'loading' | 'guest' | 'no-cards' | 'connect' | 'marketplace' | 'error'
 type TabId = 'list' | 'active' | 'sold' | 'ended'
@@ -36,20 +35,17 @@ const TABS: { id: TabId; label: string }[] = [
 ]
 
 /**
- * Native InstaList Marketplace screen.
+ * Native InstaList Marketplace tab.
  *
- * Mirrors the web /instalist-marketplace state machine exactly:
- *   loading → (auth check) → guest | (cards check) → no-cards | (ebay
- *   check) → connect | marketplace
+ * Lives in (tabs)/ so it gets the standard tab chrome (AppHeaderBar +
+ * bottom Tabs nav). Uses the same backend endpoints as the web
+ * /instalist-marketplace page so mobile and web see identical data.
  *
- * Uses the same backend endpoints, so mobile and web see identical data.
- * Listing creation hands off to the existing native ebay-list.tsx screen
- * by router.push with ?cardId=… — no modal involved.
- *
- * Important: contains NO purchase UI. All credit/subscription paths route
- * through pages/credits which already forks iOS IAP vs Android Stripe.
+ * Contains NO purchase UI. Any credit/subscription paths go through
+ * pages/credits which already forks iOS native StoreKit IAP vs Android
+ * Stripe-in-WebView. Don't add a "buy credits" CTA here.
  */
-export default function InstalistMarketplaceScreen() {
+export default function InstalistMarketplaceTab() {
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const { user, session, isLoading: authLoading } = useAuth()
@@ -59,6 +55,9 @@ export default function InstalistMarketplaceScreen() {
 
   const [cards, setCards] = useState<EligibleCard[]>([])
   const [cardsTruncated, setCardsTruncated] = useState(false)
+  const [pickerSearchQuery, setPickerSearchQuery] = useState('')
+  const [pickerSearchInFlight, setPickerSearchInFlight] = useState(false)
+
   const [stats, setStats] = useState<MarketplaceStats | null>(null)
   const [listings, setListings] = useState<{ active: MarketplaceListing[]; sold: MarketplaceListing[]; ended: MarketplaceListing[] }>({
     active: [], sold: [], ended: [],
@@ -68,7 +67,7 @@ export default function InstalistMarketplaceScreen() {
   const [activeTab, setActiveTab] = useState<TabId | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // OAuth modal — reuses the same native WebView modal as ebay-list.tsx.
+  // OAuth modal — reuses the same native WebView modal pattern as ebay-list.tsx.
   const [showOAuth, setShowOAuth] = useState(false)
   const [oauthUrl, setOauthUrl] = useState('')
   const [connecting, setConnecting] = useState(false)
@@ -77,16 +76,17 @@ export default function InstalistMarketplaceScreen() {
   const [syncState, setSyncState] = useState<SyncState>({ kind: 'idle' })
   const syncInFlight = useRef(false)
 
-  // ─── Hardware back on Android — pop the stack cleanly ─────────────────
+  // ─── Hardware back on Android — only intercept for OAuth modal ────────
+  // As a tab screen the default back behavior (exit app) is fine; we only
+  // need to dismiss the OAuth modal cleanly when it's open.
   useEffect(() => {
     if (Platform.OS !== 'android') return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (showOAuth) { setShowOAuth(false); return true }
-      router.back()
-      return true
+      return false
     })
     return () => sub.remove()
-  }, [router, showOAuth])
+  }, [showOAuth])
 
   // ─── Main data load ───────────────────────────────────────────────────
   const refreshAll = useCallback(async () => {
@@ -97,7 +97,9 @@ export default function InstalistMarketplaceScreen() {
     setRefreshing(true)
     setErrorMessage(null)
     try {
-      // Eligible cards first — they double as the "do you have cards?" check
+      // Eligible cards first — they double as the "do you have cards?" check.
+      // No query on the bulk refresh; server-side search uses a separate
+      // fetch wired below via onSearchQueryChange.
       const cardsRes = await fetchEligibleCards()
       const totalGraded = cardsRes.cards.length + cardsRes.alreadyListedCount
       setCards(cardsRes.cards)
@@ -142,9 +144,7 @@ export default function InstalistMarketplaceScreen() {
   }, [authLoading, refreshAll])
 
   // ─── Auto-refresh on focus — fires when returning from ebay-list.tsx ──
-  // useFocusEffect re-runs whenever the screen regains focus, which is
-  // exactly the post-publish handoff path. Skip the first run since the
-  // mount effect already covers it.
+  // Skip the first run since the mount effect already covers it.
   const isFirstFocus = useRef(true)
   useFocusEffect(useCallback(() => {
     if (isFirstFocus.current) { isFirstFocus.current = false; return }
@@ -163,6 +163,23 @@ export default function InstalistMarketplaceScreen() {
     setActiveTab(stats.activeCount > 0 ? 'active' : 'list')
   }, [pageState, stats, activeTab])
 
+  // ─── Picker server-side search — fires after the debounce in CardPicker
+  const handlePickerSearchQueryChange = useCallback(async (q: string) => {
+    setPickerSearchQuery(q)
+    if (!session?.access_token) return
+    setPickerSearchInFlight(true)
+    try {
+      const res = await fetchEligibleCards(q || undefined)
+      setCards(res.cards)
+      setCardsTruncated(res.truncated ?? false)
+    } catch (e) {
+      // Search failure shouldn't tear down the screen — just stop the spinner.
+      console.warn('[marketplace] search failed', e)
+    } finally {
+      setPickerSearchInFlight(false)
+    }
+  }, [session?.access_token])
+
   // ─── On-demand sync ───────────────────────────────────────────────────
   const fireSyncMe = useCallback(async () => {
     if (syncInFlight.current) return
@@ -177,8 +194,6 @@ export default function InstalistMarketplaceScreen() {
       }
       const transitions = result.transitions ?? 0
       setSyncState({ kind: 'done', transitions })
-      // Pull fresh lists so the new state surfaces immediately, and give
-      // a light success haptic only when there's something new to surface.
       if (transitions > 0) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {})
         await refreshAll()
@@ -214,7 +229,6 @@ export default function InstalistMarketplaceScreen() {
   const handleOAuthNavigation = useCallback((navState: WebViewNavigation) => {
     if (navState.url.includes('/ebay-auth-success')) {
       setShowOAuth(false)
-      // Give the server a beat to finish the token write before we re-check.
       setTimeout(() => { refreshAll() }, 600)
     } else if (navState.url.includes('error=')) {
       setShowOAuth(false)
@@ -228,51 +242,32 @@ export default function InstalistMarketplaceScreen() {
   }, [router])
 
   const handleRelist = useCallback((cardId: string) => {
-    // Same target — ebay-list.tsx already accepts cardId and handles the
-    // "previously listed" warning shown by /api/ebay/listing/check.
     router.push({ pathname: '/pages/ebay-list', params: { cardId } })
   }, [router])
 
   // ─── Render ────────────────────────────────────────────────────────────
 
-  // While auth resolves, hold on a spinner — don't flash "guest" then
-  // "marketplace" for a user whose session is still hydrating.
   if (authLoading || pageState === 'loading') {
     return (
       <View style={styles.screen}>
-        <AppHeaderBar showBack title="Marketplace" />
         <View style={styles.loaderWrap}>
           <ActivityIndicator size="large" color={Colors.purple[600]} />
         </View>
-        <MobileTabBar />
       </View>
     )
   }
 
   if (pageState === 'guest') {
-    return (
-      <View style={styles.screen}>
-        <AppHeaderBar showBack title="Marketplace" />
-        <InfoView variant="guest" />
-        <MobileTabBar />
-      </View>
-    )
+    return <View style={styles.screen}><InfoView variant="guest" /></View>
   }
 
   if (pageState === 'no-cards') {
-    return (
-      <View style={styles.screen}>
-        <AppHeaderBar showBack title="Marketplace" />
-        <InfoView variant="no-cards" />
-        <MobileTabBar />
-      </View>
-    )
+    return <View style={styles.screen}><InfoView variant="no-cards" /></View>
   }
 
   if (pageState === 'connect') {
     return (
       <View style={styles.screen}>
-        <AppHeaderBar showBack title="Marketplace" />
         <InfoView variant="connect" onConnect={startOAuth} isConnecting={connecting} />
         <OAuthModal
           visible={showOAuth}
@@ -281,7 +276,6 @@ export default function InstalistMarketplaceScreen() {
           onClose={() => setShowOAuth(false)}
           onNavStateChange={handleOAuthNavigation}
         />
-        <MobileTabBar />
       </View>
     )
   }
@@ -289,9 +283,7 @@ export default function InstalistMarketplaceScreen() {
   if (pageState === 'error') {
     return (
       <View style={styles.screen}>
-        <AppHeaderBar showBack title="Marketplace" />
         <InfoView variant="error" errorMessage={errorMessage ?? undefined} onRetry={refreshAll} />
-        <MobileTabBar />
       </View>
     )
   }
@@ -299,7 +291,8 @@ export default function InstalistMarketplaceScreen() {
   // ───────────────── Full marketplace ─────────────────
   return (
     <View style={styles.screen}>
-      <AppHeaderBar showBack title="Marketplace" />
+      {/* First-visit intro modal — auto-dismisses after first acknowledgment */}
+      <IntroModal userId={user?.id} />
 
       {/* Connection chip + sync pill row */}
       <View style={styles.subHeader}>
@@ -365,9 +358,11 @@ export default function InstalistMarketplaceScreen() {
           <CardPicker
             cards={cards}
             truncated={cardsTruncated}
+            searchInFlight={pickerSearchInFlight}
             onSelect={handlePickCard}
             onRefresh={refreshAll}
             refreshing={refreshing}
+            onSearchQueryChange={handlePickerSearchQueryChange}
           />
         )}
         {activeTab === 'active' && (
@@ -396,8 +391,6 @@ export default function InstalistMarketplaceScreen() {
           />
         )}
       </View>
-
-      <MobileTabBar />
     </View>
   )
 }

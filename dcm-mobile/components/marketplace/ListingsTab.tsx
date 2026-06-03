@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback } from 'react'
 import {
   View, Text, FlatList, StyleSheet, RefreshControl,
-  TouchableOpacity, Modal,
+  TouchableOpacity, Modal, TextInput,
 } from 'react-native'
 import { Ionicons } from '@expo/vector-icons'
 import { Colors } from '@/lib/constants'
@@ -34,9 +34,17 @@ interface Props {
 export default function ListingsTab({ mode, listings, refreshing, onRefresh, onRelist }: Props) {
   const [sort, setSort] = useState<SortKey>('date')
   const [showSortSheet, setShowSortSheet] = useState(false)
+  const [query, setQuery] = useState('')
 
   const sorted = useMemo(() => {
-    const arr = [...listings]
+    // Filter by search first, then sort.
+    const q = query.trim().toLowerCase()
+    let arr = q
+      ? listings.filter(l =>
+          (l.cardName || '').toLowerCase().includes(q) ||
+          (l.title || '').toLowerCase().includes(q),
+        )
+      : [...listings]
     if (sort === 'price') {
       arr.sort((a, b) => safe(b.price) - safe(a.price))
     } else if (sort === 'name') {
@@ -50,7 +58,7 @@ export default function ListingsTab({ mode, listings, refreshing, onRefresh, onR
       arr.sort((a, b) => dateOf(b) - dateOf(a))
     }
     return arr
-  }, [listings, sort, mode])
+  }, [listings, sort, mode, query])
 
   // Sold-tab strip: "Lifetime gross" total.
   const totalGross = useMemo(() => {
@@ -86,9 +94,26 @@ export default function ListingsTab({ mode, listings, refreshing, onRefresh, onR
         </View>
       )}
 
+      <View style={styles.searchRow}>
+        <View style={styles.searchBox}>
+          <Ionicons name="search" size={16} color={Colors.gray[400]} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search by card name or title"
+            placeholderTextColor={Colors.gray[400]}
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+          />
+        </View>
+      </View>
+
       <View style={styles.toolbar}>
         <Text style={styles.count}>
-          {listings.length} {listings.length === 1 ? 'listing' : 'listings'}
+          {sorted.length}{query.trim() ? ` of ${listings.length}` : ''} {listings.length === 1 ? 'listing' : 'listings'}
         </Text>
         <TouchableOpacity
           style={styles.sortButton}
@@ -193,6 +218,18 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase', letterSpacing: 0.4,
   },
   grossValue: { fontSize: 22, fontWeight: '800', color: Colors.gray[900], marginTop: 2 },
+  searchRow: {
+    paddingHorizontal: 12, paddingTop: 10,
+  },
+  searchBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    backgroundColor: Colors.white,
+    borderColor: Colors.gray[200], borderWidth: 1,
+    borderRadius: 10, paddingHorizontal: 10,
+  },
+  searchInput: {
+    flex: 1, paddingVertical: 8, fontSize: 14, color: Colors.gray[900],
+  },
   toolbar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 12, paddingVertical: 10,
