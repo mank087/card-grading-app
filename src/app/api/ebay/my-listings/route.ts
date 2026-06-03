@@ -58,7 +58,7 @@ export async function GET(request: NextRequest) {
         last_synced_at,
         created_at,
         updated_at,
-        cards!inner (
+        cards (
           id,
           card_name,
           category,
@@ -113,7 +113,9 @@ export async function GET(request: NextRequest) {
       listingId: r.listing_id,
       listingUrl: r.listing_url,
       title: r.title,
-      price: Number(r.price),
+      // Guard against null/undefined/non-numeric price so the client's
+      // `.toFixed()` calls never blow up rendering for a malformed row.
+      price: Number.isFinite(Number(r.price)) ? Number(r.price) : 0,
       currency: r.currency,
       quantity: r.quantity,
       quantitySold: r.quantity_sold ?? 0,

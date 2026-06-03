@@ -44,54 +44,92 @@ export default function EndedTab({ listings, onRelist }: Props) {
   }
 
   return (
-    <div className="overflow-hidden bg-white border border-gray-200 rounded-xl">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
-              <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
-              <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Last price</SortableTh>
-              <SortableTh col="endedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Ended</SortableTh>
-              <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {sortedRows.map(l => (
-              <tr key={l.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
-                      {l.thumbnailUrl ? (
-                        <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{l.cardName}</p>
-                      <p className="text-xs text-gray-500">{l.cardCategory}{l.cardGrade != null ? ` · Grade ${l.cardGrade}` : ''}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-700 max-w-[280px]">
-                  <div className="truncate" title={l.title}>{l.title}</div>
-                </td>
-                <td className="px-4 py-3 text-sm text-right text-gray-700">${l.price.toFixed(2)}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{formatDate(l.endedAt)}</td>
-                <td className="px-4 py-3 text-sm text-right">
-                  <button
-                    onClick={() => onRelist(l.cardId)}
-                    className="text-indigo-600 hover:text-indigo-800 font-semibold text-sm"
-                  >
-                    Relist
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+    <>
+      {/* Mobile card layout */}
+      <div className="md:hidden space-y-3">
+        {sortedRows.map(l => (
+          <div key={l.id} className="bg-white border border-gray-200 rounded-xl p-3">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
+                {l.thumbnailUrl ? (
+                  <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-gray-900 truncate">{l.cardName}</p>
+                <p className="text-xs text-gray-500">{l.cardCategory}{l.cardGrade != null ? ` · Grade ${l.cardGrade}` : ''}</p>
+                <p className="text-xs text-gray-600 mt-1 line-clamp-2" title={l.title}>{l.title}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-sm text-gray-700">${safePrice(l.price)}</span>
+                  <span className="text-xs text-gray-500">{formatDate(l.endedAt)}</span>
+                </div>
+                <button
+                  onClick={() => onRelist(l.cardId)}
+                  className="mt-2 inline-flex items-center text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+                >
+                  Relist this card
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-hidden bg-white border border-gray-200 rounded-xl">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+                <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+                <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Last price</SortableTh>
+                <SortableTh col="endedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Ended</SortableTh>
+                <th className="px-4 py-3 text-xs font-bold text-gray-500 uppercase tracking-wider text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {sortedRows.map(l => (
+                <tr key={l.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
+                        {l.thumbnailUrl ? (
+                          <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{l.cardName}</p>
+                        <p className="text-xs text-gray-500">{l.cardCategory}{l.cardGrade != null ? ` · Grade ${l.cardGrade}` : ''}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 max-w-[280px]">
+                    <div className="truncate" title={l.title}>{l.title}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right text-gray-700">${safePrice(l.price)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(l.endedAt)}</td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    <button
+                      onClick={() => onRelist(l.cardId)}
+                      className="text-indigo-600 hover:text-indigo-800 font-semibold text-sm"
+                    >
+                      Relist
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
+}
+
+function safePrice(n: number): string {
+  if (!Number.isFinite(n)) return '0.00';
+  return n.toFixed(2);
 }
 
 function formatDate(iso: string | null): string {

@@ -4,6 +4,7 @@ import type { MarketplaceCard } from '../types';
 
 interface Props {
   cards: MarketplaceCard[];
+  truncated?: boolean;
   onSelectCard: (card: MarketplaceCard) => void;
 }
 
@@ -11,7 +12,7 @@ interface Props {
  * "List a Card" tab. Left rail = card picker, right area = explainer/empty state.
  * On select, parent opens the EbayListingModal — same modal the card-detail page uses.
  */
-export default function ListNewTab({ cards, onSelectCard }: Props) {
+export default function ListNewTab({ cards, truncated, onSelectCard }: Props) {
   if (cards.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
@@ -40,6 +41,11 @@ export default function ListNewTab({ cards, onSelectCard }: Props) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1">
+        {truncated && (
+          <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
+            Showing your 500 most recently graded cards. Older ones aren&rsquo;t in this picker — use search to narrow down.
+          </div>
+        )}
         <CardPicker cards={cards} onSelect={onSelectCard} />
       </div>
       <div className="lg:col-span-2">

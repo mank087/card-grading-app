@@ -42,28 +42,34 @@ export async function GET(request: NextRequest) {
     // always sees the same shape regardless of where the user opens it
     // from. Avoids 500s if any conversational_* / item-specifics column
     // is added or removed from the cards schema later.
-    let query = supabase
+    //
+    // Hard limit kept conservative — the picker is browsing UI, not bulk
+    // export. Users with >500 graded cards see a truncation notice and
+    // can use search/filter to find specific cards.
+    const HARD_LIMIT = 500;
+    const { data: cards, error } = await supabase
       .from('cards')
       .select('*')
       .eq('user_id', user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(500);
+      .limit(HARD_LIMIT);
 
-    if (excludeIds.size > 0) {
-      query = query.not('id', 'in', `(${[...excludeIds].map(id => `"${id}"`).join(',')})`);
-    }
-
-    const { data: cards, error } = await query;
     if (error) {
       console.error('[eligible-cards] DB error:', error);
       return NextResponse.json({ error: 'Failed to load cards' }, { status: 500 });
     }
 
+    // Filter out already-listed cards in JS rather than a PostgREST
+    // `not.in.(...)` URL filter — that filter encodes every excluded UUID
+    // into the request URL and breaks (HTTP 414) for power users with many
+    // active listings. JS-side filtering scales without that risk.
+    const eligibleRows = (cards ?? []).filter(c => !excludeIds.has(c.id));
+
     // Batch-sign both front AND back paths so the modal has working URLs
     // for its image generation pipeline without making per-card storage calls.
     const allPaths: string[] = [];
-    for (const c of cards ?? []) {
+    for (const c of eligibleRows) {
       if (c.front_path) allPaths.push(c.front_path);
       if (c.back_path) allPaths.push(c.back_path);
     }
@@ -77,7 +83,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const enriched = (cards ?? []).map(c => ({
+    const enriched = eligibleRows.map(c => ({
       ...c,
       front_url: c.front_path ? urlMap.get(c.front_path) ?? null : null,
       back_url: c.back_path ? urlMap.get(c.back_path) ?? null : null,
@@ -86,6 +92,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       cards: enriched,
       alreadyListedCount: excludeIds.size,
+      // Signals that we hit the hard cap — UI can show "Showing your N most
+      // recent cards" so a power user understands why old cards are missing.
+      truncated: (cards?.length ?? 0) >= HARD_LIMIT,
     });
   } catch (err: any) {
     console.error('[eligible-cards] unexpected error:', err);

@@ -17,7 +17,7 @@ export default function SoldTab({ listings }: Props) {
     switch (key) {
       case 'card': return row.cardName ?? '';
       case 'title': return row.title ?? '';
-      case 'price': return row.price * Math.max(1, row.quantitySold);
+      case 'price': return safeNumber(row.price) * Math.max(1, row.quantitySold);
       case 'qty': return row.quantitySold || 1;
       case 'soldAt': return row.soldAt ? new Date(row.soldAt).getTime() : null;
       case 'url': return row.listingUrl ?? '';
@@ -43,16 +43,51 @@ export default function SoldTab({ listings }: Props) {
     );
   }
 
-  const totalGross = listings.reduce((sum, l) => sum + (l.price * Math.max(1, l.quantitySold)), 0);
+  const totalGross = listings.reduce((sum, l) => sum + (safeNumber(l.price) * Math.max(1, l.quantitySold)), 0);
 
   return (
     <div className="space-y-4">
       <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-5 py-4">
         <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Lifetime gross</p>
-        <p className="mt-1 text-2xl font-bold text-gray-900">${totalGross.toFixed(2)}</p>
+        <p className="mt-1 text-2xl font-bold text-gray-900">${safePrice(totalGross)}</p>
       </div>
 
-      <div className="overflow-hidden bg-white border border-gray-200 rounded-xl">
+      {/* Mobile card layout */}
+      <div className="md:hidden space-y-3">
+        {sortedRows.map(l => (
+          <div key={l.id} className="bg-white border border-gray-200 rounded-xl p-3">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
+                {l.thumbnailUrl ? (
+                  <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-gray-900 truncate">{l.cardName}</p>
+                <p className="text-xs text-gray-500">{l.cardCategory}{l.cardGrade != null ? ` · Grade ${l.cardGrade}` : ''}</p>
+                <p className="text-xs text-gray-600 mt-1 line-clamp-2" title={l.title}>{l.title}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-sm font-semibold text-emerald-700">${safePrice(l.price)}{l.quantitySold > 1 ? ` × ${l.quantitySold}` : ''}</span>
+                  <span className="text-xs text-gray-500">{formatDate(l.soldAt)}</span>
+                </div>
+                {l.listingUrl ? (
+                  <a
+                    href={l.listingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-2 inline-flex items-center gap-1 text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+                  >
+                    View on eBay
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-hidden bg-white border border-gray-200 rounded-xl">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -85,7 +120,7 @@ export default function SoldTab({ listings }: Props) {
                     <div className="truncate" title={l.title}>{l.title}</div>
                   </td>
                   <td className="px-4 py-3 text-sm text-right font-semibold text-emerald-700">
-                    ${l.price.toFixed(2)}
+                    ${safePrice(l.price)}
                   </td>
                   <td className="px-4 py-3 text-sm text-right text-gray-700">{l.quantitySold || 1}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{formatDate(l.soldAt)}</td>
@@ -99,7 +134,7 @@ export default function SoldTab({ listings }: Props) {
                       >
                         Open
                       </a>
-                    ) : <span className="text-gray-400">—</span>}
+                    ) : <span className="text-gray-400">&mdash;</span>}
                   </td>
                 </tr>
               ))}
@@ -109,6 +144,15 @@ export default function SoldTab({ listings }: Props) {
       </div>
     </div>
   );
+}
+
+function safeNumber(n: any): number {
+  const v = typeof n === 'number' ? n : Number(n);
+  return Number.isFinite(v) ? v : 0;
+}
+
+function safePrice(n: number): string {
+  return safeNumber(n).toFixed(2);
 }
 
 function formatDate(iso: string | null): string {

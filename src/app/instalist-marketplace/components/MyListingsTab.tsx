@@ -39,43 +39,29 @@ export default function MyListingsTab({ listings }: Props) {
   }
 
   return (
-    <div className="overflow-hidden bg-white border border-gray-200 rounded-xl">
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
-              <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
-              <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Price</SortableTh>
-              <SortableTh col="publishedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Published</SortableTh>
-              <SortableTh col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100">
-            {sortedRows.map(l => (
-              <tr key={l.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
-                      {l.thumbnailUrl ? (
-                        <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
-                      ) : null}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{l.cardName}</p>
-                      <p className="text-xs text-gray-500">{l.cardCategory}{l.cardGrade != null ? ` · Grade ${l.cardGrade}` : ''}</p>
-                    </div>
-                  </div>
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-700 max-w-[280px]">
-                  <div className="truncate" title={l.title}>{l.title}</div>
-                  <div className="text-xs text-gray-400 mt-0.5">{l.listingFormat === 'AUCTION' ? 'Auction' : 'Fixed price'} · {labelForDuration(l.duration)}</div>
-                </td>
-                <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
-                  ${l.price.toFixed(2)}
-                </td>
-                <td className="px-4 py-3 text-sm text-gray-600">{formatDate(l.publishedAt)}</td>
-                <td className="px-4 py-3 text-sm text-right">
+    <>
+      {/* Mobile card layout — tables don't fit on phones without horizontal
+          scroll, which hides every column except Card. Below md we render a
+          stack of cards instead. */}
+      <div className="md:hidden space-y-3">
+        {sortedRows.map(l => (
+          <div key={l.id} className="bg-white border border-gray-200 rounded-xl p-3">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
+                {l.thumbnailUrl ? (
+                  <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
+                ) : null}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold text-gray-900 truncate">{l.cardName}</p>
+                <p className="text-xs text-gray-500">{l.cardCategory}{l.cardGrade != null ? ` · Grade ${l.cardGrade}` : ''}</p>
+                <p className="text-xs text-gray-600 mt-1 line-clamp-2" title={l.title}>{l.title}</p>
+                <div className="flex items-center justify-between mt-2">
+                  <span className="text-sm font-semibold text-gray-900">${safePrice(l.price)}</span>
+                  <span className="text-xs text-gray-500">{formatDate(l.publishedAt)}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between text-xs">
+                  <span className="text-gray-400">{l.listingFormat === 'AUCTION' ? 'Auction' : 'Fixed'} · {labelForDuration(l.duration)}</span>
                   {l.listingUrl ? (
                     <a
                       href={l.listingUrl}
@@ -86,17 +72,79 @@ export default function MyListingsTab({ listings }: Props) {
                       Open
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                     </a>
-                  ) : (
-                    <span className="text-gray-400">—</span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-    </div>
+
+      {/* Desktop table */}
+      <div className="hidden md:block overflow-hidden bg-white border border-gray-200 rounded-xl">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <SortableTh col="card" toggleSort={toggleSort} sortIndicator={sortIndicator}>Card</SortableTh>
+                <SortableTh col="title" toggleSort={toggleSort} sortIndicator={sortIndicator}>Title</SortableTh>
+                <SortableTh col="price" align="right" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Price</SortableTh>
+                <SortableTh col="publishedAt" defaultDir="desc" toggleSort={toggleSort} sortIndicator={sortIndicator}>Published</SortableTh>
+                <SortableTh col="url" align="right" toggleSort={toggleSort} sortIndicator={sortIndicator}>View on eBay</SortableTh>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {sortedRows.map(l => (
+                <tr key={l.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-14 h-20 bg-gray-100 rounded overflow-hidden">
+                        {l.thumbnailUrl ? (
+                          <img src={l.thumbnailUrl} alt="" className="w-full h-full object-contain" />
+                        ) : null}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate max-w-[180px]">{l.cardName}</p>
+                        <p className="text-xs text-gray-500">{l.cardCategory}{l.cardGrade != null ? ` · Grade ${l.cardGrade}` : ''}</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-700 max-w-[280px]">
+                    <div className="truncate" title={l.title}>{l.title}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{l.listingFormat === 'AUCTION' ? 'Auction' : 'Fixed price'} · {labelForDuration(l.duration)}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-right font-semibold text-gray-900">
+                    ${safePrice(l.price)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{formatDate(l.publishedAt)}</td>
+                  <td className="px-4 py-3 text-sm text-right">
+                    {l.listingUrl ? (
+                      <a
+                        href={l.listingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-indigo-600 hover:text-indigo-800 font-semibold"
+                      >
+                        Open
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                      </a>
+                    ) : (
+                      <span className="text-gray-400">&mdash;</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   );
+}
+
+function safePrice(n: number): string {
+  if (!Number.isFinite(n)) return '0.00';
+  return n.toFixed(2);
 }
 
 function labelForDuration(d: string): string {

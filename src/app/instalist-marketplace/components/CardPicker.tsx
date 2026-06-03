@@ -95,7 +95,10 @@ export default function CardPicker({ cards, onSelect }: Props) {
           <p className="text-sm text-gray-500">No matching cards.</p>
         </div>
       ) : (
-        <ul className="divide-y divide-gray-100 max-h-[640px] overflow-y-auto">
+        // No max-h on mobile — the page scrolls naturally and a nested
+        // 640px scroll trap is a known mobile anti-pattern. On lg screens
+        // we cap it so the right-side explainer panel stays visible.
+        <ul className="divide-y divide-gray-100 lg:max-h-[640px] lg:overflow-y-auto">
           {filtered.map(card => (
             <li key={card.id}>
               <button

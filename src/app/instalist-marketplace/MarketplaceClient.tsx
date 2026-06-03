@@ -50,6 +50,7 @@ export default function MarketplaceClient() {
   }>({ active: [], sold: [], ended: [] });
 
   const [cards, setCards] = useState<MarketplaceCard[]>([]);
+  const [cardsTruncated, setCardsTruncated] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,6 +94,7 @@ export default function MarketplaceClient() {
       const alreadyListedCount: number = cardsJson.alreadyListedCount ?? 0;
       const totalGradedCards = eligibleCards.length + alreadyListedCount;
       setCards(eligibleCards);
+      setCardsTruncated(!!cardsJson.truncated);
 
       if (totalGradedCards === 0) {
         setPageState('no-cards');
@@ -110,20 +112,34 @@ export default function MarketplaceClient() {
         return;
       }
 
-      // Fully provisioned — load the dashboard payloads.
+      // Fully provisioned — load the dashboard payloads. Surface failures
+      // explicitly instead of silently landing the user in an empty
+      // marketplace — a 401 on either endpoint is almost always an expired
+      // eBay session and the user needs to know to reconnect.
       const [statsRes, listingsRes] = await Promise.all([
         fetch('/api/ebay/stats', { headers }),
         fetch('/api/ebay/my-listings', { headers }),
       ]);
-      if (statsRes.ok) setStats(await statsRes.json());
-      if (listingsRes.ok) {
-        const j = await listingsRes.json();
-        setListings({ active: j.active ?? [], sold: j.sold ?? [], ended: j.ended ?? [] });
+      if (!statsRes.ok || !listingsRes.ok) {
+        const failed = !statsRes.ok ? 'stats' : 'listings';
+        const status = !statsRes.ok ? statsRes.status : listingsRes.status;
+        const msg = status === 401
+          ? "Your DCM session expired. Please refresh the page and sign in again."
+          : `Couldn't load your eBay ${failed} (status ${status}). Try again in a moment.`;
+        throw new Error(msg);
       }
+      setStats(await statsRes.json());
+      const lj = await listingsRes.json();
+      setListings({ active: lj.active ?? [], sold: lj.sold ?? [], ended: lj.ended ?? [] });
       setPageState('marketplace');
     } catch (e: any) {
       console.error('[Marketplace] refreshAll error', e);
-      setError(e.message || 'Failed to load marketplace');
+      // Only surface our own crafted messages — never raw server error text
+      // (could contain Supabase/eBay internals).
+      const friendly = (e?.message && typeof e.message === 'string' && e.message.length < 200)
+        ? e.message
+        : 'Something went wrong loading your marketplace. Please try again.';
+      setError(friendly);
     } finally {
       setRefreshing(false);
     }
@@ -215,23 +231,50 @@ export default function MarketplaceClient() {
       const res = await fetch('/api/ebay/auth?return_url=/instalist-marketplace', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      if (!res.ok) {
+        throw new Error(`Couldn't start the eBay connection (HTTP ${res.status}). Try again.`);
+      }
       const j = await res.json();
-      // The route returns { authUrl }, not { url } — earlier draft used the
-      // wrong key and surfaced "No auth URL returned" even when the API was
-      // working fine. Accept both shapes defensively.
+      // The route returns { authUrl }, not { url } — accept both for safety.
       const authUrl = j.authUrl || j.url;
-      if (!authUrl) throw new Error(j.error || 'No auth URL returned');
+      if (!authUrl) throw new Error("Couldn't get an eBay sign-in link. Please try again.");
+
       const popup = window.open(authUrl, 'ebay-oauth', 'width=600,height=750');
+      if (!popup || popup.closed) {
+        // Popup blocked. Give the user a direct link as a fallback so they
+        // aren't stuck staring at an unresponsive button.
+        setConnectError(
+          "Your browser blocked the eBay sign-in popup. Allow popups for this site or open the link manually."
+        );
+        try { window.location.href = authUrl; } catch { /* navigation failure is non-fatal here */ }
+        return;
+      }
+
       const onMessage = (e: MessageEvent) => {
+        // Origin check — only trust messages from our own window.
+        // Otherwise a hostile site could spoof a "connected" signal.
+        if (e.origin !== window.location.origin) return;
         if (e.data?.type === 'EBAY_AUTH_COMPLETE') {
           window.removeEventListener('message', onMessage);
-          popup?.close();
+          popup.close();
           refreshAll();
         }
       };
       window.addEventListener('message', onMessage);
+
+      // Safety: auto-detach the listener if the user closes the popup
+      // without completing OAuth, so we don't leak handlers across attempts.
+      const closeWatcher = window.setInterval(() => {
+        if (popup.closed) {
+          window.removeEventListener('message', onMessage);
+          window.clearInterval(closeWatcher);
+        }
+      }, 1000);
     } catch (e: any) {
-      setConnectError(e.message || 'Connection failed');
+      const friendly = (e?.message && typeof e.message === 'string' && e.message.length < 200)
+        ? e.message
+        : 'Connection failed. Please try again.';
+      setConnectError(friendly);
     } finally {
       setConnecting(false);
     }
@@ -287,13 +330,15 @@ export default function MarketplaceClient() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 mb-6">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">InstaList Marketplace</h1>
             <p className="text-sm sm:text-base text-gray-600 mt-1">
               List your graded cards on eBay and track performance.
             </p>
           </div>
-          <div className="flex items-center gap-3 flex-wrap">
+          {/* Right-side controls — wrap on narrow screens so the pill chips
+              don't overflow the header on phones <360px wide. */}
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {ebayUsername && (
               <span className="inline-flex items-center gap-2 text-xs sm:text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
                 <span className="w-2 h-2 rounded-full bg-emerald-500" />
@@ -338,7 +383,7 @@ export default function MarketplaceClient() {
         {/* Tab content */}
         <div className="mt-6">
           {activeTab === 'list' && (
-            <ListNewTab cards={cards} onSelectCard={setModalCard} />
+            <ListNewTab cards={cards} truncated={cardsTruncated} onSelectCard={setModalCard} />
           )}
           {activeTab === 'active' && (
             <MyListingsTab listings={listings.active} />
