@@ -2089,6 +2089,14 @@ EXTRACTION RULES:
                   collectorNumber: cardNumber,
                   year,
                   variant,
+                  // Foil flag passes through to PriceCharting's product-id
+                  // resolver so the `dcm_price_at_grading` baseline written
+                  // below matches the variant the user actually owns.
+                  // Previously the foil flag was only set on manual
+                  // refresh — meaning foil MTG baselines were always
+                  // non-foil prices, which made every foil card look like
+                  // a permanent gainer or loser on the Movers table.
+                  isFoil: !!cardInfo?.is_foil,
                 });
                 if (result.prices) {
                   estimatedValue = estimateMTGDcmValue(result.prices, dcmGrade);
@@ -2105,6 +2113,8 @@ EXTRACTION RULES:
                   collectorNumber: cardNumber,
                   year,
                   variant,
+                  // Same foil-baseline fix as MTG above.
+                  isFoil: !!cardInfo?.is_foil,
                 });
                 if (result.prices) {
                   estimatedValue = estimateLorcanaDcmValue(result.prices, dcmGrade);

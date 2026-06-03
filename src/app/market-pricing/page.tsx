@@ -44,6 +44,12 @@ export default function MarketPricingPage() {
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshFeedback, setRefreshFeedback] = useState<
+    | null
+    | { kind: 'success'; refreshed: number; failed: number; remaining: number }
+    | { kind: 'error'; message: string }
+    | { kind: 'rate-limited'; retryAfterSec: number }
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [refreshCount, setRefreshCount] = useState<number>(() => {
@@ -100,6 +106,7 @@ export default function MarketPricingPage() {
   async function handleRefreshPrices() {
     if (refreshLimitReached) return;
     setRefreshing(true);
+    setRefreshFeedback(null);
     try {
       const session = getStoredSession();
       if (!session?.access_token) return;
@@ -112,12 +119,31 @@ export default function MarketPricingPage() {
         },
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        console.error('Refresh failed:', data.error || res.statusText);
+      const data = await res.json().catch(() => ({} as any));
+
+      if (res.status === 429) {
+        setRefreshFeedback({ kind: 'rate-limited', retryAfterSec: data.retryAfterSec ?? 60 });
+        // Don't burn one of the 2 daily clicks on a server-rejected one.
+        return;
       }
 
-      // Track refresh count (2 per day limit)
+      if (!res.ok || !data.success) {
+        setRefreshFeedback({
+          kind: 'error',
+          message: typeof data.error === 'string' ? data.error : 'Refresh failed. Please try again in a moment.',
+        });
+        return;
+      }
+
+      setRefreshFeedback({
+        kind: 'success',
+        refreshed: Number(data.refreshed) || 0,
+        failed: Number(data.failed) || 0,
+        remaining: Number(data.remaining) || 0,
+      });
+
+      // Track refresh count (2 per day limit). Server also enforces a
+      // 60s cool-down; the localStorage counter is just for the UI label.
       const newCount = refreshCount + 1;
       setRefreshCount(newCount);
       localStorage.setItem('dcm_refresh_data', JSON.stringify({
@@ -127,8 +153,11 @@ export default function MarketPricingPage() {
 
       // Re-fetch portfolio after refresh
       await fetchPortfolio();
-    } catch (err) {
-      console.error('Failed to refresh prices:', err);
+    } catch (err: any) {
+      setRefreshFeedback({
+        kind: 'error',
+        message: err?.message?.length < 200 ? err.message : 'Refresh failed. Please try again.',
+      });
     } finally {
       setRefreshing(false);
     }
@@ -203,6 +232,57 @@ export default function MarketPricingPage() {
             </div>
           </div>
         </section>
+
+        {/* Refresh feedback banner — appears after the user clicks Refresh
+            Prices Now. Dismissible; auto-clears on next refresh attempt. */}
+        {refreshFeedback && (
+          <section className="max-w-7xl mx-auto px-4 mt-4">
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm flex items-start justify-between gap-3 ${
+                refreshFeedback.kind === 'success'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : refreshFeedback.kind === 'rate-limited'
+                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                  : 'bg-red-50 border-red-200 text-red-800'
+              }`}
+              role="status"
+            >
+              <div className="flex-1">
+                {refreshFeedback.kind === 'success' && (
+                  <>
+                    <strong>Refresh complete.</strong>{' '}
+                    {refreshFeedback.refreshed} card{refreshFeedback.refreshed === 1 ? '' : 's'} updated
+                    {refreshFeedback.failed > 0 && `, ${refreshFeedback.failed} couldn't be priced`}
+                    {refreshFeedback.remaining > 0 && (
+                      <>
+                        {' '}&middot; {refreshFeedback.remaining} more stale card{refreshFeedback.remaining === 1 ? '' : 's'} will refresh on the next click or weekly cron
+                      </>
+                    )}
+                    .
+                  </>
+                )}
+                {refreshFeedback.kind === 'rate-limited' && (
+                  <>
+                    <strong>Easy there.</strong> Please wait {refreshFeedback.retryAfterSec}s
+                    before refreshing again so we don&apos;t hammer the pricing APIs.
+                  </>
+                )}
+                {refreshFeedback.kind === 'error' && (
+                  <>
+                    <strong>Refresh didn&apos;t complete.</strong> {refreshFeedback.message}
+                  </>
+                )}
+              </div>
+              <button
+                onClick={() => setRefreshFeedback(null)}
+                className="text-current opacity-60 hover:opacity-100 flex-shrink-0"
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* Category Filter Pills */}
         {portfolio && portfolio.categoryBreakdown.length > 1 && (

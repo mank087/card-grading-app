@@ -155,11 +155,15 @@ export async function searchEbayPrices(
   // Build filter string
   const filters: string[] = [];
 
+  // Always restrict to USD listings. Without this, JP Pokemon cards (and
+  // any non-US market match) leak yen/euro prices into the median we
+  // cache on cards.ebay_price_median, distorting Portfolio values.
+  filters.push('priceCurrency:USD');
+
   if (options.minPrice !== undefined || options.maxPrice !== undefined) {
     const min = options.minPrice ?? 0;
     const max = options.maxPrice ?? 10000;
     filters.push(`price:[${min}..${max}]`);
-    filters.push('priceCurrency:USD');
   }
 
   if (options.categoryId) {
@@ -183,15 +187,30 @@ export async function searchEbayPrices(
 
   const searchUrl = `${apiUrl}/buy/browse/v1/item_summary/search?${params.toString()}`;
 
-  const response = await fetch(searchUrl, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
-    },
-  });
-
-  const responseText = await response.text();
+  // Retry once on 429 (rate limit) and 5xx errors with exponential backoff.
+  // The Browse API is generally generous but throttles aggressively when
+  // we batch refresh hundreds of cards in a row from the cron.
+  let response: Response;
+  let responseText: string;
+  let attempt = 0;
+  const MAX_ATTEMPTS = 3;
+  const BACKOFF_BASE_MS = 750;
+  while (true) {
+    response = await fetch(searchUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'X-EBAY-C-MARKETPLACE-ID': 'EBAY_US',
+      },
+    });
+    responseText = await response.text();
+    const retryable = response.status === 429 || response.status >= 500;
+    if (response.ok || !retryable || attempt >= MAX_ATTEMPTS - 1) break;
+    attempt++;
+    const delayMs = BACKOFF_BASE_MS * Math.pow(2, attempt - 1);
+    console.warn(`[eBay Browse] HTTP ${response.status} on attempt ${attempt}, retrying in ${delayMs}ms`);
+    await new Promise(r => setTimeout(r, delayMs));
+  }
 
   if (!response.ok) {
     console.error('[eBay Browse] Search failed:', response.status, responseText);
