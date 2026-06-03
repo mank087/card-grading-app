@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { pdf } from '@react-pdf/renderer';
 import { generateCardImages, generateRawCardImages, CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
@@ -176,6 +176,16 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; blob: Blob; url: string; selected: boolean }>>([]);
   const additionalInputRef = useRef<HTMLInputElement>(null);
 
+  // Ordered list of image references — mirrors the mobile flow. The user
+  // reorders this list via arrow buttons; first SELECTED item becomes the
+  // gallery main image on eBay. System tiles (front/back/etc.) and custom
+  // uploads share the same ordering — that's how the user controls which
+  // image lands in position 1 vs 2 etc.
+  type OrderedImageItem =
+    | { kind: 'system'; key: 'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack' }
+    | { kind: 'custom'; id: string };
+  const [imageOrder, setImageOrder] = useState<OrderedImageItem[]>([]);
+
   // Listing details state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -271,6 +281,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setImageBlobs({});
       setSelectedImages({ front: true, back: true, miniReport: true, rawFront: true, rawBack: true });
       setAdditionalImages([]);
+      setImageOrder([]);
       setListingResult(null);
       setExistingListing(null);
       setCheckingExistingListing(false);
@@ -780,6 +791,15 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         rawFront: URL.createObjectURL(rawImages.front),
         rawBack: URL.createObjectURL(rawImages.back),
       });
+      // Seed the ordered list once the system images are ready. Subsequent
+      // user uploads append themselves via the additionalImages-sync effect.
+      setImageOrder(prev => prev.length > 0 ? prev : [
+        { kind: 'system', key: 'front' },
+        { kind: 'system', key: 'back' },
+        { kind: 'system', key: 'miniReport' },
+        { kind: 'system', key: 'rawFront' },
+        { kind: 'system', key: 'rawBack' },
+      ]);
 
     } catch (err) {
       console.error('[eBay Listing] Failed to generate images:', err);
@@ -788,6 +808,35 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setIsLoading(false);
     }
   };
+
+  // Keep imageOrder in lockstep with additionalImages: new uploads land at
+  // the end (so they don't shove the user's curated system-image order
+  // around), and deletions are pruned.
+  useEffect(() => {
+    setImageOrder(prev => {
+      const currentIds = new Set(additionalImages.map(a => a.id));
+      const existingCustomIds = new Set(
+        prev.filter((i): i is { kind: 'custom'; id: string } => i.kind === 'custom').map(i => i.id)
+      );
+      const pruned = prev.filter(i => i.kind === 'system' || currentIds.has(i.id));
+      const newOnes: OrderedImageItem[] = additionalImages
+        .filter(a => !existingCustomIds.has(a.id))
+        .map(a => ({ kind: 'custom', id: a.id }));
+      if (pruned.length === prev.length && newOnes.length === 0) return prev;
+      return [...pruned, ...newOnes];
+    });
+  }, [additionalImages]);
+
+  const moveImage = useCallback((index: number, direction: -1 | 1) => {
+    setImageOrder(prev => {
+      const newIndex = index + direction;
+      if (newIndex < 0 || newIndex >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(index, 1);
+      next.splice(newIndex, 0, moved);
+      return next;
+    });
+  }, []);
 
   const uploadImages = async (): Promise<string[]> => {
     const session = getStoredSession();
@@ -854,52 +903,41 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
     const urls: string[] = [];
 
-    // Upload system images sequentially
-    if (selectedImages.front && imageBlobs.front) {
-      const url = await uploadSingleImage('front', imageBlobs.front);
-      if (url) urls.push(url);
-    }
-    if (selectedImages.back && imageBlobs.back) {
-      const url = await uploadSingleImage('back', imageBlobs.back);
-      if (url) urls.push(url);
-    }
-    if (selectedImages.miniReport && imageBlobs.miniReport) {
-      const url = await uploadSingleImage('miniReport', imageBlobs.miniReport);
-      if (url) urls.push(url);
-    }
-    if (selectedImages.rawFront && imageBlobs.rawFront) {
-      const url = await uploadSingleImage('rawFront', imageBlobs.rawFront);
-      if (url) urls.push(url);
-    }
-    if (selectedImages.rawBack && imageBlobs.rawBack) {
-      const url = await uploadSingleImage('rawBack', imageBlobs.rawBack);
-      if (url) urls.push(url);
-    }
-
-    // Upload additional user images
-    for (const img of additionalImages.filter(i => i.selected)) {
-      try {
-        const compressed = await compressBlob(img.blob);
-        const base64 = await toBase64(compressed);
-        const response = await fetch('/api/ebay/images', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session!.access_token}`,
-          },
-          body: JSON.stringify({
-            cardId: card.id,
-            additionalImages: [base64],
-          }),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          if (data.urls.additional?.length) urls.push(...data.urls.additional);
-        } else {
-          console.error('[eBay Images] Failed to upload additional image:', await response.text());
+    // Walk imageOrder so the gallery upload order matches the order the
+    // user arranged in the picker. First selected becomes eBay main image.
+    for (const item of imageOrder) {
+      if (item.kind === 'system') {
+        if (!selectedImages[item.key]) continue;
+        const blob = imageBlobs[item.key];
+        if (!blob) continue;
+        const url = await uploadSingleImage(item.key, blob);
+        if (url) urls.push(url);
+      } else {
+        const img = additionalImages.find(a => a.id === item.id);
+        if (!img || !img.selected) continue;
+        try {
+          const compressed = await compressBlob(img.blob);
+          const base64 = await toBase64(compressed);
+          const response = await fetch('/api/ebay/images', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${session!.access_token}`,
+            },
+            body: JSON.stringify({
+              cardId: card.id,
+              additionalImages: [base64],
+            }),
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.urls.additional?.length) urls.push(...data.urls.additional);
+          } else {
+            console.error('[eBay Images] Failed to upload additional image:', await response.text());
+          }
+        } catch (err) {
+          console.error('[eBay Images] Error uploading additional image:', err);
         }
-      } catch (err) {
-        console.error('[eBay Images] Error uploading additional image:', err);
       }
     }
 
@@ -1747,7 +1785,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </div>
                 </div>
               )}
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Images for Listing</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">Select & Arrange Images for Listing</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                Click to toggle. Use the arrows under each tile to reorder.
+                The first selected image becomes your eBay main image.
+              </p>
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
@@ -1755,160 +1797,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                 </div>
               ) : (
                 <div>
-                  {/* Labeled images row */}
-                  <p className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">With Grade Label</p>
-                  <div className="grid grid-cols-3 gap-4">
-                    {/* Front Image (with label) */}
-                    <div
-                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                        selectedImages.front ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                      }`}
-                      onClick={() => setSelectedImages(s => ({ ...s, front: !s.front }))}
-                    >
-                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                        {imageUrls.front && (
-                          <img src={imageUrls.front} alt="Front with label" className="max-w-full max-h-full object-contain" />
-                        )}
-                      </div>
-                      <div className="absolute top-2 right-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          selectedImages.front ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                        }`}>
-                          {selectedImages.front && (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                        Front
-                      </div>
-                    </div>
-
-                    {/* Back Image (with label) */}
-                    <div
-                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                        selectedImages.back ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                      }`}
-                      onClick={() => setSelectedImages(s => ({ ...s, back: !s.back }))}
-                    >
-                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                        {imageUrls.back && (
-                          <img src={imageUrls.back} alt="Back with label" className="max-w-full max-h-full object-contain" />
-                        )}
-                      </div>
-                      <div className="absolute top-2 right-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          selectedImages.back ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                        }`}>
-                          {selectedImages.back && (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                        Back
-                      </div>
-                    </div>
-
-                    {/* Mini Report */}
-                    <div
-                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                        selectedImages.miniReport ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                      }`}
-                      onClick={() => setSelectedImages(s => ({ ...s, miniReport: !s.miniReport }))}
-                    >
-                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                        {imageUrls.miniReport && (
-                          <img src={imageUrls.miniReport} alt="Mini Report" className="max-w-full max-h-full object-contain" />
-                        )}
-                      </div>
-                      <div className="absolute top-2 right-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          selectedImages.miniReport ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                        }`}>
-                          {selectedImages.miniReport && (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                        Report
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Raw card images row */}
-                  <p className="text-xs text-gray-500 mb-2 mt-4 font-medium uppercase tracking-wide">Card Only (No Label)</p>
-                  <div className="grid grid-cols-3 gap-4">
-                    {/* Raw Front */}
-                    <div
-                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                        selectedImages.rawFront ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                      }`}
-                      onClick={() => setSelectedImages(s => ({ ...s, rawFront: !s.rawFront }))}
-                    >
-                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                        {imageUrls.rawFront && (
-                          <img src={imageUrls.rawFront} alt="Front (no label)" className="max-w-full max-h-full object-contain" />
-                        )}
-                      </div>
-                      <div className="absolute top-2 right-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          selectedImages.rawFront ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                        }`}>
-                          {selectedImages.rawFront && (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                        Front (Raw)
-                      </div>
-                    </div>
-
-                    {/* Raw Back */}
-                    <div
-                      className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                        selectedImages.rawBack ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                      }`}
-                      onClick={() => setSelectedImages(s => ({ ...s, rawBack: !s.rawBack }))}
-                    >
-                      <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                        {imageUrls.rawBack && (
-                          <img src={imageUrls.rawBack} alt="Back (no label)" className="max-w-full max-h-full object-contain" />
-                        )}
-                      </div>
-                      <div className="absolute top-2 right-2">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                          selectedImages.rawBack ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                        }`}>
-                          {selectedImages.rawBack && (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </div>
-                      </div>
-                      <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs py-1 text-center">
-                        Back (Raw)
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              {/* Additional User Photos */}
-              {!isLoading && (
-                <div className="mt-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium text-gray-700">Additional Photos</h4>
+                  <div className="flex items-center justify-end mb-2">
                     <span className="text-xs text-gray-400">
                       {(() => {
                         const total = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length
@@ -1917,46 +1806,153 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                       })()}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    {additionalImages.map((img) => (
-                      <div
-                        key={img.id}
-                        className={`relative border-2 rounded-lg overflow-hidden cursor-pointer transition-all ${
-                          img.selected ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
-                        }`}
-                        onClick={() => setAdditionalImages(prev => prev.map(i => i.id === img.id ? { ...i, selected: !i.selected } : i))}
-                      >
-                        <div className="aspect-[3/4] bg-gray-100 flex items-center justify-center">
-                          <img src={img.url} alt="Additional" className="max-w-full max-h-full object-contain" />
-                        </div>
-                        <div className="absolute top-2 right-2">
-                          <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                            img.selected ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
-                          }`}>
-                            {img.selected && (
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                            )}
-                          </div>
-                        </div>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            URL.revokeObjectURL(img.url);
-                            setAdditionalImages(prev => prev.filter(i => i.id !== img.id));
-                          }}
-                          className="absolute top-2 left-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
-                          title="Remove"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
+                  {/* Unified ordered grid — mirrors the mobile pattern. System
+                      tiles (front/back/mini-report/raw front/raw back) and
+                      user uploads share one running order, so the user can
+                      drag any image into position 1 (main) regardless of
+                      which "bucket" it came from. */}
+                  {(() => {
+                    const SYSTEM_LABELS: Record<'front' | 'back' | 'miniReport' | 'rawFront' | 'rawBack', string> = {
+                      front: 'Front',
+                      back: 'Back',
+                      miniReport: 'Report',
+                      rawFront: 'Front (Raw)',
+                      rawBack: 'Back (Raw)',
+                    };
+                    const isItemSelected = (item: OrderedImageItem): boolean => {
+                      if (item.kind === 'system') return !!selectedImages[item.key];
+                      return !!additionalImages.find(a => a.id === item.id)?.selected;
+                    };
+                    const mainIdx = imageOrder.findIndex(isItemSelected);
+                    return (
+                      <div className="grid grid-cols-3 gap-4">
+                        {imageOrder.map((item, idx) => {
+                          const isFirst = idx === 0;
+                          const isLast = idx === imageOrder.length - 1;
+                          const isMain = idx === mainIdx;
+                          const tileKey = item.kind === 'system' ? `sys-${item.key}` : `cust-${item.id}`;
 
-                    {/* Add Photo Button */}
+                          // Resolve tile contents based on item kind
+                          let url: string | undefined;
+                          let label: string;
+                          let selected: boolean;
+                          let onToggle: () => void;
+                          let onRemove: (() => void) | null = null;
+                          if (item.kind === 'system') {
+                            url = imageUrls[item.key];
+                            label = SYSTEM_LABELS[item.key];
+                            selected = !!selectedImages[item.key];
+                            onToggle = () => setSelectedImages(s => ({ ...s, [item.key]: !s[item.key] }));
+                          } else {
+                            const img = additionalImages.find(a => a.id === item.id);
+                            if (!img) return null;
+                            url = img.url;
+                            label = 'Additional';
+                            selected = img.selected;
+                            const customId = item.id;
+                            onToggle = () => setAdditionalImages(prev => prev.map(i => i.id === customId ? { ...i, selected: !i.selected } : i));
+                            onRemove = () => {
+                              URL.revokeObjectURL(img.url);
+                              setAdditionalImages(prev => prev.filter(i => i.id !== customId));
+                            };
+                          }
+
+                          return (
+                            <div
+                              key={tileKey}
+                              className={`relative border-2 rounded-lg overflow-hidden transition-all ${
+                                selected ? 'border-purple-500 ring-2 ring-purple-200' : 'border-gray-200'
+                              }`}
+                            >
+                              {/* Image area (click to toggle select) */}
+                              <div
+                                className="aspect-[3/4] bg-gray-100 flex items-center justify-center cursor-pointer"
+                                onClick={onToggle}
+                              >
+                                {url && (
+                                  <img src={url} alt={label} className="max-w-full max-h-full object-contain" />
+                                )}
+                              </div>
+
+                              {/* MAIN badge (only on the first selected tile) */}
+                              {isMain && (
+                                <div className="absolute top-2 left-1/2 -translate-x-1/2 bg-purple-600 text-white text-[9px] font-extrabold tracking-wider px-1.5 py-0.5 rounded shadow">
+                                  MAIN
+                                </div>
+                              )}
+
+                              {/* Select indicator (top right) */}
+                              <div className="absolute top-2 right-2 pointer-events-none">
+                                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                                  selected ? 'bg-purple-500 text-white' : 'bg-white border border-gray-300'
+                                }`}>
+                                  {selected && (
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Remove button (custom uploads only) */}
+                              {onRemove && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); onRemove!(); }}
+                                  className="absolute top-2 left-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                                  title="Remove"
+                                >
+                                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              )}
+
+                              {/* Reorder row (arrows + position number) */}
+                              <div className="flex items-center justify-between bg-purple-50 border-t border-gray-200 px-2 py-1.5">
+                                <button
+                                  type="button"
+                                  disabled={isFirst}
+                                  onClick={(e) => { e.stopPropagation(); moveImage(idx, -1); }}
+                                  className={`w-7 h-7 rounded flex items-center justify-center border ${
+                                    isFirst
+                                      ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
+                                      : 'border-purple-200 bg-white text-purple-600 hover:bg-purple-100'
+                                  }`}
+                                  title="Move left"
+                                  aria-label="Move left"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  </svg>
+                                </button>
+                                <span className="text-xs font-bold text-purple-700">{idx + 1}</span>
+                                <button
+                                  type="button"
+                                  disabled={isLast}
+                                  onClick={(e) => { e.stopPropagation(); moveImage(idx, 1); }}
+                                  className={`w-7 h-7 rounded flex items-center justify-center border ${
+                                    isLast
+                                      ? 'border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed'
+                                      : 'border-purple-200 bg-white text-purple-600 hover:bg-purple-100'
+                                  }`}
+                                  title="Move right"
+                                  aria-label="Move right"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                  </svg>
+                                </button>
+                              </div>
+
+                              {/* Label footer */}
+                              <div className="bg-gray-900/80 text-white text-xs py-1 text-center">
+                                {label}
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Add Photo Button (kept at the end of the unified grid) */}
                     {(() => {
                       const totalSelected = [selectedImages.front, selectedImages.back, selectedImages.miniReport, selectedImages.rawFront, selectedImages.rawBack].filter(Boolean).length
                         + additionalImages.filter(i => i.selected).length;
@@ -1976,7 +1972,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                         </div>
                       ) : null;
                     })()}
-                  </div>
+                        </div>
+                      );
+                    })()}
                   <input
                     ref={additionalInputRef}
                     type="file"
@@ -2003,7 +2001,7 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               )}
 
               <p className="mt-4 text-sm text-gray-500">
-                Click images to select/deselect. At least one image is required.
+                At least one image is required to continue.
               </p>
             </div>
           )}
