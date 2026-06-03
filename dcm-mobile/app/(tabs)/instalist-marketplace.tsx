@@ -156,12 +156,15 @@ export default function InstalistMarketplaceTab() {
   }, [pageState]))
 
   // ─── Default tab selection once marketplace is provisioned ────────────
+  // Always default to "List a Card" — that's the action-oriented entry
+  // point users expect, even if they already have active listings to
+  // monitor. They can switch to My Listings with one tap if that's
+  // what they came for.
   useEffect(() => {
     if (pageState !== 'marketplace') return
     if (activeTab !== null) return
-    if (!stats) return
-    setActiveTab(stats.activeCount > 0 ? 'active' : 'list')
-  }, [pageState, stats, activeTab])
+    setActiveTab('list')
+  }, [pageState, activeTab])
 
   // ─── Picker server-side search — fires after the debounce in CardPicker
   const handlePickerSearchQueryChange = useCallback(async (q: string) => {
