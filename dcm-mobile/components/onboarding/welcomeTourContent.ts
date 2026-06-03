@@ -128,19 +128,19 @@ export const TOUR_STEPS: Record<TourScreenId, TourStep[]> = {
   portfolio: [
     {
       title: 'Track Your Collection’s Value',
-      body: 'See what your collection is worth in real time — pulled from actual eBay sales of similarly-graded cards.',
+      body: 'See what your collection is worth in real time, pulled from actual eBay sales of similarly-graded cards.',
     },
     {
       title: 'Portfolio at a glance',
-      body: 'Total value, top earners, and how your collection trends over time.',
+      body: 'Total value, top earners, and how your collection trends over time. Free for every DCM user.',
     },
     {
       title: 'Live market data',
       body: 'Each card shows its current value based on recent sales of cards at the same grade.',
     },
     {
-      title: 'Unlock full pricing dashboard',
-      body: 'Card Lovers members get historical price trends, bulk valuation tools, and the complete market dashboard.',
+      title: 'On-demand refresh for Card Lovers',
+      body: 'Prices auto-refresh every Sunday for everyone. Card Lovers also get the on-demand refresh button to pull the latest values across your whole collection any time.',
     },
   ],
   instalist: [

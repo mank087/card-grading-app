@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
-import { isActiveCardLover } from '@/lib/credits';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { resolveCardValue, type CardForPricing } from '@/lib/pricing/resolveCardValue';
 
 // DB stores: Pokemon, MTG, Lorcana, One Piece, Other, or sport names (Football, Baseball, etc.)
 const SPORTS_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
@@ -16,36 +16,13 @@ function getCategoryPath(category: string): string {
   return 'sports';
 }
 
+/**
+ * Single price-resolution path. Mirrors the version every other surface
+ * (collection, card detail, mobile native) uses — see
+ * @/lib/pricing/resolveCardValue.
+ */
 function getCardValue(card: Record<string, unknown>): number {
-  const category = (card.category as string) || 'Other';
-
-  // Primary: dcm_price_estimate column
-  if (card.dcm_price_estimate != null && (card.dcm_price_estimate as number) > 0) {
-    return card.dcm_price_estimate as number;
-  }
-
-  // Fallback: dcm_cached_prices JSON blob (older cards before column was added)
-  const cached = card.dcm_cached_prices as Record<string, unknown> | null;
-  if (cached?.estimatedValue != null && (cached.estimatedValue as number) > 0) {
-    return cached.estimatedValue as number;
-  }
-
-  // MTG foil-aware Scryfall fallback
-  if (category === 'MTG') {
-    if (card.is_foil && (card.scryfall_price_usd_foil as number) > 0) {
-      return card.scryfall_price_usd_foil as number;
-    }
-    if ((card.scryfall_price_usd as number) > 0) {
-      return card.scryfall_price_usd as number;
-    }
-  }
-
-  // eBay median as final fallback
-  if (card.ebay_price_median != null && (card.ebay_price_median as number) > 0) {
-    return card.ebay_price_median as number;
-  }
-
-  return 0;
+  return resolveCardValue(card as unknown as CardForPricing).value;
 }
 
 // Parse card_info from conversational_grading JSON string (fallback for older cards)
@@ -88,10 +65,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: auth.error || 'Authentication required' }, { status: 401 });
     }
 
-    const isCardLover = await isActiveCardLover(auth.userId);
-    if (!isCardLover) {
-      return NextResponse.json({ error: 'Card Lovers subscription required' }, { status: 403 });
-    }
+    // Market Pricing portfolio view is open to all authenticated users.
+    // The manual on-demand refresh (POST /api/market-pricing/refresh-prices)
+    // is still gated to Card Lovers — that's where the premium pitch lives.
+    // Read-only access to your own collection's prices is a baseline feature.
 
     // Parse optional category filter
     const categoryFilter = request.nextUrl.searchParams.get('category') || null;

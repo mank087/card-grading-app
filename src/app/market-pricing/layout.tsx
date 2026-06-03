@@ -1,12 +1,12 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Market Pricing - Card Lovers Exclusive | DCM',
-  description: 'Track your card collection value, view market trends, and list cards on eBay. Exclusive portfolio dashboard for Card Lovers subscribers.',
-  keywords: 'card market pricing, collection value, card portfolio, eBay listing, card price trends, DCM market pricing',
+  title: 'Market Pricing & Portfolio Dashboard | DCM',
+  description: 'Track your graded card collection value with live market data — free for every DCM user. On-demand price refresh available with Card Lovers.',
+  keywords: 'card market pricing, collection value, card portfolio, card price trends, DCM market pricing',
   openGraph: {
-    title: 'Market Pricing - Card Lovers Exclusive | DCM',
-    description: 'Track your card collection value, view market trends, and list cards on eBay. Exclusive to Card Lovers subscribers.',
+    title: 'Market Pricing & Portfolio Dashboard | DCM',
+    description: 'Track your graded card collection value with live market data — free for every DCM user.',
     type: 'website',
     siteName: 'DCM Grading',
   },

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getStoredSession } from '@/lib/directAuth';
-import MarketPricingGate from '@/components/market-pricing/MarketPricingGate';
 import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart';
 import TopCardsTable from '@/components/market-pricing/TopCardsTable';
 import MoversTable from '@/components/market-pricing/MoversTable';
@@ -52,6 +51,10 @@ export default function MarketPricingPage() {
   >(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  // Card Lovers status drives the on-demand Refresh button. Free users see
+  // an "Auto-refreshes weekly" pill instead — they're still served the
+  // fresh data from the Sunday cron, just not on-demand.
+  const [isCardLover, setIsCardLover] = useState<boolean>(false);
   const [refreshCount, setRefreshCount] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const stored = localStorage.getItem('dcm_refresh_data');
@@ -68,7 +71,22 @@ export default function MarketPricingPage() {
 
   useEffect(() => {
     fetchPortfolio();
+    checkCardLoverStatus();
   }, []);
+
+  async function checkCardLoverStatus() {
+    try {
+      const session = getStoredSession();
+      if (!session?.access_token) return;
+      const res = await fetch('/api/subscription/status', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsCardLover(data.isActive === true);
+      }
+    } catch { /* default false */ }
+  }
 
   // Re-fetch when category filter changes
   useEffect(() => {
@@ -164,17 +182,10 @@ export default function MarketPricingPage() {
   }
 
   return (
-    <MarketPricingGate>
-      <main className="min-h-screen bg-gray-50">
+    <main className="min-h-screen bg-gray-50">
         {/* Header */}
         <section className="bg-gradient-to-r from-purple-600 via-rose-500 to-orange-500 text-white">
           <div className="max-w-7xl mx-auto px-4 py-8">
-            <div className="flex items-center gap-2 mb-2">
-              <svg className="w-5 h-5 text-rose-200" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
-              </svg>
-              <span className="text-sm font-medium text-rose-200">Card Lovers Exclusive</span>
-            </div>
             <h1 className="text-3xl md:text-4xl font-bold">Market Pricing</h1>
             <p className="text-white/80 mt-1">Track your collection&apos;s market value in real time</p>
           </div>
@@ -416,6 +427,7 @@ export default function MarketPricingPage() {
                       refreshLimitReached={refreshLimitReached}
                       refreshCount={refreshCount}
                       maxRefreshesPerDay={maxRefreshesPerDay}
+                      showRefreshButton={isCardLover}
                     />
                   </div>
 
@@ -425,6 +437,5 @@ export default function MarketPricingPage() {
 
         </section>
       </main>
-    </MarketPricingGate>
   );
 }

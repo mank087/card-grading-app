@@ -42,6 +42,7 @@ import DefectOverlay, { extractDefectMarkers } from '@/components/grading/Defect
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import { useUserEmblems } from '@/hooks/useUserEmblems'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
+import { resolveCardValue } from '@/lib/resolveCardValue'
 import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/onboarding/OnboardingTour'
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
@@ -1094,13 +1095,19 @@ export default function CardDetailScreen() {
       </View>{/* close twoPaneLeft */}
       <View style={isTwoPane ? s.twoPaneRight : undefined}>
 
-      {/* ══════ ESTIMATED VALUE + SUMMARY ══════ */}
-      {(card.ebay_price_median || card.dcm_price_estimate) && (
-        <View style={s.valueCard}>
-          <Text style={s.valueLabel}>DCM Estimated Value</Text>
-          <Text style={s.valueAmount}>${(card.dcm_price_estimate || card.ebay_price_median || 0).toFixed(2)}</Text>
-        </View>
-      )}
+      {/* ══════ ESTIMATED VALUE + SUMMARY ══════
+          Uses the shared resolveCardValue so the number here matches
+          what Collection + Market Pricing show for the same card. */}
+      {(() => {
+        const resolved = resolveCardValue(card as any)
+        if (resolved.source === 'none') return null
+        return (
+          <View style={s.valueCard}>
+            <Text style={s.valueLabel}>DCM Estimated Value</Text>
+            <Text style={s.valueAmount}>${resolved.value.toFixed(2)}</Text>
+          </View>
+        )
+      })()}
 
       {/* Overall Condition Summary */}
       {(card.conversational_front_summary || gradingJson?.final_grade?.summary) && (

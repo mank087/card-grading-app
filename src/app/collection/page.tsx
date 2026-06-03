@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getStoredSession } from '../../lib/directAuth'
 import { getConditionFromGrade } from '@/lib/conditionAssessment'
+import { resolveCardValue } from '@/lib/pricing/resolveCardValue'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
 import { useToast } from '@/hooks/useToast'
@@ -261,38 +262,13 @@ const usesDcmPricing = (card: Card): boolean => {
   return isSportsCard(card) || isPokemonCard(card) || isMTGCard(card) || isLorcanaCard(card) || isOnePieceCard(card) || isOtherCard(card);
 };
 
-// 💰 Helper: Get card's market value (DCM for sports/Pokemon/MTG, eBay for others)
+// 💰 Helper: Get card's market value using the shared resolver so the
+// number here always matches what /market-pricing and the card-detail
+// pages show. Returns null instead of 0 when no price data exists, to
+// preserve the existing UI semantics that distinguish "no price" from "$0".
 const getMarketValue = (card: Card): number | null => {
-  // Use DCM price estimate for sports cards, Pokemon cards, and MTG cards
-  if (usesDcmPricing(card)) {
-    // Primary: Use dcm_price_estimate column (fast, no parsing)
-    if (card.dcm_price_estimate !== null && card.dcm_price_estimate !== undefined) {
-      return card.dcm_price_estimate;
-    }
-    // Fallback: Check dcm_cached_prices JSON blob (for cards cached before fix)
-    if (card.dcm_cached_prices?.estimatedValue !== null && card.dcm_cached_prices?.estimatedValue !== undefined) {
-      return card.dcm_cached_prices.estimatedValue;
-    }
-    // Fallback to Scryfall price for MTG cards if no DCM price yet
-    if (isMTGCard(card)) {
-      if (card.is_foil && card.scryfall_price_usd_foil) {
-        return card.scryfall_price_usd_foil;
-      }
-      if (card.scryfall_price_usd) {
-        return card.scryfall_price_usd;
-      }
-    }
-    // Fallback to eBay median for Other cards when PriceCharting doesn't have a match
-    if (isOtherCard(card) && card.ebay_price_median !== null && card.ebay_price_median !== undefined) {
-      return card.ebay_price_median;
-    }
-    return null;
-  }
-  // Use eBay median price for any remaining cards
-  if (card.ebay_price_median !== null && card.ebay_price_median !== undefined) {
-    return card.ebay_price_median;
-  }
-  return null;
+  const { value, source } = resolveCardValue(card);
+  return source === 'none' ? null : value;
 };
 
 // 💰 Helper: Check if price data is stale (> 7 days)

@@ -487,9 +487,9 @@ export default function CardLoversPage() {
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-bold text-gray-900 mb-1">Market Pricing Dashboard</h3>
+                    <h3 className="font-bold text-gray-900 mb-1">On-Demand Price Refresh</h3>
                     <p className="text-gray-600 text-sm">
-                      Track your collection&apos;s market value with interactive charts, grade and value breakdowns, top-card rankings, and price change tracking since grading. Filter by category, refresh prices on demand, and manage eBay listings, all from one dashboard.
+                      The Market Pricing dashboard is free for every DCM user, with prices auto-refreshed weekly. Card Lovers get the on-demand refresh button — pull the latest values across your whole collection any time, without waiting for the weekly cycle.
                     </p>
                     <Link href="/market-pricing" className="inline-flex items-center gap-1 text-sm text-purple-600 hover:text-purple-700 font-medium mt-2">
                       View Market Pricing

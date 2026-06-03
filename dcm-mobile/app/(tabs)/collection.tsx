@@ -12,6 +12,7 @@ import GradeBadge from '@/components/ui/GradeBadge'
 import SlabCard from '@/components/grading/SlabCard'
 import { supabase } from '@/lib/supabase'
 import { getDisplayName, getContextLine, getFeatures } from '@/lib/labelData'
+import { resolveCardValue } from '@/lib/resolveCardValue'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import LabelStylePicker from '@/components/labels/LabelStylePicker'
 import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
@@ -44,6 +45,13 @@ interface CardItem {
   created_at: string
   ebay_price_median: number | null
   dcm_price_estimate: number | null
+  // Extra price-resolver fields so resolveCardValue can fall through to
+  // legacy DCM cache or MTG-foil Scryfall data when dcm_price_estimate is
+  // missing — keeps mobile prices matching web prices for the same card.
+  dcm_cached_prices: { estimatedValue?: number | null } | null
+  scryfall_price_usd: number | null
+  scryfall_price_usd_foil: number | null
+  is_foil: boolean | null
   visibility: string | null
 }
 
@@ -157,7 +165,9 @@ export default function CollectionScreen() {
           rookie_card, autographed, serial_numbering,
           conversational_whole_grade, conversational_condition_label,
           conversational_card_info, front_path,
-          ebay_price_median, dcm_price_estimate, created_at
+          ebay_price_median, dcm_price_estimate,
+          dcm_cached_prices, scryfall_price_usd, scryfall_price_usd_foil, is_foil,
+          created_at
         `)
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: false })
@@ -335,11 +345,16 @@ export default function CollectionScreen() {
     return Array.from({ length: n }, (_, i) => start + i)
   }, [selectedIds.size])
 
-  // Stats
+  // Stats — uses the shared resolveCardValue so the totals here match
+  // what /market-pricing and the card-detail screen show for the same
+  // collection. Previously only dcm_price_estimate + ebay_price_median
+  // were consulted, so cards priced via the legacy dcm_cached_prices
+  // blob or Scryfall came up as $0 on mobile but >$0 on web.
   const stats = useMemo(() => {
     const graded = cards.filter(c => c.conversational_whole_grade != null)
-    const withPrice = cards.filter(c => c.dcm_price_estimate != null || c.ebay_price_median != null)
-    const totalValue = withPrice.reduce((sum, c) => sum + (c.dcm_price_estimate || c.ebay_price_median || 0), 0)
+    const resolved = cards.map(c => ({ c, r: resolveCardValue(c) }))
+    const withPrice = resolved.filter(({ r }) => r.source !== 'none')
+    const totalValue = withPrice.reduce((sum, { r }) => sum + r.value, 0)
     const avgGrade = graded.length > 0 ? graded.reduce((sum, c) => sum + (c.conversational_whole_grade || 0), 0) / graded.length : 0
     return { total: cards.length, graded: graded.length, totalValue, avgGrade, priced: withPrice.length }
   }, [cards])
@@ -352,7 +367,7 @@ export default function CollectionScreen() {
     const contextParts = getContextLine(item as any)
     const featuresArr = getFeatures(item as any)
     const condition = item.conversational_condition_label || ''
-    const price = item.dcm_price_estimate || item.ebay_price_median
+    const price = resolveCardValue(item).value || null
     const isSelected = selectedIds.has(item.id)
 
     return (
@@ -409,7 +424,7 @@ export default function CollectionScreen() {
     const contextLine = getContextLine(item as any)
     const featuresArr = getFeatures(item as any)
     const isPublic = item.visibility === 'public'
-    const price = item.dcm_price_estimate || item.ebay_price_median
+    const price = resolveCardValue(item).value || null
     const isSelected = selectedIds.has(item.id)
     return (
       <TouchableOpacity
