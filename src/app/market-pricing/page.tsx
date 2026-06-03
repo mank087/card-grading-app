@@ -7,7 +7,6 @@ import MarketPricingGate from '@/components/market-pricing/MarketPricingGate';
 import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart';
 import TopCardsTable from '@/components/market-pricing/TopCardsTable';
 import MoversTable from '@/components/market-pricing/MoversTable';
-import MyEbayListings from '@/components/market-pricing/MyEbayListings';
 import GradeDistributionChart from '@/components/market-pricing/GradeDistributionChart';
 import ValueDistributionChart from '@/components/market-pricing/ValueDistributionChart';
 import ValueByGradeChart from '@/components/market-pricing/ValueByGradeChart';
@@ -15,8 +14,6 @@ import TopSetsChart from '@/components/market-pricing/TopSetsChart';
 import PriceSourceChart from '@/components/market-pricing/PriceSourceChart';
 import GradeVsValueChart from '@/components/market-pricing/GradeVsValueChart';
 
-
-type TabId = 'overview' | 'listings';
 
 interface PortfolioData {
   totalValue: number;
@@ -44,12 +41,8 @@ interface PortfolioData {
 }
 
 export default function MarketPricingPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
   const [portfolio, setPortfolio] = useState<PortfolioData | null>(null);
-  const [listings, setListings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [listingsLoading, setListingsLoading] = useState(false);
-  const [ebayConnected, setEbayConnected] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -69,7 +62,6 @@ export default function MarketPricingPage() {
 
   useEffect(() => {
     fetchPortfolio();
-    checkEbayStatus();
   }, []);
 
   // Re-fetch when category filter changes
@@ -102,43 +94,6 @@ export default function MarketPricingPage() {
       setError('Unable to connect. Please check your connection and try again.');
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function fetchListings() {
-    setListingsLoading(true);
-    try {
-      const session = getStoredSession();
-      if (!session?.access_token) return;
-
-      const response = await fetch('/api/market-pricing/listings', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setListings(data.listings || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch listings:', err);
-    } finally {
-      setListingsLoading(false);
-    }
-  }
-
-  async function checkEbayStatus() {
-    try {
-      const session = getStoredSession();
-      if (!session?.access_token) return;
-
-      const response = await fetch('/api/ebay/status', {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setEbayConnected(data.connected === true);
-      }
-    } catch {
-      // Ignore — default false
     }
   }
 
@@ -179,34 +134,6 @@ export default function MarketPricingPage() {
     }
   }
 
-  // Lazy-load listings when tab is first activated
-  useEffect(() => {
-    if (activeTab === 'listings' && listings.length === 0 && !listingsLoading) {
-      fetchListings();
-    }
-  }, [activeTab]);
-
-  const tabs: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
-    {
-      id: 'overview',
-      label: 'Overview',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
-    },
-    {
-      id: 'listings',
-      label: 'My eBay Listings',
-      icon: (
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z" />
-        </svg>
-      ),
-    },
-  ];
-
   return (
     <MarketPricingGate>
       <main className="min-h-screen bg-gray-50">
@@ -220,7 +147,7 @@ export default function MarketPricingPage() {
               <span className="text-sm font-medium text-rose-200">Card Lovers Exclusive</span>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold">Market Pricing</h1>
-            <p className="text-white/80 mt-1">Track your collection&apos;s market value and manage listings</p>
+            <p className="text-white/80 mt-1">Track your collection&apos;s market value in real time</p>
           </div>
         </section>
 
@@ -313,31 +240,9 @@ export default function MarketPricingPage() {
           </section>
         )}
 
-        {/* Tabs */}
-        <section className="max-w-7xl mx-auto px-4 mt-4">
-          <div className="flex border-b border-gray-200">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-purple-600 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Tab Content */}
+        {/* Content */}
         <section className="max-w-7xl mx-auto px-4 py-6">
-          {/* OVERVIEW TAB */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
+          <div className="space-y-6">
               {loading ? (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100 h-80 animate-pulse" />
@@ -436,32 +341,7 @@ export default function MarketPricingPage() {
 
                 </>
               )}
-            </div>
-          )}
-
-          {/* LISTINGS TAB */}
-          {activeTab === 'listings' && (
-            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">My eBay Listings</h3>
-                {ebayConnected && (
-                  <Link
-                    href="/collection"
-                    className="text-sm text-purple-600 hover:text-purple-700 font-medium"
-                  >
-                    List a Card from Collection
-                  </Link>
-                )}
-              </div>
-              {listingsLoading ? (
-                <div className="h-48 flex items-center justify-center">
-                  <div className="w-8 h-8 border-4 border-gray-200 border-t-purple-600 rounded-full animate-spin" />
-                </div>
-              ) : (
-                <MyEbayListings listings={listings} ebayConnected={ebayConnected} />
-              )}
-            </div>
-          )}
+          </div>
 
         </section>
       </main>
