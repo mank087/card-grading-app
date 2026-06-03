@@ -21,7 +21,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
-import { generateQRCodeWithLogo, loadLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
+import { generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
 import { generateAveryLabel } from '@/lib/averyLabelGenerator';
 import { generateToploaderLabelPair, generateFoldOverLabel8167 } from '@/lib/avery8167LabelGenerator';
 import { generateSlabLabel, generateFoldOverSlabLabel } from '@/lib/slabLabelGenerator';
@@ -490,9 +490,14 @@ export default function LabelExportPage() {
           if (!config) {
             throw new Error(`Could not find a custom label config. Save one in Label Studio first or pass an inline config.`);
           }
-          const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+          // Load BOTH logos — customSlabLabelGenerator picks logoDataUrl OR
+          // whiteLogoDataUrl based on whether the user's design is light or
+          // dark. Previously only logoDataUrl was loaded, so dark-themed
+          // custom labels generated through the mobile path had no logo.
+          const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
             generateQRCodeWithLogo(cardUrl).catch(() => ''),
             loadLogoAsBase64().catch(() => ''),
+            loadWhiteLogoAsBase64().catch(() => ''),
           ]);
           const slabPayload: any = {
             primaryName: labelData.primaryName,
@@ -508,6 +513,7 @@ export default function LabelExportPage() {
             qrCodeDataUrl,
             subScores,
             logoDataUrl,
+            whiteLogoDataUrl,
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
@@ -523,9 +529,14 @@ export default function LabelExportPage() {
         } else if (type === 'slab-modern' || type === 'slab-traditional') {
           postStatus('Generating slab label PDF…');
           const slabStyle: 'modern' | 'traditional' = type === 'slab-traditional' ? 'traditional' : 'modern';
-          const [qrCodeDataUrl, logoDataUrl] = await Promise.all([
+          // Load BOTH logos — slabLabelGenerator picks whiteLogoDataUrl for
+          // modern style (dark gradient bg) and logoDataUrl for traditional
+          // (light bg). Previously only color was loaded; modern slabs
+          // generated through the mobile path had no logo as a result.
+          const [qrCodeDataUrl, logoDataUrl, whiteLogoDataUrl] = await Promise.all([
             generateQRCodeWithLogo(cardUrl).catch(() => ''),
             loadLogoAsBase64().catch(() => ''),
+            loadWhiteLogoAsBase64().catch(() => ''),
           ]);
           // SlabLabelData shape per src/lib/slabLabelGenerator.ts
           const slabPayload: any = {
@@ -542,6 +553,7 @@ export default function LabelExportPage() {
             qrCodeDataUrl,
             subScores,
             logoDataUrl,
+            whiteLogoDataUrl,
             showFounderEmblem,
             showVipEmblem,
             showCardLoversEmblem,
