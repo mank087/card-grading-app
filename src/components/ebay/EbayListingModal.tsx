@@ -243,12 +243,17 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
   } | null>(null);
 
   // Existing listing state (to prevent duplicate listings)
+  // dcmRowId is the ebay_listings.id (NOT the eBay listing_id) — needed
+  // so the "I've already ended this" override can hit /mark-ended.
   const [existingListing, setExistingListing] = useState<{
+    dcmRowId: string;
     listingId: string;
     listingUrl: string;
     status: string;
   } | null>(null);
   const [checkingExistingListing, setCheckingExistingListing] = useState(false);
+  const [overridingExisting, setOverridingExisting] = useState(false);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
   // Previous listing state (for sold/ended cards that can be relisted)
   const [previousListing, setPreviousListing] = useState<{
     listingId: string;
@@ -404,8 +409,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
         if (response.ok) {
           const data = await response.json();
           if (data.hasListing && data.listing) {
-            // Card has an active listing - block relisting
+            // Card has an active listing - block relisting (user can
+            // still override via the "I've already ended this" button
+            // if eBay's API hasn't caught up yet).
             setExistingListing({
+              dcmRowId: data.listing.id,
               listingId: data.listing.listing_id,
               listingUrl: data.listing.listing_url,
               status: data.listing.status,
@@ -1517,6 +1525,51 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
                   </a>
                 )}
                 <button
+                  onClick={async () => {
+                    if (!existingListing?.dcmRowId) return;
+                    setOverridingExisting(true);
+                    setOverrideError(null);
+                    try {
+                      const session = getStoredSession();
+                      if (!session?.access_token) {
+                        setOverrideError('Session expired. Please refresh and try again.');
+                        return;
+                      }
+                      const res = await fetch('/api/ebay/listing/mark-ended', {
+                        method: 'POST',
+                        headers: {
+                          Authorization: `Bearer ${session.access_token}`,
+                          'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ listingRowId: existingListing.dcmRowId }),
+                      });
+                      if (!res.ok) {
+                        const j = await res.json().catch(() => ({}));
+                        throw new Error(j.error || 'Failed to clear existing listing');
+                      }
+                      // Promote to a soft "previously listed" warning so the
+                      // user lands on the regular listing form, not stuck here.
+                      setPreviousListing({
+                        listingId: existingListing.listingId,
+                        status: 'ended',
+                        message: `Previous listing #${existingListing.listingId} marked as ended. Creating a new listing now.`,
+                      });
+                      setExistingListing(null);
+                    } catch (e: any) {
+                      setOverrideError(e.message || 'Failed to clear existing listing');
+                    } finally {
+                      setOverridingExisting(false);
+                    }
+                  }}
+                  disabled={overridingExisting}
+                  className="w-full px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed transition-colors font-medium"
+                >
+                  {overridingExisting ? 'Clearing…' : "I've already ended this listing — list a new one"}
+                </button>
+                {overrideError && (
+                  <p className="text-xs text-red-600 text-center">{overrideError}</p>
+                )}
+                <button
                   onClick={onClose}
                   className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
                 >
@@ -1525,7 +1578,8 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
               </div>
 
               <p className="text-xs text-gray-500 text-center">
-                To create a new listing for this card, first end the existing listing on eBay.
+                If eBay still shows this listing as active but you just ended it, use the green
+                button above to clear it on DCM&rsquo;s side and create a new listing.
               </p>
             </div>
           )}

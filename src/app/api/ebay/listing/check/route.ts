@@ -72,26 +72,33 @@ export async function GET(request: NextRequest) {
     // We have a listing in our database - verify it's still active on eBay
     console.log('[eBay Listing Check] Found listing in DB, verifying with eBay:', existingListing.listing_id);
 
-    // Get eBay connection for the user
+    // Get eBay connection for the user. If we can't verify with eBay,
+    // downgrade to a soft warning (previousListing) instead of a hard block
+    // — the user knows their own intent better than our stale DB row, and
+    // forcing them to give up on relisting because of a token issue is the
+    // wrong call.
     let connection = await getConnectionForUser(user.id);
     if (!connection) {
-      // Can't verify with eBay, but we have a record - return it
-      console.log('[eBay Listing Check] No eBay connection, returning DB record');
+      console.log('[eBay Listing Check] No eBay connection — soft warning');
       return NextResponse.json({
-        hasListing: true,
-        listing: existingListing,
+        hasListing: false,
+        listing: null,
+        previousListing: existingListing,
         verified: false,
+        message: `Couldn't reach eBay to verify your existing listing. If you've already ended it on eBay, you're safe to proceed.`,
       });
     }
 
     // Refresh token if needed
     connection = await refreshTokenIfNeeded(connection);
     if (!connection) {
-      console.log('[eBay Listing Check] Token refresh failed, returning DB record');
+      console.log('[eBay Listing Check] Token refresh failed — soft warning');
       return NextResponse.json({
-        hasListing: true,
-        listing: existingListing,
+        hasListing: false,
+        listing: null,
+        previousListing: existingListing,
         verified: false,
+        message: `Couldn't refresh your eBay session to verify the existing listing. If you've already ended it on eBay, you're safe to proceed.`,
       });
     }
 
@@ -105,13 +112,17 @@ export async function GET(request: NextRequest) {
 
     console.log('[eBay Listing Check] eBay status response:', ebayStatus);
 
-    // If we couldn't get status from eBay, return the DB record
+    // If we couldn't get status from eBay (transient API error, listing
+    // too old to be findable, etc.) downgrade to soft warning so a
+    // verification glitch can't permanently block a relist.
     if (!ebayStatus.success) {
       console.log('[eBay Listing Check] Could not verify with eBay:', ebayStatus.error);
       return NextResponse.json({
-        hasListing: true,
-        listing: existingListing,
+        hasListing: false,
+        listing: null,
+        previousListing: existingListing,
         verified: false,
+        message: `Couldn't verify the existing listing with eBay (${ebayStatus.error || 'unknown error'}). If you've already ended it on eBay, you're safe to proceed.`,
       });
     }
 
