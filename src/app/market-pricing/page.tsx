@@ -186,7 +186,7 @@ export default function MarketPricingPage() {
         {/* Header */}
         <section className="bg-gradient-to-r from-purple-600 via-rose-500 to-orange-500 text-white">
           <div className="max-w-7xl mx-auto px-4 py-8">
-            <h1 className="text-3xl md:text-4xl font-bold">Market Pricing</h1>
+            <h1 className="text-3xl md:text-4xl font-bold">Portfolio</h1>
             <p className="text-white/80 mt-1">Track your collection&apos;s market value in real time</p>
           </div>
         </section>

@@ -237,7 +237,7 @@ function NavigationInner() {
                     className="text-gray-700 hover:text-emerald-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
                   >
                     <span className="flex items-center gap-1">
-                      <span className="text-emerald-500">$</span> Market Pricing
+                      <span className="text-emerald-500">$</span> Portfolio
                     </span>
                   </Link>
                   <Link
@@ -247,10 +247,10 @@ function NavigationInner() {
                     Label Studio
                   </Link>
                   <Link
-                    href="/shop"
+                    href="/instalist-marketplace"
                     className="text-gray-700 hover:text-purple-600 px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap"
                   >
-                    Shop
+                    eBay InstaList
                   </Link>
                 </>
               ) : (
@@ -671,7 +671,7 @@ function NavigationInner() {
                     className="flex items-center gap-3 text-gray-700 hover:text-emerald-600 hover:bg-emerald-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
                   >
                     <span className="w-5 h-5 flex items-center justify-center text-emerald-500 font-bold">$</span>
-                    Market Pricing
+                    Portfolio
                   </Link>
                   <Link
                     href="/labels"
@@ -682,6 +682,17 @@ function NavigationInner() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
                     </svg>
                     Label Studio
+                  </Link>
+                  <Link
+                    href="/instalist-marketplace"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 text-gray-700 hover:text-purple-600 hover:bg-purple-50 px-3 py-2.5 rounded-md text-sm font-medium transition-colors"
+                  >
+                    {/* Storefront icon — matches the marketplace's brand cue */}
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V10m0 0V7a2 2 0 00-2-2H7a2 2 0 00-2 2v3m14 0H5m14 11H5V10m0 11h14M9 21V13a2 2 0 012-2h2a2 2 0 012 2v8" />
+                    </svg>
+                    eBay InstaList
                   </Link>
                   <Link
                     href="/shop"
