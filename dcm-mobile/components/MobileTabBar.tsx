@@ -14,8 +14,9 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '@/lib/constants'
+import EbayWordmark from '@/components/marketplace/EbayWordmark'
 
-type TabKey = 'grade' | 'collection' | 'labels' | 'market-pricing' | 'account'
+type TabKey = 'grade' | 'collection' | 'labels' | 'market-pricing' | 'instalist-marketplace' | 'account'
 
 interface TabDef {
   key: TabKey
@@ -24,6 +25,8 @@ interface TabDef {
   icon: (color: string, size: number) => React.ReactNode
 }
 
+// Must match the order + identity of (tabs)/_layout.tsx so users don't
+// perceive a tab order shift when they cross into card detail / pages.
 const TABS: TabDef[] = [
   {
     key: 'grade',
@@ -44,10 +47,14 @@ const TABS: TabDef[] = [
       </View>
     ),
   },
-  { key: 'collection',     href: '/(tabs)/collection',     label: 'Collection', icon: (c, s) => <Ionicons name="grid"      size={s} color={c} /> },
-  { key: 'labels',         href: '/(tabs)/labels',         label: 'Labels',     icon: (c, s) => <Ionicons name="pricetags" size={s} color={c} /> },
-  { key: 'market-pricing', href: '/(tabs)/market-pricing', label: 'Portfolio', icon: (c, s) => <Ionicons name="cash"      size={s} color={c} /> },
-  { key: 'account',        href: '/(tabs)/account',        label: 'Menu',       icon: (c, s) => <Ionicons name="menu"      size={s} color={c} /> },
+  { key: 'collection',            href: '/(tabs)/collection',            label: 'Collection', icon: (c, s) => <Ionicons name="grid"      size={s} color={c} /> },
+  { key: 'labels',                href: '/(tabs)/labels',                label: 'Labels',     icon: (c, s) => <Ionicons name="pricetags" size={s} color={c} /> },
+  { key: 'market-pricing',        href: '/(tabs)/market-pricing',        label: 'Portfolio',  icon: (c, s) => <Ionicons name="cash"      size={s} color={c} /> },
+  // The wordmark renders gray here because MobileTabBar always shows
+  // non-active state (you're already on a non-tab screen by definition).
+  // It still mirrors the bottom of the (tabs) layout 1:1.
+  { key: 'instalist-marketplace', href: '/(tabs)/instalist-marketplace', label: 'InstaList',  icon: (c, s) => <EbayWordmark color={c} size={s} focused={false} /> },
+  { key: 'account',               href: '/(tabs)/account',               label: 'Menu',       icon: (c, s) => <Ionicons name="menu"      size={s} color={c} /> },
 ]
 
 export default function MobileTabBar() {
@@ -66,7 +73,9 @@ export default function MobileTabBar() {
           accessibilityRole="button"
         >
           {tab.icon(Colors.gray[400], 24)}
-          <Text style={styles.label}>{tab.label}</Text>
+          <Text style={styles.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>
+            {tab.label}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
