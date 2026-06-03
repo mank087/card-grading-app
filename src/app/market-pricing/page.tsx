@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { getStoredSession } from '@/lib/directAuth';
+import LoggedOutPreview from '@/components/market-pricing/LoggedOutPreview';
 import CategoryBreakdownChart from '@/components/market-pricing/CategoryBreakdownChart';
 import TopCardsTable from '@/components/market-pricing/TopCardsTable';
 import MoversTable from '@/components/market-pricing/MoversTable';
@@ -55,6 +56,11 @@ export default function MarketPricingPage() {
   // an "Auto-refreshes weekly" pill instead — they're still served the
   // fresh data from the Sunday cron, just not on-demand.
   const [isCardLover, setIsCardLover] = useState<boolean>(false);
+  // Auth check resolved separately from the data fetch so we can render
+  // the LoggedOutPreview immediately for guests rather than flashing a
+  // loading spinner that resolves to a guest CTA.
+  const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [refreshCount, setRefreshCount] = useState<number>(() => {
     if (typeof window === 'undefined') return 0;
     const stored = localStorage.getItem('dcm_refresh_data');
@@ -70,6 +76,16 @@ export default function MarketPricingPage() {
   const refreshLimitReached = refreshCount >= maxRefreshesPerDay;
 
   useEffect(() => {
+    // Inspect the session once so we can decide between the logged-out
+    // preview and the real dashboard before kicking off any fetches.
+    const session = getStoredSession();
+    const authed = !!session?.access_token;
+    setIsAuthenticated(authed);
+    setAuthChecked(true);
+    if (!authed) {
+      setLoading(false);
+      return;
+    }
     fetchPortfolio();
     checkCardLoverStatus();
   }, []);
@@ -88,9 +104,12 @@ export default function MarketPricingPage() {
     } catch { /* default false */ }
   }
 
-  // Re-fetch when category filter changes
+  // Re-fetch when category filter changes — but only for authenticated
+  // users; the guest preview never hits the API.
   useEffect(() => {
+    if (!isAuthenticated) return;
     fetchPortfolio();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory]);
 
   async function fetchPortfolio() {
@@ -179,6 +198,13 @@ export default function MarketPricingPage() {
     } finally {
       setRefreshing(false);
     }
+  }
+
+  // Logged-out marketing preview. Renders immediately for guests so they
+  // see what the Portfolio is + a sign-in / sign-up CTA, instead of a
+  // blank page while the data fetch decides it can't auth.
+  if (authChecked && !isAuthenticated) {
+    return <LoggedOutPreview />;
   }
 
   return (
