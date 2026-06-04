@@ -213,7 +213,7 @@ export default function LoggedOutPreview() {
 
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Link
-              href="/login?redirect=/market-pricing"
+              href="/login?mode=login&redirect=/market-pricing"
               className="inline-block bg-gradient-to-r from-purple-600 to-rose-500 hover:from-purple-500 hover:to-rose-400 text-white font-bold text-lg px-8 py-4 rounded-xl transition-all shadow-lg hover:shadow-xl"
             >
               Sign in to view yours

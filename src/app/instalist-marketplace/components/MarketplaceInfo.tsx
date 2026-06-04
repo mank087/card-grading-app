@@ -272,7 +272,7 @@ function CtaBlock({
           Create a free account
         </Link>
         <Link
-          href="/login?redirect=/instalist-marketplace"
+          href="/login?mode=login&redirect=/instalist-marketplace"
           className={`inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-semibold text-base transition-colors ${
             inverted
               ? 'border-2 border-white/40 text-white hover:bg-white/10'
