@@ -205,6 +205,67 @@ function ColorSlotPicker({
 }
 
 // ============================================================================
+// DIMENSION INPUT — number field that tolerates intermediate typing state
+// (empty, lone ".", partial decimals) without snapping back to the fallback
+// on every keystroke. The previous implementation did
+//     onChange={(e) => updateConfig({ width: parseFloat(e.target.value) || 2.8 })}
+// which meant clearing the field instantly fell through to the fallback,
+// re-rendered the controlled input with the default, and the user could
+// never retype a value cleanly. iOS mobile-web makes this especially
+// obvious because every character keypress fires onChange. Commit happens
+// on blur with clamping, and Enter blurs the field.
+// ============================================================================
+
+function DimensionInput({
+  value,
+  min,
+  max,
+  step,
+  fallback,
+  onCommit,
+  className,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  fallback: number;
+  onCommit: (v: number) => void;
+  className?: string;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => { setDraft(String(value)); }, [value]);
+
+  const commit = () => {
+    const parsed = parseFloat(draft);
+    if (Number.isFinite(parsed)) {
+      const clamped = Math.min(max, Math.max(min, parsed));
+      onCommit(clamped);
+      if (clamped !== parsed) setDraft(String(clamped));
+    } else {
+      // Empty or unparseable: fall through to the documented fallback so
+      // the underlying config stays in a renderable state, and show it.
+      onCommit(fallback);
+      setDraft(String(fallback));
+    }
+  };
+
+  return (
+    <input
+      type="number"
+      min={min}
+      max={max}
+      step={step}
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+      className={className}
+    />
+  );
+}
+
+// ============================================================================
 // GRADIENT ANGLE SLIDER
 // ============================================================================
 
@@ -1362,25 +1423,25 @@ function CustomDesigner({
                 <div className="flex gap-2 mt-2">
                   <div>
                     <label className="text-[10px] text-gray-500">Width (in)</label>
-                    <input
-                      type="number"
-                      min="0.5"
-                      max="4.0"
-                      step="0.1"
+                    <DimensionInput
                       value={config.width}
-                      onChange={(e) => updateConfig({ width: parseFloat(e.target.value) || 2.8 })}
+                      min={0.5}
+                      max={4.0}
+                      step={0.1}
+                      fallback={2.8}
+                      onCommit={(w) => updateConfig({ width: w })}
                       className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
                     />
                   </div>
                   <div>
                     <label className="text-[10px] text-gray-500">Height (in)</label>
-                    <input
-                      type="number"
-                      min="0.3"
-                      max="4.0"
-                      step="0.1"
+                    <DimensionInput
                       value={config.height}
-                      onChange={(e) => updateConfig({ height: parseFloat(e.target.value) || 0.8 })}
+                      min={0.3}
+                      max={4.0}
+                      step={0.1}
+                      fallback={0.8}
+                      onCommit={(h) => updateConfig({ height: h })}
                       className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
                     />
                   </div>
@@ -1852,13 +1913,13 @@ function CustomDesigner({
                       </div>
                       <div>
                         <label className="text-[10px] text-gray-500">Width (in)</label>
-                        <input
-                          type="number"
-                          min="0.01"
-                          max="0.15"
-                          step="0.01"
+                        <DimensionInput
                           value={config.borderWidth}
-                          onChange={(e) => updateConfig({ borderWidth: parseFloat(e.target.value) || 0.04 })}
+                          min={0.01}
+                          max={0.15}
+                          step={0.01}
+                          fallback={0.04}
+                          onCommit={(w) => updateConfig({ borderWidth: w })}
                           className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-purple-500 outline-none"
                         />
                       </div>

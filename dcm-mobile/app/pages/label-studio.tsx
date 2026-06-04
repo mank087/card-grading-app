@@ -100,6 +100,64 @@ interface DesignerConfig {
 }
 
 // ============================================================================
+// DimensionInput — width/height field that tolerates intermediate typing
+// state (empty, lone ".", partial decimals) without snapping back to the
+// fallback value on every keystroke. The previous implementation parsed
+// + clamped on every onChangeText, so clearing the field instantly fell
+// through to the fallback default and the user could never retype. iOS
+// makes this especially obvious because the decimal-pad keyboard fires
+// onChangeText for each character. Commit happens on blur with clamping.
+// ============================================================================
+
+function DimensionInput({
+  value,
+  min,
+  max,
+  fallback,
+  styleField,
+  onCommit,
+}: {
+  value: number
+  min: number
+  max: number
+  fallback: number
+  styleField: any
+  onCommit: (v: number) => void
+}) {
+  const [draft, setDraft] = useState(String(value))
+  // External value changes (preset taps, reset, etc.) refresh the draft
+  // so the field reflects the new value while the user isn't editing it.
+  useEffect(() => { setDraft(String(value)) }, [value])
+
+  const commit = () => {
+    const parsed = parseFloat(draft)
+    if (Number.isFinite(parsed)) {
+      const clamped = Math.min(max, Math.max(min, parsed))
+      onCommit(clamped)
+      // Reflect any clamping back into the field text on blur, so a
+      // typed "10" in a 0.5-4 input visibly snaps to "4".
+      if (clamped !== parsed) setDraft(String(clamped))
+    } else {
+      // Empty / unparseable: revert to the last committed value rather
+      // than silently overwriting with the fallback.
+      onCommit(fallback)
+      setDraft(String(fallback))
+    }
+  }
+
+  return (
+    <TextInput
+      style={styleField}
+      value={draft}
+      keyboardType="decimal-pad"
+      onChangeText={setDraft}
+      onBlur={commit}
+      selectTextOnFocus
+    />
+  )
+}
+
+// ============================================================================
 // Main Screen
 // ============================================================================
 
@@ -1129,26 +1187,24 @@ export default function LabelStudioScreen() {
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={s.fieldLabel}>Width (in)</Text>
-                    <TextInput
-                      style={s.fieldInput}
-                      value={String(config.width ?? 2.8)}
-                      keyboardType="decimal-pad"
-                      onChangeText={(t) => {
-                        const v = parseFloat(t)
-                        updateConfig({ width: Number.isFinite(v) ? Math.min(4, Math.max(0.5, v)) : 2.8 })
-                      }}
+                    <DimensionInput
+                      value={config.width ?? 2.8}
+                      min={0.5}
+                      max={4}
+                      fallback={2.8}
+                      styleField={s.fieldInput}
+                      onCommit={(w) => updateConfig({ width: w })}
                     />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={s.fieldLabel}>Height (in)</Text>
-                    <TextInput
-                      style={s.fieldInput}
-                      value={String(config.height ?? 0.8)}
-                      keyboardType="decimal-pad"
-                      onChangeText={(t) => {
-                        const v = parseFloat(t)
-                        updateConfig({ height: Number.isFinite(v) ? Math.min(4, Math.max(0.3, v)) : 0.8 })
-                      }}
+                    <DimensionInput
+                      value={config.height ?? 0.8}
+                      min={0.3}
+                      max={4}
+                      fallback={0.8}
+                      styleField={s.fieldInput}
+                      onCommit={(h) => updateConfig({ height: h })}
                     />
                   </View>
                 </View>
