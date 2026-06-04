@@ -8,6 +8,13 @@ import { View, Text, StyleSheet } from 'react-native'
  * When the tab is inactive, all four letters share the tint color passed
  * in, so it visually grays out alongside the other tab icons. When active,
  * the wordmark renders in its native colors as the focal element.
+ *
+ * Sized to fit within a standard 24x24 tab-icon container. The previous
+ * implementation scaled the font to ~20px (using size * 0.85), which made
+ * the wordmark ~55-60px wide and overflowed iOS' bottom-tab icon slot —
+ * iOS clipped or hid the entire tab. Android was more forgiving. Now the
+ * wordmark always sits inside a fixed-size box with an explicit
+ * lineHeight (iOS needs that to avoid baseline drift in tiny text).
  */
 
 interface Props {
@@ -20,9 +27,6 @@ interface Props {
   focused: boolean
 }
 
-// Approximate eBay brand colors (not the exact licensed wordmark but a
-// well-known visual approximation — same palette every UI dev uses for
-// "eBay-style" representation).
 const EBAY_COLORS = {
   e: '#E53238', // red
   b: '#0064D2', // blue
@@ -31,28 +35,56 @@ const EBAY_COLORS = {
 }
 
 export default function EbayWordmark({ color, size, focused }: Props) {
-  const fontSize = Math.max(13, size * 0.85)
+  // Scale relative to the icon container but cap so 4 letters always fit
+  // within `size` pixels of width. ~38% of the box height gives a tight
+  // wordmark that reads cleanly at 24px (the default tab icon size).
+  const fontSize = Math.round(size * 0.42)
+  const lineHeight = Math.round(fontSize * 1.05)
+
   return (
-    <View style={styles.row} accessibilityLabel="eBay InstaList tab">
-      <Text style={[styles.letter, { fontSize, color: focused ? EBAY_COLORS.e : color }]}>e</Text>
-      <Text style={[styles.letter, { fontSize, color: focused ? EBAY_COLORS.b : color }]}>b</Text>
-      <Text style={[styles.letter, { fontSize, color: focused ? EBAY_COLORS.a : color }]}>a</Text>
-      <Text style={[styles.letter, { fontSize, color: focused ? EBAY_COLORS.y : color }]}>y</Text>
+    <View
+      style={[styles.box, { width: size, height: size }]}
+      accessibilityLabel="eBay InstaList tab"
+    >
+      <Text
+        style={[styles.letter, { fontSize, lineHeight, color: focused ? EBAY_COLORS.e : color }]}
+        allowFontScaling={false}
+      >
+        e
+      </Text>
+      <Text
+        style={[styles.letter, { fontSize, lineHeight, color: focused ? EBAY_COLORS.b : color }]}
+        allowFontScaling={false}
+      >
+        b
+      </Text>
+      <Text
+        style={[styles.letter, { fontSize, lineHeight, color: focused ? EBAY_COLORS.a : color }]}
+        allowFontScaling={false}
+      >
+        a
+      </Text>
+      <Text
+        style={[styles.letter, { fontSize, lineHeight, color: focused ? EBAY_COLORS.y : color }]}
+        allowFontScaling={false}
+      >
+        y
+      </Text>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  row: {
+  box: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   letter: {
     fontWeight: '900',
-    // Slight negative letter-spacing tightens the wordmark to feel like
-    // the eBay logo rather than four loose letters.
-    letterSpacing: -0.5,
-    // Force a consistent baseline across the four glyphs.
-    lineHeight: undefined,
+    // Tighter than before so 4 letters fit in the standard icon width.
+    letterSpacing: -1,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
 })
