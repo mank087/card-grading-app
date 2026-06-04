@@ -20,6 +20,14 @@ import ExportRunner, { type ExportSource } from '@/components/exports/ExportRunn
 
 // Star Wars was retired as a top-level category and is now an "Other" sub-category.
 const CATEGORIES = ['All', 'Sports', 'Pokemon', 'MTG', 'Lorcana', 'One Piece', 'Yu-Gi-Oh', 'Other']
+
+// Sports cards land in the database tagged with the specific sport
+// detected at grading time (Football, Baseball, etc.) — the generic
+// "Sports" bucket is only used as a fallback. The Sports filter at the
+// top of Collection expands to all of these so the user sees their
+// entire sports collection in one place. Tapping a specific sport in
+// the sub-row then narrows further.
+const SPORTS_CATEGORIES = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'] as const
 const SORT_OPTIONS = [
   { value: 'created_at', label: 'Date' },
   { value: 'conversational_whole_grade', label: 'Grade' },
@@ -71,6 +79,11 @@ export default function CollectionScreen() {
   const [search, setSearch] = useState('')
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [category, setCategory] = useState('All')
+  // When the Sports filter is active, sub-row lets the user narrow to a
+  // single sport (e.g., just Football). null = show all sports cards.
+  // Always reset to null when the top-level category changes — see the
+  // pickCategory handler below.
+  const [subSport, setSubSport] = useState<string | null>(null)
   const [sortBy, setSortBy] = useState('created_at')
   const [sortAsc, setSortAsc] = useState(false)
   const [showSort, setShowSort] = useState(false)
@@ -226,8 +239,15 @@ export default function CollectionScreen() {
   const filteredCards = useMemo(() => {
     let result = cards
 
-    // Category filter
-    if (category !== 'All') {
+    // Category filter. "Sports" expands across every sport-specific
+    // category present in the user's collection; a sub-sport narrows
+    // within that. Any other top-level category is a literal match.
+    if (category === 'Sports') {
+      const sportsSet: ReadonlySet<string> = subSport
+        ? new Set([subSport])
+        : new Set(SPORTS_CATEGORIES)
+      result = result.filter(c => sportsSet.has(c.category || ''))
+    } else if (category !== 'All') {
       result = result.filter(c => c.category === category)
     }
 
@@ -263,7 +283,37 @@ export default function CollectionScreen() {
     })
 
     return result
-  }, [cards, category, search, sortBy, sortAsc])
+  }, [cards, category, subSport, search, sortBy, sortAsc])
+
+  // Sports actually present in the user's collection, with per-sport
+  // counts. Powers the sub-row that appears under the category tabs
+  // when "Sports" is the active filter. Built off the unfiltered card
+  // list so the counts reflect the whole collection, not the currently
+  // narrowed view.
+  const sportsInCollection = useMemo(() => {
+    const counts = new Map<string, number>()
+    for (const c of cards) {
+      const cat = c.category || ''
+      if ((SPORTS_CATEGORIES as readonly string[]).includes(cat)) {
+        counts.set(cat, (counts.get(cat) || 0) + 1)
+      }
+    }
+    // Sort by count descending so the user's most-graded sport leads.
+    return Array.from(counts.entries())
+      .map(([sport, count]) => ({ sport, count }))
+      .sort((a, b) => b.count - a.count)
+  }, [cards])
+  const totalSportsCount = useMemo(
+    () => sportsInCollection.reduce((sum, s) => sum + s.count, 0),
+    [sportsInCollection],
+  )
+
+  // Reset subSport whenever the top-level category changes so the sub-
+  // row never leaks state from a previous Sports visit.
+  const pickCategory = useCallback((next: string) => {
+    setCategory(next)
+    if (next !== 'Sports') setSubSport(null)
+  }, [])
 
   // Select-all toggles between selecting every visible (filtered) card and
   // clearing — same UX as web's collection toolbar.
@@ -604,12 +654,49 @@ export default function CollectionScreen() {
           <TouchableOpacity
             key={cat}
             style={[st.catTab, category === cat && st.catTabActive]}
-            onPress={() => setCategory(cat)}
+            onPress={() => pickCategory(cat)}
           >
             <Text style={[st.catTabText, category === cat && st.catTabTextActive]}>{cat}</Text>
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {/* Sport sub-row — only visible when Sports is the active top-level
+          category and the user actually has sports cards. "All sports"
+          (subSport === null) is the default. */}
+      {category === 'Sports' && sportsInCollection.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={st.subCatScroll}
+          contentContainerStyle={st.subCatContent}
+        >
+          <TouchableOpacity
+            style={[st.subCatPill, subSport === null && st.subCatPillActive]}
+            onPress={() => setSubSport(null)}
+            activeOpacity={0.7}
+          >
+            <Text style={[st.subCatPillText, subSport === null && st.subCatPillTextActive]}>
+              All sports ({totalSportsCount})
+            </Text>
+          </TouchableOpacity>
+          {sportsInCollection.map(({ sport, count }) => {
+            const active = subSport === sport
+            return (
+              <TouchableOpacity
+                key={sport}
+                style={[st.subCatPill, active && st.subCatPillActive]}
+                onPress={() => setSubSport(active ? null : sport)}
+                activeOpacity={0.7}
+              >
+                <Text style={[st.subCatPillText, active && st.subCatPillTextActive]}>
+                  {sport} ({count})
+                </Text>
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      )}
 
       {/* Stats bar */}
       <View style={st.statsBar}>
@@ -925,6 +1012,33 @@ const st = StyleSheet.create({
   catTabActive: { backgroundColor: Colors.purple[600] },
   catTabText: { fontSize: 12, fontWeight: '600', color: Colors.gray[600] },
   catTabTextActive: { color: '#fff' },
+  // Sport sub-row — visually subordinate to the main category row.
+  // Lighter background, smaller pills, purple accent ring on the active
+  // pill instead of a solid fill so it reads as "narrowing within
+  // Sports" rather than a peer of the main category choice.
+  subCatScroll: {
+    backgroundColor: Colors.gray[50],
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.gray[200],
+    height: 40,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  subCatContent: { paddingHorizontal: 12, gap: 6, alignItems: 'center' },
+  subCatPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: Colors.white,
+    borderWidth: 1,
+    borderColor: Colors.gray[200],
+  },
+  subCatPillActive: {
+    backgroundColor: Colors.purple[50],
+    borderColor: Colors.purple[600],
+  },
+  subCatPillText: { fontSize: 11, fontWeight: '600', color: Colors.gray[600] },
+  subCatPillTextActive: { color: Colors.purple[700] },
 
   // Stats
   statsBar: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 12, paddingVertical: 6, backgroundColor: Colors.gray[50] },

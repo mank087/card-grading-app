@@ -390,6 +390,11 @@ function CollectionPageContent() {
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  // Sub-filter that appears when "Sports" is selected. null = show every
+  // sport. Selecting a specific sport (e.g., 'Football') narrows further.
+  // Always resets to null whenever selectedCategory changes — see effect
+  // below.
+  const [selectedSport, setSelectedSport] = useState<string | null>(null)
   const [displayLimit, setDisplayLimit] = useState(20) // Initial display limit
   const [deletingCardId, setDeletingCardId] = useState<string | null>(null)
   const [selectedCardIds, setSelectedCardIds] = useState<Set<string>>(new Set())
@@ -1385,7 +1390,15 @@ function CollectionPageContent() {
     let categoryMatch = true;
     if (selectedCategory !== 'all') {
       if (selectedCategory === 'Sports') {
-        categoryMatch = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+        // When a specific sport is selected in the sub-row, narrow to
+        // just that sport. Otherwise keep the broad expansion across
+        // every sport-tagged category so "Sports" surfaces Football,
+        // Baseball, etc. in one combined view.
+        if (selectedSport) {
+          categoryMatch = (card.category || '') === selectedSport;
+        } else {
+          categoryMatch = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '');
+        }
       } else {
         categoryMatch = card.category === selectedCategory;
       }
@@ -1799,7 +1812,7 @@ function CollectionPageContent() {
         )}
 
         {/* Category Filter Tabs */}
-        <div className="mb-6 flex flex-wrap gap-2">
+        <div className="mb-3 flex flex-wrap gap-2">
           {[
             { id: 'all', label: 'All Cards', icon: '🎴' },
             { id: 'Sports', label: 'Sports', icon: '⚾' },
@@ -1812,7 +1825,13 @@ function CollectionPageContent() {
           ].map((category) => (
             <button
               key={category.id}
-              onClick={() => setSelectedCategory(category.id)}
+              onClick={() => {
+                setSelectedCategory(category.id);
+                // Reset the sport drill-down whenever the top-level
+                // category changes so the sub-row never leaks state
+                // from a previous Sports visit.
+                if (category.id !== 'Sports') setSelectedSport(null);
+              }}
               className={`px-4 py-2 rounded-lg font-medium transition-all ${
                 selectedCategory === category.id
                   ? 'bg-blue-600 text-white shadow-md'
@@ -1824,6 +1843,53 @@ function CollectionPageContent() {
             </button>
           ))}
         </div>
+
+        {/* Sport sub-row — only visible when Sports is the active
+            top-level category and the user actually has sport-tagged
+            cards. "All sports" (selectedSport === null) is the default. */}
+        {selectedCategory === 'Sports' && (() => {
+          const SPORTS_SUB = ['Sports', 'Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
+          const counts = new Map<string, number>();
+          for (const c of cards) {
+            const cat = c.category || '';
+            if (SPORTS_SUB.includes(cat)) counts.set(cat, (counts.get(cat) || 0) + 1);
+          }
+          const sportsInCollection = Array.from(counts.entries())
+            .map(([sport, count]) => ({ sport, count }))
+            .sort((a, b) => b.count - a.count);
+          const total = sportsInCollection.reduce((sum, s) => sum + s.count, 0);
+          if (sportsInCollection.length === 0) return null;
+          return (
+            <div className="mb-6 flex flex-wrap gap-2 items-center">
+              <button
+                onClick={() => setSelectedSport(null)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                  selectedSport === null
+                    ? 'bg-purple-50 border-purple-600 text-purple-700'
+                    : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                All sports ({total})
+              </button>
+              {sportsInCollection.map(({ sport, count }) => {
+                const active = selectedSport === sport;
+                return (
+                  <button
+                    key={sport}
+                    onClick={() => setSelectedSport(active ? null : sport)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
+                      active
+                        ? 'bg-purple-50 border-purple-600 text-purple-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {sport} ({count})
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Grid View */}
         {viewMode === 'grid' && (
