@@ -39,6 +39,32 @@ interface CardLike {
   autographed?: boolean | null
   serial_numbering?: string | null
   conversational_card_info?: CardInfoLike | null
+  // User overrides written by the web "Edit Label" modal and the Label
+  // Studio "Label Text" section. Always win over AI-derived values when
+  // present. Mirrors the override layer in @/lib/useLabelData (web's
+  // getCardLabelData applies the same shape).
+  custom_label_data?: CustomLabelOverrides | null
+}
+
+/**
+ * The override shape stored on `cards.custom_label_data`. Six display-
+ * level fields the user can override; everything else still comes from
+ * the AI / database. Empty string and null both mean "user explicitly
+ * wants this field blank"; `undefined` means "no override, fall through".
+ */
+export interface CustomLabelOverrides {
+  primaryName?: string | null
+  setName?: string | null
+  subset?: string | null
+  cardNumber?: string | null
+  year?: string | null
+  features?: string[] | null
+}
+
+function getOverrides(card: CardLike): CustomLabelOverrides | null {
+  const o = card.custom_label_data
+  if (!o || typeof o !== 'object') return null
+  return o
 }
 
 const stripMarkdown = (v?: string | null): string | null => {
@@ -64,6 +90,14 @@ const SPORTS_CATEGORIES = new Set(['Sports', 'Baseball', 'Basketball', 'Football
  * card_name often contains the insert/parallel set name (e.g., "Power Players").
  */
 export function getDisplayName(card: CardLike): string {
+  // User-defined override wins over everything. Empty string means the
+  // user wants the headline blank — respect that. undefined means no
+  // override exists; fall through to the AI-derived value.
+  const overrides = getOverrides(card)
+  if (overrides && overrides.primaryName !== undefined && overrides.primaryName !== null) {
+    return overrides.primaryName
+  }
+
   const ci = card.conversational_card_info || {}
   const category = card.category || 'Other'
   const isSports = SPORTS_CATEGORIES.has(category) || card.sub_category === 'Sports'
@@ -114,8 +148,14 @@ export function getContextLine(card: CardLike): string {
   const ci = card.conversational_card_info || {}
   const category = card.category || 'Other'
   const isSports = SPORTS_CATEGORIES.has(category) || card.sub_category === 'Sports'
+  const overrides = getOverrides(card)
 
-  const setName = stripMarkdown(ci.set_name) || stripMarkdown(ci.set_era) || stripMarkdown(card.card_set) || ''
+  // For each component, prefer the override (including null/empty for
+  // "user wants this blank") and fall through to the AI chain only when
+  // the override is undefined.
+  let setName = stripMarkdown(ci.set_name) || stripMarkdown(ci.set_era) || stripMarkdown(card.card_set) || ''
+  if (overrides && overrides.setName !== undefined) setName = overrides.setName || ''
+
   let subset = stripMarkdown(ci.subset) || ''
   if (isSports) {
     const player = stripMarkdown(ci.player_or_character) || ''
@@ -124,13 +164,18 @@ export function getContextLine(card: CardLike): string {
       subset = aiCardName
     }
   }
-  const cardNumber =
+  if (overrides && overrides.subset !== undefined) subset = overrides.subset || ''
+
+  let cardNumber =
     stripMarkdown(ci.card_number_raw) ||
     stripMarkdown(ci.card_number) ||
     stripMarkdown(ci.collector_number) ||
     stripMarkdown(card.card_number) ||
     ''
-  const year = stripMarkdown(ci.year) || stripMarkdown(ci.set_year) || stripMarkdown(card.release_date) || ''
+  if (overrides && overrides.cardNumber !== undefined) cardNumber = overrides.cardNumber || ''
+
+  let year = stripMarkdown(ci.year) || stripMarkdown(ci.set_year) || stripMarkdown(card.release_date) || ''
+  if (overrides && overrides.year !== undefined) year = overrides.year || ''
 
   const parts: string[] = []
   if (setName) parts.push(setName)
@@ -250,6 +295,14 @@ function getOtherFeatures(ci: any, card: any): string[] {
  * top-level category to a sub-category of Other.
  */
 export function getFeatures(card: CardLike): string[] {
+  // User-defined features array wins. An explicitly empty array [] means
+  // the user wants no features shown; undefined means no override, fall
+  // through to category-specific auto-detection below.
+  const overrides = getOverrides(card)
+  if (overrides && Array.isArray(overrides.features)) {
+    return overrides.features
+  }
+
   const ci = card.conversational_card_info || {}
   const category = card.category || 'Other'
   const isSports = SPORTS_CATEGORIES.has(category) || card.sub_category === 'Sports'

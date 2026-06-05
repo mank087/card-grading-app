@@ -81,60 +81,34 @@ export async function compressImage(
 }
 
 /**
- * Crop image to the card aspect ratio (2.5:3.5 portrait / 3.5:2.5 landscape),
- * keeping as much of the captured frame as possible.
+ * Crop image to the card aspect ratio. Standalone version used by
+ * non-capture callers; the camera/gallery flow uses processCardCapture
+ * below which does this + center-band + resize + compress in a single
+ * ImageManipulator pass to avoid stacking JPEG re-encodes.
  *
- * Earlier versions cropped tightly to "70% (guide width) + 5% padding ×2 =
- * 80% of the frame", on the assumption that the captured frame matched the
- * camera preview 1:1. That assumption breaks on iOS, where the CameraView
- * preview applies aspect-fill — the preview shows only the center band of
- * the sensor (typically 80-90% of the sensor width). takePictureAsync then
- * returns the FULL sensor frame, and an "80% crop of the full frame" ends
- * up being significantly tighter than the 70% guide the user aligned the
- * card to. Result: card appears noticeably zoomed-in vs what the user saw.
- *
- * Now: crop only enforces card aspect ratio without shrinking. The longer
- * axis is preserved at 100%; the shorter axis is trimmed just enough to
- * match the card's 2.5:3.5 ratio. The card ends up at roughly the same
- * relative size in the captured image as it appeared in the preview.
+ * Why the center-band step matters: CameraView's preview applies
+ * aspect-fill on iOS and Android, showing only the center band of the
+ * sensor (~85% in each dimension on typical devices). takePictureAsync
+ * returns the FULL sensor frame, so a card the user aligned to the
+ * on-screen guide ends up much smaller in the captured photo than the
+ * preview implied. Pre-cropping to the center 85% before the aspect-
+ * ratio crop puts the captured frame close to what the user actually
+ * saw through the preview.
  */
+const PREVIEW_VISIBLE_FRACTION = 0.85
+
 export async function cropToCardAspect(
   uri: string,
   orientation: 'portrait' | 'landscape' = 'portrait'
 ): Promise<{ uri: string; width: number; height: number }> {
-  const original = await ImageManipulator.manipulateAsync(uri, [], {
+  const probe = await ImageManipulator.manipulateAsync(uri, [], {
     format: ImageManipulator.SaveFormat.JPEG,
   })
-  const { width, height } = original
-
-  const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
-
-  let cropWidth: number, cropHeight: number
-
-  // Enforce card aspect ratio with NO scale reduction. The longer axis
-  // stays at full size; the shorter axis is whatever the longer axis ÷
-  // cardAspect demands. Centered on the original frame.
-  const imgAspect = width / height
-  if (imgAspect > cardAspect) {
-    // Image wider than card — height is full, trim sides to card AR
-    cropHeight = height
-    cropWidth = Math.round(cropHeight * cardAspect)
-  } else {
-    // Image taller than card — width is full, trim top/bottom to card AR
-    cropWidth = width
-    cropHeight = Math.round(cropWidth / cardAspect)
-  }
-
-  // Clamp to image bounds
-  cropWidth = Math.min(cropWidth, width)
-  cropHeight = Math.min(cropHeight, height)
-
-  // Center the crop
-  const originX = Math.max(0, Math.round((width - cropWidth) / 2))
-  const originY = Math.max(0, Math.round((height - cropHeight) / 2))
-
-  const finalW = Math.min(cropWidth, width - originX)
-  const finalH = Math.min(cropHeight, height - originY)
+  const { originX, originY, finalW, finalH } = computeCardCrop(
+    probe.width,
+    probe.height,
+    orientation,
+  )
 
   const cropped = await ImageManipulator.manipulateAsync(
     uri,
@@ -142,9 +116,109 @@ export async function cropToCardAspect(
     { compress: 0.92, format: ImageManipulator.SaveFormat.JPEG }
   )
 
-  // Return dims so compressImage can skip its own probe pass — saves one
-  // ImageManipulator roundtrip + one temp JPEG per capture.
   return { uri: cropped.uri, width: cropped.width, height: cropped.height }
+}
+
+/**
+ * Center-band + card-aspect + max-edge resize + JPEG compress in a
+ * single ImageManipulator pass.
+ *
+ * The previous capture pipeline called three separate manipulateAsync
+ * passes (probe → cropToCardAspect → compressImage). Each pass decoded
+ * and re-encoded JPEG, which compounded to visible softness around card
+ * text and corners. Now: one decode, one combined transform list, one
+ * encode at the final downstream-friendly quality.
+ *
+ * Caller still gets back the same CompressedImage shape so the capture
+ * screen needs almost no other change.
+ */
+export async function processCardCapture(
+  uri: string,
+  orientation: 'portrait' | 'landscape' = 'portrait',
+  sensorHints?: { width: number; height: number },
+): Promise<CompressedImage> {
+  // Read dimensions if the caller didn't already know them. Most camera
+  // and gallery results expose width/height directly so we avoid the
+  // probe pass entirely when the caller passes them in.
+  let sensorW = sensorHints?.width
+  let sensorH = sensorHints?.height
+  if (sensorW == null || sensorH == null) {
+    const probe = await ImageManipulator.manipulateAsync(uri, [], {
+      format: ImageManipulator.SaveFormat.JPEG,
+    })
+    sensorW = probe.width
+    sensorH = probe.height
+  }
+
+  const { originX, originY, finalW, finalH } = computeCardCrop(sensorW, sensorH, orientation)
+
+  // Decide whether to resize too. If the post-crop dimensions are over
+  // MAX_LONG_EDGE on the long axis, append a resize action. Otherwise
+  // skip resize so we don't waste cycles upscaling or no-op'ing a tiny
+  // amount.
+  const longEdge = Math.max(finalW, finalH)
+  const actions: ImageManipulator.Action[] = [
+    { crop: { originX, originY, width: finalW, height: finalH } },
+  ]
+  if (longEdge > MAX_LONG_EDGE) {
+    if (finalW >= finalH) actions.push({ resize: { width: MAX_LONG_EDGE } })
+    else actions.push({ resize: { height: MAX_LONG_EDGE } })
+  }
+
+  const result = await ImageManipulator.manipulateAsync(uri, actions, {
+    compress: 0.85,
+    format: ImageManipulator.SaveFormat.JPEG,
+  })
+
+  const fileSize = Math.round(result.width * result.height * 0.15)
+  return {
+    uri: result.uri,
+    width: result.width,
+    height: result.height,
+    fileSize,
+  }
+}
+
+/**
+ * Shared crop math. Takes a sensor-sized image, applies the 85% center
+ * band (matches the preview's visible region), then enforces the card
+ * 2.5:3.5 aspect ratio centered within that band.
+ */
+function computeCardCrop(
+  width: number,
+  height: number,
+  orientation: 'portrait' | 'landscape',
+): { originX: number; originY: number; finalW: number; finalH: number } {
+  // Step 1 — preview-band crop. Trim each dimension to 85% so the
+  // captured frame approximates what the user saw through the aspect-
+  // fill preview.
+  const bandW = Math.round(width * PREVIEW_VISIBLE_FRACTION)
+  const bandH = Math.round(height * PREVIEW_VISIBLE_FRACTION)
+  const bandX = Math.max(0, Math.round((width - bandW) / 2))
+  const bandY = Math.max(0, Math.round((height - bandH) / 2))
+
+  // Step 2 — card-aspect crop, centered within the band.
+  const cardAspect = orientation === 'portrait' ? 2.5 / 3.5 : 3.5 / 2.5
+  const bandAspect = bandW / bandH
+
+  let cropW: number
+  let cropH: number
+  if (bandAspect > cardAspect) {
+    cropH = bandH
+    cropW = Math.round(cropH * cardAspect)
+  } else {
+    cropW = bandW
+    cropH = Math.round(cropW / cardAspect)
+  }
+  cropW = Math.min(cropW, bandW)
+  cropH = Math.min(cropH, bandH)
+
+  const originX = bandX + Math.max(0, Math.round((bandW - cropW) / 2))
+  const originY = bandY + Math.max(0, Math.round((bandH - cropH) / 2))
+  const finalW = Math.min(cropW, width - originX)
+  const finalH = Math.min(cropH, height - originY)
+
+  return { originX, originY, finalW, finalH }
 }
 
 /**

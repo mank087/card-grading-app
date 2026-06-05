@@ -280,6 +280,22 @@ export default function CardDetailScreen() {
     rarity: string
   }>({ card_name: '', card_set: '', card_number: '', release_date: '', player_or_character: '', manufacturer: '', rarity: '' })
   const [savingEdit, setSavingEdit] = useState(false)
+  // "Edit Label" modal — writes user overrides to cards.custom_label_data
+  // via PUT /api/cards/[id]/custom-label, mirroring the web
+  // EditCardLabelModal. The override layer always wins over AI-derived
+  // values in labelData.ts so the displayed name/context line/features
+  // update everywhere as soon as the user saves.
+  const [editLabelOpen, setEditLabelOpen] = useState(false)
+  const [editLabelForm, setEditLabelForm] = useState<{
+    primaryName: string
+    setName: string
+    subset: string
+    cardNumber: string
+    year: string
+    features: string
+  }>({ primaryName: '', setName: '', subset: '', cardNumber: '', year: '', features: '' })
+  const [savingLabel, setSavingLabel] = useState(false)
+  const [revertingLabel, setRevertingLabel] = useState(false)
   const [hideMarkers, setHideMarkers] = useState(false)
   const [refreshingPrice, setRefreshingPrice] = useState(false)
 
@@ -951,7 +967,19 @@ export default function CardDetailScreen() {
               <View style={s.editHandle} />
               <Text style={s.editTitle}>Edit Card Info</Text>
               <Text style={s.editSubtitle}>Updates appear on the slab label, collection, and downloadable labels.</Text>
-              <ScrollView style={{ maxHeight: 460 }} keyboardShouldPersistTaps="handled">
+              {/* flexShrink + automaticallyAdjustKeyboardInsets together let
+                  the ScrollView shrink to whatever space remains above the
+                  keyboard, so the focused TextInput and the Save/Cancel
+                  buttons below stay visible. Previously a hard maxHeight:
+                  460 kept the ScrollView demanding the same space whether
+                  the keyboard was up or not, pushing the Save buttons (and
+                  often the focused input itself) off the bottom of the
+                  screen on Android. */}
+              <ScrollView
+                style={{ flexShrink: 1 }}
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+              >
                 {[
                   { key: 'card_name', label: 'Card Name', placeholder: 'e.g. Charizard' },
                   { key: 'player_or_character', label: 'Player / Character', placeholder: 'e.g. Patrick Mahomes' },
@@ -1013,6 +1041,129 @@ export default function CardDetailScreen() {
                   }}
                 >
                   {savingEdit
+                    ? <ActivityIndicator color="#fff" size="small" />
+                    : <Text style={s.editBtnSaveText}>Save</Text>}
+                </TouchableOpacity>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Edit Label Modal — overrides shown on the slab + Collection
+          thumbnail + downloaded labels. Writes to custom_label_data; mirrors
+          the web EditCardLabelModal contract exactly so a card edited on
+          one surface stays consistent on the other. */}
+      <Modal visible={editLabelOpen} transparent animationType="slide" onRequestClose={() => setEditLabelOpen(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={s.editBackdrop} onPress={() => setEditLabelOpen(false)}>
+            <Pressable style={[s.editSheet, { paddingBottom: insets.bottom + 20 }]} onPress={e => e.stopPropagation()}>
+              <View style={s.editHandle} />
+              <Text style={s.editTitle}>Edit Label</Text>
+              <Text style={s.editSubtitle}>Overrides what appears on the slab, Collection thumbnail, and downloadable labels. Grade and serial cannot be changed.</Text>
+              <ScrollView
+                style={{ flexShrink: 1 }}
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+              >
+                {([
+                  { key: 'primaryName', label: 'Card Name',       hint: 'The headline on the slab. For sports cards this is the player name.', placeholder: 'e.g. Charizard EX, Tom Brady' },
+                  { key: 'setName',     label: 'Set Name',        hint: 'Appears first in the context line below the card name.',              placeholder: 'e.g. Scarlet & Violet, Topps Chrome' },
+                  { key: 'subset',      label: 'Subset / Variant',hint: 'The parallel, insert, or variant. Comes after the set.',              placeholder: 'e.g. Holo Rare, Refractor, Full Art' },
+                  { key: 'cardNumber',  label: 'Card Number',     hint: 'The collector number as printed. # prefix is fine.',                  placeholder: 'e.g. 25, 232/182, SM226' },
+                  { key: 'year',        label: 'Year',            hint: 'Release year of the card or set.',                                    placeholder: 'e.g. 2024' },
+                  { key: 'features',    label: 'Special Features',hint: 'Comma-separated. Leave empty to use the auto-detected list.',         placeholder: 'e.g. RC, Auto, /99, 1st Edition' },
+                ] as const).map(field => (
+                  <View key={field.key} style={s.editField}>
+                    <Text style={s.editLabel}>{field.label}</Text>
+                    <Text style={{ fontSize: 11, color: Colors.gray[500], marginBottom: 4 }}>{field.hint}</Text>
+                    <TextInput
+                      style={s.editInput}
+                      value={(editLabelForm as any)[field.key]}
+                      onChangeText={t => setEditLabelForm(f => ({ ...f, [field.key]: t }))}
+                      placeholder={field.placeholder}
+                      placeholderTextColor={Colors.gray[400]}
+                      autoCapitalize={field.key === 'features' ? 'characters' : 'words'}
+                    />
+                  </View>
+                ))}
+              </ScrollView>
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                {!!card?.custom_label_data && (
+                  <TouchableOpacity
+                    style={[s.editBtn, { backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[100] }]}
+                    disabled={savingLabel || revertingLabel}
+                    onPress={async () => {
+                      setRevertingLabel(true)
+                      try {
+                        const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+                        const res = await fetch(`${API_BASE}/api/cards/${card.id}/custom-label`, {
+                          method: 'DELETE',
+                          headers: { Authorization: `Bearer ${session?.access_token}` },
+                        })
+                        if (!res.ok) {
+                          const j = await res.json().catch(() => ({} as any))
+                          throw new Error(j.error || `Revert failed (HTTP ${res.status})`)
+                        }
+                        setCard((prev: any) => prev ? { ...prev, custom_label_data: null } : prev)
+                        setEditLabelOpen(false)
+                      } catch (err: any) {
+                        Alert.alert('Revert failed', err?.message || 'Could not revert label overrides.')
+                      } finally {
+                        setRevertingLabel(false)
+                      }
+                    }}
+                  >
+                    {revertingLabel
+                      ? <ActivityIndicator color={Colors.amber[600]} size="small" />
+                      : <Text style={{ color: Colors.amber[600], fontSize: 13, fontWeight: '700' }}>Revert</Text>}
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity style={[s.editBtn, s.editBtnCancel]} onPress={() => setEditLabelOpen(false)} disabled={savingLabel || revertingLabel}>
+                  <Text style={s.editBtnCancelText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[s.editBtn, s.editBtnSave]}
+                  disabled={savingLabel || revertingLabel}
+                  onPress={async () => {
+                    setSavingLabel(true)
+                    try {
+                      const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+                      const features = editLabelForm.features
+                        .split(',')
+                        .map(f => f.trim())
+                        .filter(Boolean)
+                        .slice(0, 10)
+                      const customFields = {
+                        primaryName: editLabelForm.primaryName,
+                        setName: editLabelForm.setName || null,
+                        subset: editLabelForm.subset || null,
+                        cardNumber: editLabelForm.cardNumber || null,
+                        year: editLabelForm.year || null,
+                        features,
+                      }
+                      const res = await fetch(`${API_BASE}/api/cards/${card.id}/custom-label`, {
+                        method: 'PUT',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${session?.access_token}`,
+                        },
+                        body: JSON.stringify({ customFields }),
+                      })
+                      if (!res.ok) {
+                        const j = await res.json().catch(() => ({} as any))
+                        throw new Error(j.error || `Save failed (HTTP ${res.status})`)
+                      }
+                      setCard((prev: any) => prev ? { ...prev, custom_label_data: customFields } : prev)
+                      setEditLabelOpen(false)
+                    } catch (err: any) {
+                      Alert.alert('Save failed', err?.message || 'Could not save label overrides.')
+                    } finally {
+                      setSavingLabel(false)
+                    }
+                  }}
+                >
+                  {savingLabel
                     ? <ActivityIndicator color="#fff" size="small" />
                     : <Text style={s.editBtnSaveText}>Save</Text>}
                 </TouchableOpacity>
@@ -1365,24 +1516,56 @@ export default function CardDetailScreen() {
           {card.slab_grade && <InfoRow label="Slab Grade" value={card.slab_grade} />}
           {/* Edit button */}
           {isOwner && (
-            <TouchableOpacity
-              style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 10, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.purple[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200], alignSelf: 'flex-start' }}
-              onPress={() => {
-                setEditForm({
-                  card_name: card.card_name || ci?.card_name || '',
-                  card_set: card.card_set || ci?.set_name || '',
-                  card_number: card.card_number || ci?.card_number || '',
-                  release_date: card.release_date || ci?.year || '',
-                  player_or_character: ci?.player_or_character || '',
-                  manufacturer: ci?.manufacturer || (card as any).manufacturer_name || '',
-                  rarity: ci?.rarity_tier || ci?.rarity_or_variant || '',
-                })
-                setEditOpen(true)
-              }}
-            >
-              <Ionicons name="create-outline" size={14} color={Colors.purple[600]} />
-              <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.purple[600] }}>Edit Card Info</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.purple[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.purple[200] }}
+                onPress={() => {
+                  setEditForm({
+                    card_name: card.card_name || ci?.card_name || '',
+                    card_set: card.card_set || ci?.set_name || '',
+                    card_number: card.card_number || ci?.card_number || '',
+                    release_date: card.release_date || ci?.year || '',
+                    player_or_character: ci?.player_or_character || '',
+                    manufacturer: ci?.manufacturer || (card as any).manufacturer_name || '',
+                    rarity: ci?.rarity_tier || ci?.rarity_or_variant || '',
+                  })
+                  setEditOpen(true)
+                }}
+              >
+                <Ionicons name="create-outline" size={14} color={Colors.purple[600]} />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: Colors.purple[600] }}>Edit Card Info</Text>
+              </TouchableOpacity>
+              {/* Edit Label — opens the override modal. Prefills from any
+                  existing custom_label_data so the user picks up where
+                  they left off; otherwise prefills from the AI-derived
+                  values so they're editing what's currently visible. */}
+              <TouchableOpacity
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 12, backgroundColor: Colors.purple[600], borderRadius: 8 }}
+                onPress={() => {
+                  const overrides = (card.custom_label_data as any) || null
+                  // card_number_raw isn't in the narrow local CardInfo
+                  // type; it lives in the AI's wider conversational_card_info
+                  // shape (e.g. "94/220"). Read defensively.
+                  const ciAny = ci as any
+                  const ciCardNumber = ciAny?.card_number_raw || ci?.card_number || ''
+                  const ciYear = ci?.year || ''
+                  setEditLabelForm({
+                    primaryName: overrides?.primaryName ?? getDisplayName(card as any),
+                    setName: overrides?.setName ?? (ci?.set_name || card.card_set || ''),
+                    subset: overrides?.subset ?? (ciAny?.subset || ''),
+                    cardNumber: overrides?.cardNumber ?? (ciCardNumber || card.card_number || ''),
+                    year: overrides?.year ?? (ciYear || card.release_date || ''),
+                    features: overrides?.features
+                      ? (overrides.features as string[]).join(', ')
+                      : getFeatures(card as any).join(', '),
+                  })
+                  setEditLabelOpen(true)
+                }}
+              >
+                <Ionicons name="pricetag-outline" size={14} color="#fff" />
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#fff' }}>Edit Label</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </CollapsibleSection>
         </View>
@@ -2450,7 +2633,12 @@ const s = StyleSheet.create({
 
   // Edit modal
   editBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  editSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24 },
+  // maxHeight caps the sheet at 92% of the screen-above-keyboard so the
+  // ScrollView inside (with flexShrink: 1) is forced to give up height to
+  // the Save/Cancel button row. Without the cap, the sheet's natural
+  // content height could exceed the available space and the buttons would
+  // be cut off when the keyboard came up.
+  editSheet: { backgroundColor: Colors.white, borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 24, maxHeight: '92%' },
   editHandle: { width: 36, height: 4, backgroundColor: Colors.gray[300], borderRadius: 2, alignSelf: 'center', marginBottom: 8 },
   editTitle: { fontSize: 18, fontWeight: '700', color: Colors.gray[900] },
   editSubtitle: { fontSize: 11, color: Colors.gray[500], marginBottom: 12, marginTop: 2 },

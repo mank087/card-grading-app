@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, ScrollView, Image, StyleSheet, TouchableOpacity, TextInput,
   ActivityIndicator, useWindowDimensions, FlatList, Alert, Share, Platform,
+  KeyboardAvoidingView,
 } from 'react-native'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -979,7 +980,24 @@ export default function LabelStudioScreen() {
           Documents (visible in Files app) and offer Share. */}
       <ExportRunner source={exportSource} onClose={() => setExportSource(null)} />
 
-      <ScrollView style={s.scroll} contentContainerStyle={s.scrollContent}>
+      {/* Wrap the main scroll in a KeyboardAvoidingView so the bottom
+          form fields (Card Name, Set, Year, Card #, Features, the
+          custom dimension inputs, the saved-style rename, etc.) lift
+          above the soft keyboard. Android edge-to-edge layouts (the
+          DCM app has edgeToEdgeEnabled: true) won't auto-shift the
+          screen on focus, so without this the keyboard covers the
+          focused input. automaticallyAdjustKeyboardInsets covers iOS
+          via UIScrollView's native inset behavior. */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+      <ScrollView
+        style={s.scroll}
+        contentContainerStyle={s.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+      >
         {/* ============ Card Selector ============ */}
         <View style={s.section}>
           <Text style={s.sectionTitle}>Select a Card</Text>
@@ -1670,6 +1688,7 @@ export default function LabelStudioScreen() {
           </>
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
       {!isTabContext && <MobileTabBar />}
     </View>
   )

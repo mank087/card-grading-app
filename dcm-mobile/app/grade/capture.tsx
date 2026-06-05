@@ -6,8 +6,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Ionicons } from '@expo/vector-icons'
 import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
+import { StatusBar } from 'expo-status-bar'
 import { Colors } from '@/lib/constants'
-import { compressImage, cropToCardAspect, assessQuality, hashImage, QualityResult, CompressedImage } from '@/lib/imageUtils'
+import { assessQuality, hashImage, processCardCapture, QualityResult, CompressedImage } from '@/lib/imageUtils'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 import { useResponsive } from '@/hooks/useResponsive'
@@ -74,8 +75,10 @@ export default function CaptureScreen() {
   const processImage = async (rawUri: string) => {
     setIsProcessing(true)
     try {
-      const cropped = await cropToCardAspect(rawUri, orientation)
-      const compressed = await compressImage(cropped.uri, { width: cropped.width, height: cropped.height })
+      // Single ImageManipulator pass — crop center band + card aspect
+      // + resize + compress. Removes the JPEG re-encode chain that was
+      // softening photos around card text and corners.
+      const compressed = await processCardCapture(rawUri, orientation)
       const quality = assessQuality(compressed)
       const hash = await hashImage(compressed.uri)
 
@@ -192,24 +195,30 @@ export default function CaptureScreen() {
     setIsCapturing(true)
 
     try {
-      // iPad rear cameras autofocus more slowly than iPhone; if the user
-      // taps shutter mid-focus-sweep the result is blurry. Give the lens
-      // ~200ms to settle before the actual exposure. Negligible on iPhone,
-      // material on iPad. shutterSound: false suppresses the system camera
-      // click on capture (Japanese/Korean Android devices force it on by
-      // law, so the flag is ignored there).
-      if (isTablet) await new Promise(r => setTimeout(r, 200))
+      // Always give the lens ~200ms to settle before the shutter fires.
+      // The previous version delayed only on iPad because iPhones
+      // autofocus quickly; in practice Android phones land somewhere in
+      // between and the user can tap shutter mid-focus-sweep. A small
+      // universal delay catches all the focus-sweep blur cases without
+      // a perceptible UI hitch. shutterSound: false suppresses the
+      // system camera click (Japanese/Korean Android devices force it
+      // on by law, so the flag is ignored there).
+      await new Promise(r => setTimeout(r, isTablet ? 250 : 180))
       const photo = await cameraRef.current.takePictureAsync({ quality: 0.92, shutterSound: false })
       if (!photo?.uri) throw new Error('Capture failed')
 
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium)
       setIsProcessing(true)
 
-      // Crop to card aspect ratio
-      const cropped = await cropToCardAspect(photo.uri, orientation)
-
-      // Compress — pass dims so compressImage skips its probe pass
-      const compressed = await compressImage(cropped.uri, { width: cropped.width, height: cropped.height })
+      // Single ImageManipulator pass — see processCardCapture for the
+      // crop/resize/compress math. Replaces the previous chain of
+      // probe → cropToCardAspect → compressImage which compounded
+      // JPEG re-encodes and softened the final photo.
+      const compressed = await processCardCapture(
+        photo.uri,
+        orientation,
+        photo.width && photo.height ? { width: photo.width, height: photo.height } : undefined,
+      )
 
       // Quality assessment
       const quality = assessQuality(compressed)
@@ -364,8 +373,17 @@ export default function CaptureScreen() {
   // Camera or Gallery mode
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.cameraHeader, { paddingTop: insets.top + 8 }]}>
+      {/* Hide the system status bar while capture is mounted. Notification
+          banners (e.g., a grading-in-progress card) can otherwise expand
+          insets.top and squeeze the camera region. Hidden mode keeps the
+          camera area dimensionally stable; notifications still post to
+          the tray, they just don't push the layout around. */}
+      <StatusBar hidden translucent />
+      {/* Header — uses a fixed top padding instead of insets.top so the
+          camera region's height stays constant when the status bar
+          toggles for any reason (rotation, notifications, accessibility
+          adjustments). */}
+      <View style={[styles.cameraHeader, { paddingTop: 12 }]}>
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.headerButton}
