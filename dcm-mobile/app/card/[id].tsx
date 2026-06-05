@@ -93,16 +93,44 @@ export default function CardDetailScreen() {
   const [activeImage, setActiveImage] = useState<'front' | 'back'>('front')
   const [zoomImage, setZoomImage] = useState<string | null>(null)
 
-  // Swipe gestures on the slab — left/right to switch front/back. Built-in PanResponder
-  // (no extra deps); only triggers on a clear horizontal swipe so the parent ScrollView
-  // can still scroll vertically.
+  // Swipe gestures on the slab — left/right to switch front/back.
+  //
+  // Previous version had the PanResponder on a View nested INSIDE the
+  // TouchableOpacity that opens the zoom modal. TouchableOpacity claims
+  // the touch responder on press-down (for its onPress) and doesn't
+  // yield it to the inner View's PanResponder, so the user could tap to
+  // zoom but every drag was swallowed as a press, not a swipe. Customer
+  // confirmed swipe-to-flip never worked on Android; same root cause on iOS.
+  //
+  // Fix: the slab JSX now wraps the TouchableOpacity in the panResponder
+  // View, and the PanResponder uses capture-phase + termination-resistant
+  // handlers so a horizontal drag intercepts BEFORE the inner
+  // TouchableOpacity claims it as a press. Vertical motion still falls
+  // through to the parent ScrollView so the page scrolls normally.
   const slabPanResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_e, gs) => Math.abs(gs.dx) > 18 && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
+      // Don't claim on touch-start — taps should pass through to the
+      // TouchableOpacity (which opens the zoom modal).
+      onStartShouldSetPanResponder: () => false,
+      onStartShouldSetPanResponderCapture: () => false,
+      // Once movement begins, decide whether this is a horizontal swipe
+      // (claim it) or a vertical scroll (let it pass through).
+      onMoveShouldSetPanResponder: (_e, gs) =>
+        Math.abs(gs.dx) > 10 && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
+      // Capture-phase intercept — runs before the inner TouchableOpacity
+      // gets a chance to swallow the touch as a press, which is what was
+      // happening before.
+      onMoveShouldSetPanResponderCapture: (_e, gs) =>
+        Math.abs(gs.dx) > 10 && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
       onPanResponderRelease: (_e, gs) => {
         if (gs.dx < -40) setActiveImage('back')   // swipe left → back
         else if (gs.dx > 40) setActiveImage('front') // swipe right → front
       },
+      // Don't let TouchableOpacity reclaim the responder once we've
+      // grabbed it mid-swipe — that would cancel the gesture before
+      // onPanResponderRelease fires.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
     })
   ).current
   const [editOpen, setEditOpen] = useState(false)
@@ -1182,8 +1210,12 @@ export default function CardDetailScreen() {
 
       {/* ══════ SLAB PREVIEW ══════ */}
       <View ref={tourRefs['card-images']} collapsable={false} style={s.slabSection}>
-        <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
+        {/* PanResponder lives on the OUTER wrapper so horizontal swipes
+            intercept before the TouchableOpacity below can claim them as
+            a tap. See slabPanResponder declaration above for why this
+            nesting matters. */}
         <View style={s.slabContainer} {...slabPanResponder.panHandlers}>
+        <TouchableOpacity activeOpacity={0.9} onPress={() => { const url = activeImage === 'front' ? frontUrl : backUrl; if (url) setZoomImage(url) }}>
           <SlabCard
             imageUrl={activeImage === 'front' ? frontUrl : backUrl}
             displayName={getDisplayName(card as any)}
@@ -1202,8 +1234,8 @@ export default function CardDetailScreen() {
             showVipEmblem={emblems.showVip}
             showCardLoversEmblem={emblems.showCardLovers}
           />
-        </View>
         </TouchableOpacity>
+        </View>
         <Text style={{ fontSize: 9, color: Colors.gray[400], textAlign: 'center', marginTop: 2 }}>Swipe to flip · Tap to zoom</Text>
         <View style={s.imageToggle}>
           {['front', 'back'].map(side => (
