@@ -1,7 +1,8 @@
-import { View, StyleSheet, ActivityIndicator } from 'react-native'
+import { View, StyleSheet, ActivityIndicator, BackHandler } from 'react-native'
 import { WebView } from 'react-native-webview'
-import { useRouter, useSegments } from 'expo-router'
-import { useState, useEffect, useRef } from 'react'
+import { useRouter, useSegments, useNavigation } from 'expo-router'
+import { useFocusEffect } from '@react-navigation/native'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Colors } from '@/lib/constants'
 import { supabase } from '@/lib/supabase'
 import MobileTabBar from '@/components/MobileTabBar'
@@ -28,6 +29,7 @@ export default function InAppPage({ path, title }: InAppPageProps) {
   // tab bar, so suppress our inline chrome to avoid stacking two of each.
   const segments = useSegments()
   const isTabContext = segments[0] === '(tabs)'
+  const navigation = useNavigation()
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState<{ access_token: string; refresh_token: string; user: any } | null>(null)
   const [ready, setReady] = useState(false)
@@ -44,6 +46,38 @@ export default function InAppPage({ path, title }: InAppPageProps) {
       router.back()
     }
   }
+
+  // Tab re-tap: when the user is already on this tab and taps it again
+  // in the bottom nav, snap the WebView back to its start URL. Without
+  // this, SPA navigations inside the WebView (e.g. Portfolio → a card
+  // detail page on the web side) leave the user stranded — the tab
+  // press is a no-op because expo-router considers them "already there."
+  useEffect(() => {
+    if (!isTabContext) return
+    const unsub = navigation.addListener('tabPress' as any, () => {
+      webViewRef.current?.injectJavaScript(
+        `try { window.location.replace(${JSON.stringify(url)}); } catch(e) {} true;`,
+      )
+    })
+    return unsub
+  }, [isTabContext, navigation, url])
+
+  // Android hardware back: when this screen is focused, prefer walking
+  // the WebView's own history before letting expo-router pop. Otherwise
+  // tapping back from inside a SPA-navigated page exits the tab instead
+  // of returning to the page the user came from.
+  useFocusEffect(
+    useCallback(() => {
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (canGoBack) {
+          webViewRef.current?.goBack()
+          return true
+        }
+        return false
+      })
+      return () => sub.remove()
+    }, [canGoBack]),
+  )
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -169,6 +203,10 @@ export default function InAppPage({ path, title }: InAppPageProps) {
         allowFileAccessFromFileURLs
         // Share cookies/storage within the app
         sharedCookiesEnabled
+        // iOS: enable the native edge-swipe back/forward gesture so
+        // users can swipe-back through WebView history the same way they
+        // would in Safari. No-op on Android.
+        allowsBackForwardNavigationGestures
       />
       {!isTabContext && <MobileTabBar />}
     </View>
