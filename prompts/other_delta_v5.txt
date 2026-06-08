@@ -50,7 +50,8 @@ REQUIRED FIELDS (All Generic Cards)
 **year**: Release year
 • 4-digit year from copyright text or card design
 • Example: "2024", "2002"
-• If not visible: null
+• Prefer the back copyright (© YYYY) when visible — this is the authoritative print year.
+• **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set logo: return null. Do NOT guess based on the design era, art style, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher/producer
 • Extract game publisher or card manufacturer

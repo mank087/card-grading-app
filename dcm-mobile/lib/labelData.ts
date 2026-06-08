@@ -21,8 +21,18 @@ interface CardInfoLike {
   facsimile_autograph?: boolean | null
   serial_number?: string | null
   pokemon_type?: string | null
+  holofoil?: string | null
   is_foil?: boolean | null
   foil_type?: string | null
+  // One Piece-specific
+  op_card_type?: string | null
+  op_variant_type?: string | null
+  // Yu-Gi-Oh-specific
+  ygo_card_type?: string | null
+  ygo_attribute?: string | null
+  ygo_race?: string | null
+  // Star Wars-specific fallback for subset
+  rarity_or_variant?: string | null
 }
 
 interface CardLike {
@@ -166,24 +176,81 @@ export function getContextLine(card: CardLike): string {
   }
   if (overrides && overrides.subset !== undefined) subset = overrides.subset || ''
 
-  let cardNumber =
-    stripMarkdown(ci.card_number_raw) ||
-    stripMarkdown(ci.card_number) ||
-    stripMarkdown(ci.collector_number) ||
-    stripMarkdown(card.card_number) ||
-    ''
+  // Card-number source priority mirrors web's labelDataGenerator.ts:1138-1152.
+  // Pokemon and Lorcana prefer the DB column (verified via the per-game API
+  // lookup or OCR override); everything else prefers the AI-extracted value.
+  let cardNumber: string
+  if (category === 'Pokemon' || category === 'Lorcana') {
+    cardNumber =
+      stripMarkdown(card.card_number) ||
+      stripMarkdown(ci.card_number_raw) ||
+      stripMarkdown(ci.card_number) ||
+      stripMarkdown(ci.collector_number) ||
+      ''
+  } else {
+    cardNumber =
+      stripMarkdown(ci.card_number_raw) ||
+      stripMarkdown(ci.card_number) ||
+      stripMarkdown(ci.collector_number) ||
+      stripMarkdown(card.card_number) ||
+      ''
+  }
   if (overrides && overrides.cardNumber !== undefined) cardNumber = overrides.cardNumber || ''
 
-  let year = stripMarkdown(ci.year) || stripMarkdown(ci.set_year) || stripMarkdown(card.release_date) || ''
+  // Year source priority mirrors web's labelDataGenerator.ts:1200-1215.
+  // Pokemon and Lorcana prefer the DB release_date (verified via the per-game
+  // API lookup or OCR override); everything else prefers the AI-extracted year.
+  let year: string
+  if (category === 'Pokemon' || category === 'Lorcana') {
+    const releaseYear = card.release_date ? String(card.release_date).slice(0, 4) : ''
+    year =
+      releaseYear ||
+      stripMarkdown(ci.year) ||
+      stripMarkdown(ci.set_year) ||
+      ''
+  } else {
+    year =
+      stripMarkdown(ci.year) ||
+      stripMarkdown(ci.set_year) ||
+      stripMarkdown(card.release_date) ||
+      ''
+  }
   if (overrides && overrides.year !== undefined) year = overrides.year || ''
 
   const parts: string[] = []
   if (setName) parts.push(setName)
   if (subset && subset !== setName) parts.push(subset)
-  if (cardNumber) parts.push(`#${cardNumber.replace(/^#/, '')}`)
+  const formattedCardNumber = formatCardNumberForCategory(cardNumber, category)
+  if (formattedCardNumber) parts.push(formattedCardNumber)
   if (year) parts.push(year)
 
   return parts.join(' • ')
+}
+
+/**
+ * Format a card number for display. Pokemon has product-specific conventions
+ * (promo prefixes like SM226 are shown bare; fractions like 232/182 keep the
+ * slash; gallery formats like TG10/TG30 collapse to TG10); everything else
+ * gets a plain "#" prefix. Direct port of the regex chain in web's
+ * labelDataGenerator.ts:1156-1198.
+ *
+ * One intentional gap from web: web also looks up
+ * card.pokemon_api_data?.set?.printedTotal to synthesize "#232/182" from a
+ * bare "232". Mobile collection thumbnails don't fetch pokemon_api_data (it
+ * would add ~5-10KB × 1000 rows to the list payload), so a bare-numeric
+ * Pokemon card_number stays as "#232" here. Card detail screen fetches the
+ * full row including pokemon_api_data, so the gap is thumbnail-only.
+ */
+function formatCardNumberForCategory(cardNumber: string, category: string): string {
+  if (!cardNumber) return ''
+  if (category === 'Pokemon') {
+    if (/^\d+\/\d+$/.test(cardNumber)) return `#${cardNumber}`
+    if (/^(SM|SWSH|SVP|TG|GG|XY|BW)\d+$/i.test(cardNumber)) return cardNumber.toUpperCase()
+    if (/^(TG|GG)\d+\/(TG|GG)\d+$/i.test(cardNumber)) return cardNumber.split('/')[0].toUpperCase()
+    if (/^\d+$/.test(cardNumber)) return `#${cardNumber}`
+    return `#${cardNumber}`
+  }
+  return `#${cardNumber.replace(/^#/, '')}`
 }
 
 // Matches isValidSerialNumber in src/lib/labelDataGenerator.ts — keep filters

@@ -43,8 +43,15 @@ REQUIRED FIELDS (All Sports Cards)
 **year**: Year from copyright or release date
 • 4-digit year format
 • Example: "2024", "2023", "1989"
-• Check card back for copyright date (© 2024)
-• If range shown (e.g., 2023-24 season), use first year: "2023"
+
+**YEAR DETECTION HIERARCHY (authoritative → fallback)**:
+  1. **Back copyright (© YYYY)** — this is the AUTHORITATIVE print year. If you can read it on the card back, USE IT. Do not override it with anything else.
+  2. **Explicit print/release date printed on the card** (front or back).
+  3. **Set logo with a 4-digit year** (e.g., "2024 Topps Chrome").
+  4. **Front season indicator** (e.g., "2023-24" or "2024-25") — this denotes the SEASON the player played, NOT necessarily the print year. Sports products for "2024-25" are typically printed in 2024 or 2025; the season label can lag the print year by ~1 year. Use the season convention (first year of the range, e.g., "2023" for a "2023-24" card) ONLY if no copyright/print date is visible.
+
+• When the back copyright and the front season label disagree, ALWAYS use the back copyright.
+• Modern sports products (Panini, Topps, Upper Deck, Bowman) consistently print a back © year — look for it before falling back to the season label.
 • **If the year is not clearly visible from copyright text, a printed date, or an unambiguous set logo: return null. Do NOT guess based on the player, design era, or set "feel." A blank year on the label is better than a wrong one.**
 
 **manufacturer**: Card publisher

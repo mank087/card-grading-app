@@ -262,6 +262,14 @@ export interface ConversationalCardInfo {
   op_counter?: number | null;
   op_attribute?: string | null;
   op_sub_types?: string | null;     // Affiliations/types
+
+  // Yu-Gi-Oh-specific
+  ygo_card_type?: string | null;    // Normal Monster, Effect Monster, Spell Card, Trap Card
+  ygo_attribute?: string | null;    // DARK, LIGHT, FIRE, WATER, EARTH, WIND, DIVINE
+  ygo_race?: string | null;         // Spellcaster, Dragon, Warrior, etc.
+
+  // Star Wars-specific
+  rarity_or_variant?: string | null; // Fallback for subset (e.g., "Rare", "Legendary")
 }
 
 export interface CardForLabel {
@@ -648,7 +656,7 @@ function getStarWarsSubset(cardInfo: ConversationalCardInfo, card: CardForLabel)
   const subset = stripMarkdown(cardInfo.subset);
   if (isValidValue(subset)) return subset;
   // Check rarity as subset (e.g., "Rare", "Legendary")
-  const rarity = stripMarkdown(cardInfo.rarity_tier) || stripMarkdown((cardInfo as any).rarity_or_variant);
+  const rarity = stripMarkdown(cardInfo.rarity_tier) || stripMarkdown(cardInfo.rarity_or_variant);
   if (isValidValue(rarity)) return rarity;
   if (isValidValue(card.rarity_description)) return card.rarity_description!;
   return null;
@@ -787,7 +795,7 @@ function getYugiohSubset(cardInfo: ConversationalCardInfo, card: CardForLabel): 
   const subset = stripMarkdown(cardInfo.subset);
   if (subset) return subset;
   // Use card type as subset (e.g., "Effect Monster", "Spell Card")
-  const cardType = (cardInfo as any).ygo_card_type || (card as any).ygo_card_type;
+  const cardType = cardInfo.ygo_card_type || (card as any).ygo_card_type;
   if (isValidValue(cardType)) return cardType;
   return null;
 }
@@ -953,11 +961,11 @@ function getYugiohFeatures(cardInfo: ConversationalCardInfo, card: CardForLabel)
   const features: string[] = [];
 
   // Attribute (DARK, LIGHT, FIRE, etc.)
-  const attribute = (cardInfo as any).ygo_attribute || (card as any).ygo_attribute;
+  const attribute = cardInfo.ygo_attribute || (card as any).ygo_attribute;
   if (isValidValue(attribute)) features.push(attribute);
 
   // Monster type / Race (Spellcaster, Dragon, Warrior)
-  const race = (cardInfo as any).ygo_race || (card as any).ygo_race;
+  const race = cardInfo.ygo_race || (card as any).ygo_race;
   if (isValidValue(race)) features.push(race);
 
   // Foil
