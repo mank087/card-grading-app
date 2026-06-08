@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
@@ -30,10 +30,25 @@ function NavigationInner() {
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  // startMenuTransition wraps the mobile-menu state flip so React schedules
+  // the ~295 lines of menu JSX as a low-priority transition rather than as
+  // a blocking update on the click frame. Keeps INP under the 200ms bar on
+  // low-end Android — the hamburger tap returns immediately and the menu
+  // paint follows. The unused isPending slot is discarded.
+  const [, startMenuTransition] = useTransition();
   const router = useRouter();
   const { balance, isLoading: creditsLoading } = useCredits();
 
-  // Check authentication status
+  // Check authentication status.
+  //
+  // No setInterval here on purpose — directAuth.ts dispatches
+  // AUTH_STATE_CHANGE_EVENT on every sign-in / sign-out / token refresh, and
+  // the browser fires a `storage` event on cross-tab localStorage writes.
+  // Those two cover same-tab and cross-tab correctness; the previous 5s
+  // poll added ~12 main-thread wakeups per minute fighting for the same
+  // frame as user interactions, which was a measurable INP regression.
+  // visibilitychange + the focus-driven refresh in CreditsContext catch any
+  // token expiry that lapses while the tab was backgrounded.
   useEffect(() => {
     const checkAuth = () => {
       try {
@@ -50,7 +65,6 @@ function NavigationInner() {
     };
 
     checkAuth();
-    const interval = setInterval(checkAuth, 5000);
 
     const handleStorageChange = (e: StorageEvent) => {
       if (e.key === 'supabase.auth.token') {
@@ -62,13 +76,18 @@ function NavigationInner() {
       checkAuth();
     };
 
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') checkAuth();
+    };
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
-      clearInterval(interval);
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener(AUTH_STATE_CHANGE_EVENT, handleAuthChange);
+      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, []);
 
@@ -526,7 +545,11 @@ function NavigationInner() {
           </div>
 
           {/* ============ MOBILE NAVIGATION ============ */}
-          <div className="flex lg:hidden items-center space-x-2">
+          {/* min-h-[40px] reserves the row height before the auth check
+              resolves so the skeleton → credits-badge swap doesn't shift
+              the hamburger button horizontally. Mirrors the desktop row's
+              min-h-[40px] at line 188. */}
+          <div className="flex lg:hidden items-center space-x-2 min-h-[40px]">
 
             {!authChecked ? (
               /* Skeleton placeholders for mobile */
@@ -573,10 +596,14 @@ function NavigationInner() {
               </Link>
             )}
 
-            {/* Hamburger Menu Button */}
+            {/* Hamburger Menu Button.
+                startMenuTransition keeps the click frame responsive —
+                without it, the ~295 lines of mobile-menu JSX render
+                synchronously on the click handler and pushed INP above
+                200ms on mobile, especially on low-end Android. */}
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              onClick={() => startMenuTransition(() => setMobileMenuOpen(prev => !prev))}
               className="text-gray-700 hover:text-purple-600 p-2 rounded-md transition-colors mobile-menu-button"
               aria-label="Toggle menu"
             >

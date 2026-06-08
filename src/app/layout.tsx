@@ -44,6 +44,26 @@ export default function RootLayout({
         {/* Facebook Domain Verification */}
         <meta name="facebook-domain-verification" content="gqf9ydy92vx2nn9eq1bmw3yyf0wu8z" />
 
+        {/*
+          Pre-paint LaunchBanner state read. Must run before the body
+          renders so the .launch-banner-slot CSS rule can resolve the
+          right reserved height on the first paint instead of after
+          React hydration. This is the only way to eliminate the ~40px
+          layout shift that was driving CLS to 0.30 on mobile.
+          Keep this in sync with the DISMISS_KEY in LaunchBanner.tsx.
+        */}
+        <Script id="launch-banner-prepaint" strategy="beforeInteractive">
+          {`
+            try {
+              var k = 'dcm-launch-banner-dismissed-v2-ios-android';
+              if (window.localStorage && window.localStorage.getItem(k) === '1') {
+                document.documentElement.setAttribute('data-banner-state', 'dismissed');
+              }
+            } catch(e) {}
+          `}
+        </Script>
+
+
         {/* Google Analytics + Google Ads - lazyOnload to avoid blocking LCP */}
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-YLC2FKKBGC"

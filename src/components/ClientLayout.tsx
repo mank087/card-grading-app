@@ -105,8 +105,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <PersistentStatusBar />
         <HelpBot />
         {/* Site-wide launch banner — sits above the sticky Navigation
-            because it's rendered before {children}. Dismissible. */}
-        <LaunchBanner />
+            because it's rendered before {children}. Dismissible.
+            The slot wrapper reserves the banner's height pre-hydration
+            so the nav doesn't jump down ~40px when LaunchBanner mounts.
+            See .launch-banner-slot in globals.css and the inline
+            launch-banner-prepaint script in layout.tsx. */}
+        <div className="launch-banner-slot">
+          <LaunchBanner />
+        </div>
         {children}
       </GradingQueueProvider>
     </CreditsProvider>

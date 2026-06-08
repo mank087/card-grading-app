@@ -44,6 +44,12 @@ export default function LaunchBanner() {
       // Best-effort; if storage is blocked the banner just won't persist its
       // dismissal across reloads.
     }
+    // Collapse the reserved .launch-banner-slot synchronously so the nav
+    // slides up smoothly instead of leaving a 40px gap behind. Matches the
+    // pre-paint script in src/app/layout.tsx — keep both in sync.
+    try {
+      document.documentElement.setAttribute('data-banner-state', 'dismissed')
+    } catch { /* SSR-safety; no-op */ }
     setVisible(false)
   }
 
