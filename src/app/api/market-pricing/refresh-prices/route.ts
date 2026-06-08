@@ -17,7 +17,19 @@ import {
   refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale,
 } from '@/lib/pricing/batchPriceRefresh';
 
-const MAX_CARDS_PER_BATCH = 40;
+// Vercel function timeout. Per-card cost is ~1.5-2s (300ms inter-card
+// delay + 1-3 upstream PriceCharting/eBay calls each), so the default
+// ~60s ceiling killed the route at ~40 cards. 300s matches the weekly
+// cron and admin price-tracker routes.
+export const maxDuration = 300;
+
+// 150 cards × ~1.5s/card = ~225s, comfortably under the 300s ceiling
+// with headroom for slower API responses. Was 40 (set against the
+// previous default timeout); bumped here so a single manual click can
+// drain a larger stale-card queue and so the Phase-2 login-triggered
+// fire-and-forget refresh can catch up users with mid-sized portfolios
+// in one pass.
+const MAX_CARDS_PER_BATCH = 150;
 const DELAY_BETWEEN_CALLS_MS = 300;
 // Minimum gap between manual refreshes per user. The page also limits
 // to 2 clicks/day client-side via localStorage, but that's bypassable by

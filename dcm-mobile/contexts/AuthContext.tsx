@@ -29,6 +29,34 @@ async function tagSignupSource(accessToken: string): Promise<void> {
   })
 }
 
+// Background market-pricing refresh trigger. Fire-and-forget on each
+// session start so cards whose dcm_price_updated_at is older than 7 days
+// get topped up without the user having to hit the manual button.
+//
+// Safety nets that make spamming this harmless:
+//   - Server filters to cards stale > 7 days, so most calls do zero work
+//     and return in < 1s.
+//   - Server enforces a 60s per-user cool-down (in-memory) and an
+//     active-Card-Lover check; non-subscribers get a fast rejection.
+//   - Per-batch cap (150 cards) on the server so this never runs longer
+//     than ~225s; the user backgrounding the app mid-refresh just means
+//     the server completes whatever's in-flight and the next login picks
+//     up wherever the freshness column left off.
+async function triggerBackgroundPriceRefresh(accessToken: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/market-pricing/refresh-prices`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ trigger: 'login' }),
+    })
+  } catch (e) {
+    if (__DEV__) console.warn('[Auth] background price refresh failed:', e)
+  }
+}
+
 // Sentry — wrapped in try/catch like everywhere else (Expo Go lacks the
 // native module). When available, tag every captured exception with the
 // Supabase user ID so crashes can be triaged per-user without PII.
@@ -137,6 +165,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         tagSignupSource(session.access_token).catch((err) => {
           if (__DEV__) console.warn('[Auth] tag-signup-source failed:', err)
         })
+      }
+
+      // Background market-pricing refresh on every meaningful session
+      // start: explicit sign-in AND cold-start with a stored session
+      // (INITIAL_SESSION fires once per app launch). Server-side
+      // staleness filter + 60s cool-down keep this cheap.
+      if (
+        (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') &&
+        session?.access_token
+      ) {
+        triggerBackgroundPriceRefresh(session.access_token)
       }
     })
 

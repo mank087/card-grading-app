@@ -10,7 +10,9 @@ import HelpBot from '@/components/helpbot/HelpBot'
 import ReferralTracker from '@/components/ReferralTracker'
 import LaunchBanner from '@/components/LaunchBanner'
 import { useBackgroundGrading } from '@/hooks/useBackgroundGrading'
-import { initSessionRefresh, cleanupSessionRefresh } from '@/lib/directAuth'
+import {
+  initSessionRefresh, cleanupSessionRefresh, getStoredSession, AUTH_STATE_CHANGE_EVENT,
+} from '@/lib/directAuth'
 
 function BackgroundGradingMonitor() {
   useBackgroundGrading()
@@ -26,11 +28,51 @@ function ScrollToTop() {
   return null
 }
 
+// Background market-pricing refresh trigger. Fire-and-forget on session
+// start so cards whose dcm_price_updated_at is older than 7 days get
+// topped up without the user hitting the manual button.
+//
+// Safety nets that make spamming this harmless:
+//   - Server filters to cards stale > 7 days, so most calls do zero work.
+//   - Server enforces 60s per-user cool-down and an active-Card-Lover
+//     check; non-subscribers get a fast rejection.
+//   - Per-batch cap (150) on the server so this never runs longer than
+//     ~225s; the user closing the tab mid-refresh just means the server
+//     completes whatever's in-flight and the next session picks up where
+//     the freshness column left off.
+function triggerBackgroundPriceRefresh() {
+  try {
+    const session = getStoredSession()
+    if (!session?.access_token) return
+    void fetch('/api/market-pricing/refresh-prices', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ trigger: 'login' }),
+      keepalive: true,
+    }).catch(() => { /* fire-and-forget */ })
+  } catch { /* no-op */ }
+}
+
 // Initialize session refresh monitoring to keep users logged in
 function SessionRefreshMonitor() {
   useEffect(() => {
     initSessionRefresh()
-    return () => cleanupSessionRefresh()
+    // Fire once on mount for users already signed in. Wraps in a
+    // microtask so it never blocks first paint, even on slow networks.
+    queueMicrotask(triggerBackgroundPriceRefresh)
+    // Fire again whenever the custom auth-state-change event signals
+    // a fresh sign-in. directAuth dispatches this on signInWithPassword,
+    // OAuth callback, and token refresh — the no-op exit when there's
+    // no session keeps refresh-only events cheap.
+    const handler = () => triggerBackgroundPriceRefresh()
+    window.addEventListener(AUTH_STATE_CHANGE_EVENT, handler)
+    return () => {
+      cleanupSessionRefresh()
+      window.removeEventListener(AUTH_STATE_CHANGE_EVENT, handler)
+    }
   }, [])
   return null
 }
