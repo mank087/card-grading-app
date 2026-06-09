@@ -100,17 +100,25 @@ export async function GET(request: NextRequest) {
 }
 
 /**
- * Pick the N users whose active listings are most overdue for a sync.
- * Distinct user_ids from ebay_listings WHERE status='active', ordered so
- * never-synced rows come first, then oldest last_synced_at.
+ * Pick the N users whose listings are most overdue for a sync.
+ *
+ * Distinct user_ids from ebay_listings across ALL statuses (not just
+ * 'active'), ordered so never-synced rows come first, then oldest
+ * last_synced_at. The earlier version filtered to status='active' rows
+ * only, which meant a user whose listings were all incorrectly marked
+ * 'ended' (by the now-fixed Pass 0b gap) was never picked for sync
+ * again and stayed stuck. Considering all rows lets sync.ts heal those
+ * stuck users on the next cron tick.
+ *
+ * The TOTAL_CAP + PER_USER_CAP budgets in the caller still protect us
+ * against expensive runs.
  */
 async function pickUsersToSync(limit: number): Promise<string[]> {
   const { data, error } = await supabaseAdmin
     .from('ebay_listings')
     .select('user_id, last_synced_at')
-    .eq('status', 'active')
     .order('last_synced_at', { ascending: true, nullsFirst: true })
-    .limit(limit * 10);
+    .limit(limit * 20);
 
   if (error) {
     console.error('[ebay-sync] pickUsersToSync error:', error);

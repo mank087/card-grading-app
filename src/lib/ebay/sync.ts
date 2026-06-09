@@ -151,6 +151,31 @@ export async function syncUser(
     dbByListingId.set(item.itemId, { ...dbRow, status: 'ended' });
   }
 
+  // -------- Pass 0b: revive rows that are LIVE on eBay but stuck on a
+  // terminal status in our DB. Without this, once a row was marked
+  // 'ended' (most often by Pass 2 GetItem returning null during a
+  // transient eBay state), Pass 1 never re-evaluated it because Pass 1
+  // only walks rows where dbRow.status === 'active'. Result: dashboards
+  // under-counted active listings forever. This walk closes that loop.
+  // View/watch refresh is left to Pass 1 in the same run since we put
+  // the now-active row back into dbByListingId.
+  for (const item of ebayState.active) {
+    const dbRow = dbByListingId.get(item.itemId);
+    if (!dbRow) continue;
+    if (dbRow.status === 'active') continue;
+    await supabaseAdmin
+      .from('ebay_listings')
+      .update({
+        status: 'active',
+        ended_at: null,
+        sold_at: null,
+        last_synced_at: now,
+      })
+      .eq('id', dbRow.id);
+    updated++;
+    dbByListingId.set(item.itemId, { ...dbRow, status: 'active' });
+  }
+
   // -------- Pass 1: bulk reconciliation --------
   for (const [listingId, dbRow] of dbByListingId.entries()) {
     if (dbRow.status !== 'active') continue;
