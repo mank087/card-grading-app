@@ -34,14 +34,12 @@ export async function POST(request: NextRequest) {
     const userId = auth.user.id;
 
     const activeCount = await countActiveListingsForUser(userId);
-    if (activeCount === 0) {
-      return NextResponse.json({
-        success: true,
-        skipped: true,
-        reason: 'No active listings to sync',
-        activeCount: 0,
-      });
-    }
+    // We used to early-exit when activeCount === 0, but that left users
+    // whose listings were all stuck on a terminal status (because of the
+    // now-patched sync.ts Pass 0b gap) with no way to trigger the heal.
+    // Running syncUser on zero-active users is cheap: one GetMyeBaySelling
+    // call and a handful of UPDATEs at most. Keep the response shape and
+    // pass activeCount through for the client.
 
     // Rate-limit: most recent last_synced_at must be older than the window.
     // The cron stamps every active row with last_synced_at on every pass,
