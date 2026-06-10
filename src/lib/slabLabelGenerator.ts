@@ -335,7 +335,12 @@ function strokeText(
 // FRONT LABEL — Canvas renderer
 // ============================================================================
 
-async function renderFrontLabelCanvas(
+/**
+ * Exported for the admin Label Lab calibration sheet, which embeds this
+ * exact production raster next to its vector replica so print sharpness
+ * can be compared on the same sheet in the same printer pass.
+ */
+export async function renderFrontLabelCanvas(
   data: SlabLabelData,
   style: 'modern' | 'traditional'
 ): Promise<string> {

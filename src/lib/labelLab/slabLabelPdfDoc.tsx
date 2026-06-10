@@ -110,7 +110,12 @@ const SERIAL_FACTOR = 0.76
 const MODERN = {
   bgDark1: '#1a1625',
   bgDark2: '#2d1f47',
-  glow: 'rgba(139, 92, 246, 0.1)', // radial overlay
+  // Radial glow overlay. MUST stay hex + separate opacity: react-pdf's SVG
+  // fill parser silently breaks on rgba() strings and corrupts the whole
+  // Svg paint (everything renders solid green) — see
+  // scripts/test-gradient-isolation.tsx for the repro.
+  glowHex: '#8b5cf6',
+  glowOpacity: 0.1,
   textWhite: '#FFFFFF',
   textWhiteMuted: 'rgba(255,255,255,0.7)',
   textGreen: 'rgba(34,197,94,0.9)',
@@ -173,6 +178,24 @@ export function SlabLabelPdfDoc(inputs: SlabLabelInputs) {
 // ============================================================================
 
 function FrontPage(inputs: SlabLabelInputs) {
+  return (
+    <Page size={{ width: PAGE_WIDTH, height: PAGE_HEIGHT }} style={styles.page}>
+      <LetterSheetWithCutGuides theme={inputs.theme}>
+        <SlabFrontLabelBlock inputs={inputs} idSuffix="f" />
+      </LetterSheetWithCutGuides>
+    </Page>
+  )
+}
+
+/**
+ * Front label content (gradient background + logo | text | grade row) at
+ * exact label size with no page chrome. Exported so the calibration sheet
+ * can place the identical block this production-replica page uses. The
+ * parent must be a View sized LABEL_WIDTH x LABEL_HEIGHT — the absolute-
+ * positioned children anchor to it. `idSuffix` keeps the SVG gradient ids
+ * unique when several blocks render in one document.
+ */
+export function SlabFrontLabelBlock({ inputs, idSuffix }: { inputs: SlabLabelInputs; idSuffix: string }) {
   const theme = inputs.theme
   const isModern = theme === 'modern'
 
@@ -190,9 +213,8 @@ function FrontPage(inputs: SlabLabelInputs) {
   const serialPt = namePt * SERIAL_FACTOR
 
   return (
-    <Page size={{ width: PAGE_WIDTH, height: PAGE_HEIGHT }} style={styles.page}>
-      <LetterSheetWithCutGuides theme={theme}>
-        <LabelBackground theme={theme} dark1={dark1} dark2={dark2} idSuffix="f" />
+    <>
+      <LabelBackground theme={theme} dark1={dark1} dark2={dark2} idSuffix={idSuffix} />
 
         {/* Content row: logo | text stack | grade */}
         <View style={styles.contentRow}>
@@ -298,8 +320,7 @@ function FrontPage(inputs: SlabLabelInputs) {
             </View>
           </View>
         </View>
-      </LetterSheetWithCutGuides>
-    </Page>
+    </>
   )
 }
 
@@ -333,7 +354,9 @@ function BackPage(inputs: SlabLabelInputs) {
                 borderRadius: 1.5,
                 backgroundColor: isModern ? 'rgba(255,255,255,0.06)' : '#ffffff',
                 borderWidth: 0.5,
-                borderColor: isModern ? 'rgba(139,92,246,0.5)' : '#7c3aed',
+                // Hex, not rgba — rgba borderColor hits the same react-pdf
+                // parser bug as SVG fills and paints green.
+                borderColor: isModern ? '#8b5cf6' : '#7c3aed',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
@@ -389,7 +412,11 @@ function BackPage(inputs: SlabLabelInputs) {
 
           {/* Right: subgrades, right-aligned (matches production back) */}
           <View style={[styles.gradeSlot, { width: GRADE_AREA_WIDTH + px(70) /* roomier on back */ }]}>
-            <View style={{ flex: 1, justifyContent: 'center' }}>
+            {/* No flex:1 here — the parent's height is auto, so flex:1
+                collapses to zero height and center-stacks all four lines on
+                top of each other. alignSelf stretch keeps textAlign right
+                meaningful across the full slot width. */}
+            <View style={{ alignSelf: 'stretch', justifyContent: 'center' }}>
               {(['centering', 'corners', 'edges', 'surface'] as const).map((k) => {
                 const v = inputs.subgrades?.[k]
                 return (
@@ -559,8 +586,9 @@ function LabelBackground({
       {theme === 'modern' ? (
         // Radial purple glow overlay matches production's createRadialGradient.
         // react-pdf SVG doesn't support radialGradient natively; we
-        // approximate with a low-opacity centered ellipse fill.
-        <Rect x={0} y={0} width={LABEL_WIDTH} height={LABEL_HEIGHT} fill={MODERN.glow} />
+        // approximate with a low-opacity full-rect fill. fillOpacity (NOT an
+        // rgba fill string) is load-bearing — see MODERN.glowHex comment.
+        <Rect x={0} y={0} width={LABEL_WIDTH} height={LABEL_HEIGHT} fill={MODERN.glowHex} fillOpacity={MODERN.glowOpacity} />
       ) : null}
     </Svg>
   )
@@ -689,3 +717,14 @@ function labelOf(k: 'centering' | 'corners' | 'edges' | 'surface'): string {
     case 'surface': return 'Surface'
   }
 }
+
+// ============================================================================
+// Calibration-sheet exports
+// ============================================================================
+
+// The calibration sheet places SlabFrontLabelBlock at exact label size and
+// draws its own gradient swatches with the same stops as the modern theme.
+export const SLAB_LABEL_W_PT = LABEL_WIDTH
+export const SLAB_LABEL_H_PT = LABEL_HEIGHT
+export const SLAB_BLEED_PT = BLEED
+export const MODERN_GRADIENT_HEX = { start: MODERN.bgDark1, mid: MODERN.bgDark2 }

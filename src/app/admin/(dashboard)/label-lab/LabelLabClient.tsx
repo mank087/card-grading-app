@@ -32,6 +32,7 @@ interface LabCard {
 }
 
 type LabFormat =
+  | 'calibration'
   | 'slab-modern'
   | 'slab-traditional'
   | 'foldable'
@@ -40,6 +41,7 @@ type LabFormat =
   | 'card-image'
 
 const LAB_FORMATS: { id: LabFormat; label: string; live: boolean; description: string }[] = [
+  { id: 'calibration', label: 'Print Calibration Sheet', live: true, description: 'One-page test matrix — raster vs vector A/B, knockout size ladder, tweak strip, halo test, scale ruler. Print at 100%.' },
   { id: 'slab-modern', label: 'Modern Slab (front + back)', live: true, description: '2.8" × 0.8" insert — dark gradient. Production: src/lib/slabLabelGenerator.ts' },
   { id: 'slab-traditional', label: 'Traditional Slab (front + back)', live: true, description: '2.8" × 0.8" insert — light theme. Production: src/lib/slabLabelGenerator.ts' },
   { id: 'foldable', label: 'Foldable 2.5" × 3.5"', live: false, description: 'Full trading-card insert with QR + summary. Production: src/lib/foldableLabelGenerator.ts. Next iteration.' },
@@ -158,16 +160,48 @@ export default function LabelLabClient() {
     setVectorPdfError(null)
     ;(async () => {
       try {
-        const { SlabLabelPdfDoc } = await import('@/lib/labelLab/slabLabelPdfDoc')
         const { pdf } = await import('@react-pdf/renderer')
-        const theme = format === 'slab-traditional' ? 'traditional' : 'modern'
-        const doc = SlabLabelPdfDoc({
-          ...slabInputs,
-          theme,
-          whiteLogoDataUrl,
-          colorLogoDataUrl,
-          printColorTweakIntensity: printTweakIntensity,
-        })
+        let doc: any
+        if (format === 'calibration') {
+          // The calibration sheet embeds the REAL production raster (canvas
+          // JPEG) next to the vector replica, so render both rasters first
+          // via the exported production renderer.
+          const [{ CalibrationSheetPdfDoc }, prod] = await Promise.all([
+            import('@/lib/labelLab/calibrationSheetPdfDoc'),
+            import('@/lib/slabLabelGenerator'),
+          ])
+          const prodData = {
+            primaryName: slabInputs.primaryName,
+            contextLine: slabInputs.contextLine,
+            features: slabInputs.featuresLine ? slabInputs.featuresLine.split(' • ') : [],
+            featuresLine: slabInputs.featuresLine || null,
+            serial: slabInputs.serial,
+            grade: selectedCard.conversational_whole_grade,
+            condition: slabInputs.condition,
+            qrCodeDataUrl: '',
+            logoDataUrl: colorLogoDataUrl || undefined,
+            whiteLogoDataUrl: whiteLogoDataUrl || undefined,
+          }
+          const [rasterModern, rasterTraditional] = await Promise.all([
+            prod.renderFrontLabelCanvas(prodData, 'modern').catch(() => null),
+            prod.renderFrontLabelCanvas(prodData, 'traditional').catch(() => null),
+          ])
+          doc = CalibrationSheetPdfDoc({
+            slabInputs: { ...slabInputs, whiteLogoDataUrl, colorLogoDataUrl },
+            rasterModernDataUrl: rasterModern,
+            rasterTraditionalDataUrl: rasterTraditional,
+          })
+        } else {
+          const { SlabLabelPdfDoc } = await import('@/lib/labelLab/slabLabelPdfDoc')
+          const theme = format === 'slab-traditional' ? 'traditional' : 'modern'
+          doc = SlabLabelPdfDoc({
+            ...slabInputs,
+            theme,
+            whiteLogoDataUrl,
+            colorLogoDataUrl,
+            printColorTweakIntensity: printTweakIntensity,
+          })
+        }
         const instance = pdf(doc as any)
         const blob = await instance.toBlob()
         if (cancelled) return
@@ -247,6 +281,11 @@ export default function LabelLabClient() {
               error={vectorPdfError}
               onDownload={downloadVector}
               formatLabel={activeFormat.label}
+              description={
+                format === 'calibration'
+                  ? 'Single page. Print at 100% ("Actual size") — the footer ruler verifies scale. One pass yields the raster-vs-vector A/B verdict, knockout size floor, tweak direction, and halo necessity. Tweak slider does not apply; the sheet sweeps all intensities.'
+                  : '@react-pdf/renderer. Letter portrait, 2 pages (front + back), cut guides + L-corner marks. Print to compare.'
+              }
             />
           ) : (
             <StubFormatPanel format={activeFormat} />
@@ -429,6 +468,7 @@ function VectorPdfPreview(props: {
   error: string | null
   onDownload: () => void
   formatLabel: string
+  description: string
 }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
@@ -436,7 +476,7 @@ function VectorPdfPreview(props: {
         <div>
           <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">{props.formatLabel} — vector PDF</h3>
           <p className="text-xs text-gray-500 mt-1">
-            @react-pdf/renderer. Letter portrait, 2 pages (front + back), cut guides + L-corner marks. Print to compare.
+            {props.description}
           </p>
         </div>
         <button
