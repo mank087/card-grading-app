@@ -205,6 +205,63 @@ export function SlabFrontLabelBlock({ inputs, idSuffix }: { inputs: SlabLabelInp
   const dark1 = isModern && intensity > 0 ? printColorTweaksHex(MODERN.bgDark1, intensity) : MODERN.bgDark1
   const dark2 = isModern && intensity > 0 ? printColorTweaksHex(MODERN.bgDark2, intensity) : MODERN.bgDark2
 
+  const palette: SlabTextPalette = isModern
+    ? {
+        name: MODERN.textWhite,
+        muted: MODERN.textWhiteMuted,
+        accent: MODERN.textGreen,
+        grade: MODERN.textWhite,
+        condition: 'rgba(255,255,255,0.85)',
+        gradeDivider: null,
+        logo: 'white',
+      }
+    : {
+        name: TRADITIONAL.textDark,
+        muted: TRADITIONAL.textMedium,
+        accent: TRADITIONAL.featureBlue,
+        grade: TRADITIONAL.purplePrimary,
+        condition: TRADITIONAL.purpleDark,
+        gradeDivider: TRADITIONAL.purplePrimary,
+        logo: 'color',
+      }
+
+  return (
+    <>
+      <LabelBackground theme={theme} dark1={dark1} dark2={dark2} idSuffix={idSuffix} />
+      <SlabFrontContentRow inputs={inputs} palette={palette} />
+    </>
+  )
+}
+
+/**
+ * Text colors for the front content row. The theme blocks derive this from
+ * Modern/Traditional; the custom-style block derives it from a style spec's
+ * chosen text color.
+ */
+export interface SlabTextPalette {
+  name: string
+  muted: string
+  accent: string
+  grade: string
+  condition: string
+  /** Traditional draws an underline below the grade; null skips it. */
+  gradeDivider?: string | null
+  logo: 'white' | 'color'
+}
+
+/**
+ * The front content row (logo | text stack | grade) with all geometry and
+ * auto-shrink behavior, colors injected via palette. Exported so the
+ * custom-style block renders the IDENTICAL layout over arbitrary
+ * backgrounds.
+ */
+export function SlabFrontContentRow({
+  inputs,
+  palette,
+}: {
+  inputs: Omit<SlabLabelInputs, 'theme'>
+  palette: SlabTextPalette
+}) {
   // Auto-fit name and child sizes (production fitCardInfoFonts).
   const textRegionWidth = LABEL_WIDTH - PADDING - LOGO_SIZE - TEXT_LOGO_GAP - GRADE_AREA_WIDTH - GRADE_RIGHT_PADDING
   const namePt = fitFontSize(inputs.primaryName || 'Card', textRegionWidth, NAME_PT_MAX, NAME_PT_MIN, true)
@@ -212,115 +269,127 @@ export function SlabFrontLabelBlock({ inputs, idSuffix }: { inputs: SlabLabelInp
   const featuresPt = namePt * FEATURES_FACTOR
   const serialPt = namePt * SERIAL_FACTOR
 
+  const logoSrc = palette.logo === 'white' ? inputs.whiteLogoDataUrl : inputs.colorLogoDataUrl
+
   return (
-    <>
-      <LabelBackground theme={theme} dark1={dark1} dark2={dark2} idSuffix={idSuffix} />
-
-        {/* Content row: logo | text stack | grade */}
-        <View style={styles.contentRow}>
-          {/* Left: logo */}
-          <View style={styles.logoSlot}>
-            <LogoSlot theme={theme} inputs={inputs} />
+    <View style={styles.contentRow}>
+      {/* Left: logo */}
+      <View style={styles.logoSlot}>
+        {logoSrc ? (
+          <Image src={logoSrc} style={{ width: LOGO_SIZE, height: LOGO_SIZE }} />
+        ) : (
+          <View style={{ width: LOGO_SIZE, height: LOGO_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+            <Text
+              style={{
+                fontFamily: 'Helvetica-Bold',
+                fontSize: px(36),
+                color: palette.logo === 'white' ? '#FFFFFF' : '#7c3aed',
+                letterSpacing: 1,
+              }}
+            >
+              DCM
+            </Text>
           </View>
+        )}
+      </View>
 
-          {/* Center: text stack vertically centered */}
-          <View style={styles.textColumn}>
-            <View style={styles.textInner}>
-              <Text
-                style={{
-                  fontFamily: 'Helvetica-Bold',
-                  fontSize: namePt,
-                  color: isModern ? MODERN.textWhite : TRADITIONAL.textDark,
-                  lineHeight: 1.05,
-                }}
-              >
-                {inputs.primaryName}
-              </Text>
-              {inputs.contextLine ? (
-                <Text
-                  style={{
-                    fontFamily: 'Helvetica',
-                    fontSize: contextPt,
-                    color: isModern ? MODERN.textWhiteMuted : TRADITIONAL.textMedium,
-                      marginTop: contextPt * 0.25,
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {inputs.contextLine}
-                </Text>
-              ) : null}
-              {inputs.featuresLine ? (
-                <Text
-                  style={{
-                    fontFamily: 'Helvetica-Bold',
-                    fontSize: featuresPt,
-                    color: isModern ? MODERN.textGreen : TRADITIONAL.featureBlue,
-                      marginTop: featuresPt * 0.25,
-                    lineHeight: 1.1,
-                  }}
-                >
-                  {inputs.featuresLine}
-                </Text>
-              ) : null}
-              <Text
-                style={{
-                  fontFamily: 'Helvetica',
-                  fontSize: serialPt,
-                  color: isModern ? MODERN.textWhiteMuted : TRADITIONAL.textMedium,
-                  marginTop: serialPt * 0.45,
-                  lineHeight: 1.05,
-                }}
-              >
-                {inputs.serial}
-              </Text>
-            </View>
-          </View>
-
-          {/* Right: grade + condition */}
-          <View style={styles.gradeSlot}>
-            <View style={styles.gradeInner}>
-              <Text
-                style={{
-                  fontFamily: 'Helvetica-Bold',
-                  fontSize: GRADE_PT,
-                  color: isModern ? MODERN.textWhite : TRADITIONAL.purplePrimary,
-                  textAlign: 'center',
-                  lineHeight: 1,
-                }}
-              >
-                {inputs.grade}
-              </Text>
-              {!isModern ? (
-                <Svg
-                  style={{ width: 22.4, height: 2, marginTop: 1.6 }}
-                  viewBox="0 0 22.4 2"
-                >
-                  <Line
-                    x1={0}
-                    y1={1}
-                    x2={22.4}
-                    y2={1}
-                    stroke={TRADITIONAL.purplePrimary}
-                    strokeWidth={1}
-                  />
-                </Svg>
-              ) : null}
-              <Text
-                style={{
-                  fontFamily: 'Helvetica-Bold',
-                  fontSize: fitConditionSize(inputs.condition, GRADE_AREA_WIDTH + 4),
-                  color: isModern ? 'rgba(255,255,255,0.85)' : TRADITIONAL.purpleDark,
-                  textAlign: 'center',
-                  marginTop: 2,
-                  letterSpacing: 0.4,
-                }}
-              >
-                {(inputs.condition || '').toUpperCase()}
-              </Text>
-            </View>
-          </View>
+      {/* Center: text stack vertically centered */}
+      <View style={styles.textColumn}>
+        <View style={styles.textInner}>
+          <Text
+            style={{
+              fontFamily: 'Helvetica-Bold',
+              fontSize: namePt,
+              color: palette.name,
+              lineHeight: 1.05,
+            }}
+          >
+            {inputs.primaryName}
+          </Text>
+          {inputs.contextLine ? (
+            <Text
+              style={{
+                fontFamily: 'Helvetica',
+                fontSize: contextPt,
+                color: palette.muted,
+                marginTop: contextPt * 0.25,
+                lineHeight: 1.1,
+              }}
+            >
+              {inputs.contextLine}
+            </Text>
+          ) : null}
+          {inputs.featuresLine ? (
+            <Text
+              style={{
+                fontFamily: 'Helvetica-Bold',
+                fontSize: featuresPt,
+                color: palette.accent,
+                marginTop: featuresPt * 0.25,
+                lineHeight: 1.1,
+              }}
+            >
+              {inputs.featuresLine}
+            </Text>
+          ) : null}
+          <Text
+            style={{
+              fontFamily: 'Helvetica',
+              fontSize: serialPt,
+              color: palette.muted,
+              marginTop: serialPt * 0.45,
+              lineHeight: 1.05,
+            }}
+          >
+            {inputs.serial}
+          </Text>
         </View>
-    </>
+      </View>
+
+      {/* Right: grade + condition */}
+      <View style={styles.gradeSlot}>
+        <View style={styles.gradeInner}>
+          <Text
+            style={{
+              fontFamily: 'Helvetica-Bold',
+              fontSize: GRADE_PT,
+              color: palette.grade,
+              textAlign: 'center',
+              lineHeight: 1,
+            }}
+          >
+            {inputs.grade}
+          </Text>
+          {palette.gradeDivider ? (
+            <Svg
+              style={{ width: 22.4, height: 2, marginTop: 1.6 }}
+              viewBox="0 0 22.4 2"
+            >
+              <Line
+                x1={0}
+                y1={1}
+                x2={22.4}
+                y2={1}
+                stroke={palette.gradeDivider}
+                strokeWidth={1}
+              />
+            </Svg>
+          ) : null}
+          <Text
+            style={{
+              fontFamily: 'Helvetica-Bold',
+              fontSize: fitConditionSize(inputs.condition, GRADE_AREA_WIDTH + 4),
+              color: palette.condition,
+              textAlign: 'center',
+              marginTop: 2,
+              letterSpacing: 0.4,
+            }}
+          >
+            {(inputs.condition || '').toUpperCase()}
+          </Text>
+        </View>
+      </View>
+    </View>
   )
 }
 
@@ -591,40 +660,6 @@ function LabelBackground({
         <Rect x={0} y={0} width={LABEL_WIDTH} height={LABEL_HEIGHT} fill={MODERN.glowHex} fillOpacity={MODERN.glowOpacity} />
       ) : null}
     </Svg>
-  )
-}
-
-// ============================================================================
-// Logo slot
-// ============================================================================
-
-function LogoSlot({ theme, inputs }: { theme: SlabTheme; inputs: SlabLabelInputs }) {
-  const isModern = theme === 'modern'
-  const src = isModern ? inputs.whiteLogoDataUrl : inputs.colorLogoDataUrl
-  if (src) {
-    return <Image src={src} style={{ width: LOGO_SIZE, height: LOGO_SIZE }} />
-  }
-  // Placeholder text logo when assets haven't loaded yet
-  return (
-    <View
-      style={{
-        width: LOGO_SIZE,
-        height: LOGO_SIZE,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Text
-        style={{
-          fontFamily: 'Helvetica-Bold',
-          fontSize: px(36),
-          color: isModern ? '#FFFFFF' : '#7c3aed',
-          letterSpacing: 1,
-        }}
-      >
-        DCM
-      </Text>
-    </View>
   )
 }
 

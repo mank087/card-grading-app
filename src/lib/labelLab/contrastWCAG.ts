@@ -242,3 +242,141 @@ export function printColorTweaksHex(hex: string, intensity: number = 0.5): strin
   if (!rgb) return hex
   return toHex(printColorTweaks(rgb, intensity))
 }
+
+// ============================================================================
+// Style-aware background evaluation (Label Lab custom styles)
+// ============================================================================
+
+/**
+ * Expand a multi-stop background into the set of colors text actually sits
+ * on. `discrete: false` (gradients) interpolates samples inside every
+ * adjacent stop pair; `discrete: true` (split/geometric region fills)
+ * evaluates only the exact colors — interpolated mid-colors never exist on
+ * those labels and would skew the verdict.
+ */
+export function buildBackgroundSamples(
+  stops: string[],
+  options: { discrete?: boolean; samplesPerSegment?: number } = {},
+): Rgb[] {
+  const parsed = stops.map(parseHex).filter((c): c is Rgb => c !== null)
+  if (parsed.length === 0) return []
+  if (options.discrete || parsed.length === 1) return parsed
+  const per = options.samplesPerSegment ?? 4
+  const out: Rgb[] = []
+  for (let i = 0; i < parsed.length - 1; i++) {
+    for (let s = 0; s < per; s++) {
+      out.push(lerpRgb(parsed[i], parsed[i + 1], s / per))
+    }
+  }
+  out.push(parsed[parsed.length - 1])
+  return out
+}
+
+export type BackgroundContrastVerdict =
+  /** The style's own text color clears the threshold everywhere. */
+  | 'pass'
+  /** Chosen text fails, but the opposite text color passes — production's
+      isDark heuristic picked wrong; auto text color would fix it. */
+  | 'flip-text'
+  /** NEITHER white nor near-black clears the threshold — mid-tone
+      background; needs a guard (adjust background, scrim, or halo). */
+  | 'guard-needed'
+
+export interface BackgroundContrastReport {
+  verdict: BackgroundContrastVerdict
+  /** Worst ratio of the style's chosen text color across all samples. */
+  minChosen: number
+  /** The better of near-white/near-black as a single color for the whole label. */
+  altHex: string
+  altChoice: 'light' | 'dark'
+  /** Worst ratio of that alternative across all samples. */
+  minAlt: number
+  threshold: number
+}
+
+const NEAR_WHITE_HEX = '#fafafa'
+const NEAR_BLACK_HEX = '#0a0a0a'
+
+/**
+ * Evaluate a label background (any number of stops) against the style's
+ * chosen text color AND the best single-color alternative. This is the
+ * check production can't do today: its isDark flag comes from Rec.601
+ * luminance of one extracted color, while text may sit on any point of a
+ * multi-stop gradient.
+ */
+export function evaluateLabelBackground(opts: {
+  stops: string[]
+  textHex: string
+  discrete?: boolean
+  threshold?: number
+}): BackgroundContrastReport {
+  const threshold = opts.threshold ?? 7
+  const samples = buildBackgroundSamples(opts.stops, { discrete: opts.discrete })
+  const text = parseHex(opts.textHex)
+  const white = parseHex(NEAR_WHITE_HEX)!
+  const black = parseHex(NEAR_BLACK_HEX)!
+  if (samples.length === 0 || !text) {
+    return { verdict: 'guard-needed', minChosen: 1, altHex: NEAR_WHITE_HEX, altChoice: 'light', minAlt: 1, threshold }
+  }
+  let minChosen = Infinity
+  let minWhite = Infinity
+  let minBlack = Infinity
+  for (const bg of samples) {
+    minChosen = Math.min(minChosen, contrastRatio(bg, text))
+    minWhite = Math.min(minWhite, contrastRatio(bg, white))
+    minBlack = Math.min(minBlack, contrastRatio(bg, black))
+  }
+  const altIsLight = minWhite >= minBlack
+  const minAlt = altIsLight ? minWhite : minBlack
+  const verdict: BackgroundContrastVerdict =
+    minChosen >= threshold ? 'pass' : minAlt >= threshold ? 'flip-text' : 'guard-needed'
+  return {
+    verdict,
+    minChosen,
+    altHex: altIsLight ? NEAR_WHITE_HEX : NEAR_BLACK_HEX,
+    altChoice: altIsLight ? 'light' : 'dark',
+    minAlt,
+    threshold,
+  }
+}
+
+/**
+ * Guard candidate: pull every background stop toward black (for light
+ * text) or toward white (for dark text) until the worst sample clears the
+ * threshold. Returns the adjusted stops, the blend amount that was needed
+ * (0..0.9), and whether it succeeded within the cap.
+ *
+ * This is the "fix the background, keep the design's hues" guard — the
+ * alternative to flipping text color or adding a halo.
+ */
+export function adjustStopsToPass(
+  stops: string[],
+  textHex: string,
+  options: { discrete?: boolean; threshold?: number } = {},
+): { stops: string[]; amount: number; passed: boolean } {
+  const threshold = options.threshold ?? 7
+  const text = parseHex(textHex)
+  if (!text) return { stops, amount: 0, passed: false }
+  const towardLight = relativeLuminanceWCAG(text) < 0.5 // dark text -> lighten bg
+  const target: Rgb = towardLight ? { r: 255, g: 255, b: 255 } : { r: 0, g: 0, b: 0 }
+
+  for (let amount = 0; amount <= 0.9; amount += 0.05) {
+    const blended = stops.map(s => {
+      const rgb = parseHex(s)
+      return rgb ? toHex(lerpRgb(rgb, target, amount)) : s
+    })
+    const samples = buildBackgroundSamples(blended, { discrete: options.discrete })
+    const min = Math.min(...samples.map(bg => contrastRatio(bg, text)))
+    if (min >= threshold) {
+      return { stops: blended, amount: Math.round(amount * 100) / 100, passed: true }
+    }
+  }
+  return {
+    stops: stops.map(s => {
+      const rgb = parseHex(s)
+      return rgb ? toHex(lerpRgb(rgb, target, 0.9)) : s
+    }),
+    amount: 0.9,
+    passed: false,
+  }
+}

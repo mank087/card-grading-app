@@ -5,7 +5,23 @@ import {
   pickContrastTextHex,
   sampleGradientContrast,
   printColorTweaksHex,
+  type BackgroundContrastReport,
 } from '@/lib/labelLab/contrastWCAG'
+import {
+  presetSpec,
+  cardColorSpecs,
+  customSpec,
+  evaluateSpec,
+  PRESET_IDS,
+  type LabStyleSpec,
+} from '@/lib/labelLab/labStyleSpecs'
+import {
+  COLOR_PRESETS,
+  CARD_COLOR_STYLES,
+  LAYOUT_STYLES,
+  GEOMETRIC_PATTERNS,
+  type CardColorInput,
+} from '@/lib/labelPresets'
 
 // ============================================================================
 // Types
@@ -33,6 +49,8 @@ interface LabCard {
 
 type LabFormat =
   | 'calibration'
+  | 'custom-style'
+  | 'style-gauntlet'
   | 'slab-modern'
   | 'slab-traditional'
   | 'foldable'
@@ -42,6 +60,8 @@ type LabFormat =
 
 const LAB_FORMATS: { id: LabFormat; label: string; live: boolean; description: string }[] = [
   { id: 'calibration', label: 'Print Calibration Sheet', live: true, description: 'One-page test matrix — raster vs vector A/B, knockout size ladder, tweak strip, halo test, scale ruler. Print at 100%.' },
+  { id: 'custom-style', label: 'Custom Style (single label)', live: true, description: 'Any Studio style — presets, card-color styles, custom designer — with a live WCAG legibility verdict.' },
+  { id: 'style-gauntlet', label: 'Style Gauntlet (all styles)', live: true, description: 'Every Studio style for the selected card on one sheet, each with its verdict, plus guard tests for the worst failure.' },
   { id: 'slab-modern', label: 'Modern Slab (front + back)', live: true, description: '2.8" × 0.8" insert — dark gradient. Production: src/lib/slabLabelGenerator.ts' },
   { id: 'slab-traditional', label: 'Traditional Slab (front + back)', live: true, description: '2.8" × 0.8" insert — light theme. Production: src/lib/slabLabelGenerator.ts' },
   { id: 'foldable', label: 'Foldable 2.5" × 3.5"', live: false, description: 'Full trading-card insert with QR + summary. Production: src/lib/foldableLabelGenerator.ts. Next iteration.' },
@@ -67,6 +87,17 @@ export default function LabelLabClient() {
 
   // --- Print color tweak ---
   const [printTweakIntensity, setPrintTweakIntensity] = useState<number>(0.5)
+
+  // --- Custom style designer ---
+  const [styleMode, setStyleMode] = useState<'preset' | 'card-style' | 'custom'>('preset')
+  const [presetId, setPresetId] = useState<string>('modern-dark')
+  const [cardStyleId, setCardStyleId] = useState<string>('color-gradient')
+  const [customColors, setCustomColors] = useState<string[]>(['#7c3aed', '#4c1d95'])
+  const [layoutId, setLayoutId] = useState<string>('color-gradient')
+  const [angleDeg, setAngleDeg] = useState<number>(135)
+  const [geomPattern, setGeomPattern] = useState<number>(0)
+  const [borderEnabled, setBorderEnabled] = useState<boolean>(false)
+  const [borderColor, setBorderColor] = useState<string>('#7c3aed')
 
   // --- Logos (fetched once and cached as base64) ---
   const [whiteLogoDataUrl, setWhiteLogoDataUrl] = useState<string | null>(null)
@@ -132,6 +163,54 @@ export default function LabelLabClient() {
     return cardToSlabInputs(selectedCard)
   }, [selectedCard])
 
+  // --- Card extracted colors (drives card-color styles + gauntlet) ---
+  const cardColorInput = useMemo<(CardColorInput & { palette?: string[] }) | null>(() => {
+    const cc = selectedCard?.card_colors
+    if (!cc || !cc.primary) return null
+    return {
+      primary: cc.primary,
+      secondary: cc.secondary || cc.primary,
+      isDark: !!cc.isDark,
+      borderColor: cc.borderColor,
+      topEdgeColors: Array.isArray(cc.topEdgeColors) ? cc.topEdgeColors : undefined,
+      palette: Array.isArray(cc.palette) ? cc.palette : undefined,
+    }
+  }, [selectedCard])
+
+  // --- Active custom-style spec + verdict ---
+  const activeStyleSpec = useMemo<LabStyleSpec | null>(() => {
+    if (styleMode === 'preset') return presetSpec(presetId)
+    if (styleMode === 'card-style') {
+      if (!cardColorInput) return null
+      return cardColorSpecs(cardColorInput).find(s => s.id === cardStyleId) || null
+    }
+    return customSpec({
+      colors: customColors,
+      layoutId,
+      angleDeg,
+      geometricPattern: geomPattern,
+      borderEnabled,
+      borderColor,
+      borderWidthIn: 0.03,
+    })
+  }, [styleMode, presetId, cardStyleId, cardColorInput, customColors, layoutId, angleDeg, geomPattern, borderEnabled, borderColor])
+
+  const styleVerdict = useMemo<BackgroundContrastReport | null>(
+    () => (activeStyleSpec ? evaluateSpec(activeStyleSpec) : null),
+    [activeStyleSpec],
+  )
+
+  // --- Gauntlet spec list: all presets + the card's five color styles ---
+  const gauntletSpecs = useMemo<LabStyleSpec[]>(() => {
+    const specs: LabStyleSpec[] = []
+    for (const id of PRESET_IDS) {
+      const s = presetSpec(id)
+      if (s) specs.push(s)
+    }
+    if (cardColorInput) specs.push(...cardColorSpecs(cardColorInput))
+    return specs
+  }, [cardColorInput])
+
   // --- WCAG contrast report (Modern slab dark gradient is the worst case) ---
   const contrastReport = useMemo(() => {
     if (format !== 'slab-modern') {
@@ -191,6 +270,29 @@ export default function LabelLabClient() {
             rasterModernDataUrl: rasterModern,
             rasterTraditionalDataUrl: rasterTraditional,
           })
+        } else if (format === 'custom-style') {
+          if (!activeStyleSpec) {
+            throw new Error('This card has no extracted colors — card-color styles need card_colors. Pick a preset or custom style, or run the color backfill for this card.')
+          }
+          const { CustomSlabPdfDoc } = await import('@/lib/labelLab/customSlabPdfBlock')
+          doc = CustomSlabPdfDoc({
+            inputs: { ...slabInputs, whiteLogoDataUrl, colorLogoDataUrl },
+            spec: activeStyleSpec,
+            verdictLine: styleVerdict
+              ? `Verdict: ${styleVerdict.verdict.toUpperCase()} — chosen text min ${styleVerdict.minChosen.toFixed(1)}:1 · best alternative (${styleVerdict.altChoice}) min ${styleVerdict.minAlt.toFixed(1)}:1 · print threshold 7:1`
+              : undefined,
+          })
+        } else if (format === 'style-gauntlet') {
+          const { StyleGauntletPdfDoc } = await import('@/lib/labelLab/styleGauntletPdfDoc')
+          const specs = [...gauntletSpecs]
+          // Include the designer's current custom spec so one print can
+          // also validate work-in-progress designs.
+          if (styleMode === 'custom' && activeStyleSpec) specs.push(activeStyleSpec)
+          doc = StyleGauntletPdfDoc({
+            slabInputs: { ...slabInputs, whiteLogoDataUrl, colorLogoDataUrl },
+            specs,
+            cardLabel: displayLabel(selectedCard),
+          })
         } else {
           const { SlabLabelPdfDoc } = await import('@/lib/labelLab/slabLabelPdfDoc')
           const theme = format === 'slab-traditional' ? 'traditional' : 'modern'
@@ -217,7 +319,7 @@ export default function LabelLabClient() {
       }
     })()
     return () => { cancelled = true }
-  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl])
+  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl, activeStyleSpec, styleVerdict, gauntletSpecs, styleMode])
 
   // --- Download vector PDF ---
   const downloadVector = () => {
@@ -262,10 +364,40 @@ export default function LabelLabClient() {
             onSelect={setSelectedCard}
           />
 
-          <PrintTweakSlider
-            value={printTweakIntensity}
-            onChange={setPrintTweakIntensity}
-          />
+          {format === 'custom-style' ? (
+            <StyleDesignerPanel
+              styleMode={styleMode}
+              onStyleMode={setStyleMode}
+              presetId={presetId}
+              onPresetId={setPresetId}
+              cardStyleId={cardStyleId}
+              onCardStyleId={setCardStyleId}
+              hasCardColors={!!cardColorInput}
+              customColors={customColors}
+              onCustomColors={setCustomColors}
+              layoutId={layoutId}
+              onLayoutId={setLayoutId}
+              angleDeg={angleDeg}
+              onAngleDeg={setAngleDeg}
+              geomPattern={geomPattern}
+              onGeomPattern={setGeomPattern}
+              borderEnabled={borderEnabled}
+              onBorderEnabled={setBorderEnabled}
+              borderColor={borderColor}
+              onBorderColor={setBorderColor}
+            />
+          ) : null}
+
+          {format === 'custom-style' && styleVerdict ? (
+            <StyleVerdictPanel report={styleVerdict} />
+          ) : null}
+
+          {(format === 'slab-modern' || format === 'slab-traditional') ? (
+            <PrintTweakSlider
+              value={printTweakIntensity}
+              onChange={setPrintTweakIntensity}
+            />
+          ) : null}
 
           {contrastReport ? (
             <ContrastReportPanel report={contrastReport} />
@@ -284,6 +416,10 @@ export default function LabelLabClient() {
               description={
                 format === 'calibration'
                   ? 'Single page. Print at 100% ("Actual size") — the footer ruler verifies scale. One pass yields the raster-vs-vector A/B verdict, knockout size floor, tweak direction, and halo necessity. Tweak slider does not apply; the sheet sweeps all intensities.'
+                  : format === 'custom-style'
+                  ? 'Single label at exact print size with neutral cut guides. The verdict panel on the left scores the current style live; the verdict is also printed on the sheet.'
+                  : format === 'style-gauntlet'
+                  ? `Every Studio style for this card, exact print size, WCAG verdict per row, guard tests for the worst failure. Print at 100%.${cardColorInput ? '' : ' NOTE: this card has no extracted colors — card-color style rows are skipped (presets only). Run the color backfill to include them.'}`
                   : '@react-pdf/renderer. Letter portrait, 2 pages (front + back), cut guides + L-corner marks. Print to compare.'
               }
             />
@@ -453,6 +589,266 @@ function ContrastReportPanel(props: {
         {report.allPass
           ? `Min ${report.minRatio.toFixed(2)}:1 across the gradient. Should print clean.`
           : `Min ${report.minRatio.toFixed(2)}:1 — below the 7:1 print threshold in places. Consider raising tweak intensity or switching to traditional.`}
+      </div>
+    </section>
+  )
+}
+
+// ============================================================================
+// Custom style designer
+// ============================================================================
+
+function StyleDesignerPanel(props: {
+  styleMode: 'preset' | 'card-style' | 'custom'
+  onStyleMode: (m: 'preset' | 'card-style' | 'custom') => void
+  presetId: string
+  onPresetId: (id: string) => void
+  cardStyleId: string
+  onCardStyleId: (id: string) => void
+  hasCardColors: boolean
+  customColors: string[]
+  onCustomColors: (c: string[]) => void
+  layoutId: string
+  onLayoutId: (id: string) => void
+  angleDeg: number
+  onAngleDeg: (a: number) => void
+  geomPattern: number
+  onGeomPattern: (p: number) => void
+  borderEnabled: boolean
+  onBorderEnabled: (b: boolean) => void
+  borderColor: string
+  onBorderColor: (c: string) => void
+}) {
+  const modeTab = (id: 'preset' | 'card-style' | 'custom', label: string) => (
+    <button
+      key={id}
+      onClick={() => props.onStyleMode(id)}
+      className={`flex-1 px-2 py-1.5 rounded text-xs font-semibold transition-colors ${
+        props.styleMode === id ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+    >
+      {label}
+    </button>
+  )
+
+  const presets = PRESET_IDS.map(id => COLOR_PRESETS.find(p => p.id === id)!).filter(Boolean)
+
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Style designer</h3>
+      <div className="flex gap-1 mb-3">
+        {modeTab('preset', 'Presets')}
+        {modeTab('card-style', 'Card Styles')}
+        {modeTab('custom', 'Custom')}
+      </div>
+
+      {props.styleMode === 'preset' && (
+        <div className="grid grid-cols-2 gap-1">
+          {presets.map(p => (
+            <button
+              key={p.id}
+              onClick={() => props.onPresetId(p.id)}
+              className={`px-2 py-1.5 rounded text-xs text-left transition-colors flex items-center gap-2 ${
+                props.presetId === p.id ? 'bg-purple-100 text-purple-900 ring-1 ring-purple-300' : 'hover:bg-gray-100 text-gray-700'
+              }`}
+            >
+              <span
+                className="inline-block w-4 h-4 rounded border border-gray-300 shrink-0"
+                style={{
+                  background: p.isRainbow
+                    ? 'linear-gradient(90deg, #ff0000, #ffff00, #00cc00, #0066ff, #ff00ff)'
+                    : `linear-gradient(135deg, ${p.gradientStart}, ${p.gradientEnd})`,
+                }}
+              />
+              {p.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {props.styleMode === 'card-style' && (
+        <div className="space-y-1">
+          {!props.hasCardColors && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2">
+              This card has no extracted colors (card_colors is empty). Pick another card or run the color
+              backfill: <code className="font-mono text-[10px]">npx tsx scripts/backfill-card-colors.ts</code>
+            </p>
+          )}
+          {CARD_COLOR_STYLES.map(s => (
+            <button
+              key={s.id}
+              disabled={!props.hasCardColors}
+              onClick={() => props.onCardStyleId(s.id)}
+              className={`w-full px-2 py-1.5 rounded text-xs text-left transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                props.cardStyleId === s.id ? 'bg-purple-100 text-purple-900 ring-1 ring-purple-300' : 'hover:bg-gray-100 text-gray-700'
+              }`}
+            >
+              <span className="font-semibold">{s.name}</span>
+              <span className="block text-[10px] text-gray-500">{s.description}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {props.styleMode === 'custom' && (
+        <div className="space-y-3">
+          {/* Colors */}
+          <div>
+            <p className="text-xs font-semibold text-gray-700 mb-1">Colors ({props.customColors.length}/5)</p>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {props.customColors.map((c, i) => (
+                <span key={i} className="relative inline-flex">
+                  <input
+                    type="color"
+                    value={c}
+                    onChange={e => {
+                      const next = [...props.customColors]
+                      next[i] = e.target.value
+                      props.onCustomColors(next)
+                    }}
+                    className="w-8 h-8 rounded border border-gray-300 cursor-pointer p-0"
+                  />
+                  {props.customColors.length > 1 && (
+                    <button
+                      onClick={() => props.onCustomColors(props.customColors.filter((_, j) => j !== i))}
+                      className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-gray-200 text-gray-600 text-[9px] leading-none hover:bg-red-100 hover:text-red-700"
+                      title="Remove color"
+                    >
+                      ×
+                    </button>
+                  )}
+                </span>
+              ))}
+              {props.customColors.length < 5 && (
+                <button
+                  onClick={() => props.onCustomColors([...props.customColors, '#888888'])}
+                  className="w-8 h-8 rounded border border-dashed border-gray-400 text-gray-500 text-sm hover:bg-gray-100"
+                  title="Add color"
+                >
+                  +
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Layout */}
+          <div>
+            <p className="text-xs font-semibold text-gray-700 mb-1">Layout</p>
+            <div className="flex gap-1 flex-wrap">
+              {LAYOUT_STYLES.map(l => (
+                <button
+                  key={l.id}
+                  onClick={() => props.onLayoutId(l.id)}
+                  className={`px-2 py-1 rounded text-xs transition-colors ${
+                    props.layoutId === l.id ? 'bg-purple-100 text-purple-900 ring-1 ring-purple-300' : 'hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  {l.icon} {l.name}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Geometric pattern picker */}
+          {props.layoutId === 'geometric' && (
+            <div>
+              <p className="text-xs font-semibold text-gray-700 mb-1">Pattern</p>
+              <select
+                value={props.geomPattern}
+                onChange={e => props.onGeomPattern(Number(e.target.value))}
+                className="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-md"
+              >
+                {GEOMETRIC_PATTERNS.map(g => (
+                  <option key={g.id} value={g.id}>{g.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Angle */}
+          <div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-700">Gradient angle</span>
+              <span className="text-xs text-gray-500">{props.angleDeg}°</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={360}
+              step={15}
+              value={props.angleDeg}
+              onChange={e => props.onAngleDeg(Number(e.target.value))}
+              className="w-full mt-1"
+            />
+          </div>
+
+          {/* Border */}
+          <div className="flex items-center gap-2">
+            <label className="flex items-center gap-1.5 text-xs text-gray-700">
+              <input
+                type="checkbox"
+                checked={props.borderEnabled}
+                onChange={e => props.onBorderEnabled(e.target.checked)}
+              />
+              Border
+            </label>
+            {props.borderEnabled && (
+              <input
+                type="color"
+                value={props.borderColor}
+                onChange={e => props.onBorderColor(e.target.value)}
+                className="w-7 h-7 rounded border border-gray-300 cursor-pointer p-0"
+              />
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ============================================================================
+// Style verdict panel
+// ============================================================================
+
+function StyleVerdictPanel(props: { report: BackgroundContrastReport }) {
+  const { report } = props
+  const tone =
+    report.verdict === 'pass'
+      ? { badge: 'bg-emerald-100 text-emerald-800', label: 'PASS' }
+      : report.verdict === 'flip-text'
+      ? { badge: 'bg-amber-100 text-amber-800', label: 'FLIP TEXT' }
+      : { badge: 'bg-red-100 text-red-800', label: 'GUARD NEEDED' }
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Legibility verdict</h3>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wide ${tone.badge}`}>
+          {tone.label}
+        </span>
+      </div>
+      <div className="space-y-1 text-xs text-gray-700">
+        <p>
+          Chosen text: <span className="font-mono font-bold">{report.minChosen.toFixed(2)}:1</span> worst-case
+          (print target {report.threshold}:1)
+        </p>
+        <p>
+          Best alternative ({report.altChoice === 'light' ? 'white' : 'near-black'}):{' '}
+          <span className="font-mono font-bold">{report.minAlt.toFixed(2)}:1</span>
+        </p>
+        {report.verdict === 'flip-text' && (
+          <p className="text-amber-700">
+            Production would pick the wrong text color here — switching to{' '}
+            {report.altChoice === 'light' ? 'white' : 'near-black'} passes. This is the auto-text-color fix
+            the gauntlet's Guard A tests.
+          </p>
+        )}
+        {report.verdict === 'guard-needed' && (
+          <p className="text-red-700">
+            Mid-tone background — no single text color reaches {report.threshold}:1. Print the Style
+            Gauntlet to compare the three guards (flip text / adjust background / halo) on paper.
+          </p>
+        )}
       </div>
     </section>
   )
