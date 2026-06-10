@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import {
-  contrastRatioHex,
   pickContrastTextHex,
   sampleGradientContrast,
   printColorTweaksHex,
@@ -32,26 +31,21 @@ interface LabCard {
   back_url: string | null
 }
 
-// ============================================================================
-// Presets — small starter set, matches the most-used production options
-// ============================================================================
+type LabFormat =
+  | 'slab-modern'
+  | 'slab-traditional'
+  | 'foldable'
+  | 'avery-6871'
+  | 'avery-8167'
+  | 'card-image'
 
-interface GradientPreset {
-  id: string
-  label: string
-  start: string
-  end: string
-}
-
-const GRADIENT_PRESETS: GradientPreset[] = [
-  { id: 'modern-dark', label: 'Modern Dark', start: '#1a1625', end: '#3a2a5c' },
-  { id: 'midnight', label: 'Midnight Blue', start: '#0a0f2a', end: '#1e3a8a' },
-  { id: 'emerald', label: 'Emerald', start: '#064e3b', end: '#0d9488' },
-  { id: 'royal', label: 'Royal Purple', start: '#3b0764', end: '#7c3aed' },
-  { id: 'sunset', label: 'Sunset', start: '#9a3412', end: '#fde047' },
-  { id: 'rose', label: 'Rose Gold', start: '#831843', end: '#fb7185' },
-  { id: 'paper', label: 'Paper Light', start: '#f9fafb', end: '#e5e7eb' },
-  { id: 'silver', label: 'Silver', start: '#cbd5e1', end: '#94a3b8' },
+const LAB_FORMATS: { id: LabFormat; label: string; live: boolean; description: string }[] = [
+  { id: 'slab-modern', label: 'Modern Slab (front + back)', live: true, description: '2.8" × 0.8" insert — dark gradient. Production: src/lib/slabLabelGenerator.ts' },
+  { id: 'slab-traditional', label: 'Traditional Slab (front + back)', live: true, description: '2.8" × 0.8" insert — light theme. Production: src/lib/slabLabelGenerator.ts' },
+  { id: 'foldable', label: 'Foldable 2.5" × 3.5"', live: false, description: 'Full trading-card insert with QR + summary. Production: src/lib/foldableLabelGenerator.ts. Next iteration.' },
+  { id: 'avery-6871', label: 'Avery 6871 One-Touch (18/sheet)', live: false, description: 'One-Touch case foldover, 2.375" × 1.25". Production: src/lib/averyLabelGenerator.ts. Next iteration.' },
+  { id: 'avery-8167', label: 'Avery 8167 Toploader (80/sheet)', live: false, description: 'Toploader sticker, 1.75" × 0.5". Production: src/lib/avery8167LabelGenerator.ts. Next iteration.' },
+  { id: 'card-image', label: 'Card Image (eBay / social)', live: false, description: '800 × 1328 PNG composite. Production: src/lib/cardImageGenerator.ts. Next iteration.' },
 ]
 
 // ============================================================================
@@ -66,37 +60,20 @@ export default function LabelLabClient() {
   const [selectedCard, setSelectedCard] = useState<LabCard | null>(null)
   const [loadingCards, setLoadingCards] = useState(true)
 
-  // --- Label design state ---
-  const [presetId, setPresetId] = useState<string>('modern-dark')
-  const [customStart, setCustomStart] = useState<string>('#1a1625')
-  const [customEnd, setCustomEnd] = useState<string>('#3a2a5c')
-  const [useCustom, setUseCustom] = useState(false)
+  // --- Format ---
+  const [format, setFormat] = useState<LabFormat>('slab-modern')
+
+  // --- Print color tweak ---
   const [printTweakIntensity, setPrintTweakIntensity] = useState<number>(0.5)
+
+  // --- Logos (fetched once and cached as base64) ---
+  const [whiteLogoDataUrl, setWhiteLogoDataUrl] = useState<string | null>(null)
+  const [colorLogoDataUrl, setColorLogoDataUrl] = useState<string | null>(null)
 
   // --- Render state ---
   const [vectorPdfBlobUrl, setVectorPdfBlobUrl] = useState<string | null>(null)
   const [vectorPdfError, setVectorPdfError] = useState<string | null>(null)
   const [vectorBuilding, setVectorBuilding] = useState(false)
-
-  // --- Resolved colors ---
-  const gradientStart = useCustom ? customStart : (GRADIENT_PRESETS.find(p => p.id === presetId)?.start || '#1a1625')
-  const gradientEnd = useCustom ? customEnd : (GRADIENT_PRESETS.find(p => p.id === presetId)?.end || '#3a2a5c')
-
-  // Print-tuned colors for the lab vector path
-  const tweakedStart = printTweakIntensity > 0 ? printColorTweaksHex(gradientStart, printTweakIntensity) : gradientStart
-  const tweakedEnd = printTweakIntensity > 0 ? printColorTweaksHex(gradientEnd, printTweakIntensity) : gradientEnd
-
-  // Pick text color based on mid-band of the TWEAKED gradient (what we'll actually paint)
-  const midHex = useMemo(() => mixHex(tweakedStart, tweakedEnd, 0.5), [tweakedStart, tweakedEnd])
-  const textChoice = useMemo(() => pickContrastTextHex(midHex), [midHex])
-
-  // WCAG contrast report across 5 sample points
-  const contrastReport = useMemo(() => {
-    return sampleGradientContrast(tweakedStart, tweakedEnd, textChoice.hex, {
-      samples: 5,
-      threshold: 7, // print-grade
-    })
-  }, [tweakedStart, tweakedEnd, textChoice.hex])
 
   // --- Load recent cards on mount ---
   useEffect(() => {
@@ -112,6 +89,20 @@ export default function LabelLabClient() {
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setLoadingCards(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  // --- Fetch logos as base64 (once) ---
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([
+      fetchAsDataUrl('/DCM%20Logo%20white.png').catch(() => null),
+      fetchAsDataUrl('/DCM-logo.png').catch(() => null),
+    ]).then(([whiteUrl, colorUrl]) => {
+      if (cancelled) return
+      setWhiteLogoDataUrl(whiteUrl)
+      setColorLogoDataUrl(colorUrl)
+    })
     return () => { cancelled = true }
   }, [])
 
@@ -133,22 +124,50 @@ export default function LabelLabClient() {
     return () => { cancelled = true; clearTimeout(t) }
   }, [search])
 
+  // --- Resolve slab inputs from the selected card ---
+  const slabInputs = useMemo(() => {
+    if (!selectedCard) return null
+    return cardToSlabInputs(selectedCard)
+  }, [selectedCard])
+
+  // --- WCAG contrast report (Modern slab dark gradient is the worst case) ---
+  const contrastReport = useMemo(() => {
+    if (format !== 'slab-modern') {
+      // Traditional is light text on white; passes trivially. Skip noise.
+      return null
+    }
+    const tweakedStart = printTweakIntensity > 0 ? printColorTweaksHex('#1a1625', printTweakIntensity) : '#1a1625'
+    const tweakedEnd = printTweakIntensity > 0 ? printColorTweaksHex('#2d1f47', printTweakIntensity) : '#2d1f47'
+    return sampleGradientContrast(tweakedStart, tweakedEnd, '#FFFFFF', {
+      samples: 5,
+      threshold: 7,
+    })
+  }, [format, printTweakIntensity])
+
   // --- Build the react-pdf vector blob whenever inputs change ---
   useEffect(() => {
-    if (!selectedCard) return
+    if (!selectedCard || !slabInputs) return
+    const liveFormat = LAB_FORMATS.find(f => f.id === format)?.live
+    if (!liveFormat) {
+      // Stub format selected — clear the PDF panel
+      setVectorPdfBlobUrl(prev => { if (prev) URL.revokeObjectURL(prev); return null })
+      return
+    }
     let cancelled = false
     setVectorBuilding(true)
     setVectorPdfError(null)
     ;(async () => {
       try {
-        const { ModernSlabPdfDoc } = await import('@/lib/labelLab/modernSlabPdfDoc')
+        const { SlabLabelPdfDoc } = await import('@/lib/labelLab/slabLabelPdfDoc')
         const { pdf } = await import('@react-pdf/renderer')
-        const inputs = labCardToPdfInputs(selectedCard, {
-          gradientStart,
-          gradientEnd,
+        const theme = format === 'slab-traditional' ? 'traditional' : 'modern'
+        const doc = SlabLabelPdfDoc({
+          ...slabInputs,
+          theme,
+          whiteLogoDataUrl,
+          colorLogoDataUrl,
           printColorTweakIntensity: printTweakIntensity,
         })
-        const doc = ModernSlabPdfDoc(inputs)
         const instance = pdf(doc as any)
         const blob = await instance.toBlob()
         if (cancelled) return
@@ -164,16 +183,18 @@ export default function LabelLabClient() {
       }
     })()
     return () => { cancelled = true }
-  }, [selectedCard, gradientStart, gradientEnd, printTweakIntensity])
+  }, [selectedCard, slabInputs, format, printTweakIntensity, whiteLogoDataUrl, colorLogoDataUrl])
 
   // --- Download vector PDF ---
   const downloadVector = () => {
     if (!vectorPdfBlobUrl || !selectedCard) return
     const a = document.createElement('a')
     a.href = vectorPdfBlobUrl
-    a.download = `lab-vector-${selectedCard.serial}.pdf`
+    a.download = `lab-${format}-${selectedCard.serial}.pdf`
     a.click()
   }
+
+  const activeFormat = LAB_FORMATS.find(f => f.id === format)!
 
   return (
     <div className="space-y-6">
@@ -184,17 +205,19 @@ export default function LabelLabClient() {
           <div>
             <p className="text-sm font-bold text-amber-900">Label Lab — closed test environment</p>
             <p className="text-sm text-amber-800 mt-1">
-              Validates a new vector PDF rendering pipeline with print-tuned colors and WCAG contrast scoring.
-              Nothing here is wired to the production Label Studio or end-user downloads. v1 covers the modern slab
-              only. Print the lab PDF on real paper to compare against the production raster export.
+              Vector PDF replicas of production label formats. Nothing here is wired to the production
+              Label Studio or end-user downloads. Modern + Traditional slab are live in v2; the other
+              formats are stubbed and will land in the next iteration once paper-test feedback comes in.
             </p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* Left rail — controls */}
+        {/* Left rail */}
         <div className="space-y-4 xl:col-span-1">
+          <FormatPicker format={format} onChange={setFormat} />
+
           <CardPicker
             cards={cards}
             search={search}
@@ -205,44 +228,71 @@ export default function LabelLabClient() {
             onSelect={setSelectedCard}
           />
 
-          <ControlsPanel
-            presetId={presetId}
-            useCustom={useCustom}
-            customStart={customStart}
-            customEnd={customEnd}
-            printTweakIntensity={printTweakIntensity}
-            onPreset={(id) => { setPresetId(id); setUseCustom(false) }}
-            onCustomToggle={(v) => setUseCustom(v)}
-            onCustomStart={setCustomStart}
-            onCustomEnd={setCustomEnd}
-            onPrintTweak={setPrintTweakIntensity}
+          <PrintTweakSlider
+            value={printTweakIntensity}
+            onChange={setPrintTweakIntensity}
           />
 
-          <ContrastReportPanel
-            report={contrastReport}
-            textHex={textChoice.hex}
-            textChoice={textChoice.choice}
-          />
+          {contrastReport ? (
+            <ContrastReportPanel report={contrastReport} />
+          ) : null}
         </div>
 
-        {/* Right panel — preview + download */}
+        {/* Right panel */}
         <div className="space-y-4 xl:col-span-2">
-          <LivePreview
-            card={selectedCard}
-            gradientStart={tweakedStart}
-            gradientEnd={tweakedEnd}
-            textHex={textChoice.hex}
-          />
+          {activeFormat.live ? (
+            <VectorPdfPreview
+              blobUrl={vectorPdfBlobUrl}
+              building={vectorBuilding}
+              error={vectorPdfError}
+              onDownload={downloadVector}
+              formatLabel={activeFormat.label}
+            />
+          ) : (
+            <StubFormatPanel format={activeFormat} />
+          )}
 
-          <VectorPdfPreview
-            blobUrl={vectorPdfBlobUrl}
-            building={vectorBuilding}
-            error={vectorPdfError}
-            onDownload={downloadVector}
-          />
+          <ProductionReferencePanel format={activeFormat} card={selectedCard} />
         </div>
       </div>
     </div>
+  )
+}
+
+// ============================================================================
+// Format picker
+// ============================================================================
+
+function FormatPicker(props: { format: LabFormat; onChange: (f: LabFormat) => void }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-4">
+      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Label format</h3>
+      <div className="space-y-1">
+        {LAB_FORMATS.map(f => (
+          <button
+            key={f.id}
+            onClick={() => props.onChange(f.id)}
+            className={`w-full text-left px-3 py-2 rounded text-xs transition-colors flex items-center justify-between ${
+              props.format === f.id
+                ? 'bg-purple-100 text-purple-900 ring-1 ring-purple-300'
+                : 'hover:bg-gray-100 text-gray-700'
+            }`}
+          >
+            <div>
+              <p className="font-semibold">{f.label}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">{f.description}</p>
+            </div>
+            <span
+              className={`ml-2 text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${
+                f.live ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              {f.live ? 'Live' : 'Soon'}
+            </span>
+          </button>
+        ))}
+      </div>
+    </section>
   )
 }
 
@@ -305,97 +355,30 @@ function CardPicker(props: {
 }
 
 // ============================================================================
-// Controls
+// Print tweak slider
 // ============================================================================
 
-function ControlsPanel(props: {
-  presetId: string
-  useCustom: boolean
-  customStart: string
-  customEnd: string
-  printTweakIntensity: number
-  onPreset: (id: string) => void
-  onCustomToggle: (v: boolean) => void
-  onCustomStart: (v: string) => void
-  onCustomEnd: (v: string) => void
-  onPrintTweak: (v: number) => void
-}) {
+function PrintTweakSlider(props: { value: number; onChange: (v: number) => void }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
-      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Background</h3>
-
-      <div className="grid grid-cols-2 gap-2">
-        {GRADIENT_PRESETS.map((p) => {
-          const isActive = !props.useCustom && props.presetId === p.id
-          return (
-            <button
-              key={p.id}
-              onClick={() => props.onPreset(p.id)}
-              className={`text-left text-xs rounded p-2 border transition-colors ${
-                isActive ? 'border-purple-500 ring-1 ring-purple-300' : 'border-gray-200 hover:border-purple-300'
-              }`}
-            >
-              <div
-                className="h-6 w-full rounded mb-1"
-                style={{ background: `linear-gradient(90deg, ${p.start}, ${p.end})` }}
-              />
-              <span className="font-medium text-gray-800">{p.label}</span>
-            </button>
-          )
-        })}
+      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Print color tweak</h3>
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-gray-700">Intensity</span>
+        <span className="text-xs text-gray-500">{Math.round(props.value * 100)}%</span>
       </div>
-
-      <div className="mt-4 pt-3 border-t border-gray-200">
-        <label className="flex items-center gap-2 text-xs font-medium text-gray-700 mb-2">
-          <input
-            type="checkbox"
-            checked={props.useCustom}
-            onChange={(e) => props.onCustomToggle(e.target.checked)}
-          />
-          Use custom gradient
-        </label>
-        {props.useCustom && (
-          <div className="grid grid-cols-2 gap-2">
-            <label className="text-xs text-gray-600">
-              <span className="block mb-1">Start</span>
-              <input
-                type="color"
-                value={props.customStart}
-                onChange={(e) => props.onCustomStart(e.target.value)}
-                className="w-full h-9 rounded border border-gray-200"
-              />
-            </label>
-            <label className="text-xs text-gray-600">
-              <span className="block mb-1">End</span>
-              <input
-                type="color"
-                value={props.customEnd}
-                onChange={(e) => props.onCustomEnd(e.target.value)}
-                className="w-full h-9 rounded border border-gray-200"
-              />
-            </label>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-4 pt-3 border-t border-gray-200">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-700">Print color tweak</span>
-          <span className="text-xs text-gray-500">{Math.round(props.printTweakIntensity * 100)}%</span>
-        </div>
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={props.printTweakIntensity}
-          onChange={(e) => props.onPrintTweak(Number(e.target.value))}
-          className="w-full mt-1"
-        />
-        <p className="text-[11px] text-gray-500 mt-1">
-          Darken-toward-black on dark colors + slight desaturation. Counters consumer-inkjet color drift.
-        </p>
-      </div>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={props.value}
+        onChange={(e) => props.onChange(Number(e.target.value))}
+        className="w-full mt-1"
+      />
+      <p className="text-[11px] text-gray-500 mt-1">
+        Darken-toward-black on dark colors + slight desaturation. Counters consumer-inkjet color drift.
+        Recommended starting point: 50%. Set to 0% to compare against the untweaked production palette.
+      </p>
     </section>
   )
 }
@@ -406,8 +389,6 @@ function ControlsPanel(props: {
 
 function ContrastReportPanel(props: {
   report: ReturnType<typeof sampleGradientContrast>
-  textHex: string
-  textChoice: 'light' | 'dark'
 }) {
   const { report } = props
   return (
@@ -415,10 +396,6 @@ function ContrastReportPanel(props: {
       <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">
         Contrast (WCAG, print-grade 7:1)
       </h3>
-      <div className="text-xs text-gray-700 mb-2">
-        Chosen text color: <span className="inline-block align-middle w-4 h-4 rounded border border-gray-300" style={{ background: props.textHex }} /> <span className="font-mono">{props.textHex}</span>
-        <span className="ml-2 text-gray-500">({props.textChoice})</span>
-      </div>
       <div className="space-y-1">
         {report.samples.map((s, i) => (
           <div key={i} className="flex items-center gap-2 text-xs">
@@ -436,79 +413,7 @@ function ContrastReportPanel(props: {
       <div className={`mt-3 text-xs font-semibold ${report.allPass ? 'text-green-700' : 'text-amber-700'}`}>
         {report.allPass
           ? `Min ${report.minRatio.toFixed(2)}:1 across the gradient. Should print clean.`
-          : `Min ${report.minRatio.toFixed(2)}:1 — some regions below the 7:1 print threshold. Add stroke or reconsider colors.`}
-      </div>
-    </section>
-  )
-}
-
-// ============================================================================
-// Live HTML preview — fast feedback while the user adjusts colors
-// ============================================================================
-
-function LivePreview(props: {
-  card: LabCard | null
-  gradientStart: string
-  gradientEnd: string
-  textHex: string
-}) {
-  if (!props.card) {
-    return (
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <p className="text-sm text-gray-500">Pick a card to start previewing.</p>
-      </section>
-    )
-  }
-  const inputs = labCardToPdfInputs(props.card, {
-    gradientStart: props.gradientStart,
-    gradientEnd: props.gradientEnd,
-    printColorTweakIntensity: 0, // already applied upstream
-  })
-  return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4">
-      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-3">Live preview (HTML)</h3>
-      <p className="text-xs text-gray-500 mb-3">
-        Fast feedback as you tweak colors. The final lab PDF below is the authoritative vector render.
-      </p>
-      <div
-        className="w-full max-w-[600px] rounded-md shadow-md mx-auto"
-        style={{
-          aspectRatio: '2 / 1',
-          background: `linear-gradient(90deg, ${props.gradientStart}, ${props.gradientEnd})`,
-          color: props.textHex,
-          display: 'grid',
-          gridTemplateColumns: '32% 1fr 20%',
-          padding: '12px',
-          fontFamily: 'Helvetica, Arial, sans-serif',
-        }}
-      >
-        <div className="flex items-center justify-center">
-          {inputs.frontImageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={inputs.frontImageUrl} alt="" style={{ maxHeight: '95%', maxWidth: '95%', objectFit: 'contain' }} />
-          ) : <div className="w-full h-full bg-black/20 rounded" />}
-        </div>
-        <div className="flex flex-col justify-between px-2">
-          <div>
-            <p className="text-[10px] tracking-widest opacity-80 font-bold">DCM</p>
-            <p className="text-[18px] font-bold leading-tight mt-1">{inputs.playerOrCharacter}</p>
-            <p className="text-[11px] opacity-90 mt-0.5">{inputs.setName}</p>
-            <p className="text-[10px] opacity-80">{[inputs.year, inputs.cardNumber].filter(Boolean).join(' • ')}</p>
-          </div>
-          <div className="flex gap-1 mt-2">
-            {(['centering', 'corners', 'edges', 'surface'] as const).map((k) => (
-              <div key={k} className="flex-1 text-center border rounded py-0.5" style={{ borderColor: props.textHex }}>
-                <p className="text-[11px] font-bold">{inputs.subgrades?.[k] ?? '—'}</p>
-                <p className="text-[7px] tracking-widest opacity-80">{k.slice(0, 3).toUpperCase()}</p>
-              </div>
-            ))}
-          </div>
-          <p className="text-[9px] opacity-80 mt-1 tracking-wider">DCM • {inputs.serial}</p>
-        </div>
-        <div className="flex flex-col items-center justify-center">
-          <p className="text-[48px] font-bold leading-none">{inputs.grade}</p>
-          <p className="text-[8px] tracking-widest opacity-90 font-bold mt-1">{inputs.conditionLabel.toUpperCase()}</p>
-        </div>
+          : `Min ${report.minRatio.toFixed(2)}:1 — below the 7:1 print threshold in places. Consider raising tweak intensity or switching to traditional.`}
       </div>
     </section>
   )
@@ -523,13 +428,16 @@ function VectorPdfPreview(props: {
   building: boolean
   error: string | null
   onDownload: () => void
+  formatLabel: string
 }) {
   return (
     <section className="rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between mb-3">
         <div>
-          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">Lab vector PDF</h3>
-          <p className="text-xs text-gray-500 mt-1">@react-pdf/renderer. Text and gradients vector at every DPI.</p>
+          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">{props.formatLabel} — vector PDF</h3>
+          <p className="text-xs text-gray-500 mt-1">
+            @react-pdf/renderer. Letter portrait, 2 pages (front + back), cut guides + L-corner marks. Print to compare.
+          </p>
         </div>
         <button
           onClick={props.onDownload}
@@ -545,12 +453,51 @@ function VectorPdfPreview(props: {
         </p>
       )}
       {props.blobUrl ? (
-        <iframe src={props.blobUrl} title="Lab vector PDF" className="w-full h-[480px] border border-gray-200 rounded" />
+        <iframe src={props.blobUrl} title="Lab vector PDF" className="w-full h-[640px] border border-gray-200 rounded" />
       ) : (
-        <div className="h-[480px] flex items-center justify-center border border-dashed border-gray-300 rounded text-sm text-gray-500">
-          {props.building ? 'Building vector PDF…' : 'Pick a card and gradient to render.'}
+        <div className="h-[640px] flex items-center justify-center border border-dashed border-gray-300 rounded text-sm text-gray-500">
+          {props.building ? 'Building vector PDF…' : 'Pick a card to render.'}
         </div>
       )}
+    </section>
+  )
+}
+
+// ============================================================================
+// Stub format panel — for formats not yet implemented
+// ============================================================================
+
+function StubFormatPanel(props: { format: typeof LAB_FORMATS[number] }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-white p-8 text-center">
+      <span className="inline-block text-5xl mb-3" aria-hidden>🚧</span>
+      <h3 className="text-lg font-bold text-gray-900">{props.format.label}</h3>
+      <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">{props.format.description}</p>
+      <p className="text-xs text-gray-500 mt-4">
+        Switch to <strong>Modern Slab</strong> or <strong>Traditional Slab</strong> in the format
+        list to render and download. The other formats land once paper-test feedback on the slab
+        comes in.
+      </p>
+    </section>
+  )
+}
+
+// ============================================================================
+// Production reference panel — links to the existing canvas file
+// ============================================================================
+
+function ProductionReferencePanel(props: { format: typeof LAB_FORMATS[number]; card: LabCard | null }) {
+  return (
+    <section className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-2">Production reference</h3>
+      <p className="text-xs text-gray-600">{props.format.description}</p>
+      {props.card ? (
+        <p className="text-xs text-gray-500 mt-2">
+          Current card: <span className="font-mono">{props.card.serial}</span>{' '}
+          • Grade <span className="font-bold">{props.card.conversational_whole_grade ?? '—'}</span>
+          {' '}({props.card.conversational_condition_label || 'Graded'})
+        </p>
+      ) : null}
     </section>
   )
 }
@@ -572,13 +519,29 @@ function displayLabel(c: LabCard): string {
   )
 }
 
-function labCardToPdfInputs(
-  c: LabCard,
-  overrides: { gradientStart: string; gradientEnd: string; printColorTweakIntensity?: number },
-): import('@/lib/labelLab/modernSlabPdfDoc').ModernSlabPdfInputs {
+function cardToSlabInputs(c: LabCard): {
+  primaryName: string
+  contextLine: string
+  featuresLine: string
+  serial: string
+  grade: string
+  condition: string
+  subgrades: { centering: number | null; corners: number | null; edges: number | null; surface: number | null }
+} {
   const ci = c.conversational_card_info || {}
   const ws = c.conversational_weighted_sub_scores || {}
   const ss = c.conversational_sub_scores || {}
+  const setName = ci.set_name || c.card_set || ''
+  const cardNumber = ci.card_number ? `#${ci.card_number.replace(/^#/, '')}` : (c.card_number ? `#${c.card_number}` : '')
+  const year = String(ci.year || (c.release_date ? c.release_date.slice(0, 4) : ''))
+  const contextParts = [setName, cardNumber, year].filter(Boolean)
+  // Production builds the features line from a few flags. For the lab we
+  // synthesize a simple version since we don't carry the full label-data
+  // resolver into the browser.
+  const features: string[] = []
+  if (ci.rookie_or_first === true || ci.rookie_or_first === 'true') features.push('RC')
+  if (ci.autographed === true) features.push('Auto')
+  if (ci.holofoil && ci.holofoil !== 'None') features.push(String(ci.holofoil))
   const sub = {
     centering: roundSub(ws.centering ?? ss.centering),
     corners: roundSub(ws.corners ?? ss.corners),
@@ -586,19 +549,13 @@ function labCardToPdfInputs(
     surface: roundSub(ws.surface ?? ss.surface),
   }
   return {
-    gradientStart: overrides.gradientStart,
-    gradientEnd: overrides.gradientEnd,
-    printColorTweakIntensity: overrides.printColorTweakIntensity ?? 0.5,
-    playerOrCharacter: ci.player_or_character || c.featured || c.pokemon_featured || c.card_name || '—',
-    setName: ci.set_name || c.card_set || '',
-    year: String(ci.year || (c.release_date ? c.release_date.slice(0, 4) : '')),
-    cardNumber: ci.card_number ? `#${ci.card_number.replace(/^#/, '')}` : (c.card_number ? `#${c.card_number}` : ''),
-    grade: String(c.conversational_whole_grade ?? '?'),
-    conditionLabel: c.conversational_condition_label || 'Graded',
-    subgrades: sub,
+    primaryName: ci.player_or_character || c.featured || c.pokemon_featured || c.card_name || 'Card',
+    contextLine: contextParts.join(' • '),
+    featuresLine: features.join(' • '),
     serial: c.serial,
-    frontImageUrl: c.front_url,
-    backImageUrl: c.back_url,
+    grade: c.conversational_whole_grade != null ? String(c.conversational_whole_grade) : '—',
+    condition: c.conversational_condition_label || 'Graded',
+    subgrades: sub,
   }
 }
 
@@ -609,19 +566,14 @@ function roundSub(v: any): number | null {
   return Math.round(n * 2) / 2
 }
 
-function mixHex(a: string, b: string, t: number): string {
-  const pa = parse(a)
-  const pb = parse(b)
-  if (!pa || !pb) return a
-  const r = Math.round(pa[0] + (pb[0] - pa[0]) * t)
-  const g = Math.round(pa[1] + (pb[1] - pa[1]) * t)
-  const bl = Math.round(pa[2] + (pb[2] - pa[2]) * t)
-  return '#' + [r, g, bl].map(n => Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')).join('')
-}
-
-function parse(hex: string): [number, number, number] | null {
-  let h = hex.trim().replace(/^#/, '')
-  if (h.length === 3) h = h.split('').map(c => c + c).join('')
-  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)]
+async function fetchAsDataUrl(url: string): Promise<string> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`)
+  const blob = await res.blob()
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onloadend = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('FileReader error'))
+    reader.readAsDataURL(blob)
+  })
 }
