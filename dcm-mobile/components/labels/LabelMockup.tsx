@@ -74,6 +74,9 @@ export interface CustomColorOverrides {
   gradientAngle?: number
   /** Geometric pattern variant (0-4) per GEOMETRIC_PATTERNS. */
   geometricPattern?: number
+  /** Label text polarity from the web config: 'auto' resolves by WCAG
+      contrast; 'light'/'dark' are explicit user overrides. */
+  textColorMode?: 'auto' | 'light' | 'dark'
 }
 
 interface LabelMockupProps {
@@ -210,18 +213,48 @@ function getLabelGradient(slabStyle: SlabStyle, customOverrides?: CustomColorOve
 
 /** Whether the label should use light text (over a dark bg). For custom, infer
  *  from the gradient — if the average is dark, use light text. */
-function isDarkSlab(slabStyle: SlabStyle, customOverrides?: CustomColorOverrides): boolean {
-  if (slabStyle === 'modern') return true
-  if (slabStyle === 'traditional') return false
-  // Custom: read luminance from first color of override
-  const first = customOverrides?.labelGradient?.[0]
-  if (!first) return true
-  const m = /^#?([0-9a-f]{6})$/i.exec(first)
-  if (!m) return true
+/** sRGB-linearized WCAG relative luminance (matches web src/lib/contrastWCAG.ts). */
+function wcagLuminance(hex: string): number | null {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex)
+  if (!m) return null
   const n = parseInt(m[1], 16)
-  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff
-  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-  return lum < 0.6
+  const lin = (c: number) => {
+    const v = c / 255
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+  }
+  return 0.2126 * lin((n >> 16) & 0xff) + 0.7152 * lin((n >> 8) & 0xff) + 0.0722 * lin(n & 0xff)
+}
+
+/**
+ * True when the slab fallback should render LIGHT text. Mirrors the web's
+ * WCAG polarity rule (June 2026): pick white vs near-black by worst-case
+ * contrast across ALL background stops, honoring the user's textColorMode
+ * override. (This native mockup only shows for the brief window before the
+ * WebView canvas render arrives — it just needs to agree with the web.)
+ */
+function isDarkSlab(slabStyle: SlabStyle, customOverrides?: CustomColorOverrides): boolean {
+  if (customOverrides?.textColorMode === 'light') return true
+  if (customOverrides?.textColorMode === 'dark') return false
+  if (!customOverrides && slabStyle === 'modern') return true
+  if (!customOverrides && slabStyle === 'traditional') return false
+  const stops = (customOverrides?.layoutStyle === 'card-extension' && customOverrides.topEdgeGradient?.length
+    ? customOverrides.topEdgeGradient
+    : customOverrides?.labelGradient) || []
+  if (stops.length === 0) return slabStyle !== 'traditional'
+  // Worst-case contrast vs white and vs near-black across all stops
+  const ratio = (l1: number, l2: number) => (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)
+  const whiteL = 0.9559 // #fafafa
+  const blackL = 0.0033 // #0a0a0a
+  let minWhite = Infinity
+  let minBlack = Infinity
+  for (const s of stops) {
+    const l = wcagLuminance(s)
+    if (l == null) continue
+    minWhite = Math.min(minWhite, ratio(l, whiteL))
+    minBlack = Math.min(minBlack, ratio(l, blackL))
+  }
+  if (!isFinite(minWhite)) return slabStyle !== 'traditional'
+  return minWhite >= minBlack
 }
 
 /** Convert gradientAngle (degrees) to RN LinearGradient {start, end}.

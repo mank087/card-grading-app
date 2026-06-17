@@ -23,6 +23,7 @@ import {
   Page,
   View,
   Text,
+  Image,
   Svg,
   Defs,
   LinearGradient as SvgLinearGradient,
@@ -49,11 +50,20 @@ const INCH = 72
 // Palette derivation
 // ============================================================================
 
-/** Derive the content-row palette from a spec's chosen text color. */
-export function paletteFromSpec(spec: LabStyleSpec): SlabTextPalette {
+/** True when the spec's text color is light (white-ish). */
+export function specHasLightText(spec: LabStyleSpec): boolean {
   const rgb = parseHex(spec.textColor)
-  const lightText = rgb ? relativeLuminanceWCAG(rgb) >= 0.5 : true
-  return lightText
+  return rgb ? relativeLuminanceWCAG(rgb) >= 0.5 : true
+}
+
+/**
+ * Derive the content-row palette from a spec's chosen text color. The
+ * dark-text branch uses the production traditional/custom-light set
+ * (purple grade + divider, gray body) so vector output matches the canvas
+ * renderer for light backgrounds.
+ */
+export function paletteFromSpec(spec: LabStyleSpec): SlabTextPalette {
+  return specHasLightText(spec)
     ? {
         name: spec.textColor,
         muted: 'rgba(255,255,255,0.72)',
@@ -67,9 +77,9 @@ export function paletteFromSpec(spec: LabStyleSpec): SlabTextPalette {
         name: spec.textColor,
         muted: '#4b5563',
         accent: spec.accentColor || '#2563eb',
-        grade: spec.textColor,
-        condition: '#374151',
-        gradeDivider: null,
+        grade: '#7c3aed',
+        condition: '#6b46c1',
+        gradeDivider: '#7c3aed',
         logo: 'color',
       }
 }
@@ -82,14 +92,26 @@ export function CustomSlabLabelBlock({
   inputs,
   spec,
   idSuffix,
+  bleedPt = 0,
 }: {
   inputs: Omit<SlabLabelInputs, 'theme'>
   spec: LabStyleSpec
   idSuffix: string
+  /** When set, the background paints bleedPt past the label rect on every
+      side (print docs). The parent must not clip. */
+  bleedPt?: number
 }) {
   return (
     <>
-      <SpecBackground spec={spec} idSuffix={idSuffix} />
+      <SpecBackground
+        spec={spec}
+        idSuffix={idSuffix}
+        w={W + bleedPt * 2}
+        h={H + bleedPt * 2}
+        offsetX={bleedPt}
+        offsetY={bleedPt}
+      />
+      <SpecBorder spec={spec} />
       <SlabFrontContentRow inputs={inputs} palette={paletteFromSpec(spec)} />
     </>
   )
@@ -113,16 +135,32 @@ function angleToCoords(angleDeg: number): { x1: string; y1: string; x2: string; 
   }
 }
 
-function SpecBackground({ spec, idSuffix }: { spec: LabStyleSpec; idSuffix: string }) {
+export function SpecBackground({
+  spec,
+  idSuffix,
+  w = W,
+  h = H,
+  offsetX = 0,
+  offsetY = 0,
+}: {
+  spec: LabStyleSpec
+  idSuffix: string
+  /** Painted size — pass label + 2×bleed for print docs (production paints
+      the background across the bleed ring). */
+  w?: number
+  h?: number
+  /** Shift left/up relative to the parent label rect (the bleed amount). */
+  offsetX?: number
+  offsetY?: number
+}) {
   const coords = angleToCoords(spec.background.angleDeg)
   const gradId = `lab-spec-${idSuffix}`
   const fadeId = `lab-fade-${idSuffix}`
-  const borderPt = spec.border ? Math.max(0.5, spec.border.widthIn * INCH) : 0
 
   return (
     <Svg
-      style={{ position: 'absolute', top: 0, left: 0, width: W, height: H }}
-      viewBox={`0 0 ${W} ${H}`}
+      style={{ position: 'absolute', top: -offsetY, left: -offsetX, width: w, height: h }}
+      viewBox={`0 0 ${w} ${h}`}
     >
       <Defs>
         <SvgLinearGradient id={gradId} x1={coords.x1} y1={coords.y1} x2={coords.x2} y2={coords.y2}>
@@ -139,33 +177,45 @@ function SpecBackground({ spec, idSuffix }: { spec: LabStyleSpec; idSuffix: stri
       </Defs>
 
       {/* Base: gradient (or pattern polygons drawn over it) */}
-      <Rect x={0} y={0} width={W} height={H} fill={`url(#${gradId})`} />
-      {spec.pattern ? <GeometricPattern idx={spec.pattern.idx} colors={spec.pattern.colors} /> : null}
+      <Rect x={0} y={0} width={w} height={h} fill={`url(#${gradId})`} />
+      {spec.pattern ? <GeometricPattern idx={spec.pattern.idx} colors={spec.pattern.colors} w={w} h={h} /> : null}
 
       {/* Overlays */}
       {spec.overlay?.kind === 'bottom-fade' ? (
-        <Rect x={0} y={0} width={W} height={H} fill={`url(#${fadeId})`} />
+        <Rect x={0} y={0} width={w} height={h} fill={`url(#${fadeId})`} />
       ) : null}
       {spec.overlay?.kind === 'darken' ? (
-        <Rect x={0} y={0} width={W} height={H} fill="#000000" fillOpacity={spec.overlay.opacity} />
+        <Rect x={0} y={0} width={w} height={h} fill="#000000" fillOpacity={spec.overlay.opacity} />
       ) : null}
       {spec.overlay?.kind === 'modern-glow' ? (
-        <Rect x={0} y={0} width={W} height={H} fill="#8b5cf6" fillOpacity={0.1} />
+        <Rect x={0} y={0} width={w} height={h} fill="#8b5cf6" fillOpacity={0.1} />
       ) : null}
+    </Svg>
+  )
+}
 
-      {/* Border (neon outline / custom border) — stroked rect inset so the
-          full width survives the cut line. */}
-      {spec.border ? (
-        <Rect
-          x={borderPt / 2}
-          y={borderPt / 2}
-          width={W - borderPt}
-          height={H - borderPt}
-          fill="none"
-          stroke={spec.border.color}
-          strokeWidth={borderPt}
-        />
-      ) : null}
+/**
+ * Border drawn at LABEL coordinates (inside the cut line, like production's
+ * drawBorder) — separate from SpecBackground so the background can expand
+ * into the bleed while the border stays fully inside the trimmed label.
+ */
+export function SpecBorder({ spec }: { spec: LabStyleSpec }) {
+  if (!spec.border) return null
+  const borderPt = Math.max(0.5, spec.border.widthIn * INCH)
+  return (
+    <Svg
+      style={{ position: 'absolute', top: 0, left: 0, width: W, height: H }}
+      viewBox={`0 0 ${W} ${H}`}
+    >
+      <Rect
+        x={borderPt / 2}
+        y={borderPt / 2}
+        width={W - borderPt}
+        height={H - borderPt}
+        fill="none"
+        stroke={spec.border.color}
+        strokeWidth={borderPt}
+      />
     </Svg>
   )
 }
@@ -186,7 +236,7 @@ function pathOf(points: [number, number][], close = true): string {
   )
 }
 
-function buildPattern(idx: number, colors: string[]): { polys: Poly[]; dividers: Divider[] } {
+function buildPattern(idx: number, colors: string[], W: number, H: number): { polys: Poly[]; dividers: Divider[] } {
   const pick = (i: number) => colors[((i % colors.length) + colors.length) % colors.length]
   const polys: Poly[] = []
   const dividers: Divider[] = []
@@ -295,10 +345,10 @@ function buildPattern(idx: number, colors: string[]): { polys: Poly[]; dividers:
   return { polys, dividers }
 }
 
-function GeometricPattern({ idx, colors }: { idx: number; colors: string[] }) {
+function GeometricPattern({ idx, colors, w = W, h = H }: { idx: number; colors: string[]; w?: number; h?: number }) {
   // Production: strokeStyle rgba(0,0,0,0.9), lineWidth 2.5 * (min(W,H)/400)
-  const strokeW = 2.5 * (Math.min(W, H) / 400)
-  const { polys, dividers } = buildPattern(idx, colors)
+  const strokeW = 2.5 * (Math.min(w, h) / 400)
+  const { polys, dividers } = buildPattern(idx, colors, w, h)
   return (
     <>
       {polys.map((p, i) => (
@@ -309,6 +359,262 @@ function GeometricPattern({ idx, colors }: { idx: number; colors: string[] }) {
       ))}
     </>
   )
+}
+
+// ============================================================================
+// Back block — spec-driven replica of the production back label
+// (QR + emblems | centered grade | right-aligned subgrades)
+// ============================================================================
+
+// Production back geometry at 300 DPI px -> pt (x 0.24)
+const BK_PADDING = 18 * 0.24            // 4.32
+const BK_QR_SIZE = H * 0.72             // 41.47
+const BK_QR_X = BK_PADDING + 12 * 0.24  // 7.2
+const BK_GRADE_PT = 88 * 0.24           // 21.12
+const BK_COND_PT = 24 * 0.24            // 5.76
+const BK_SUB_PT = 26 * 0.24             // 6.24
+const BK_SUB_LH = 36 * 0.24             // 8.64
+const BK_SUB_RIGHT_INSET = (18 + 30) * 0.24 // padding + cut-line inset = 11.52
+const BADGE_SYMBOL = 28 * 0.24          // 6.72
+const BADGE_TEXT = 16 * 0.24            // 3.84
+const BADGE_SPACING = 36 * 0.24         // 8.64
+
+// SVG glyphs for badge symbols — the WinAnsi base-14 fonts cannot encode
+// the canvas renderer's unicode glyphs, so we draw shapes.
+const STAR_D = 'M12 2 L14.9 8.6 L22 9.3 L16.7 14 L18.2 21 L12 17.3 L5.8 21 L7.3 14 L2 9.3 L9.1 8.6 Z'
+const HEART_D = 'M12 21 C5 14 2 10.5 2 7.5 C2 4.5 4.5 3 7 3 C9 3 11 4.5 12 6 C13 4.5 15 3 17 3 C19.5 3 22 4.5 22 7.5 C22 10.5 19 14 12 21 Z'
+const DIAMOND_D = 'M12 2 L22 12 L12 22 L2 12 Z'
+
+function BadgeColumn({
+  glyphD,
+  label,
+  symbolColor,
+  textColor,
+}: {
+  glyphD: string
+  label: string
+  symbolColor: string
+  textColor: string
+}) {
+  const rotH = 26 // vertical room for the rotated label
+  return (
+    <View style={{ width: BADGE_SPACING, alignItems: 'center', justifyContent: 'center' }}>
+      <Svg style={{ width: BADGE_SYMBOL, height: BADGE_SYMBOL }} viewBox="0 0 24 24">
+        <Path d={glyphD} fill={symbolColor} />
+      </Svg>
+      <View style={{ width: BADGE_TEXT + 2, height: rotH, alignItems: 'center', justifyContent: 'center', marginTop: 1.5 }}>
+        <Text
+          style={{
+            fontFamily: 'Helvetica-Bold',
+            fontSize: BADGE_TEXT,
+            color: textColor,
+            width: rotH,
+            textAlign: 'center',
+            transform: 'rotate(-90deg)',
+          }}
+        >
+          {label}
+        </Text>
+      </View>
+    </View>
+  )
+}
+
+export interface SlabBackInputs {
+  grade: string
+  condition: string
+  qrCodeDataUrl?: string | null
+  subgrades?: {
+    centering?: number | null
+    corners?: number | null
+    edges?: number | null
+    surface?: number | null
+  }
+  showFounderEmblem?: boolean
+  showVipEmblem?: boolean
+  showCardLoversEmblem?: boolean
+}
+
+/**
+ * Spec-driven back label at exact label size. Parent must be a View sized
+ * SLAB_LABEL_W_PT x SLAB_LABEL_H_PT. Three absolute layers mirror the
+ * canvas renderer: left QR + emblem strip, full-width centered grade,
+ * right-aligned subgrades.
+ */
+export function CustomSlabBackBlock({
+  inputs,
+  spec,
+  idSuffix,
+  bleedPt = 0,
+}: {
+  inputs: SlabBackInputs
+  spec: LabStyleSpec
+  idSuffix: string
+  bleedPt?: number
+}) {
+  const lightText = specHasLightText(spec)
+  const gradeColor = lightText ? '#FFFFFF' : '#7c3aed'
+  const condColor = lightText ? 'rgba(255,255,255,0.8)' : '#6b46c1'
+  const subColor = lightText ? 'rgba(255,255,255,0.95)' : '#4b5563'
+  const condPt = fitBackCondition(inputs.condition)
+  const qrFrameFill = spec.background.stops[0]?.color || '#1a1625'
+
+  return (
+    <>
+      <SpecBackground
+        spec={spec}
+        idSuffix={idSuffix}
+        w={W + bleedPt * 2}
+        h={H + bleedPt * 2}
+        offsetX={bleedPt}
+        offsetY={bleedPt}
+      />
+      <SpecBorder spec={spec} />
+
+      {/* Layer 1: QR + emblems (left) */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: W,
+          height: H,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
+      >
+        <View style={{ width: BK_QR_X }} />
+        {/* QR frame: dark themes get the purple glow frame, light themes a flat white pad */}
+        <View
+          style={{
+            padding: lightText ? 0.72 : 1.92,
+            backgroundColor: lightText ? qrFrameFill : '#FFFFFF',
+            borderWidth: lightText ? 0.5 : 0,
+            borderColor: '#8b5cf6',
+          }}
+        >
+          <View style={{ padding: lightText ? 0.72 : 0.48, backgroundColor: '#FFFFFF' }}>
+            {inputs.qrCodeDataUrl ? (
+              <Image src={inputs.qrCodeDataUrl} style={{ width: BK_QR_SIZE, height: BK_QR_SIZE }} />
+            ) : (
+              <View style={{ width: BK_QR_SIZE, height: BK_QR_SIZE, alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ fontSize: 4, color: '#9ca3af' }}>QR</Text>
+              </View>
+            )}
+          </View>
+        </View>
+        <View style={{ width: lightText ? 6.72 : 4.8 }} />
+        {inputs.showFounderEmblem ? (
+          <BadgeColumn
+            glyphD={STAR_D}
+            label="FOUNDER"
+            symbolColor={lightText ? '#FFD700' : '#d97706'}
+            textColor={lightText ? '#FFFFFF' : '#7c3aed'}
+          />
+        ) : null}
+        {inputs.showCardLoversEmblem ? (
+          <BadgeColumn
+            glyphD={HEART_D}
+            label="Card Lover"
+            symbolColor="#f43f5e"
+            textColor={lightText ? '#FFFFFF' : '#f43f5e'}
+          />
+        ) : null}
+        {inputs.showVipEmblem ? (
+          <BadgeColumn
+            glyphD={DIAMOND_D}
+            label="VIP"
+            symbolColor="#6366f1"
+            textColor={lightText ? '#FFFFFF' : '#6366f1'}
+          />
+        ) : null}
+      </View>
+
+      {/* Layer 2: grade + condition, centered on the full label like production */}
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: W,
+          height: H,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: BK_GRADE_PT, color: gradeColor, lineHeight: 1 }}>
+          {inputs.grade}
+        </Text>
+        {inputs.condition ? (
+          <Text
+            style={{
+              fontFamily: 'Helvetica-Bold',
+              fontSize: condPt,
+              color: condColor,
+              marginTop: 1.9,
+              letterSpacing: 0.4,
+            }}
+          >
+            {inputs.condition.toUpperCase()}
+          </Text>
+        ) : null}
+      </View>
+
+      {/* Layer 3: subgrades, right-aligned */}
+      {inputs.subgrades ? (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            width: W,
+            height: H,
+            justifyContent: 'center',
+            alignItems: 'flex-end',
+            paddingRight: BK_SUB_RIGHT_INSET,
+          }}
+        >
+          {(['centering', 'corners', 'edges', 'surface'] as const).map(k => {
+            const v = inputs.subgrades?.[k]
+            if (v == null || isNaN(Number(v))) return null
+            return (
+              <Text
+                key={k}
+                style={{
+                  fontFamily: 'Helvetica',
+                  fontSize: BK_SUB_PT,
+                  color: subColor,
+                  textAlign: 'right',
+                  lineHeight: BK_SUB_LH / BK_SUB_PT,
+                }}
+              >
+                {labelOfSub(k)}: {Math.round(Number(v))}
+              </Text>
+            )
+          })}
+        </View>
+      ) : null}
+    </>
+  )
+}
+
+function labelOfSub(k: 'centering' | 'corners' | 'edges' | 'surface'): string {
+  switch (k) {
+    case 'centering': return 'Centering'
+    case 'corners': return 'Corners'
+    case 'edges': return 'Edges'
+    case 'surface': return 'Surface'
+  }
+}
+
+/** Back condition auto-shrink (24px down to 12px at 300 DPI, like production). */
+function fitBackCondition(text: string): number {
+  const maxW = W - BK_PADDING * 2 - 9.6
+  const len = (text || '').length || 1
+  let pt = BK_COND_PT
+  const min = 12 * 0.24
+  while (pt > min && len * pt * 0.58 > maxW) pt -= 0.25
+  return Math.max(min, pt)
 }
 
 // ============================================================================

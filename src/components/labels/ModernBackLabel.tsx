@@ -117,6 +117,13 @@ export function ModernBackLabel({
     ? { border: `${Math.round(colorOverrides.borderWidth * 96)}px solid ${colorOverrides.borderColor}` }
     : {}
 
+  // Text polarity (June 2026): dark text when the resolved polarity says
+  // the background is light. Defaults to light text (built-in modern theme).
+  const darkText = colorOverrides?.textPolarity === 'dark'
+  const tx = darkText
+    ? { grade: '#7c3aed', condition: '#6b46c1', sub: '#4b5563', badgeLabel: '#7c3aed' }
+    : { grade: '#ffffff', condition: 'rgba(255, 255, 255, 0.8)', sub: 'rgba(255, 255, 255, 0.9)', badgeLabel: '#FFFFFF' }
+
   return (
     <div
       className={`${config.height} ${config.padding} relative overflow-hidden`}
@@ -171,7 +178,7 @@ export function ModernBackLabel({
                   fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                   fontWeight: 600,
                   fontSize: config.founderTextSize,
-                  color: '#FFFFFF',
+                  color: tx.badgeLabel,
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
                   marginTop: '3px',
@@ -197,7 +204,7 @@ export function ModernBackLabel({
                   fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                   fontWeight: 600,
                   fontSize: config.founderTextSize,
-                  color: '#FFFFFF',
+                  color: tx.badgeLabel,
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
                   marginTop: '3px',
@@ -223,7 +230,7 @@ export function ModernBackLabel({
                   fontFamily: '"Helvetica Neue", Helvetica, Arial, sans-serif',
                   fontWeight: 600,
                   fontSize: config.founderTextSize,
-                  color: '#FFFFFF',
+                  color: tx.badgeLabel,
                   writingMode: 'vertical-rl',
                   transform: 'rotate(180deg)',
                   marginTop: '3px',
@@ -244,7 +251,7 @@ export function ModernBackLabel({
           {/* Grade */}
           <div
             className={`font-bold ${config.gradeSize} leading-none`}
-            style={{ color: '#ffffff' }}
+            style={{ color: tx.grade }}
           >
             {grade !== null ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
           </div>
@@ -252,7 +259,7 @@ export function ModernBackLabel({
           {(condition || isAlteredAuthentic) && (
             <div
               className={`font-semibold ${config.conditionSize} leading-tight mt-1 uppercase tracking-wide`}
-              style={{ color: 'rgba(255, 255, 255, 0.8)' }}
+              style={{ color: tx.condition }}
             >
               {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
             </div>
@@ -262,16 +269,16 @@ export function ModernBackLabel({
         {/* RIGHT: Four Sub-Grades formatted as "Label: Score" */}
         {subScores && (
           <div className="flex flex-col justify-center gap-0.5 flex-shrink-0 text-right">
-            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+            <div className={`${config.subScoreSize}`} style={{ color: tx.sub }}>
               Centering: {formatSubScore(subScores.centering)}
             </div>
-            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+            <div className={`${config.subScoreSize}`} style={{ color: tx.sub }}>
               Corners: {formatSubScore(subScores.corners)}
             </div>
-            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+            <div className={`${config.subScoreSize}`} style={{ color: tx.sub }}>
               Edges: {formatSubScore(subScores.edges)}
             </div>
-            <div className={`${config.subScoreSize}`} style={{ color: 'rgba(255, 255, 255, 0.9)' }}>
+            <div className={`${config.subScoreSize}`} style={{ color: tx.sub }}>
               Surface: {formatSubScore(subScores.surface)}
             </div>
           </div>

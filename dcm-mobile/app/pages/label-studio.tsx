@@ -94,6 +94,8 @@ interface DesignerConfig {
   layoutStyle?: string
   gradientAngle?: number
   geometricPattern?: number
+  /** Label text polarity (matches CustomLabelConfig.textColorMode on web). */
+  textColorMode?: 'auto' | 'light' | 'dark'
   // Dimension preset bookkeeping (matches CustomLabelConfig in src/lib/labelPresets.ts)
   preset?: 'dcm' | 'dcm-traditional' | 'dcm-bordered' | 'custom'
   width?: number
@@ -393,8 +395,9 @@ export default function LabelStudioScreen() {
       borderColor: config.borderColor,
       gradientAngle: config.gradientAngle,
       geometricPattern: config.geometricPattern,
+      textColorMode: config.textColorMode,
     }
-  }, [config.gradientStart, config.gradientEnd, config.customColors, config.layoutStyle, config.colorPreset, config.topEdgeGradient, config.borderEnabled, config.borderColor, config.gradientAngle, config.geometricPattern])
+  }, [config.gradientStart, config.gradientEnd, config.customColors, config.layoutStyle, config.colorPreset, config.topEdgeGradient, config.borderEnabled, config.borderColor, config.gradientAngle, config.geometricPattern, config.textColorMode])
 
   // Derive the labelConfig sent to LabelWebRenderer. For tiles with a
   // forcedStyle (slab-modern, slab-traditional, card-image-modern,
@@ -446,6 +449,7 @@ export default function LabelStudioScreen() {
       geometricPattern: config.geometricPattern,
       customColors: config.customColors,
       layoutStyle: config.layoutStyle,
+      textColorMode: config.textColorMode,
     }
   }, [config, activeGalleryIdx])
 
@@ -751,6 +755,7 @@ export default function LabelStudioScreen() {
         geometricPattern: config.geometricPattern,
         customColors: config.customColors,
         layoutStyle: config.layoutStyle,
+        textColorMode: config.textColorMode,
         preset: config.preset,
         width: config.width,
         height: config.height,
@@ -1505,6 +1510,35 @@ export default function LabelStudioScreen() {
                 </View>
               </View>
             )}
+
+            {/* ============ Text Color ============ */}
+            {/* Auto picks white vs dark text by WCAG contrast against the
+                background (matches web CustomLabelConfig.textColorMode);
+                Light/Dark are explicit overrides. */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Text Color</Text>
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {([
+                  { id: 'auto', label: 'Auto' },
+                  { id: 'light', label: 'Light' },
+                  { id: 'dark', label: 'Dark' },
+                ] as const).map(opt => {
+                  const active = (config.textColorMode || 'auto') === opt.id
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[s.dirBtn, { flex: 1 }, active && s.dirBtnActive]}
+                      onPress={() => updateConfig({ textColorMode: opt.id })}
+                    >
+                      <Text style={[s.dirBtnText, active && s.dirBtnTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+              <Text style={[s.subLabel, { marginTop: 6 }]}>
+                Auto (recommended) keeps text readable on any background, including in print.
+              </Text>
+            </View>
 
             {/* ============ Custom Slab Preview (duplicate) ============ */}
             {/* Second preview below border so users can edit colors/border and

@@ -44,6 +44,9 @@ export interface LabelConfig {
   customColors?: string[]
   layoutStyle?: string
   preset?: string
+  /** Label text polarity — forwarded to the web /label-preview so it
+      resolves white vs dark text (matches CustomLabelConfig.textColorMode). */
+  textColorMode?: 'auto' | 'light' | 'dark'
 }
 
 export interface LabelCardData {

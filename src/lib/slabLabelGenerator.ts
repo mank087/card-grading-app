@@ -800,6 +800,23 @@ export async function generateSlabLabel(
   data: SlabLabelData,
   style: 'modern' | 'traditional'
 ): Promise<Blob> {
+  // June 2026: vector PDF first (crisp text at any printer DPI — Label Lab
+  // calibration paper test), raster fallback preserves the old behavior on
+  // any failure.
+  try {
+    const vector = await import('./labels/vectorSlabGenerator');
+    return await vector.generateSlabLabelVector(data, style);
+  } catch (err) {
+    console.warn('[slabLabel] vector path failed, falling back to raster:', err);
+    return generateSlabLabelRaster(data, style);
+  }
+}
+
+/** The original canvas-raster-into-jsPDF path, kept as the vector fallback. */
+export async function generateSlabLabelRaster(
+  data: SlabLabelData,
+  style: 'modern' | 'traditional'
+): Promise<Blob> {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });
 
   const singleX = (PAGE_WIDTH - LABEL_WIDTH) / 2;
@@ -831,9 +848,25 @@ export async function generateBatchSlabLabels(
 ): Promise<Blob> {
   if (dataArray.length === 0) throw new Error('No label data provided');
 
+  try {
+    const vector = await import('./labels/vectorSlabGenerator');
+    return await vector.generateBatchSlabLabelsVector(dataArray, style);
+  } catch (err) {
+    console.warn('[slabLabel] vector batch failed, falling back to raster:', err);
+    return generateBatchSlabLabelsRaster(dataArray, style);
+  }
+}
+
+/** The original raster batch path, kept as the vector fallback. */
+export async function generateBatchSlabLabelsRaster(
+  dataArray: SlabLabelData[],
+  style: 'modern' | 'traditional'
+): Promise<Blob> {
+  if (dataArray.length === 0) throw new Error('No label data provided');
+
   // Single label: use centered layout (symmetric — works with any duplex setting)
   if (dataArray.length === 1) {
-    return generateSlabLabel(dataArray[0], style);
+    return generateSlabLabelRaster(dataArray[0], style);
   }
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'letter' });

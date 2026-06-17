@@ -14,7 +14,7 @@
 import { jsPDF } from 'jspdf';
 import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from './labelDataGenerator';
 import type { SlabLabelData } from './slabLabelGenerator';
-import type { CustomLabelConfig } from './labelPresets';
+import { resolveConfigTextPolarity, type CustomLabelConfig } from './labelPresets';
 
 // ============================================================================
 // HELPERS
@@ -492,12 +492,31 @@ function drawCustomBackground(
   }
 }
 
-/** Determine if colors are light (for text contrast) */
+/**
+ * Determine if the label should use DARK text (light = "light theme").
+ *
+ * June 2026 (Style Gauntlet "Guard A", paper-tested): polarity is resolved
+ * by WCAG contrast against the config's REAL background stops, with the
+ * user's textColorMode override honored. The old rule — white text on every
+ * card-color style — rendered illegibly on mid-tone cards (1.4:1 on light
+ * blue/gold card-extension gradients).
+ */
 function isLightTheme(config: CustomLabelConfig): boolean {
-  // Card-color styles always use white text + black outline (print-safe)
-  if (isCardColorPreset(config.colorPreset)) return false;
-  return config.style === 'traditional' ||
-    config.colorPreset === 'traditional';
+  return resolveConfigTextPolarity(config) === 'dark';
+}
+
+/**
+ * Outline style behind label text. White text keeps the black halo it has
+ * always had; dark text gets a WHITE halo — but only on busy card-color /
+ * rainbow backgrounds, never on the flat traditional theme (which has
+ * never stroked and would look dirty if it did).
+ */
+function textStrokeStyle(config: CustomLabelConfig, light: boolean): string | null {
+  if (!light) return 'rgba(0, 0, 0, 0.8)';
+  if (isCardColorPreset(config.colorPreset) || config.colorPreset === 'rainbow') {
+    return 'rgba(255, 255, 255, 0.85)';
+  }
+  return null;
 }
 
 /** Check if a preset is one of the card-color derived styles */
@@ -550,12 +569,12 @@ function strokeText(
   text: string,
   x: number,
   y: number,
-  isDark: boolean,
+  stroke: string | null,
   strokeWidth: number = 3
 ) {
-  if (isDark) {
+  if (stroke) {
     ctx.save();
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = strokeWidth;
     ctx.lineJoin = 'round';
     ctx.miterLimit = 2;
@@ -588,6 +607,7 @@ export async function renderFrontCanvas(
   const CW = W - B * 2;
   const CH = H - B * 2;
   const light = isLightTheme(config);
+  const textStroke = textStrokeStyle(config, light);
 
   drawCustomBackground(ctx, W, H, config);
 
@@ -644,7 +664,7 @@ export async function renderFrontCanvas(
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  strokeText(ctx, gradeText, gradeCenterX, gradeStartY, !light, 4);
+  strokeText(ctx, gradeText, gradeCenterX, gradeStartY, textStroke,4);
 
   if (!light) {
     // No divider for modern
@@ -668,7 +688,7 @@ export async function renderFrontCanvas(
   }
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  strokeText(ctx, conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap, !light, 3);
+  strokeText(ctx, conditionText, gradeCenterX, gradeStartY + gradeFontSize + dividerGap + condGap, textStroke,3);
 
   // Center: Card Info
   const infoX = logoX + logoSize + Math.round(16 * scale);
@@ -707,14 +727,14 @@ export async function renderFrontCanvas(
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.font = `bold ${fs.name}px 'Helvetica Neue', Arial, sans-serif`;
-  strokeText(ctx, safeCardName, infoX, currentY, !light, 3);
+  strokeText(ctx, safeCardName, infoX, currentY, textStroke,3);
   currentY += fs.name + fs.afterName;
 
   if (ctxLines.length > 0) {
     ctx.fillStyle = light ? TRAD_COLORS.textMedium : 'rgba(255, 255, 255, 0.7)';
     ctx.font = `${fs.context}px 'Helvetica Neue', Arial, sans-serif`;
     for (const line of ctxLines) {
-      strokeText(ctx, line, infoX, currentY, !light, 2);
+      strokeText(ctx, line, infoX, currentY, textStroke,2);
       currentY += fs.context + fs.contextLineGap;
     }
   }
@@ -723,7 +743,7 @@ export async function renderFrontCanvas(
     currentY += fs.afterContext - fs.contextLineGap;
     ctx.fillStyle = light ? TRAD_COLORS.featureBlue : 'rgba(34, 197, 94, 0.9)';
     ctx.font = `bold ${fs.features}px 'Helvetica Neue', Arial, sans-serif`;
-    strokeText(ctx, safeFeatures, infoX, currentY, !light, 2);
+    strokeText(ctx, safeFeatures, infoX, currentY, textStroke,2);
     currentY += fs.features + fs.afterFeatures;
   } else {
     currentY += fs.afterFeatures;
@@ -731,7 +751,7 @@ export async function renderFrontCanvas(
 
   ctx.fillStyle = light ? TRAD_COLORS.textMedium : 'rgba(255, 255, 255, 0.7)';
   ctx.font = `${fs.serial}px 'Helvetica Neue', Arial, sans-serif`;
-  strokeText(ctx, data.serial, infoX, currentY, !light, 2);
+  strokeText(ctx, data.serial, infoX, currentY, textStroke,2);
 
   return canvas;
 }
@@ -759,6 +779,7 @@ export async function renderBackCanvas(
   const CW = W - B * 2;
   const CH = H - B * 2;
   const light = isLightTheme(config);
+  const textStroke = textStrokeStyle(config, light);
   const scale = (config.width * dpi) / (2.8 * 300);
 
   drawCustomBackground(ctx, W, H, config);
@@ -855,7 +876,7 @@ export async function renderBackCanvas(
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  strokeText(ctx, gradeText, centerX, centerStartY, !light, 4);
+  strokeText(ctx, gradeText, centerX, centerStartY, textStroke,4);
 
   if (conditionText) {
     ctx.fillStyle = light ? TRAD_COLORS.purpleDark : 'rgba(255, 255, 255, 0.8)';
@@ -866,7 +887,7 @@ export async function renderBackCanvas(
       backCondSize -= 1;
       ctx.font = `bold ${backCondSize}px 'Helvetica Neue', Arial, sans-serif`;
     }
-    strokeText(ctx, conditionText, centerX, centerStartY + gradeFontSize + condGap, !light, 3);
+    strokeText(ctx, conditionText, centerX, centerStartY + gradeFontSize + condGap, textStroke,3);
   }
 
   // Right: Sub-scores
@@ -886,7 +907,7 @@ export async function renderBackCanvas(
       ctx.font = `${subFontSize}px 'Helvetica Neue', Arial, sans-serif`;
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
-      strokeText(ctx, scoreText, rightEdge, y, !light, 2);
+      strokeText(ctx, scoreText, rightEdge, y, textStroke,2);
     };
 
     drawSubScore('Centering', data.subScores.centering, 0);
@@ -939,6 +960,26 @@ const INCH = 72; // 1 inch = 72 points in jsPDF
 
 /** Generate a print-quality PDF at 300 DPI with the custom dimensions/colors */
 export async function generateCustomSlabLabel(
+  data: SlabLabelData,
+  config: CustomLabelConfig
+): Promise<Blob> {
+  // June 2026: vector PDF first for standard 2.8"×0.8" labels (crisp text
+  // at any printer DPI). Non-standard dimensions and any vector failure
+  // fall back to the original raster path.
+  const isStdDims = Math.abs(config.width - 2.8) < 0.001 && Math.abs(config.height - 0.8) < 0.001;
+  if (isStdDims) {
+    try {
+      const vector = await import('./labels/vectorSlabGenerator');
+      return await vector.generateCustomSlabLabelVector(data, config);
+    } catch (err) {
+      console.warn('[customSlabLabel] vector path failed, falling back to raster:', err);
+    }
+  }
+  return generateCustomSlabLabelRaster(data, config);
+}
+
+/** The original canvas-raster-into-jsPDF path, kept as the vector fallback. */
+export async function generateCustomSlabLabelRaster(
   data: SlabLabelData,
   config: CustomLabelConfig
 ): Promise<Blob> {
@@ -1405,6 +1446,24 @@ function batchDrawFrontCutGuides(doc: jsPDF, labelX: number, labelY: number) {
  * 10 labels per page (2x5), front/back duplex pages, cut guides, mirrored backs.
  */
 export async function generateBatchCustomSlabLabels(
+  dataArray: SlabLabelData[],
+  config: CustomLabelConfig
+): Promise<Blob> {
+  if (dataArray.length === 0) throw new Error('No label data provided');
+
+  // June 2026: vector first (batch always renders at standard slab
+  // dimensions), raster fallback on any failure.
+  try {
+    const vector = await import('./labels/vectorSlabGenerator');
+    return await vector.generateBatchCustomSlabLabelsVector(dataArray, config);
+  } catch (err) {
+    console.warn('[customSlabLabel] vector batch failed, falling back to raster:', err);
+  }
+  return generateBatchCustomSlabLabelsRaster(dataArray, config);
+}
+
+/** The original raster batch path, kept as the vector fallback. */
+export async function generateBatchCustomSlabLabelsRaster(
   dataArray: SlabLabelData[],
   config: CustomLabelConfig
 ): Promise<Blob> {

@@ -102,6 +102,30 @@ export function ModernFrontLabel({
     ? { border: `${Math.round(colorOverrides.borderWidth * 96)}px solid ${colorOverrides.borderColor}` }
     : {}
 
+  // Text polarity (June 2026): light text unless the resolved polarity says
+  // the background needs dark text. Defaults to light when no overrides
+  // (the built-in modern dark gradient).
+  const darkText = colorOverrides?.textPolarity === 'dark'
+  const tx = darkText
+    ? {
+        name: 'rgba(31, 41, 55, 0.95)',
+        detail: '#4b5563',
+        feature: '#2563eb',
+        serial: '#6b7280',
+        grade: '#7c3aed',
+        condition: '#6b46c1',
+        logo: '/DCM-logo.png',
+      }
+    : {
+        name: 'rgba(255, 255, 255, 0.95)',
+        detail: 'rgba(255, 255, 255, 0.7)',
+        feature: 'rgba(34, 197, 94, 0.9)',
+        serial: 'rgba(255, 255, 255, 0.5)',
+        grade: '#ffffff',
+        condition: 'rgba(255, 255, 255, 0.8)',
+        logo: '/DCM Logo white.png',
+      }
+
   return (
     <div
       className={`${config.height} ${config.padding} relative overflow-hidden`}
@@ -122,7 +146,7 @@ export function ModernFrontLabel({
         {/* Left: DCM Logo */}
         <div className="flex-shrink-0">
           <img
-            src="/DCM Logo white.png"
+            src={tx.logo}
             alt="DCM"
             className={`${config.logoHeight} w-auto`}
           />
@@ -135,7 +159,7 @@ export function ModernFrontLabel({
             className="font-semibold leading-tight"
             style={{
               fontSize: `${nameFontSize}px`,
-              color: 'rgba(255, 255, 255, 0.95)',
+              color: tx.name,
               wordBreak: 'break-word',
             }}
             title={displayName}
@@ -148,7 +172,7 @@ export function ModernFrontLabel({
             className="leading-tight"
             style={{
               fontSize: config.detailFontSize,
-              color: 'rgba(255, 255, 255, 0.7)',
+              color: tx.detail,
               wordBreak: 'break-word',
             }}
             title={setLineText}
@@ -162,7 +186,7 @@ export function ModernFrontLabel({
               className="font-medium leading-tight"
               style={{
                 fontSize: config.featureFontSize,
-                color: 'rgba(34, 197, 94, 0.9)', // Green accent for features
+                color: tx.feature,
                 wordBreak: 'break-word',
               }}
             >
@@ -175,7 +199,7 @@ export function ModernFrontLabel({
             className="font-mono leading-tight"
             style={{
               fontSize: config.serialFontSize,
-              color: 'rgba(255, 255, 255, 0.5)',
+              color: tx.serial,
             }}
           >
             {serial}
@@ -186,14 +210,14 @@ export function ModernFrontLabel({
         <div className="text-center flex-shrink-0">
           <div
             className={`font-bold ${config.gradeSize} leading-none`}
-            style={{ color: '#ffffff' }}
+            style={{ color: tx.grade }}
           >
             {grade !== null ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
           </div>
           {(condition || isAlteredAuthentic) && (
             <div
               className={`font-semibold ${config.conditionSize} leading-tight mt-0.5 uppercase tracking-wide`}
-              style={{ color: 'rgba(255, 255, 255, 0.8)' }}
+              style={{ color: tx.condition }}
             >
               {isAlteredAuthentic && grade === null ? 'Authentic' : condition}
             </div>

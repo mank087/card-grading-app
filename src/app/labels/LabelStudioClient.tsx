@@ -1866,6 +1866,34 @@ function CustomDesigner({
               </div>
             </div>
 
+            {/* Text Color — Auto picks white vs dark by WCAG contrast against
+                the actual background; Light/Dark are explicit overrides. */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Text Color</h3>
+              <div className="flex gap-2">
+                {([
+                  { id: 'auto', label: 'Auto' },
+                  { id: 'light', label: 'Light' },
+                  { id: 'dark', label: 'Dark' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.id}
+                    onClick={() => updateConfig({ textColorMode: opt.id })}
+                    className={`flex-1 text-xs py-1.5 rounded border transition-colors ${
+                      (config.textColorMode || 'auto') === opt.id
+                        ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                        : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Auto (recommended) picks the most readable text for your colors — including on print.
+              </p>
+            </div>
+
             {/* Border Controls — shown when border is active. Border is auto-
                 enabled by selecting "DCM Bordered" in the Dimensions section
                 (handleDimensionPreset sets borderEnabled: true). The manual

@@ -16,8 +16,8 @@
  * start/end/start at the config angle.
  */
 
-import { COLOR_PRESETS, CARD_COLOR_STYLES, applyLayoutToColors } from '@/lib/labelPresets'
-import type { CardColorInput } from '@/lib/labelPresets'
+import { COLOR_PRESETS, CARD_COLOR_STYLES, applyLayoutToColors, resolveConfigTextPolarity } from '@/lib/labelPresets'
+import type { CardColorInput, CustomLabelConfig } from '@/lib/labelPresets'
 import { evaluateLabelBackground, type BackgroundContrastReport } from './contrastWCAG'
 
 // ------- Spec shape -------
@@ -246,6 +246,108 @@ export interface LabCustomConfig {
   borderEnabled: boolean
   borderColor: string
   borderWidthIn: number
+}
+
+/**
+ * Build a render spec from a PRODUCTION CustomLabelConfig — the persisted
+ * shape from the Label Studio (saved styles, mobile customConfig params).
+ * Mirrors customSlabLabelGenerator.drawCustomBackground() branch-for-branch
+ * and resolves text polarity with the user's textColorMode honored.
+ *
+ * Used by the production vector slab path; the Label Lab's interactive
+ * designer keeps building specs via customSpec() above.
+ */
+export function specFromCustomConfig(config: CustomLabelConfig): LabStyleSpec {
+  const polarity = resolveConfigTextPolarity(config)
+  const lightText = polarity === 'light'
+  const base = {
+    id: `cfg-${config.colorPreset}`,
+    name: config.colorPreset,
+    source: 'custom' as const,
+    textColor: lightText ? '#ffffff' : '#1f2937',
+    accentColor: lightText ? 'rgba(34,197,94,0.9)' : '#2563eb',
+    border: config.borderEnabled && config.borderWidth
+      ? { color: config.borderColor, widthIn: config.borderWidth }
+      : undefined,
+  }
+  const angle = config.gradientAngle ?? 135
+
+  if (config.colorPreset === 'rainbow') {
+    return {
+      ...base,
+      background: { stops: RAINBOW_STOPS, angleDeg: 0 },
+      contrastStops: RAINBOW_STOPS.map(s => s.color),
+      contrastDiscrete: false,
+    }
+  }
+  if (config.colorPreset === 'card-extension') {
+    const stops = config.topEdgeGradient && config.topEdgeGradient.length >= 3
+      ? config.topEdgeGradient
+      : [config.gradientStart, config.gradientEnd]
+    return {
+      ...base,
+      background: { stops: evenStops(stops), angleDeg: 0 },
+      overlay: { kind: 'bottom-fade', opacity: 0.25 },
+      contrastStops: stops,
+      contrastDiscrete: false,
+    }
+  }
+  if (config.colorPreset === 'team-colors') {
+    return {
+      ...base,
+      background: {
+        stops: [
+          { color: config.gradientStart, offset: 0 },
+          { color: config.gradientStart, offset: 0.45 },
+          { color: config.gradientEnd, offset: 0.55 },
+          { color: config.gradientEnd, offset: 1 },
+        ],
+        angleDeg: 0,
+      },
+      contrastStops: [config.gradientStart, config.gradientEnd],
+      contrastDiscrete: true,
+    }
+  }
+  if (config.colorPreset === 'geometric') {
+    const colors = config.customColors && config.customColors.length >= 2
+      ? config.customColors
+      : [config.gradientStart, config.gradientEnd]
+    return {
+      ...base,
+      background: { stops: evenStops([config.gradientStart, config.gradientEnd]), angleDeg: angle },
+      pattern: { idx: config.geometricPattern ?? 0, colors },
+      overlay: { kind: 'darken', opacity: 0.1 },
+      contrastStops: colors.map(c => mixHex(c, '#000000', 0.1)),
+      contrastDiscrete: true,
+    }
+  }
+  if (config.colorPreset === 'color-gradient' || config.colorPreset === 'neon-outline') {
+    return {
+      ...base,
+      background: { stops: evenStops([config.gradientStart, config.gradientEnd]), angleDeg: angle },
+      contrastStops: [config.gradientStart, config.gradientEnd],
+      contrastDiscrete: false,
+    }
+  }
+  // Plain presets / simple custom: modern = production 3-stop
+  // start/end/start + glow; traditional = flat 2-stop.
+  const isModernStyle = config.style === 'modern' && config.colorPreset !== 'traditional'
+  return {
+    ...base,
+    background: {
+      stops: isModernStyle
+        ? [
+            { color: config.gradientStart, offset: 0 },
+            { color: config.gradientEnd, offset: 0.5 },
+            { color: config.gradientStart, offset: 1 },
+          ]
+        : evenStops([config.gradientStart, config.gradientEnd]),
+      angleDeg: angle,
+    },
+    overlay: isModernStyle ? { kind: 'modern-glow' } : undefined,
+    contrastStops: [config.gradientStart, config.gradientEnd],
+    contrastDiscrete: false,
+  }
 }
 
 /**

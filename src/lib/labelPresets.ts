@@ -5,6 +5,8 @@
  * and label type metadata for the gallery view.
  */
 
+import { resolveTextPolarity } from './contrastWCAG';
+
 // ============================================================================
 // DIMENSION PRESETS
 // ============================================================================
@@ -83,18 +85,32 @@ export interface CardColorStyle {
   getColors: (colors: CardColorInput) => CardColorResult;
 }
 
+/**
+ * Text colors per WCAG polarity. June 2026 (Style Gauntlet paper test):
+ * polarity is now picked by worst-case contrast against the style's REAL
+ * background stops instead of the Rec.601 isDark flag, which chose
+ * illegible white text on mid-tone cards (e.g. 1.4:1 on light blue/gold).
+ */
+function polarityTextColors(polarity: 'light' | 'dark'): { textColor: string; accentColor: string } {
+  return polarity === 'light'
+    ? { textColor: '#ffffff', accentColor: '#ffffff' }
+    : { textColor: '#1f2937', accentColor: '#1a1625' };
+}
+
 export const CARD_COLOR_STYLES: CardColorStyle[] = [
   {
     id: 'color-gradient',
     name: 'Color Gradient',
     description: 'Smooth gradient from card\'s primary to secondary color',
-    getColors: ({ primary, secondary, isDark }) => ({
-      gradientStart: primary,
-      gradientEnd: secondary,
-      accentColor: isDark ? '#ffffff' : '#1a1625',
-      textColor: isDark ? '#ffffff' : '#1f2937',
-      style: 'modern',
-    }),
+    getColors: ({ primary, secondary }) => {
+      const polarity = resolveTextPolarity([primary, secondary]);
+      return {
+        gradientStart: primary,
+        gradientEnd: secondary,
+        ...polarityTextColors(polarity),
+        style: 'modern',
+      };
+    },
   },
   {
     id: 'card-extension',
@@ -106,12 +122,13 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
       const topGradient = topEdgeColors && topEdgeColors.length >= 4
         ? topEdgeColors
         : [primary, mixHex(primary, secondary, 0.5), secondary];
+      const polarity = resolveTextPolarity(topGradient);
 
       return {
         gradientStart: topGradient[0],
         gradientEnd: topGradient[topGradient.length - 1],
-        accentColor: secondary,
-        textColor: '#ffffff',
+        accentColor: polarity === 'light' ? '#ffffff' : '#1a1625',
+        textColor: polarityTextColors(polarity).textColor,
         style: 'modern',
         topEdgeGradient: topGradient,
       };
@@ -122,6 +139,7 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     name: 'Neon Outline',
     description: 'Dark background with glowing neon border in card color',
     getColors: ({ primary }) => ({
+      // Fixed near-black background — white text always wins here.
       gradientStart: '#0a0a0a',
       gradientEnd: '#1a1a2e',
       accentColor: primary,
@@ -133,25 +151,33 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
     id: 'geometric',
     name: 'Geometric',
     description: 'Hard-line geometric dividers between colors',
-    getColors: ({ primary, secondary, isDark }) => ({
-      gradientStart: primary,
-      gradientEnd: secondary,
-      accentColor: isDark ? '#ffffff' : '#1a1625',
-      textColor: '#ffffff',
-      style: 'modern',
-    }),
+    getColors: ({ primary, secondary }) => {
+      // Hard-edged regions + the canvas's 10% darken overlay
+      const regions = [primary, secondary].map(c => mixHex(c, '#000000', 0.1));
+      const polarity = resolveTextPolarity(regions, { discrete: true });
+      return {
+        gradientStart: primary,
+        gradientEnd: secondary,
+        ...polarityTextColors(polarity),
+        style: 'modern',
+      };
+    },
   },
   {
     id: 'team-colors',
     name: 'Split',
     description: 'Bold split design using two dominant colors',
-    getColors: ({ primary, secondary, isDark }) => ({
-      gradientStart: mixHex(primary, '#000000', 0.2),
-      gradientEnd: mixHex(secondary, '#000000', 0.2),
-      accentColor: isDark ? '#ffffff' : '#1a1625',
-      textColor: '#ffffff',
-      style: 'modern',
-    }),
+    getColors: ({ primary, secondary }) => {
+      const start = mixHex(primary, '#000000', 0.2);
+      const end = mixHex(secondary, '#000000', 0.2);
+      const polarity = resolveTextPolarity([start, end], { discrete: true });
+      return {
+        gradientStart: start,
+        gradientEnd: end,
+        ...polarityTextColors(polarity),
+        style: 'modern',
+      };
+    },
   },
 ];
 
@@ -281,6 +307,12 @@ export interface CustomLabelConfig {
   layoutStyle?: string;        // Layout style id applied to custom colors
   gradientAngle?: number;      // Gradient direction in degrees (0-360, default 135)
   geometricPattern?: number;   // Geometric pattern index (0-4)
+  /**
+   * Label text polarity. 'auto' (default) picks white vs near-black text by
+   * WCAG contrast against the actual background stops (resolveTextPolarity);
+   * 'light'/'dark' are explicit user overrides from the Studio toggle.
+   */
+  textColorMode?: 'auto' | 'light' | 'dark';
 }
 
 export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {
@@ -295,7 +327,54 @@ export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {
   borderEnabled: false,
   borderColor: '#7c3aed',
   borderWidth: 0.04,
+  textColorMode: 'auto',
 };
+
+// ============================================================================
+// TEXT POLARITY (WCAG — promoted from the Label Lab, June 2026)
+// ============================================================================
+
+/**
+ * The background colors text actually sits on for a config, mirroring
+ * customSlabLabelGenerator.drawCustomBackground() semantics. `discrete`
+ * means hard-edged regions (split/geometric) — evaluate exact colors, no
+ * interpolation.
+ */
+export function configBackgroundStops(config: CustomLabelConfig): { stops: string[]; discrete: boolean } {
+  if (config.colorPreset === 'rainbow') {
+    return { stops: ['#ff0000', '#ff8800', '#ffff00', '#00cc00', '#0066ff', '#8800ff', '#ff00ff'], discrete: false };
+  }
+  if (config.colorPreset === 'card-extension') {
+    const stops = config.topEdgeGradient && config.topEdgeGradient.length >= 3
+      ? config.topEdgeGradient
+      : [config.gradientStart, config.gradientEnd];
+    return { stops, discrete: false };
+  }
+  if (config.colorPreset === 'team-colors') {
+    return { stops: [config.gradientStart, config.gradientEnd], discrete: true };
+  }
+  if (config.colorPreset === 'geometric') {
+    const colors = config.customColors && config.customColors.length >= 2
+      ? config.customColors
+      : [config.gradientStart, config.gradientEnd];
+    // The canvas darkens geometric regions 10% for readability
+    return { stops: colors.map(c => mixHex(c, '#000000', 0.1)), discrete: true };
+  }
+  return { stops: [config.gradientStart, config.gradientEnd], discrete: false };
+}
+
+/**
+ * Resolve whether a config's label text should be LIGHT (white) or DARK
+ * (near-black). Honors the user's explicit textColorMode override; 'auto'
+ * (and absent, for configs saved before the field existed) uses the WCAG
+ * polarity pick against the real background stops.
+ */
+export function resolveConfigTextPolarity(config: CustomLabelConfig): 'light' | 'dark' {
+  if (config.textColorMode === 'light') return 'light';
+  if (config.textColorMode === 'dark') return 'dark';
+  const { stops, discrete } = configBackgroundStops(config);
+  return resolveTextPolarity(stops, { discrete });
+}
 
 // ============================================================================
 // SAVED CUSTOM STYLES (persisted to DB)
@@ -317,6 +396,9 @@ export interface LabelColorOverrides {
   isNeonOutline?: boolean;  // true when using neon-outline card color style
   isCardExtension?: boolean;  // true when using card-extension style
   topEdgeGradient?: string[];  // Multi-stop gradient for card-extension slab wrapper
+  /** Resolved label text polarity (WCAG auto or user override). HTML label
+      components use this to pick light vs dark text sets. */
+  textPolarity?: 'light' | 'dark';
 }
 
 /** Rainbow CSS gradient string for reuse across components */
@@ -382,6 +464,7 @@ export function extractColorOverrides(config: CustomLabelConfig | null | undefin
     isNeonOutline: config.colorPreset === 'neon-outline',
     isCardExtension: config.colorPreset === 'card-extension',
     topEdgeGradient: config.topEdgeGradient,
+    textPolarity: resolveConfigTextPolarity(config),
   };
 }
 
