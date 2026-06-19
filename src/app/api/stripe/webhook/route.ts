@@ -647,18 +647,47 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     // Just log for now
   }
 
-  // Update period end if changed
-  const newPeriodEnd = getSubscriptionPeriodEnd(subscription);
-  const currentPeriodEnd = userCredits.card_lover_current_period_end
-    ? new Date(userCredits.card_lover_current_period_end)
-    : null;
+  const supabase = getServiceClient();
 
-  if (!currentPeriodEnd || newPeriodEnd.getTime() !== currentPeriodEnd.getTime()) {
-    console.log('Updating subscription period end:', {
-      userId,
-      oldPeriodEnd: currentPeriodEnd,
-      newPeriodEnd,
+  // Mirror Stripe's pending-cancellation state into our DB. Previously this
+  // handler recorded NOTHING, so a cancel scheduled via
+  // /api/stripe/cancel-subscription left no DB trace — the only persisted
+  // record was the final 'cancelled' event on subscription.deleted. Now we
+  // persist the flag + the effective date and log a one-time audit event on
+  // each transition (scheduled ↔ reversed).
+  const newPeriodEnd = getSubscriptionPeriodEnd(subscription);
+  const willCancel = subscription.cancel_at_period_end === true;
+  const wasCancel = userCredits.card_lover_cancel_at_period_end === true;
+
+  const { error: updateError } = await supabase
+    .from('user_credits')
+    .update({
+      // Keep the sub id current and write the period end (the old code only
+      // logged this — the DB never actually moved).
+      card_lover_subscription_id: subscription.id,
+      card_lover_current_period_end: newPeriodEnd.toISOString(),
+      card_lover_cancel_at_period_end: willCancel,
+      card_lover_cancel_at: willCancel ? newPeriodEnd.toISOString() : null,
+    })
+    .eq('user_id', userId);
+
+  if (updateError) {
+    console.error('[handleSubscriptionUpdated] Failed to persist subscription update:', updateError);
+  }
+
+  if (willCancel !== wasCancel) {
+    await supabase.from('subscription_events').insert({
+      user_id: userId,
+      event_type: willCancel ? 'cancel_scheduled' : 'cancel_reversed',
+      plan: isCardLoversAnnual ? 'annual' : 'monthly',
+      credits_added: 0,
+      bonus_credits: 0,
+      stripe_subscription_id: subscription.id,
+      metadata: willCancel
+        ? { cancel_at: newPeriodEnd.toISOString() }
+        : { resumed: true },
     });
+    console.log(`[handleSubscriptionUpdated] ${willCancel ? 'cancel_scheduled' : 'cancel_reversed'} for user ${userId}`);
   }
 }
 

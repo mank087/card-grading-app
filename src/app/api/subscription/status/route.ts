@@ -148,19 +148,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Check if subscription has a pending cancellation (cancel_at_period_end)
+    // Inspect the live Stripe subscription whenever we have one on file —
+    // NOT just when isActive. A past-due / lapsed member (renewal failed,
+    // period end in the past → isActive false) still has a real Stripe
+    // subscription they must be able to cancel. Gating this on isActive hid
+    // the cancel button from exactly the people most likely to need it.
     let cancelAtPeriodEnd = false;
     let cancelAt: string | null = null;
-    if (isActive && userCredits.card_lover_subscription_id) {
+    let subscriptionStatus: string | null = null;
+    let hasManageableSubscription = false;
+    if (userCredits.card_lover_subscription_id) {
       try {
         const subscription = await stripe.subscriptions.retrieve(userCredits.card_lover_subscription_id);
-        if (subscription.cancel_at_period_end) {
-          cancelAtPeriodEnd = true;
+        subscriptionStatus = subscription.status;
+        cancelAtPeriodEnd = subscription.cancel_at_period_end === true;
+        if (cancelAtPeriodEnd) {
           // Use the helper — top-level current_period_end is deprecated;
           // reading from there returned undefined → wrong cancelAt date
           // shown on the account page after pending cancellation.
           cancelAt = getSubscriptionPeriodEnd(subscription).toISOString();
         }
+        // Manageable = a live subscription that isn't already gone. These
+        // are the states where Stripe still considers the sub real and a
+        // cancel (or resume) is meaningful.
+        hasManageableSubscription = ['active', 'past_due', 'trialing', 'unpaid'].includes(subscription.status);
       } catch (stripeError) {
         // Don't fail status check if Stripe lookup fails
         console.error('[SubscriptionStatus] Error checking Stripe subscription:', stripeError);
@@ -194,6 +205,11 @@ export async function GET(request: NextRequest) {
       subscribedAt: userCredits.card_lover_subscribed_at,
       currentPeriodEnd: userCredits.card_lover_current_period_end,
       subscriptionId: userCredits.card_lover_subscription_id,
+      // Whether there's a Stripe subscription the user can still cancel/manage,
+      // independent of isActive (benefit gating). Drives the cancel button so
+      // past-due / lapsed members can still self-cancel.
+      hasManageableSubscription,
+      subscriptionStatus,
       cancelAtPeriodEnd,
       cancelAt,
       nextLoyaltyBonus,

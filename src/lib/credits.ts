@@ -31,6 +31,8 @@ export interface UserCredits {
   card_lover_subscription_id: string | null;
   card_lover_plan: 'monthly' | 'annual' | null;
   card_lover_months_active: number;
+  card_lover_cancel_at_period_end: boolean | null;
+  card_lover_cancel_at: string | null;
   show_card_lover_badge: boolean;
   // VIP fields
   is_vip: boolean;

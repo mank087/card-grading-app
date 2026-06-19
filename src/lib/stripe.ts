@@ -73,6 +73,47 @@ export const CARD_LOVERS_SUBSCRIPTION = {
 
 export type CardLoversPlan = keyof typeof CARD_LOVERS_SUBSCRIPTION;
 
+/**
+ * True if a Stripe price id is one of the Card Lovers subscription prices
+ * (monthly or annual). Used to identify a customer's Card Lovers sub when
+ * we only have a customer id (e.g. our DB lost the subscription id).
+ */
+export function isCardLoversPriceId(priceId: string | null | undefined): boolean {
+  if (!priceId) return false;
+  return (
+    priceId === CARD_LOVERS_SUBSCRIPTION.monthly.priceId ||
+    priceId === CARD_LOVERS_SUBSCRIPTION.annual.priceId
+  );
+}
+
+/**
+ * Find a customer's current Card Lovers subscription directly from Stripe,
+ * preferring a still-billable one. Returns null if the customer has none.
+ *
+ * "Billable" = Stripe still considers the sub real and a cancel/resume is
+ * meaningful: active, past_due, trialing, or unpaid. This is the source of
+ * truth when our DB is out of sync (missed webhook, lapsed period) — Stripe
+ * may still be charging a sub our DB has forgotten.
+ */
+export async function findCardLoversSubscription(
+  customerId: string
+): Promise<Stripe.Subscription | null> {
+  const subs = await stripe.subscriptions.list({
+    customer: customerId,
+    status: 'all',
+    limit: 20,
+  });
+  const cardLovers = subs.data.filter((s) =>
+    isCardLoversPriceId(s.items.data[0]?.price?.id)
+  );
+  const MANAGEABLE = ['active', 'past_due', 'trialing', 'unpaid'];
+  return (
+    cardLovers.find((s) => MANAGEABLE.includes(s.status)) ||
+    cardLovers[0] ||
+    null
+  );
+}
+
 // Loyalty bonus milestones for monthly subscribers
 export const CARD_LOVERS_LOYALTY_BONUSES: Record<number, number> = {
   3: 5,   // Month 3: +5 credits

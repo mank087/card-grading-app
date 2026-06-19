@@ -74,6 +74,11 @@ export default function AccountPage() {
   const [cardLoverPeriodEnd, setCardLoverPeriodEnd] = useState<string | null>(null)
   const [cardLoverMonthsActive, setCardLoverMonthsActive] = useState(0)
   const [nextLoyaltyBonus, setNextLoyaltyBonus] = useState<{ atMonth: number; credits: number; monthsUntil: number } | null>(null)
+  // Whether a Stripe subscription exists that can still be cancelled/managed,
+  // even if benefits have lapsed (past_due). Keeps the cancel button visible
+  // for members whose renewal failed — see /api/subscription/status.
+  const [hasSubscription, setHasSubscription] = useState(false)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null)
   const [isCancellingSubscription, setIsCancellingSubscription] = useState(false)
   const [isResumingSubscription, setIsResumingSubscription] = useState(false)
   const [isUpgradingSubscription, setIsUpgradingSubscription] = useState(false)
@@ -236,6 +241,8 @@ export default function AccountPage() {
           if (subscriptionRes.ok) {
             const subData = await subscriptionRes.json()
             setIsCardLover(subData.isActive)
+            setHasSubscription(subData.hasManageableSubscription || subData.isActive || false)
+            setSubscriptionStatus(subData.subscriptionStatus || null)
             setCardLoverPlan(subData.plan)
             setCardLoverPeriodEnd(subData.currentPeriodEnd)
             setCardLoverMonthsActive(subData.monthsActive || 0)
@@ -1078,8 +1085,10 @@ export default function AccountPage() {
           </div>
         )}
 
-        {/* Card Lovers Subscription Section */}
-        {isCardLover ? (
+        {/* Card Lovers Subscription Section — shown for active members AND
+            for members with a still-manageable Stripe sub (e.g. past_due),
+            so a lapsed renewal never hides the cancel button. */}
+        {(isCardLover || hasSubscription) ? (
           <div className="bg-gradient-to-r from-purple-50 to-rose-50 rounded-lg shadow-md p-6 border border-purple-200 mb-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4 flex items-center">
               <svg className="w-6 h-6 mr-2 text-rose-500" fill="currentColor" viewBox="0 0 20 20">
@@ -1174,6 +1183,26 @@ export default function AccountPage() {
               </div>
             </div>
 
+            {/* Past-Due Banner — renewal payment failed; benefits are paused
+                but the subscription still exists in Stripe. The user can
+                update payment in Stripe's emails, or cancel below. */}
+            {subscriptionStatus === 'past_due' && !cancelAtPeriodEnd && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="font-semibold text-red-800">Payment Past Due</p>
+                    <p className="text-sm text-red-700 mt-1">
+                      Your last renewal payment didn&apos;t go through, so your membership benefits are paused.
+                      Stripe will retry your card, or you can cancel your subscription below.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Cancellation Pending Banner */}
             {cancelAtPeriodEnd && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
@@ -1203,7 +1232,7 @@ export default function AccountPage() {
             {/* Action Buttons */}
             {!cancelAtPeriodEnd && (
               <div className="flex flex-wrap gap-3">
-                {cardLoverPlan === 'monthly' && (
+                {isCardLover && cardLoverPlan === 'monthly' && (
                   <button
                     onClick={handleUpgradeSubscription}
                     disabled={isUpgradingSubscription}

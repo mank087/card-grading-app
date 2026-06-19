@@ -19,7 +19,8 @@ CREATE TABLE IF NOT EXISTS subscription_events (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
   event_type TEXT NOT NULL,
-  -- Values: 'subscribed', 'renewed', 'cancelled', 'upgraded', 'loyalty_bonus', 'payment_failed'
+  -- Values: 'subscribed', 'renewed', 'cancelled', 'upgraded', 'loyalty_bonus', 'payment_failed',
+  --         'cancellation_requested', 'cancel_scheduled', 'cancel_reversed', 'resume_requested'
   plan TEXT, -- 'monthly' or 'annual'
   credits_added INTEGER DEFAULT 0,
   bonus_credits INTEGER DEFAULT 0,
