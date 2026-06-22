@@ -19,6 +19,9 @@ export interface IAPProductDefinition {
   type: ProductType
   /** For subscriptions only — used to label the Card Lovers period. */
   subscriptionPeriod?: 'monthly' | 'annual'
+  /** True for the VIP package — grants VIP status (is_vip + badge) in
+   *  addition to credits, mirroring the web setVipStatus() purchase path. */
+  grantsVip?: boolean
   /** Human-readable, used in receipts / logs only. Not user-facing. */
   label: string
 }
@@ -47,6 +50,7 @@ export const IAP_PRODUCTS: Record<string, IAPProductDefinition> = {
     productId: 'dcm.credits.vip',
     credits: 150,
     type: 'consumable',
+    grantsVip: true,
     label: 'DCM Grading - 150 Credits (VIP)',
   },
 

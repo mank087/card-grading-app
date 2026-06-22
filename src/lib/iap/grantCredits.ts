@@ -146,6 +146,14 @@ export async function recordIAPTransaction(input: RecordIAPInput): Promise<Recor
     })
   }
 
+  // 4b. Grant VIP status for the VIP package. The web purchase path
+  //     (setVipStatus) sets these flags; without this the iOS buyer got
+  //     the 150 credits but never became VIP, so the VIP emblem stayed
+  //     locked. Idempotent — safe for repeat VIP purchases.
+  if (product.grantsVip && shouldGrantCredits) {
+    await grantVipStatus(input.userId)
+  }
+
   return {
     success: true,
     alreadyGranted: false,
@@ -224,6 +232,25 @@ async function updateCardLoversState(
         card_lover_plan: meta.plan,
         card_lover_provider: meta.platform,
         card_lover_current_period_end: meta.periodEnd?.toISOString() ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' },
+    )
+}
+
+/**
+ * Flip the VIP flags on user_credits when the VIP package is purchased.
+ * Mirrors the web setVipStatus() path. VIP is a permanent status, so this
+ * only ever turns it on (never off) and is idempotent across repeat buys.
+ */
+async function grantVipStatus(userId: string): Promise<void> {
+  await supabaseAdmin
+    .from('user_credits')
+    .upsert(
+      {
+        user_id: userId,
+        is_vip: true,
+        show_vip_badge: true,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'user_id' },
