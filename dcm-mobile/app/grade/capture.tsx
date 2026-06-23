@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Platform } from 'react-native'
+import { View, Text, StyleSheet, TouchableOpacity, Image, Alert, Platform, ScrollView } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -316,33 +316,45 @@ export default function CaptureScreen() {
 
   // Preview mode
   if (previewUri && previewQuality) {
+    const isFront = currentSide === 'front'
     return (
       <View style={styles.container}>
         <View style={[styles.previewHeader, { paddingTop: insets.top + 8 }]}>
-          <Text style={styles.previewSideLabel}>{currentSide === 'front' ? 'Front' : 'Back'} Image</Text>
+          <View style={styles.previewHeaderText}>
+            <Text style={styles.previewStep}>STEP {isFront ? '1' : '2'} OF 2</Text>
+            <Text style={styles.previewSideLabel}>{isFront ? 'Front' : 'Back'} Image</Text>
+          </View>
           <View style={[styles.qualityBadge, { backgroundColor: gradeColor }]}>
             <Text style={styles.qualityBadgeText}>{previewQuality.grade} ({previewQuality.score}/100)</Text>
           </View>
         </View>
 
-        <View style={styles.previewImageContainer}>
-          <Image source={{ uri: previewUri }} style={styles.previewImage} resizeMode="contain" />
-        </View>
+        {/* Scrollable middle. Previously this was a fixed flex column with no
+            scroll: a tall image plus a long quality-suggestion list (common on
+            lower-quality gallery uploads) pushed the action bar below the screen
+            edge, stranding users on a full-screen image with no reachable "next"
+            control. The image + details now scroll; the action bar is a pinned
+            footer that can never be clipped. */}
+        <ScrollView style={styles.previewScroll} contentContainerStyle={styles.previewScrollContent}>
+          <View style={styles.previewImageContainer}>
+            <Image source={{ uri: previewUri }} style={styles.previewImage} resizeMode="contain" />
+          </View>
 
-        <View style={styles.qualityDetails}>
-          <View style={styles.qualityRow}>
-            <Ionicons name="eye" size={16} color={Colors.gray[500]} />
-            <Text style={styles.qualityLabel}>Sharpness: {previewQuality.blurLabel}</Text>
+          <View style={styles.qualityDetails}>
+            <View style={styles.qualityRow}>
+              <Ionicons name="eye" size={16} color={Colors.gray[500]} />
+              <Text style={styles.qualityLabel}>Sharpness: {previewQuality.blurLabel}</Text>
+            </View>
+            <View style={styles.qualityRow}>
+              <Ionicons name="sunny" size={16} color={Colors.gray[500]} />
+              <Text style={styles.qualityLabel}>Brightness: {previewQuality.brightnessLabel}</Text>
+            </View>
+            <Text style={styles.uncertaintyText}>Grade uncertainty: {previewQuality.uncertainty}</Text>
+            {previewQuality.suggestions.map((s, i) => (
+              <Text key={i} style={styles.suggestionText}>{s}</Text>
+            ))}
           </View>
-          <View style={styles.qualityRow}>
-            <Ionicons name="sunny" size={16} color={Colors.gray[500]} />
-            <Text style={styles.qualityLabel}>Brightness: {previewQuality.brightnessLabel}</Text>
-          </View>
-          <Text style={styles.uncertaintyText}>Grade uncertainty: {previewQuality.uncertainty}</Text>
-          {previewQuality.suggestions.map((s, i) => (
-            <Text key={i} style={styles.suggestionText}>{s}</Text>
-          ))}
-        </View>
+        </ScrollView>
 
         <View style={[styles.previewActions, { paddingBottom: insets.bottom + 12 }]}>
           <TouchableOpacity
@@ -360,9 +372,9 @@ export default function CaptureScreen() {
             accessibilityLabel={currentSide === 'front' ? 'Use this front photo and continue to back' : 'Use this back photo and continue to review'}
             accessibilityRole="button"
           >
-            <Ionicons name="checkmark" size={20} color={Colors.white} />
+            <Ionicons name={isFront ? 'arrow-forward-circle' : 'checkmark-circle'} size={22} color={Colors.white} />
             <Text style={styles.useText}>
-              {currentSide === 'front' ? 'Use This — Capture Back \u203A' : 'Use This — Review \u203A'}
+              {isFront ? 'Next: Back of Card ›' : 'Done — Review ›'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -637,10 +649,17 @@ const styles = StyleSheet.create({
 
   // Preview
   previewHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, backgroundColor: Colors.gray[900] },
+  previewHeaderText: { flex: 1 },
+  previewStep: { color: Colors.purple[300], fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 2 },
   previewSideLabel: { color: Colors.white, fontSize: 18, fontWeight: '700' },
   qualityBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16 },
   qualityBadgeText: { color: Colors.white, fontSize: 13, fontWeight: '700' },
-  previewImageContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[900], padding: 16 },
+  // ScrollView wrapping the image + quality details so the pinned action
+  // footer below can never be pushed off-screen. flexGrow centers a short
+  // image vertically; a tall image + long suggestion list simply scrolls.
+  previewScroll: { flex: 1, backgroundColor: Colors.gray[900] },
+  previewScrollContent: { flexGrow: 1, justifyContent: 'center' },
+  previewImageContainer: { justifyContent: 'center', alignItems: 'center', backgroundColor: Colors.gray[900], paddingVertical: 16 },
   previewImage: { width: '80%', aspectRatio: 0.714, borderRadius: 8 },
   qualityDetails: { padding: 16, backgroundColor: Colors.gray[800], gap: 6 },
   qualityRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
