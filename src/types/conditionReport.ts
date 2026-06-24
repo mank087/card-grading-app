@@ -87,6 +87,7 @@ export interface UserConditionReportInput {
   factory: FactoryDefects;        // Factory/manufacturing defects
   notes: string;                   // Single consolidated notes field (500 chars max)
   cardDescription?: string;        // Optional card details to guide AI (art style, serial numbering, etc.)
+  noDefectsConfirmed?: boolean;    // Simplified flow: owner confirmed no visible defects (omits per-side defect objects)
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -306,24 +307,25 @@ export const EMPTY_CONDITION_REPORT: UserConditionReportInput = {
  * Check if a condition report has any data
  */
 export function hasAnyConditionData(report: UserConditionReportInput): boolean {
-  // Check front defects
-  const hasFrontSurface = Object.values(report.front.surface).some(v => v);
-  const hasFrontCorners = Object.values(report.front.corners).some(v => v);
-  const hasFrontEdges = Object.values(report.front.edges).some(v => v);
+  if (!report || typeof report !== 'object') return false;
 
-  // Check back defects
-  const hasBackSurface = Object.values(report.back.surface).some(v => v);
-  const hasBackCorners = Object.values(report.back.corners).some(v => v);
-  const hasBackEdges = Object.values(report.back.edges).some(v => v);
+  // Simplified reports (e.g. the mobile "no defects" / description-only flow)
+  // omit the per-side defect objects entirely, so guard every nested access.
+  const anyTrue = (obj: unknown): boolean =>
+    !!obj && typeof obj === 'object' && Object.values(obj as Record<string, unknown>).some(Boolean);
 
-  // Check structural
-  const hasStructural = Object.values(report.structural).some(v => v);
+  const hasFrontSurface = anyTrue(report.front?.surface);
+  const hasFrontCorners = anyTrue(report.front?.corners);
+  const hasFrontEdges = anyTrue(report.front?.edges);
 
-  // Check factory
-  const hasFactory = Object.values(report.factory).some(v => v);
+  const hasBackSurface = anyTrue(report.back?.surface);
+  const hasBackCorners = anyTrue(report.back?.corners);
+  const hasBackEdges = anyTrue(report.back?.edges);
 
-  // Check notes
-  const hasNotes = report.notes.trim().length > 0;
+  const hasStructural = anyTrue(report.structural);
+  const hasFactory = anyTrue(report.factory);
+
+  const hasNotes = typeof report.notes === 'string' && report.notes.trim().length > 0;
 
   return hasFrontSurface || hasFrontCorners || hasFrontEdges ||
          hasBackSurface || hasBackCorners || hasBackEdges ||
@@ -334,16 +336,22 @@ export function hasAnyConditionData(report: UserConditionReportInput): boolean {
  * Count total defects reported
  */
 export function countDefects(report: UserConditionReportInput): number {
-  let count = 0;
+  if (!report || typeof report !== 'object') return 0;
 
-  count += Object.values(report.front.surface).filter(v => v).length;
-  count += Object.values(report.front.corners).filter(v => v).length;
-  count += Object.values(report.front.edges).filter(v => v).length;
-  count += Object.values(report.back.surface).filter(v => v).length;
-  count += Object.values(report.back.corners).filter(v => v).length;
-  count += Object.values(report.back.edges).filter(v => v).length;
-  count += Object.values(report.structural).filter(v => v).length;
-  count += Object.values(report.factory).filter(v => v).length;
+  const countTrue = (obj: unknown): number =>
+    !!obj && typeof obj === 'object'
+      ? Object.values(obj as Record<string, unknown>).filter(Boolean).length
+      : 0;
+
+  let count = 0;
+  count += countTrue(report.front?.surface);
+  count += countTrue(report.front?.corners);
+  count += countTrue(report.front?.edges);
+  count += countTrue(report.back?.surface);
+  count += countTrue(report.back?.corners);
+  count += countTrue(report.back?.edges);
+  count += countTrue(report.structural);
+  count += countTrue(report.factory);
 
   return count;
 }

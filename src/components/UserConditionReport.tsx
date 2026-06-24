@@ -16,6 +16,10 @@ import {
   STRUCTURAL_TOOLTIPS,
   FACTORY_TOOLTIPS,
   EMPTY_CONDITION_REPORT,
+  EMPTY_SURFACE_DEFECTS,
+  EMPTY_CORNER_DEFECTS,
+  EMPTY_EDGE_DEFECTS,
+  EMPTY_STRUCTURAL_DEFECTS,
   hasAnyConditionData,
   countDefects,
 } from '@/types/conditionReport'
@@ -599,11 +603,25 @@ interface ConditionReportDisplayProps {
 
 export function ConditionReportDisplay({ report, aiResponse }: ConditionReportDisplayProps) {
   const hasData = hasAnyConditionData(report)
-  const hasCardDescription = report.cardDescription && report.cardDescription.trim().length > 0
+  const hasCardDescription = !!report?.cardDescription && report.cardDescription.trim().length > 0
+  // Simplified "no defects" flow: owner confirmed the card is clean and the
+  // per-side defect objects are omitted entirely.
+  const noDefectsConfirmed = report?.noDefectsConfirmed === true
 
-  if (!hasData && !hasCardDescription) {
+  if (!hasData && !hasCardDescription && !noDefectsConfirmed) {
     return null
   }
+
+  // Simplified/legacy reports may omit some or all of the per-side defect
+  // objects — fall back to empty defect sets so the breakdown below never
+  // dereferences undefined (was crashing the whole card page).
+  const frontSurface = report.front?.surface ?? EMPTY_SURFACE_DEFECTS
+  const frontCorners = report.front?.corners ?? EMPTY_CORNER_DEFECTS
+  const frontEdges = report.front?.edges ?? EMPTY_EDGE_DEFECTS
+  const backSurface = report.back?.surface ?? EMPTY_SURFACE_DEFECTS
+  const backCorners = report.back?.corners ?? EMPTY_CORNER_DEFECTS
+  const backEdges = report.back?.edges ?? EMPTY_EDGE_DEFECTS
+  const structural = report.structural ?? EMPTY_STRUCTURAL_DEFECTS
 
   // Collect all reported defects by category
   const frontDefects: string[] = []
@@ -612,58 +630,58 @@ export function ConditionReportDisplay({ report, aiResponse }: ConditionReportDi
   const factoryDefects: string[] = []
 
   // Front surface
-  if (report.front.surface.scratches) frontDefects.push('Surface scratches')
-  if (report.front.surface.print_lines) frontDefects.push('Print lines')
-  if (report.front.surface.fingerprints) frontDefects.push('Fingerprints')
-  if (report.front.surface.holo_scratches) frontDefects.push('Holofoil scratches')
-  if (report.front.surface.indentations) frontDefects.push('Indentations')
-  if (report.front.surface.white_spots) frontDefects.push('White dots/specks')
-  if (report.front.surface.fish_eyes) frontDefects.push('Fish eyes')
-  if (report.front.surface.staining) frontDefects.push('Staining')
+  if (frontSurface.scratches) frontDefects.push('Surface scratches')
+  if (frontSurface.print_lines) frontDefects.push('Print lines')
+  if (frontSurface.fingerprints) frontDefects.push('Fingerprints')
+  if (frontSurface.holo_scratches) frontDefects.push('Holofoil scratches')
+  if (frontSurface.indentations) frontDefects.push('Indentations')
+  if (frontSurface.white_spots) frontDefects.push('White dots/specks')
+  if (frontSurface.fish_eyes) frontDefects.push('Fish eyes')
+  if (frontSurface.staining) frontDefects.push('Staining')
 
   // Front corners
-  if (report.front.corners.whitening) frontDefects.push('Corner whitening')
-  if (report.front.corners.soft_rounded) frontDefects.push('Soft corners')
-  if (report.front.corners.dings) frontDefects.push('Corner dings')
-  if (report.front.corners.creasing) frontDefects.push('Corner creases')
+  if (frontCorners.whitening) frontDefects.push('Corner whitening')
+  if (frontCorners.soft_rounded) frontDefects.push('Soft corners')
+  if (frontCorners.dings) frontDefects.push('Corner dings')
+  if (frontCorners.creasing) frontDefects.push('Corner creases')
 
   // Front edges
-  if (report.front.edges.whitening) frontDefects.push('Edge whitening')
-  if (report.front.edges.chipping) frontDefects.push('Edge chipping')
-  if (report.front.edges.rough_cut) frontDefects.push('Rough cut')
-  if (report.front.edges.peeling) frontDefects.push('Edge peeling')
-  if (report.front.edges.silvering) frontDefects.push('Silvering')
-  if (report.front.edges.white_dots) frontDefects.push('Edge white dots')
+  if (frontEdges.whitening) frontDefects.push('Edge whitening')
+  if (frontEdges.chipping) frontDefects.push('Edge chipping')
+  if (frontEdges.rough_cut) frontDefects.push('Rough cut')
+  if (frontEdges.peeling) frontDefects.push('Edge peeling')
+  if (frontEdges.silvering) frontDefects.push('Silvering')
+  if (frontEdges.white_dots) frontDefects.push('Edge white dots')
 
   // Back surface
-  if (report.back.surface.scratches) backDefects.push('Surface scratches')
-  if (report.back.surface.print_lines) backDefects.push('Print lines')
-  if (report.back.surface.fingerprints) backDefects.push('Fingerprints')
-  if (report.back.surface.holo_scratches) backDefects.push('Holofoil scratches')
-  if (report.back.surface.indentations) backDefects.push('Indentations')
-  if (report.back.surface.white_spots) backDefects.push('White dots/specks')
-  if (report.back.surface.fish_eyes) backDefects.push('Fish eyes')
-  if (report.back.surface.staining) backDefects.push('Staining')
+  if (backSurface.scratches) backDefects.push('Surface scratches')
+  if (backSurface.print_lines) backDefects.push('Print lines')
+  if (backSurface.fingerprints) backDefects.push('Fingerprints')
+  if (backSurface.holo_scratches) backDefects.push('Holofoil scratches')
+  if (backSurface.indentations) backDefects.push('Indentations')
+  if (backSurface.white_spots) backDefects.push('White dots/specks')
+  if (backSurface.fish_eyes) backDefects.push('Fish eyes')
+  if (backSurface.staining) backDefects.push('Staining')
 
   // Back corners
-  if (report.back.corners.whitening) backDefects.push('Corner whitening')
-  if (report.back.corners.soft_rounded) backDefects.push('Soft corners')
-  if (report.back.corners.dings) backDefects.push('Corner dings')
-  if (report.back.corners.creasing) backDefects.push('Corner creases')
+  if (backCorners.whitening) backDefects.push('Corner whitening')
+  if (backCorners.soft_rounded) backDefects.push('Soft corners')
+  if (backCorners.dings) backDefects.push('Corner dings')
+  if (backCorners.creasing) backDefects.push('Corner creases')
 
   // Back edges
-  if (report.back.edges.whitening) backDefects.push('Edge whitening')
-  if (report.back.edges.chipping) backDefects.push('Edge chipping')
-  if (report.back.edges.rough_cut) backDefects.push('Rough cut')
-  if (report.back.edges.peeling) backDefects.push('Edge peeling')
-  if (report.back.edges.silvering) backDefects.push('Silvering')
-  if (report.back.edges.white_dots) backDefects.push('Edge white dots')
+  if (backEdges.whitening) backDefects.push('Edge whitening')
+  if (backEdges.chipping) backDefects.push('Edge chipping')
+  if (backEdges.rough_cut) backDefects.push('Rough cut')
+  if (backEdges.peeling) backDefects.push('Edge peeling')
+  if (backEdges.silvering) backDefects.push('Silvering')
+  if (backEdges.white_dots) backDefects.push('Edge white dots')
 
   // Structural
-  if (report.structural.crease) structuralDefects.push('Crease')
-  if (report.structural.bend) structuralDefects.push('Bend')
-  if (report.structural.warp) structuralDefects.push('Warping')
-  if (report.structural.water_damage) structuralDefects.push('Water damage')
+  if (structural.crease) structuralDefects.push('Crease')
+  if (structural.bend) structuralDefects.push('Bend')
+  if (structural.warp) structuralDefects.push('Warping')
+  if (structural.water_damage) structuralDefects.push('Water damage')
 
   // Factory (with backwards compatibility check)
   if (report.factory) {
@@ -684,6 +702,14 @@ export function ConditionReportDisplay({ report, aiResponse }: ConditionReportDi
       </h4>
 
       <div className="space-y-3 text-sm">
+        {noDefectsConfirmed && frontDefects.length === 0 && backDefects.length === 0 &&
+         structuralDefects.length === 0 && factoryDefects.length === 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-green-600">✓</span>
+            <p className="text-amber-700">Owner confirmed no visible defects.</p>
+          </div>
+        )}
+
         {frontDefects.length > 0 && (
           <div>
             <p className="font-medium text-amber-700">Front:</p>
