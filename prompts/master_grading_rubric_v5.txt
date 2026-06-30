@@ -5408,6 +5408,16 @@ For each subgrade category, the score is the MINIMUM of front and back:
 **IMPORTANT:** The front and back scores are STILL recorded individually in raw_sub_scores
 for transparency. The MIN is used for the displayed subgrade and for final grade calculation.
 
+🚨 **MANDATORY SELF-CHECK BEFORE OUTPUT (per pass):**
+For EVERY category, the category score MUST equal MIN(front_score, back_score). A category
+score can NEVER be higher than either face. Before emitting JSON, verify and correct:
+• If centering > MIN(centering_front, centering_back) → set it to that MIN
+• If corners  > MIN(corners_front,  corners_back)    → set it to that MIN
+• If edges    > MIN(edges_front,    edges_back)       → set it to that MIN
+• If surface  > MIN(surface_front,  surface_back)     → set it to that MIN
+Example: corners_front=7, corners_back=7 → corners MUST be 7 (NEVER 8).
+This applies to EACH of the three passes independently, before averaging.
+
 **Combined Scores (for final grade calculation):**
 • total_centering = MIN(front_centering_score, back_centering_score)
 • total_corners = MIN(front_corners_score, back_corners_score)

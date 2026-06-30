@@ -393,6 +393,53 @@ Many sports cards feature legitimate manufacturer artwork on card backs that may
 
 ═══════════════════════════════════════════════════════════════════════
 
+═══════════════════════════════════════════════════════════════════════
+🚨 SIMULATED-DAMAGE / DISTRESSED DESIGNS - NOT SURFACE DEFECTS
+═══════════════════════════════════════════════════════════════════════
+
+Some cards INTENTIONALLY print a worn, aged, or "damaged" aesthetic as part
+of the design. These printed effects must NOT be scored as surface defects,
+scratches, scribbles, smudges, stains, or alterations.
+
+**Common simulated-damage design elements (Grade Normally - NOT defects):**
+• Crumpled, wrinkled, or creased-paper textures (printed shading, not real folds)
+• Torn, burnt, or rough/deckled edge artwork
+• Ruled-notebook, graph-paper, or legal-pad backgrounds
+• Handwritten, scribbled, marker, or "doodle" style text and signatures
+• Printed ink smudges, splatter, fingerprints, or stamp/postmark graphics
+• Coffee/water-stain, sepia, parchment, or "aged document" effects
+• Chalkboard, blueprint, grunge, distressed, or vintage-throwback textures
+
+🚨 **CRITICAL TEST - printed design vs. physical damage:**
+Before flagging ANY mark, line, smudge, scribble, scuff, or "crease" on a
+text/graphic panel, ask:
+1. Does it sit UNDER the gloss layer (printed) rather than on top of it?
+2. Does it share the card's halftone dot pattern and color palette?
+3. Does it form a COHERENT, intentional aesthetic across the whole panel?
+4. Would the IDENTICAL "damage" appear on every copy of this card?
+5. Is the cardstock plane physically UNDISTURBED (no real fold/scratch/indent)?
+→ If YES to these = PRINTED DESIGN. No surface deduction. Do not describe it
+  as "marks," "smudges," "scribble-like lines," or "alteration."
+→ Physical damage instead: scratch BREAKS the gloss, scuff DULLS the finish,
+  crease DISTURBS the surface plane, stain has irregular edges and sits on top.
+
+**Sets/issues known for distressed or handwritten-style designs:**
+• 1990s "Trade Card"/promo and oddball inserts
+• Retro/throwback, grunge, and "vintage reproduction" inserts
+• Notebook/sketch/doodle-themed inserts and parallels
+
+🚨 **THREE-PASS NOTE:** Consensus does NOT protect against this. All passes see
+the same printed design and will AGREE it "looks marked." Apply the test above
+on EVERY pass; do not let a uniformly stylized panel cap the surface subgrade.
+
+**DO NOT flag as defects:**
+❌ Printed crumpled/aged-paper texture on the back panel
+❌ Handwritten or scribble-style printed text
+❌ Printed ink smudges, splatter, or stamp graphics
+❌ Any "damage" that is clearly under the gloss and part of the layout
+
+═══════════════════════════════════════════════════════════════════════
+
 **Centering Assessment:**
 • Front: Usually has borders or photo framing for measurement
 • Back: May be borderless - use text blocks, stats table, or logos as centering anchors

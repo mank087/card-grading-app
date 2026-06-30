@@ -1787,6 +1787,29 @@ Provide detailed analysis as markdown with all required sections.`
           final: Math.round(boostedAvg.final) // standard rounding for final too
         };
 
+        // Step 3.5 (v8.7): Enforce the rubric's weakest-link invariant at the FACE level.
+        // Rubric Section 1.16 + raw_sub_scores spec: category subgrade = MIN(front, back).
+        // The three-pass average above can drift ABOVE MIN(front,back) when a pass reports a
+        // holistic category score that isn't the min of its own faces (e.g. corners=8 while
+        // its faces are 7/7). Averaging those (8,8,7 -> 7.67 -> 8) yields a subgrade higher
+        // than both displayed faces, which is impossible under weakest-link and looks broken.
+        // Clamp each subgrade down to the weaker of its two faces. This only ever LOWERS a
+        // subgrade, so it preserves weakest-link behavior and never inflates a grade.
+        if (jsonData.raw_sub_scores) {
+          const faceCats = ['centering', 'corners', 'edges', 'surface'] as const;
+          for (const cat of faceCats) {
+            const f = jsonData.raw_sub_scores[`${cat}_front`];
+            const b = jsonData.raw_sub_scores[`${cat}_back`];
+            if (f != null && b != null) {
+              const faceMin = Math.min(f, b);
+              if (serverRounded[cat] > faceMin) {
+                console.log(`[GRADE RECALC] 🔒 ${cat}: subgrade ${serverRounded[cat]} exceeded MIN(front,back)=${faceMin} (F:${f} B:${b}); clamping to ${faceMin} per weakest-link`);
+                serverRounded[cat] = faceMin;
+              }
+            }
+          }
+        }
+
         // Step 4: Apply dominant defect control (weakest subgrade caps the final)
         const subgradeCap = Math.min(serverRounded.centering, serverRounded.corners, serverRounded.edges, serverRounded.surface);
         let finalGrade = Math.min(serverRounded.final, subgradeCap);
@@ -1951,8 +1974,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.6-json',
-          prompt_version: 'DCM_Grading_v8.6'
+          version: 'conversational-v8.7-json',
+          prompt_version: 'DCM_Grading_v8.7'
         }
       };
 
@@ -2003,8 +2026,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.6-markdown',
-          prompt_version: 'DCM_Grading_v8.6'
+          version: 'conversational-v8.7-markdown',
+          prompt_version: 'DCM_Grading_v8.7'
         }
       };
 
