@@ -4,8 +4,13 @@ import * as Crypto from 'expo-crypto'
 export interface QualityResult {
   score: number
   grade: 'A' | 'B' | 'C' | 'D'
-  blurLabel: string
-  brightnessLabel: string
+  /**
+   * Label for what this module can actually measure on-device:
+   * resolution + framing. It is intentionally NOT called "sharpness".
+   * See the honesty note on assessQuality — without pixel access we
+   * cannot measure blur or brightness, so we must not claim to.
+   */
+  resolutionLabel: string
   uncertainty: string
   suggestions: string[]
 }
@@ -224,9 +229,24 @@ function computeCardCrop(
 }
 
 /**
- * Image quality assessment — checks resolution, blur, and brightness.
- * Uses dimension checks + basic heuristics. For a more thorough check,
- * the capture screen runs pixel analysis via the camera preview quality.
+ * Image quality assessment — resolution + framing heuristics ONLY.
+ *
+ * HONESTY NOTE (why no sharpness/brightness here, unlike the web):
+ * web's src/utils/imageQuality.ts measures Laplacian-variance blur and
+ * average brightness by reading raw pixels off a <canvas>. React Native
+ * has no canvas, and this app has no pixel-access dependency —
+ * @shopify/react-native-skia and expo-gl are not installed, and adding
+ * either is a NATIVE module change that would break OTA updates for
+ * every user on the current binary (see project OTA constraint). A pure
+ * JS PNG/JPEG decoder over an expo-image-manipulator base64 export was
+ * evaluated and rejected as impractical (inflate implementation + MB-scale
+ * base64 churn on the UI thread).
+ *
+ * So this function reports only what it can truly verify — dimensions,
+ * megapixels, and card-like aspect ratio — and the capture UI labels it
+ * as "Resolution", not "Sharpness". Blur/lighting are assessed
+ * server-side by the AI grader (conversational_image_confidence), which
+ * is the value users ultimately see on the card detail screen.
  */
 export function assessQuality(compressed: CompressedImage): QualityResult {
   const { width, height } = compressed
@@ -280,23 +300,19 @@ export function assessQuality(compressed: CompressedImage): QualityResult {
   const uncertainty =
     grade === 'A' ? '±0.25' : grade === 'B' ? '±0.5' : grade === 'C' ? '±1.0' : '±1.5'
 
-  // More descriptive labels
-  let blurLabel = 'Good'
-  let brightnessLabel = 'Good'
+  // Resolution label — the only per-image signal we can measure honestly.
+  let resolutionLabel = 'Good'
   if (score < 60) {
-    blurLabel = 'Unknown — low resolution'
-    brightnessLabel = 'Unknown — low resolution'
+    resolutionLabel = 'Low'
     suggestions.push('Take a clearer, well-lit photo for best grading accuracy')
   } else if (score < 75) {
-    blurLabel = 'Acceptable'
-    brightnessLabel = 'Acceptable'
+    resolutionLabel = 'Acceptable'
   }
 
   return {
     score,
     grade,
-    blurLabel,
-    brightnessLabel,
+    resolutionLabel,
     uncertainty,
     suggestions,
   }

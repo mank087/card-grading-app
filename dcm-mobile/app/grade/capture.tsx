@@ -19,6 +19,10 @@ export default function CaptureScreen() {
   const cameraRef = useRef<CameraView>(null)
   const [permission, requestPermission] = useCameraPermissions()
   const [facing, setFacing] = useState<'front' | 'back'>('back')
+  // Torch (continuous flashlight) — helps in dim rooms. Note this is the
+  // steady lamp, not the capture flash, so the user sees the true lighting
+  // in the preview before committing the shot.
+  const [torchOn, setTorchOn] = useState(false)
   const [currentSide, setCurrentSide] = useState<'front' | 'back'>('front')
   const [isCapturing, setIsCapturing] = useState(false)
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
@@ -368,14 +372,17 @@ export default function CaptureScreen() {
           </View>
 
           <View style={styles.qualityDetails}>
+            {/* Only claim what we actually measure. assessQuality is a
+                dimensions/framing check (no pixel access on RN without a
+                native dep — see the honesty note in lib/imageUtils.ts), so
+                the old "Sharpness: Good / Brightness: Good" rows were
+                fabricated. Show the real signal and tell the user where
+                sharpness/lighting actually get evaluated. */}
             <View style={styles.qualityRow}>
-              <Ionicons name="eye" size={16} color={Colors.gray[500]} />
-              <Text style={styles.qualityLabel}>Sharpness: {previewQuality.blurLabel}</Text>
+              <Ionicons name="scan" size={16} color={Colors.gray[500]} />
+              <Text style={styles.qualityLabel}>Resolution: {previewQuality.resolutionLabel}</Text>
             </View>
-            <View style={styles.qualityRow}>
-              <Ionicons name="sunny" size={16} color={Colors.gray[500]} />
-              <Text style={styles.qualityLabel}>Brightness: {previewQuality.brightnessLabel}</Text>
-            </View>
+            <Text style={styles.qualityNote}>Sharpness and lighting are evaluated by DCM Optic™ during grading.</Text>
             <Text style={styles.uncertaintyText}>Grade uncertainty: {previewQuality.uncertainty}</Text>
             {previewQuality.suggestions.map((s, i) => (
               <Text key={i} style={styles.suggestionText}>{s}</Text>
@@ -484,6 +491,7 @@ export default function CaptureScreen() {
               ref={cameraRef}
               style={styles.camera}
               facing={facing}
+              enableTorch={torchOn && facing === 'back'}
               autofocus="on"
               zoom={0}
               pictureSize={pictureSize}
@@ -544,6 +552,24 @@ export default function CaptureScreen() {
       {/* Controls (camera mode only) */}
       {mode === 'camera' && (
         <View style={[styles.controls, { paddingBottom: insets.bottom + 12 }]}>
+          <TouchableOpacity
+            onPress={() => setTorchOn(t => !t)}
+            style={styles.controlButton}
+            disabled={facing === 'front'}
+            accessibilityLabel={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: facing === 'front', selected: torchOn }}
+          >
+            <Ionicons
+              name={torchOn ? 'flashlight' : 'flashlight-outline'}
+              size={22}
+              color={facing === 'front' ? Colors.gray[600] : torchOn ? Colors.amber[500] : Colors.white}
+            />
+            <Text style={[styles.controlLabel, torchOn && facing === 'back' && { color: Colors.amber[500] }]}>
+              {torchOn ? 'Torch On' : 'Torch'}
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => setOrientation(o => o === 'portrait' ? 'landscape' : 'portrait')}
             style={styles.controlButton}
@@ -691,6 +717,7 @@ const styles = StyleSheet.create({
   qualityDetails: { padding: 16, backgroundColor: Colors.gray[800], gap: 6 },
   qualityRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   qualityLabel: { color: Colors.gray[300], fontSize: 13 },
+  qualityNote: { color: Colors.gray[500], fontSize: 11 },
   uncertaintyText: { color: Colors.gray[400], fontSize: 12, marginTop: 4 },
   suggestionText: { color: Colors.amber[500], fontSize: 12 },
   previewActions: { flexDirection: 'row', gap: 12, padding: 16, backgroundColor: Colors.gray[900] },

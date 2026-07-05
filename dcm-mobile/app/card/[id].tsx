@@ -1270,6 +1270,26 @@ export default function CardDetailScreen() {
           <Text style={s.metaText}>Uncertainty: {resolveUncertainty(card.conversational_grade_uncertainty, confidence)}</Text>
           <Text style={s.metaText}>Confidence Score: {confidence}</Text>
         </View>
+        {/* Retake CTA — image confidence C/D means photo quality (blur,
+            glare, lighting) capped how precisely the AI could grade
+            (±2/±3 uncertainty). Regrading an existing card in place isn't
+            supported — grading always creates a new card via the capture →
+            review → processing flow — so this routes the owner to the
+            grade tab to start a fresh, better-lit submission. */}
+        {isOwner && ['C', 'D'].includes((confidence || '').toUpperCase().trim()) && (
+          <TouchableOpacity
+            style={s.retakeBanner}
+            onPress={() => router.push('/(tabs)/grade')}
+            accessibilityRole="button"
+            accessibilityLabel="Image quality limited this grade. Retake your photos for a better result."
+          >
+            <Ionicons name="camera-outline" size={18} color={Colors.amber[600]} />
+            <Text style={s.retakeBannerText}>
+              Image quality limited this grade — retake your photos for a better result
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={Colors.amber[600]} />
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Card Not Gradable — mirrors web's red block shown when the grade is
@@ -2733,6 +2753,8 @@ const s = StyleSheet.create({
   gradeArea: { alignItems: 'center', paddingVertical: 16, backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.gray[200] },
   gradeMetaRow: { flexDirection: 'row', gap: 16, marginTop: 8 },
   metaText: { fontSize: 12, color: Colors.gray[500], fontWeight: '600' },
+  retakeBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[100], borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, marginTop: 12, marginHorizontal: 16, alignSelf: 'stretch' },
+  retakeBannerText: { flex: 1, fontSize: 12, fontWeight: '600', color: Colors.amber[600] },
 
   // Subgrade boxes
   subgradeGrid: { flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8 },
