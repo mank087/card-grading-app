@@ -19,6 +19,8 @@
  */
 
 import { safePricingFetch, pricingDelay, PricingApiError } from './pricingFetch';
+import { isSportsLocalDbAvailable, matchSportsCardLocal, productToNormalizedPrices } from './sportsCardMatcher';
+import { estimateDcmValue as estimateDcmValueShared } from './pricing/dcmEstimate';
 
 // SportsCardsPro API base URL (for sports trading cards)
 const API_BASE_URL = 'https://www.sportscardspro.com/api';
@@ -114,9 +116,33 @@ export interface SportsCardSearchParams {
   setName?: string;
   cardNumber?: string;
   variant?: string;
+  subset?: string;   // Insert name (e.g. "Downtown", "Kaboom") — used by the local DB matcher
   rookie?: boolean;
   sport?: string;  // e.g., "Hockey", "Baseball", "Basketball", "Football"
   serialNumbering?: string;  // e.g., "23/75" or "/99" - we extract the denominator
+}
+
+/** Result of a sports price search; extra fields populated on local-DB matches */
+export interface SportsCardSearchResult {
+  prices: NormalizedPrices | null;
+  matchConfidence: 'high' | 'medium' | 'low' | 'none';
+  queryUsed: string;
+  /** 'local-db' when matched against sports_card_products, 'api' otherwise */
+  source?: 'local-db' | 'api';
+  /** WS2b identity tier (local-DB matches only) */
+  matchTier?: 'exact' | 'family' | 'none';
+  /** All parallels in the matched family (local-DB matches only) */
+  family?: Array<{
+    id: string;
+    productName: string;
+    variantText: string | null;
+    serialDenominator: number | null;
+    hasPrices: boolean;
+  }>;
+  /** True when the parallel was ambiguous and we defaulted to the base card */
+  defaultedToBase?: boolean;
+  /** True when the AI named a parallel that doesn't exist in the family */
+  variantNotFound?: boolean;
 }
 
 /**
@@ -479,58 +505,16 @@ export function normalizePrices(product: SportsCardsPriceResult): NormalizedPric
 }
 
 /**
- * Estimate DCM grade equivalent value based on PSA prices
- * DCM grades map approximately to PSA grades
- *
- * SportsCardsPro provides prices for grades: 7, 8, 9, 9.5, 10
- * We interpolate between available grades for DCM values
+ * Estimate DCM grade equivalent value.
+ * Thin wrapper over the shared implementation (WS4 consolidation) —
+ * grade-tier interpolation, no raw×3 fallback.
  */
 export function estimateDcmValue(
   prices: NormalizedPrices,
   dcmGrade: number
 ): number | null {
-  const raw = prices.raw;
-
-  // Get PSA equivalent price for the grade
-  const roundedGrade = Math.round(dcmGrade).toString();
-  const halfGrade = dcmGrade >= 9 ? '9.5' : null;
-  const psaEquivalentPrice = prices.psa[roundedGrade] || (halfGrade ? prices.psa[halfGrade] : null) || null;
-
-  // Fallback: if no graded equivalent, use raw × 3
-  if (!psaEquivalentPrice && raw) {
-    return Math.round(raw * 3 * 100) / 100;
-  }
-
-  if (!raw || !psaEquivalentPrice) {
-    // If we have PSA price but no raw, just return a discounted PSA price
-    if (psaEquivalentPrice) {
-      // Apply a 30% discount (DCM is 70% of PSA value)
-      return Math.round(psaEquivalentPrice * 0.70 * 100) / 100;
-    }
-    return null;
-  }
-
-  // DCM multiplier: represents market premium over raw
-  // Higher grades get closer to PSA values, lower grades closer to raw
-  // This is a conservative estimate since DCM is establishing market presence
-  let dcmMultiplier: number;
-  if (dcmGrade >= 9.5) {
-    dcmMultiplier = 0.70; // 70% of PSA premium over raw
-  } else if (dcmGrade >= 9) {
-    dcmMultiplier = 0.65; // 65% of PSA premium
-  } else if (dcmGrade >= 8) {
-    dcmMultiplier = 0.55; // 55% of PSA premium
-  } else if (dcmGrade >= 7) {
-    dcmMultiplier = 0.45; // 45% of PSA premium
-  } else {
-    dcmMultiplier = 0.35; // 35% of PSA premium for lower grades
-  }
-
-  // Calculate: Raw + (PSA premium × DCM multiplier)
-  const psaPremium = psaEquivalentPrice - raw;
-  const dcmValue = raw + (psaPremium * dcmMultiplier);
-
-  return Math.round(dcmValue * 100) / 100;
+  const result = estimateDcmValueShared(prices, dcmGrade);
+  return result ? result.estimate : null;
 }
 
 /**
@@ -539,12 +523,54 @@ export function estimateDcmValue(
  */
 export async function searchSportsCardPrices(
   params: SportsCardSearchParams
-): Promise<{ prices: NormalizedPrices | null; matchConfidence: 'high' | 'medium' | 'low' | 'none'; queryUsed: string }> {
+): Promise<SportsCardSearchResult> {
   // Sanitize params: clear literal "undefined" strings
   if (params.setName === 'undefined') params.setName = undefined;
   if (params.year === 'undefined') params.year = undefined;
   if (params.variant === 'undefined') params.variant = undefined;
   if (params.cardNumber === 'undefined') params.cardNumber = undefined;
+  if (params.subset === 'undefined') params.subset = undefined;
+
+  // WS2: local database first — exact card-number equality, subset/insert-aware,
+  // serial auto-disambiguation, full parallel family. Falls back to the live
+  // API search when the local DB is empty (pre-import) or has no match.
+  try {
+    if (await isSportsLocalDbAvailable()) {
+      const local = await matchSportsCardLocal({
+        playerName: params.playerName,
+        year: params.year,
+        setName: params.setName,
+        cardNumber: params.cardNumber,
+        variant: params.variant,
+        subset: params.subset,
+        serialNumbering: params.serialNumbering,
+        rookie: params.rookie,
+        sport: params.sport,
+      });
+      if (local.tier !== 'none' && local.product) {
+        console.log(`[SportsCardsPro] ✓ LOCAL DB match (${local.tier}/${local.confidence}): ${local.product.product_name} — ${local.product.console_name}${local.notes.length ? ` [${local.notes.join('; ')}]` : ''}`);
+        return {
+          prices: productToNormalizedPrices(local.product),
+          matchConfidence: local.confidence === 'none' ? 'none' : local.confidence,
+          queryUsed: `local-db (${local.tier})`,
+          source: 'local-db',
+          matchTier: local.tier,
+          family: local.family.map(f => ({
+            id: f.id,
+            productName: f.product_name,
+            variantText: f.variant_text,
+            serialDenominator: f.serial_denominator,
+            hasPrices: !!(f.loose_price || f.graded_price || f.manual_only_price || f.new_price),
+          })),
+          defaultedToBase: local.defaultedToBase,
+          variantNotFound: local.variantNotFound,
+        };
+      }
+      console.log(`[SportsCardsPro] Local DB no match (${local.notes.join('; ')}) — falling back to API search`);
+    }
+  } catch (localErr) {
+    console.error('[SportsCardsPro] Local matcher error, falling back to API:', localErr);
+  }
 
   // Log search parameters clearly
   console.log('[SportsCardsPro] === SEARCH REQUEST ===');
@@ -655,13 +681,17 @@ export async function searchSportsCardPrices(
         const flexNum = cleanCardNum.replace(/[\s-]+/g, '');  // Remove spaces and hyphens
         const flexNumProduct = productName.toLowerCase().replace(/[\s-]+/g, '');
 
-        // Check if product name contains the card number (with or without #, with or without leading zeros)
-        const exactMatch = productName.includes(`#${cleanCardNum}`) || productName.includes(cleanCardNum) ||
-          productName.includes(`#${cleanCardNumNoZeros}`) || productName.includes(cleanCardNumNoZeros);
-        const normalizedMatch = normalizedProductName.includes(`#${normalizedSearchNum}`) || normalizedProductName.includes(normalizedSearchNum) ||
-          normalizedProductName.includes(`#${normalizedSearchNumNoZeros}`) || normalizedProductName.includes(normalizedSearchNumNoZeros);
-        // Flexible match: collapse spaces/hyphens and compare
-        const flexMatch = flexNumProduct.includes(`#${flexNum}`) || flexNumProduct.includes(flexNum);
+        // Check if product name contains the card number as a whole token.
+        // Boundary-aware so "#4" does NOT match "#40"/"#400" (WS2 fix).
+        const boundaryMatch = (haystack: string, needle: string): boolean => {
+          if (!needle) return false;
+          const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          return new RegExp(`(^|[^a-z0-9])#?${escaped}([^a-z0-9]|$)`, 'i').test(haystack);
+        };
+        const exactMatch = boundaryMatch(productName, cleanCardNum) || boundaryMatch(productName, cleanCardNumNoZeros);
+        const normalizedMatch = boundaryMatch(normalizedProductName, normalizedSearchNum) || boundaryMatch(normalizedProductName, normalizedSearchNumNoZeros);
+        // Flexible match: collapse spaces/hyphens and compare (still boundary-aware)
+        const flexMatch = boundaryMatch(flexNumProduct, flexNum);
 
         if (!exactMatch && !normalizedMatch && !flexMatch) {
           console.log(`[SportsCardsPro] SKIP: Card # mismatch - looking for "${cleanCardNum}" (or "${cleanCardNumNoZeros}", flex "${flexNum}"), found "${productName}"`);
@@ -786,36 +816,33 @@ export async function searchSportsCardPrices(
         const hasSgcPrices = Object.values(normalized.sgc).some(p => p > 0);
 
         if (hasRawPrice || hasPsaPrices || hasBgsPrices || hasSgcPrices) {
-          // Check if this is a fallback (we found an exact match earlier but it had no prices)
-          const isFallback = exactMatchWithoutPrices !== null && score < exactMatchWithoutPrices.score;
-
-          if (isFallback) {
-            console.log(`[SportsCardsPro] ✓ Using FALLBACK product with prices: ${product['product-name']}`);
-            console.log(`[SportsCardsPro]   (Exact match "${exactMatchWithoutPrices.product['product-name']}" had no prices)`);
-          } else {
-            console.log('[SportsCardsPro] ✓ Found matching product with prices:', product['product-name']);
+          // WS2.5: never substitute a lower-scored, different product's prices
+          // for the true best match. A wrong parallel's price is worse than no
+          // price — skip and let the no-prices return below handle it.
+          const betterMatchNoPrices = exactMatchWithoutPrices;
+          if (betterMatchNoPrices && score < betterMatchNoPrices.score) {
+            console.log(`[SportsCardsPro] SKIP substitution: best match "${betterMatchNoPrices.product['product-name']}" has no prices; not using lower-scored "${product['product-name']}" prices`);
+            continue;
           }
+
+          console.log('[SportsCardsPro] ✓ Found matching product with prices:', product['product-name']);
 
           // Determine confidence based on match quality
           // High (30+): matched parallel AND serial
           // Medium (15-29): matched parallel OR serial
-          // Low (<15): only matched card number/set OR using fallback
+          // Low (<15): only matched card number/set
           let confidence: 'high' | 'medium' | 'low' = 'low';
-          if (!isFallback && score >= 30) {
+          if (score >= 30) {
             confidence = 'high';
-          } else if (!isFallback && score >= 15) {
+          } else if (score >= 15) {
             confidence = 'medium';
           }
 
           return {
-            prices: {
-              ...normalized,
-              // Include fallback info so UI can show appropriate message
-              isFallback: isFallback,
-              exactMatchName: isFallback ? exactMatchWithoutPrices.product['product-name'] : undefined,
-            },
+            prices: normalized,
             matchConfidence: confidence,
             queryUsed: query,
+            source: 'api' as const,
           };
         } else {
           // No prices for this product - remember it if it's our best match so far

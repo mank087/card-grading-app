@@ -262,6 +262,11 @@ export default function Footer() {
                   Star Wars
                 </Link>
               </li>
+              <li>
+                <Link href="/sports-database" className="text-gray-400 hover:text-white transition-colors">
+                  Sports Cards
+                </Link>
+              </li>
             </ul>
           </div>
 

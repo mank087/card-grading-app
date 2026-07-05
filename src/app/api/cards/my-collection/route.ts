@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
+import { createSignedUrlMap } from "@/lib/signedUrlBatch";
 
 export async function GET(request: NextRequest) {
   try {
@@ -59,30 +60,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ cards: [] });
     }
 
-    // 🚀 PERFORMANCE: Batch create signed URLs (fast, single request)
-    // Then modify URLs to use image transforms for egress optimization
+    // 🚀 PERFORMANCE: Batch create signed URLs — chunked to respect Supabase's
+    // 1,000-paths-per-request limit (collections >500 cards used to 400 the whole
+    // batch and every card rendered "No image").
     const allPaths = cards.flatMap(card => [card.front_path, card.back_path]);
 
-    const { data: signedUrls, error: signError } = await supabase.storage
-      .from('cards')
-      .createSignedUrls(allPaths, 60 * 60); // 1 hour expiry
-
-    if (signError) {
+    let urlMap: Map<string, string>;
+    try {
+      urlMap = await createSignedUrlMap(supabase.storage, 'cards', allPaths, 60 * 60);
+    } catch (signError) {
       console.error('[Collection API] Error creating signed URLs:', signError);
       // Fall back to returning cards without URLs
       return NextResponse.json({
         cards: cards.map(card => ({ ...card, front_url: null, back_url: null }))
       });
     }
-
-    // Build a map of path -> signedUrl for quick lookup
-    // Note: Client-side Next.js Image component handles optimization
-    const urlMap = new Map<string, string>();
-    signedUrls?.forEach(item => {
-      if (item.path && item.signedUrl) {
-        urlMap.set(item.path, item.signedUrl);
-      }
-    });
 
     // Map URLs back to cards + parse conversational_grading for missing fields
     const cardsWithUrls = cards.map(card => {

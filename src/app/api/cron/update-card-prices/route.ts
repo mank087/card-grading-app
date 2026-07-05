@@ -72,7 +72,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, processed: 0, message: 'No cards to refresh' });
     }
 
+    // WS6.2 observability: when the slice is full and entirely stale, more
+    // stale cards exist beyond MAX_CARDS_PER_RUN — surface the backlog
+    // instead of silently leaving them for next week.
     const staleCards = cards.filter(c => isCacheStale(c.dcm_price_updated_at));
+    if (cards.length === MAX_CARDS_PER_RUN && staleCards.length === cards.length) {
+      const { count: totalStale } = await supabaseAdmin
+        .from('cards')
+        .select('id', { count: 'estimated', head: true })
+        .not('category', 'is', null)
+        .or(`dcm_price_updated_at.is.null,dcm_price_updated_at.lt.${new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()}`);
+      if (totalStale && totalStale > MAX_CARDS_PER_RUN) {
+        console.warn(`[Price Cron] BACKLOG: ~${totalStale} stale cards total; this run covers ${MAX_CARDS_PER_RUN}. Remainder waits for the next run.`);
+      }
+    }
     if (staleCards.length === 0) {
       console.log('[Price Cron] All cards in this slice are fresh');
       return NextResponse.json({

@@ -15,6 +15,8 @@ import {
   isPriceChartingEnabled,
   type NormalizedPrices,
 } from '@/lib/priceCharting';
+import { getLocalSportsProductById, productToNormalizedPrices } from '@/lib/sportsCardMatcher';
+import { estimateDcmValue as estimateDcmValueShared } from '@/lib/pricing/dcmEstimate';
 
 // Types
 export interface DcmCachedPrice {
@@ -62,57 +64,22 @@ export function isSportsCardCategory(category: string): boolean {
 }
 
 /**
- * Calculate DCM estimated value using multiplier approach
- *
- * DCM is newer and not yet established like PSA, so values are typically
- * a percentage between raw and PSA equivalent grade.
- *
- * Fallback: If no graded equivalent price, use raw × 3
+ * Calculate DCM estimated value.
+ * Thin wrapper over the shared implementation (WS4 consolidation) —
+ * grade-tier interpolation, no raw×3 fallback, low-data flagging.
  */
 export function calculateDcmEstimate(
   prices: NormalizedPrices,
-  dcmGrade: number
-): { estimate: number; method: 'multiplier' | 'fallback' } | null {
-  const raw = prices.raw;
-  const psaGrades = prices.psa;
-
-  // Get the PSA price at equivalent grade
-  const roundedGrade = Math.round(dcmGrade).toString();
-  const halfGrade = dcmGrade >= 9 ? '9.5' : null;
-  const psaEquivalentPrice = psaGrades[roundedGrade] || (halfGrade && psaGrades[halfGrade]) || null;
-
-  // Fallback: if no graded equivalent, use raw × 3
-  if (!psaEquivalentPrice && raw) {
-    return {
-      estimate: Math.round(raw * 3 * 100) / 100,
-      method: 'fallback',
-    };
-  }
-
-  if (!raw || !psaEquivalentPrice) return null;
-
-  // DCM multiplier: represents market premium over raw
-  // Higher grades get closer to PSA values, lower grades closer to raw
-  let dcmMultiplier: number;
-  if (dcmGrade >= 9.5) {
-    dcmMultiplier = 0.70; // 70% of PSA premium over raw
-  } else if (dcmGrade >= 9) {
-    dcmMultiplier = 0.65; // 65% of PSA premium
-  } else if (dcmGrade >= 8) {
-    dcmMultiplier = 0.55; // 55% of PSA premium
-  } else if (dcmGrade >= 7) {
-    dcmMultiplier = 0.45; // 45% of PSA premium
-  } else {
-    dcmMultiplier = 0.35; // 35% of PSA premium for lower grades
-  }
-
-  // Calculate: Raw + (PSA premium × DCM multiplier)
-  const psaPremium = psaEquivalentPrice - raw;
-  const dcmValue = raw + (psaPremium * dcmMultiplier);
-
+  dcmGrade: number,
+  options: { gradeWasDefaulted?: boolean } = {}
+): { estimate: number; method: 'multiplier' | 'fallback'; lowData?: boolean } | null {
+  const result = estimateDcmValueShared(prices, dcmGrade, options);
+  if (!result) return null;
   return {
-    estimate: Math.round(dcmValue * 100) / 100,
-    method: 'multiplier',
+    estimate: result.estimate,
+    // Legacy method labels preserved for existing consumers
+    method: result.method === 'interpolated' ? 'multiplier' : 'fallback',
+    lowData: result.lowData,
   };
 }
 
@@ -317,7 +284,7 @@ export async function fetchAndCacheDcmPrice(card: CardForDcmPricing, options: { 
   console.log(`[DcmPriceTracker] Card #: ${cardNumber || '(not specified)'}`);
   console.log(`[DcmPriceTracker] Serial: ${serialNumbering || '(not numbered)'}`);
   console.log(`[DcmPriceTracker] Parallel Type: ${cardInfo?.parallel_type || '(none)'}`);
-  console.log(`[DcmPriceTracker] Subset (NOT used): ${cardInfo?.subset || '(none)'}`);
+  console.log(`[DcmPriceTracker] Subset: ${cardInfo?.subset || '(none)'}`);
   console.log(`[DcmPriceTracker] Rarity/Variant: ${cardInfo?.rarity_or_variant || '(none)'}`);
   console.log(`[DcmPriceTracker] VARIANT USED: ${variant || '(none)'}`);
 
@@ -336,13 +303,14 @@ export async function fetchAndCacheDcmPrice(card: CardForDcmPricing, options: { 
   try {
     console.log(`[DcmPriceTracker] Fetching SportsCardsPro prices for card ${card.id}...`);
 
-    // Search SportsCardsPro
+    // Search: local sports DB first (subset/insert-aware), API fallback inside
     const result = await searchSportsCardPrices({
       playerName: playerOrCharacter,
       year: year || undefined,
       setName: setName || undefined,
       cardNumber: cardNumber || undefined,
       variant: variant || undefined,  // Use parallel_type if available, else rarity_or_variant
+      subset: cardInfo?.subset || undefined, // WS2.2: insert name now participates in matching
       rookie: isRookie,
       sport: card.category,
       serialNumbering: serialNumbering || undefined,
@@ -354,10 +322,11 @@ export async function fetchAndCacheDcmPrice(card: CardForDcmPricing, options: { 
     }
 
     const prices = result.prices;
+    const gradeWasDefaulted = !card.conversational_decimal_grade;
     const dcmGrade = card.conversational_decimal_grade || 8; // Default to 8 if no grade
 
-    // Calculate DCM estimate
-    const dcmResult = calculateDcmEstimate(prices, dcmGrade);
+    // Calculate DCM estimate (low-data flag when grade defaulted / thin comps)
+    const dcmResult = calculateDcmEstimate(prices, dcmGrade, { gradeWasDefaulted });
 
     // Calculate market stats
     const stats = calculateMarketStats(prices);
@@ -418,14 +387,20 @@ export async function refreshDcmPriceByProductId(
   try {
     console.log(`[DcmPriceTracker] Refreshing price for card ${cardId} using product ID ${productId}...`);
 
-    // Fetch prices directly by product ID
-    const priceResult = await getProductPrices(productId);
-    if (!priceResult) {
-      console.log(`[DcmPriceTracker] No price data for product ${productId}`);
-      return null;
+    // Local DB first (same product IDs as the API); fall back to live API
+    let prices: NormalizedPrices | null = null;
+    const localRow = await getLocalSportsProductById(productId).catch(() => null);
+    if (localRow) {
+      prices = productToNormalizedPrices(localRow);
+      console.log(`[DcmPriceTracker] Product ${productId} served from local DB`);
+    } else {
+      const priceResult = await getProductPrices(productId);
+      if (!priceResult) {
+        console.log(`[DcmPriceTracker] No price data for product ${productId}`);
+        return null;
+      }
+      prices = normalizePrices(priceResult);
     }
-
-    const prices = normalizePrices(priceResult);
 
     // Calculate DCM estimate
     const dcmResult = calculateDcmEstimate(prices, dcmGrade);

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
+import { createSignedUrlMap } from '@/lib/signedUrlBatch'
 
 export async function GET(request: NextRequest) {
   try {
@@ -55,19 +56,14 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Batch create signed URLs
+    // Batch create signed URLs — chunked (Supabase rejects >1000 paths per request;
+    // public collections >500 cards used to render with no images)
     const allPaths = cards.flatMap(card => [card.front_path, card.back_path])
-    const { data: signedUrls, error: signError } = await supabaseAdmin.storage
-      .from('cards')
-      .createSignedUrls(allPaths, 60 * 60)
-
-    const urlMap = new Map<string, string>()
-    if (!signError && signedUrls) {
-      signedUrls.forEach(item => {
-        if (item.signedUrl && item.path) {
-          urlMap.set(item.path, item.signedUrl)
-        }
-      })
+    let urlMap = new Map<string, string>()
+    try {
+      urlMap = await createSignedUrlMap(supabaseAdmin.storage, 'cards', allPaths, 60 * 60)
+    } catch (signError) {
+      console.error('[Public Collection API] Error creating signed URLs:', signError)
     }
 
     // Enrich cards (same logic as featured API)

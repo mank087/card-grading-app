@@ -59,6 +59,44 @@ const EBAY_CONFIG = {
 let appTokenCache: { token: string; expiresAt: number } | null = null;
 
 // =============================================================================
+// Title Exclusion Patterns
+// =============================================================================
+
+// Listings whose titles match any of these are excluded BEFORE price stats.
+// Graded slabs (PSA/BGS/SGC/CGC/"graded"/"gem mint"/"slab") trade in a
+// different price band than the raw asking listings this fallback represents,
+// and lots/reprints/proxies/customs/digital items/breaks aren't comparable
+// single raw cards at all.
+// NOTE: "lot" is deliberately matched only as "lot of" / "card lot" / "lot)"
+// (word-boundary anchored) so it never matches inside words like "lots",
+// "Lotte", or player/character names.
+const TITLE_EXCLUSION_PATTERNS: RegExp[] = [
+  /\bpsa\b/i,
+  /\bbgs\b/i,
+  /\bsgc\b/i,
+  /\bcgc\b/i,
+  /\bgraded\b/i,
+  /\bgem\s+mint\b/i,
+  /\bslab\b/i,
+  /\blot\s+of\b/i,
+  /\blot\)/i,
+  /\bcard\s+lot\b/i,
+  /\breprint\b/i,
+  /\bproxy\b/i,
+  /\bcustom\b/i,
+  /\bdigital\b/i,
+  /\bbreak\b/i,
+];
+
+/**
+ * Drop listings whose titles indicate graded slabs, lots, reprints, etc.
+ * Always applied before computing price statistics.
+ */
+function excludeIneligibleTitles(items: EbayPriceResult[]): EbayPriceResult[] {
+  return items.filter(item => !TITLE_EXCLUSION_PATTERNS.some(re => re.test(item.title)));
+}
+
+// =============================================================================
 // Application Token (Client Credentials)
 // =============================================================================
 
@@ -182,8 +220,9 @@ export async function searchEbayPrices(
     params.set('filter', filters.join(','));
   }
 
-  // Sort by price to get range
-  params.set('sort', 'price');
+  // NOTE: no explicit sort — eBay's default best-match relevance gives a
+  // representative sample of the market. Sorting by price ascending sampled
+  // only the cheapest ~25 listings and skewed the stats low.
 
   const searchUrl = `${apiUrl}/buy/browse/v1/item_summary/search?${params.toString()}`;
 
@@ -252,13 +291,37 @@ export async function searchEbayPrices(
     bidCount: item.bidCount,
   }));
 
+  // Always exclude graded slabs, lots, reprints, etc. before computing stats
+  const preExclusionCount = items.length;
+  items = excludeIneligibleTitles(items);
+  const excludedCount = preExclusionCount - items.length;
+
   // Apply relevance filter if provided (removes non-card items like magazines, books)
   if (options.relevanceFilter) {
     items = filterRelevantItems(items, options.relevanceFilter);
   }
 
   // Calculate price statistics
-  const prices = items.map(i => i.price).filter(p => p > 0);
+  let prices = items.map(i => i.price).filter(p => p > 0);
+
+  // IQR outlier trimming: with enough samples (n >= 8), drop prices outside
+  // [Q1 - 1.5*IQR, Q3 + 1.5*IQR] so mispriced/mismatched listings don't skew
+  // lowest/average/highest. Below 8 samples the quartiles are too noisy to trust.
+  let trimmedCount = 0;
+  if (prices.length >= 8) {
+    const sorted = [...prices].sort((a, b) => a - b);
+    const q1 = quantile(sorted, 0.25);
+    const q3 = quantile(sorted, 0.75);
+    const iqr = q3 - q1;
+    const lowerBound = q1 - 1.5 * iqr;
+    const upperBound = q3 + 1.5 * iqr;
+    const kept = prices.filter(p => p >= lowerBound && p <= upperBound);
+    trimmedCount = prices.length - kept.length;
+    prices = kept;
+  }
+
+  console.log(`[eBay Browse] Stats for "${query}": ${prices.length} listings used (${excludedCount} excluded by title, ${trimmedCount} IQR-trimmed)`);
+
   const lowestPrice = prices.length > 0 ? Math.min(...prices) : undefined;
   const highestPrice = prices.length > 0 ? Math.max(...prices) : undefined;
   const averagePrice = prices.length > 0
@@ -276,7 +339,10 @@ export async function searchEbayPrices(
   }
 
   return {
-    total: options.relevanceFilter ? items.length : (data.total || 0),
+    // "Listings used for stats": the post-exclusion, post-relevance-filter,
+    // post-IQR-trim count that the price statistics were computed from —
+    // NOT eBay's reported total match count for the query.
+    total: prices.length,
     items,
     lowestPrice,
     highestPrice,
@@ -290,8 +356,41 @@ export async function searchEbayPrices(
 // =============================================================================
 
 /**
+ * Linear-interpolated quantile of an ascending-sorted array.
+ * Used for IQR outlier trimming in price statistics.
+ */
+function quantile(sortedAsc: number[], q: number): number {
+  const pos = (sortedAsc.length - 1) * q;
+  const base = Math.floor(pos);
+  const rest = pos - base;
+  if (sortedAsc[base + 1] !== undefined) {
+    return sortedAsc[base] + rest * (sortedAsc[base + 1] - sortedAsc[base]);
+  }
+  return sortedAsc[base];
+}
+
+/**
+ * Build a boundary-aware regex for a card number so "#4" doesn't match "#40".
+ * Requires a non-alphanumeric char (or string edge) on both sides of the
+ * number, with an optional leading '#'.
+ */
+function buildCardNumberRegex(cardNumber: string): RegExp | null {
+  const cleaned = cardNumber.replace(/^#/, '').trim();
+  if (!cleaned) return null;
+  const escaped = cleaned.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^a-z0-9])#?${escaped}([^a-z0-9]|$)`, 'i');
+}
+
+/**
  * Filter eBay results to only items that are actually relevant trading cards.
- * Prevents irrelevant items (magazines, books, etc.) from polluting price data.
+ * Prevents irrelevant items (magazines, books, other cards by the same
+ * player) from polluting price data.
+ *
+ * Matching is AND-based: when BOTH a player/card name and a card number are
+ * available, the title must contain the last name AND the (boundary-aware)
+ * card number. When only one is available, that one is required. The
+ * year+keyword heuristic is only a fallback when neither name nor number
+ * exists.
  */
 function filterRelevantItems(
   items: EbayPriceResult[],
@@ -300,19 +399,23 @@ function filterRelevantItems(
   // If no filter criteria, return all
   if (!filter.playerLastName && !filter.cardNumber && !filter.year) return items;
 
+  const nameLower = filter.playerLastName?.toLowerCase() || null;
+  const numberRegex = filter.cardNumber ? buildCardNumberRegex(filter.cardNumber) : null;
+
   return items.filter(item => {
     const titleLower = item.title.toLowerCase();
 
-    // Match player last name in title → relevant
-    if (filter.playerLastName && titleLower.includes(filter.playerLastName.toLowerCase())) return true;
+    // Require name AND number when both are available
+    if (nameLower && numberRegex) {
+      return titleLower.includes(nameLower) && numberRegex.test(item.title);
+    }
+    if (nameLower) return titleLower.includes(nameLower);
+    if (numberRegex) return numberRegex.test(item.title);
 
-    // Match card number in title → relevant
-    if (filter.cardNumber && titleLower.includes(filter.cardNumber.toLowerCase())) return true;
-
-    // Match year + card keyword → relevant
+    // Fallback (no name or number available): year + card keyword
     if (filter.year && titleLower.includes(filter.year)) {
       const cardKeywords = [
-        'card', 'trading', '#', 'rookie', 'rc', 'psa', 'bgs', 'sgc', 'cgc', 'graded',
+        'card', 'trading', '#', 'rookie', 'rc',
         'topps', 'panini', 'upper deck', 'bowman', 'fleer', 'o-pee-chee', 'opc', 'parkhurst',
       ];
       if (cardKeywords.some(kw => titleLower.includes(kw))) return true;
@@ -864,6 +967,7 @@ export async function searchPokemonPricesWithFallback(
     categoryId?: string;
     limit?: number;
     minResults?: number;
+    relevanceFilter?: { playerLastName?: string; cardNumber?: string; year?: string; };
   } = {}
 ): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
   const queries = buildPokemonCardQueries(card);
@@ -880,6 +984,7 @@ export async function searchPokemonPricesWithFallback(
       const result = await searchEbayPrices(queryInfo.query, {
         categoryId: options.categoryId,
         limit,
+        relevanceFilter: options.relevanceFilter,
       });
 
       // If we found enough results, return immediately
@@ -1041,6 +1146,7 @@ export async function searchMTGPricesWithFallback(
     categoryId?: string;
     limit?: number;
     minResults?: number;
+    relevanceFilter?: { playerLastName?: string; cardNumber?: string; year?: string; };
   } = {}
 ): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
   const queries = buildMTGCardQueries(card);
@@ -1057,6 +1163,7 @@ export async function searchMTGPricesWithFallback(
       const result = await searchEbayPrices(queryInfo.query, {
         categoryId: options.categoryId,
         limit,
+        relevanceFilter: options.relevanceFilter,
       });
 
       if (result.total >= minResults) {
@@ -1211,6 +1318,7 @@ export async function searchLorcanaPricesWithFallback(
     categoryId?: string;
     limit?: number;
     minResults?: number;
+    relevanceFilter?: { playerLastName?: string; cardNumber?: string; year?: string; };
   } = {}
 ): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
   const queries = buildLorcanaCardQueries(card);
@@ -1227,6 +1335,7 @@ export async function searchLorcanaPricesWithFallback(
       const result = await searchEbayPrices(queryInfo.query, {
         categoryId: options.categoryId,
         limit,
+        relevanceFilter: options.relevanceFilter,
       });
 
       if (result.total >= minResults) {
@@ -1445,6 +1554,7 @@ export async function searchOnePiecePricesWithFallback(
     categoryId?: string;
     limit?: number;
     minResults?: number;
+    relevanceFilter?: { playerLastName?: string; cardNumber?: string; year?: string; };
   } = {}
 ): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
   const queries = buildOnePieceCardQueries(card);
@@ -1463,6 +1573,7 @@ export async function searchOnePiecePricesWithFallback(
       const result = await searchEbayPrices(queryInfo.query, {
         categoryId: options.categoryId,
         limit,
+        relevanceFilter: options.relevanceFilter,
       });
 
       console.log(`[eBay One Piece] Found ${result.total} results`);
@@ -1691,6 +1802,7 @@ export async function searchOtherPricesWithFallback(
     categoryId?: string;
     limit?: number;
     minResults?: number;
+    relevanceFilter?: { playerLastName?: string; cardNumber?: string; year?: string; };
   } = {}
 ): Promise<EbayPriceSearchResult & { queryUsed: string; queryStrategy: string }> {
   const queries = buildOtherCardQueries(card);
@@ -1710,6 +1822,7 @@ export async function searchOtherPricesWithFallback(
       const result = await searchEbayPrices(queryInfo.query, {
         categoryId: options.categoryId,
         limit,
+        relevanceFilter: options.relevanceFilter,
       });
 
       // Check if this query includes the card number

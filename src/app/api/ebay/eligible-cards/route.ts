@@ -13,6 +13,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { createSignedUrlMap } from '@/lib/signedUrlBatch';
 
 export async function GET(request: NextRequest) {
   try {
@@ -96,14 +97,15 @@ export async function GET(request: NextRequest) {
       if (c.front_path) allPaths.push(c.front_path);
       if (c.back_path) allPaths.push(c.back_path);
     }
-    const urlMap = new Map<string, string>();
+    // Chunked — Supabase rejects >1000 paths per request, and the 2000-card cap
+    // here means up to 4000 paths (collections >500 cards used to get no images)
+    let urlMap = new Map<string, string>();
     if (allPaths.length > 0) {
-      const { data: signed } = await supabase.storage
-        .from('cards')
-        .createSignedUrls(allPaths, 60 * 60);
-      signed?.forEach(s => {
-        if (s.signedUrl && s.path) urlMap.set(s.path, s.signedUrl);
-      });
+      try {
+        urlMap = await createSignedUrlMap(supabase.storage, 'cards', allPaths, 60 * 60);
+      } catch (signErr) {
+        console.error('[eligible-cards] Error creating signed URLs:', signErr);
+      }
     }
 
     const enriched = eligibleRows.map(c => ({

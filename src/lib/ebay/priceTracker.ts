@@ -115,6 +115,44 @@ function isVintageCard(year?: string | null): boolean {
   return !isNaN(yearNum) && yearNum < 1980;
 }
 
+// Tokens that shouldn't be picked as the "last name" for title matching:
+// TCG grade-style suffixes (ex, GX, V, VMAX...) and generational suffixes.
+const NAME_SUFFIX_TOKENS = new Set([
+  'ex', 'gx', 'v', 'vmax', 'vstar', 'tag', 'team', 'card',
+  'jr', 'sr', 'ii', 'iii', 'iv',
+]);
+
+/**
+ * Build an eBay title relevance filter from card info (all card types).
+ * Uses the last meaningful word of the player/character/card name plus the
+ * card number and year, so searchEbayPrices can require name AND number in
+ * listing titles before counting them toward price stats.
+ */
+function buildRelevanceFilter(
+  name: string | undefined,
+  cardNumber: string | undefined,
+  year: string | undefined
+): { playerLastName?: string; cardNumber?: string; year?: string } | undefined {
+  let lastName: string | undefined;
+  if (name) {
+    const words = name
+      .trim()
+      .split(/\s+/)
+      .map(w => w.toLowerCase().replace(/[^\w#/-]/g, ''))
+      .filter(w => w.length > 0);
+    const meaningful = words.filter(w => !NAME_SUFFIX_TOKENS.has(w));
+    lastName = (meaningful.length > 0 ? meaningful[meaningful.length - 1] : words[words.length - 1]) || undefined;
+  }
+
+  if (!lastName && !cardNumber && !year) return undefined;
+
+  return {
+    playerLastName: lastName,
+    cardNumber: cardNumber || undefined,
+    year: year?.substring(0, 4) || undefined,
+  };
+}
+
 /**
  * Fetch price data for a single card
  */
@@ -157,6 +195,7 @@ export async function fetchCardPrice(card: CardForPricing): Promise<PriceSnapsho
         categoryId,
         limit: 25,
         minResults: 3,
+        relevanceFilter: buildRelevanceFilter(playerOrCharacter || cardName, cardNumber, year),
       });
     } else {
       // Use sports card search for sports and other cards
@@ -174,23 +213,11 @@ export async function fetchCardPrice(card: CardForPricing): Promise<PriceSnapsho
         sport: card.category,
       };
 
-      // Build relevance filter from card data
-      const playerLastName = playerOrCharacter
-        ? playerOrCharacter.trim().split(/\s+/).pop()?.toLowerCase()
-        : undefined;
-      const relevanceFilter = (playerLastName || cardNumber || year)
-        ? {
-            playerLastName,
-            cardNumber: cardNumber || undefined,
-            year: year?.substring(0, 4) || undefined,
-          }
-        : undefined;
-
       result = await searchEbayPricesWithFallback(queryOptions, {
         categoryId,
         limit: 25,
         minResults: isVintageCard(year) ? 1 : 3,
-        relevanceFilter,
+        relevanceFilter: buildRelevanceFilter(playerOrCharacter || cardName, cardNumber, year),
       });
     }
 
@@ -604,6 +631,10 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
   try {
     console.log(`[PriceTracker] Fetching eBay prices for card ${card.id} (type: ${cardType})...`);
 
+    // Title relevance filter (name + card number) — applied on ALL card-type
+    // paths so mismatched listings don't pollute the cached price stats
+    const relevanceFilter = buildRelevanceFilter(playerOrCharacter || cardName, cardNumber, year);
+
     let result;
 
     // Use card-type-specific search strategies
@@ -623,6 +654,7 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
         categoryId,
         limit: 25,
         minResults: 3,
+        relevanceFilter,
       });
     } else if (cardType === 'mtg') {
       const mtgQueryOptions: MTGCardQueryOptions = {
@@ -640,6 +672,7 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
         categoryId,
         limit: 25,
         minResults: 3,
+        relevanceFilter,
       });
     } else if (cardType === 'lorcana') {
       const lorcanaQueryOptions: LorcanaCardQueryOptions = {
@@ -656,6 +689,7 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
         categoryId,
         limit: 25,
         minResults: 3,
+        relevanceFilter,
       });
     } else if (cardType === 'other') {
       // Use Other card search for miscellaneous/non-sport cards
@@ -674,6 +708,7 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
         categoryId,
         limit: 25,
         minResults: 3,
+        relevanceFilter,
       });
     } else {
       // Use sports card search for sports cards
@@ -690,18 +725,6 @@ export async function fetchAndCacheCardPrice(card: CardForPricing): Promise<Cach
         rookie_card: isRookie,
         sport: card.category,
       };
-
-      // Build relevance filter from card data
-      const playerLastName = playerOrCharacter
-        ? playerOrCharacter.trim().split(/\s+/).pop()?.toLowerCase()
-        : undefined;
-      const relevanceFilter = (playerLastName || cardNumber || year)
-        ? {
-            playerLastName,
-            cardNumber: cardNumber || undefined,
-            year: year?.substring(0, 4) || undefined,
-          }
-        : undefined;
 
       result = await searchEbayPricesWithFallback(queryOptions, {
         categoryId,

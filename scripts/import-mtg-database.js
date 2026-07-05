@@ -26,6 +26,13 @@ const { createClient } = require('@supabase/supabase-js');
 const SCRYFALL_API_BASE = 'https://api.scryfall.com';
 const REQUEST_DELAY_MS = 100; // Scryfall asks for 50-100ms between requests
 
+// Scryfall now rejects requests that use a default HTTP-library User-Agent
+// (HTTP 400, subcode "generic_user_agent"). Always identify ourselves.
+const SCRYFALL_HEADERS = {
+  'User-Agent': 'DCMGrading/1.0 (benjamin@maniczmedia.com)',
+  'Accept': 'application/json',
+};
+
 // Initialize Supabase client with service role key for admin operations
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -71,7 +78,7 @@ async function fetchFromApi(endpoint, retries = 3) {
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { headers: SCRYFALL_HEADERS });
 
       if (response.status === 429) {
         console.log('  Rate limited, waiting 5 seconds...');
