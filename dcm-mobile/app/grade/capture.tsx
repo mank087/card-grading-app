@@ -8,7 +8,7 @@ import * as Haptics from 'expo-haptics'
 import * as ImagePicker from 'expo-image-picker'
 import { StatusBar } from 'expo-status-bar'
 import { Colors } from '@/lib/constants'
-import { assessQuality, hashImage, processCardCapture, QualityResult, CompressedImage } from '@/lib/imageUtils'
+import { assessQuality, compressImage, hashImage, processCardCapture, QualityResult, CompressedImage } from '@/lib/imageUtils'
 import Button from '@/components/ui/Button'
 import PhotoTipsModal, { shouldShowPhotoTips } from '@/components/PhotoTipsModal'
 import { useResponsive } from '@/hooks/useResponsive'
@@ -70,15 +70,31 @@ export default function CaptureScreen() {
     })
   }, [params.tipsAcked])
 
-  // Run a captured / picked image through the same compress → quality → hash pipeline
-  // and stash it as the current side. Used by both camera and gallery paths.
+  // Run a picked image through the compress → quality → hash pipeline
+  // and stash it as the current side. GALLERY PATH ONLY — the camera path
+  // uses processCardCapture directly in handleCapture.
   const processImage = async (rawUri: string) => {
     setIsProcessing(true)
     try {
-      // Single ImageManipulator pass — crop center band + card aspect
-      // + resize + compress. Removes the JPEG re-encode chain that was
-      // softening photos around card text and corners.
-      const compressed = await processCardCapture(rawUri, orientation)
+      // Gallery images are NEVER auto-cropped. The center-band + card-aspect
+      // crop in processCardCapture exists solely to compensate for the
+      // camera preview's aspect-fill; applied to a user-framed photo
+      // (e.g. a DSLR shot transferred to the phone) it slices off parts of
+      // the card — especially when the photo's aspect differs from 2.5:3.5.
+      // Resize + compress only, exactly like the web gallery path.
+      const compressed = await compressImage(rawUri)
+
+      // v8.9 MINIMUM-RESOLUTION GATE (matches web): below ~1000px the grading AI
+      // physically cannot resolve edge whitening, corner wear, or fine print.
+      if (Math.max(compressed.width, compressed.height) < 1000) {
+        Alert.alert(
+          'Image Too Small',
+          `This image is ${compressed.width}×${compressed.height} — too small to grade accurately. Please pick the original photo (at least 1000px on the long side). Screenshots and thumbnails lose the detail needed for corner and edge inspection.`
+        )
+        setPreviewUri(null)
+        setPreviewQuality(null)
+        return
+      }
       const quality = assessQuality(compressed)
       const hash = await hashImage(compressed.uri)
 
@@ -219,6 +235,17 @@ export default function CaptureScreen() {
         orientation,
         photo.width && photo.height ? { width: photo.width, height: photo.height } : undefined,
       )
+
+      // v8.9 MINIMUM-RESOLUTION GATE (matches web/gallery)
+      if (Math.max(compressed.width, compressed.height) < 1000) {
+        Alert.alert(
+          'Capture Too Small',
+          'The captured photo resolution is too low for accurate grading. Move closer to the card and retake.'
+        )
+        setIsCapturing(false)
+        setIsProcessing(false)
+        return
+      }
 
       // Quality assessment
       const quality = assessQuality(compressed)

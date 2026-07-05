@@ -80,7 +80,7 @@ export const ConditionLabels: Record<number, string> = {
   9: 'Mint',
   8: 'Near Mint-Mint',
   7: 'Near Mint',
-  6: 'Excellent-Near Mint',
+  6: 'Excellent-Mint',
   5: 'Excellent',
   4: 'Very Good-Excellent',
   3: 'Very Good',

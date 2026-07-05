@@ -47,6 +47,7 @@ import { OnboardingTour, TOUR_COMPLETED_KEY, type TourStep } from '@/components/
 import LabelPositionPicker, { type AverySheet } from '@/components/labels/LabelPositionPicker'
 import SlabLabelOptionsSheet from '@/components/labels/SlabLabelOptionsSheet'
 import MobileTabBar from '@/components/MobileTabBar'
+import ParallelPicker from '@/components/ParallelPicker'
 import AppHeaderBar from '@/components/AppHeaderBar'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useResponsive } from '@/hooks/useResponsive'
@@ -326,6 +327,10 @@ export default function CardDetailScreen() {
   const [revertingLabel, setRevertingLabel] = useState(false)
   const [hideMarkers, setHideMarkers] = useState(false)
   const [refreshingPrice, setRefreshingPrice] = useState(false)
+  // WS3.3 — native parallel picker (sports cards, owner only). Opens from
+  // the Market Value section; on selection it saves via /api/pricing/dcm-select
+  // and re-runs the normal refreshPrice() flow.
+  const [parallelPickerOpen, setParallelPickerOpen] = useState(false)
 
   // Tracks whether this screen is still mounted so async fetch+signed-URL
   // chains don't setState after the user has navigated away. Strict Mode and
@@ -399,10 +404,14 @@ export default function CardDetailScreen() {
     }
   }, [])
 
-  const refreshPrice = useCallback(async (silent = false) => {
+  const refreshPrice = useCallback(async (silent = false, selectedProductId?: string) => {
     if (!card) return
     const req = buildPriceRequest(card)
     if (!req) return
+    // When the user picked a specific product in the searcher, price THAT
+    // product (the /api/pricing/pricecharting route honors selectedProductId)
+    // instead of re-running the auto-match.
+    if (selectedProductId) (req.body as any).selectedProductId = selectedProductId
     if (!silent) setRefreshingPrice(true)
     try {
       const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
@@ -489,6 +498,14 @@ export default function CardDetailScreen() {
     surface: extractScore(subRaw, 'surface'),
   } : null
   const grade = card.conversational_whole_grade
+  // Not-gradable reason — mirrors web's CardDetailClient which reads
+  // card.conversational_weighted_summary?.grade_cap_reason (jsonb column,
+  // populated server-side from the grading JSON's weighted_summary).
+  // Fall back to the raw grading JSON for older rows where the column is unset.
+  const gradeCapReason: string | null =
+    card.conversational_weighted_summary?.grade_cap_reason ||
+    gradingJsonEarly?.weighted_summary?.grade_cap_reason ||
+    null
   const lf = card.conversational_limiting_factor?.toLowerCase()
   const isOwner = session?.user?.id === card.user_id
   const cardName = card.card_name || ci?.card_name || `Card #${card.serial}`
@@ -1254,6 +1271,18 @@ export default function CardDetailScreen() {
           <Text style={s.metaText}>Confidence Score: {confidence}</Text>
         </View>
       </View>
+
+      {/* Card Not Gradable — mirrors web's red block shown when the grade is
+          N/A and the AI supplied a grade_cap_reason */}
+      {grade == null && gradeCapReason && (
+        <View style={s.notGradableCard}>
+          <Text style={s.notGradableTitle}>Card Not Gradable</Text>
+          <Text style={s.notGradableReason}>{gradeCapReason}</Text>
+          <Text style={s.notGradableNote}>
+            This card cannot receive a numerical grade due to the detected issues. Professional grading companies (PSA, BGS, SGC) also do not assign numerical grades to cards with these conditions.
+          </Text>
+        </View>
+      )}
 
       {/* 4 Subgrade Boxes */}
       {sub && (sub.centering != null || sub.corners != null) && (
@@ -2119,14 +2148,15 @@ export default function CardDetailScreen() {
                 {/* eBay fallback */}
                 {!prices && card.ebay_price_median != null && (
                   <View style={{ marginTop: 12 }}>
-                    <Text style={s.pricingSource}>eBay Comparable Sales</Text>
+                    <Text style={s.pricingSource}>eBay Asking Range</Text>
                     <View style={s.priceGrid}>
                       <PriceCell label="Lowest" value={card.ebay_price_lowest} />
                       <PriceCell label="Median" value={card.ebay_price_median} />
                       <PriceCell label="Average" value={card.ebay_price_average} />
                       <PriceCell label="Highest" value={card.ebay_price_highest} />
                     </View>
-                    {card.ebay_price_listing_count != null && <Text style={s.priceNote}>{card.ebay_price_listing_count} listings found</Text>}
+                    {card.ebay_price_listing_count != null && <Text style={s.priceNote}>{card.ebay_price_listing_count} active listings found</Text>}
+                    <Text style={[s.priceNote, { marginTop: 2 }]}>Based on active eBay listings (asking prices), not sold prices.</Text>
                   </View>
                 )}
 
@@ -2141,6 +2171,45 @@ export default function CardDetailScreen() {
                 {!dcmEst && !prices && !card.ebay_price_median && !card.scryfall_price_usd && (
                   <Text style={s.naText}>No pricing data available yet. Pricing is fetched automatically after grading.</Text>
                 )}
+
+                {/* Parallel/variant searcher entry point (sports cards, owner only).
+                    Shows WHAT product the cached prices came from, plus a
+                    "wrong card?" escape hatch that opens the native searcher. */}
+                {card.category === 'Sports' && isOwner && (() => {
+                  const ci = card.conversational_card_info as any
+                  const num = card.card_number || ci?.card_number
+                  const pickerQuery = [
+                    ci?.player_or_character || card.featured || card.card_name,
+                    card.release_date || ci?.year,
+                    card.card_set || ci?.set_name,
+                    num ? `#${num}` : '',
+                  ].filter(Boolean).join(' ').trim()
+                  return (
+                  <View style={{ marginTop: 12 }}>
+                    {prodName ? (
+                      <Text style={s.priceNote}>Priced as: {prodName}</Text>
+                    ) : null}
+                    <TouchableOpacity
+                      style={s.parallelPickerBtn}
+                      onPress={() => setParallelPickerOpen(true)}
+                      disabled={refreshingPrice}
+                    >
+                      <Ionicons name="search-outline" size={14} color={Colors.purple[600]} />
+                      <Text style={s.parallelPickerBtnText}>Wrong card or variant? Search</Text>
+                    </TouchableOpacity>
+                    <ParallelPicker
+                      visible={parallelPickerOpen}
+                      onClose={() => setParallelPickerOpen(false)}
+                      cardId={card.id}
+                      initialQuery={pickerQuery}
+                      currentProductId={(card as any).dcm_selected_product_id || (card as any).dcm_price_product_id || null}
+                      accessToken={session?.access_token || null}
+                      isOwner={isOwner}
+                      onSelected={(productId: string) => { setParallelPickerOpen(false); refreshPrice(false, productId) }}
+                    />
+                  </View>
+                  )
+                })()}
 
                 {/* Marketplace links — direct PriceCharting/SCP URL via cached product slugs, plus eBay fallback */}
                 {(() => {
@@ -2303,10 +2372,20 @@ export default function CardDetailScreen() {
           })()}
 
           {/* Three-Pass Evaluation */}
-          {gradingJson?.grading_passes && (
+          {gradingJson?.grading_passes && (() => {
+            const gp = gradingJson.grading_passes
+            const ar = gp.averaged_rounded
+            const passFinal = (p: any) => p.final ?? p.final_grade ?? p.whole_grade
+            // Strip internal/dev boilerplate — users shouldn't see ensemble jargon.
+            const rawNotes = Array.isArray(gp.consensus_notes) ? gp.consensus_notes : (gp.consensus_notes ? [gp.consensus_notes] : [])
+            const userNotes = rawNotes.filter((n: string) => {
+              const t = String(n).toLowerCase()
+              return !(t.includes('server-side ensemble') || t.includes('median consensus') || /\bn\s*=\s*3\b/.test(t) || /^v\d+\.\d+\b/.test(String(n).trim()))
+            })
+            return (
             <View style={{ marginBottom: 12 }}>
               <Text style={s.reportSubhead}>Three-Pass Evaluation</Text>
-              <Text style={s.analysisText}>DCM Optic™ performs three independent evaluations of each card to ensure accuracy.</Text>
+              <Text style={s.analysisText}>DCM Optic™ runs three independent evaluations, each including a magnified zoom inspection of corners, edges, and surfaces.</Text>
               <View style={{ marginTop: 8, borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8, overflow: 'hidden' }}>
                 {/* Header */}
                 <View style={{ flexDirection: 'row', backgroundColor: Colors.gray[100], paddingVertical: 6, paddingHorizontal: 8 }}>
@@ -2319,7 +2398,7 @@ export default function CardDetailScreen() {
                 </View>
                 {/* Pass rows */}
                 {[1, 2, 3].map(passNum => {
-                  const pass = gradingJson.grading_passes?.[`pass_${passNum}`] || gradingJson.grading_passes?.passes?.[passNum - 1]
+                  const pass = gp?.[`pass_${passNum}`] || gp?.passes?.[passNum - 1]
                   if (!pass) return null
                   const sc = pass.sub_scores || pass
                   return (
@@ -2329,39 +2408,42 @@ export default function CardDetailScreen() {
                       <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.corners ?? '-'}</Text>
                       <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.edges ?? '-'}</Text>
                       <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '600' }}>{sc.surface ?? '-'}</Text>
-                      <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '700' }}>{pass.final_grade ?? pass.whole_grade ?? '-'}</Text>
+                      <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '700' }}>{passFinal(pass) ?? '-'}</Text>
                     </View>
                   )
                 })}
-                {/* Average row */}
-                {gradingJson.grading_passes?.averaged_rounded && (
+                {/* Consensus row */}
+                {ar && (
                   <View style={{ flexDirection: 'row', paddingVertical: 5, paddingHorizontal: 8, borderTopWidth: 1, borderTopColor: Colors.gray[200], backgroundColor: Colors.purple[50] }}>
-                    <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: Colors.gray[800] }}>Average</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.centering ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.corners ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.edges ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{gradingJson.grading_passes.averaged_rounded.surface ?? '-'}</Text>
-                    <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '800' }}>{gradingJson.grading_passes.averaged_rounded.final ?? '-'}</Text>
+                    <Text style={{ flex: 1, fontSize: 10, fontWeight: '700', color: Colors.gray[800] }}>Consensus</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.centering ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.corners ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.edges ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.gray[800], textAlign: 'center', fontWeight: '700' }}>{ar.surface ?? '-'}</Text>
+                    <Text style={{ width: 36, fontSize: 10, color: Colors.purple[600], textAlign: 'center', fontWeight: '800' }}>{ar.final ?? '-'}</Text>
                   </View>
                 )}
               </View>
-              {/* Consistency */}
-              {gradingJson.grading_passes?.consistency && (
-                <Text style={[s.priceNote, { marginTop: 4 }]}>Consistency: {gradingJson.grading_passes.consistency} · Variance: {gradingJson.grading_passes.variance ?? '0'}</Text>
-              )}
-              {/* Consensus notes */}
-              {gradingJson.grading_passes?.consensus_notes && (
-                <View style={{ marginTop: 6 }}>
-                  {(Array.isArray(gradingJson.grading_passes.consensus_notes)
-                    ? gradingJson.grading_passes.consensus_notes
-                    : [gradingJson.grading_passes.consensus_notes]
-                  ).map((note: string, i: number) => (
-                    <Text key={i} style={[s.analysisText, { marginTop: 2 }]}>• {note}</Text>
+              {/* Magnified-inspection findings — zoom caps are folded into each pass
+                  row above, so this lists what the 24-crop inspection found. */}
+              {userNotes.length > 0 && (
+                <View style={{ marginTop: 8, padding: 10, backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[100], borderRadius: 8 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                    <Ionicons name="search" size={13} color={Colors.amber[600]} />
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: Colors.amber[600] }}>Magnified inspection findings</Text>
+                  </View>
+                  {userNotes.map((note: string, i: number) => (
+                    <Text key={i} style={{ fontSize: 11, color: Colors.amber[600], marginTop: 2 }}>• {note}</Text>
                   ))}
                 </View>
               )}
+              {/* Consistency */}
+              {gp?.consistency && (
+                <Text style={[s.priceNote, { marginTop: 4 }]}>Consistency: {gp.consistency} · Variance: {gp.variance ?? '0'}</Text>
+              )}
             </View>
-          )}
+            )
+          })()}
 
           {/* Centering Analysis from grading JSON */}
           {gradingJson?.centering && (
@@ -2485,7 +2567,10 @@ export default function CardDetailScreen() {
               <View style={{ flexDirection: 'row', gap: 12, marginTop: 4 }}>
                 <View style={{ alignItems: 'center' }}>
                   <Text style={{ fontSize: 28, fontWeight: '800', color: Colors.purple[600] }}>{gradingJson.final_grade.whole_grade ?? grade}</Text>
-                  <Text style={{ fontSize: 10, color: Colors.gray[500] }}>{gradingJson.final_grade.condition_label || card.conversational_condition_label}</Text>
+                  {/* Use the same grade-derived column the header uses (server writes
+                      getConditionFromGrade) rather than the raw JSON's pre-cap AI label,
+                      so this never contradicts the header label on the same screen. */}
+                  <Text style={{ fontSize: 10, color: Colors.gray[500] }}>{card.conversational_condition_label || gradingJson.final_grade.condition_label}</Text>
                 </View>
                 <View style={{ flex: 1 }}>
                   {gradingJson.final_grade.decimal_grade != null && (
@@ -2692,6 +2777,12 @@ const s = StyleSheet.create({
   summaryTitle: { fontSize: 14, fontWeight: '700', color: Colors.gray[900], marginBottom: 8 },
   summaryText: { fontSize: 13, color: Colors.gray[600], lineHeight: 20 },
 
+  // Card Not Gradable (N/A grade + grade_cap_reason)
+  notGradableCard: { marginHorizontal: 12, marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: Colors.red[50], borderWidth: 1, borderColor: Colors.red[100] },
+  notGradableTitle: { fontSize: 14, fontWeight: '700', color: Colors.red[600], marginBottom: 6 },
+  notGradableReason: { fontSize: 13, fontWeight: '600', color: Colors.red[600], marginBottom: 8, lineHeight: 19 },
+  notGradableNote: { fontSize: 11, color: Colors.red[600], lineHeight: 16, fontStyle: 'italic' },
+
   // User-Reported Condition card
   userReportCard: { marginHorizontal: 12, marginTop: 10, marginBottom: 4, padding: 14, borderRadius: 12, backgroundColor: Colors.amber[50], borderWidth: 1, borderColor: Colors.amber[100] },
   userReportHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, gap: 8 },
@@ -2740,6 +2831,8 @@ const s = StyleSheet.create({
   priceCellLabel: { fontSize: 11, color: Colors.gray[500] },
   priceCellValue: { fontSize: 16, fontWeight: '700', color: Colors.gray[900], marginTop: 2 },
   priceNote: { fontSize: 11, color: Colors.gray[400], marginTop: 4 },
+  parallelPickerBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8, alignSelf: 'flex-start' },
+  parallelPickerBtnText: { fontSize: 13, fontWeight: '600', color: Colors.purple[600] },
   dcmPriceCard: { backgroundColor: Colors.green[50], borderRadius: 10, padding: 12, borderWidth: 1, borderColor: Colors.green[100] },
   dcmPrice: { fontSize: 24, fontWeight: '800' as const, color: Colors.green[600] },
   priceHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 },

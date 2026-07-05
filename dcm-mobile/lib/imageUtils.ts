@@ -82,9 +82,11 @@ export async function compressImage(
 
 /**
  * Crop image to the card aspect ratio. Standalone version used by
- * non-capture callers; the camera/gallery flow uses processCardCapture
- * below which does this + center-band + resize + compress in a single
- * ImageManipulator pass to avoid stacking JPEG re-encodes.
+ * non-capture callers; the CAMERA flow uses processCardCapture below
+ * which does this + center-band + resize + compress in a single
+ * ImageManipulator pass. GALLERY picks must NOT be run through either —
+ * the crop math models the camera preview and will cut user-framed
+ * photos (gallery uses compressImage only).
  *
  * Why the center-band step matters: CameraView's preview applies
  * aspect-fill on iOS and Android, showing only the center band of the

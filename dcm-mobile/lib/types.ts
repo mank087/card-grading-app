@@ -122,6 +122,7 @@ export interface Card {
   conversational_limiting_factor: string | null
   conversational_preliminary_grade: number | null
   conversational_prompt_version?: string | null
+  conversational_weighted_summary?: { grade_cap_reason?: string | null; [key: string]: any } | null
 
   // Subgrades
   conversational_weighted_sub_scores: SubScores | null
