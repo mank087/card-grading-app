@@ -166,6 +166,27 @@ function calculateOptimalDimensions(
 }
 
 /**
+ * Read the pixel dimensions of an image file WITHOUT re-encoding it.
+ * Used by the camera path, whose files are already final single-pass JPEGs —
+ * running them through compressImage again would add a second lossy generation.
+ */
+export async function getImageDimensions(file: File | Blob): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      resolve({ width: img.width, height: img.height });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Failed to load image'));
+    };
+    img.src = url;
+  });
+}
+
+/**
  * Format file size for display
  */
 export function formatFileSize(bytes: number): string {

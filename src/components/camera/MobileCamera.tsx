@@ -4,8 +4,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { useCamera } from '@/hooks/useCamera';
 import CameraGuideOverlay from './CameraGuideOverlay';
 import ImagePreview from './ImagePreview';
-import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality';
-import { cropToGuideFrame } from '@/utils/guideCrop';
+import { validateImageQuality } from '@/utils/imageQuality';
+import { cropCanvasToGuideFrame, canvasToJpegFile } from '@/utils/guideCrop';
 import { ImageQualityValidation } from '@/types/camera';
 import Image from 'next/image';
 import { useToast } from '@/hooks/useToast';
@@ -33,6 +33,8 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   const [qualityValidation, setQualityValidation] = useState<ImageQualityValidation | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const toast = useToast();
 
   // Start camera on mount and when facingMode changes
@@ -51,7 +53,43 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
     }
   }, [stream, videoRef]);
 
-  // Simple capture handler
+  // Torch (flashlight) support detection — graceful no-op where unsupported (e.g. iOS Safari)
+  useEffect(() => {
+    setTorchOn(false);
+    if (!stream) {
+      setTorchSupported(false);
+      return;
+    }
+    try {
+      const track = stream.getVideoTracks()[0];
+      const capabilities = track?.getCapabilities?.() as (MediaTrackCapabilities & { torch?: boolean }) | undefined;
+      setTorchSupported(!!capabilities?.torch);
+    } catch {
+      setTorchSupported(false);
+    }
+  }, [stream]);
+
+  const toggleTorch = useCallback(async () => {
+    if (!stream) return;
+    const track = stream.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next } as MediaTrackConstraintSet]
+      });
+      setTorchOn(next);
+    } catch (err) {
+      // Unsupported or rejected — leave state unchanged (graceful no-op)
+      console.warn('[MobileCamera] Torch toggle failed:', err);
+    }
+  }, [stream, torchOn]);
+
+
+  // Simple capture handler.
+  // v9.1 single-pass encode: captureImage returns a raw canvas frame (no JPEG),
+  // and cropCanvasToGuideFrame does crop+resize+encode in ONE step. The upload
+  // page skips re-compression for camera files, so this is the only lossy encode.
   const handleCapture = useCallback(async () => {
     if (isProcessing) return;
 
@@ -65,27 +103,41 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
         return;
       }
 
-      // Show preview immediately
-      setCapturedImageUrl(captured.dataUrl);
-      setCapturedFile(captured.file);
-      setIsProcessing(false);
+      let previewUrl: string;
+      let file: File;
+      let qualityCanvas: HTMLCanvasElement;
 
-      // Process crop in background
       try {
-        const cropResult = await cropToGuideFrame(captured.file, {
+        const cropResult = await cropCanvasToGuideFrame(captured.canvas, {
           paddingPercent: 0.05, // 5% padding around the card guide
           orientation: orientation,
+          maxDimension: 3000, // matches the old compression pipeline's max size
+          quality: 0.9,
         });
-        setCapturedImageUrl(cropResult.croppedDataUrl);
-        setCapturedFile(cropResult.croppedFile);
+        previewUrl = cropResult.croppedDataUrl;
+        file = cropResult.croppedFile;
+        qualityCanvas = cropResult.croppedCanvas;
+      } catch (err) {
+        console.warn('[MobileCamera] Crop failed, using full frame:', err);
+        const fallback = await canvasToJpegFile(captured.canvas, { quality: 0.9, maxDimension: 3000 });
+        previewUrl = fallback.previewUrl;
+        file = fallback.file;
+        qualityCanvas = fallback.canvas;
+      }
 
-        // Validate quality
-        const imageData = await getImageDataFromFile(cropResult.croppedFile);
-        if (imageData) {
+      setCapturedImageUrl(previewUrl);
+      setCapturedFile(file);
+      setIsProcessing(false);
+
+      // Validate quality directly from the final canvas (no re-decode of the JPEG)
+      try {
+        const qctx = qualityCanvas.getContext('2d');
+        if (qctx) {
+          const imageData = qctx.getImageData(0, 0, qualityCanvas.width, qualityCanvas.height);
           setQualityValidation(validateImageQuality(imageData));
         }
       } catch (err) {
-        console.warn('[MobileCamera] Crop failed, using original:', err);
+        console.warn('[MobileCamera] Quality validation failed:', err);
       }
     } catch (err) {
       console.error('Capture error:', err);
@@ -101,6 +153,9 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
   };
 
   const handleRetake = () => {
+    if (capturedImageUrl?.startsWith('blob:')) {
+      URL.revokeObjectURL(capturedImageUrl);
+    }
     setCapturedImageUrl(null);
     setCapturedFile(null);
     setQualityValidation(null);
@@ -227,15 +282,35 @@ export default function MobileCamera({ side, onCapture, onCancel }: MobileCamera
             />
             <span className="font-semibold text-sm">{side === 'front' ? 'Front' : 'Back'}</span>
           </div>
-          <button
-            onClick={handleSwitchCamera}
-            className="text-white p-1.5 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
-            title="Switch Camera"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-1.5">
+            {torchSupported && (
+              <button
+                onClick={toggleTorch}
+                className={`p-1.5 rounded-full transition-colors ${
+                  torchOn
+                    ? 'bg-yellow-400 text-gray-900 hover:bg-yellow-300'
+                    : 'text-white bg-black/30 hover:bg-black/50'
+                }`}
+                title={torchOn ? 'Turn Flashlight Off' : 'Turn Flashlight On'}
+                aria-label={torchOn ? 'Turn flashlight off' : 'Turn flashlight on'}
+                aria-pressed={torchOn}
+              >
+                {/* Flashlight (lightning bolt) icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill={torchOn ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={handleSwitchCamera}
+              className="text-white p-1.5 rounded-full bg-black/30 hover:bg-black/50 transition-colors"
+              title="Switch Camera"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 

@@ -19,6 +19,18 @@ export interface CapturedImage {
 }
 
 /**
+ * Raw captured camera frame (no JPEG encode yet).
+ * The camera path defers encoding so the final crop+resize+encode
+ * happens exactly once (single-pass encode).
+ */
+export interface CapturedFrame {
+  canvas: HTMLCanvasElement;
+  width: number;
+  height: number;
+  timestamp: number;
+}
+
+/**
  * Camera Guide Overlay Configuration
  */
 export interface CameraGuideOverlay {

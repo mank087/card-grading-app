@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { CapturedImage } from '@/types/camera';
+import { CapturedFrame } from '@/types/camera';
 
 // Detect iOS for constraint compatibility
 const isIOS = typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -135,45 +135,29 @@ export const useCamera = () => {
     setIsStarting(false);
   }, []);
 
-  const captureImage = useCallback(async (): Promise<CapturedImage | null> => {
-    if (!videoRef.current) return null;
+  // v9.1 single-pass encode: capture returns the raw canvas frame with NO JPEG
+  // encode. The downstream crop step performs the one and only crop+resize+encode,
+  // so the camera path no longer re-encodes the image three times (capture 0.92 →
+  // crop 0.95 → compress 0.8-0.9), which compounded JPEG generation loss.
+  const captureImage = useCallback(async (): Promise<CapturedFrame | null> => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth || !video.videoHeight) return null;
 
-    return new Promise((resolve) => {
-      const video = videoRef.current;
-      if (!video) {
-        resolve(null);
-        return;
-      }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
 
-      const canvas = document.createElement('canvas');
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
 
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        resolve(null);
-        return;
-      }
+    ctx.drawImage(video, 0, 0);
 
-      ctx.drawImage(video, 0, 0);
-
-      canvas.toBlob((blob) => {
-        if (!blob) {
-          resolve(null);
-          return;
-        }
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
-        const file = new File([blob], `card-${Date.now()}.jpg`, { type: 'image/jpeg' });
-
-        resolve({
-          dataUrl,
-          blob,
-          file,
-          timestamp: Date.now()
-        });
-      }, 'image/jpeg', 0.92);
-    });
+    return {
+      canvas,
+      width: canvas.width,
+      height: canvas.height,
+      timestamp: Date.now()
+    };
   }, []);
 
   // Cleanup on unmount

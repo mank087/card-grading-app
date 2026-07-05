@@ -13,7 +13,9 @@ declare global {
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 import { getStoredSession, getAuthenticatedClient } from '@/lib/directAuth'
-import { compressImage, formatFileSize, getOptimalCompressionSettings, ensureBrowserDecodableImage } from '@/lib/imageCompression'
+import { compressImage, formatFileSize, getOptimalCompressionSettings, ensureBrowserDecodableImage, getImageDimensions } from '@/lib/imageCompression'
+import { validateImageQuality, getImageDataFromFile } from '@/utils/imageQuality'
+import { ImageQualityValidation } from '@/types/camera'
 import CardAnalysisAnimation from './sports/CardAnalysisAnimation'
 import { useDeviceDetection } from '@/hooks/useDeviceDetection'
 import UploadMethodSelector from '@/components/camera/UploadMethodSelector'
@@ -216,6 +218,24 @@ function UniversalUploadPageContent() {
   const [isCompressingFront, setIsCompressingFront] = useState(false)
   const [isCompressingBack, setIsCompressingBack] = useState(false)
 
+  // Advisory image-quality check (blur + brightness) for gallery/desktop uploads.
+  // The camera path already shows this in its capture preview; this extends the
+  // same check to files that never went through the camera preview.
+  const [frontQuality, setFrontQuality] = useState<ImageQualityValidation | null>(null)
+  const [backQuality, setBackQuality] = useState<ImageQualityValidation | null>(null)
+  const [frontQualityDismissed, setFrontQualityDismissed] = useState(false)
+  const [backQualityDismissed, setBackQualityDismissed] = useState(false)
+
+  const clearSideQuality = (side: 'front' | 'back') => {
+    if (side === 'front') {
+      setFrontQuality(null)
+      setFrontQualityDismissed(false)
+    } else {
+      setBackQuality(null)
+      setBackQualityDismissed(false)
+    }
+  }
+
   // Computed compression state - true if either side is compressing
   const isCompressing = isCompressingFront || isCompressingBack
   const [isUploading, setIsUploading] = useState(false)
@@ -271,6 +291,8 @@ function UniversalUploadPageContent() {
         setBackCompressionInfo(null);
         setFrontHash(null);
         setBackHash(null);
+        clearSideQuality('front');
+        clearSideQuality('back');
         setIsUploading(false);
         setIsCompressingFront(false);
         setIsCompressingBack(false);
@@ -322,6 +344,7 @@ function UniversalUploadPageContent() {
     const setCompressingState = side === 'front' ? setIsCompressingFront : setIsCompressingBack
     try {
       setCompressingState(true)
+      clearSideQuality(side)
 
       // Convert HEIC/HEIF (iPhone default) to JPEG up front. Without this,
       // Android Chrome and other non-Safari browsers can't render the image
@@ -382,11 +405,26 @@ function UniversalUploadPageContent() {
         return
       }
 
-      // Get optimal compression settings based on file size
-      const compressionSettings = getOptimalCompressionSettings(file.size)
-
-      // Compress the image
-      const result = await compressImage(file, compressionSettings)
+      // Compress the image.
+      // v9.1 single-pass encode: camera captures are already cropped, resized
+      // (≤3000px) and JPEG-encoded exactly once by the capture pipeline —
+      // re-compressing here would add a second lossy generation, so we only
+      // read their dimensions for the resolution gate below.
+      let result: { compressedFile: File; originalSize: number; compressedSize: number; compressionRatio: number; dimensions: { width: number; height: number } }
+      if (source === 'camera') {
+        const dimensions = await getImageDimensions(file)
+        result = {
+          compressedFile: file,
+          originalSize: file.size,
+          compressedSize: file.size,
+          compressionRatio: 0,
+          dimensions
+        }
+      } else {
+        // Get optimal compression settings based on file size
+        const compressionSettings = getOptimalCompressionSettings(file.size)
+        result = await compressImage(file, compressionSettings)
+      }
 
       // v8.9 MINIMUM-RESOLUTION GATE: below ~1000px on the long edge, fine defects
       // (edge whitening, corner wear, fine-print text) physically cannot be resolved
@@ -432,7 +470,27 @@ function UniversalUploadPageContent() {
       }
 
       console.log('[Upload] handleFileSelect completed:', side, 'compressed size:', result.compressedSize)
-      setStatus(`✅ ${side} image compressed: ${result.compressionRatio.toFixed(1)}% smaller`)
+      setStatus(source === 'camera'
+        ? `✅ ${side} image ready`
+        : `✅ ${side} image compressed: ${result.compressionRatio.toFixed(1)}% smaller`)
+
+      // Advisory quality check (blur + brightness) for gallery/desktop uploads.
+      // Camera captures already surfaced this in the capture preview. This never
+      // blocks the upload — C/D results just render a warning panel with a
+      // "Use anyway" escape hatch.
+      if (source === 'gallery') {
+        try {
+          const imageData = await getImageDataFromFile(result.compressedFile)
+          if (imageData) {
+            const quality = validateImageQuality(imageData)
+            console.log(`[Upload] ${side} image quality: ${quality.confidenceLetter} (score ${quality.overallScore})`)
+            if (side === 'front') setFrontQuality(quality)
+            else setBackQuality(quality)
+          }
+        } catch (qualityErr) {
+          console.warn(`[Upload] Quality check failed for ${side} image (non-blocking):`, qualityErr)
+        }
+      }
     } catch (error: any) {
       console.error(`Failed to compress ${side} image:`, error)
       // Clear file + hash so the green check disappears and the submit button
@@ -899,6 +957,7 @@ function UniversalUploadPageContent() {
         setBackCompressed(null)
         setBackCompressionInfo(null)
       }
+      clearSideQuality(side)
       setCurrentSide(side)
       setUploadMode(originalUploadMethod)
     }
@@ -919,6 +978,8 @@ function UniversalUploadPageContent() {
     setBackCompressionInfo(null)
     setFrontHash(null)
     setBackHash(null)
+    clearSideQuality('front')
+    clearSideQuality('back')
     setIsUploading(false)
     setIsCompressingFront(false)
     setIsCompressingBack(false)
@@ -962,6 +1023,58 @@ function UniversalUploadPageContent() {
 
   const handleCameraCancel = () => {
     setUploadMode('select')
+  }
+
+  // Advisory quality warning for gallery/desktop uploads — shown only for C/D
+  // results, never blocks the flow (the hard block is the 1000px resolution gate).
+  const renderQualityAdvisory = (side: 'front' | 'back') => {
+    const quality = side === 'front' ? frontQuality : backQuality
+    const dismissed = side === 'front' ? frontQualityDismissed : backQualityDismissed
+    if (!quality || dismissed) return null
+    if (quality.confidenceLetter !== 'C' && quality.confidenceLetter !== 'D') return null
+
+    const setDismissed = side === 'front' ? setFrontQualityDismissed : setBackQualityDismissed
+    const issues = [quality.checks.blur, quality.checks.brightness].filter(check => check.score < 75 || !check.passed)
+
+    return (
+      <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-left">
+        <div className="flex items-start gap-2">
+          <span className="text-base leading-none">⚠️</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-amber-800">
+              {side === 'front' ? 'Front' : 'Back'} image quality: Grade {quality.confidenceLetter}
+              {quality.confidenceLetter === 'C' ? ' (Fair)' : ' (Poor)'}
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              May reduce grading accuracy ({quality.gradeUncertainty} grades)
+            </p>
+            {issues.length > 0 && (
+              <ul className="mt-1 text-xs text-amber-700 space-y-0.5">
+                {issues.map((check, idx) => (
+                  <li key={idx}>• {check.message}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => document.getElementById(`${side}-input`)?.click()}
+            className="px-2 py-1.5 text-xs font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors"
+          >
+            Choose different photo
+          </button>
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="px-2 py-1.5 text-xs font-semibold bg-white border border-amber-300 text-amber-800 rounded-lg hover:bg-amber-100 transition-colors"
+          >
+            Use anyway
+          </button>
+        </div>
+      </div>
+    )
   }
 
   // Render hidden file inputs for all modes
@@ -1186,6 +1299,7 @@ function UniversalUploadPageContent() {
                         alt="Front of card"
                         className="w-full rounded-lg"
                       />
+                      {renderQualityAdvisory('front')}
                       <button
                         onClick={() => handleGalleryFileSelect('front')}
                         className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
@@ -1223,6 +1337,7 @@ function UniversalUploadPageContent() {
                         alt="Back of card"
                         className="w-full rounded-lg"
                       />
+                      {renderQualityAdvisory('back')}
                       <button
                         onClick={() => handleGalleryFileSelect('back')}
                         className="w-full px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors"
@@ -2044,6 +2159,7 @@ function UniversalUploadPageContent() {
                       <p className="text-sm text-green-600 font-medium">✓ Front image ready</p>
                     </div>
                   </div>
+                  {renderQualityAdvisory('front')}
                   <div className="grid grid-cols-2 gap-2">
                     {showCameraOption && (
                       <button
@@ -2114,6 +2230,7 @@ function UniversalUploadPageContent() {
                       <p className="text-sm text-green-600 font-medium">✓ Back image ready</p>
                     </div>
                   </div>
+                  {renderQualityAdvisory('back')}
                   <div className="grid grid-cols-2 gap-2">
                     {showCameraOption && (
                       <button

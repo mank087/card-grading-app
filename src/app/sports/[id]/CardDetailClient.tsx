@@ -3016,6 +3016,24 @@ export function SportsCardDetails() {
                     </span>
                   )}
                 </div>
+
+                {/* Retake CTA — shown when C/D image quality limited grading accuracy */}
+                {(card.conversational_image_confidence === 'C' || card.conversational_image_confidence === 'D') && (
+                  <div className="mt-4 mx-auto max-w-md bg-amber-500/20 border border-amber-300/70 rounded-lg px-4 py-3 flex items-start gap-2 text-left">
+                    <span className="text-base leading-none">⚠️</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-amber-100">
+                        Image quality limited this grade — retake your photos for a more accurate result
+                      </p>
+                      <Link
+                        href="/upload?category=Sports"
+                        className="inline-block mt-1 text-xs font-semibold text-white underline underline-offset-2 hover:text-amber-200"
+                      >
+                        Retake photos →
+                      </Link>
+                    </div>
+                  </div>
+                )}
                 {card.dvg_reshoot_required && (
                   <div className="mt-3 bg-red-500/30 px-4 py-2 rounded-lg inline-block">
                     <p className="text-sm font-semibold">⚠️ Reshoot Recommended</p>
