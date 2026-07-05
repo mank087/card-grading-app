@@ -196,7 +196,7 @@ export default function LoggedOutPreview() {
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-900">Live market data</p>
-                  <p className="text-xs text-gray-500">PriceCharting, SportsCardsPro, Scryfall, eBay</p>
+                  <p className="text-xs text-gray-500">PriceCharting, SportsCardsPro, Scryfall, eBay (asking)</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">

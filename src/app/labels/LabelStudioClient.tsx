@@ -671,7 +671,7 @@ function LabelGallery({
     return {
       serial: selectedCard.serial || '',
       grade,
-      condition: selectedCard.conversational_condition_label || '',
+      condition: labelProps?.condition || '',
       qrCodeUrl: `https://dcmgrading.com/verify/${selectedCard.serial}`,
       subScores: hasSub ? {
         centering: ext('centering'),
@@ -684,7 +684,7 @@ function LabelGallery({
       showVipEmblem,
       showCardLoversEmblem,
     }
-  }, [selectedCard, slabData, showFounderEmblem, showVipEmblem, showCardLoversEmblem])
+  }, [selectedCard, slabData, labelProps, showFounderEmblem, showVipEmblem, showCardLoversEmblem])
 
   const handleQuickDownload = async (labelType: typeof LABEL_TYPES[0]) => {
     if (!slabData || !selectedCard) return
@@ -736,7 +736,7 @@ function LabelGallery({
         const grade = selectedCard.conversational_whole_grade ?? selectedCard.dcm_grade_whole ?? 0
         const toploaderData = {
           grade,
-          conditionLabel: selectedCard.conversational_condition_label || labelData.condition,
+          conditionLabel: labelData.condition || selectedCard.conversational_condition_label,
           qrCodeUrl: `https://dcmgrading.com/verify/${selectedCard.serial}`,
           cardName: labelData.primaryName,
         }

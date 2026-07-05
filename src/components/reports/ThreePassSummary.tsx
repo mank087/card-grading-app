@@ -30,6 +30,20 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
     return Math.round(score).toString();
   };
 
+  // Filter out internal/dev boilerplate — users should only see notes that
+  // explain WHY the consensus differs (zoom inspection, structural findings),
+  // not implementation chatter like "v8.9 server-side ensemble (n=3)".
+  const userNotes = (consensus_notes || []).filter((n) => {
+    const t = String(n).toLowerCase();
+    return !(
+      t.includes('server-side ensemble') ||
+      t.includes('median consensus') ||
+      /\bn\s*=\s*3\b/.test(t) ||
+      /^v\d+\.\d+\b/.test(String(n).trim())
+    );
+  });
+  const hasConsensusNotes = userNotes.length > 0;
+
   // Helper to get consistency color
   const getConsistencyColor = (cons: string): string => {
     switch (cons) {
@@ -64,7 +78,7 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
         Three-Pass Evaluation Summary
       </h4>
       <p className="text-sm text-gray-600 mb-4">
-        DCM Optic™ performs three independent evaluations of each card to ensure grading accuracy and reduce variance.
+        DCM Optic™ performs three independent evaluations of each card — each incorporating a magnified zoom inspection of the corners, edges, and surfaces — and takes the median as the consensus grade.
       </p>
 
       {/* Scores Table */}
@@ -112,9 +126,9 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
             <tr className="bg-gray-100">
               <td colSpan={6} className="px-4 py-1"></td>
             </tr>
-            {/* Average Row */}
+            {/* Consensus Row */}
             <tr className="bg-indigo-50 font-semibold">
-              <td className="px-4 py-3 text-sm font-bold text-indigo-800">Average</td>
+              <td className="px-4 py-3 text-sm font-bold text-indigo-800">Consensus</td>
               <td className="px-4 py-3 text-center text-sm text-indigo-700">{formatScore(averaged_rounded.centering)}</td>
               <td className="px-4 py-3 text-center text-sm text-indigo-700">{formatScore(averaged_rounded.corners)}</td>
               <td className="px-4 py-3 text-center text-sm text-indigo-700">{formatScore(averaged_rounded.edges)}</td>
@@ -124,6 +138,25 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
           </tbody>
         </table>
       </div>
+
+      {/* Magnified-inspection findings. Zoom caps are now folded into every pass
+          row (so the table is internally coherent — no "10/10/10 → 8" jump); this
+          lists what the 24-crop inspection actually found on corners/edges/surface. */}
+      {hasConsensusNotes && (
+        <div className="-mt-3 mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+          <h5 className="text-sm font-semibold text-amber-800 mb-1.5 flex items-center gap-2">
+            <span aria-hidden>🔍</span> Magnified inspection findings
+          </h5>
+          <ul className="space-y-1">
+            {userNotes.map((note, index) => (
+              <li key={index} className="text-sm text-amber-700 flex items-start gap-2">
+                <span className="text-amber-500 mt-0.5">•</span>
+                <span>{note}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Consistency and Variance */}
       <div className="flex flex-wrap gap-4 mb-4">
@@ -140,22 +173,6 @@ export function ThreePassSummary({ gradingPasses }: ThreePassSummaryProps) {
         </div>
       </div>
 
-      {/* Consensus Notes */}
-      {consensus_notes && consensus_notes.length > 0 && (
-        <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-          <h5 className="text-sm font-semibold text-amber-800 mb-2">
-            Consensus Notes
-          </h5>
-          <ul className="space-y-1">
-            {consensus_notes.map((note, index) => (
-              <li key={index} className="text-sm text-amber-700 flex items-start gap-2">
-                <span className="text-amber-500 mt-0.5">•</span>
-                <span>{note}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

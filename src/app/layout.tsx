@@ -39,7 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: the launch-banner pre-paint script below intentionally
+    // sets data-banner-state on <html> BEFORE hydration (CLS fix). React 19 flags that
+    // attribute mismatch as a hydration error; suppression applies to this element's
+    // attributes only — children are still fully validated.
+    <html lang="en" suppressHydrationWarning>
       <head>
         {/* Facebook Domain Verification */}
         <meta name="facebook-domain-verification" content="gqf9ydy92vx2nn9eq1bmw3yyf0wu8z" />

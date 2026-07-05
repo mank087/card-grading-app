@@ -471,6 +471,7 @@ interface SportsCard {
   } | null;
   // v3.2 NEW fields
   conversational_condition_label?: string | null;
+  conversational_limiting_factor?: string | null;
   conversational_image_confidence?: string | null;
   conversational_validation_checklist?: {
     autograph_verified: boolean;
@@ -2541,6 +2542,22 @@ export function MTGCardDetails() {
   const visualInspection = gradingScale["Visual_Inspection_Results"] || {};
 
   // 🎯 MTG cards: Extract centering from conversational_grading JSON as primary source
+  // 🆕 Structural "unconfirmed" note — flagged crease reviewed and dismissed as a lighting reflection
+  let structuralUnconfirmedNote: string | null = null;
+  if (card.conversational_grading) {
+    try {
+      const parsedStructural = typeof card.conversational_grading === 'string'
+        ? JSON.parse(card.conversational_grading)
+        : card.conversational_grading;
+      const sd = parsedStructural?.structural_damage;
+      if (sd?.unconfirmed === true && typeof sd?.unconfirmed_note === 'string' && sd.unconfirmed_note.trim()) {
+        structuralUnconfirmedNote = sd.unconfirmed_note;
+      }
+    } catch {
+      // Markdown-format report (not JSON) — no structural note to surface
+    }
+  }
+
   let parsedCenteringFromJSON = null;
   if (card.conversational_grading) {
     try {
@@ -3225,6 +3242,20 @@ export function MTGCardDetails() {
                   <p className="text-gray-700 leading-relaxed">
                     {card.conversational_final_grade_summary}
                   </p>
+                  {card.conversational_limiting_factor && (
+                    <div className="mt-4 pt-4 border-t border-indigo-200">
+                      <p className="text-sm font-semibold text-indigo-700 mb-1">Limiting Factor:</p>
+                      <p className="text-sm text-gray-700">{card.conversational_limiting_factor}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Structural line reviewed — flagged crease dismissed as lighting reflection */}
+              {structuralUnconfirmedNote && (
+                <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                  <h3 className="text-sm font-bold text-slate-700 mb-1">Surface line reviewed</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">{structuralUnconfirmedNote}</p>
                 </div>
               )}
 
@@ -4133,7 +4164,7 @@ export function MTGCardDetails() {
               {/* 2. Centering Analysis */}
               <CollapsibleSection
                 title="Centering Analysis"
-                badge={card.conversational_sub_scores?.centering ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+                badge={card.conversational_sub_scores?.centering?.weighted ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
                 tourId="tour-centering"
               >
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}

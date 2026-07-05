@@ -40,6 +40,7 @@ import { useSearchParams } from 'next/navigation';
 export const dynamic = 'force-dynamic';
 import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { generateBatchSlabLabels, generateBatchFoldOverSlabLabels } from '@/lib/slabLabelGenerator';
 import {
   generateBatchCustomSlabLabels,
@@ -70,20 +71,6 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 function sanitize(text: string): string {
   return text.replace(/[^a-zA-Z0-9\s-]/g, '').replace(/\s+/g, '-').slice(0, 60) || 'card';
-}
-
-function getConditionLabel(grade: number): string {
-  if (grade >= 10) return 'Pristine';
-  if (grade >= 9) return 'Gem Mint';
-  if (grade >= 8) return 'Near Mint-Mint';
-  if (grade >= 7) return 'Near Mint';
-  if (grade >= 6) return 'Excellent-Mint';
-  if (grade >= 5) return 'Excellent';
-  if (grade >= 4) return 'Very Good-Excellent';
-  if (grade >= 3) return 'Very Good';
-  if (grade >= 2) return 'Good';
-  if (grade >= 1) return 'Fair';
-  return 'Poor';
 }
 
 async function imageToJpegBase64(imageUrl: string): Promise<string> {
@@ -185,8 +172,13 @@ function BatchLabelExportInner() {
           if (c.front_path) allPaths.push(c.front_path);
           if (c.back_path) allPaths.push(c.back_path);
         });
-        const { data: signed } = await supabase.storage.from('cards').createSignedUrls(allPaths, 3600);
-        const signedByPath = new Map((signed ?? []).map(s => [s.path, s.signedUrl]));
+        // Chunked at 500 — Supabase rejects >1000 paths per request (a select-all
+        // batch export on a large collection would otherwise get zero images)
+        const signedByPath = new Map<string | null, string | null>();
+        for (let i = 0; i < allPaths.length; i += 500) {
+          const { data: signed } = await supabase.storage.from('cards').createSignedUrls(allPaths.slice(i, i + 500), 3600);
+          (signed ?? []).forEach(s => signedByPath.set(s.path, s.signedUrl));
+        }
 
         // Emblems
         let showFounderEmblem = false, showVipEmblem = false, showCardLoversEmblem = false;
@@ -331,7 +323,7 @@ function BatchLabelExportInner() {
             serial: labelData.serial,
             englishName: card.featured || card.pokemon_featured || undefined,
             grade,
-            conditionLabel: labelData.condition || getConditionLabel(grade),
+            conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
             subgrades: subScores,
             overallSummary: card.conversational_final_grade_summary || '',
             cardUrl: `${window.location.origin}/verify/${card.serial}`,
@@ -361,7 +353,7 @@ function BatchLabelExportInner() {
           const labelDataArray: ToploaderLabelData[] = perCard.map(({ card, labelData, grade }) => ({
             cardName: labelData.primaryName,
             grade,
-            conditionLabel: labelData.condition || getConditionLabel(grade),
+            conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
             qrCodeUrl: `${window.location.origin}/verify/${card.serial}`,
           }));
           const globalPositions = positions.length === labelDataArray.length ? positions : undefined;
@@ -385,7 +377,7 @@ function BatchLabelExportInner() {
           const labelDataArray: ToploaderLabelData[] = perCard.map(({ card, labelData, grade }) => ({
             cardName: labelData.primaryName,
             grade,
-            conditionLabel: labelData.condition || getConditionLabel(grade),
+            conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
             qrCodeUrl: `${window.location.origin}/verify/${card.serial}`,
           }));
           // generateFoldOverLabelSheet takes startPosition (single number) and
@@ -417,7 +409,7 @@ function BatchLabelExportInner() {
             serial: labelData.serial,
             englishName: card.featured || card.pokemon_featured || undefined,
             grade,
-            conditionLabel: labelData.condition || getConditionLabel(grade),
+            conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
             subgrades: subScores,
             overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
             cardUrl: `${window.location.origin}/verify/${card.serial}`,
@@ -461,7 +453,7 @@ function BatchLabelExportInner() {
               serial: labelData.serial,
               englishName: card.featured || card.pokemon_featured || undefined,
               grade,
-              conditionLabel: labelData.condition || getConditionLabel(grade),
+              conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
               subgrades: subScores,
               overallSummary: card.conversational_final_grade_summary || 'Card condition analysis not available.',
               qrCodeDataUrl,
@@ -533,7 +525,7 @@ function BatchLabelExportInner() {
               serial: card.serial,
               grade,
               gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
-              condition: labelData.condition || getConditionLabel(grade),
+              condition: labelData.condition || getConditionFromGrade(Math.round(grade)),
               cardName: safePrimary,
               playerName: safePrimary,
               setName: (labelData as any).setName || '',
@@ -543,8 +535,8 @@ function BatchLabelExportInner() {
               sport: cardInfo.sport_or_category || card.category || '',
               frontImageUrl: frontJpeg,
               backImageUrl: backJpeg,
-              conditionLabel: card.conversational_condition_label || labelData.condition || getConditionLabel(grade),
-              labelCondition: labelData.condition || getConditionLabel(grade),
+              conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)) || card.conversational_condition_label,
+              labelCondition: labelData.condition || getConditionFromGrade(Math.round(grade)),
               gradeRange,
               cardDetails: safeContext,
               specialFeaturesString: safeFeatures || '',
@@ -606,7 +598,7 @@ function BatchLabelExportInner() {
               serial: labelData.serial,
               englishName: card.featured || card.pokemon_featured || undefined,
               grade,
-              conditionLabel: labelData.condition || getConditionLabel(grade),
+              conditionLabel: labelData.condition || getConditionFromGrade(Math.round(grade)),
               cardUrl,
               frontImageUrl: frontUrl,
               backImageUrl: backUrl,

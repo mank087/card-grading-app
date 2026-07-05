@@ -468,6 +468,7 @@ interface SportsCard {
   } | null;
   // v3.2 NEW fields
   conversational_condition_label?: string | null;
+  conversational_limiting_factor?: string | null;
   conversational_image_confidence?: string | null;
   conversational_validation_checklist?: {
     autograph_verified: boolean;
@@ -2472,6 +2473,22 @@ export function OtherCardDetails() {
   const visualInspection = gradingScale["Visual_Inspection_Results"] || {};
 
   // 🎯 Other cards: Extract centering from conversational_grading JSON as primary source
+  // 🆕 Structural "unconfirmed" note — flagged crease reviewed and dismissed as a lighting reflection
+  let structuralUnconfirmedNote: string | null = null;
+  if (card.conversational_grading) {
+    try {
+      const parsedStructural = typeof card.conversational_grading === 'string'
+        ? JSON.parse(card.conversational_grading)
+        : card.conversational_grading;
+      const sd = parsedStructural?.structural_damage;
+      if (sd?.unconfirmed === true && typeof sd?.unconfirmed_note === 'string' && sd.unconfirmed_note.trim()) {
+        structuralUnconfirmedNote = sd.unconfirmed_note;
+      }
+    } catch {
+      // Markdown-format report (not JSON) — no structural note to surface
+    }
+  }
+
   let parsedCenteringFromJSON = null;
   if (card.conversational_grading) {
     try {
@@ -3114,7 +3131,7 @@ export function OtherCardDetails() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className={`text-sm font-medium ${dcmPriceData.source === 'ebay' ? 'text-blue-700' : 'text-emerald-700'}`}>
-                          {dcmPriceData.source === 'ebay' ? 'eBay Median Price' : 'DCM Estimated Value'}
+                          {dcmPriceData.source === 'ebay' ? 'eBay Median Asking Price' : 'DCM Estimated Value'}
                         </span>
                       </div>
                       <p className={`text-2xl font-bold ${dcmPriceData.source === 'ebay' ? 'text-blue-800' : 'text-emerald-800'}`}>
@@ -3140,6 +3157,7 @@ export function OtherCardDetails() {
                     </div>
                   </div>
                   <p className="text-xs text-gray-600 mt-3 leading-relaxed">
+                    {dcmPriceData.source === 'ebay' && <>Based on active eBay listings (asking prices), not sold prices.{' '}</>}
                     Card variant may differ from the matched listing. Review and adjust in the{' '}
                     <a
                       href="#tour-market-value"
@@ -3170,6 +3188,20 @@ export function OtherCardDetails() {
                   <p className="text-gray-700 leading-relaxed">
                     {card.conversational_final_grade_summary}
                   </p>
+                  {card.conversational_limiting_factor && (
+                    <div className="mt-4 pt-4 border-t border-indigo-200">
+                      <p className="text-sm font-semibold text-indigo-700 mb-1">Limiting Factor:</p>
+                      <p className="text-sm text-gray-700">{card.conversational_limiting_factor}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Structural line reviewed — flagged crease dismissed as lighting reflection */}
+              {structuralUnconfirmedNote && (
+                <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                  <h3 className="text-sm font-bold text-slate-700 mb-1">Surface line reviewed</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">{structuralUnconfirmedNote}</p>
                 </div>
               )}
 
@@ -3861,7 +3893,7 @@ export function OtherCardDetails() {
               {/* 2. Centering Analysis */}
               <CollapsibleSection
                 title="Centering Analysis"
-                badge={card.conversational_sub_scores?.centering ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+                badge={card.conversational_sub_scores?.centering?.weighted ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
                 tourId="tour-centering"
               >
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}

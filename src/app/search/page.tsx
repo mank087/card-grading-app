@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { CardSlabGrid } from '@/components/CardSlab';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { getConditionFromGrade } from '@/lib/conditionAssessment';
 
 interface CardResult {
   id: string;
@@ -42,18 +43,6 @@ const formatGrade = (grade: number | null | undefined): string => {
   if (grade === null || grade === undefined || grade === 0) return 'N/A';
   // v6.0: Always return whole number (no .5 grades)
   return Math.round(grade).toString();
-};
-
-// Helper: Get condition label from grade
-const getConditionFromGrade = (grade: number): string => {
-  if (grade >= 10) return 'Gem Mint';
-  if (grade >= 9) return 'Mint';
-  if (grade >= 8) return 'Near Mint';
-  if (grade >= 7) return 'Excellent';
-  if (grade >= 6) return 'Very Good';
-  if (grade >= 5) return 'Good';
-  if (grade >= 4) return 'Fair';
-  return 'Poor';
 };
 
 function SearchPageContent() {

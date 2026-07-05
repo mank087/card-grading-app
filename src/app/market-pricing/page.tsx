@@ -232,7 +232,7 @@ export default function MarketPricingPage() {
                   ${(portfolio?.totalValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </div>
               )}
-              <div className="text-xs text-gray-400 mt-1">Based on DCM estimates &amp; eBay data</div>
+              <div className="text-xs text-gray-400 mt-1">Based on DCM estimates &amp; eBay asking prices (active listings)</div>
             </div>
 
             {/* Cards Priced */}

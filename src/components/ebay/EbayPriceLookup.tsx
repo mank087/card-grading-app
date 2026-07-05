@@ -371,7 +371,7 @@ export function EbayPriceLookup({ card, cardId, category = 'sports', onPriceLoad
             </svg>
           </div>
           <div className="min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-gray-800">Live Market Prices</h3>
+            <h3 className="text-base sm:text-lg font-bold text-gray-800">eBay Asking Prices</h3>
             <p className="text-xs sm:text-sm text-gray-500">
               {cachedPrices?.updated_at ? (
                 <>Updated {formatLastUpdated(cachedPrices.updated_at)}</>
@@ -432,6 +432,10 @@ export function EbayPriceLookup({ card, cardId, category = 'sports', onPriceLoad
               </p>
             </div>
           </div>
+
+          <p className="text-xs text-gray-400 mb-4">
+            Based on active eBay listings (asking prices), not sold prices.
+          </p>
 
           {/* Price Confidence Indicator - Use items count if available, otherwise total from cache */}
           {(priceData.items.length > 0 || priceData.total > 0) && (

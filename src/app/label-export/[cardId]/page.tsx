@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { createClient } from '@supabase/supabase-js';
 import { getCardLabelData } from '@/lib/useLabelData';
+import { getConditionFromGrade } from '@/lib/conditionAssessment';
 import { generateCardImages, type CardImageData } from '@/lib/cardImageGenerator';
 import { generateMiniReportJpg } from '@/lib/miniReportJpgGenerator';
 import { generateQRCodeWithLogo, loadLogoAsBase64, loadWhiteLogoAsBase64, type FoldableLabelData } from '@/lib/foldableLabelGenerator';
@@ -81,20 +82,6 @@ async function rotateImage180(dataUrl: string): Promise<string> {
   ctx.translate(-canvas.width / 2, -canvas.height / 2);
   ctx.drawImage(img, 0, 0);
   return canvas.toDataURL('image/png');
-}
-
-function getConditionLabel(grade: number): string {
-  if (grade >= 10) return 'Pristine';
-  if (grade >= 9) return 'Gem Mint';
-  if (grade >= 8) return 'Near Mint-Mint';
-  if (grade >= 7) return 'Near Mint';
-  if (grade >= 6) return 'Excellent-Mint';
-  if (grade >= 5) return 'Excellent';
-  if (grade >= 4) return 'Very Good-Excellent';
-  if (grade >= 3) return 'Very Good';
-  if (grade >= 2) return 'Good';
-  if (grade >= 1) return 'Fair';
-  return 'Poor';
 }
 
 // PDF library only accepts JPEG/PNG, so we re-encode each card image via canvas.
@@ -290,7 +277,7 @@ export default function LabelExportPage() {
             serial: card.serial,
             grade: labelData.grade ?? 0,
             gradeFormatted: (labelData as any).gradeFormatted || ((labelData.grade ?? 0) % 1 === 0 ? String(labelData.grade ?? 0) : (labelData.grade ?? 0).toFixed(1)),
-            condition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
+            condition: labelData.condition || getConditionFromGrade(Math.round(labelData.grade ?? 0)),
             cardName: safePrimary,
             playerName: safePrimary,
             setName: labelData.setName || '',
@@ -300,8 +287,8 @@ export default function LabelExportPage() {
             sport: cardInfo.sport_or_category || card.category || '',
             frontImageUrl: frontJpeg,
             backImageUrl: backJpeg,
-            conditionLabel: card.conversational_condition_label || labelData.condition || getConditionLabel(labelData.grade ?? 0),
-            labelCondition: labelData.condition || getConditionLabel(labelData.grade ?? 0),
+            conditionLabel: labelData.condition || getConditionFromGrade(Math.round(labelData.grade ?? 0)) || card.conversational_condition_label,
+            labelCondition: labelData.condition || getConditionFromGrade(Math.round(labelData.grade ?? 0)),
             gradeRange,
             cardDetails: safeContext,
             specialFeaturesString: safeFeatures || '',
@@ -453,7 +440,7 @@ export default function LabelExportPage() {
           postStatus('Generating Avery 8167 toploader label…');
           const toploaderData = {
             grade,
-            conditionLabel: card.conversational_condition_label || labelData.condition,
+            conditionLabel: labelData.condition || card.conversational_condition_label,
             qrCodeUrl: cardUrl,
             cardName: labelData.primaryName,
           };

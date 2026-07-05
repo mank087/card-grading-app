@@ -13,12 +13,18 @@ const SOURCE_COLORS: Record<string, string> = {
   'Unpriced': '#D1D5DB',
 };
 
+// Display-only relabeling — eBay values are asking prices from active listings.
+const SOURCE_LABELS: Record<string, string> = {
+  'eBay': 'eBay (asking)',
+};
+const sourceLabel = (source: string) => SOURCE_LABELS[source] || source;
+
 const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: { source: string; count: number }; value: number }> }) => {
   if (!active || !payload?.[0]) return null;
   const d = payload[0].payload;
   return (
     <div className="bg-white shadow-lg rounded-lg px-3 py-2 border border-gray-100">
-      <p className="font-semibold text-gray-900">{d.source}</p>
+      <p className="font-semibold text-gray-900">{sourceLabel(d.source)}</p>
       <p className="text-sm text-gray-600">{d.count} card{d.count !== 1 ? 's' : ''}</p>
     </div>
   );
@@ -61,7 +67,7 @@ export default function PriceSourceChart({ data }: PriceSourceChartProps) {
             formatter={(value: string, entry: any) => {
               const item = data.find(d => d.source === value);
               const pct = item ? Math.round((item.count / total) * 100) : 0;
-              return <span className="text-xs text-gray-600">{value} ({pct}%)</span>;
+              return <span className="text-xs text-gray-600">{sourceLabel(value)} ({pct}%)</span>;
             }}
           />
         </PieChart>

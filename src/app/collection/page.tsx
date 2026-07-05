@@ -1943,7 +1943,7 @@ function CollectionPageContent() {
                       // Determine price source label
                       const hasDcmEstimate = (card.dcm_price_estimate !== null && card.dcm_price_estimate !== undefined) ||
                         (card.dcm_cached_prices?.estimatedValue !== null && card.dcm_cached_prices?.estimatedValue !== undefined);
-                      const priceLabel = hasDcmEstimate ? 'DCM estimate' : 'eBay median price';
+                      const priceLabel = hasDcmEstimate ? 'DCM estimate' : 'eBay median asking price (active listings, not sold)';
                       return (
                         <div
                           className={`absolute -top-8 right-2 px-2 py-1 rounded-full text-xs font-semibold border-2 flex items-center gap-1 ${

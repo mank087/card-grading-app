@@ -306,7 +306,7 @@ export const BatchDownloadModal: React.FC<BatchDownloadModalProps> = ({
       sport: (cardInfo.sport_or_category as string) || card.sport || '',
       frontImageUrl: frontImageBase64,
       backImageUrl: backImageBase64,
-      conditionLabel: card.conversational_condition_label || cleanLabelData.condition,
+      conditionLabel: cleanLabelData.condition || card.conversational_condition_label || '',
       labelCondition: cleanLabelData.condition,
       gradeRange: (() => {
         const uncertaintyStr = card.conversational_grade_uncertainty || '±0.25';

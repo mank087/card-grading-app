@@ -469,6 +469,7 @@ interface SportsCard {
   } | null;
   // v3.2 NEW fields
   conversational_condition_label?: string | null;
+  conversational_limiting_factor?: string | null;
   conversational_image_confidence?: string | null;
   conversational_validation_checklist?: {
     autograph_verified: boolean;
@@ -2455,6 +2456,22 @@ export function SportsCardDetails() {
   // v3.1: Read centering from multiple possible sources (v3.1 centerings_used, legacy Centering_Measurements, or stage0_detection)
   // 🎯 Sports cards: Use conversational_centering_ratios FIRST (matches Pokemon pattern)
   // 🆕 ALWAYS try to extract centering from conversational_grading JSON as primary source
+  // 🆕 Structural "unconfirmed" note — flagged crease reviewed and dismissed as a lighting reflection
+  let structuralUnconfirmedNote: string | null = null;
+  if (card.conversational_grading) {
+    try {
+      const parsedStructural = typeof card.conversational_grading === 'string'
+        ? JSON.parse(card.conversational_grading)
+        : card.conversational_grading;
+      const sd = parsedStructural?.structural_damage;
+      if (sd?.unconfirmed === true && typeof sd?.unconfirmed_note === 'string' && sd.unconfirmed_note.trim()) {
+        structuralUnconfirmedNote = sd.unconfirmed_note;
+      }
+    } catch {
+      // Markdown-format report (not JSON) — no structural note to surface
+    }
+  }
+
   let parsedCenteringFromJSON = null;
   if (card.conversational_grading) {
     try {
@@ -3128,26 +3145,16 @@ export function SportsCardDetails() {
                   (subScores.surface?.weighted ?? subScores.surface?.weighted_score ?? 10) < 10
                 );
 
-                // For perfect cards, show a clean summary without limiting factor language
-                // For cards with defects, show the full summary including limiting factors
-                let displaySummary = card.conversational_final_grade_summary;
-
-                if (!hasDefects) {
-                  // Remove limiting factor language for perfect cards
-                  displaySummary = displaySummary
-                    .replace(/The limiting factor.*?(?=\.|$)/gi, '')
-                    .replace(/limiting factor:?\s*[^.]*\.?/gi, '')
-                    .replace(/\s+/g, ' ')
-                    .trim();
-                }
-
+                // v8.9: Render the stored summary as-is — the server-side narrator
+                // owns summary correctness. (Client-side "limiting factor" sentence
+                // stripping removed; it mutated the displayed summary.)
                 return (
                   <div id="tour-condition-summary" className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl shadow-lg p-6 border-2 border-indigo-200 mt-6">
                     <h3 className="text-lg font-bold text-gray-800 mb-3">
                       Overall Card Condition Summary
                     </h3>
                     <p className="text-gray-700 leading-relaxed">
-                      {displaySummary}
+                      {card.conversational_final_grade_summary}
                     </p>
                     {hasDefects && card.conversational_limiting_factor && (
                       <div className="mt-4 pt-4 border-t border-indigo-200">
@@ -3158,6 +3165,14 @@ export function SportsCardDetails() {
                   </div>
                 );
               })()}
+
+              {/* Structural line reviewed — flagged crease dismissed as lighting reflection */}
+              {structuralUnconfirmedNote && (
+                <div className="bg-slate-50 rounded-xl shadow-lg p-5 border-2 border-slate-200 mt-6">
+                  <h3 className="text-sm font-bold text-slate-700 mb-1">Surface line reviewed</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed">{structuralUnconfirmedNote}</p>
+                </div>
+              )}
 
               {/* 💰 DCM Estimated Price Callout */}
               {dcmPriceData?.estimatedValue && (
@@ -3819,7 +3834,7 @@ export function SportsCardDetails() {
               {/* 2. Centering Analysis */}
               <CollapsibleSection
                 title="Centering Analysis"
-                badge={card.conversational_sub_scores?.centering ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
+                badge={card.conversational_sub_scores?.centering?.weighted ? `${Math.round(card.conversational_sub_scores.centering.weighted)}/10` : undefined}
                 tourId="tour-centering"
               >
               {/* Centering Visual Analysis - Show if conversational AI or DVG has centering data */}

@@ -388,7 +388,7 @@ export const DownloadReportButton: React.FC<DownloadReportButtonProps> = ({
         frontImageUrl: frontImageBase64,
         backImageUrl: backImageBase64,
         // Grade details
-        conditionLabel: card.conversational_condition_label || cleanLabelData.condition,
+        conditionLabel: cleanLabelData.condition || card.conversational_condition_label,
         labelCondition: cleanLabelData.condition,
         gradeRange: (() => {
           // Extract just the uncertainty value (e.g., "10.0 ± 0.25" → "0.25")

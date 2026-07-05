@@ -317,7 +317,7 @@ function UniversalUploadPageContent() {
   };
 
   // Handle file selection and compression
-  const handleFileSelect = async (originalFile: File, side: 'front' | 'back') => {
+  const handleFileSelect = async (originalFile: File, side: 'front' | 'back', source: 'camera' | 'gallery' = 'gallery') => {
     console.log('[Upload] handleFileSelect started:', side, 'size:', originalFile.size, 'type:', originalFile.type)
     const setCompressingState = side === 'front' ? setIsCompressingFront : setIsCompressingBack
     try {
@@ -387,6 +387,30 @@ function UniversalUploadPageContent() {
 
       // Compress the image
       const result = await compressImage(file, compressionSettings)
+
+      // v8.9 MINIMUM-RESOLUTION GATE: below ~1000px on the long edge, fine defects
+      // (edge whitening, corner wear, fine-print text) physically cannot be resolved
+      // by the grading AI — blocking here prevents spending a credit on an image that
+      // cannot be graded accurately. (Observed in production: 600px screenshots graded
+      // blind and 343px thumbnails misread copyright years.)
+      const longEdge = Math.max(result.dimensions.width, result.dimensions.height)
+      console.log(`[Upload] ${side} image dimensions: ${result.dimensions.width}×${result.dimensions.height} (source: ${source})`)
+      if (longEdge < 1000) {
+        console.warn(`[Upload] ${side} image REJECTED by minimum-resolution gate: ${result.dimensions.width}×${result.dimensions.height} (need 1000px+ long edge)`)
+        toast.error(
+          `This ${side} image is too small to grade accurately (${result.dimensions.width}×${result.dimensions.height}). Please use the original photo — at least 1000px on the long side. Screenshots and thumbnails lose the detail needed for corner and edge inspection.`,
+          { duration: 8000 }
+        )
+        setStatus(`❌ ${side} image rejected: ${result.dimensions.width}×${result.dimensions.height} is below the 1000px minimum for accurate grading.`)
+        setCompressingState(false)
+        if (side === 'front') { setFrontFile(null); setFrontHash(null); setFrontCompressed(null); setFrontCompressionInfo(null) }
+        else { setBackFile(null); setBackHash(null); setBackCompressed(null); setBackCompressionInfo(null) }
+        return
+      }
+      if (longEdge < 1600 && source === 'gallery') {
+        console.warn(`[Upload] ${side} image is small (${result.dimensions.width}×${result.dimensions.height}) — grading proceeds with a quality warning`)
+        toast(`Heads up: the ${side} image is on the small side (${result.dimensions.width}×${result.dimensions.height}). A 2000px+ photo gives noticeably more accurate grading.`, { icon: '⚠️', duration: 6000 })
+      }
 
       // Update state with compressed file and info
       if (side === 'front') {
@@ -911,7 +935,7 @@ function UniversalUploadPageContent() {
     console.log('[Upload] Camera captured:', currentSide, 'file size:', file.size)
 
     // Process captured image (async - will set isCompressing)
-    handleFileSelect(file, currentSide)
+    handleFileSelect(file, currentSide, 'camera')
 
     // Determine next step based on what photos we have
     const willHaveFront = currentSide === 'front' || frontFile

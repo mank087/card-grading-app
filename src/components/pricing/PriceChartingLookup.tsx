@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { getStoredSession } from '@/lib/directAuth';
+import { estimateDcmValue as sharedEstimateDcmValue } from '@/lib/pricing/dcmEstimate';
 import {
   BarChart,
   Bar,
@@ -34,6 +35,12 @@ interface AvailableParallel {
   name: string;
   setName: string;
   hasPrice: boolean;
+  // Extra fields when sourced from the local sports DB (/api/pricing/sports-parallels)
+  variantText?: string | null;
+  serialDenominator?: number | null;
+  isRookie?: boolean;
+  prices?: { raw: number | null; psa9: number | null; psa10: number | null } | null;
+  isBase?: boolean;
 }
 
 interface PriceChartingResult {
@@ -114,6 +121,9 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
   const [isManualSelection, setIsManualSelection] = useState<boolean>(!!card.dcm_selected_product_id);
   const [showParallelSelector, setShowParallelSelector] = useState(false);
   const [loadingParallels, setLoadingParallels] = useState(false);
+  // True only after a parallels fetch returned a NON-empty list — an empty
+  // result must not be cached, or a once-empty list would never re-query.
+  const [parallelsLoaded, setParallelsLoaded] = useState(false);
   const [savingSelection, setSavingSelection] = useState(false);
 
   // Cache status
@@ -136,6 +146,15 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
     const session = getStoredSession();
     if (!session?.access_token) return;
 
+    // Match the server's dcmPriceTracker logic: graded_high is the max across
+    // ALL grading companies (PSA/BGS/SGC), not just PSA 10.
+    const gradedPrices = [
+      ...Object.values(data.prices?.psa ?? {}),
+      ...Object.values(data.prices?.bgs ?? {}),
+      ...Object.values(data.prices?.sgc ?? {}),
+    ].filter((p): p is number => typeof p === 'number' && p > 0);
+    const gradedHigh = gradedPrices.length > 0 ? Math.max(...gradedPrices) : null;
+
     try {
       await fetch('/api/pricing/dcm-save', {
         method: 'POST',
@@ -147,7 +166,7 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
           card_id: card.id,
           estimate: data.estimatedValue,
           raw: data.prices?.raw ?? null,
-          graded_high: data.prices?.psa?.['10'] ?? null,
+          graded_high: gradedHigh,
           median: null,
           average: null,
           match_confidence: data.matchConfidence,
@@ -296,7 +315,16 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
       const data: PriceChartingResult = await response.json();
 
       if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch prices');
+        const msg = data.error || 'Failed to fetch prices';
+        // "No matching products" is a normal outcome for promos, oddball issues, and
+        // brand-new releases — an informational empty state, not an exception.
+        if (/no matching products/i.test(msg)) {
+          console.log('[PriceChartingLookup] No SportsCardsPro match for this card (common for promos/oddball issues)');
+          setPriceData(null);
+          setError('No price match found on SportsCardsPro — common for promos, oddball issues, and very new releases. Try Manual Search to look it up under a different product name.');
+          return;
+        }
+        throw new Error(msg);
       }
 
       setPriceData(data.data);
@@ -328,9 +356,11 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
         });
       }
 
-      // Store available parallels for selection dropdown
-      if (data.data?.availableParallels) {
+      // Store available parallels for selection dropdown (only a non-empty
+      // list counts as "loaded" — see parallelsLoaded)
+      if (data.data?.availableParallels && data.data.availableParallels.length > 0) {
         setAvailableParallels(data.data.availableParallels);
+        setParallelsLoaded(true);
       }
       // Persist estimated price to database for collection/portfolio pages
       savePriceEstimate(data.data || undefined);
@@ -346,30 +376,79 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
     }
   };
 
-  // Fetch available parallels for the selector dropdown
+  // Fetch available parallels for the selector dropdown.
+  // PRIMARY: local sports DB via /api/pricing/sports-parallels (full parallel
+  // family with prices in one call). FALLBACK: legacy live SportsCardsPro
+  // search, used only when the local DB is not imported yet (available:false).
   const fetchParallels = async () => {
-    if (!card.player_or_character || availableParallels.length > 0) {
+    // Only skip re-querying if a previous fetch returned a NON-empty list
+    if (parallelsLoaded && availableParallels.length > 0) {
       setShowParallelSelector(true);
       return;
     }
 
     setLoadingParallels(true);
     try {
-      const response = await fetch('/api/pricing/pricecharting', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          playerName: card.player_or_character,
-          year: card.year,
-          setName: card.set_name,
-          cardNumber: card.card_number,
-          includeParallels: true,
-        }),
-      });
+      let parallels: AvailableParallel[] = [];
+      let localAvailable = false;
 
-      const data: PriceChartingResult = await response.json();
-      if (data.data?.availableParallels) {
-        setAvailableParallels(data.data.availableParallels);
+      // PRIMARY: local parallel family
+      if (card.id) {
+        try {
+          const response = await fetch(`/api/pricing/sports-parallels?cardId=${encodeURIComponent(card.id)}`);
+          const data = await response.json();
+          if (data?.available) {
+            localAvailable = true;
+            parallels = (data.parallels || []).map((p: {
+              id: string | number;
+              productName: string;
+              variantText: string | null;
+              serialDenominator: number | null;
+              isRookie: boolean;
+              prices: { raw: number | null; psa9: number | null; psa10: number | null };
+              hasPrices: boolean;
+              isBase: boolean;
+            }): AvailableParallel => ({
+              id: String(p.id),
+              name: p.productName,
+              setName: data.setName || '',
+              hasPrice: !!p.hasPrices,
+              variantText: p.variantText ?? null,
+              serialDenominator: p.serialDenominator ?? null,
+              isRookie: !!p.isRookie,
+              prices: p.prices ?? null,
+              isBase: !!p.isBase,
+            }));
+          }
+        } catch (err) {
+          console.error('[PriceChartingLookup] Local parallels lookup failed, falling back to live search:', err);
+        }
+      }
+
+      // FALLBACK: legacy live search (local DB not imported yet)
+      if (!localAvailable && card.player_or_character) {
+        const response = await fetch('/api/pricing/pricecharting', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            playerName: card.player_or_character,
+            year: card.year,
+            setName: card.set_name,
+            cardNumber: card.card_number,
+            includeParallels: true,
+          }),
+        });
+
+        const data: PriceChartingResult = await response.json();
+        if (data.data?.availableParallels) {
+          parallels = data.data.availableParallels;
+        }
+      }
+
+      setAvailableParallels(parallels);
+      // An empty result is NOT cached — the button stays and re-queries
+      if (parallels.length > 0) {
+        setParallelsLoaded(true);
       }
       setShowParallelSelector(true);
     } catch (err) {
@@ -766,51 +845,14 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
   const getDcmEstimatedValue = () => {
     if (!priceData?.prices || !dcmGrade) return null;
 
-    const raw = priceData.prices.raw;
-    const psaGrades = priceData.prices.psa;
-
-    // Get the PSA price at equivalent grade (for reference only)
-    const roundedGrade = Math.round(dcmGrade).toString();
-    const halfGrade = dcmGrade >= 9 ? '9.5' : null;
-    const psaEquivalentPrice = psaGrades[roundedGrade] || (halfGrade && psaGrades[halfGrade]) || null;
-
-    // Fallback: if no graded equivalent, use raw × 3
-    if (!psaEquivalentPrice && raw) {
-      return {
-        value: Math.round(raw * 3 * 100) / 100,
-        multiplier: null, // Indicates fallback method was used
-        rawPrice: raw,
-        psaPrice: null,
-      };
-    }
-
-    if (!raw || !psaEquivalentPrice) return null;
-
-    // DCM multiplier: represents market premium over raw
-    // Higher grades get closer to PSA values, lower grades closer to raw
-    // This is a conservative estimate since DCM is establishing market presence
-    let dcmMultiplier: number;
-    if (dcmGrade >= 9.5) {
-      dcmMultiplier = 0.70; // 70% of PSA premium over raw
-    } else if (dcmGrade >= 9) {
-      dcmMultiplier = 0.65; // 65% of PSA premium
-    } else if (dcmGrade >= 8) {
-      dcmMultiplier = 0.55; // 55% of PSA premium
-    } else if (dcmGrade >= 7) {
-      dcmMultiplier = 0.45; // 45% of PSA premium
-    } else {
-      dcmMultiplier = 0.35; // 35% of PSA premium for lower grades
-    }
-
-    // Calculate: Raw + (PSA premium × DCM multiplier)
-    const psaPremium = psaEquivalentPrice - raw;
-    const dcmValue = raw + (psaPremium * dcmMultiplier);
+    // WS4: single shared implementation (grade interpolation, no raw×3)
+    const result = sharedEstimateDcmValue(priceData.prices, dcmGrade);
+    if (!result) return null;
 
     return {
-      value: Math.round(dcmValue * 100) / 100,
-      multiplier: dcmMultiplier,
-      rawPrice: raw,
-      psaPrice: psaEquivalentPrice,
+      value: result.estimate,
+      lowData: result.lowData,
+      method: result.method,
     };
   };
 
@@ -982,7 +1024,8 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
               ? 'Price service temporarily unavailable. Click Refresh to try again.'
               : error}
           </p>
-          {error === 'No matching products found' && isOwner && !showManualSearch && (
+          {/* WS3.2: manual search available on ANY error, not just the exact no-match string */}
+          {isOwner && !showManualSearch && (
             <button
               onClick={() => {
                 setShowManualSearch(true);
@@ -1401,6 +1444,8 @@ export function PriceChartingLookup({ card, dcmGrade, isOwner = false, onPriceLo
               <p className="text-4xl font-bold mb-3">{formatPrice(dcmEstimate.value)}</p>
               <p className="text-xs text-white/70 leading-relaxed">
                 DCM value is estimated conservatively based on live sold pricing for both raw and graded cards. Actual sale prices may vary.
+                {dcmEstimate.method === 'raw-only' && ' No graded sales data exists for this card yet — this reflects its ungraded value.'}
+                {dcmEstimate.lowData && ' Limited sales data — treat this estimate as approximate.'}
               </p>
             </div>
           )}

@@ -280,8 +280,12 @@ export function processConditionReport(
   const notesFiltered = filterPositiveClaims(notesSanitized);
   const notesParsed = parseDefectsFromNotes(notesFiltered, 'both');
 
-  // Detect suspicious patterns
-  const suspiciousInput = detectSuspiciousPatterns(input.notes);
+  // Detect suspicious patterns — v8.8: screen the card description too. Previously only
+  // `notes` was screened, so injection attempts typed into the description box reached
+  // the prompt unfiltered.
+  const suspiciousInput = detectSuspiciousPatterns(
+    [input.notes, input.cardDescription].filter(Boolean).join(' ')
+  );
 
   // Count total defects from checkboxes
   let totalDefects = 0;
@@ -319,7 +323,7 @@ export function processConditionReport(
     notes_raw: input.notes,
     notes_sanitized: notesFiltered,
     notes_parsed: notesParsed,
-    card_description: input.cardDescription ? sanitizeUserNotes(input.cardDescription) : undefined,
+    card_description: input.cardDescription ? filterPositiveClaims(sanitizeUserNotes(input.cardDescription)) : undefined,
     has_any_reports: hasAnyReports,
     total_defects_reported: totalDefects,
     suspicious_input: suspiciousInput,
@@ -493,6 +497,27 @@ function formatParsedDefects(defects: ParsedDefect[]): string[] {
 export function formatConditionReportForPrompt(
   report: ProcessedConditionReport
 ): ConditionReportPromptSection {
+  // v8.8: the description-only branch must honor the suspicious-input screen — previously
+  // it bypassed it entirely, letting injection text reach the prompt as "context".
+  if (report.suspicious_input.should_ignore_notes) {
+    console.warn('[ConditionReportProcessor] Suspicious input detected, ignoring user notes/description');
+    return {
+      has_user_hints: false,
+      front_section: '',
+      back_section: '',
+      structural_section: '',
+      factory_section: '',
+      full_prompt_text: `
+═══════════════════════════════════════════════════════════════════════
+USER CONDITION NOTES: FILTERED
+═══════════════════════════════════════════════════════════════════════
+User-submitted notes were filtered due to suspicious content patterns.
+Proceed with image-only grading.
+═══════════════════════════════════════════════════════════════════════
+`,
+    };
+  }
+
   // If no defect reports but card description provided, return description-only section
   if (!report.has_any_reports && report.card_description && report.card_description.trim().length > 0) {
     const descText = `
@@ -604,11 +629,13 @@ RULES FOR USING THESE HINTS (MANDATORY - DO NOT SKIP):
 ───────────────────────────────────────────────────────────────────────
 1. You MUST address EVERY defect type listed above in your grading analysis
 2. For EACH reported defect type, state: CONFIRMED, NOT CONFIRMED, or AMBIGUOUS
-3. If CONFIRMED → include in defects array and apply normal deduction
+3. If CONFIRMED → include in defects array and score it from the category
+   scoring ladder like any visually confirmed defect
 4. If NOT CONFIRMED → explicitly state "User reported [X] — not visible in
    submitted photos" in the relevant description field
-5. If AMBIGUOUS → apply MINIMUM deduction (user physically held the card and
-   likely saw something real that photos may not capture clearly)
+5. If AMBIGUOUS → NO deduction (v8.8). Scores come only from visible evidence.
+   Document the ambiguity explicitly and WIDEN the uncertainty band instead —
+   hints direct your attention; they are never themselves evidence
 6. NEVER improve scores based on user claims — hints only ADD defect awareness
 7. Your visual analysis is primary, but you MUST NOT silently ignore hints
 8. VIOLATION: Saying a surface is "flawless" or "clean" when the user reported
@@ -662,14 +689,28 @@ export function ensureProcessedConditionReport(
   }
 
   // Mobile's "no defects" payload: { noDefectsConfirmed: true, cardDescription }.
-  // Treat as nothing to grade against.
+  // v8.8 fix: previously this returned undefined unconditionally, silently DISCARDING
+  // the user's comment-box insights on mobile while the identical submission on web
+  // delivered them to the AI as context. If a description exists, build a minimal
+  // processed report so the formatter's description-only (context-only, never affects
+  // grades) branch fires — platform parity with web.
   if (
     raw &&
     typeof raw === 'object' &&
     (raw as any).noDefectsConfirmed === true &&
     !(raw as any).front
   ) {
-    return undefined;
+    const desc = sanitizeUserNotes(String((raw as any).cardDescription ?? ''));
+    if (!desc) return undefined;
+    const emptySide = { surface: {}, corners: {}, edges: {} };
+    return processConditionReport({
+      front: emptySide,
+      back: { surface: {}, corners: {}, edges: {} },
+      structural: {},
+      factory: EMPTY_FACTORY_DEFECTS,
+      notes: '',
+      cardDescription: desc,
+    } as unknown as UserConditionReportInput);
   }
 
   // Raw input from a client that didn't process — validate then process.

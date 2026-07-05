@@ -13,8 +13,13 @@ const getCameraConstraints = (facingMode: 'user' | 'environment'): MediaStreamCo
   return {
     video: {
       facingMode: isIOS ? facingMode : { ideal: facingMode },
-      width: { ideal: 1920, min: 1280 },
-      height: { ideal: 1080, min: 720 },
+      // v9.0: request 4K — browsers negotiate DOWN to the camera's best mode, so this
+      // yields the highest available capture resolution. At the old 1920×1080 ideal, a
+      // portrait card crop from the landscape stream came out ~1037px on the long edge
+      // (borderline for the 1000px minimum-resolution grading gate) and the 720p
+      // fallback produced ~690px captures that the gate rightly rejects.
+      width: { ideal: 3840, min: 1280 },
+      height: { ideal: 2160, min: 720 },
       frameRate: { ideal: 30 },
     }
   };
@@ -24,7 +29,7 @@ const getCameraConstraints = (facingMode: 'user' | 'environment'): MediaStreamCo
  * Fallback constraints if optimal fails
  */
 const getFallbackConstraints = (facingMode: 'user' | 'environment'): MediaStreamConstraints[] => [
-  { video: { facingMode, width: { ideal: 1280 }, height: { ideal: 720 } } },
+  { video: { facingMode, width: { ideal: 1920 }, height: { ideal: 1080 } } },
   { video: { facingMode } },
   { video: true },
 ];
