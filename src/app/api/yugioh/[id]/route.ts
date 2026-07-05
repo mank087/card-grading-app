@@ -10,6 +10,8 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
+import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Yu-Gi-Oh cards
@@ -331,17 +333,31 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
           const avgRounded = threePassData?.averaged_rounded;
 
           // v6.2: Fix any grade mismatches in cached summary text
-          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedDecimalGrade = jsonData.final_grade?.decimal_grade ?? avgRounded?.final ?? null; // v8.8: final_grade is the server-capped value; averaged_rounded.final was uncapped in pre-v8.8 data
           const cachedRawSummary = jsonData.final_grade?.summary || null;
           const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
             ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
             : cachedRawSummary;
 
+          // v9.0 label unification: derive from ROUNDED grade (8.5 -> 9 -> 'Mint') to match labelDataGenerator
+          const cachedDerivedLabel = cachedDecimalGrade != null ? getConditionFromGrade(Math.round(cachedDecimalGrade)) : (jsonData.final_grade?.condition_label || null);
+          // Heal stale stored label so collection/mobile (which read the column) match this page.
+          // Fire-and-forget: never await, never fail the request.
+          if (cachedDerivedLabel && card.conversational_condition_label !== cachedDerivedLabel) {
+            supabase
+              .from("cards")
+              .update({ conversational_condition_label: cachedDerivedLabel })
+              .eq("id", card.id)
+              .then(({ error: healError }) => {
+                if (healError) console.error("[CACHE] Failed to heal stale condition label:", healError.message);
+              });
+          }
+
           parsedConversationalData = {
             decimal_grade: cachedDecimalGrade,
-            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
+            whole_grade: jsonData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : null), // v8.8: prefer capped value; round not floor
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
-            condition_label: jsonData.final_grade?.condition_label || null,
+            condition_label: cachedDerivedLabel, // v9.0: canonical label from ROUNDED final grade (fixes pre-v8.8 cached labels + 8.5 -> 'Mint' rounding)
             final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             sub_scores: {
@@ -606,7 +622,7 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
           decimal_grade: actualDecimalGrade,
           whole_grade: jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null,
           grade_range: jsonData.image_quality?.grade_uncertainty || jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || '±0.5',
-          condition_label: jsonData.final_grade?.condition_label || null,
+          condition_label: actualDecimalGrade != null ? getConditionFromGrade(Math.round(actualDecimalGrade)) : (jsonData.final_grade?.condition_label || null), // v8.9: derive label from final grade
           final_grade_summary: correctedSummary,
           image_confidence: jsonData.image_quality?.confidence_letter || null,
           sub_scores: {

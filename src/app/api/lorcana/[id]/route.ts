@@ -10,6 +10,8 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
+import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Lorcana cards
@@ -342,18 +344,32 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
           const avgRounded = threePassData?.averaged_rounded;
 
           // 🔧 v6.2: Fix any grade mismatches in cached summary text
-          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedDecimalGrade = jsonData.final_grade?.decimal_grade ?? avgRounded?.final ?? null; // v8.8: final_grade is the server-capped value; averaged_rounded.final was uncapped in pre-v8.8 data
           const cachedRawSummary = jsonData.final_grade?.summary || null;
           const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
             ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
             : cachedRawSummary;
 
+          // v9.0 label unification: derive from ROUNDED grade (8.5 -> 9 -> 'Mint') to match labelDataGenerator
+          const cachedDerivedLabel = cachedDecimalGrade != null ? getConditionFromGrade(Math.round(cachedDecimalGrade)) : (jsonData.final_grade?.condition_label || null);
+          // Heal stale stored label so collection/mobile (which read the column) match this page.
+          // Fire-and-forget: never await, never fail the request.
+          if (cachedDerivedLabel && card.conversational_condition_label !== cachedDerivedLabel) {
+            supabase
+              .from("cards")
+              .update({ conversational_condition_label: cachedDerivedLabel })
+              .eq("id", card.id)
+              .then(({ error: healError }) => {
+                if (healError) console.error("[CACHE] Failed to heal stale condition label:", healError.message);
+              });
+          }
+
           parsedConversationalData = {
             // 🎯 THREE-PASS: Use averaged_rounded when available
             decimal_grade: cachedDecimalGrade,
-            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
+            whole_grade: jsonData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : null), // v8.8: prefer capped value; round not floor
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
-            condition_label: jsonData.final_grade?.condition_label || null,
+            condition_label: cachedDerivedLabel, // v9.0: canonical label from ROUNDED final grade (fixes pre-v8.8 cached labels + 8.5 -> 'Mint' rounding)
             final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
@@ -631,7 +647,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
           decimal_grade: actualDecimalGrade,
           whole_grade: jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null,
           grade_range: jsonData.image_quality?.grade_uncertainty || jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || '±0.5',  // 🔧 FIX: Prioritize ± format over range
-          condition_label: jsonData.final_grade?.condition_label || null,
+          condition_label: actualDecimalGrade != null ? getConditionFromGrade(Math.round(actualDecimalGrade)) : (jsonData.final_grade?.condition_label || null), // v8.9: derive label from final grade
           final_grade_summary: correctedSummary,  // 🆕 v6.2: Fixed summary with correct grade
           image_confidence: jsonData.image_quality?.confidence_letter || null,
           sub_scores: {
@@ -835,6 +851,10 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
     let matchedDatabaseCard: LorcanaCard | null = null;
     let databaseMatchConfidence: string | null = null;
 
+    // 🆕 WS7: Validation provenance tracking (persisted to cards table columns)
+    let aiCardInfoOriginal: any = null;
+    let validationTier: string | null = null;
+
     if (conversationalGradingData?.card_info) {
       try {
         const aiCardInfo = conversationalGradingData.card_info;
@@ -845,29 +865,34 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
         let setCode = aiCardInfo.expansion_code || null;
 
         // Try to derive set code from set name if not provided
-        // Lorcana sets are numbered: "The First Chapter" = "1", "Rise of the Floodborn" = "2", etc.
+        // 🆕 WS7: Lookup against lorcana_sets table (code + name) instead of a hardcoded
+        // set-name→code chain that went stale with every new set release.
         if (!setCode && aiCardInfo.set_name) {
-          const setNameLower = aiCardInfo.set_name.toLowerCase();
-          // Main sets (1-11+)
-          if (setNameLower.includes('first chapter')) setCode = '1';
-          else if (setNameLower.includes('rise of the floodborn') || setNameLower.includes('floodborn')) setCode = '2';
-          else if (setNameLower.includes('into the inklands') || setNameLower.includes('inklands')) setCode = '3';
-          else if (setNameLower.includes('ursula\'s return') || setNameLower.includes('ursulas return')) setCode = '4';
-          else if (setNameLower.includes('shimmering skies')) setCode = '5';
-          else if (setNameLower.includes('azurite sea') || setNameLower.includes('azurite')) setCode = '6';
-          else if (setNameLower.includes('archazia\'s island') || setNameLower.includes('archazia')) setCode = '7';
-          else if (setNameLower.includes('reign of jafar') || setNameLower.includes('jafar')) setCode = '8';
-          else if (setNameLower.includes('fabled')) setCode = '9';
-          else if (setNameLower.includes('whispers in the well') || setNameLower.includes('whispers')) setCode = '10';
-          else if (setNameLower.includes('winterspell')) setCode = '11';
-          // Promo and special sets
-          else if (setNameLower.includes('promo set 1') || setNameLower === 'p1') setCode = 'P1';
-          else if (setNameLower.includes('promo set 2') || setNameLower === 'p2') setCode = 'P2';
-          else if (setNameLower.includes('challenge promo')) setCode = 'cp';
-          else if (setNameLower.includes('d23')) setCode = 'D23';
+          try {
+            const { data: lorcanaSets, error: setsError } = await supabase
+              .from('lorcana_sets')
+              .select('code, name');
 
-          if (setCode) {
-            console.log(`[GET /api/lorcana/${cardId}]   Derived set code: "${setCode}" from set name: "${aiCardInfo.set_name}"`);
+            if (setsError) {
+              console.error(`[GET /api/lorcana/${cardId}]   ⚠️ lorcana_sets lookup failed:`, setsError.message);
+            } else if (lorcanaSets && lorcanaSets.length > 0) {
+              const normalizeSetName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+              const aiSetNorm = normalizeSetName(aiCardInfo.set_name);
+
+              if (aiSetNorm) {
+                const matchedSet = lorcanaSets.find(s => {
+                  const dbSetNorm = normalizeSetName(s.name || '');
+                  return !!dbSetNorm && (aiSetNorm.includes(dbSetNorm) || dbSetNorm.includes(aiSetNorm));
+                });
+
+                if (matchedSet) {
+                  setCode = matchedSet.code;
+                  console.log(`[GET /api/lorcana/${cardId}]   Derived set code: "${setCode}" from set name: "${aiCardInfo.set_name}" (matched lorcana_sets: "${matchedSet.name}")`);
+                }
+              }
+            }
+          } catch (setLookupError) {
+            console.error(`[GET /api/lorcana/${cardId}]   ⚠️ lorcana_sets lookup error:`, setLookupError);
           }
         }
 
@@ -920,6 +945,10 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
             matchedDatabaseCard = null;
             databaseMatchConfidence = null;
           } else {
+            // 🆕 WS7: Snapshot the AI-extracted card_info BEFORE database values overwrite it
+            aiCardInfoOriginal = JSON.parse(JSON.stringify(conversationalGradingData.card_info));
+            validationTier = 'exact';
+
             // Name is compatible — safe to enhance card_info with verified database data
             conversationalGradingData.card_info = {
               ...conversationalGradingData.card_info,
@@ -1007,6 +1036,11 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
 
           if (nameOverlap) {
             console.log(`[GET /api/lorcana/${cardId}] ✅ Last-resort match: "${bestResult.full_name}" from set "${bestResult.set_name}" (set_code: ${bestResult.set_code})`);
+
+            // 🆕 WS7: Snapshot the AI-extracted card_info BEFORE database values overwrite it.
+            // Name-only match with forced medium confidence → 'family' tier, not 'exact'.
+            aiCardInfoOriginal = JSON.parse(JSON.stringify(conversationalGradingData.card_info));
+            validationTier = 'family';
 
             // Apply full DB override since we found the right card
             matchedDatabaseCard = bestResult;
@@ -1152,7 +1186,13 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       ...(matchedDatabaseCard && {
         // lorcana_card_id: matchedDatabaseCard.id,  // Commented out until column type is fixed
         lorcana_reference_image: matchedDatabaseCard.image_normal || matchedDatabaseCard.image_large,
-        database_match_confidence: databaseMatchConfidence
+        database_match_confidence: databaseMatchConfidence,
+
+        // 🆕 WS7: Validation provenance columns (only written when a DB match was accepted)
+        validated_source: 'lorcana_cards',
+        validation_tier: validationTier,
+        validation_confidence: databaseMatchConfidence,
+        ai_card_info_original: aiCardInfoOriginal
       }),
 
       // Processing metadata

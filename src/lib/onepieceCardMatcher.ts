@@ -49,12 +49,25 @@ export interface MatchConfidenceFlags {
 }
 
 /**
+ * Lightweight summary of one row in a card-ID family (base + variants)
+ * Used so the route can expose all printings without conflating their prices
+ */
+export interface OnePieceFamilyEntry {
+  id: string;
+  variant_type: string | null;
+  market_price: number | null;
+  image_url: string | null;
+}
+
+/**
  * Extended match result with confidence flags
  */
 export interface MatchResult {
   card: OnePieceCard | null;
   score: number;
   confidence: MatchConfidenceFlags;
+  /** All rows sharing the matched card's base card ID (base + alt-art/manga/parallel variants) */
+  family?: OnePieceFamilyEntry[];
 }
 
 /**
@@ -412,39 +425,178 @@ export function findBestMatchWithConfidence(
 }
 
 /**
+ * Map full card rows to lightweight family entries (id / variant / price / image only)
+ * so callers can expose every printing without conflating their prices.
+ */
+function toFamilyEntries(rows: OnePieceCard[]): OnePieceFamilyEntry[] {
+  return rows.map(row => ({
+    id: row.id,
+    variant_type: row.variant_type,
+    market_price: row.market_price,
+    image_url: row.card_image
+  }));
+}
+
+// Common shorthand tokens normalized to the canonical variant_type vocabulary
+const VARIANT_TOKEN_SYNONYMS: Record<string, string> = {
+  alt: 'alternate',
+  aa: 'alternate',
+  alternative: 'alternate'
+};
+
+// Tokens too generic to identify a variant on their own (e.g. "art" alone must not match "alternate_art")
+const GENERIC_VARIANT_TOKENS = new Set(['art', 'card', 'version', 'rare', 'holo', 'foil']);
+
+function tokenizeVariantText(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map(token => VARIANT_TOKEN_SYNONYMS[token] || token);
+}
+
+/**
+ * Resolve a variant row from a family using an AI-extracted hint (e.g. "Alternate Art",
+ * "Manga", "Special Parallel"). Case-insensitive token match against variant_type values.
+ * Returns null when the hint is absent or matches no variant (caller keeps the base row).
+ */
+function resolveVariantFromHint(
+  familyRows: OnePieceCard[],
+  variantHint?: string
+): OnePieceCard | null {
+  if (!variantHint) return null;
+
+  const hintTokens = new Set(tokenizeVariantText(variantHint));
+  if (hintTokens.size === 0) return null;
+
+  let best: OnePieceCard | null = null;
+  let bestOverlap = 0;
+
+  for (const row of familyRows) {
+    if (!row.variant_type) continue; // base row is the default; hints only select variant rows
+
+    const typeTokens = tokenizeVariantText(row.variant_type);
+    const distinctiveTokens = typeTokens.filter(t => !GENERIC_VARIANT_TOKENS.has(t));
+
+    // Require at least one distinctive token match to avoid false positives on generic words
+    if (!distinctiveTokens.some(t => hintTokens.has(t))) continue;
+
+    const overlap = typeTokens.filter(t => hintTokens.has(t)).length;
+    if (overlap > bestOverlap) {
+      bestOverlap = overlap;
+      best = row;
+    }
+  }
+
+  return best;
+}
+
+/**
+ * Fetch the full family for a matched card (base + ALL variant rows — no variant_type filter)
+ * and select which row to return: the hinted variant if resolvable, otherwise the base row.
+ * Each returned row keeps its OWN market_price — a variant's price is never attached to base
+ * or vice versa.
+ */
+async function buildFamilyAndSelect(
+  matchedCard: OnePieceCard,
+  variantHint?: string
+): Promise<{ family: OnePieceFamilyEntry[]; selected: OnePieceCard }> {
+  const baseCardId = matchedCard.base_card_id || matchedCard.id;
+  const familyRows = await getCardVariants(baseCardId);
+  const rows = familyRows.length > 0 ? familyRows : [matchedCard];
+
+  const baseRow = rows.find(row => row.variant_type === null) || matchedCard;
+  const variantRow = resolveVariantFromHint(rows, variantHint);
+
+  return {
+    family: toFamilyEntries(rows),
+    selected: variantRow || baseRow
+  };
+}
+
+/**
  * Main lookup function: Find a One Piece card from AI-extracted info
  * Tries card ID first (most reliable), then falls back to name search
+ *
+ * @param variantHint AI-extracted rarity/variant text (e.g. "Alternate Art", "Manga",
+ *                    "Parallel") used to select the correct printing within a card-ID family
  */
 export async function lookupOnePieceCard(
   aiIdentification: {
     cardId?: string;
     name?: string;
     set?: string;
-  }
+  },
+  variantHint?: string
 ): Promise<MatchResult> {
-  console.log('[OnePiece Matcher] Looking up card:', aiIdentification);
+  console.log('[OnePiece Matcher] Looking up card:', aiIdentification, variantHint ? `(variant hint: "${variantHint}")` : '');
 
   // Strategy 1: Direct card ID lookup (most reliable)
+  // IMPORTANT: name must be cross-checked — a misread card number must not become a
+  // confident wrong identity (mirrors mtgCardMatcher's nameScore < 0.35 rejection)
+  let rejectedDirectMatch: OnePieceCard | null = null;
+  let rejectedNameScore = 0;
+
   if (aiIdentification.cardId) {
     const directMatch = await lookupByCardId(aiIdentification.cardId);
     if (directMatch) {
-      console.log('[OnePiece Matcher] Direct card ID match found:', directMatch.id);
-      return {
-        card: directMatch,
-        score: 1.0,
-        confidence: {
-          cardIdMatched: true,
-          cardIdScore: 1.0,
-          nameMatched: true,
-          nameScore: 1.0,
-          setMatched: true,
-          setScore: 1.0,
-          overallConfidence: 'high',
-          matchedFeatures: 3,
-          totalFeatures: 3,
-          warnings: []
+      if (!aiIdentification.name) {
+        // No AI name available to validate — accept, but never at full confidence
+        const { family, selected } = await buildFamilyAndSelect(directMatch, variantHint);
+        console.log(`[OnePiece Matcher] Direct card ID match found: ${selected.id} (no AI name to validate — medium confidence)`);
+        return {
+          card: selected,
+          score: 0.85,
+          confidence: {
+            cardIdMatched: true,
+            cardIdScore: 1.0,
+            nameMatched: false,
+            nameScore: 0,
+            setMatched: false,
+            setScore: 0,
+            overallConfidence: 'medium',
+            matchedFeatures: 1,
+            totalFeatures: 3,
+            warnings: ['No AI card name provided for validation']
+          },
+          family
+        };
+      }
+
+      const nameScore = calculateSimilarity(directMatch.card_name, aiIdentification.name);
+      const nameMatched = nameScore >= 0.5;
+
+      if (nameScore < 0.35) {
+        // Name is very different — likely a misread card number. Fall through to name/set strategies.
+        console.log(`[OnePiece Matcher] Direct card ID match REJECTED: name mismatch "${aiIdentification.name}" vs "${directMatch.card_name}" (score: ${nameScore.toFixed(2)})`);
+        rejectedDirectMatch = directMatch;
+        rejectedNameScore = nameScore;
+      } else {
+        const warnings: string[] = [];
+        if (!nameMatched) {
+          warnings.push(`Name partially matched: "${aiIdentification.name}" vs "${directMatch.card_name}" (score: ${nameScore.toFixed(2)})`);
         }
-      };
+        const overallConfidence: 'high' | 'medium' = nameScore >= 0.65 ? 'high' : 'medium';
+        const { family, selected } = await buildFamilyAndSelect(directMatch, variantHint);
+        console.log(`[OnePiece Matcher] Direct card ID match found: ${selected.id}${selected.variant_type ? ` (variant: ${selected.variant_type})` : ' (base)'} — family size: ${family.length}, name score: ${nameScore.toFixed(2)}, confidence: ${overallConfidence}`);
+        return {
+          card: selected,
+          score: nameScore >= 0.65 ? 1.0 : 0.85,
+          confidence: {
+            cardIdMatched: true,
+            cardIdScore: 1.0,
+            nameMatched,
+            nameScore,
+            setMatched: true,
+            setScore: 1.0,
+            overallConfidence,
+            matchedFeatures: nameMatched ? 3 : 2,
+            totalFeatures: 3,
+            warnings
+          },
+          family
+        };
+      }
     }
   }
 
@@ -457,7 +609,32 @@ export async function lookupOnePieceCard(
     searchResults = await searchByName(aiIdentification.name);
   }
 
+  // Low-confidence fallback for a name-rejected direct card-ID match:
+  // return it so the caller can see it, but flag it so it is NOT trusted as identity
+  const buildRejectedLowResult = (): MatchResult => ({
+    card: rejectedDirectMatch,
+    score: 0.3,
+    confidence: {
+      cardIdMatched: true,
+      cardIdScore: 1.0,
+      nameMatched: false,
+      nameScore: rejectedNameScore,
+      setMatched: false,
+      setScore: 0,
+      overallConfidence: 'low',
+      matchedFeatures: 1,
+      totalFeatures: 3,
+      warnings: [
+        `Card ID matched but name mismatch: "${aiIdentification.name}" vs "${rejectedDirectMatch!.card_name}" (score: ${rejectedNameScore.toFixed(2)}) — identity not trusted`
+      ]
+    }
+  });
+
   if (searchResults.length === 0) {
+    if (rejectedDirectMatch) {
+      console.log('[OnePiece Matcher] No name/set matches — returning name-rejected direct match at LOW confidence');
+      return buildRejectedLowResult();
+    }
     console.log('[OnePiece Matcher] No matches found');
     return {
       card: null,
@@ -478,7 +655,21 @@ export async function lookupOnePieceCard(
   }
 
   // Find best match with confidence scoring
-  return findBestMatchWithConfidence(searchResults, aiIdentification);
+  const bestMatch = findBestMatchWithConfidence(searchResults, aiIdentification);
+
+  if (bestMatch.card && bestMatch.confidence.overallConfidence !== 'low') {
+    // Attach the full printing family and resolve the hinted variant for accepted matches
+    const { family, selected } = await buildFamilyAndSelect(bestMatch.card, variantHint);
+    return { ...bestMatch, card: selected, family };
+  }
+
+  // Nothing better than the rejected direct match — surface it at low confidence with a warning
+  if (rejectedDirectMatch) {
+    console.log('[OnePiece Matcher] Name/set strategies found nothing better — returning name-rejected direct match at LOW confidence');
+    return buildRejectedLowResult();
+  }
+
+  return bestMatch;
 }
 
 /**

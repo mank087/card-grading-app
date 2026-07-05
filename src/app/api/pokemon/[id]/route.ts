@@ -12,6 +12,8 @@ import { lookupSetByCardNumber } from "@/lib/pokemonTcgApi";
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
+import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // Color extraction for color-matched labels
@@ -460,18 +462,32 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
           const avgRounded = threePassData?.averaged_rounded;
 
           // 🔧 v6.2: Fix any grade mismatches in cached summary text
-          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedDecimalGrade = jsonData.final_grade?.decimal_grade ?? avgRounded?.final ?? null; // v8.8: final_grade is the server-capped value; averaged_rounded.final was uncapped in pre-v8.8 data
           const cachedRawSummary = jsonData.final_grade?.summary || null;
           const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
             ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
             : cachedRawSummary;
 
+          // v9.0 label unification: derive from ROUNDED grade (8.5 -> 9 -> 'Mint') to match labelDataGenerator
+          const cachedDerivedLabel = cachedDecimalGrade != null ? getConditionFromGrade(Math.round(cachedDecimalGrade)) : (jsonData.final_grade?.condition_label || null);
+          // Heal stale stored label so collection/mobile (which read the column) match this page.
+          // Fire-and-forget: never await, never fail the request.
+          if (cachedDerivedLabel && card.conversational_condition_label !== cachedDerivedLabel) {
+            supabase
+              .from("cards")
+              .update({ conversational_condition_label: cachedDerivedLabel })
+              .eq("id", card.id)
+              .then(({ error: healError }) => {
+                if (healError) console.error("[CACHE] Failed to heal stale condition label:", healError.message);
+              });
+          }
+
           parsedConversationalData = {
             // 🎯 THREE-PASS: Use averaged_rounded when available
             decimal_grade: cachedDecimalGrade,
-            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
+            whole_grade: jsonData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : null), // v8.8: prefer capped value; round not floor
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
-            condition_label: jsonData.final_grade?.condition_label || null,
+            condition_label: cachedDerivedLabel, // v9.0: canonical label from ROUNDED final grade (fixes pre-v8.8 cached labels + 8.5 -> 'Mint' rounding)
             final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
@@ -786,6 +802,8 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
 
     // 🆕 Parse conversational JSON to extract structured fields
     let conversationalGradingData = null;
+    // 🔒 WS7.1: Snapshot of the AI's original card_info, captured BEFORE DB validation mutates it
+    let aiCardInfoOriginal: any = null;
     if (conversationalGradingResult) {
       try {
         console.log(`[GET /api/pokemon/${cardId}] Parsing conversational JSON...`);
@@ -808,7 +826,7 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         const avgRounded = threePassData?.averaged_rounded;
 
         // 🔧 v6.2: Fix any grade mismatches in the summary text
-        const actualDecimalGrade = avgRounded?.final ?? jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null;
+        const actualDecimalGrade = jsonData.final_grade?.decimal_grade ?? avgRounded?.final ?? jsonData.scoring?.final_grade ?? null; // v8.8: final_grade carries the weakest-link-capped server grade
         const rawSummary = jsonData.final_grade?.summary || null;
         const correctedSummary = rawSummary && actualDecimalGrade !== null
           ? fixSummaryGradeMismatch(rawSummary, actualDecimalGrade)
@@ -817,9 +835,9 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
         conversationalGradingData = {
           // Handle three-pass, v5.0, and v4.2 formats (priority order)
           decimal_grade: actualDecimalGrade,
-          whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null),
+          whole_grade: jsonData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : (jsonData.scoring?.rounded_grade ?? null)), // v8.8
           grade_range: jsonData.image_quality?.grade_uncertainty || jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || '±0.5',
-          condition_label: jsonData.final_grade?.condition_label || null,
+          condition_label: actualDecimalGrade != null ? getConditionFromGrade(Math.round(actualDecimalGrade)) : (jsonData.final_grade?.condition_label || null), // v8.9: derive label from final grade
           final_grade_summary: correctedSummary,
           image_confidence: jsonData.image_quality?.confidence_letter || null,
           // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
@@ -1029,6 +1047,15 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                                cardInfo?.language === 'ja' ||
                                cardInfo?.language === 'japanese';
 
+        // 🔒 WS7.1: Snapshot the AI's original card_info BEFORE any DB validation mutates it
+        if (cardInfo) {
+          try {
+            aiCardInfoOriginal = JSON.parse(JSON.stringify(cardInfo));
+          } catch (snapshotError) {
+            console.error(`[GET /api/pokemon/${cardId}] ⚠️ Failed to snapshot original card_info:`, snapshotError);
+          }
+        }
+
         // 🇯🇵 JAPANESE DATABASE VALIDATION: Query pokemon_cards_ja for Japanese cards
         let dbValidationApplied = false;
         if (isJapaneseCard && cardInfo?.card_number) {
@@ -1192,9 +1219,14 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
                   cardInfo.year = dbYear;
                 }
                 cardInfo.needs_api_lookup = false; // Already resolved from local DB
+                cardInfo.validated_source = 'pokemon_cards'; // 🔒 WS7.2: mirror JA path provenance
                 dbValidationApplied = true;
               } else {
                 console.log(`[GET /api/pokemon/${cardId}] ✅ DB VALIDATED: All values match database`);
+                // WS7.2 fix: a clean match IS a validation — record provenance even
+                // when no correction was needed (previously left null, so a
+                // perfectly-validated card recorded as unvalidated).
+                cardInfo.validated_source = 'pokemon_cards';
               }
             } else {
               console.log(`[GET /api/pokemon/${cardId}] ⚠️ No DB match for "${pokemonName}" #${cardNumber}, using AI values`);
@@ -1216,6 +1248,10 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
               updatedJson.card_info.card_number_raw = cardInfo.card_number_raw;
               updatedJson.card_info.year = cardInfo.year;
               updatedJson.card_info.needs_api_lookup = false;
+              // 🔒 WS7.2: Persist validation provenance in the raw JSON (EN and JA paths)
+              if (cardInfo.validated_source) {
+                updatedJson.card_info.validated_source = cardInfo.validated_source;
+              }
 
               // 🇯🇵 Add Japanese-specific fields if this is a Japanese card
               if (isJapaneseCard) {
@@ -1447,6 +1483,12 @@ export async function GET(request: NextRequest, { params }: PokemonCardGradingRe
 
       // Individual searchable/sortable columns (Pokemon-specific - merged from both sources)
       ...cardFields,
+
+      // 🔒 WS7.1/7.2: DB validation provenance + pre-validation AI snapshot
+      validated_source: conversationalGradingData?.card_info?.validated_source || null,
+      validation_tier: conversationalGradingData?.card_info?.validated_source ? 'exact' : null,
+      validation_confidence: conversationalGradingData?.card_info?.validated_source ? 'high' : null,
+      ai_card_info_original: conversationalGradingData?.card_info?.validated_source ? aiCardInfoOriginal : null,
 
       // Processing metadata
       processing_time: Date.now() - startTime

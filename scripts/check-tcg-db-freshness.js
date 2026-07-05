@@ -1,12 +1,13 @@
 /**
- * Read-only freshness inquiry for MTG, Lorcana, and One Piece.
+ * Read-only freshness inquiry for MTG, Lorcana, One Piece, Yu-Gi-Oh,
+ * Pokemon, and Star Wars.
  *
  * For each game: compares our internal sets table against the relevant
  * external API and reports total counts, the newest set on each side,
  * sets present in the API but missing from our DB, and orphaned sets
  * we have that the API has dropped or renamed.
  *
- * Does NOT write anything. Use scripts/import-{mtg,lorcana,onepiece}-database.js
+ * Does NOT write anything. Use scripts/import-{mtg,lorcana,onepiece,yugioh,pokemon,starwars}-database.js
  * to actually pull updates.
  *
  * Usage: node scripts/check-tcg-db-freshness.js
@@ -27,10 +28,25 @@ function divider(title) {
   console.log('='.repeat(62));
 }
 
-async function fetchJson(url) {
-  const res = await fetch(url);
+// Scryfall (and good API etiquette generally) requires a descriptive
+// User-Agent; Scryfall returns HTTP 400 "generic_user_agent" without one.
+const FETCH_HEADERS = {
+  'User-Agent': 'DCMGrading/1.0 (benjamin@maniczmedia.com)',
+  'Accept': 'application/json',
+};
+
+async function fetchJson(url, extraHeaders = {}) {
+  const res = await fetch(url, { headers: { ...FETCH_HEADERS, ...extraHeaders } });
   if (!res.ok) throw new Error(`HTTP ${res.status} on ${url}`);
   return res.json();
+}
+
+async function fetchHtml(url) {
+  const res = await fetch(url, {
+    headers: { ...FETCH_HEADERS, 'Accept': 'text/html' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} on ${url}`);
+  return res.text();
 }
 
 // ---------- MTG (Scryfall) ----------
@@ -312,6 +328,157 @@ async function checkYugioh() {
   return { hasMissing: recentMissing.length > 0, count: recentMissing.length };
 }
 
+// ---------- Pokemon (pokemontcg.io) ----------
+async function checkPokemon() {
+  divider('Pokemon vs pokemontcg.io API');
+
+  const { count: dbSetCount } = await supabase
+    .from('pokemon_sets').select('id', { count: 'exact', head: true });
+  const { count: dbCardCount } = await supabase
+    .from('pokemon_cards').select('id', { count: 'exact', head: true });
+
+  const { data: dbSets } = await supabase
+    .from('pokemon_sets')
+    .select('id, name, series, release_date, total, printed_total')
+    .order('release_date', { ascending: false });
+
+  // Same API + key as scripts/import-pokemon-database.js. The key is optional
+  // but recommended (higher rate limits). pageSize=250 covers all ~170 sets.
+  const apiKeyHeaders = process.env.POKEMON_TCG_API_KEY
+    ? { 'X-Api-Key': process.env.POKEMON_TCG_API_KEY }
+    : {};
+  const api = await fetchJson(
+    'https://api.pokemontcg.io/v2/sets?orderBy=-releaseDate&pageSize=250',
+    apiKeyHeaders,
+  );
+  const apiSets = api.data || [];
+
+  // Global card count via totalCount on a 1-card page.
+  let apiCardCount = '?';
+  try {
+    const cardRes = await fetchJson('https://api.pokemontcg.io/v2/cards?pageSize=1', apiKeyHeaders);
+    apiCardCount = cardRes.totalCount ?? '?';
+  } catch { /* non-fatal — counts line just shows '?' */ }
+
+  console.log(`Sets:  DB ${dbSetCount}  |  API ${apiSets.length}  |  Diff ${apiSets.length - dbSetCount}`);
+  console.log(`Cards: DB ${dbCardCount}  |  API ${apiCardCount}`);
+  console.log('(English only — pokemon_sets_ja / TCGdex Japanese data is not checked here)');
+
+  const dbIds = new Set(dbSets.map(s => s.id));
+  const apiIds = new Set(apiSets.map(s => s.id));
+  const apiNotInDb = apiSets.filter(s => !dbIds.has(s.id));
+  const dbNotInApi = dbSets.filter(s => !apiIds.has(s.id));
+
+  console.log(`\nMost recent DB set:  ${(dbSets[0]?.name || '?').padEnd(35)} ${dbSets[0]?.release_date || '?'}`);
+  const newestApi = [...apiSets].sort((a, b) => (b.releaseDate || '').localeCompare(a.releaseDate || ''))[0];
+  console.log(`Most recent API set: ${(newestApi?.name || '?').padEnd(35)} ${newestApi?.releaseDate || '?'}`);
+
+  console.log(`\nAPI sets missing from DB: ${apiNotInDb.length}`);
+  apiNotInDb
+    .sort((a, b) => (b.releaseDate || '').localeCompare(a.releaseDate || ''))
+    .forEach(s => {
+      console.log(`    ${s.releaseDate || '?'}  ${(s.id || '').padEnd(14)} ${(s.name || '').padEnd(40)} ${s.total || '?'} cards`);
+    });
+
+  if (dbNotInApi.length > 0) {
+    console.log(`\nSets in DB but not in API: ${dbNotInApi.length}`);
+    dbNotInApi.slice(0, 5).forEach(s => {
+      console.log(`    ${s.release_date || '?'}  ${(s.id || '').padEnd(14)} ${s.name}`);
+    });
+    if (dbNotInApi.length > 5) console.log(`    ... and ${dbNotInApi.length - 5} more`);
+  }
+
+  // Per-set card count drift on overlapping sets
+  const drifts = [];
+  for (const dbSet of dbSets) {
+    const apiSet = apiSets.find(s => s.id === dbSet.id);
+    if (!apiSet) continue;
+    if ((dbSet.total || 0) !== (apiSet.total || 0)) {
+      drifts.push({ id: dbSet.id, name: dbSet.name, db: dbSet.total || 0, api: apiSet.total || 0 });
+    }
+  }
+  if (drifts.length > 0) {
+    console.log(`\nSets with card-count drift (top 10 by gap):`);
+    drifts.sort((a, b) => Math.abs(b.api - b.db) - Math.abs(a.api - a.db));
+    drifts.slice(0, 10).forEach(d => {
+      console.log(`    ${d.id.padEnd(14)} ${(d.name || '').padEnd(40)} DB=${d.db} API=${d.api}`);
+    });
+    if (drifts.length > 10) console.log(`    ... and ${drifts.length - 10} more`);
+  }
+
+  return { hasMissing: apiNotInDb.length > 0, count: apiNotInDb.length };
+}
+
+// ---------- Star Wars (PriceCharting category page) ----------
+async function checkStarWars() {
+  divider('Star Wars vs PriceCharting category page');
+
+  const { count: dbSetCount } = await supabase
+    .from('starwars_sets').select('id', { count: 'exact', head: true });
+  const { count: dbCardCount } = await supabase
+    .from('starwars_cards').select('id', { count: 'exact', head: true });
+
+  const { data: dbSets } = await supabase
+    .from('starwars_sets')
+    .select('id, name, set_type, total_cards, release_date')
+    .order('id');
+
+  // The importer (scripts/import-starwars-database.js) discovers sets via
+  // hardcoded DISCOVERY_QUERIES against the PriceCharting API — anything those
+  // queries miss never gets imported. The public category page lists every
+  // Star Wars console PriceCharting knows about, so scraping its /console/
+  // slugs is exactly the safety net that catches discovery gaps.
+  // starwars_sets.id is the set slug (lowercased console name, non-alphanumerics
+  // collapsed to '-'), which matches PriceCharting's /console/<slug> URLs.
+  const html = await fetchHtml('https://www.pricecharting.com/category/star-wars-cards');
+  const slugSet = new Set();
+  const slugRe = /\/console\/([^"'\s?#<>]+)/g;
+  let m;
+  while ((m = slugRe.exec(html)) !== null) {
+    // PriceCharting URLs keep characters like & and ' percent-encoded
+    // (e.g. ...black-%26-white). Decode, then normalize with the same
+    // slug rule the importer uses (lowercase, non-alphanumerics -> '-')
+    // so page slugs line up with starwars_sets.id.
+    let raw = m[1].replace(/&amp;/g, '&');
+    try { raw = decodeURIComponent(raw); } catch { /* keep as-is */ }
+    const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (slug) slugSet.add(slug);
+  }
+
+  const dbIds = new Set(dbSets.map(s => s.id));
+  // The page can carry nav/footer links to consoles outside this category;
+  // keep a slug if it looks like Star Wars or if we already track it. Also
+  // drop the non-card consoles the importer excludes (Funko Pop, LEGO).
+  const pageSlugs = [...slugSet].filter(slug =>
+    (slug.includes('star-wars') || dbIds.has(slug)) &&
+    !slug.includes('funko-pop') && !slug.includes('lego'));
+
+  console.log(`Sets:  DB ${dbSetCount}  |  Category page ${pageSlugs.length}  |  Diff ${pageSlugs.length - dbSetCount}`);
+  console.log(`Cards: DB ${dbCardCount}  |  (category page does not expose card counts)`);
+
+  const pageSlugSet = new Set(pageSlugs);
+  const pageNotInDb = pageSlugs.filter(slug => !dbIds.has(slug)).sort();
+  const dbNotOnPage = dbSets.filter(s => !pageSlugSet.has(s.id));
+
+  console.log(`\nCategory-page sets missing from DB: ${pageNotInDb.length}`);
+  pageNotInDb.forEach(slug => {
+    console.log(`    ${slug}`);
+  });
+  if (pageNotInDb.length > 0) {
+    console.log(`  (these are likely sets the importer's DISCOVERY_QUERIES miss)`);
+  }
+
+  if (dbNotOnPage.length > 0) {
+    console.log(`\nSets in DB but not on category page: ${dbNotOnPage.length}`);
+    dbNotOnPage.slice(0, 10).forEach(s => {
+      console.log(`    ${(s.id || '').padEnd(50)} ${s.name}`);
+    });
+    if (dbNotOnPage.length > 10) console.log(`    ... and ${dbNotOnPage.length - 10} more`);
+  }
+
+  return { hasMissing: pageNotInDb.length > 0, count: pageNotInDb.length };
+}
+
 async function main() {
   const results = {};
   try { results.mtg = await checkMtg(); }
@@ -322,6 +489,10 @@ async function main() {
   catch (e) { console.error('\nOne Piece check failed:', e.message); results.onepiece = { error: e.message }; }
   try { results.yugioh = await checkYugioh(); }
   catch (e) { console.error('\nYu-Gi-Oh check failed:', e.message); results.yugioh = { error: e.message }; }
+  try { results.pokemon = await checkPokemon(); }
+  catch (e) { console.error('\nPokemon check failed:', e.message); results.pokemon = { error: e.message }; }
+  try { results.starwars = await checkStarWars(); }
+  catch (e) { console.error('\nStar Wars check failed:', e.message); results.starwars = { error: e.message }; }
 
   divider('Summary');
   const actions = [];
@@ -329,6 +500,8 @@ async function main() {
   if (results.lorcana?.hasMissing) actions.push(`Lorcana: ${results.lorcana.count} sets missing -> node scripts/import-lorcana-database.js`);
   if (results.onepiece?.hasMissing) actions.push(`One Piece: ${results.onepiece.count} sets missing -> node scripts/import-onepiece-database.js`);
   if (results.yugioh?.hasMissing) actions.push(`Yu-Gi-Oh: ${results.yugioh.count} recent sets missing -> node scripts/import-yugioh-database.js`);
+  if (results.pokemon?.hasMissing) actions.push(`Pokemon: ${results.pokemon.count} sets missing -> node scripts/import-pokemon-database.js --incremental`);
+  if (results.starwars?.hasMissing) actions.push(`Star Wars: ${results.starwars.count} sets missing -> node scripts/import-starwars-database.js`);
   if (actions.length === 0) {
     console.log('  All TCG databases are in sync with their respective APIs.');
   } else {

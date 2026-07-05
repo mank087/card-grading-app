@@ -98,7 +98,7 @@ function parseSetCode(setCode: string): { prefix: string; number: string } | nul
 async function lookupBySetCode(setCode: string): Promise<YugiohCard | null> {
   if (!setCode) return null;
 
-  const { data, error } = await supabaseServer
+  const { data, error } = await supabaseServer()
     .from('yugioh_card_printings')
     .select(`
       card_id, card_name, set_code, set_name, set_rarity, set_rarity_code, set_price,
@@ -152,7 +152,7 @@ async function searchByName(
 ): Promise<YugiohCard[]> {
   if (!cardName) return [];
 
-  let query = supabaseServer
+  let query = supabaseServer()
     .from('yugioh_card_printings')
     .select(`
       card_id, card_name, set_code, set_name, set_rarity, set_price,

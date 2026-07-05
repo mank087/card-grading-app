@@ -126,6 +126,24 @@ function extractCardNumber(productName) {
   return null;
 }
 
+/**
+ * Extract PriceCharting bracket variant text from a product name.
+ * e.g., "Luke Skywalker [Foil] #100" → "Foil"
+ *       "Darth Vader [Blue] [Refractor] #12" → "Blue Refractor"
+ * Returns null when the name has no bracket annotation (base card).
+ */
+function extractVariantText(productName) {
+  if (!productName) return null;
+  var matches = productName.match(/\[([^\]]+)\]/g);
+  if (!matches || matches.length === 0) return null;
+  var parts = [];
+  for (var i = 0; i < matches.length; i++) {
+    var inner = matches[i].slice(1, -1).trim();
+    if (inner) parts.push(inner);
+  }
+  return parts.length > 0 ? parts.join(' ') : null;
+}
+
 function generateSetSlug(consoleName) {
   if (!consoleName) return 'unknown';
   return consoleName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -189,6 +207,75 @@ async function fetchProducts(query, page, retries) {
 }
 
 // ============================================================================
+// Phase 1b: Category-page discovery (WS7.6)
+// ============================================================================
+// The hardcoded DISCOVERY_QUERIES miss sets whose names don't match any query
+// (freshness check found 114 missing on 2026-07-03). The PriceCharting
+// category page lists every Star Wars console — use it to find the stragglers.
+// Each missing console page's <title> carries the exact console-name
+// ("Star Wars CCG Dagobah Card Prices | ..." -> "Star Wars CCG Dagobah").
+
+var CATEGORY_PAGE_URL = 'https://www.pricecharting.com/category/star-wars-cards';
+var HTML_HEADERS = { 'User-Agent': 'DCMGrading/1.0 (benjamin@maniczmedia.com)', 'Accept': 'text/html' };
+
+function decodeHtmlEntities(str) {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+async function discoverSetsFromCategoryPage(knownConsoleNames) {
+  console.log('\n--- Phase 1b: category-page discovery ---');
+  var extra = [];
+  try {
+    var response = await fetch(CATEGORY_PAGE_URL, { headers: HTML_HEADERS });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
+    var html = await response.text();
+
+    var slugs = [];
+    var seen = {};
+    var re = /href="\/console\/([^"?#]+)"/g;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      // Hrefs are HTML-encoded ("&amp;" etc.) — decode before use
+      var slug = decodeHtmlEntities(m[1]);
+      // The page's nav lists ALL consoles (amiibo, atari...) — keep Star Wars only
+      if (slug.indexOf('star-wars') === -1) continue;
+      if (!seen[slug]) { seen[slug] = true; slugs.push(slug); }
+    }
+
+    var knownSlugs = {};
+    knownConsoleNames.forEach(function(name) { knownSlugs[generateSetSlug(name)] = true; });
+    var missing = slugs.filter(function(s) { return !knownSlugs[s]; });
+    console.log('Category page lists ' + slugs.length + ' Star Wars consoles; ' + missing.length + ' not found by discovery queries');
+
+    for (var i = 0; i < missing.length; i++) {
+      try {
+        var pageRes = await fetch('https://www.pricecharting.com/console/' + encodeURIComponent(missing[i]), { headers: HTML_HEADERS });
+        if (!pageRes.ok) { console.log('  skip ' + missing[i] + ' (HTTP ' + pageRes.status + ')'); continue; }
+        var pageHtml = await pageRes.text();
+        var titleMatch = pageHtml.match(/<title>([^<]+)/);
+        if (!titleMatch) continue;
+        var consoleName = decodeHtmlEntities(titleMatch[1]).replace(/\s*Card Prices.*$/i, '').trim();
+        if (!consoleName || isExcludedProduct(consoleName)) continue;
+        extra.push(consoleName);
+        if ((i + 1) % 20 === 0) console.log('  ...' + (i + 1) + '/' + missing.length + ' pages checked');
+      } catch (pageErr) {
+        console.log('  skip ' + missing[i] + ': ' + pageErr.message);
+      }
+      await sleep(REQUEST_DELAY_MS);
+    }
+    console.log('Category-page discovery added ' + extra.length + ' sets');
+  } catch (error) {
+    console.log('Category-page discovery failed (continuing with query results): ' + error.message);
+  }
+  return extra;
+}
+
+// ============================================================================
 // Phase 1: Discovery — find all unique Star Wars console-names
 // ============================================================================
 
@@ -225,6 +312,11 @@ async function discoverSets() {
 
     await sleep(REQUEST_DELAY_MS);
   }
+
+  // WS7.6: supplement with the category-page listing (catches sets the
+  // hardcoded queries miss — 114 as of 2026-07-03)
+  var extraSets = await discoverSetsFromCategoryPage(Array.from(allConsoleNames));
+  extraSets.forEach(function(name) { allConsoleNames.add(name); });
 
   var setNames = Array.from(allConsoleNames).sort();
   console.log('\nDiscovery complete: ' + setNames.length + ' unique sets found (' + getElapsedTime(startTime) + ')');
@@ -315,6 +407,7 @@ async function importCards(cardsMap) {
         id: String(product.id),
         card_name: product['product-name'] || 'Unknown',
         card_number: extractCardNumber(product['product-name']),
+        variant_text: extractVariantText(product['product-name']),
         set_id: generateSetSlug(consoleName) || null,
         console_name: consoleName || null,
         genre: product.genre || null,

@@ -5,17 +5,23 @@ import { verifyAuth } from "@/lib/serverAuth";
 import { gradeCardConversational } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
-import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
+import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
 // Label data generation for consistent display across all contexts
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
+import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // Color extraction for color-matched labels
 import { extractAndSaveCardColors } from "@/lib/serverColorExtractor";
 // Platform attribution — tags cards.graded_from with 'web' | 'ios_app' | 'android_app'
 import { resolveGradedFrom } from "@/lib/platformAttribution";
+// WS2b: DB-backed identity validation against local SportsCardsPro database
+import { matchSportsCardLocal, isSportsLocalDbAvailable } from "@/lib/sportsCardMatcher";
+// WS2c: visual parallel disambiguation (attribute-based, confidence-gated)
+import { disambiguateParallelVisually } from "@/lib/sportsParallelVision";
 
 // Vercel serverless function configuration
 // maxDuration: Maximum execution time in seconds (Pro plan supports up to 300s)
@@ -261,18 +267,32 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
           const avgRounded = threePassData?.averaged_rounded;
 
           // 🔧 v6.2: Fix any grade mismatches in cached summary text
-          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedDecimalGrade = jsonData.final_grade?.decimal_grade ?? avgRounded?.final ?? null; // v8.8: final_grade is the server-capped value; averaged_rounded.final was uncapped in pre-v8.8 data
           const cachedRawSummary = jsonData.final_grade?.summary || null;
           const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
             ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
             : cachedRawSummary;
 
+          // v9.0 label unification: derive from ROUNDED grade (8.5 -> 9 -> 'Mint') to match labelDataGenerator
+          const cachedDerivedLabel = cachedDecimalGrade != null ? getConditionFromGrade(Math.round(cachedDecimalGrade)) : (jsonData.final_grade?.condition_label || null);
+          // Heal stale stored label so collection/mobile (which read the column) match this page.
+          // Fire-and-forget: never await, never fail the request.
+          if (cachedDerivedLabel && card.conversational_condition_label !== cachedDerivedLabel) {
+            supabase
+              .from("cards")
+              .update({ conversational_condition_label: cachedDerivedLabel })
+              .eq("id", card.id)
+              .then(({ error: healError }) => {
+                if (healError) console.error("[CACHE] Failed to heal stale condition label:", healError.message);
+              });
+          }
+
           parsedConversationalData = {
             // 🎯 THREE-PASS: Use averaged_rounded when available
             decimal_grade: cachedDecimalGrade,
-            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
+            whole_grade: jsonData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : null), // v8.8: prefer capped value; round not floor
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
-            condition_label: jsonData.final_grade?.condition_label || null,
+            condition_label: cachedDerivedLabel, // v9.0: canonical label from ROUNDED final grade (fixes pre-v8.8 cached labels + 8.5 -> 'Mint' rounding)
             final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
@@ -397,12 +417,14 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
               const mapperInput = {
                 final_grade: parsedConversationalData.decimal_grade,
+                // Cast: front ratios may be undefined when unparseable ('N/A');
+                // the mapper call is wrapped in try/catch, matching prior behavior
                 centering: {
                   front_lr: parseCentering(parsedConversationalData.centering_ratios?.front_lr),
                   front_tb: parseCentering(parsedConversationalData.centering_ratios?.front_tb),
                   back_lr: parseCentering(parsedConversationalData.centering_ratios?.back_lr),
                   back_tb: parseCentering(parsedConversationalData.centering_ratios?.back_tb)
-                },
+                } as CenteringMeasurements,
                 corners_score: parsedConversationalData.sub_scores?.corners?.weighted,
                 edges_score: parsedConversationalData.sub_scores?.edges?.weighted,
                 surface_score: parsedConversationalData.sub_scores?.surface?.weighted,
@@ -581,7 +603,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
             // Build conversationalGradingData from JSON
             // 🎯 THREE-PASS: Use averaged_rounded when available, fallback to direct values
-            const actualDecimalGrade = avgRounded?.final ?? parsedJSONData.scoring?.final_grade ?? parsedJSONData.final_grade?.decimal_grade ?? null;
+            const actualDecimalGrade = parsedJSONData.final_grade?.decimal_grade ?? avgRounded?.final ?? parsedJSONData.scoring?.final_grade ?? null; // v8.8: final_grade carries the weakest-link-capped server grade
             const rawSummary = parsedJSONData.final_grade?.summary || null;
             // 🔧 v6.2: Fix any grade mismatches in the summary text
             const correctedSummary = rawSummary && actualDecimalGrade !== null
@@ -591,9 +613,9 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
             conversationalGradingData = {
               // Handle three-pass, v5.0, and v4.2 formats (priority order)
               decimal_grade: actualDecimalGrade,
-              whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (parsedJSONData.scoring?.rounded_grade ?? parsedJSONData.final_grade?.whole_grade ?? null),
+              whole_grade: parsedJSONData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : (parsedJSONData.scoring?.rounded_grade ?? null)), // v8.8
               grade_uncertainty: parsedJSONData.image_quality?.grade_uncertainty || parsedJSONData.scoring?.grade_range || parsedJSONData.final_grade?.grade_range || '±0.5',
-              condition_label: parsedJSONData.final_grade?.condition_label || null,
+              condition_label: actualDecimalGrade != null ? getConditionFromGrade(Math.round(actualDecimalGrade)) : (parsedJSONData.final_grade?.condition_label || null), // v8.9: derive label from final grade
               final_grade_summary: correctedSummary,
               image_confidence: parsedJSONData.image_quality?.confidence_letter || null,
               // 🎯 THREE-PASS: Use averaged_rounded sub-scores when available
@@ -768,12 +790,14 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
                 const mapperInput = {
                   final_grade: conversationalGradingData.decimal_grade,
+                  // Cast: front ratios may be undefined when unparseable ('N/A');
+                  // the mapper call is wrapped in try/catch, matching prior behavior
                   centering: {
                     front_lr: parseCentering(conversationalGradingData.centering_ratios?.front_lr),
                     front_tb: parseCentering(conversationalGradingData.centering_ratios?.front_tb),
                     back_lr: parseCentering(conversationalGradingData.centering_ratios?.back_lr),
                     back_tb: parseCentering(conversationalGradingData.centering_ratios?.back_tb)
-                  },
+                  } as CenteringMeasurements,
                   corners_score: conversationalGradingData.sub_scores?.corners?.weighted,
                   edges_score: conversationalGradingData.sub_scores?.edges?.weighted,
                   surface_score: conversationalGradingData.sub_scores?.surface?.weighted,
@@ -822,6 +846,164 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       }
     }
 
+    // 🎯 WS2b: DATABASE-BACKED IDENTITY VALIDATION
+    // Cross-reference the AI-extracted identity against the local SportsCardsPro
+    // database (sports_card_products / sports_sets) and canonicalize set/year/
+    // number (plus parallel when pinned to a single product). The raw AI
+    // extraction is preserved in ai_card_info_original. Mirrors the One Piece
+    // grade-time DB lookup — any failure here is non-fatal and keeps AI values.
+    const validationColumns: Record<string, any> = {};
+    if (conversationalGradingData?.card_info) {
+      try {
+        if (await isSportsLocalDbAvailable()) {
+          const cardInfo = conversationalGradingData.card_info;
+          // Snapshot the AI extraction BEFORE any overwrite (audit trail)
+          const aiOriginal = JSON.parse(JSON.stringify(cardInfo));
+
+          console.log(`[SportsValidation] Looking up card in local sports database...`);
+          console.log(`[SportsValidation]   AI identified: player="${cardInfo.player_or_character || cardInfo.featured}", year="${cardInfo.year || cardInfo.release_date}", set="${cardInfo.set_name || cardInfo.card_set}", #="${cardInfo.card_number_raw || cardInfo.card_number}"`);
+
+          const matchResult = await matchSportsCardLocal({
+            playerName: cardInfo.player_or_character || cardInfo.featured,
+            year: cardInfo.year || cardInfo.release_date,
+            setName: cardInfo.set_name || cardInfo.card_set,
+            cardNumber: cardInfo.card_number_raw || cardInfo.card_number,
+            variant: cardInfo.parallel_type,
+            subset: cardInfo.subset,
+            serialNumbering: cardInfo.serial_numbering,
+            sport: card.category
+          });
+
+          console.log(`[SportsValidation] Result: tier=${matchResult.tier}, confidence=${matchResult.confidence}, product="${matchResult.product?.product_name || 'none'}" (${matchResult.product?.console_name || 'n/a'})`);
+          if (matchResult.notes.length > 0) {
+            console.log(`[SportsValidation]   Notes: ${matchResult.notes.join(' | ')}`);
+          }
+
+          // Record the validation outcome (persisted alongside the graded card)
+          validationColumns.validation_tier = matchResult.tier;
+          validationColumns.validation_confidence = matchResult.confidence;
+
+          if (matchResult.tier !== 'none' && matchResult.product) {
+            const product = matchResult.product;
+            const matchedSet = matchResult.matchedSet;
+
+            // Display form: strip leading "<Sport> Cards " prefix
+            // e.g. "Basketball Cards 1986 Fleer" -> "1986 Fleer"
+            const displaySetName = matchedSet
+              ? matchedSet.console_name.replace(/^[A-Za-z]+ Cards\s+/i, '')
+              : null;
+
+            const databaseMatch: Record<string, any> = {
+              product_id: product.id,
+              product_name: product.product_name,
+              console_name: product.console_name,
+              tier: matchResult.tier,
+              confidence: matchResult.confidence,
+              defaulted_to_base: matchResult.defaultedToBase,
+              variant_not_found: matchResult.variantNotFound
+            };
+
+            // Family-level facts (adopted for BOTH exact and family tiers):
+            // set name, year, card number — confirmed by the DB match.
+            if (displaySetName) cardInfo.set_name = displaySetName;
+            if (matchedSet?.year != null) cardInfo.year = String(matchedSet.year);
+            if (product.card_number) cardInfo.card_number = product.card_number;
+            // player_or_character stays AI-primary (DB player names differ
+            // only in punctuation/initials — keep the AI reading)
+
+            if (matchResult.tier === 'exact') {
+              // Parallel pinned to a single product: adopt variant + serial
+              cardInfo.parallel_type = product.variant_text; // null for base
+              cardInfo.serial_numbering = product.serial_denominator
+                ? `/${product.serial_denominator}`
+                : cardInfo.serial_numbering;
+              console.log(`[SportsValidation] ✅ EXACT adoption: set="${displaySetName}", year=${matchedSet?.year}, #${product.card_number}, parallel="${product.variant_text || 'base'}", serial=${product.serial_denominator ? `/${product.serial_denominator}` : 'n/a'}`);
+            } else {
+              // family: parallel unresolved — do NOT overwrite parallel_type/
+              // subset (the parallel picker resolves it). If the AI named a
+              // parallel that doesn't exist in the family, keep it but flag it.
+              if (matchResult.variantNotFound) {
+                databaseMatch.ai_variant_kept = cardInfo.parallel_type || null;
+              }
+              console.log(`[SportsValidation] ✅ FAMILY adoption: set="${displaySetName}", year=${matchedSet?.year}, #${product.card_number} (parallel left unresolved, ${matchResult.family.length} in family${matchResult.variantNotFound ? ', AI variant not found in family' : ''})`);
+            }
+
+            // 🎯 WS2c: VISUAL PARALLEL DISAMBIGUATION
+            // Family confirmed but parallel ambiguous (defaulted to base):
+            // one small vision pass on the front image, constrained to the
+            // family's real parallel list via glossary attributes. Base-biased
+            // and confidence-gated inside disambiguateParallelVisually; a null
+            // return (reject/error/timeout) keeps the base default untouched.
+            if (
+              matchResult.tier === 'family' &&
+              matchResult.defaultedToBase &&
+              matchResult.family.length > 1 &&
+              frontUrl
+            ) {
+              let visionTimer: ReturnType<typeof setTimeout> | undefined;
+              const visionResult = await Promise.race([
+                disambiguateParallelVisually({
+                  frontImageUrl: frontUrl,
+                  playerName: cardInfo.player_or_character || cardInfo.featured || '',
+                  family: matchResult.family.map(f => ({
+                    id: f.id,
+                    variantText: f.variant_text,
+                    serialDenominator: f.serial_denominator
+                  }))
+                }),
+                new Promise<null>(resolve => {
+                  visionTimer = setTimeout(() => {
+                    console.log(`[ParallelVision] Timed out after 20s — keeping base default`);
+                    resolve(null);
+                  }, 20_000);
+                })
+              ]).finally(() => clearTimeout(visionTimer));
+
+              if (visionResult && visionResult.variantText !== null) {
+                const pickedRow = matchResult.family.find(f => f.id === visionResult.productId);
+                if (pickedRow) {
+                  cardInfo.parallel_type = visionResult.variantText;
+                  databaseMatch.product_id = pickedRow.id;
+                  databaseMatch.product_name = pickedRow.product_name;
+                  databaseMatch.visual_pick = {
+                    observed: visionResult.observed,
+                    confidence: visionResult.confidence
+                  };
+                  // Only a high-confidence visual pick upgrades the tier and
+                  // feeds the pricing fast path; medium stays 'family' so the
+                  // parallel picker / confirm prompt can still correct it.
+                  if (visionResult.confidence === 'high') {
+                    validationColumns.validation_tier = 'exact';
+                    validationColumns.dcm_price_product_id = pickedRow.id;
+                  }
+                  console.log(`[SportsValidation] 🎨 Visual parallel adopted: "${visionResult.variantText}" (confidence=${visionResult.confidence}, tier=${visionResult.confidence === 'high' ? 'exact' : 'family'})`);
+                }
+              }
+              // Base pick or null: leave base default + family tier as-is
+            }
+
+            cardInfo._database_match = databaseMatch;
+
+            validationColumns.validated_source = 'sports_card_products';
+            // Preserve the AI original only if adoption actually changed anything
+            if (JSON.stringify(cardInfo) !== JSON.stringify(aiOriginal)) {
+              validationColumns.ai_card_info_original = aiOriginal;
+            }
+            if (matchResult.tier === 'exact') {
+              // Feeds the pricing fast path (dcm_price_product_id column,
+              // migrations 20260206/20260209)
+              validationColumns.dcm_price_product_id = product.id;
+            }
+          } else {
+            console.log(`[SportsValidation] ⏭️ No local DB match (tier=none) — keeping AI-extracted identity unchanged`);
+          }
+        } else {
+          console.log(`[SportsValidation] ⏭️ Local sports database not available — skipping validation`);
+        }
+      } catch (validationError) {
+        console.error(`[SportsValidation] ⚠️ Validation failed (non-fatal), continuing with AI values:`, validationError);
+      }
+    }
 
     // Update database with comprehensive sports card data
     const updateData = {
@@ -905,6 +1087,10 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       dcm_grade_whole: conversationalGradingData?.whole_grade || null,
       ai_confidence_score: conversationalGradingData?.image_confidence || null,
       final_dcm_score: conversationalGradingData?.whole_grade?.toString() || null,
+
+      // 🎯 WS2b: Identity validation outcome (validated_source, validation_tier,
+      // validation_confidence, ai_card_info_original, dcm_price_product_id)
+      ...validationColumns,
 
       // Processing metadata
       processing_time: Date.now() - startTime

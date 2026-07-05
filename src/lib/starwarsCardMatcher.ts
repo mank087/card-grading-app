@@ -7,6 +7,9 @@ export interface StarWarsCard {
   id: string;
   card_name: string;
   card_number: string | null;
+  /** Bracket content from the PriceCharting product name (NULL = base card).
+   *  May be undefined/null on all rows if the variant_text backfill hasn't run yet. */
+  variant_text?: string | null;
   set_id: string | null;
   set_name: string | null;
   console_name: string | null;
@@ -38,10 +41,28 @@ export interface MatchConfidenceFlags {
   warnings: string[];
 }
 
+/** One member of a variant family: rows sharing a card_number/base name that
+ *  differ only in their PriceCharting bracket variant (base + foils/parallels). */
+export interface FamilyVariant {
+  id: string;
+  card_name: string;
+  variant_text: string | null;
+  loose_price: number | null;
+  graded_price: number | null;
+}
+
+export type VariantResolution =
+  | 'single'        // only one row in the family — no ambiguity
+  | 'hint'          // variant resolved via the caller-supplied variant hint
+  | 'default_base'; // multiple variants, defaulted to the base (non-variant) row
+
 export interface MatchResult {
   card: StarWarsCard | null;
   score: number;
   confidence: MatchConfidenceFlags;
+  /** All rows sharing the matched card's number/base name (base + variants). */
+  family: FamilyVariant[];
+  variantResolution: VariantResolution | null;
 }
 
 /**
@@ -50,6 +71,71 @@ export interface MatchResult {
  */
 function stripBrackets(str: string): string {
   return str.replace(/\s*\[[^\]]*\]\s*/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/**
+ * Extract PriceCharting bracket variant text from a card name.
+ * e.g., "Luke Skywalker [Foil] #100" → "Foil". Null when no brackets (base card).
+ */
+function extractBracketVariant(name: string | null | undefined): string | null {
+  if (!name) return null;
+  const matches = name.match(/\[([^\]]+)\]/g);
+  if (!matches || matches.length === 0) return null;
+  const joined = matches
+    .map(m => m.slice(1, -1).trim())
+    .filter(Boolean)
+    .join(' ');
+  return joined || null;
+}
+
+/**
+ * Effective variant of a DB row: prefer the dedicated variant_text column,
+ * falling back to parsing the bracket suffix out of card_name for rows
+ * imported before the variant_text backfill ran (column NULL everywhere).
+ */
+function effectiveVariant(card: StarWarsCard): string | null {
+  return card.variant_text ?? extractBracketVariant(card.card_name);
+}
+
+// Generic words that don't identify a specific variant on their own
+const VARIANT_STOPWORDS = new Set(['parallel', 'variant', 'card', 'base']);
+
+function variantTokens(text: string | null | undefined): string[] {
+  if (!text) return [];
+  return text
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(t => t.length > 0 && !VARIANT_STOPWORDS.has(t));
+}
+
+/**
+ * Fetch the variant family for a matched card: all rows in the same set
+ * sharing its card_number whose names differ only by bracket variant text
+ * (base + foils/parallels). Always includes the matched card itself.
+ */
+async function fetchVariantFamily(matched: StarWarsCard): Promise<StarWarsCard[]> {
+  if (!matched.card_number) return [matched];
+
+  const supabase = supabaseServer();
+  let query = supabase
+    .from('starwars_cards')
+    .select('*')
+    .eq('card_number', matched.card_number)
+    .limit(50);
+  if (matched.set_id) {
+    query = query.eq('set_id', matched.set_id);
+  }
+
+  const { data, error } = await query;
+  if (error || !data || data.length === 0) return [matched];
+
+  // Family membership = same base name once bracket variants are stripped
+  const baseName = stripBrackets(matched.card_name || '').toLowerCase();
+  const family = (data as StarWarsCard[]).filter(
+    r => stripBrackets(r.card_name || '').toLowerCase() === baseName
+  );
+  if (!family.some(r => r.id === matched.id)) family.push(matched);
+  return family.length > 0 ? family : [matched];
 }
 
 function calculateSimilarity(str1: string, str2: string): number {
@@ -157,12 +243,15 @@ async function searchByName(
  * @param cardNumber - Card collector number (most reliable ID)
  * @param setName - Set name
  * @param characterName - Character/subject depicted on front (for verification)
+ * @param variantHint - AI-detected rarity/variant text (e.g. "Foil", "Mojo Refractor")
+ *                      used to pick the right row when base + parallels share a card_number
  */
 export async function lookupStarWarsCard(
   cardName: string,
   cardNumber?: string,
   setName?: string,
-  characterName?: string
+  characterName?: string,
+  variantHint?: string
 ): Promise<MatchResult> {
   const warnings: string[] = [];
   let bestCard: StarWarsCard | null = null;
@@ -311,6 +400,66 @@ export async function lookupStarWarsCard(
     }
   }
 
+  // VARIANT RESOLUTION (WS7.3): base and foil/parallel rows share the same
+  // card_number and differ only in bracket variant text — resolve which family
+  // member the physical card actually is instead of keeping an arbitrary row.
+  let family: StarWarsCard[] = [];
+  let variantResolution: VariantResolution | null = null;
+  let capConfidenceToMedium = false;
+
+  if (bestCard) {
+    try {
+      family = await fetchVariantFamily(bestCard);
+    } catch {
+      family = [bestCard];
+    }
+
+    if (family.length > 1) {
+      // Base row = no variant text (from column or, pre-backfill, card_name brackets).
+      // If variant_text is null on every row AND names carry no brackets, there is
+      // no signal to distinguish them — baseRow picks the first and we degrade gracefully.
+      const baseRow = family.find(r => effectiveVariant(r) === null) || null;
+      const hintTokens = variantTokens(variantHint);
+
+      if (hintTokens.length > 0) {
+        // Prefer the family member whose variant tokens overlap the hint
+        let bestVariantRow: StarWarsCard | null = null;
+        let bestOverlap = 0;
+        let bestRatio = 0;
+        for (const row of family) {
+          const vTokens = variantTokens(effectiveVariant(row));
+          if (vTokens.length === 0) continue;
+          const overlap = vTokens.filter(t => hintTokens.includes(t)).length;
+          const ratio = overlap / vTokens.length;
+          if (overlap > bestOverlap || (overlap === bestOverlap && overlap > 0 && ratio > bestRatio)) {
+            bestOverlap = overlap;
+            bestRatio = ratio;
+            bestVariantRow = row;
+          }
+        }
+
+        if (bestVariantRow && bestOverlap > 0) {
+          bestCard = bestVariantRow;
+          variantResolution = 'hint';
+        } else {
+          // Hint matched no known variant — fall back to the base row, but the
+          // physical card may still be a parallel we don't have: cap confidence.
+          if (baseRow) bestCard = baseRow;
+          variantResolution = 'default_base';
+          capConfidenceToMedium = true;
+          warnings.push(`Variant hint "${variantHint}" did not match any of ${family.length} known variants — defaulted to base version`);
+        }
+      } else {
+        // No usable hint — default to the base (non-variant) row
+        if (baseRow) bestCard = baseRow;
+        variantResolution = 'default_base';
+        warnings.push(`${family.length} variants share card #${bestCard.card_number || '?'} — defaulted to base version`);
+      }
+    } else {
+      variantResolution = 'single';
+    }
+  }
+
   // Calculate overall confidence
   const totalFeatures = (cardNumber ? 1 : 0) + 1 + (setName ? 1 : 0) + (characterName ? 1 : 0);
   const matchedFeatures = (flags.numberMatched ? 1 : 0) + (flags.nameMatched ? 1 : 0) + (flags.setMatched ? 1 : 0) + (flags.characterMatched ? 1 : 0);
@@ -321,9 +470,23 @@ export async function lookupStarWarsCard(
   else if (bestScore >= 60) flags.overallConfidence = 'medium';
   else flags.overallConfidence = 'low';
 
+  // Hint given but unmatched among variants → we can't be sure which parallel
+  // this is, so never report 'high' confidence
+  if (capConfidenceToMedium && flags.overallConfidence === 'high') {
+    flags.overallConfidence = 'medium';
+  }
+
   if (!bestCard) {
     warnings.push(`No match found for "${cardName}"${cardNumber ? ` (#${cardNumber})` : ''}`);
   }
 
-  return { card: bestCard, score: bestScore, confidence: flags };
+  const familyOut: FamilyVariant[] = family.map(r => ({
+    id: r.id,
+    card_name: r.card_name,
+    variant_text: effectiveVariant(r),
+    loose_price: r.loose_price,
+    graded_price: r.graded_price,
+  }));
+
+  return { card: bestCard, score: bestScore, confidence: flags, family: familyOut, variantResolution };
 }

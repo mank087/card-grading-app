@@ -10,6 +10,8 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
+import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for Star Wars cards
@@ -319,17 +321,31 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
           const avgRounded = threePassData?.averaged_rounded;
 
           // v6.2: Fix any grade mismatches in cached summary text
-          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedDecimalGrade = jsonData.final_grade?.decimal_grade ?? avgRounded?.final ?? null; // v8.8: final_grade is the server-capped value; averaged_rounded.final was uncapped in pre-v8.8 data
           const cachedRawSummary = jsonData.final_grade?.summary || null;
           const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
             ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
             : cachedRawSummary;
 
+          // v9.0 label unification: derive from ROUNDED grade (8.5 -> 9 -> 'Mint') to match labelDataGenerator
+          const cachedDerivedLabel = cachedDecimalGrade != null ? getConditionFromGrade(Math.round(cachedDecimalGrade)) : (jsonData.final_grade?.condition_label || null);
+          // Heal stale stored label so collection/mobile (which read the column) match this page.
+          // Fire-and-forget: never await, never fail the request.
+          if (cachedDerivedLabel && card.conversational_condition_label !== cachedDerivedLabel) {
+            supabase
+              .from("cards")
+              .update({ conversational_condition_label: cachedDerivedLabel })
+              .eq("id", card.id)
+              .then(({ error: healError }) => {
+                if (healError) console.error("[CACHE] Failed to heal stale condition label:", healError.message);
+              });
+          }
+
           parsedConversationalData = {
             decimal_grade: cachedDecimalGrade,
-            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
+            whole_grade: jsonData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : null), // v8.8: prefer capped value; round not floor
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
-            condition_label: jsonData.final_grade?.condition_label || null,
+            condition_label: cachedDerivedLabel, // v9.0: canonical label from ROUNDED final grade (fixes pre-v8.8 cached labels + 8.5 -> 'Mint' rounding)
             final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             sub_scores: {
@@ -594,7 +610,7 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
           decimal_grade: actualDecimalGrade,
           whole_grade: jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null,
           grade_range: jsonData.image_quality?.grade_uncertainty || jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || '±0.5',
-          condition_label: jsonData.final_grade?.condition_label || null,
+          condition_label: actualDecimalGrade != null ? getConditionFromGrade(Math.round(actualDecimalGrade)) : (jsonData.final_grade?.condition_label || null), // v8.9: derive label from final grade
           final_grade_summary: correctedSummary,
           image_confidence: jsonData.image_quality?.confidence_letter || null,
           sub_scores: {
@@ -777,18 +793,23 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
     // DATABASE LOOKUP: Cross-reference AI identification with internal Star Wars database
     let matchedDatabaseCard: any = null;
     let databaseMatchConfidence: string | null = null;
+    // 🎯 WS7.5: Identity validation outcome persisted alongside the graded card
+    const validationColumns: Record<string, any> = {};
 
     if (conversationalGradingData?.card_info) {
       try {
         const aiCardInfo = conversationalGradingData.card_info;
+        // WS7.5: Snapshot the AI extraction BEFORE any DB overwrite (audit trail)
+        const aiOriginal = JSON.parse(JSON.stringify(aiCardInfo));
         console.log(`[GET /api/starwars/${cardId}] Looking up card in internal database...`);
-        console.log(`[GET /api/starwars/${cardId}]   AI identified: name="${aiCardInfo.card_name}", character="${aiCardInfo.player_or_character}", card_number="${aiCardInfo.card_id || aiCardInfo.card_number}", set="${aiCardInfo.set_name}"`);
+        console.log(`[GET /api/starwars/${cardId}]   AI identified: name="${aiCardInfo.card_name}", character="${aiCardInfo.player_or_character}", card_number="${aiCardInfo.card_id || aiCardInfo.card_number}", set="${aiCardInfo.set_name}", variant="${aiCardInfo.rarity_or_variant || aiCardInfo.variant_type || 'none'}"`);
 
         const matchResult = await lookupStarWarsCard(
           aiCardInfo.card_name,
           aiCardInfo.card_id || aiCardInfo.card_number,
           aiCardInfo.set_name,
-          aiCardInfo.player_or_character  // Character name for cross-verification
+          aiCardInfo.player_or_character,  // Character name for cross-verification
+          aiCardInfo.rarity_or_variant || aiCardInfo.variant_type  // WS7.3: variant hint (base vs foil/parallel)
         );
 
         if (matchResult.card && matchResult.confidence.overallConfidence !== 'low') {
@@ -796,7 +817,7 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
           databaseMatchConfidence = matchResult.confidence.overallConfidence;
 
           console.log(`[GET /api/starwars/${cardId}] Database match found (${databaseMatchConfidence} confidence):`);
-          console.log(`[GET /api/starwars/${cardId}]   DB: ${matchResult.card.card_name} (${matchResult.card.set_name}) #${matchResult.card.card_number}`);
+          console.log(`[GET /api/starwars/${cardId}]   DB: ${matchResult.card.card_name} (${matchResult.card.set_name}) #${matchResult.card.card_number} [variant resolution: ${matchResult.variantResolution || 'n/a'}, family size: ${matchResult.family.length}]`);
 
           // Enhance card_info with verified database data
           const dbCard = matchResult.card;
@@ -842,10 +863,29 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
               db_card_name: dbCard.card_name,
               db_card_number: dbCard.card_number,
               db_set_name: dbCard.set_name,
+              // WS7.3: variant family context (base vs foil/parallel)
+              db_variant_text: matchResult.family.find(f => f.id === dbCard.id)?.variant_text ?? null,
+              variant_resolution: matchResult.variantResolution,
+              variant_family_size: matchResult.family.length,
             }
           };
 
-          console.log(`[GET /api/starwars/${cardId}] Card info enhanced with database data`);
+          // 🎯 WS7.5: Persist the validation outcome in the same update that
+          // saves starwars_card_id. Tier semantics: 'exact' when the row is
+          // unambiguous (single family member) or the variant was resolved via
+          // the AI hint; 'family' when we defaulted among multiple variants.
+          validationColumns.validated_source = 'starwars_cards';
+          validationColumns.validation_tier =
+            matchResult.family.length > 1 && matchResult.variantResolution === 'default_base'
+              ? 'family'
+              : 'exact';
+          validationColumns.validation_confidence = databaseMatchConfidence;
+          // Preserve the raw AI extraction only if enhancement changed anything
+          if (JSON.stringify(conversationalGradingData.card_info) !== JSON.stringify(aiOriginal)) {
+            validationColumns.ai_card_info_original = aiOriginal;
+          }
+
+          console.log(`[GET /api/starwars/${cardId}] Card info enhanced with database data (tier: ${validationColumns.validation_tier})`);
         } else {
           console.log(`[GET /api/starwars/${cardId}] No high-confidence database match found`);
         }
@@ -943,6 +983,10 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
         starwars_database_match_confidence: databaseMatchConfidence
       }),
 
+      // 🎯 WS7.5: Identity validation outcome (validated_source, validation_tier,
+      // validation_confidence, ai_card_info_original)
+      ...validationColumns,
+
       // Processing metadata
       processing_time: Date.now() - startTime
     };
@@ -1005,6 +1049,11 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
       delete (fallbackUpdateData as any).sw_faction;
       delete (fallbackUpdateData as any).sw_era;
       delete (fallbackUpdateData as any).sw_rarity;
+      // WS7.5 validation columns (migration 20260703_add_identity_validation_columns.sql)
+      delete (fallbackUpdateData as any).validated_source;
+      delete (fallbackUpdateData as any).validation_tier;
+      delete (fallbackUpdateData as any).validation_confidence;
+      delete (fallbackUpdateData as any).ai_card_info_original;
 
       const { error: retryError } = await supabase
         .from("cards")
@@ -1039,7 +1088,10 @@ export async function GET(request: NextRequest, { params }: StarWarsCardGradingR
         if (!isOtherPricingEnabled()) return;
 
         const cardInfo = conversationalGradingData?.card_info || {};
-        const pricingCardName = cardFields.card_name || cardInfo.card_name;
+        // WS7.3: prefer the exact PriceCharting product name captured at DB-match
+        // time (db_card_name, incl. bracket variant + #number) over the AI name —
+        // it pins the search to the correct base/foil/parallel product.
+        const pricingCardName = cardInfo.db_card_name || cardFields.card_name || cardInfo.card_name;
         if (!pricingCardName) return;
 
         console.log(`[GET /api/starwars/${cardId}] Fetching pricing for: ${pricingCardName}`);

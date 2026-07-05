@@ -10,6 +10,8 @@ import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
 import { generateLabelData, type CardForLabel } from "@/lib/labelDataGenerator";
 // Grade/summary mismatch fixer (v6.2)
 import { fixSummaryGradeMismatch } from "@/lib/cardGradingSchema_v5";
+// v8.9: condition label is ALWAYS derived from the final numeric grade, never from AI prose
+import { getConditionFromGrade } from "@/lib/conditionAssessment";
 // Founder status for card owner
 import { getUserCredits } from "@/lib/credits";
 // CARD IDENTIFICATION: Local Supabase database lookup for One Piece cards
@@ -329,17 +331,31 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
           const avgRounded = threePassData?.averaged_rounded;
 
           // v6.2: Fix any grade mismatches in cached summary text
-          const cachedDecimalGrade = avgRounded?.final ?? jsonData.final_grade?.decimal_grade ?? null;
+          const cachedDecimalGrade = jsonData.final_grade?.decimal_grade ?? avgRounded?.final ?? null; // v8.8: final_grade is the server-capped value; averaged_rounded.final was uncapped in pre-v8.8 data
           const cachedRawSummary = jsonData.final_grade?.summary || null;
           const cachedCorrectedSummary = cachedRawSummary && cachedDecimalGrade !== null
             ? fixSummaryGradeMismatch(cachedRawSummary, cachedDecimalGrade)
             : cachedRawSummary;
 
+          // v9.0 label unification: derive from ROUNDED grade (8.5 -> 9 -> 'Mint') to match labelDataGenerator
+          const cachedDerivedLabel = cachedDecimalGrade != null ? getConditionFromGrade(Math.round(cachedDecimalGrade)) : (jsonData.final_grade?.condition_label || null);
+          // Heal stale stored label so collection/mobile (which read the column) match this page.
+          // Fire-and-forget: never await, never fail the request.
+          if (cachedDerivedLabel && card.conversational_condition_label !== cachedDerivedLabel) {
+            supabase
+              .from("cards")
+              .update({ conversational_condition_label: cachedDerivedLabel })
+              .eq("id", card.id)
+              .then(({ error: healError }) => {
+                if (healError) console.error("[CACHE] Failed to heal stale condition label:", healError.message);
+              });
+          }
+
           parsedConversationalData = {
             decimal_grade: cachedDecimalGrade,
-            whole_grade: avgRounded?.final ? Math.floor(avgRounded.final) : (jsonData.final_grade?.whole_grade ?? null),
+            whole_grade: jsonData.final_grade?.whole_grade ?? (avgRounded?.final != null ? Math.round(avgRounded.final) : null), // v8.8: prefer capped value; round not floor
             grade_range: jsonData.final_grade?.grade_range || '±0.5',
-            condition_label: jsonData.final_grade?.condition_label || null,
+            condition_label: cachedDerivedLabel, // v9.0: canonical label from ROUNDED final grade (fixes pre-v8.8 cached labels + 8.5 -> 'Mint' rounding)
             final_grade_summary: cachedCorrectedSummary,
             image_confidence: jsonData.image_quality?.confidence_letter || null,
             sub_scores: {
@@ -604,7 +620,7 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
           decimal_grade: actualDecimalGrade,
           whole_grade: jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null,
           grade_range: jsonData.image_quality?.grade_uncertainty || jsonData.scoring?.grade_range || jsonData.final_grade?.grade_range || '±0.5',
-          condition_label: jsonData.final_grade?.condition_label || null,
+          condition_label: actualDecimalGrade != null ? getConditionFromGrade(Math.round(actualDecimalGrade)) : (jsonData.final_grade?.condition_label || null), // v8.9: derive label from final grade
           final_grade_summary: correctedSummary,
           image_confidence: jsonData.image_quality?.confidence_letter || null,
           sub_scores: {
@@ -787,26 +803,43 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
     // DATABASE LOOKUP: Cross-reference AI identification with internal One Piece database
     let matchedDatabaseCard: OnePieceCard | null = null;
     let databaseMatchConfidence: string | null = null;
+    let validationTier: 'exact' | 'family' | null = null;
+    let aiCardInfoOriginal: any = null;
 
     if (conversationalGradingData?.card_info) {
       try {
         const aiCardInfo = conversationalGradingData.card_info;
+
+        // WS7.1: Snapshot the AI's original identification BEFORE any database overwrites
+        const aiOriginal = JSON.parse(JSON.stringify(aiCardInfo));
+
+        // WS7.3: Variant hint from AI-extracted rarity/variant indicators (e.g. "Alternate Art", "Manga", "Parallel")
+        const variantHintParts = [aiCardInfo.rarity_or_variant, aiCardInfo.variant_type]
+          .filter((v: any) => typeof v === 'string' && v.trim().length > 0);
+        const variantHint = variantHintParts.length > 0 ? variantHintParts.join(' ') : undefined;
+
         console.log(`[GET /api/onepiece/${cardId}] Looking up card in internal database...`);
-        console.log(`[GET /api/onepiece/${cardId}]   AI identified: name="${aiCardInfo.card_name}", card_id="${aiCardInfo.card_id || aiCardInfo.card_number}", set="${aiCardInfo.set_name}"`);
+        console.log(`[GET /api/onepiece/${cardId}]   AI identified: name="${aiCardInfo.card_name}", card_id="${aiCardInfo.card_id || aiCardInfo.card_number}", set="${aiCardInfo.set_name}", variant_hint="${variantHint || 'none'}"`);
 
         const matchResult = await lookupOnePieceCard({
           cardId: aiCardInfo.card_id || aiCardInfo.card_number,
           name: aiCardInfo.card_name,
           set: aiCardInfo.set_name
-        });
+        }, variantHint);
 
         if (matchResult.card && matchResult.confidence.overallConfidence !== 'low') {
           matchedDatabaseCard = matchResult.card;
           databaseMatchConfidence = matchResult.confidence.overallConfidence;
+          aiCardInfoOriginal = aiOriginal;
 
-          console.log(`[GET /api/onepiece/${cardId}] Database match found (${databaseMatchConfidence} confidence):`);
-          console.log(`[GET /api/onepiece/${cardId}]   DB: ${matchResult.card.card_name} (${matchResult.card.set_name}) #${matchResult.card.id}`);
-          console.log(`[GET /api/onepiece/${cardId}]   Rarity: ${matchResult.card.rarity}, Color: ${matchResult.card.card_color}`);
+          // WS7.1: 'exact' when a specific printing was resolved (variant row selected via hint,
+          // or the family has a single printing); 'family' when defaulted to base among variants
+          const familySize = matchResult.family?.length ?? 1;
+          validationTier = (matchResult.card.variant_type !== null || familySize <= 1) ? 'exact' : 'family';
+
+          console.log(`[GET /api/onepiece/${cardId}] Database match found (${databaseMatchConfidence} confidence, tier: ${validationTier}):`);
+          console.log(`[GET /api/onepiece/${cardId}]   DB: ${matchResult.card.card_name} (${matchResult.card.set_name}) #${matchResult.card.id}${matchResult.card.variant_type ? ` [variant: ${matchResult.card.variant_type}]` : ' [base]'}`);
+          console.log(`[GET /api/onepiece/${cardId}]   Rarity: ${matchResult.card.rarity}, Color: ${matchResult.card.card_color}, Family size: ${matchResult.family?.length ?? 1}`);
 
           // Enhance card_info with verified database data
           const dbCard = matchResult.card;
@@ -839,7 +872,10 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
               onepiece_card_id: dbCard.id,
               match_confidence: databaseMatchConfidence,
               match_score: matchResult.score,
-              image_url: dbCard.card_image
+              image_url: dbCard.card_image,
+              validation_tier: validationTier,
+              // Full printing family (base + variants) — each entry carries its OWN market_price
+              family: matchResult.family || null
             }
           };
 
@@ -938,10 +974,16 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
       ...cardFields,
 
       // Database-matched card reference
+      // WS7.1: validation provenance columns are only written on an ACCEPTED match
+      // (confidence !== 'low'); on no-match/low they are left untouched
       ...(matchedDatabaseCard && {
         onepiece_card_id: matchedDatabaseCard.id,
         onepiece_reference_image: matchedDatabaseCard.card_image,
-        onepiece_database_match_confidence: databaseMatchConfidence
+        onepiece_database_match_confidence: databaseMatchConfidence,
+        validated_source: 'onepiece_cards',
+        validation_tier: validationTier,
+        validation_confidence: databaseMatchConfidence,
+        ai_card_info_original: aiCardInfoOriginal
       }),
 
       // Processing metadata
@@ -998,6 +1040,10 @@ export async function GET(request: NextRequest, { params }: OnePieceCardGradingR
       delete (fallbackUpdateData as any).onepiece_card_id;
       delete (fallbackUpdateData as any).onepiece_reference_image;
       delete (fallbackUpdateData as any).onepiece_database_match_confidence;
+      delete (fallbackUpdateData as any).validated_source;
+      delete (fallbackUpdateData as any).validation_tier;
+      delete (fallbackUpdateData as any).validation_confidence;
+      delete (fallbackUpdateData as any).ai_card_info_original;
       delete (fallbackUpdateData as any).op_card_type;
       delete (fallbackUpdateData as any).op_card_color;
       delete (fallbackUpdateData as any).op_card_power;
