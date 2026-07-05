@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: OTHER/GENERIC TRADING CARDS v5.6 (aligned with master rubric v9.0)
+CARD TYPE DELTA: OTHER/GENERIC TRADING CARDS v5.6 (aligned with master rubric v8.8)
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains rules for non-sport collectible cards.
@@ -189,7 +189,7 @@ C. GENERIC CARD DEFECT PATTERNS
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
 • Hairline holo scratch, angle/zoom only → 9
-• Scratch noticeable at normal distance → 7 per the ladder
+• Scratch noticeable at normal distance → 8/7 per the ladder
 • Foil peeling (layer separating): serious — score via the ladder's coating-loss rows (5-4)
 🚨 GLARE CHECK FIRST: apply the master GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10,
 Step 5) before reporting holo/foil scratches.
@@ -221,8 +221,8 @@ Step 5) before reporting holo/foil scratches.
 • Note print quality issues separately from handling damage
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Print defect detectable only on close inspection → 9 (single) / 8 (multiple)
-• Noticeable at normal viewing distance → 7 per the ladder
+• Print defect detectable only on close inspection → 9
+• Noticeable at normal viewing distance → 8/7 per the ladder
 • Not structural damage, doesn't trigger caps
 
 🚨 **DISTRESSED/AGED DESIGNS ARE NOT DAMAGE (v8.8):** This catch-all category includes products
@@ -271,4 +271,4 @@ E. NOTES FOR UNCOMMON/OBSCURE TCGs
    • Focus on physical condition (universal across all cards)
    • Document any unique characteristics in notes
 
---- END OF OTHER DELTA v5.6 (aligned with master rubric v9.0) ---
+--- END OF OTHER DELTA v5.6 (aligned with master rubric v8.8) ---

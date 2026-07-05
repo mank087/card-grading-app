@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: SPORTS CARDS v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: SPORTS CARDS v5.1 (aligned with master rubric v8.8)
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY sports card-specific rules.
@@ -339,10 +339,10 @@ C. SPORTS CARD DEFECT PATTERNS
 • Heavy: Extensive chipping, multiple edges affected, large areas
 
 **Grading Impact (score from the master EDGE SCORING LADDER — Section 9; no separate deltas):**
-• ONE tiny fleck, close-inspection only → 9; 2-3 flecks → 8
-• Noticeable whitening along part of ONE edge, or a single tiny chip → 7
-• Noticeable whitening on multiple edges, or continuous whitening → 6
-• Heavy chipping → 5 or below per the ladder
+• 1-3 tiny flecks, close-inspection only → 9
+• Noticeable whitening along part of ONE edge, or a single tiny chip → 8
+• Noticeable whitening on multiple edges, or continuous whitening → 7
+• Heavy chipping → 6 or below per the ladder
 
 ────────────────────────────────────────────────────────────────────────
 2. TWO-SIDED DESIGN CONSIDERATIONS
@@ -512,7 +512,7 @@ Many modern sports card parallels feature INTENTIONAL line/geometric patterns as
 
 **Grading Impact (for CONFIRMED actual print line defects only — score via the master SURFACE SCORING LADDER, Section 10):**
 • Print line visible only at an angle or on close inspection → 9
-• Print line noticeable at normal viewing distance → 7 per the ladder
+• Print line noticeable at normal viewing distance → 8/7 per the ladder
 • Print line does NOT trigger structural damage caps (not a crease)
 • Design pattern lines that are part of the card's parallel/variant: NO DEDUCTION (not defects)
 
@@ -551,7 +551,7 @@ Before reporting ANY pattern-related defect on a holographic/parallel card:
 
 **Grading Impact (score via the master SURFACE SCORING LADDER, Section 10):**
 • Hairline holo scratch, angle/zoom only → 9
-• Holo scratch or pattern disruption noticeable at normal distance → 7 per the ladder
+• Holo scratch or pattern disruption noticeable at normal distance → 8/7 per the ladder
 • Missing/dead holo sections → moderate/heavy pattern-disruption rows (8-6)
 • Confirmed holofoil HANDLING defects prevent a 10 surface score (any confirmed defect does —
   there is no separate "high-end product" standard)
@@ -646,15 +646,15 @@ CORNER EXAMPLE (Sports Card with Dark Border)
 **Top-Left Corner (Front) — Minor severity, ladder row 9:**
 "The top-left corner sits against a solid red border background. On close inspection I observe a pinpoint of white fiber exposure at the corner tip where the red border coating has worn through to the white cardstock beneath. This speck is detectable only when zoomed in — at normal viewing distance the corner appears sharp — so per the visibility test it is a Minor defect (corner ladder row 9). The corner lies completely flat against the card surface with no lift or tilt detected."
 
-**Top-Right Corner (Front) — Moderate severity, ladder row 7:**
-"The top-right corner meets a red border identical to the opposite corner. This corner shows a larger patch of white fiber exposure with mild softening of the apex — the whitening is plainly noticeable at normal viewing distance against the red background, without zooming or searching. Per the visibility test this is a Moderate defect (corner ladder row 7 — noticeable at normal distance, market-calibrated). Despite this wear, the corner remains structurally sound with no signs of lifting, tilting, or creasing."
+**Top-Right Corner (Front) — Moderate severity, ladder row 8:**
+"The top-right corner meets a red border identical to the opposite corner. This corner shows a larger patch of white fiber exposure with mild softening of the apex — the whitening is plainly noticeable at normal viewing distance against the red background, without zooming or searching. Per the visibility test this is a Moderate defect (corner ladder row 8). Despite this wear, the corner remains structurally sound with no signs of lifting, tilting, or creasing."
 
 ────────────────────────────────────────────────────────────────────────
 EDGE EXAMPLE (Sports Card)
 ────────────────────────────────────────────────────────────────────────
 
-**Right Edge (Front) — Minor severity, ladder row 8:**
-"The right edge of this basketball card runs along a black border, which provides high contrast for detecting any white fiber exposure. Scanning the full length of this edge from the top-right corner to the bottom-right corner, I detect 3 tiny white flecks scattered along the edge line — each a pinpoint break in the black border coating where white cardstock shows through, detectable only on close inspection. A short mid-edge section also shows slight factory-cut roughness. At normal viewing distance the edge presents as clean, so per the visibility test these are Minor defects: 3 tiny flecks plus isolated minor roughness matches the edge ladder row 8 (2-3 close-inspection flecks, market-calibrated — a single fleck would be row 9)."
+**Right Edge (Front) — Minor severity, ladder row 9:**
+"The right edge of this basketball card runs along a black border, which provides high contrast for detecting any white fiber exposure. Scanning the full length of this edge from the top-right corner to the bottom-right corner, I detect 3 tiny white flecks scattered along the edge line — each a pinpoint break in the black border coating where white cardstock shows through, detectable only on close inspection. A short mid-edge section also shows slight factory-cut roughness. At normal viewing distance the edge presents as clean, so per the visibility test these are Minor defects: 1-3 tiny flecks plus isolated minor roughness matches the edge ladder row 9."
 
 ────────────────────────────────────────────────────────────────────────
 SURFACE EXAMPLE (Sports Card with Prizm Holographic Finish)

@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: MAGIC: THE GATHERING v5.2 (aligned with master rubric v9.0)
+CARD TYPE DELTA: MAGIC: THE GATHERING v5.2 (aligned with master rubric v8.8)
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Magic: The Gathering card-specific rules.
@@ -406,7 +406,7 @@ as a texture change, not merely white color.
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
 • Etched-foil scratch visible only at an angle/zoom → 9
-• Scratch or pattern wear noticeable at normal distance → 7 per the ladder
+• Scratch or pattern wear noticeable at normal distance → 8/7 per the ladder
 
 🚨 **MATTE TEXTURE IS THE DESIGN (v8.8):** Etched foil and Secret Lair matte treatments look
 dull/textured BY DESIGN. Do NOT report the uniform matte finish as scuffing or gloss loss.
@@ -428,8 +428,8 @@ reporting any etched-foil scratch — only deduct where the expected texture is 
 • Look at mana symbols for alignment
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Print line / misregistration visible only on close inspection → 9 (single) / 8 (multiple)
-• Noticeable at normal viewing distance → 7 per the ladder
+• Print line / misregistration visible only on close inspection → 9
+• Noticeable at normal viewing distance → 8/7 per the ladder
 • Does NOT trigger structural damage caps
 
 ────────────────────────────────────────────────────────────────────────
@@ -479,4 +479,4 @@ E. MTG CARD GRADING EXAMPLES
 **SURFACE EXAMPLE (MTG Etched Foil):**
 "This Magic card features an etched foil treatment with a matte holographic finish across the entire front surface. The etched pattern creates a subtle textured appearance. Examining under angled lighting, I detect one hairline scratch in the center area — a short glossy line where the matte etched texture has been smoothed down, detectable only at an angle. Per the visibility test this is a Minor defect (surface ladder row 9). Additionally, the top edge shows 2 tiny white flecks where the black border has chipped, close-inspection only (edge ladder row 9). Overall surface score: 9."
 
---- END OF MTG DELTA v5.2 (aligned with master rubric v9.0) ---
+--- END OF MTG DELTA v5.2 (aligned with master rubric v8.8) ---

@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: STAR WARS TCG v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: STAR WARS TCG v5.0
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Star Wars collectible card-specific rules.
@@ -202,13 +202,11 @@ C. STAR WARS CARD DEFECT PATTERNS
 • Surface scuffing dulling the refractor effect
 • Chrome layer peeling at edges (severe)
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Hairline chrome scratch or fingerprint, angle/zoom only → 9
-• Scratch/scuff noticeable at normal distance → 7 per the ladder
-• Confirmed handling defects prevent a 10 surface score
-🚨 GLARE CHECK FIRST: chrome is the most reflective finish in the hobby — apply the master
-GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10, Step 5) before reporting ANY chrome
-scratch, clouding, or scuff. Bright bands/streaks that shift with the light are reflections.
+**Grading Impact:**
+• Single chrome scratch: -0.5 to -1.0
+• Multiple scratches: -1.0 to -2.0
+• Fingerprints on chrome: -0.5 to -1.0
+• Prevents 10.0 surface score if any chrome defects
 
 ────────────────────────────────────────────────────────────────────────
 2. VINTAGE CARD DEFECTS (1977-1983)
@@ -228,17 +226,11 @@ scratch, clouding, or scuff. Bright bands/streaks that shift with the light are 
 • Yellowing/foxing from age
 • Rubber band marks from storage
 
-**Grading Impact (v8.8 — master ladders and centering table apply; era is narrative-only):**
-• Wax stains: score via the SURFACE SCORING LADDER stain rows (small → 7, medium → 6, large → 5)
-• Centering: ALWAYS scored from the measured ratio via the master CENTERING SCORE GUIDE —
-  never as a floating deduction
-• Age yellowing/rubber band marks: score via the surface ladder by visibility
-
-🚨 **VINTAGE GREY/TAN BACK STOCK ≠ TONING (v8.8):** 1977-1983 Topps backs are printed on
-grey/tan cardstock. A UNIFORM grey/tan back tone is the original stock color — do NOT report
-it as yellowing, toning, foxing, or staining. Real age toning is IRREGULAR: blotchy patches,
-darkened edges, or gradients that differ across the panel. If the tone is even across the
-whole back, it is the cardstock.
+**Grading Impact:**
+• Wax stains: -0.5 to -2.0 depending on severity
+• Centering off by >60/40: -1.0 to -3.0
+• Age yellowing: -0.5 to -1.0
+• Rubber band marks: -1.0 to -2.0
 
 ────────────────────────────────────────────────────────────────────────
 3. AUTOGRAPH/RELIC CARD DEFECTS
@@ -273,22 +265,22 @@ whole back, it is the cardstock.
 • Pack-fresh dimples or surface irregularities
 
 **Grading Impact:**
-• Same as master rubric standards (ladders + visibility test)
-• Colored borders make whitening more VISIBLE — the visibility test still decides the band
-• Defects on the character's face are described in prose but scored by visibility like any other
+• Same as master rubric standards
+• Colored borders make whitening more visible
+• Art-focused cards: defects on character face more impactful
 
 ═══════════════════════════════════════════════════════════════════════
 D. STAR WARS CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
 
 **VINTAGE CARD EXAMPLE (1977):**
-"This 1977 Topps Star Wars Series 1 Blue Border card #1 'Luke Skywalker' shows typical vintage characteristics. Centering is 55/45 left-right and 52/48 top-bottom — within the CENTERING SCORE GUIDE's 10 band (era does not change the mapping). Blue borders show a short run of light whitening at the top edge, noticeable at normal distance (edge ladder row 7, market-calibrated). Corners show softening noticeable at normal viewing distance (corner ladder row 7). No wax stains present. Surface has minor close-inspection handling marks (row 8, two flaws). Weakest link = 7. Grade 7 — the same standard as a modern card; the card's age is context, not a score adjustment."
+"This 1977 Topps Star Wars Series 1 Blue Border card #1 'Luke Skywalker' shows typical vintage characteristics. Centering is 55/45 left-right and 52/48 top-bottom — acceptable for the era. Blue borders show light whitening at the top edge approximately 2mm. Corners show moderate softening typical of a 40+ year old card. No wax stains present. Surface has minor handling marks but no scratches. Grade 7 — Near Mint for vintage condition."
 
 **CHROME REFRACTOR EXAMPLE:**
-"This 2023 Topps Star Wars Chrome Refractor of 'Darth Vader' displays prismatic chrome treatment across the full card face. Under varied lighting angles, I detect one fine hairline scratch running across the lower portion — it interrupts the refractor pattern rather than shifting with the light, confirming physical damage rather than glare. Angle-only visibility = Minor severity (surface ladder row 9). The refractor pattern is otherwise clean and vibrant with no fingerprints or clouding. Surface score: 9."
+"This 2023 Topps Star Wars Chrome Refractor of 'Darth Vader' displays prismatic chrome treatment across the full card face. Under varied lighting angles, I detect one fine hairline scratch approximately 6mm running across the lower portion of the card. The refractor pattern is otherwise clean and vibrant. Chrome surface shows no fingerprints or clouding. Surface score: 9.0 due to single visible chrome scratch."
 
 **AUTOGRAPH CARD EXAMPLE:**
-"This Topps Star Wars Masterwork autograph card features an on-card signature of Mark Hamill. The autograph is clear and well-placed. Grading the CARD condition (not auto quality): Centering is 50/50 LR and 52/48 TB — CENTERING SCORE GUIDE 10 band. All four corners are sharp with no wear. Edges clean with no whitening. Surface pristine aside from the intentional autograph area (the autograph is a manufacturer feature, not a defect). Grade 10 — whole numbers only; half grades like 9.5 do not exist in this system."
+"This Topps Star Wars Masterwork autograph card features an on-card signature of Mark Hamill. The autograph is clear and well-placed. Grading the CARD condition (not auto quality): Centering is 50/50 LR and 48/52 TB — excellent. All four corners are sharp with no wear. Edges clean with no whitening. Surface pristine aside from the intentional autograph area. Grade 9.5."
 
 ═══════════════════════════════════════════════════════════════════════
 E. STAR WARS SPECIFIC EXTRACTION RULES
@@ -322,4 +314,4 @@ E. STAR WARS SPECIFIC EXTRACTION RULES
 • CCG cards: Game-specific backs (Decipher, FFG)
 • Verify back matches expected set design
 
---- END OF STAR WARS DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF STAR WARS DELTA v5.0 ---

@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: ONE PIECE TCG v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: ONE PIECE TCG v5.1 (aligned with master rubric v8.8)
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY One Piece TCG card-specific rules.
@@ -319,7 +319,7 @@ C. ONE PIECE CARD DEFECT PATTERNS
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
 • Hairline holo scratch, angle/zoom only → 9
-• Holo scratch or pattern disruption noticeable at normal distance → 7 per the ladder
+• Holo scratch or pattern disruption noticeable at normal distance → 8/7 per the ladder
 • Confirmed handling defects prevent a 10 surface score
 🚨 GLARE CHECK FIRST: apply the master GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10,
 Step 5) — especially on dark Leader cards and black-bordered cards, whose glossy dark surfaces
@@ -340,9 +340,9 @@ reflect light as scuff-like streaks in photos.
 • Check corners where borders meet
 
 **Grading Impact (v8.8 — score via the master EDGE SCORING LADDER, Section 9; no per-edge stacking):**
-• ONE tiny fleck, close-inspection only → 9; 2-3 flecks → 8
-• Whitening noticeable at normal distance on part of ONE edge → 7
-• Noticeable whitening on multiple edges, or continuous → 6; heavier per the ladder
+• 1-3 tiny flecks, close-inspection only → 9
+• Whitening noticeable at normal distance on part of ONE edge → 8
+• Noticeable whitening on multiple edges, or continuous → 7; heavier per the ladder
 (The ladder's spread adjustment handles multiple edges — do NOT stack per-edge deductions.)
 
 ────────────────────────────────────────────────────────────────────────
@@ -361,9 +361,9 @@ reflect light as scuff-like streaks in photos.
 • Peeling at corner layers
 
 **Grading Impact (v8.8 — score via the master CORNER SCORING LADDER, Section 8; no per-corner stacking):**
-• ONE corner with pinpoint close-inspection wear → 9; 2+ corners → 8
-• Wear noticeable at normal distance (1-2 corners) → 7
-• Multiple noticeable corners / obvious blunting → 6; rounding → 5-4 per the ladder
+• Pinpoint tip whitening/softening, close-inspection only → 9
+• Wear noticeable at normal distance → 8
+• Obvious blunting → 7; rounding → 6 and below per the ladder
 (The ladder's spread adjustment handles multiple corners — do NOT stack per-corner deductions.)
 
 ────────────────────────────────────────────────────────────────────────
@@ -404,8 +404,8 @@ reflect light as scuff-like streaks in photos.
 • Crimped edges from packaging
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Printing variance detectable only on close inspection → 9 (single) / 8 (multiple)
-• Print defects noticeable at normal distance → 7 per the ladder
+• Printing variance detectable only on close inspection → 9
+• Print defects noticeable at normal distance → 8/7 per the ladder
 • Miscuts: score centering from the measured ratio via the CENTERING SCORE GUIDE
 
 ═══════════════════════════════════════════════════════════════════════
@@ -425,7 +425,8 @@ D. ONE PIECE CARD GRADING EXAMPLES
 shading are the PRINTED DESIGN — never report them as print lines, scratches, or silvering.
 
 Surface is clean with no visible defects. Edges show minimal handling with a trace of
-whitening at the top edge, detectable only on close inspection — Minor severity. As the face's only flaw this is edge ladder row 9. Edge score: 9."
+whitening at the top edge, detectable only on close inspection — Minor severity, edge ladder
+row 9. Edge score: 9."
 
 **CORNER ANALYSIS EXAMPLE:**
 "Examining all four corners of this Character card at maximum zoom:
@@ -433,7 +434,7 @@ whitening at the top edge, detectable only on close inspection — Minor severit
 - Top-right: Minimal softening at the corner tip, detectable only on close inspection. Near pristine.
 - Bottom-left: Trace white fiber visible against the Blue border on close inspection. Minor wear.
 - Bottom-right: Clean corner, sharp point maintained. Pristine.
-Corner score: 8 (Minor close-inspection wear at TWO corners — count-aware corner ladder row 8; a single worn corner would be 9)"
+Corner score: 9 (Minor close-inspection wear at two corners — corner ladder row 9; whole numbers only)"
 
 **EDGE ANALYSIS EXAMPLE:**
 "Examining all four edges of this Super Rare card:
@@ -441,7 +442,7 @@ Corner score: 8 (Minor close-inspection wear at TWO corners — count-aware corn
 - Bottom edge: A tiny whitening speck near the right corner, close-inspection only; otherwise clean.
 - Left edge: No defects, border color consistent throughout.
 - Right edge: Two small specks of fiber exposure, detectable only on close inspection.
-Edge score: 8 (close-inspection specks on two edges — count-aware edge ladder row 8; a single speck would be 9)"
+Edge score: 9 (1-3 tiny flecks, close-inspection only — edge ladder row 9)"
 
 ═══════════════════════════════════════════════════════════════════════
 E. ONE PIECE SPECIFIC EXTRACTION RULES
@@ -471,4 +472,4 @@ E. ONE PIECE SPECIFIC EXTRACTION RULES
 • Both colors should be listed in card_color
 • Format: "Red/Green" or "Blue/Purple"
 
---- END OF ONE PIECE DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF ONE PIECE DELTA v5.1 (aligned with master rubric v8.8) ---

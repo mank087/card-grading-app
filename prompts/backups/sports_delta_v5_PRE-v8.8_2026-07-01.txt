@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: SPORTS CARDS v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: SPORTS CARDS v5.0
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY sports card-specific rules.
@@ -19,14 +19,11 @@ Extract the following fields from sports cards:
 REQUIRED FIELDS (All Sports Cards)
 ────────────────────────────────────────────────────────────────────────
 
-**card_name**: The card's SUBJECT — the player as printed (v8.8, per master Section 4 canonical definitions)
-• 🚨 NEVER include the set name, insert name, subset, or parallel in card_name — those belong
-  in set_name/subset. "Gold Standard", "Dominators", "Prizm" are SETS/INSERTS, not names.
-• Example: "Ken Griffey Jr."
-• Example: "Tom Brady" (on a Gold Standard insert → set_name/subset: "Gold Standard")
-• Example: "LeBron James" (on a Dominators insert → subset: "Dominators")
-• Printed title designations that are part of the card itself (e.g. "Rookie Card" text) may be
-  reflected in rookie_or_first, not appended to card_name
+**card_name**: Full card name/title as printed
+• Often includes player name + card type/designation
+• Example: "Ken Griffey Jr. Rookie Card"
+• Example: "Tom Brady Gold Standard"
+• Example: "LeBron James Dominators"
 
 **player_or_character**: Player/athlete name
 • Full name as printed on card
@@ -98,15 +95,6 @@ ENHANCED FIELDS (Modern Sports Cards 2000+)
 • CRITICAL: Modern cards (2010+) frequently have subset/insert/parallel variants
 • You MUST actively search for subset indicators in small print areas on EVERY card
 • DO NOT default to null without checking borders, card number area, and back panel
-• 🚨 subset must NEVER contain the player's TEAM ("Magic", "Lakers", "Patriots" belong in the
-  team field only), the player's name, or the manufacturer. If the only candidate text is a
-  team or league name → subset is null.
-• 🚨 CONSISTENT CARVE-UP: manufacturer ("Upper Deck"), set_name (the product line), and subset
-  (the insert/variant within it) must each appear ONCE — never duplicate the manufacturer
-  inside set_name if it is already in the manufacturer field, and never repeat set words in
-  subset. For promo/redemption/exchange cards where the printed text is ambiguous, prefer:
-  manufacturer = brand, set_name = the program name as printed (e.g. "NBA Draft Trade Card"),
-  subset = null, and set identification_confidence to "medium" or "low".
 
 **Where to Check:**
 1. Back of card (bottom/top/sides) - small text
@@ -333,16 +321,15 @@ C. SPORTS CARD DEFECT PATTERNS
 • Check all four edges for white flecks or continuous whitening
 • Dark borders make detection easier (white shows clearly)
 
-**Severity (per the master VISIBILITY TEST, Section 1.9):**
-• Minor: 1-3 tiny white flecks detectable only on close inspection
-• Moderate: Whitening plainly noticeable at normal viewing distance along part of an edge
+**Severity:**
+• Minor: 1-3 small white flecks (<0.1mm each)
+• Moderate: Continuous whitening along edge section (3-10mm)
 • Heavy: Extensive chipping, multiple edges affected, large areas
 
-**Grading Impact (score from the master EDGE SCORING LADDER — Section 9; no separate deltas):**
-• ONE tiny fleck, close-inspection only → 9; 2-3 flecks → 8
-• Noticeable whitening along part of ONE edge, or a single tiny chip → 7
-• Noticeable whitening on multiple edges, or continuous whitening → 6
-• Heavy chipping → 5 or below per the ladder
+**Grading Impact:**
+• Each white fleck: -1 deduction
+• Continuous whitening per edge: -1 deduction
+• Heavy chipping: -2 or more
 
 ────────────────────────────────────────────────────────────────────────
 2. TWO-SIDED DESIGN CONSIDERATIONS
@@ -422,11 +409,6 @@ scratches, scribbles, smudges, stains, or alterations.
 • Printed ink smudges, splatter, fingerprints, or stamp/postmark graphics
 • Coffee/water-stain, sepia, parchment, or "aged document" effects
 • Chalkboard, blueprint, grunge, distressed, or vintage-throwback textures
-• UNIFORM tan/beige/cream/parchment panel coloring — this is the design's palette. Do NOT
-  describe a uniformly colored text panel as "toning," "print wear," "discoloration," or
-  "staining." Real toning/staining is IRREGULAR: uneven patches, blotchy edges, or gradients
-  that differ from the rest of the panel. If the tone is even across the whole panel, it is
-  the printed design.
 
 🚨 **CRITICAL TEST - printed design vs. physical damage:**
 Before flagging ANY mark, line, smudge, scribble, scuff, or "crease" on a
@@ -446,10 +428,9 @@ text/graphic panel, ask:
 • Retro/throwback, grunge, and "vintage reproduction" inserts
 • Notebook/sketch/doodle-themed inserts and parallels
 
-🚨 **SYSTEMATIC-ERROR NOTE:** The server-side ensemble does NOT protect against this —
-every independent evaluation sees the same printed design and will AGREE it "looks
-marked." Apply the test above every time; do not let a uniformly stylized panel cap
-the surface subgrade.
+🚨 **THREE-PASS NOTE:** Consensus does NOT protect against this. All passes see
+the same printed design and will AGREE it "looks marked." Apply the test above
+on EVERY pass; do not let a uniformly stylized panel cap the surface subgrade.
 
 **DO NOT flag as defects:**
 ❌ Printed crumpled/aged-paper texture on the back panel
@@ -510,9 +491,9 @@ Many modern sports card parallels feature INTENTIONAL line/geometric patterns as
 • Print line: Surface-level ink defect, doesn't break cardstock, straight line, consistent width
 • Crease: Structural damage, cardstock folded, visible at angles, disrupts surface plane
 
-**Grading Impact (for CONFIRMED actual print line defects only — score via the master SURFACE SCORING LADDER, Section 10):**
-• Print line visible only at an angle or on close inspection → 9
-• Print line noticeable at normal viewing distance → 7 per the ladder
+**Grading Impact (for CONFIRMED actual print line defects only):**
+• Single print line: -1 (manufacturing defect, not handling)
+• Multiple print lines: -1 to -2
 • Print line does NOT trigger structural damage caps (not a crease)
 • Design pattern lines that are part of the card's parallel/variant: NO DEDUCTION (not defects)
 
@@ -549,15 +530,11 @@ Before reporting ANY pattern-related defect on a holographic/parallel card:
 • Pattern disruption visible as dull/non-reflective areas
 • Design lines that shift uniformly with viewing angle = holographic design working correctly (NOT defects)
 
-**Grading Impact (score via the master SURFACE SCORING LADDER, Section 10):**
-• Hairline holo scratch, angle/zoom only → 9
-• Holo scratch or pattern disruption noticeable at normal distance → 7 per the ladder
-• Missing/dead holo sections → moderate/heavy pattern-disruption rows (8-6)
-• Confirmed holofoil HANDLING defects prevent a 10 surface score (any confirmed defect does —
-  there is no separate "high-end product" standard)
-🚨 GLARE CHECK FIRST: before reporting any holo scratch, apply the master GLARE & REFLECTION
-FALSE-POSITIVE CHECK (Section 10, Step 5) — bright shifting lines that move with viewing angle
-are the holographic effect, not damage.
+**Grading Impact:**
+• Single holo scratch (hairline): -1 minimum
+• Multiple holo scratches: -1 to -2
+• Pattern disruption (missing holo section): -1 to -2
+• Holofoil defects prevent 10 surface score (high-end product expectation)
 
 ────────────────────────────────────────────────────────────────────────
 5. PATCH/RELIC WINDOW CONSIDERATIONS
@@ -622,9 +599,7 @@ are the holographic effect, not damage.
 
 **Grading Adjustments:**
 • Don't expect 10 corners on vintage (manufacturing limitations)
-• Centering is ALWAYS scored from the master CENTERING SCORE GUIDE table — era does NOT
-  change the ratio→score mapping. Era context ("well centered for a 1970s issue") belongs
-  in the narrative only.
+• Centering caps still apply but context-aware (60/40 is good for 1970s card)
 • Factory roughness noted but less penalized than modern cards
 
 ═══════════════════════════════════════════════════════════════════════
@@ -637,24 +612,24 @@ D. SPORTS CARD GRADING EXAMPLES
 CENTERING EXAMPLE (Sports Card with Colored Border)
 ────────────────────────────────────────────────────────────────────────
 
-"This 2024 Topps Chrome baseball card features a distinctive dark blue border surrounding the player photo. Examining the front borders, I measure: left border ≈ 2.8mm, right border ≈ 3.5mm, top border ≈ 3.0mm, bottom border ≈ 3.2mm. Calculating the left-right ratio per the master formula (each border ÷ their total): 2.8 ÷ 6.3 = 44%, 3.5 ÷ 6.3 = 56% → 56/44 ratio. For top-bottom: 3.0 ÷ 6.2 = 48%, 3.2 ÷ 6.2 = 52% → 52/48 ratio. The worst axis is left-right at 56/44, which per the CENTERING SCORE GUIDE (56/44-60/40 band) gives a centering score of 9. The card shows a slight rightward shift, noticeable when specifically comparing the side borders."
+"This 2024 Topps Chrome baseball card features a distinctive dark blue border surrounding the player photo. Examining the front borders, I measure: left border ≈ 2.8mm, right border ≈ 3.5mm, top border ≈ 3.0mm, bottom border ≈ 3.2mm. Calculating the left-right ratio: 2.8mm (narrower) ÷ 3.5mm (wider) × 100 = 80%, expressed as 80/20 ratio. For top-bottom: 3.0mm ÷ 3.2mm × 100 = 93.75%, expressed as 94/6 ratio. The worst axis is left-right at 80/20, which according to the centering caps table, limits the maximum centering score to 5. The card is visibly off-center with the player image shifted toward the left edge."
 
 ────────────────────────────────────────────────────────────────────────
 CORNER EXAMPLE (Sports Card with Dark Border)
 ────────────────────────────────────────────────────────────────────────
 
-**Top-Left Corner (Front) — Minor severity, ladder row 9:**
-"The top-left corner sits against a solid red border background. On close inspection I observe a pinpoint of white fiber exposure at the corner tip where the red border coating has worn through to the white cardstock beneath. This speck is detectable only when zoomed in — at normal viewing distance the corner appears sharp — so per the visibility test it is a Minor defect (corner ladder row 9). The corner lies completely flat against the card surface with no lift or tilt detected."
+**Top-Left Corner (Front):**
+"The top-left corner sits against a solid red border background. Examining at maximum zoom, I observe a small amount of white fiber exposure at the corner tip, measuring approximately 0.2mm in length. The corner maintains relatively sharp geometry overall but shows this minor whitening where the red border coating has worn through to reveal the white cardstock beneath. This minor defect is characteristic of handling wear on dark-bordered sports cards, where the high contrast between red ink and white cardstock makes even small amounts of fiber exposure highly visible. The corner lies completely flat against the card surface with no lift or tilt detected."
 
-**Top-Right Corner (Front) — Moderate severity, ladder row 7:**
-"The top-right corner meets a red border identical to the opposite corner. This corner shows a larger patch of white fiber exposure with mild softening of the apex — the whitening is plainly noticeable at normal viewing distance against the red background, without zooming or searching. Per the visibility test this is a Moderate defect (corner ladder row 7 — noticeable at normal distance, market-calibrated). Despite this wear, the corner remains structurally sound with no signs of lifting, tilting, or creasing."
+**Top-Right Corner (Front):**
+"The top-right corner meets a red border identical to the opposite corner. At maximum zoom, this corner displays a slightly larger area of white fiber exposure, roughly 0.3mm in extent, with visible rounding of the corner apex. The border coating has worn away more extensively here compared to the top-left corner, suggesting this area received more handling contact. The white cardstock is clearly visible against the red background, and the corner geometry shows mild softening. Despite this wear, the corner remains structurally sound with no signs of lifting, tilting, or creasing."
 
 ────────────────────────────────────────────────────────────────────────
 EDGE EXAMPLE (Sports Card)
 ────────────────────────────────────────────────────────────────────────
 
-**Right Edge (Front) — Minor severity, ladder row 8:**
-"The right edge of this basketball card runs along a black border, which provides high contrast for detecting any white fiber exposure. Scanning the full length of this edge from the top-right corner to the bottom-right corner, I detect 3 tiny white flecks scattered along the edge line — each a pinpoint break in the black border coating where white cardstock shows through, detectable only on close inspection. A short mid-edge section also shows slight factory-cut roughness. At normal viewing distance the edge presents as clean, so per the visibility test these are Minor defects: 3 tiny flecks plus isolated minor roughness matches the edge ladder row 8 (2-3 close-inspection flecks, market-calibrated — a single fleck would be row 9)."
+**Right Edge (Front):**
+"The right edge of this basketball card runs along a black border, which provides high contrast for detecting any white fiber exposure. Scanning the full length of this edge from the top-right corner to the bottom-right corner, I detect 3 small white flecks scattered along the edge line. Each fleck measures less than 0.1mm in length and appears as a tiny break in the black border coating where white cardstock shows through. Additionally, examining the factory cut quality, the middle section of this edge (approximately 3mm length) shows slight roughness - the cut line appears fuzzy rather than perfectly straight and clean. The combination of minor whitening (3 flecks) and localized roughness results in an edge score of 9 for this specific edge."
 
 ────────────────────────────────────────────────────────────────────────
 SURFACE EXAMPLE (Sports Card with Prizm Holographic Finish)
@@ -678,4 +653,4 @@ Grading the card condition independently of the relic window:
 
 The presence of the memorabilia window does not negatively impact the grade; it is an intentional design feature. The card is assessed based on its condition as a relic card, with the window treated as part of the original design rather than a defect."
 
---- END OF SPORTS DELTA v5.1 ---
+--- END OF SPORTS DELTA v5.0 ---

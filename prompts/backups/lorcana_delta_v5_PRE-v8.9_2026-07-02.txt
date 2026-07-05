@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: DISNEY LORCANA v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: DISNEY LORCANA v5.0
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Disney Lorcana card-specific rules.
@@ -239,16 +239,9 @@ D. LORCANA CARD DEFECT PATTERNS
 • Pattern disruption
 • Fingerprints visible on holo surface
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Hairline holo scratch, angle/zoom only → 9
-• Holo scratch noticeable at normal distance → 7 per the ladder
-• Confirmed handling defects prevent a 10 surface score
-
-🚨 **ENCHANTED FOIL GLARE CHECK (v8.8):** Enchanted variants' full-art holographic finish
-produces intense shifting rainbow reflections and glare bands in photos. Apply the master
-GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10, Step 5) before reporting any scratch,
-scuff, or clouding on an Enchanted surface — reflections that shift with the light are the
-foil working as designed, not damage.
+**Grading Impact:**
+• Holo scratches: -0.5 to -1.5 per scratch
+• Prevents 10.0 surface score
 
 ────────────────────────────────────────────────────────────────────────
 2. INK SPLASH BORDER DEFECTS
@@ -304,9 +297,9 @@ E. LORCANA CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
 
 **CENTERING EXAMPLE:**
-"This Disney Lorcana card features an Amethyst (purple) border. Measuring borders: left ≈ 3.0mm, right ≈ 3.5mm, top ≈ 2.8mm, bottom ≈ 3.2mm. Left-right ratio per the master formula (each border ÷ their total): 3.0 ÷ 6.5 = 46%, 3.5 ÷ 6.5 = 54% → 54/46. Top-bottom: 2.8 ÷ 6.0 = 47%, 3.2 ÷ 6.0 = 53% → 53/47. Worst axis: left-right at 54/46, which per the CENTERING SCORE GUIDE (50/50-55/45 band) gives a centering score of 10 — borders appear nearly equal on visual check, consistent with the measurement."
+"This Disney Lorcana card features an Amethyst (purple) border. Measuring borders: left ≈ 3.0mm, right ≈ 3.5mm, top ≈ 2.8mm, bottom ≈ 3.2mm. Left-right ratio: 86/14. Top-bottom ratio: 88/12. Worst axis: top-bottom at 88/12, capping centering at 4.0."
 
 **ENCHANTED VARIANT EXAMPLE:**
-"This Enchanted variant Lorcana card has a full-art holographic treatment across the entire front surface. Examining the holographic layer, I detect one short hairline scratch in the center, visible only when the light catches it at an angle — it interrupts the rainbow pattern rather than shifting with it, confirming physical damage rather than glare. Per the visibility test this is a Minor defect (surface ladder row 9). Surface score: 9."
+"This Enchanted variant Lorcana card has a full-art holographic treatment across the entire front surface. Examining the holographic layer, I detect one hairline scratch in the center running approximately 6mm. The scratch disrupts the rainbow holographic pattern. Surface score: 9.0 due to holo scratch."
 
---- END OF LORCANA DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF LORCANA DELTA v5.0 ---

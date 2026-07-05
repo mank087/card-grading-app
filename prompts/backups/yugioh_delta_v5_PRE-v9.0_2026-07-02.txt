@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: YU-GI-OH! TCG v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: YU-GI-OH! TCG v5.1 (aligned with master rubric v8.8)
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Yu-Gi-Oh! TCG card-specific rules.
@@ -279,7 +279,7 @@ C. YU-GI-OH! CARD DEFECT PATTERNS
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
 • Hairline holo scratch, angle/zoom only → 9
-• Holo scratch or crushed embossing noticeable at normal distance → 7 per the ladder
+• Holo scratch or crushed embossing noticeable at normal distance → 8/7 per the ladder
 • Confirmed handling defects prevent a 10 surface score
 
 ────────────────────────────────────────────────────────────────────────
@@ -299,9 +299,9 @@ C. YU-GI-OH! CARD DEFECT PATTERNS
 • Check corners where borders meet
 
 **Grading Impact (v8.8 — score via the master EDGE SCORING LADDER, Section 9; no per-edge stacking):**
-• ONE tiny fleck, close-inspection only → 9; 2-3 flecks → 8
-• Whitening noticeable at normal distance on part of ONE edge → 7
-• Noticeable whitening on multiple edges, or continuous → 6; heavier per the ladder
+• 1-3 tiny flecks, close-inspection only → 9
+• Whitening noticeable at normal distance on part of ONE edge → 8
+• Noticeable whitening on multiple edges, or continuous → 7; heavier per the ladder
 🚨 DARK BACK NOTE: Yu-Gi-Oh's dark brown backs make edge whitening HIGHLY visible — a tiny
 speck is still Minor (9) even though it stands out against the dark back. Score by the
 visibility test, not by contrast. The glossy dark back is also glare-prone: apply the glare
@@ -325,8 +325,8 @@ check before reporting back-surface scuffs.
 • "Dog ear" bends at corners
 
 **Grading Impact (v8.8 — score via the master CORNER SCORING LADDER, Section 8; no per-corner stacking):**
-• ONE corner with pinpoint close-inspection wear → 9; 2+ corners → 8
-• Wear noticeable at normal distance → 7; multiple/obvious blunting → 6; rounding → 5-4
+• Pinpoint tip whitening/softening, close-inspection only → 9
+• Wear noticeable at normal distance → 8; obvious blunting → 7; rounding → 6 and below
 • Square corners make wear easier to SEE — the visibility test still decides the band
 (The ladder's spread adjustment handles multiple corners — do NOT stack per-corner deductions.)
 
@@ -369,8 +369,8 @@ check before reporting back-surface scuffs.
 • Factory crimped edges from packaging
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Printing variance detectable only on close inspection → 9 (single) / 8 (multiple)
-• Print defects noticeable at normal distance → 7 per the ladder
+• Printing variance detectable only on close inspection → 9
+• Print defects noticeable at normal distance → 8/7 per the ladder
 • Miscuts: score centering from the measured ratio via the CENTERING SCORE GUIDE
 
 ═══════════════════════════════════════════════════════════════════════
@@ -390,9 +390,10 @@ D. YU-GI-OH! CARD GRADING EXAMPLES
 "Examining all four SQUARE corners of this Effect Monster at maximum zoom:
 - Top-left: Light softening at corner point, close-inspection only. Minor (row 9).
 - Top-right: Sharp corner maintained, gold border intact. Near pristine.
-- Bottom-left: Rounding with white fiber exposure, noticeable at normal distance. Moderate (row 7, market-calibrated).
+- Bottom-left: Rounding with white fiber exposure, noticeable at normal distance. Moderate (row 8).
 - Bottom-right: Light corner ding, slight depression visible on close inspection. Minor (row 9).
-Corner score: 7 (worst state = bottom-left noticeable at normal distance → count-aware row 7; whole numbers only — never 8.5)"
+Corner score: 8 (worst corner = bottom-left Moderate row 8; wear on only 2 of 8 corners → no
+spread adjustment; whole numbers only — never 8.5)"
 
 **EDGE ANALYSIS EXAMPLE:**
 "Examining all four edges of this Ultra Rare card:
@@ -400,7 +401,8 @@ Corner score: 7 (worst state = bottom-left noticeable at normal distance → cou
 - Bottom edge: A tiny whitening speck near the left corner, close-inspection only.
 - Left edge: No defects, border color consistent throughout. Pristine.
 - Right edge: A pinpoint chip at one spot, close-inspection only.
-Edge score: 7 (worst state = single tiny chip → count-aware row 7, market-calibrated)"
+Edge score: 8 (worst edge = right edge single tiny chip, row 8; Minor wear spread across 3
+edges triggers no further adjustment since the worst state is on only 1 edge)"
 
 ═══════════════════════════════════════════════════════════════════════
 E. YU-GI-OH! SPECIFIC EXTRACTION RULES
@@ -446,4 +448,4 @@ E. YU-GI-OH! SPECIFIC EXTRACTION RULES
 • Japanese cards have the same back design as English cards
 • The back should be consistent brown/gold spiral pattern
 
---- END OF YU-GI-OH! DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF YU-GI-OH! DELTA v5.1 (aligned with master rubric v8.8) ---

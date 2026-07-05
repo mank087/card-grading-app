@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: YU-GI-OH! TCG v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: YU-GI-OH! TCG v5.0
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Yu-Gi-Oh! TCG card-specific rules.
@@ -263,24 +263,16 @@ C. YU-GI-OH! CARD DEFECT PATTERNS
 
 **Common Holo Issues:**
 • Holo scratches across artwork (micro-scratches visible under light)
+• Pattern disruption or clouding on Secret Rares
 • Fingerprints visible on holo surface
-• Genuine flattened/crushed spots interrupting Ultimate Rare embossing
-• Scratches that BREAK the Starlight prismatic pattern
+• Embossing damage on Ultimate Rares (flattened areas)
+• Prismatic pattern scratches on Starlight Rares
 
-🚨 **EMBOSSED/PRISMATIC FINISHES ARE THE DESIGN, NOT DAMAGE (v8.8):**
-• Ultimate Rares have an INTENTIONAL 3-D embossed relief on artwork/name/borders — the raised,
-  uneven texture is manufactured. Do NOT report the embossing itself as damage; only deduct
-  where the relief is visibly CRUSHED or FLATTENED in a localized spot.
-• Secret Rares' diagonal rainbow shimmer and Starlight Rares' prismatic sparkle are the
-  intended finish. Uniform "clouding" or shimmer across the pattern is the FOIL WORKING —
-  only deduct for defined dull dead spots or scratch lines that ignore the pattern.
-• Apply the master GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10, Step 5) before ANY
-  holo-surface deduction.
-
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Hairline holo scratch, angle/zoom only → 9
-• Holo scratch or crushed embossing noticeable at normal distance → 7 per the ladder
-• Confirmed handling defects prevent a 10 surface score
+**Grading Impact:**
+• Single holo scratch: -0.5 to -1.0
+• Multiple holo scratches: -1.0 to -2.0
+• Embossing damage: -1.0 to -2.0
+• Prevents 10.0 surface score if any holo defects present
 
 ────────────────────────────────────────────────────────────────────────
 2. BORDER/EDGE DEFECTS
@@ -298,14 +290,10 @@ C. YU-GI-OH! CARD DEFECT PATTERNS
 • Gold/brown border makes whitening visible
 • Check corners where borders meet
 
-**Grading Impact (v8.8 — score via the master EDGE SCORING LADDER, Section 9; no per-edge stacking):**
-• ONE tiny fleck, close-inspection only → 9; 2-3 flecks → 8
-• Whitening noticeable at normal distance on part of ONE edge → 7
-• Noticeable whitening on multiple edges, or continuous → 6; heavier per the ladder
-🚨 DARK BACK NOTE: Yu-Gi-Oh's dark brown backs make edge whitening HIGHLY visible — a tiny
-speck is still Minor (9) even though it stands out against the dark back. Score by the
-visibility test, not by contrast. The glossy dark back is also glare-prone: apply the glare
-check before reporting back-surface scuffs.
+**Grading Impact:**
+• Minor edge whitening: -0.5 per affected edge
+• Moderate whitening: -1.0 per affected edge
+• Heavy whitening/chipping: -1.5 to -2.0
 
 ────────────────────────────────────────────────────────────────────────
 3. CORNER DEFECTS
@@ -324,11 +312,11 @@ check before reporting back-surface scuffs.
 • Peeling at corner layers
 • "Dog ear" bends at corners
 
-**Grading Impact (v8.8 — score via the master CORNER SCORING LADDER, Section 8; no per-corner stacking):**
-• ONE corner with pinpoint close-inspection wear → 9; 2+ corners → 8
-• Wear noticeable at normal distance → 7; multiple/obvious blunting → 6; rounding → 5-4
-• Square corners make wear easier to SEE — the visibility test still decides the band
-(The ladder's spread adjustment handles multiple corners — do NOT stack per-corner deductions.)
+**Grading Impact:**
+• Light softening: -0.5 per corner
+• Moderate wear: -1.0 per corner
+• Heavy damage/bending: -1.5 to -2.0 per corner
+• 🚨 Square corners show damage more readily than rounded corners
 
 ────────────────────────────────────────────────────────────────────────
 4. SURFACE DEFECTS
@@ -351,11 +339,11 @@ check before reporting back-surface scuffs.
 • Defects on card name text area noticeable
 • Background damage less severe but still graded
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Hairline/close-inspection scratch or print line → 9/8 per the ladder
-• Scratch noticeable at normal distance → 7 (location — e.g. the monster's face — is described
-  in prose but does not change the score)
-• Damaged/scratched square hologram stamp (bottom-right) → Minor 9 / Moderate 8 by visibility
+**Grading Impact:**
+• Light surface scratches: -0.5 to -1.0
+• Scratches on monster face: -1.0 to -1.5
+• Print lines: -0.5 to -1.0
+• Hologram stamp damage: -0.5
 
 ────────────────────────────────────────────────────────────────────────
 5. PRINTING/MANUFACTURING DEFECTS
@@ -368,10 +356,10 @@ check before reporting back-surface scuffs.
 • Miscut cards (may be collectible if severe)
 • Factory crimped edges from packaging
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Printing variance detectable only on close inspection → 9 (single) / 8 (multiple)
-• Print defects noticeable at normal distance → 7 per the ladder
-• Miscuts: score centering from the measured ratio via the CENTERING SCORE GUIDE
+**Grading Impact:**
+• Minor printing variance: -0.5
+• Visible print defects: -1.0 to -1.5
+• Miscuts: May cap grade depending on severity
 
 ═══════════════════════════════════════════════════════════════════════
 D. YU-GI-OH! CARD GRADING EXAMPLES
@@ -381,26 +369,26 @@ D. YU-GI-OH! CARD GRADING EXAMPLES
 "This Yu-Gi-Oh! card features a yellow Normal Monster frame with gold outer border. Measuring borders: left ≈ 2.5mm, right ≈ 3.0mm, top ≈ 2.2mm, bottom ≈ 2.8mm. Left-right ratio: 45/55. Top-bottom ratio: 44/56. Worst axis: top-bottom at 44/56. Acceptable centering with slight bottom-heavy shift."
 
 **SECRET RARE EXAMPLE:**
-"This Blue-Eyes White Dragon Secret Rare (CT13-EN003) displays diagonal rainbow holographic pattern across card name and artwork. Examining the holo layer under varied lighting, I detect two fine hairline scratches across the dragon artwork — visible only when the light catches them, and they cut across the diagonal pattern rather than shifting with it, confirming physical damage. The lower third shows uniform shimmer consistent with the Secret Rare finish (not damage — see the embossed/prismatic design rule). Two hairline scratches, angle-only = Minor severity (surface ladder row 9). Surface score: 9."
+"This Blue-Eyes White Dragon Secret Rare (CT13-EN003) displays diagonal rainbow holographic pattern across card name and artwork. Examining the holo layer under varied lighting, I detect two fine hairline scratches approximately 5mm in length across the dragon artwork. The secret rare pattern shows minor clouding in the lower third. Surface score: 8.5 due to holo scratches and pattern clouding."
 
 **1ST EDITION EXAMPLE:**
-"This Dark Magician 1st Edition (LOB-005) from Legend of Blue Eyes White Dragon displays '1st Edition' text clearly below the card artwork. The card shows corner softening with trace whitening at two corner points, noticeable on close inspection, and light whitening along the top edge. Surface is clean with minor handling marks. (v8.8 note: era NEVER adjusts scores — a 2002 card is scored by the same ladders as a 2024 card; age context belongs in prose only.)"
+"This Dark Magician 1st Edition (LOB-005) from Legend of Blue Eyes White Dragon displays '1st Edition' text clearly below the card artwork. The card shows age-appropriate wear for a 2002 card: corners show moderate softening with trace whitening at two corner points. Edges show light whitening along the top edge. Surface is remarkably clean for its age with minor handling marks."
 
 **CORNER ANALYSIS EXAMPLE:**
 "Examining all four SQUARE corners of this Effect Monster at maximum zoom:
-- Top-left: Light softening at corner point, close-inspection only. Minor (row 9).
+- Top-left: Light softening at corner point, minimal whitening. Minor wear.
 - Top-right: Sharp corner maintained, gold border intact. Near pristine.
-- Bottom-left: Rounding with white fiber exposure, noticeable at normal distance. Moderate (row 7, market-calibrated).
-- Bottom-right: Light corner ding, slight depression visible on close inspection. Minor (row 9).
-Corner score: 7 (worst state = bottom-left noticeable at normal distance → count-aware row 7; whole numbers only — never 8.5)"
+- Bottom-left: Moderate rounding with visible white fiber exposure. Notable wear.
+- Bottom-right: Light corner ding, slight depression visible. Minor damage.
+Corner score: 8.5 (bottom-left wear and bottom-right ding reduce score)"
 
 **EDGE ANALYSIS EXAMPLE:**
 "Examining all four edges of this Ultra Rare card:
-- Top edge: Clean edge line, gold border intact. One small whitening speck near center, close-inspection only.
-- Bottom edge: A tiny whitening speck near the left corner, close-inspection only.
+- Top edge: Clean edge line, gold border intact. One small area of whitening ≈1mm near center.
+- Bottom edge: Minor whitening approximately 2mm from left corner.
 - Left edge: No defects, border color consistent throughout. Pristine.
-- Right edge: A pinpoint chip at one spot, close-inspection only.
-Edge score: 7 (worst state = single tiny chip → count-aware row 7, market-calibrated)"
+- Right edge: Light chipping at one point, approximately 0.5mm whitening.
+Edge score: 9.0 (scattered minor whitening prevents higher score)"
 
 ═══════════════════════════════════════════════════════════════════════
 E. YU-GI-OH! SPECIFIC EXTRACTION RULES
@@ -446,4 +434,4 @@ E. YU-GI-OH! SPECIFIC EXTRACTION RULES
 • Japanese cards have the same back design as English cards
 • The back should be consistent brown/gold spiral pattern
 
---- END OF YU-GI-OH! DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF YU-GI-OH! DELTA v5.0 ---

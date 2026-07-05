@@ -82,8 +82,8 @@ export interface ConversationalGradeResultV3_3 {
   meta: {
     model: string;
     timestamp: string;
-    version: 'conversational-v3.3' | 'conversational-v3.5-patched-v2';
-    prompt_version: 'Conversational_Grading_v3.3' | 'Conversational_Grading_v3.5_PATCHED_v2';
+    version: string;        // e.g. 'conversational-v8.8-json' — engine version tag
+    prompt_version: string; // e.g. 'DCM_Grading_v8.8'
   };
 }
 

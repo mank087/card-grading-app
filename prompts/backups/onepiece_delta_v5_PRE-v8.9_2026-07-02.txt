@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: ONE PIECE TCG v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: ONE PIECE TCG v5.0
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY One Piece TCG card-specific rules.
@@ -317,13 +317,11 @@ C. ONE PIECE CARD DEFECT PATTERNS
 • Rainbow pattern inconsistency
 • Surface scuffing dulling the holo effect
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Hairline holo scratch, angle/zoom only → 9
-• Holo scratch or pattern disruption noticeable at normal distance → 7 per the ladder
-• Confirmed handling defects prevent a 10 surface score
-🚨 GLARE CHECK FIRST: apply the master GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10,
-Step 5) — especially on dark Leader cards and black-bordered cards, whose glossy dark surfaces
-reflect light as scuff-like streaks in photos.
+**Grading Impact:**
+• Single holo scratch: -0.5 to -1.0
+• Multiple holo scratches: -1.0 to -2.0
+• Pattern disruption: -0.5 to -1.0
+• Prevents 10.0 surface score if any holo defects present
 
 ────────────────────────────────────────────────────────────────────────
 2. COLORED BORDER DEFECTS
@@ -339,11 +337,10 @@ reflect light as scuff-like streaks in photos.
 • Red/Blue/Green borders make whitening highly visible
 • Check corners where borders meet
 
-**Grading Impact (v8.8 — score via the master EDGE SCORING LADDER, Section 9; no per-edge stacking):**
-• ONE tiny fleck, close-inspection only → 9; 2-3 flecks → 8
-• Whitening noticeable at normal distance on part of ONE edge → 7
-• Noticeable whitening on multiple edges, or continuous → 6; heavier per the ladder
-(The ladder's spread adjustment handles multiple edges — do NOT stack per-edge deductions.)
+**Grading Impact:**
+• Minor edge whitening: -0.5 per affected edge
+• Moderate whitening: -1.0 per affected edge
+• Heavy whitening/chipping: -1.5 to -2.0
 
 ────────────────────────────────────────────────────────────────────────
 3. CORNER DEFECTS
@@ -360,11 +357,10 @@ reflect light as scuff-like streaks in photos.
 • Corner dings or dents
 • Peeling at corner layers
 
-**Grading Impact (v8.8 — score via the master CORNER SCORING LADDER, Section 8; no per-corner stacking):**
-• ONE corner with pinpoint close-inspection wear → 9; 2+ corners → 8
-• Wear noticeable at normal distance (1-2 corners) → 7
-• Multiple noticeable corners / obvious blunting → 6; rounding → 5-4 per the ladder
-(The ladder's spread adjustment handles multiple corners — do NOT stack per-corner deductions.)
+**Grading Impact:**
+• Light rounding: -0.5 per corner
+• Moderate wear: -1.0 per corner
+• Heavy damage: -1.5 to -2.0 per corner
 
 ────────────────────────────────────────────────────────────────────────
 4. SURFACE DEFECTS
@@ -386,11 +382,11 @@ reflect light as scuff-like streaks in photos.
 • Defects in background less severe
 • Center artwork damage most noticeable
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Hairline/close-inspection scratch or print line → 9/8 per the ladder
-• Scratch noticeable at normal distance → 7 (location does not change the score — a scratch
-  on the character's face is described in prose but scored by visibility like any other)
-• Heavy surface damage → 6 and below per the ladder
+**Grading Impact:**
+• Light surface scratches: -0.5 to -1.0
+• Scratches on character face: -1.0 to -1.5
+• Print lines: -0.5 to -1.0
+• Heavy surface damage: -2.0+
 
 ────────────────────────────────────────────────────────────────────────
 5. PRINTING/MANUFACTURING DEFECTS
@@ -403,10 +399,10 @@ reflect light as scuff-like streaks in photos.
 • Miscut cards
 • Crimped edges from packaging
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Printing variance detectable only on close inspection → 9 (single) / 8 (multiple)
-• Print defects noticeable at normal distance → 7 per the ladder
-• Miscuts: score centering from the measured ratio via the CENTERING SCORE GUIDE
+**Grading Impact:**
+• Minor printing variance: -0.5
+• Visible print defects: -1.0 to -1.5
+• Miscuts: May cap grade depending on severity
 
 ═══════════════════════════════════════════════════════════════════════
 D. ONE PIECE CARD GRADING EXAMPLES
@@ -416,32 +412,26 @@ D. ONE PIECE CARD GRADING EXAMPLES
 "This One Piece TCG card features a Red border frame. Measuring borders: left ≈ 2.8mm, right ≈ 3.2mm, top ≈ 2.5mm, bottom ≈ 3.0mm. Left-right ratio: 47/53. Top-bottom ratio: 45/55. Worst axis: top-bottom at 45/55. Good centering overall with slight bottom-heavy shift."
 
 **PARALLEL VARIANT EXAMPLE:**
-"This Shanks Parallel variant (OP01-120) displays full-card prismatic holographic treatment with rainbow pattern visible across the entire surface. Examining the holo layer under varied lighting angles, I detect one fine hairline scratch approximately 8mm in length running diagonally across the upper left quadrant. The scratch causes minor pattern disruption but does not affect the character artwork. Per the visibility test this is a Minor defect (surface ladder row 9). Surface score: 9."
+"This Shanks Parallel variant (OP01-120) displays full-card prismatic holographic treatment with rainbow pattern visible across the entire surface. Examining the holo layer under varied lighting angles, I detect one fine hairline scratch approximately 8mm in length running diagonally across the upper left quadrant. The scratch causes minor pattern disruption but does not affect the character artwork. Surface score: 9.0 due to visible holo scratch."
 
 **MANGA VARIANT EXAMPLE:**
-"This Monkey D. Luffy Manga variant (OP01-003) features distinctive black and white manga panel artwork depicting a scene from the manga. The card has standard (non-holographic) finish.
-
-🚨 Manga-art note: the deliberately rough, sketchy black-and-white linework and halftone dot
-shading are the PRINTED DESIGN — never report them as print lines, scratches, or silvering.
-
-Surface is clean with no visible defects. Edges show minimal handling with a trace of
-whitening at the top edge, detectable only on close inspection — Minor severity. As the face's only flaw this is edge ladder row 9. Edge score: 9."
+"This Monkey D. Luffy Manga variant (OP01-003) features distinctive black and white manga panel artwork depicting a scene from the manga. The card has standard (non-holographic) finish. Surface is clean with no visible defects. Edges show minimal handling with trace whitening at top edge measuring approximately 0.3mm. Edge score: 9.5."
 
 **CORNER ANALYSIS EXAMPLE:**
 "Examining all four corners of this Character card at maximum zoom:
 - Top-left: Sharp corner point with intact border, no fiber exposure. Pristine.
-- Top-right: Minimal softening at the corner tip, detectable only on close inspection. Near pristine.
-- Bottom-left: Trace white fiber visible against the Blue border on close inspection. Minor wear.
+- Top-right: Minimal rounding visible at corner tip, approximately 0.1mm. Near pristine.
+- Bottom-left: Light wear with trace white fiber visible against Blue border. Minor wear.
 - Bottom-right: Clean corner, sharp point maintained. Pristine.
-Corner score: 8 (Minor close-inspection wear at TWO corners — count-aware corner ladder row 8; a single worn corner would be 9)"
+Corner score: 9.5 (minor wear at bottom-left prevents 10.0)"
 
 **EDGE ANALYSIS EXAMPLE:**
 "Examining all four edges of this Super Rare card:
 - Top edge: Clean edge line, Green border intact, no whitening visible. Pristine.
-- Bottom edge: A tiny whitening speck near the right corner, close-inspection only; otherwise clean.
+- Bottom edge: Minor whitening approximately 2mm from right corner, otherwise clean.
 - Left edge: No defects, border color consistent throughout.
-- Right edge: Two small specks of fiber exposure, detectable only on close inspection.
-Edge score: 8 (close-inspection specks on two edges — count-aware edge ladder row 8; a single speck would be 9)"
+- Right edge: Two small areas of fiber exposure totaling approximately 1.5mm.
+Edge score: 9.0 (whitening prevents higher score)"
 
 ═══════════════════════════════════════════════════════════════════════
 E. ONE PIECE SPECIFIC EXTRACTION RULES
@@ -471,4 +461,4 @@ E. ONE PIECE SPECIFIC EXTRACTION RULES
 • Both colors should be listed in card_color
 • Format: "Red/Green" or "Blue/Purple"
 
---- END OF ONE PIECE DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF ONE PIECE DELTA v5.0 ---

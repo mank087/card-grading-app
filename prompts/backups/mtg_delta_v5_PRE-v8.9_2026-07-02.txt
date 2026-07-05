@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: MAGIC: THE GATHERING v5.2 (aligned with master rubric v9.0)
+CARD TYPE DELTA: MAGIC: THE GATHERING v5.1
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Magic: The Gathering card-specific rules.
@@ -374,15 +374,10 @@ D. MTG CARD DEFECT PATTERNS
 • White borders: Whitening blends in (harder to detect edge wear)
 • Detection: Look for color breaks or fiber exposure
 
-**Grading Impact (v8.8 — score via the master EDGE/CORNER SCORING LADDERS, Sections 8-9):**
-• Black border wear: very visible — but the SCORE still comes from the visibility test
-  (tiny specks found by zooming → 9, even on black borders where they show easily)
-• White border wear: harder to see but still counts — inspect carefully
-
-🚨 **WHITE BORDER ≠ WHITENING (v8.8):** On white-bordered sets (Revised, Chronicles, older
-core sets) the border itself is white. Do NOT mistake the printed white border for edge
-whitening. Whitening on these cards = exposed FIBER TEXTURE at the edge/corner cut, visible
-as a texture change, not merely white color.
+**Grading Impact:**
+• Black border wear: Very visible, same deductions as sports cards
+• White border wear: Harder to see but still counts
+• Inspect carefully at edges regardless of border color
 
 ────────────────────────────────────────────────────────────────────────
 3. ETCHED FOIL DEFECTS
@@ -404,14 +399,10 @@ as a texture change, not merely white color.
 • Look for breaks in etched pattern
 • Check for glossy spots where etching wore off
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Etched-foil scratch visible only at an angle/zoom → 9
-• Scratch or pattern wear noticeable at normal distance → 7 per the ladder
-
-🚨 **MATTE TEXTURE IS THE DESIGN (v8.8):** Etched foil and Secret Lair matte treatments look
-dull/textured BY DESIGN. Do NOT report the uniform matte finish as scuffing or gloss loss.
-Apply the master GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10, Step 5) before
-reporting any etched-foil scratch — only deduct where the expected texture is DISRUPTED.
+**Grading Impact:**
+• Etched foil scratches: -0.5 to -1.5 depending on severity
+• Pattern wear: -0.3 to -0.7
+• Similar impact to regular foil defects
 
 ────────────────────────────────────────────────────────────────────────
 4. PRINT LINES AND REGISTRATION ISSUES
@@ -427,9 +418,9 @@ reporting any etched-foil scratch — only deduct where the expected texture is 
 • Check text boxes for registration errors
 • Look at mana symbols for alignment
 
-**Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
-• Print line / misregistration visible only on close inspection → 9 (single) / 8 (multiple)
-• Noticeable at normal viewing distance → 7 per the ladder
+**Grading Impact:**
+• Print lines: -0.3 to -0.5 (manufacturing defect)
+• Color misregistration: -0.3 to -0.7
 • Does NOT trigger structural damage caps
 
 ────────────────────────────────────────────────────────────────────────
@@ -447,9 +438,9 @@ reporting any etched-foil scratch — only deduct where the expected texture is 
 • Centering harder to assess (use internal anchors)
 
 **Grading Impact:**
-• Same master ladders as normal cards
-• Edge wear more visually obvious — but score by the visibility test, not by contrast
-• Centering: Maximum 9 (borderless cards, per master Type C rule)
+• Same deductions as normal cards
+• Edge wear more visually obvious
+• Centering: Maximum 9.0 (borderless cards)
 
 ────────────────────────────────────────────────────────────────────────
 6. VINTAGE MTG ISSUES (Alpha/Beta/Unlimited/Revised)
@@ -461,22 +452,22 @@ reporting any etched-foil scratch — only deduct where the expected texture is 
 • Edge roughness from older cutting technology
 • Print quality variable
 
-**Grading Expectations (v8.8 — era context is NARRATIVE ONLY, never a score adjustment):**
-• Scores come from the same master ladders and centering table regardless of era
-• A genuinely clean vintage card earns the same grade a modern card would — no pre-emptive
-  vintage caps, no vintage leniency; era context belongs in the prose only
+**Grading Expectations:**
+• Perfect 10.0 extremely rare for Alpha/Beta/Unlimited
+• 8.0-9.0 considered excellent for vintage
+• Factory defects more tolerated due to era
 
 ═══════════════════════════════════════════════════════════════════════
 E. MTG CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
 
 **CENTERING EXAMPLE (MTG Black Border Card):**
-"This Magic: The Gathering card features a black border frame. Measuring the visible borders: left border ≈ 2.5mm, right border ≈ 3.2mm, top border ≈ 3.0mm, bottom border ≈ 2.8mm. Calculating left-right ratio per the master formula (each border ÷ their total): 2.5 ÷ 5.7 = 44%, 3.2 ÷ 5.7 = 56% → 56/44 ratio. Top-bottom: 3.0 ÷ 5.8 = 52%, 2.8 ÷ 5.8 = 48% → 52/48 ratio. Worst axis is left-right at 56/44, which per the CENTERING SCORE GUIDE (56/44-60/40 band) gives a centering score of 9."
+"This Magic: The Gathering card features a black border frame. Measuring the visible borders: left border ≈ 2.5mm, right border ≈ 3.2mm, top border ≈ 3.0mm, bottom border ≈ 2.8mm. Calculating left-right ratio: 2.5mm ÷ 3.2mm × 100 = 78.1%, expressed as 78/22 ratio. Top-bottom: 2.8mm ÷ 3.0mm × 100 = 93.3%, expressed as 93/7 ratio. Worst axis is left-right at 78/22, capping centering score at 5.0."
 
 **CORNER EXAMPLE (MTG Foil Card):**
 "Top-left corner of this foil Magic card sits at the intersection of the black border and the holographic foil artwork area. At maximum zoom, I observe sharp corner geometry with no visible fiber exposure. The black border ink remains intact. The foil layer shows no cracking or peeling at this corner. Corner lies flat with no lift or tilt detected. This corner appears pristine."
 
 **SURFACE EXAMPLE (MTG Etched Foil):**
-"This Magic card features an etched foil treatment with a matte holographic finish across the entire front surface. The etched pattern creates a subtle textured appearance. Examining under angled lighting, I detect one hairline scratch in the center area — a short glossy line where the matte etched texture has been smoothed down, detectable only at an angle. Per the visibility test this is a Minor defect (surface ladder row 9). Additionally, the top edge shows 2 tiny white flecks where the black border has chipped, close-inspection only (edge ladder row 9). Overall surface score: 9."
+"This Magic card features an etched foil treatment with a matte holographic finish across the entire front surface. The etched pattern creates a subtle textured appearance. Examining under angled lighting, I detect one hairline scratch in the center area running approximately 4mm diagonally. The scratch appears as a glossy line where the matte etched texture has been smoothed down. Additionally, there is minor edge wear at the top edge with 2 small white flecks visible where the black border has chipped. Overall surface score: 9.0."
 
---- END OF MTG DELTA v5.2 (aligned with master rubric v9.0) ---
+--- END OF MTG DELTA v5.0 ---

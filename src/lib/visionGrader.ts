@@ -25,6 +25,9 @@ import {
 } from './conversationalGradingV3_3';
 import { ProcessedConditionReport } from '@/types/conditionReport';
 import { formatConditionReportForPrompt } from './conditionReportProcessor';
+import { getConditionFromGrade } from './conditionAssessment';
+import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim } from './zoomInspection';
+import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 
 // Re-export for use in routes
 export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
@@ -404,6 +407,25 @@ export interface DetailedInspectionResult {
 function countDefectsByCategory(jsonData: any): { corners: number; edges: number; surface: number; centering: number; total: number } {
   const counts = { corners: 0, edges: 0, surface: 0, centering: 0, total: 0 };
   try {
+    // v9.0: support the CONVERSATIONAL shape (top-level corners/edges/surface sections,
+    // each with .front/.back) — previously this only read the legacy VisionGradeResult
+    // `jsonData.defects.{front,back}` shape and silently returned 0 for every live grade.
+    if (!jsonData?.defects && (jsonData?.corners || jsonData?.edges || jsonData?.surface)) {
+      for (const cat of ['corners', 'edges', 'surface'] as const) {
+        for (const side of ['front', 'back']) {
+          const sec = jsonData[cat]?.[side];
+          if (!sec) continue;
+          if (Array.isArray(sec.defects)) counts[cat] += sec.defects.length;
+          // corner/edge sections also nest per-position objects with their own defects arrays
+          for (const v of Object.values(sec) as any[]) {
+            if (v && typeof v === 'object' && Array.isArray(v.defects)) counts[cat] += v.defects.length;
+          }
+        }
+      }
+      counts.total = counts.corners + counts.edges + counts.surface + counts.centering;
+      return counts;
+    }
+
     const defects = jsonData?.defects;
     if (!defects) return counts;
 
@@ -681,14 +703,14 @@ Return your observations in the required JSON format.`;
               type: 'image_url',
               image_url: {
                 url: frontImageUrl,
-                detail: 'auto'
+                detail: 'high' // v8.8: pinned (was 'auto' — OpenAI silently varied the resolution tier per call)
               }
             },
             {
               type: 'image_url',
               image_url: {
                 url: backImageUrl,
-                detail: 'auto'
+                detail: 'high' // v8.8: pinned (was 'auto')
               }
             },
             {
@@ -1539,6 +1561,50 @@ function extractGradeFromMarkdown(markdown: string): {
  * @param options - Model configuration options
  * @returns Promise<ConversationalGradeResultV3_3> - Markdown report with v3.5 PATCHED v2 data
  */
+/**
+ * v8.8: Force every explicit final-grade claim inside the AI's narrative summary to match
+ * the server-computed grade, and guarantee a canonical closing statement. The AI writes the
+ * summary BEFORE the server clamps the grade, so without this a card can display "the final
+ * grade is 8" next to a stored grade of 6 (observed in production, card eca620ab).
+ */
+export function reconcileSummaryWithGrade(summary: string | undefined | null, grade: number, conditionLabel: string): string {
+  const canonical = `Final grade: ${grade} (${conditionLabel}).`;
+  if (!summary || !summary.trim()) return canonical;
+
+  let s = summary
+    // "final grade of 8" / "final grade is 8" / "final grade: 8"
+    .replace(/(final\s+grade\s*(?:of|is|:)?\s*)(\d{1,2}(?:\.\d)?)/gi, `$1${grade}`)
+    // "overall grade of 8" / "grade of 8"
+    .replace(/((?:overall\s+)?grade\s+of\s+)(\d{1,2}(?:\.\d)?)/gi, `$1${grade}`)
+    // "receives/earns/warrants/yields/resulting in (a|an) (final grade of) 8"
+    .replace(/((?:receives?|earns?|warrants?|yields?|yielding|resulting\s+in|results\s+in|graded(?:\s+at)?)\s+(?:a|an)?\s*(?:final\s+)?(?:grade\s+(?:of\s+)?)?)(\d{1,2}(?:\.\d)?)\b/gi, `$1${grade}`)
+    // "8/10"
+    .replace(/\b\d{1,2}(?:\.\d)?(\s*\/\s*10)\b/g, `${grade}$1`);
+
+  // Guarantee the canonical statement is present and correct regardless of prose.
+  if (!new RegExp(`final\\s+grade[^.!]*\\b${grade}\\b`, 'i').test(s)) {
+    s = s.replace(/\s*$/, '') + ' ' + canonical;
+  }
+  return s;
+}
+
+/**
+ * v9.0: DCM grades are INDEPENDENT — strip comparative grading-company references from
+ * customer-facing narrative text (defense in depth behind the prompt prohibition).
+ * Factual slab references ("encapsulated in the PSA slab") are preserved.
+ */
+export function scrubGradingCompanyReferences(text: string | undefined | null): string {
+  if (!text) return text || '';
+  return text
+    // "equivalent to a PSA 9", "would likely receive a BGS 8.5", "meets the threshold for PSA 10"
+    .replace(/\b(?:equivalent to|comparable to|consistent with|would (?:likely )?(?:receive|grade|earn|be)|meets? the threshold for|matching|aligns? with)\s+(?:a\s+|an\s+)?(?:PSA|BGS|CGC|SGC|Beckett|TAG|HGA|CSG)[\s-]*(?:\d+(?:\.\d+)?|Gem\s*Mint|Mint)?\s*(?:standards?|equivalents?|requirements?)?/gi,
+      'per professional grading standards ')
+    // Bare "PSA 9" style tokens (a digit follows the company) — slab facts like "PSA slab" are untouched
+    .replace(/\b(?:PSA|BGS|CGC|SGC|Beckett|TAG|HGA|CSG)[\s-]+(\d+(?:\.\d+)?)\b/g, 'grade $1')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([.,;])/g, '$1');
+}
+
 export async function gradeCardConversational(
   frontImageUrl: string,
   backImageUrl: string,
@@ -1554,9 +1620,12 @@ export async function gradeCardConversational(
 ): Promise<ConversationalGradeResultV3_3> {
   const {
     model = 'gpt-5.1',  // 🆕 GPT-5.1 - Latest model (November 2025) with improved vision + accuracy
-    temperature = 0.35, // 🔑 v8.5: Increased from 0.2 to 0.35 for genuine three-pass variance (reduces hallucination consensus)
+    temperature = 0.3,  // 🎯 v8.9: with the real n=3 ensemble, moderate diversity between the
+                        // independent completions HELPS — the server-side median absorbs the noise.
+                        // (At 0.1 the 3 samples are near-clones and the ensemble degenerates.)
     max_tokens = 16000, // 🔧 Increased to 16K - v5.11 rubric requires extensive JSON output
-    top_p = 1.0,        // 🔑 Full probability space - allows nuanced descriptions while temp maintains consistency
+    top_p = 0.9,        // v8.9: widened with the median ensemble (was 0.5 in v8.8)
+    seed = 7,           // 🔒 v8.8: Fixed seed restored (best-effort determinism; removed in v8.5)
     userConditionReport = undefined // Optional user-reported condition hints
   } = options || {};
 
@@ -1581,6 +1650,12 @@ export async function gradeCardConversational(
   const { text: promptText, format: outputFormat } = loadConversationalPrompt(cardType);
   console.log(`[CONVERSATIONAL ${cardType.toUpperCase()}] Output format: ${outputFormat.toUpperCase()}`);
 
+  // v8.9 STAGE B: regioned zoom inspection runs IN PARALLEL with the main ensemble call
+  // (both need only the image URLs), so it adds ~zero wall-clock. Findings merge into the
+  // recalc below and can only LOWER scores. A zoom failure never fails the grade.
+  const zoomPromise: Promise<ZoomResult> | null =
+    outputFormat === 'json' ? runZoomInspection(frontImageUrl, backImageUrl) : null;
+
   // Retry configuration for transient failures
   const MAX_RETRIES = 3;
   const INITIAL_RETRY_DELAY = 2000; // 2 seconds
@@ -1593,9 +1668,14 @@ export async function gradeCardConversational(
     const apiConfig: any = {
       model: model,
       temperature: temperature,
-      top_p: top_p,        // Nucleus sampling - full probability space (1.0) allows nuanced variation
+      top_p: top_p,
       max_completion_tokens: max_tokens,  // GPT-5.1 uses max_completion_tokens instead of max_tokens
-      // seed removed in v8.5 — no fixed seed allows genuine variance between three passes
+      seed: seed,          // v8.8: best-effort determinism — same card + same images → same grade
+      n: outputFormat === 'json' ? 3 : 1, // v8.9: ENSEMBLE — 3 independent completions in ONE call,
+                                          // decoded in parallel server-side (≈ single-completion latency).
+                                          // Median consensus computed below. Replaces the fake in-output
+                                          // three-pass system (one completion copying itself 3×).
+      prompt_cache_key: `dcm-grader-${cardType}`, // v8.8: pin prompt-cache routing per card type
       messages: [
         {
           role: 'system',
@@ -1608,14 +1688,14 @@ export async function gradeCardConversational(
               type: 'image_url',
               image_url: {
                 url: frontImageUrl,
-                detail: 'auto'
+                detail: 'high' // v8.8: pinned (was 'auto' — OpenAI silently varied the resolution tier per call)
               }
             },
             {
               type: 'image_url',
               image_url: {
                 url: backImageUrl,
-                detail: 'auto'
+                detail: 'high' // v8.8: pinned (was 'auto')
               }
             },
             {
@@ -1625,6 +1705,7 @@ export async function gradeCardConversational(
 
 🔍 GRADING REQUIREMENTS:
 - Check for structural damage (creases, bent corners) — ANY crease or bent corner = AUTOMATIC 4.0 grade cap
+- MANDATORY CARD FLATNESS CHECK on both faces: is the card's outline straight on all four edges? Any corner or edge lifting off the surface (shadows/gaps under the card)? Any abrupt lighting-plane break along a line (bright band meeting dull band = fold)? A line crossing design boundaries on BOTH faces at the same location = crease. A card that does not lie flat is NEVER 8+.
 - Check for suspicious lines on BOTH front and back at same location
 - Grade accurately based on what you can genuinely see — report real defects honestly, do not invent defects
 - If the card appears clean after thorough inspection, Grade 10 is the correct result
@@ -1660,6 +1741,14 @@ Provide detailed analysis as markdown with all required sections.`
     const response = await openai.chat.completions.create(apiConfig);
 
     console.log('[CONVERSATIONAL] Received API response');
+
+    // v8.8: log real prompt-cache performance — previously only logged on the error path,
+    // leaving us blind to whether the ~78k-token system prompt was actually being cached.
+    const usage: any = (response as any).usage;
+    if (usage) {
+      const cachedTokens = usage.prompt_tokens_details?.cached_tokens ?? 0;
+      console.log(`[CONVERSATIONAL] Tokens: prompt=${usage.prompt_tokens} (cached=${cachedTokens}, ${usage.prompt_tokens ? Math.round((cachedTokens / usage.prompt_tokens) * 100) : 0}% hit), completion=${usage.completion_tokens}`);
+    }
 
     // Extract response with detailed error logging
     const responseMessage = response.choices[0]?.message;
@@ -1699,26 +1788,140 @@ Provide detailed analysis as markdown with all required sections.`
     // Handle response based on format
     if (outputFormat === 'json') {
       // ═══════════════════════════════════════════════════════════
-      // JSON MODE - Parse structured JSON response
+      // JSON MODE — v8.9 ENSEMBLE: parse every completion (n=3)
       // ═══════════════════════════════════════════════════════════
-      console.log('[CONVERSATIONAL JSON] Parsing JSON response...');
+      console.log('[CONVERSATIONAL JSON] Parsing ensemble completions...');
 
-      let jsonData: any;
-      try {
-        jsonData = JSON.parse(responseContent);
-        console.log('[CONVERSATIONAL JSON] ✅ Valid JSON received');
-      } catch (parseError) {
-        console.error('[CONVERSATIONAL JSON] ❌ JSON parse error:', parseError);
+      const candidates: any[] = [];
+      for (const choice of response.choices) {
+        const content = choice?.message?.content;
+        if (!content) continue;
+        try { candidates.push(JSON.parse(content)); }
+        catch { console.warn('[CONVERSATIONAL JSON] ⚠️ Discarding unparseable ensemble completion'); }
+      }
+      if (candidates.length === 0) {
         throw new Error('Failed to parse JSON response from AI');
       }
+      console.log(`[CONVERSATIONAL JSON] ✅ ${candidates.length}/${response.choices.length} ensemble completions parsed`);
+
+      // Per-completion category scores: prefer weighted_scores (= MIN of faces per the
+      // rubric), fall back to MIN(raw faces), then the section objects' per-face scores.
+      const catScore = (j: any, cat: string): number | null => {
+        const w = j.weighted_scores?.[`${cat}_weighted`];
+        if (typeof w === 'number') return w;
+        const f = j.raw_sub_scores?.[`${cat}_front`], b = j.raw_sub_scores?.[`${cat}_back`];
+        if (typeof f === 'number' && typeof b === 'number') return Math.min(f, b);
+        const sf = j[cat]?.front?.score, sb = j[cat]?.back?.score;
+        if (typeof sf === 'number' && typeof sb === 'number') return Math.min(sf, sb);
+        return null;
+      };
+      const finalOf = (j: any): number | null => {
+        const d = j.final_grade?.decimal_grade;
+        if (typeof d === 'number') return d;
+        const cats = ['centering', 'corners', 'edges', 'surface'].map(c => catScore(j, c));
+        return cats.every(v => typeof v === 'number') ? Math.min(...(cats as number[])) : null;
+      };
+
+      const scored = candidates
+        .map(j => ({
+          j,
+          final: finalOf(j),
+          cats: {
+            centering: catScore(j, 'centering'),
+            corners: catScore(j, 'corners'),
+            edges: catScore(j, 'edges'),
+            surface: catScore(j, 'surface'),
+          },
+        }))
+        .filter(x => x.final != null && Object.values(x.cats).every(v => v != null));
+      if (scored.length === 0) {
+        throw new Error('No ensemble completion contained usable scores');
+      }
+
+      // MEDIAN-PICK: the completion whose final grade is the median becomes the displayed
+      // result (identity, narratives, per-face detail). The other completions feed only
+      // the consensus math and the uncertainty band.
+      const byFinal = [...scored].sort((a, b) => (a.final! - b.final!));
+      let base = byFinal[Math.floor((byFinal.length - 1) / 2)];
+
+      // 🚨 STRUCTURAL-DAMAGE MINORITY REPORT (v8.9): structural damage must NOT be
+      // median-outvoted. The failure costs are asymmetric — a creased card sold as
+      // "Mint" is a guaranteed customer dispute; a conservative grade is a support
+      // ticket. If ANY completion affirmatively detected structural damage, that
+      // completion becomes the base (lowest-final detector if several).
+      const structuralDetectors = byFinal.filter(x => x.j?.structural_damage?.detected === true);
+      const structuralDisagreement = structuralDetectors.length > 0 && structuralDetectors.length < scored.length;
+      // v9.1: only let a structural detection override the median-pick when a MAJORITY
+      // of completions agree. A lone completion misreading a foil reflection / embossed
+      // line as a crease should not hijack the narrative (and the cap requires the same
+      // corroboration downstream). Zoom-confirmed structural still applies via the merge.
+      const structuralMajority = structuralDetectors.length >= Math.ceil(scored.length / 2);
+      if (structuralMajority && base.j?.structural_damage?.detected !== true) {
+        base = structuralDetectors[0]; // lowest final among detectors (byFinal is sorted)
+        console.log(`[CONVERSATIONAL JSON] 🚨 Structural damage reported by ${structuralDetectors.length}/${scored.length} completions (majority) — overriding median-pick with the detecting completion (final=${base.final})`);
+      } else if (structuralDetectors.length > 0) {
+        console.log(`[CONVERSATIONAL JSON] structural flagged by ${structuralDetectors.length}/${scored.length} (not majority) — keeping median-pick; cap decision deferred to corroboration check`);
+      }
+      const jsonData: any = base.j;
+      console.log(`[CONVERSATIONAL JSON] Ensemble finals: [${scored.map(x => x.final).join(', ')}] → base=${base.final}${structuralDetectors.length ? ` (structural detections: ${structuralDetectors.length})` : ''}`);
+
+      // Compact per-completion defect list for the synthesized pass records (keeps the
+      // stored/display shape informative with REAL per-evaluation content)
+      const defectListOf = (j: any): string[] => {
+        const out: string[] = [];
+        const walk = (node: any, depth: number) => {
+          if (!node || typeof node !== 'object' || depth > 4 || out.length >= 6) return;
+          if (Array.isArray((node as any).defects)) {
+            for (const d of (node as any).defects) {
+              if (out.length < 6 && typeof d === 'string') out.push(d);
+            }
+          }
+          for (const v of Object.values(node)) walk(v, depth + 1);
+        };
+        for (const cat of ['centering', 'corners', 'edges', 'surface']) walk(j[cat], 0);
+        return out;
+      };
+
+      // Synthesize grading_passes from the REAL independent completions so every
+      // downstream consumer (routes, card detail, PDFs) keeps its existing shape.
+      // Pad by repeating the base if fewer than 3 completions survived parsing.
+      const passSrc = [scored[0], scored[1] ?? base, scored[2] ?? base];
+      const finalsArr = passSrc.map(x => x.final as number);
+      const medOf = (vals: number[]) => vals.slice().sort((a, b) => a - b)[1];
+      const preMed = {
+        centering: medOf(passSrc.map(x => x.cats.centering as number)),
+        corners: medOf(passSrc.map(x => x.cats.corners as number)),
+        edges: medOf(passSrc.map(x => x.cats.edges as number)),
+        surface: medOf(passSrc.map(x => x.cats.surface as number)),
+        final: medOf(finalsArr),
+      };
+      const finalSpread = Math.max(...finalsArr) - Math.min(...finalsArr);
+      jsonData.grading_passes = {
+        pass_1: { ...passSrc[0].cats, final: passSrc[0].final, defects_noted: defectListOf(passSrc[0].j) },
+        pass_2: { ...passSrc[1].cats, final: passSrc[1].final, defects_noted: defectListOf(passSrc[1].j) },
+        pass_3: { ...passSrc[2].cats, final: passSrc[2].final, defects_noted: defectListOf(passSrc[2].j) },
+        // Prefilled so validateThreePassData accepts the synthesized object; the recalc
+        // below recomputes and overwrites these with the authoritative values.
+        averaged: { ...preMed },
+        averaged_rounded: { ...preMed },
+        variance: finalSpread,
+        consistency: finalSpread === 0 ? 'high' : finalSpread <= 1 ? 'moderate' : 'low', // 'moderate' matches the display components + card.ts type
+        consensus_notes: [`v8.9 server-side ensemble: ${scored.length} independent completions (n=${response.choices.length}), median consensus`],
+      };
 
       // 🆕 v8.4 THREE-PASS GRADING: Backend recalculation from raw pass data
       // Priority: Server-side recalculation > AI's averaged_rounded > final_grade > scoring
       const threePassData = jsonData.grading_passes;
 
-      // Validate three-pass structure
+      // v8.9: the passes object is synthesized by US from parsed completions — it is valid
+      // by construction. The legacy validator rejects wide variance (e.g. a structural-damage
+      // disagreement like [3,10,9]) which is precisely when the ensemble math matters most,
+      // so it is advisory-only here.
       const threePassValidation = validateThreePassData(threePassData);
-      const hasThreePass = threePassValidation.valid;
+      if (!threePassValidation.valid) {
+        console.log(`[GRADE RECALC] (advisory) legacy validator flags on synthesized ensemble: ${threePassValidation.warnings.join('; ')}`);
+      }
+      const hasThreePass = true;
 
       let extractedGrade: { decimal_grade: number | null; whole_grade: number | null; uncertainty: string };
 
@@ -1737,35 +1940,17 @@ Provide detailed analysis as markdown with all required sections.`
           final: (pass1.final + pass2.final + pass3.final) / 3
         };
 
-        // Step 2: Apply consensus boost for Grade 10 (v8.5)
-        // If a category scores 10 in 2/3 passes, the dissenting pass likely hallucinated a defect.
-        // Boost the category average to reflect the majority consensus.
-        function consensusBoost(p1: number, p2: number, p3: number, categoryName: string): [number, number, number] {
-          const scores = [p1, p2, p3];
-          const tens = scores.filter(s => s === 10).length;
-          const nines = scores.filter(s => s === 9).length;
-          // If 2 out of 3 passes gave 10, and the third gave 9 (likely hallucination),
-          // boost the dissenting pass to 10 — the consensus says no defect exists
-          if (tens === 2 && nines === 1) {
-            console.log(`[GRADE RECALC] 🔄 ${categoryName}: consensus boost applied (10,10,9 → 10,10,10) — majority says no defect`);
-            return [10, 10, 10];
-          }
-          return [p1, p2, p3];
-        }
-
-        const [c1, c2, c3] = consensusBoost(pass1.centering, pass2.centering, pass3.centering, 'centering');
-        const [co1, co2, co3] = consensusBoost(pass1.corners, pass2.corners, pass3.corners, 'corners');
-        const [e1, e2, e3] = consensusBoost(pass1.edges, pass2.edges, pass3.edges, 'edges');
-        const [s1, s2, s3] = consensusBoost(pass1.surface, pass2.surface, pass3.surface, 'surface');
-        const [f1, f2, f3] = consensusBoost(pass1.final, pass2.final, pass3.final, 'final');
-
-        // Recalculate averages with consensus-boosted scores
+        // Step 2 (v8.9): MEDIAN consensus across the independent ensemble completions.
+        // Median is robust to a single outlier evaluation (mean is not): (9,9,6) → 9.
+        // It also subsumes the old v8.5 consensusBoost — median of (10,10,9) is 10.
+        const med3 = (a: number, b: number, c: number) => [a, b, c].sort((x, y) => x - y)[1];
+        const [f1, f2, f3] = [pass1.final, pass2.final, pass3.final];
         const boostedAvg = {
-          centering: (c1 + c2 + c3) / 3,
-          corners: (co1 + co2 + co3) / 3,
-          edges: (e1 + e2 + e3) / 3,
-          surface: (s1 + s2 + s3) / 3,
-          final: (f1 + f2 + f3) / 3
+          centering: med3(pass1.centering, pass2.centering, pass3.centering),
+          corners: med3(pass1.corners, pass2.corners, pass3.corners),
+          edges: med3(pass1.edges, pass2.edges, pass3.edges),
+          surface: med3(pass1.surface, pass2.surface, pass3.surface),
+          final: med3(f1, f2, f3)
         };
 
         // Step 3: Round subgrades to whole integers using STANDARD rounding (v8.5)
@@ -1810,9 +1995,197 @@ Provide detailed analysis as markdown with all required sections.`
           }
         }
 
+        // Step 3.7 (v8.9): MERGE ZOOM INSPECTION — regioned crops catch localized damage
+        // the holistic passes miss (whitening flecks, corner softening, creases). Zoom
+        // findings map to ladder caps deterministically and only ever LOWER scores.
+        const zoom = zoomPromise ? await zoomPromise : null;
+        const zoomAdjustments: string[] = [];
+        // v9.1: per-face caps ACTUALLY applied after the corroboration rule. The
+        // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull
+        // displayed pass rows below the consensus when a cap was corroboration-limited.
+        const appliedFaceCaps: Record<string, number> = {};
+        if (zoom?.ok) {
+          const faceCats = ['centering', 'corners', 'edges', 'surface'] as const;
+          for (const cat of faceCats) {
+            if (cat === 'centering') continue; // zoom regions don't measure centering
+            const before = serverRounded[cat];
+            // v9.1 CORROBORATION RULE: a zoom finding may pull a category at most
+            // 2 points below the holistic consensus UNLESS it is corroborated by
+            // either (a) 2+ distinct zoom regions for that face+category, or
+            // (b) at least one holistic completion scoring within 1 of the cap.
+            // Validated regrades showed a single uncorroborated crop verdict
+            // overriding three unanimous holistic 10s by 4 points (run-to-run
+            // 9↔6 flips on the same card).
+            const holisticCatMin = Math.min(
+              typeof pass1?.[cat] === 'number' ? pass1[cat] : 10,
+              typeof pass2?.[cat] === 'number' ? pass2[cat] : 10,
+              typeof pass3?.[cat] === 'number' ? pass3[cat] : 10,
+            );
+            for (const face of ['front', 'back'] as const) {
+              const cap = zoom.faceCaps[`${cat}_${face}`];
+              if (cap == null) continue;
+              const rawKey = `${cat}_${face}`;
+              const regionCount = new Set(
+                zoom.defects.filter(d => d.category === cat && d.face === face).map(d => d.region)
+              ).size;
+              const corroborated = regionCount >= 2 || holisticCatMin <= cap + 1;
+              const effectiveCap = corroborated ? cap : Math.max(cap, before - 2);
+              if (!corroborated && effectiveCap > cap) {
+                console.log(`[GRADE RECALC] 🔎 zoom: ${rawKey} cap ${cap} UNCORROBORATED (1 region, holistic min ${holisticCatMin}) — limited to ${effectiveCap}`);
+              }
+              let capLoweredSomething = false;
+              if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[rawKey] === 'number' && jsonData.raw_sub_scores[rawKey] > effectiveCap) {
+                console.log(`[GRADE RECALC] 🔎 zoom: ${rawKey} ${jsonData.raw_sub_scores[rawKey]} → ${effectiveCap} (regioned inspection found defects the holistic pass missed)`);
+                jsonData.raw_sub_scores[rawKey] = effectiveCap;
+                capLoweredSomething = true;
+              }
+              if (serverRounded[cat] > effectiveCap) {
+                serverRounded[cat] = effectiveCap;
+                capLoweredSomething = true;
+              }
+              if (capLoweredSomething) appliedFaceCaps[rawKey] = effectiveCap;
+            }
+            if (serverRounded[cat] < before) {
+              // v9.1: list ALL findings (was slice(0,2), which under-justified caps)
+              const catDefects = zoom.defects.filter(d => d.category === cat);
+              const reasons = catDefects
+                .slice(0, 4)
+                .map(d => `${d.severity} ${d.type} (${d.face} ${humanizeZoomRegion(d.region)})`)
+                .join(', ') + (catDefects.length > 4 ? ` +${catDefects.length - 4} more` : '');
+              // Findings-style (no "10→7" delta): the passes now already show the
+              // folded score, so state the result + what magnified inspection saw.
+              zoomAdjustments.push(`${cat} ${serverRounded[cat]}/10 — ${reasons}`);
+            }
+          }
+
+          // Surface zoom defects into the section defects arrays for accountability.
+          // v9.0: pushed as OBJECTS matching the AI's defect shape — string entries rendered
+          // as empty "Defect" boxes on the web detail pages and polluted the coordinate
+          // extraction (which maps these arrays as objects).
+          for (const d of zoom.defects) {
+            if (d.category === 'structural') continue;
+            const sec = jsonData[d.category]?.[d.face];
+            if (sec && Array.isArray(sec.defects)) {
+              sec.defects.push({
+                type: d.type,
+                severity: d.severity,
+                location: `${d.face} ${humanizeZoomRegion(d.region)}`,
+                description: d.description,
+                source: 'zoom-inspection',
+              });
+            }
+          }
+
+          // Structural findings from zoom (creases/bends/warps) — merge into structural_damage
+          if (zoom.structuralFindings.length > 0) {
+            const sd = jsonData.structural_damage || {};
+            const existing: any[] = Array.isArray(sd.findings) ? sd.findings : [];
+            sd.detected = true;
+            sd.has_creases = sd.has_creases || zoom.structuralFindings.some(f => ['crease', 'fold'].includes(f.type));
+            sd.has_bent_corners = sd.has_bent_corners || zoom.structuralFindings.some(f => ['bend', 'warp'].includes(f.type));
+            sd.findings = [...existing, ...zoom.structuralFindings];
+            sd.description = sd.findings.map((f: any, i: number) => `(${i + 1}) ${f.type} — ${f.location}: ${f.description}`).join(' ');
+            jsonData.structural_damage = sd;
+            console.log(`[GRADE RECALC] 🔎 zoom: ${zoom.structuralFindings.length} structural finding(s) merged — structural cap will apply`);
+          }
+
+          // Note zoom contribution in the narrative (grade tokens reconciled later).
+          // Skipped when structural findings exist — the summary is rebuilt around the
+          // structural damage below, and bolting a defect list onto blind base prose
+          // produced contradictory, overlong summaries.
+          // v9.1: no summary append here — the narrator rebuilds the summary from
+          // final numbers + zoomAdjustments after ALL mutations (Step 6).
+
+          // Explain zoom adjustments in the consensus notes — the three-pass table shows
+          // holistic pass scores, so without this a zoom-lowered consensus row looks like
+          // it "came from nowhere" (e.g. passes all 10 but consensus 8).
+          if (zoomAdjustments.length > 0 && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+            jsonData.grading_passes.consensus_notes.push(
+              `Regioned zoom inspection (24 magnified crops) found defects the holistic passes missed — consensus adjusted: ${zoomAdjustments.join(' | ')}`
+            );
+          }
+        } else if (zoom && !zoom.ok) {
+          console.warn(`[GRADE RECALC] ⚠️ zoom inspection unavailable (${zoom.error}) — grading from holistic ensemble only`);
+        }
+
+        // Step 3.9 (v9.0 COHERENCE): structural damage lives in the SURFACE subgrade.
+        // Previously only the FINAL was capped, so a zoom-detected crease produced
+        // "final 4 with all subgrades 9-10" — incoherent to the customer. A confirmed
+        // crease/bend caps the surface subgrade (and its displayed faces) to the same
+        // structural cap, which then flows through weakest-link naturally.
+        const structuralFlagged = jsonData.structural_damage?.detected === true;
+        const STRUCT_CAP = 4;
+
+        // v9.1 STRUCTURAL CORROBORATION: a hard cap to 4 is catastrophic, so it now
+        // requires corroboration. A single completion (or a single zoom read) flagging
+        // a "crease" that the others missed is very often a REFLECTION or embossed
+        // design line on a foil/metallic/refractor surface — which was tanking pristine
+        // premium cards (e.g. Metal Universe "Dark Matter" 10 → 4). Corroborated =
+        // a MAJORITY of the holistic completions agree, OR the zoom inspection
+        // independently confirmed it. Otherwise the flag is treated as UNCONFIRMED and
+        // the grade proceeds normally (with raised uncertainty).
+        const structuralVotes = structuralDetectors.length;
+        const zoomStructural = !!(zoom?.ok && zoom.structuralFindings.length > 0);
+        const structuralCorroborated = structuralVotes >= Math.ceil(scored.length / 2) || zoomStructural;
+
+        // v9.1 STRUCTURAL VERIFICATION: even unanimous crease/bend claims can be a
+        // lighting/reflection band on glossy or metallic cards (a broad tonal step,
+        // not a thin ridge) — a confirmed-pristine card graded 4 this way with every
+        // pass AND zoom agreeing. Before the hard cap applies, a dedicated verifier
+        // re-crops the claimed location and answers ONE question: thin physical
+        // ridge, or broad lighting band? Fail-safe: on any error the cap stands.
+        let structuralVerified = true;
+        let structuralVerifyReason = '';
+        if (structuralFlagged && structuralCorroborated) {
+          const findings = Array.isArray(jsonData.structural_damage?.findings) && jsonData.structural_damage.findings.length > 0
+            ? jsonData.structural_damage.findings
+            : [{ type: 'crease', location: '', description: jsonData.structural_damage?.description || '' }];
+          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings);
+          structuralVerified = verdict.confirmed;
+          structuralVerifyReason = verdict.reason;
+          if (!structuralVerified && jsonData.structural_damage) {
+            console.log(`[GRADE RECALC] ⚠️ structural claim REJECTED by verification: ${verdict.reason}`);
+            jsonData.structural_damage.detected = false;
+            jsonData.structural_damage.unconfirmed = true;
+            jsonData.structural_damage.unconfirmed_note = `A straight line was flagged as a possible crease, but magnified verification identified it as a lighting/reflection band on the card's glossy surface — not physical damage. Grade not capped. (${verdict.reason})`;
+          }
+        }
+
+        const structuralDetected = structuralFlagged && structuralCorroborated && structuralVerified;
+
+        if (structuralFlagged && !structuralCorroborated) {
+          console.log(`[GRADE RECALC] ⚠️ structural UNCORROBORATED (${structuralVotes}/${scored.length} completions, zoom=${zoomStructural}) — NOT capping to 4 (likely reflection/embossed line on a foil/metallic card)`);
+          if (jsonData.structural_damage) {
+            jsonData.structural_damage.detected = false;
+            jsonData.structural_damage.unconfirmed = true;
+            jsonData.structural_damage.unconfirmed_note = 'A possible surface line was flagged by a single evaluation but not corroborated by the other evaluations or the magnified inspection — treated as unconfirmed (common on reflective/foil/embossed cards). Grade not capped.';
+          }
+        }
+
+        if (structuralDetected) {
+          if (serverRounded.surface > STRUCT_CAP) {
+            console.log(`[GRADE RECALC] 🚨 structural coherence: surface subgrade ${serverRounded.surface} → ${STRUCT_CAP} (corroborated structural damage: ${structuralVotes}/${scored.length} completions${zoomStructural ? ' + zoom' : ''})`);
+            serverRounded.surface = STRUCT_CAP;
+          }
+          if (jsonData.raw_sub_scores) {
+            for (const key of ['surface_front', 'surface_back']) {
+              if (typeof jsonData.raw_sub_scores[key] === 'number' && jsonData.raw_sub_scores[key] > STRUCT_CAP) {
+                jsonData.raw_sub_scores[key] = STRUCT_CAP;
+              }
+            }
+          }
+        }
+
         // Step 4: Apply dominant defect control (weakest subgrade caps the final)
         const subgradeCap = Math.min(serverRounded.centering, serverRounded.corners, serverRounded.edges, serverRounded.surface);
         let finalGrade = Math.min(serverRounded.final, subgradeCap);
+
+        // Step 4.5 (v8.9): SERVER-ENFORCED STRUCTURAL CAP (backstop — Step 3.9 already
+        // pulls surface down, so this only fires if that path is ever bypassed).
+        if (structuralDetected && finalGrade > STRUCT_CAP) {
+          console.log(`[GRADE RECALC] 🚨 STRUCTURAL CAP backstop: capping final ${finalGrade} → ${STRUCT_CAP}`);
+          finalGrade = STRUCT_CAP;
+        }
 
         // Step 5: Grade 10 validation — standard rounding handles the math naturally
         // Grade 10 only requires: all subgrades round to 10 AND final rounds to 10
@@ -1827,23 +2200,168 @@ Provide detailed analysis as markdown with all required sections.`
 
         // Step 6: Write corrected values back to the AI response for consistency
         threePassData.averaged = boostedAvg;
-        threePassData.averaged_rounded = serverRounded;
+        // v8.8: store the CAPPED grade in averaged_rounded.final. The per-category routes read
+        // averaged_rounded.final as their primary grade source; before this fix they received the
+        // uncapped rounded average, silently bypassing the weakest-link cap computed above.
+        threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
+
+        // v9.1: FOLD the zoom + structural caps into each displayed pass so the
+        // Three-Pass table represents the FULL evaluation (magnified inspection
+        // included on every pass) instead of the confusing "10/10/10 → 7". Capping
+        // is monotonic, so median(capped passes) === capped median === serverRounded:
+        // the grade and consensus are UNCHANGED — only the per-pass display becomes
+        // internally coherent. (f1/f2/f3, captured raw at :1940, still drive the
+        // uncertainty + unanimity gates from the independent holistic agreement.)
+        const foldCapFor = (cat: 'centering' | 'corners' | 'edges' | 'surface'): number | null => {
+          const caps: number[] = [];
+          // v9.1: fold the caps ACTUALLY applied in Step 3.7 (post-corroboration),
+          // not raw zoom.faceCaps — an uncorroborated raw cap would fold pass rows
+          // BELOW the consensus, breaking the "capped median === serverRounded" invariant.
+          const cf = appliedFaceCaps[`${cat}_front`];
+          const cb = appliedFaceCaps[`${cat}_back`];
+          if (typeof cf === 'number') caps.push(cf);
+          if (typeof cb === 'number') caps.push(cb);
+          if (structuralDetected && cat === 'surface') caps.push(STRUCT_CAP);
+          return caps.length ? Math.min(...caps) : null;
+        };
+        for (const p of [threePassData.pass_1, threePassData.pass_2, threePassData.pass_3] as any[]) {
+          if (!p) continue;
+          for (const cat of ['centering', 'corners', 'edges', 'surface'] as const) {
+            const cap = foldCapFor(cat);
+            if (cap != null && typeof p[cat] === 'number' && p[cat] > cap) p[cat] = cap;
+          }
+          let pf = Math.min(p.centering, p.corners, p.edges, p.surface);
+          if (structuralDetected) pf = Math.min(pf, STRUCT_CAP);
+          p.final = pf;
+        }
+        // Keep the displayed variance/consistency consistent with the folded passes
+        const foldedFinals = [threePassData.pass_1.final, threePassData.pass_2.final, threePassData.pass_3.final];
+        threePassData.variance = Math.max(...foldedFinals) - Math.min(...foldedFinals);
+        threePassData.consistency = threePassData.variance === 0 ? 'high' : threePassData.variance <= 1 ? 'moderate' : 'low';
+
+        // v8.8: honest uncertainty — derived from measured signals, not the AI's self-report.
+        // Components: image-confidence letter (A=0,B=1,C=2,D=3), spread between the three pass
+        // finals, and whether the server had to lower the model's own average (cap/clamp fired).
+        const confidenceLetter = (jsonData.image_quality?.confidence_letter || 'B').toUpperCase();
+        const letterUncertainty = ({ A: 0, B: 1, C: 2, D: 3 } as Record<string, number>)[confidenceLetter] ?? 1;
+        const passSpread = Math.max(f1, f2, f3) - Math.min(f1, f2, f3);
+        const clampLowered = finalGrade < Math.round(boostedAvg.final) ? 1 : 0;
+        // v8.9: structural disagreement between ensemble completions = genuine uncertainty.
+        // v9.0: ALSO covers zoom-only structural detection (zoom found a crease no holistic
+        // completion saw) — the exact case that previously reported ±1 on a capped grade.
+        const zoomOnlyStructural = structuralDetected && structuralDetectors.length === 0;
+        // v9.1: an UNCORROBORATED structural flag (single evaluation saw a possible line,
+        // not confirmed) is genuine uncertainty even though we didn't cap the grade.
+        const structuralUnconfirmed = structuralFlagged && !structuralCorroborated;
+        const structuralUncertainty = (structuralDisagreement || zoomOnlyStructural || structuralUnconfirmed) ? 2 : 0;
+        const uncertaintyValue = Math.min(3, Math.max(letterUncertainty, passSpread, clampLowered, structuralUncertainty));
+        const uncertaintyStr = `±${uncertaintyValue}`;
+
+        // v9.1 UNCERTAINTY GATE: never award Gem Mint on evidence the system
+        // itself distrusts — a 10 at ±2 literally reads "could be an 8".
+        // (Validated regrade awarded 10 (±2) on images flagged as soft.)
+        // v9.1b UNANIMITY GATE (relaxed): Gem Mint requires either all three
+        // ensemble completions at 10 OR all four consensus subgrades at 10.
+        // A 2-vs-1 split straddling the 10 line is a coin flip — repeatability
+        // testing caught the same card grading 10 ([9,10,10]) and 9 ([9,9,9])
+        // minutes apart. But when the CONSENSUS lands at 10 in every category
+        // (centering/corners/edges/surface), the evidence already meets the
+        // "Virtually Perfect" bar even if one pass final dissented — holding
+        // the 9 there punished cards the system itself scored flawless.
+        let gradeCapNote: string | null = null;
+        const unanimous10 = Math.min(f1, f2, f3) >= 10;
+        const allSubgrades10 =
+          serverRounded.centering === 10 &&
+          serverRounded.corners === 10 &&
+          serverRounded.edges === 10 &&
+          serverRounded.surface === 10;
+        if (finalGrade === 10 && (uncertaintyValue >= 2 || (!unanimous10 && !allSubgrades10))) {
+          finalGrade = 9;
+          threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
+          if (uncertaintyValue >= 2) {
+            gradeCapNote = `The card presents at Gem Mint level, but image quality (±${uncertaintyValue}) is insufficient to confirm a 10 — grade held at 9.`;
+            console.log(`[GRADE RECALC] ⚖️ uncertainty gate: 10 → 9 (uncertainty ±${uncertaintyValue})`);
+          } else {
+            gradeCapNote = `The card presents at Gem Mint level, but the independent evaluations were not unanimous (${f1}/${f2}/${f3}) and the consensus subgrades were not all 10 — grade held at 9.`;
+            console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3}, subgrades not all 10)`);
+          }
+        }
+
+        // v8.8: the condition label is DERIVED from the final grade — never the AI's prose.
+        // (Production showed two grade-6 cards stored as "Excellent" and "Near Mint-Mint".)
+        const canonicalConditionLabel = getConditionFromGrade(finalGrade);
+
         // Override AI's final grade fields with server-calculated values
         if (jsonData.final_grade) {
           jsonData.final_grade.decimal_grade = finalGrade;
           jsonData.final_grade.whole_grade = finalGrade;
+          jsonData.final_grade.condition_label = canonicalConditionLabel;
+          jsonData.final_grade.grade_range = uncertaintyStr;
+
+          // v9.1 NARRATE-AFTER-CONSENSUS: the displayed summary is REBUILT
+          // deterministically from the final post-cap numbers + structured
+          // findings. The base completion's prose was authored against its own
+          // pre-mutation scores (median, zoom caps, structural caps, weakest-link
+          // all land AFTER it was written) and routinely contradicted the
+          // displayed grade. The model's prose is preserved for reference.
+          jsonData.final_grade.model_summary = scrubGradingCompanyReferences(jsonData.final_grade.summary);
+          jsonData.final_grade.summary = buildFinalSummary({
+            finalGrade,
+            conditionLabel: canonicalConditionLabel,
+            uncertainty: uncertaintyStr,
+            subgrades: {
+              centering: serverRounded.centering,
+              corners: serverRounded.corners,
+              edges: serverRounded.edges,
+              surface: serverRounded.surface,
+            },
+            structuralDetected,
+            structuralFindings: Array.isArray(jsonData.structural_damage?.findings) ? jsonData.structural_damage.findings : [],
+            zoomAdjustments,
+            gradeCapNote,
+            jsonData,
+          });
+
+          // Length guard: overlong summaries read badly and can be visually truncated by
+          // display surfaces. Trim to ~700 chars at a sentence boundary, always keeping
+          // the canonical trailing grade statement intact.
+          const MAX_SUMMARY = 700;
+          if (jsonData.final_grade.summary.length > MAX_SUMMARY) {
+            const text = jsonData.final_grade.summary as string;
+            const tailIdx = text.lastIndexOf('Final grade');
+            const tail = tailIdx > -1 ? text.slice(tailIdx) : `Final grade: ${finalGrade} (${canonicalConditionLabel}).`;
+            let head = text.slice(0, Math.max(0, MAX_SUMMARY - tail.length - 1));
+            const lastSentence = head.lastIndexOf('. ');
+            if (lastSentence > 200) head = head.slice(0, lastSentence + 1);
+            jsonData.final_grade.summary = `${head.trim()} ${tail}`.trim();
+          }
+          // Recompute the dominant defect from the server subgrades (weakest category)
+          const weakestCat = (['centering', 'corners', 'edges', 'surface'] as const)
+            .reduce((worst, cat) => serverRounded[cat] < serverRounded[worst] ? cat : worst, 'centering' as 'centering' | 'corners' | 'edges' | 'surface');
+          jsonData.final_grade.dominant_defect = weakestCat;
+        }
+        if (jsonData.weighted_scores) {
+          // These AI-authored fields otherwise retain pre-clamp values (observed: preliminary_grade 8 on a stored 6)
+          jsonData.weighted_scores.preliminary_grade = finalGrade;
+          jsonData.weighted_scores.weakest_subgrade = subgradeCap;
+          jsonData.weighted_scores.limiting_factor = (['centering', 'corners', 'edges', 'surface'] as const)
+            .find(cat => serverRounded[cat] === subgradeCap) || jsonData.weighted_scores.limiting_factor;
+        }
+        if (jsonData.image_quality) {
+          jsonData.image_quality.grade_uncertainty = uncertaintyStr;
         }
 
         // Step 7: Also fix raw_sub_scores to derive from pass data (consistency fix)
+        // v9.0: weighted_scores sync is INDEPENDENT of raw_sub_scores existing — previously
+        // nested inside the raw_sub_scores guard, so a completion without raw faces kept
+        // stale AI weighted values while averaged_rounded showed corrected ones.
+        if (jsonData.weighted_scores) {
+          jsonData.weighted_scores.centering_weighted = serverRounded.centering;
+          jsonData.weighted_scores.corners_weighted = serverRounded.corners;
+          jsonData.weighted_scores.edges_weighted = serverRounded.edges;
+          jsonData.weighted_scores.surface_weighted = serverRounded.surface;
+        }
         if (jsonData.raw_sub_scores) {
-          // Ensure weighted_scores match server-calculated subgrades
-          if (jsonData.weighted_scores) {
-            jsonData.weighted_scores.centering_weighted = serverRounded.centering;
-            jsonData.weighted_scores.corners_weighted = serverRounded.corners;
-            jsonData.weighted_scores.edges_weighted = serverRounded.edges;
-            jsonData.weighted_scores.surface_weighted = serverRounded.surface;
-          }
-
           // Reconcile front/back scores with server-rounded weighted scores
           // If both front and back are higher than the weighted score, the display
           // becomes confusing (e.g., F:10 B:10 but Score:9). Cap them to match.
@@ -1880,15 +2398,44 @@ Provide detailed analysis as markdown with all required sections.`
           }
         }
 
+        // v9.1 Step 7.5: reconcile per-face prose score tokens to the FINAL face
+        // scores. Face summaries are authored by the base completion against its
+        // own numbers; zoom caps / structural caps / the F-B plausibility fix above
+        // can lower those numbers afterward. Descriptive wording stays (it's the
+        // examiner's observation); numeric claims ("8/10") are corrected so text
+        // never quotes a score the page doesn't display.
+        for (const cat of ['centering', 'corners', 'edges', 'surface'] as const) {
+          for (const face of ['front', 'back'] as const) {
+            const section = jsonData[cat]?.[face];
+            const faceScore = jsonData.raw_sub_scores?.[`${cat}_${face}`];
+            if (!section || typeof faceScore !== 'number') continue;
+            if (typeof section.summary === 'string') {
+              section.summary = reconcileFaceProse(section.summary, faceScore);
+            }
+            if (typeof section.condition === 'string') {
+              section.condition = reconcileFaceProse(section.condition, faceScore);
+            }
+          }
+          // Centering stores its prose at the category level
+          if (cat === 'centering' && jsonData.centering) {
+            if (typeof jsonData.centering.front_summary === 'string') {
+              jsonData.centering.front_summary = reconcileFaceProse(jsonData.centering.front_summary, jsonData.raw_sub_scores?.centering_front);
+            }
+            if (typeof jsonData.centering.back_summary === 'string') {
+              jsonData.centering.back_summary = reconcileFaceProse(jsonData.centering.back_summary, jsonData.raw_sub_scores?.centering_back);
+            }
+          }
+        }
+
         extractedGrade = {
           decimal_grade: finalGrade,
           whole_grade: finalGrade,
-          uncertainty: jsonData.image_quality?.grade_uncertainty || jsonData.final_grade?.grade_range || '±1'
+          uncertainty: uncertaintyStr // v8.8: measured (letter + pass spread + clamp), not AI self-report
         };
 
         // Log comparison: AI vs Server
         const aiRounded = threePassData.averaged_rounded;
-        console.log(`[GRADE RECALC] ✅ THREE-PASS GRADING with server-side recalculation + consensus boost`);
+        console.log(`[GRADE RECALC] ✅ ENSEMBLE GRADING with server-side median consensus`);
         console.log(`[GRADE RECALC] Pass scores: P1=${pass1.final}, P2=${pass2.final}, P3=${pass3.final}`);
         console.log(`[GRADE RECALC] Raw avg: C=${serverAvg.centering.toFixed(2)}, Co=${serverAvg.corners.toFixed(2)}, E=${serverAvg.edges.toFixed(2)}, S=${serverAvg.surface.toFixed(2)}, Final=${serverAvg.final.toFixed(2)}`);
         console.log(`[GRADE RECALC] Boosted avg: C=${boostedAvg.centering.toFixed(2)}, Co=${boostedAvg.corners.toFixed(2)}, E=${boostedAvg.edges.toFixed(2)}, S=${boostedAvg.surface.toFixed(2)}, Final=${boostedAvg.final.toFixed(2)}`);
@@ -1915,16 +2462,24 @@ Provide detailed analysis as markdown with all required sections.`
       console.log(`[GRADE RECALC] Final extracted grade: ${extractedGrade.decimal_grade} (${extractedGrade.uncertainty})`);
 
       // Build rarity classification from JSON
-      const rarityClassification = jsonData.card_info ? {
-        rarity_tier: jsonData.card_info.rarity_or_variant || null,
-        feature_tags: [],
-        serial_number: jsonData.card_info.serial_number || null,
-        autograph: jsonData.card_info.autographed ? { present: true, type: 'on-card' } : { present: false, type: 'none' },
-        memorabilia: jsonData.card_info.memorabilia ? { present: true, type: jsonData.card_info.memorabilia } : { present: false, type: 'none' },
-        print_finish: null,
-        rookie_or_first: jsonData.card_info.rookie_or_first ? 'RC' : 'No',
-        rarity_score: 0,
-        notes: ''
+      // v9.1: build to the ACTUAL RarityClassification interface — the previous
+      // literal used invented field names (rookie_or_first, serial_number,
+      // autograph{...}), so downstream consumers reading rookie_flag /
+      // subset_insert_name / serial_number_fraction silently got undefined.
+      const rarityClassification: RarityClassification | undefined = jsonData.card_info ? {
+        rarity_tier: jsonData.card_info.autographed ? 'Authenticated Autograph'
+          : jsonData.card_info.memorabilia ? 'Memorabilia / Relic'
+          : jsonData.card_info.rookie_or_first ? 'Rookie / Debut / First Edition'
+          : (jsonData.card_info.parallel_type || jsonData.card_info.subset) ? 'Parallel / Insert Variant'
+          : 'Unconfirmed',
+        serial_number_fraction: jsonData.card_info.serial_numbering || jsonData.card_info.serial_number || null,
+        autograph_type: jsonData.card_info.autographed ? 'unverified' : 'none',
+        memorabilia_type: jsonData.card_info.memorabilia || null,
+        finish_material: jsonData.card_info.print_finish || jsonData.card_info.finish || '',
+        rookie_flag: jsonData.card_info.rookie_or_first ? 'yes' : 'no',
+        subset_insert_name: jsonData.card_info.subset || null,
+        special_attributes: [],
+        rarity_notes: '',
       } : undefined;
 
       // Extract defect coordinates from JSON (if available)
@@ -1974,8 +2529,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.7-json',
-          prompt_version: 'DCM_Grading_v8.7'
+          version: 'conversational-v9.1-json',
+          prompt_version: 'DCM_Grading_v9.1'
         }
       };
 
@@ -2026,8 +2581,8 @@ Provide detailed analysis as markdown with all required sections.`
         meta: {
           model: model,
           timestamp: new Date().toISOString(),
-          version: 'conversational-v8.7-markdown',
-          prompt_version: 'DCM_Grading_v8.7'
+          version: 'conversational-v9.1-markdown',
+          prompt_version: 'DCM_Grading_v9.1'
         }
       };
 
@@ -2050,8 +2605,9 @@ Provide detailed analysis as markdown with all required sections.`
         errorMessage.includes('Timeout while downloading') ||
         errorMessage.includes('503') ||
         errorMessage.includes('502') ||
-        errorMessage.includes('500') ||
-        errorMessage.includes('400');
+        errorMessage.includes('500');
+        // v8.8: '400' removed — bad-request errors are deterministic; retrying them
+        // just tripled latency/cost on permanent failures.
 
       if (isRetryable && attempt < MAX_RETRIES) {
         const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff

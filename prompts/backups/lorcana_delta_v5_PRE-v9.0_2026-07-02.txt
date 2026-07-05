@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: DISNEY LORCANA v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: DISNEY LORCANA v5.1 (aligned with master rubric v8.8)
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Disney Lorcana card-specific rules.
@@ -241,7 +241,7 @@ D. LORCANA CARD DEFECT PATTERNS
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
 • Hairline holo scratch, angle/zoom only → 9
-• Holo scratch noticeable at normal distance → 7 per the ladder
+• Holo scratch noticeable at normal distance → 8/7 per the ladder
 • Confirmed handling defects prevent a 10 surface score
 
 🚨 **ENCHANTED FOIL GLARE CHECK (v8.8):** Enchanted variants' full-art holographic finish
@@ -309,4 +309,4 @@ E. LORCANA CARD GRADING EXAMPLES
 **ENCHANTED VARIANT EXAMPLE:**
 "This Enchanted variant Lorcana card has a full-art holographic treatment across the entire front surface. Examining the holographic layer, I detect one short hairline scratch in the center, visible only when the light catches it at an angle — it interrupts the rainbow pattern rather than shifting with it, confirming physical damage rather than glare. Per the visibility test this is a Minor defect (surface ladder row 9). Surface score: 9."
 
---- END OF LORCANA DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF LORCANA DELTA v5.1 (aligned with master rubric v8.8) ---

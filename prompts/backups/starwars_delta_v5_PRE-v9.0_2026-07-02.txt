@@ -1,5 +1,5 @@
 ═══════════════════════════════════════════════════════════════════════
-CARD TYPE DELTA: STAR WARS TCG v5.1 (aligned with master rubric v9.0)
+CARD TYPE DELTA: STAR WARS TCG v5.1 (aligned with master rubric v8.8)
 ═══════════════════════════════════════════════════════════════════════
 
 **DELTA PURPOSE:** This file contains ONLY Star Wars collectible card-specific rules.
@@ -204,7 +204,7 @@ C. STAR WARS CARD DEFECT PATTERNS
 
 **Grading Impact (v8.8 — score via the master SURFACE SCORING LADDER, Section 10):**
 • Hairline chrome scratch or fingerprint, angle/zoom only → 9
-• Scratch/scuff noticeable at normal distance → 7 per the ladder
+• Scratch/scuff noticeable at normal distance → 8/7 per the ladder
 • Confirmed handling defects prevent a 10 surface score
 🚨 GLARE CHECK FIRST: chrome is the most reflective finish in the hobby — apply the master
 GLARE & REFLECTION FALSE-POSITIVE CHECK (Section 10, Step 5) before reporting ANY chrome
@@ -282,7 +282,7 @@ D. STAR WARS CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
 
 **VINTAGE CARD EXAMPLE (1977):**
-"This 1977 Topps Star Wars Series 1 Blue Border card #1 'Luke Skywalker' shows typical vintage characteristics. Centering is 55/45 left-right and 52/48 top-bottom — within the CENTERING SCORE GUIDE's 10 band (era does not change the mapping). Blue borders show a short run of light whitening at the top edge, noticeable at normal distance (edge ladder row 7, market-calibrated). Corners show softening noticeable at normal viewing distance (corner ladder row 7). No wax stains present. Surface has minor close-inspection handling marks (row 8, two flaws). Weakest link = 7. Grade 7 — the same standard as a modern card; the card's age is context, not a score adjustment."
+"This 1977 Topps Star Wars Series 1 Blue Border card #1 'Luke Skywalker' shows typical vintage characteristics. Centering is 55/45 left-right and 52/48 top-bottom — within the CENTERING SCORE GUIDE's 10 band (era does not change the mapping). Blue borders show a short run of light whitening at the top edge, noticeable at normal distance (edge ladder row 8). Corners show softening noticeable at normal viewing distance (corner ladder row 8). No wax stains present. Surface has minor close-inspection handling marks (row 9). Weakest link = 8. Grade 8 — the same standard as a modern card; the card's age is context, not a score adjustment."
 
 **CHROME REFRACTOR EXAMPLE:**
 "This 2023 Topps Star Wars Chrome Refractor of 'Darth Vader' displays prismatic chrome treatment across the full card face. Under varied lighting angles, I detect one fine hairline scratch running across the lower portion — it interrupts the refractor pattern rather than shifting with the light, confirming physical damage rather than glare. Angle-only visibility = Minor severity (surface ladder row 9). The refractor pattern is otherwise clean and vibrant with no fingerprints or clouding. Surface score: 9."
@@ -322,4 +322,4 @@ E. STAR WARS SPECIFIC EXTRACTION RULES
 • CCG cards: Game-specific backs (Decipher, FFG)
 • Verify back matches expected set design
 
---- END OF STAR WARS DELTA v5.1 (aligned with master rubric v9.0) ---
+--- END OF STAR WARS DELTA v5.1 (aligned with master rubric v8.8) ---
