@@ -55,3 +55,25 @@ long_name_test.pdf
 
 # Temporary files
 nul
+
+# Customer PII — NEVER commit (user exports, email send-lists, per-user debug scripts)
+user-export-*.csv
+logs/
+scripts/fix-*-refund.js
+scripts/fix-*-renewal*.ts
+scripts/investigate-*.js
+scripts/investigate-*.ts
+scripts/find-celena.js
+scripts/find-my-user-id.js
+scripts/find-marketplace-user.js
+scripts/dump-*.js
+scripts/inspect-justin-cards.js
+scripts/check-*-sub.js
+scripts/check-*-vip.js
+scripts/check-adam-vip.js
+scripts/check-ios-user-attribution.js
+scripts/export-users.js
+
+# Scratch / generated reports (not source)
+output/
+public/labels/Screenshot*.png
