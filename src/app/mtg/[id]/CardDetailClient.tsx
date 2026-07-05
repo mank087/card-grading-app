@@ -4867,14 +4867,8 @@ export function MTGCardDetails() {
                   const imageGrade = card.conversational_image_confidence || card.dvg_image_quality || imageQuality?.grade || card.ai_confidence_score || 'B';
 
                   const getConfidenceLevel = (grade: string) => {
-                    // v7.4: Maps to Image Confidence: A=±0, B=±1, C=±2, D=±3
-                    if (recommendedGrade.grade_uncertainty === '±0') return { level: 'Very High', width: '95%', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
-                    if (recommendedGrade.grade_uncertainty === '±1') return { level: 'High', width: '80%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
-                    if (recommendedGrade.grade_uncertainty === '±2') return { level: 'Moderate', width: '55%', color: 'bg-yellow-400', textColor: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-300' };
-                    if (recommendedGrade.grade_uncertainty === '±3') return { level: 'Low', width: '35%', color: 'bg-red-400', textColor: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-300' };
-
-                    // Fallback: Use the actual image grade (from conversational AI or fallback)
-                    // v7.4 mapping: A=±0, B=±1, C=±2, D=±3
+                    // Level derives ONLY from the image-quality letter (A=±0, B=±1, C=±2, D=±3).
+                    // Measured grade uncertainty is internal-only (gates + grade range).
                     if (grade === 'A') return { level: 'Very High', width: '95%', color: 'bg-green-500', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
                     if (grade === 'B') return { level: 'High', width: '80%', color: 'bg-green-400', textColor: 'text-green-700', bgColor: 'bg-green-50', borderColor: 'border-green-300' };
                     if (grade === 'C') return { level: 'Moderate', width: '55%', color: 'bg-yellow-400', textColor: 'text-yellow-700', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-300' };
