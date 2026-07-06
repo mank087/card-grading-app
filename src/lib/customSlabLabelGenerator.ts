@@ -14,7 +14,7 @@
 import { jsPDF } from 'jspdf';
 import { extractAsciiSafe, extractAsciiSafePreserveBullets, containsCJK } from './labelDataGenerator';
 import type { SlabLabelData } from './slabLabelGenerator';
-import { resolveConfigTextPolarity, type CustomLabelConfig } from './labelPresets';
+import { resolveConfigTextPolarity, resolveGradeColor, resolveFontScale, type CustomLabelConfig } from './labelPresets';
 
 // ============================================================================
 // HELPERS
@@ -135,7 +135,8 @@ function fitCardInfoFonts(
       if (ctx.measureText(featuresLine).width > maxWidth) continue;
     }
 
-    ctx.font = `${sizes.serial}px 'Courier New', monospace`;
+    // Measure with the same font the serial is drawn with
+    ctx.font = `${sizes.serial}px 'Helvetica Neue', Arial, sans-serif`;
     if (ctx.measureText(serial).width > maxWidth) continue;
 
     let blockH = sizes.name;
@@ -653,14 +654,19 @@ export async function renderFrontCanvas(
   const gradeRightPadding = padding + Math.round(20 * scale);
   const gradeCenterX = EB + ECW - gradeRightPadding - gradeAreaWidth / 2;
 
-  const gradeFontSize = Math.round(88 * scale);
-  const condFontSize = Math.round(24 * scale);
+  // July 2026: fontScale raises the grade/condition sizes (validated + clamped
+  // by the resolver; 1 = historical sizes).
+  const fontScale = resolveFontScale(config);
+  const gradeFontSize = Math.round(88 * scale * fontScale);
+  const condFontSize = Math.round(24 * scale * fontScale);
   const dividerGap = light ? Math.round(8 * scale) : Math.round(4 * scale);
   const condGap = Math.round(4 * scale);
   const totalGradeH = gradeFontSize + dividerGap + condFontSize;
   const gradeStartY = EB + (ECH - totalGradeH) / 2;
 
-  ctx.fillStyle = light ? TRAD_COLORS.purplePrimary : TRAD_COLORS.white;
+  // July 2026: user-configurable grade color (resolver validates the hex and
+  // falls back to the historical purple-on-light / white-on-dark pair).
+  ctx.fillStyle = resolveGradeColor(config, light);
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -707,7 +713,9 @@ export async function renderFrontCanvas(
     ? (containsCJK(data.featuresLine) ? extractAsciiSafePreserveBullets(data.featuresLine, '') : data.featuresLine)
     : '';
 
-  const maxNameFont = Math.round(38 * scale);
+  // fontScale raises the STARTING size; the fit loop still shrinks oversized
+  // text, so larger scales are best-effort on crowded labels.
+  const maxNameFont = Math.round(38 * scale * resolveFontScale(config));
   const { sizes: fs, ctxLines } = fitCardInfoFonts(
     ctx, infoMaxWidth, infoMaxHeight,
     safeCardName, safeContextLine, safeFeatures, data.serial, maxNameFont, scale
@@ -829,12 +837,12 @@ export async function renderBackCanvas(
   }
 
   // Badges
-  let badgeXOffset = qrX + qrSize + Math.round(light ? 20 : 28 * scale);
+  let badgeXOffset = qrX + qrSize + Math.round((light ? 20 : 28) * scale);
   const drawBadge = (symbol: string, label: string, color: string, textColor: string) => {
     const bx = badgeXOffset;
     const symbolSize = Math.round(28 * scale);
     const textSize = Math.round(16 * scale);
-    const totalBadgeH = symbolSize + 6 + (ECH * 0.45);
+    const totalBadgeH = symbolSize + Math.round(6 * scale) + (ECH * 0.45);
     const by = EB + (ECH - totalBadgeH) / 2;
 
     ctx.fillStyle = color;
@@ -844,7 +852,7 @@ export async function renderBackCanvas(
     ctx.fillText(symbol, bx, by);
 
     ctx.save();
-    ctx.translate(bx, by + symbolSize + 8);
+    ctx.translate(bx, by + symbolSize + Math.round(8 * scale));
     ctx.rotate(-Math.PI / 2);
     ctx.fillStyle = textColor;
     ctx.font = `bold ${textSize}px 'Helvetica Neue', Arial, sans-serif`;
@@ -866,13 +874,14 @@ export async function renderBackCanvas(
   const conditionText = data.isAlteredAuthentic && data.grade === null
     ? 'AUTHENTIC' : (data.condition || '').toUpperCase();
 
-  const gradeFontSize = Math.round(88 * scale);
-  const condFontSize = Math.round(24 * scale);
+  const fontScale = resolveFontScale(config);
+  const gradeFontSize = Math.round(88 * scale * fontScale);
+  const condFontSize = Math.round(24 * scale * fontScale);
   const condGap = Math.round(8 * scale);
   const totalH = gradeFontSize + (conditionText ? condGap + condFontSize : 0);
   const centerStartY = EB + (ECH - totalH) / 2;
 
-  ctx.fillStyle = light ? TRAD_COLORS.purplePrimary : TRAD_COLORS.white;
+  ctx.fillStyle = resolveGradeColor(config, light);
   ctx.font = `bold ${gradeFontSize}px 'Helvetica Neue', Arial, sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
@@ -970,7 +979,15 @@ export async function generateCustomSlabLabel(
   if (isStdDims) {
     try {
       const vector = await import('./labels/vectorSlabGenerator');
-      return await vector.generateCustomSlabLabelVector(data, config);
+      // Halo gate: react-pdf can't stroke text, so styles whose text needs
+      // the raster halo (worst-case WCAG contrast < 4.5:1 on the real
+      // background stops) fall through to the legible raster path.
+      if (vector.customConfigNeedsTextHalo(config)) {
+        console.log('[customSlabLabel] style needs text halo — using raster path');
+      } else {
+        console.log('[customSlabLabel] using vector path');
+        return await vector.generateCustomSlabLabelVector(data, config);
+      }
     } catch (err) {
       console.warn('[customSlabLabel] vector path failed, falling back to raster:', err);
     }
@@ -1103,6 +1120,23 @@ export async function downloadCustomSlabLabel(
 // ============================================================================
 
 /**
+ * Crop the bleed strip off one horizontal edge of a rendered label canvas.
+ * Fold-over panels sit flush against the fold line, but the canvas bakes bleed
+ * on all four sides — and jsPDF addImage scales (it cannot crop), so leaving
+ * the fold-side bleed in the image squashes the label vertically by ~8.3%.
+ * Twin of cropBleedEdge() in slabLabelGenerator.ts (data-URL variant).
+ */
+function cropBleedEdge(source: HTMLCanvasElement, edge: 'top' | 'bottom', bleedPx: number): HTMLCanvasElement {
+  const cropped = document.createElement('canvas');
+  cropped.width = source.width;
+  cropped.height = source.height - bleedPx;
+  const ctx = cropped.getContext('2d')!;
+  const srcY = edge === 'top' ? bleedPx : 0;
+  ctx.drawImage(source, 0, srcY, source.width, cropped.height, 0, 0, source.width, cropped.height);
+  return cropped;
+}
+
+/**
  * Generate a fold-over slab label PDF (single-sided print, fold along top edge).
  * Back (upside-down) on TOP, front on BOTTOM.
  * Fold the top panel down behind the front — the back label flips right-side up.
@@ -1141,9 +1175,12 @@ export async function generateFoldOverSlabLabel(
   fCtx.translate(flippedCanvas.width, flippedCanvas.height);
   fCtx.rotate(Math.PI);
   fCtx.drawImage(backCanvas, 0, 0);
-  const flippedBackImg = flippedCanvas.toDataURL('image/png');
 
-  const frontImg = frontCanvas.toDataURL('image/png');
+  // Crop the bleed strip on each panel's fold-facing edge so the placement
+  // rect (bleed on the outer edge only) doesn't squash the image.
+  const bleedPx = Math.round(BLEED_IN * PRINT_DPI);
+  const flippedBackImg = cropBleedEdge(flippedCanvas, 'bottom', bleedPx).toDataURL('image/png');
+  const frontImg = cropBleedEdge(frontCanvas, 'top', bleedPx).toDataURL('image/png');
 
   // Page header
   doc.setFontSize(7);
@@ -1298,13 +1335,16 @@ export async function generateBatchFoldOverCustomLabels(
       fCtx.rotate(Math.PI);
       fCtx.drawImage(backCanvas, 0, 0);
 
-      // Top: BACK (flipped) — flush at fold, bleed top
-      doc.addImage(flipped.toDataURL('image/png'), 'PNG',
+      // Crop the bleed strip on each panel's fold-facing edge
+      const bleedPx = Math.round(BLEED_IN * PRINT_DPI);
+
+      // Top: BACK (flipped) — flush at fold (bottom edge cropped), bleed top
+      doc.addImage(cropBleedEdge(flipped, 'bottom', bleedPx).toDataURL('image/png'), 'PNG',
         x - bleedPt, y - bleedPt,
         labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt);
 
-      // Bottom: FRONT — flush at fold, bleed bottom
-      doc.addImage(frontCanvas.toDataURL('image/png'), 'PNG',
+      // Bottom: FRONT — flush at fold (top edge cropped), bleed bottom
+      doc.addImage(cropBleedEdge(frontCanvas, 'top', bleedPx).toDataURL('image/png'), 'PNG',
         x - bleedPt, y + labelHeightPt,
         labelWidthPt + bleedPt * 2, labelHeightPt + bleedPt);
 
@@ -1407,11 +1447,16 @@ function batchDrawPageHeader(doc: jsPDF, pageType: 'front' | 'back', pageNum: nu
   doc.text('Label: 2.8" \u00D7 0.8"', BATCH_PAGE_WIDTH - BATCH_GRID_START_X, headerY, { align: 'right' });
 }
 
-function batchDrawCornerMarks(doc: jsPDF, labelX: number, labelY: number) {
+/** Guide color from the config's resolved lightness — dark guides on light labels, white on dark (matches slabLabelGenerator). */
+function batchGuideColor(config: CustomLabelConfig): string {
+  return isLightTheme(config) ? '#000000' : '#ffffff';
+}
+
+function batchDrawCornerMarks(doc: jsPDF, labelX: number, labelY: number, config: CustomLabelConfig) {
   const cutX = labelX + BATCH_TRIM_INSET_PT;
   const cutY = labelY + BATCH_TRIM_INSET_PT;
   const markLen = 8;
-  doc.setDrawColor('#ffffff');
+  doc.setDrawColor(batchGuideColor(config));
   doc.setLineWidth(0.5);
   doc.setLineDashPattern([], 0);
   doc.line(cutX - markLen, cutY, cutX, cutY);
@@ -1424,21 +1469,22 @@ function batchDrawCornerMarks(doc: jsPDF, labelX: number, labelY: number) {
   doc.line(cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT, cutX + BATCH_CUT_WIDTH, cutY + BATCH_CUT_HEIGHT + markLen);
 }
 
-function batchDrawFrontCutGuides(doc: jsPDF, labelX: number, labelY: number) {
+function batchDrawFrontCutGuides(doc: jsPDF, labelX: number, labelY: number, config: CustomLabelConfig) {
   const cutX = labelX + BATCH_TRIM_INSET_PT;
   const cutY = labelY + BATCH_TRIM_INSET_PT;
-  doc.setDrawColor('#ffffff');
+  const guideColor = batchGuideColor(config);
+  doc.setDrawColor(guideColor);
   doc.setLineWidth(0.5);
   doc.setLineDashPattern([3, 3], 0);
   doc.rect(cutX, cutY, BATCH_CUT_WIDTH, BATCH_CUT_HEIGHT, 'S');
   doc.setLineDashPattern([], 0);
   doc.setFontSize(7);
-  doc.setTextColor('#ffffff');
+  doc.setTextColor(guideColor);
   doc.text('\u2702', cutX - 7, cutY + 3);
   doc.text('\u2702', cutX + BATCH_CUT_WIDTH + 1, cutY + 3);
   doc.text('\u2702', cutX - 7, cutY + BATCH_CUT_HEIGHT + 3);
   doc.text('\u2702', cutX + BATCH_CUT_WIDTH + 1, cutY + BATCH_CUT_HEIGHT + 3);
-  batchDrawCornerMarks(doc, labelX, labelY);
+  batchDrawCornerMarks(doc, labelX, labelY, config);
 }
 
 /**
@@ -1455,7 +1501,15 @@ export async function generateBatchCustomSlabLabels(
   // dimensions), raster fallback on any failure.
   try {
     const vector = await import('./labels/vectorSlabGenerator');
-    return await vector.generateBatchCustomSlabLabelsVector(dataArray, config);
+    // Halo gate: react-pdf can't stroke text, so styles whose text needs
+    // the raster halo (worst-case WCAG contrast < 4.5:1 on the real
+    // background stops) fall through to the legible raster path.
+    if (vector.customConfigNeedsTextHalo(config)) {
+      console.log('[customSlabLabel] style needs text halo — using raster batch path');
+    } else {
+      console.log('[customSlabLabel] using vector batch path');
+      return await vector.generateBatchCustomSlabLabelsVector(dataArray, config);
+    }
   } catch (err) {
     console.warn('[customSlabLabel] vector batch failed, falling back to raster:', err);
   }
@@ -1498,7 +1552,7 @@ export async function generateBatchCustomSlabLabelsRaster(
       const frontCanvas = await renderFrontCanvas(dataArray[i], batchConfig, BATCH_DPI);
       const frontImg = frontCanvas.toDataURL('image/jpeg', 0.92);
       batchPlaceLabelImage(doc, frontImg, labelX, labelY);
-      batchDrawFrontCutGuides(doc, labelX, labelY);
+      batchDrawFrontCutGuides(doc, labelX, labelY, batchConfig);
     }
 
     // Back side (mirrored X for duplex)
@@ -1510,7 +1564,7 @@ export async function generateBatchCustomSlabLabelsRaster(
       const backCanvas = await renderBackCanvas(dataArray[i], batchConfig, BATCH_DPI);
       const backImg = backCanvas.toDataURL('image/jpeg', 0.92);
       batchPlaceLabelImage(doc, backImg, labelX, labelY);
-      batchDrawCornerMarks(doc, labelX, labelY);
+      batchDrawCornerMarks(doc, labelX, labelY, batchConfig);
     }
   }
 

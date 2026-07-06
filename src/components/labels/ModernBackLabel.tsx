@@ -121,8 +121,8 @@ export function ModernBackLabel({
   // the background is light. Defaults to light text (built-in modern theme).
   const darkText = colorOverrides?.textPolarity === 'dark'
   const tx = darkText
-    ? { grade: '#7c3aed', condition: '#6b46c1', sub: '#4b5563', badgeLabel: '#7c3aed' }
-    : { grade: '#ffffff', condition: 'rgba(255, 255, 255, 0.8)', sub: 'rgba(255, 255, 255, 0.9)', badgeLabel: '#FFFFFF' }
+    ? { grade: colorOverrides?.gradeColor ?? '#7c3aed', condition: '#6b46c1', sub: '#4b5563', badgeLabel: '#7c3aed' }
+    : { grade: colorOverrides?.gradeColor ?? '#ffffff', condition: 'rgba(255, 255, 255, 0.8)', sub: 'rgba(255, 255, 255, 0.9)', badgeLabel: '#FFFFFF' }
 
   return (
     <div

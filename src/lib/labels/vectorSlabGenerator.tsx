@@ -22,9 +22,10 @@ import {
   type SlabBackInputs,
 } from '@/lib/labelLab/customSlabPdfBlock'
 import { presetSpec, specFromCustomConfig, type LabStyleSpec } from '@/lib/labelLab/labStyleSpecs'
+import { evaluateLabelBackground } from '@/lib/labelLab/contrastWCAG'
 import type { SlabLabelInputs } from '@/lib/labelLab/slabLabelPdfDoc'
 import type { SlabLabelData } from '@/lib/slabLabelGenerator'
-import type { CustomLabelConfig } from '@/lib/labelPresets'
+import { configBackgroundStops, resolveConfigTextPolarity, type CustomLabelConfig } from '@/lib/labelPresets'
 import {
   containsCJK,
   extractAsciiSafe,
@@ -113,6 +114,38 @@ function specForStyle(style: 'modern' | 'traditional'): LabStyleSpec {
 
 export function isStandardSlabDims(config: CustomLabelConfig): boolean {
   return Math.abs(config.width - 2.8) < 0.001 && Math.abs(config.height - 0.8) < 0.001
+}
+
+// ------- Halo routing gate -------
+
+/** WCAG threshold below which the raster text halo is load-bearing. */
+const HALO_CONTRAST_THRESHOLD = 4.5
+
+/**
+ * True when the resolved text color's WORST-CASE WCAG contrast against the
+ * colors text actually sits on drops below 4.5:1. The raster path strokes
+ * every text run with a 0.6-alpha black halo that keeps such styles legible
+ * (rainbow, card-extension, mid-tone geometric); react-pdf cannot stroke
+ * <Text>, so the generator call sites use these gates to keep those styles
+ * on the raster path. Solid dark/light styles pass and stay vector.
+ */
+function stopsNeedTextHalo(stops: string[], discrete: boolean, textHex: string): boolean {
+  const report = evaluateLabelBackground({ stops, textHex, discrete, threshold: HALO_CONTRAST_THRESHOLD })
+  return report.minChosen < HALO_CONTRAST_THRESHOLD
+}
+
+/** Gate for the custom-config generators (single + batch). */
+export function customConfigNeedsTextHalo(config: CustomLabelConfig): boolean {
+  const { stops, discrete } = configBackgroundStops(config)
+  // Same light/dark hex pair specFromCustomConfig resolves the text to.
+  const textHex = resolveConfigTextPolarity(config) === 'light' ? '#ffffff' : '#1f2937'
+  return stopsNeedTextHalo(stops, discrete, textHex)
+}
+
+/** Gate for the standard Modern/Traditional generators — same rule via the preset spec. */
+export function standardStyleNeedsTextHalo(style: 'modern' | 'traditional'): boolean {
+  const spec = specForStyle(style)
+  return stopsNeedTextHalo(spec.contrastStops, spec.contrastDiscrete, spec.textColor)
 }
 
 // ------- Page chrome (headers, cut guides — mirrors raster drawing) -------

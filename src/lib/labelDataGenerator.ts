@@ -183,6 +183,8 @@ export interface LabelData {
   setName: string | null;
   subset: string | null;
   cardNumber: string | null;
+  /** cardNumber formatted for display ("#" prefix, Pokemon fraction/promo handling). Optional for backwards compat with stored label_data. */
+  formattedCardNumber?: string | null;
   year: string | null;
   contextLine: string;  // Pre-formatted: "Set • Subset • #123 • 2023"
 
@@ -1153,49 +1155,13 @@ export function generateLabelData(card: CardForLabel): LabelData {
   // Clean card number - remove explanatory text like "(printed as 125/094★...)"
   const cardNumber = getCleanValue(rawCardNumber);
 
-  // For Pokemon cards, format the card number properly
-  // - Promo formats (SM226, SWSH039, SVP085) - show as-is, no "#" prefix
-  // - Standard fractions (232/182) - show as-is with "#" prefix
-  // - Just numerator (232) - try to add set total if we have it
-  let formattedCardNumber: string | null = null;
-  if (cardNumber && category === 'Pokemon') {
-    // Check if it's already in fraction format (X/Y)
-    if (/^\d+\/\d+$/.test(cardNumber)) {
-      // Already has fraction format - use as-is with "#" prefix
-      formattedCardNumber = `#${cardNumber}`;
-    }
-    // Check for promo-style formats (SM###, SWSH###, SVP###, TG##, GG##)
-    else if (/^(SM|SWSH|SVP|TG|GG|XY|BW)\d+$/i.test(cardNumber)) {
-      // Promo format - show as-is without "#" prefix
-      formattedCardNumber = cardNumber.toUpperCase();
-    }
-    // Check if it's a pure number that needs the set total
-    else if (/^\d+$/.test(cardNumber)) {
-      // Try to get set total from various sources
-      // 1. From card's pokemon_api_data (if verified)
-      const setPrintedTotal = card.pokemon_api_data?.set?.printedTotal;
-
-      if (setPrintedTotal) {
-        formattedCardNumber = `#${cardNumber}/${setPrintedTotal}`;
-      } else {
-        // Just use the number with "#" prefix
-        formattedCardNumber = `#${cardNumber}`;
-      }
-    }
-    // Gallery formats like TG10/TG30 or GG33/GG70
-    else if (/^(TG|GG)\d+\/(TG|GG)\d+$/i.test(cardNumber)) {
-      // Show first part only with no prefix (TG10)
-      const firstPart = cardNumber.split('/')[0];
-      formattedCardNumber = firstPart.toUpperCase();
-    }
-    else {
-      // Unknown format - show with "#" prefix
-      formattedCardNumber = `#${cardNumber}`;
-    }
-  } else if (cardNumber) {
-    // Non-Pokemon cards - standard "#" prefix
-    formattedCardNumber = `#${cardNumber}`;
-  }
+  // Format the card number for display in the context line ("#" prefix,
+  // Pokemon fraction/promo handling). Shared with custom-label override rebuilds.
+  const formattedCardNumber = formatCardNumberForContext(
+    cardNumber,
+    category,
+    card.pokemon_api_data?.set?.printedTotal
+  );
 
   // For Lorcana and Pokemon cards, prioritize database column (verified from internal database or OCR override)
   let rawYear: string | null;
@@ -1275,6 +1241,7 @@ export function generateLabelData(card: CardForLabel): LabelData {
     setName,
     subset,
     cardNumber,
+    formattedCardNumber,
     year,
     contextLine,
     features,
@@ -1305,6 +1272,47 @@ export function getLabelData(card: CardForLabel & { label_data?: LabelData | nul
 // ============================================================================
 // CONTEXT LINE / FEATURES LINE BUILDERS (used by custom label overrides)
 // ============================================================================
+
+/**
+ * Format a raw card number for display in the context line.
+ * - Pokemon promo formats (SM226, SWSH039, SVP085, TG10) - as-is, no "#" prefix
+ * - Pokemon fractions (232/182) - "#" prefix; pure numbers get set total appended when known
+ * - Everything else - standard "#" prefix
+ * Idempotent: values already starting with "#" are returned unchanged, so it is
+ * safe to run on user-edited overrides that were initialized from formatted values.
+ */
+export function formatCardNumberForContext(
+  cardNumber: string | null | undefined,
+  category?: string | null,
+  setPrintedTotal?: number | string | null
+): string | null {
+  if (!cardNumber) return null;
+  if (cardNumber.startsWith('#')) return cardNumber;
+
+  if (category === 'Pokemon') {
+    // Already in fraction format (X/Y) - use as-is with "#" prefix
+    if (/^\d+\/\d+$/.test(cardNumber)) {
+      return `#${cardNumber}`;
+    }
+    // Promo-style formats (SM###, SWSH###, SVP###, TG##, GG##) - as-is, no "#" prefix
+    if (/^(SM|SWSH|SVP|TG|GG|XY|BW)\d+$/i.test(cardNumber)) {
+      return cardNumber.toUpperCase();
+    }
+    // Pure number - append set total when we have it
+    if (/^\d+$/.test(cardNumber)) {
+      return setPrintedTotal ? `#${cardNumber}/${setPrintedTotal}` : `#${cardNumber}`;
+    }
+    // Gallery formats like TG10/TG30 or GG33/GG70 - first part only, no prefix
+    if (/^(TG|GG)\d+\/(TG|GG)\d+$/i.test(cardNumber)) {
+      return cardNumber.split('/')[0].toUpperCase();
+    }
+    // Unknown format - "#" prefix
+    return `#${cardNumber}`;
+  }
+
+  // Non-Pokemon cards - standard "#" prefix
+  return `#${cardNumber}`;
+}
 
 /** Rebuild contextLine from its component parts (Set • Subset • #Number • Year) */
 export function buildContextLine(

@@ -4,8 +4,9 @@ import { useState, useRef, useMemo, useCallback, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { getCardLabelData, getCardSlabProps } from '@/lib/useLabelData'
-import { buildContextLine, buildFeaturesLine } from '@/lib/labelDataGenerator'
-import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors } from '@/lib/labelPresets'
+import { buildContextLine, buildFeaturesLine, formatCardNumberForContext } from '@/lib/labelDataGenerator'
+import { DIMENSION_PRESETS, COLOR_PRESETS, LABEL_TYPES, DEFAULT_CUSTOM_CONFIG, CARD_COLOR_STYLES, LAYOUT_STYLES, GEOMETRIC_PATTERNS, applyLayoutToColors, FONT_SCALE_PRESETS, configBackgroundStops } from '@/lib/labelPresets'
+import { contrastRatioHex } from '@/lib/contrastWCAG'
 import type { CustomLabelConfig, DimensionPreset, ColorPreset, CardColorStyle, CardColorInput } from '@/lib/labelPresets'
 import { extractCardColors, type CardColors } from '@/lib/colorExtractor'
 import { LabelMockup } from '@/components/labels/LabelMockup'
@@ -926,6 +927,8 @@ function CustomDesigner({
 }) {
   const [isDownloading, setIsDownloading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [saveResult, setSaveResult] = useState<'saved' | 'error' | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const updateConfig = useCallback((partial: Partial<CustomLabelConfig>) => {
@@ -1127,6 +1130,9 @@ function CustomDesigner({
     primaryName: '', setName: '', subset: '', cardNumber: '', year: '', features: '',
   })
   const [fieldsInitialized, setFieldsInitialized] = useState<string | null>(null)
+  // Pure generated values (no custom overrides) — baseline for diffing on save,
+  // so untouched fields are never frozen as permanent overrides.
+  const generatedBaselineRef = useRef<LabelFields | null>(null)
 
   // Reset fieldsInitialized and clear canvas when card changes
   const prevCardIdRef = useRef<string | null>(null)
@@ -1134,6 +1140,7 @@ function CustomDesigner({
     if (selectedCard?.id !== prevCardIdRef.current) {
       prevCardIdRef.current = selectedCard?.id || null
       setFieldsInitialized(null)
+      generatedBaselineRef.current = null
       // Clear canvas so old card label doesn't linger
       const canvas = canvasRef.current
       if (canvas) {
@@ -1143,19 +1150,34 @@ function CustomDesigner({
     }
   }, [selectedCard])
 
-  // Populate fields from slabData when card changes
+  // Populate fields from the card's structured label data when card changes.
+  // Do NOT split contextLine positionally \u2014 empty segments are omitted when it
+  // is built, so positions aren't stable (and MTG subsets can contain a bullet).
   useEffect(() => {
     if (!slabData || !selectedCard) return
     if (fieldsInitialized === selectedCard.id) return
-    const parts = slabData.contextLine.split(' \u2022 ')
+    // Effective values (custom overrides applied) \u2014 what the fields should show
+    const labelData = getCardLabelData(selectedCard)
+    // Pure generated values \u2014 baseline for diffing edits on save
+    const generated = getCardLabelData(selectedCard, { ignoreCustomOverrides: true })
+    generatedBaselineRef.current = {
+      primaryName: generated.primaryName || '',
+      setName: generated.setName || '',
+      subset: generated.subset || '',
+      cardNumber: generated.formattedCardNumber || generated.cardNumber || '',
+      year: generated.year || '',
+      features: generated.features?.join(', ') || '',
+    }
     setLabelFields({
-      primaryName: slabData.primaryName || '',
-      setName: parts[0] || '',
-      subset: parts[1] || '',
-      cardNumber: parts[2] || '',
-      year: parts[3] || '',
-      features: slabData.features?.join(', ') || '',
+      primaryName: labelData.primaryName || '',
+      setName: labelData.setName || '',
+      subset: labelData.subset || '',
+      cardNumber: labelData.formattedCardNumber || labelData.cardNumber || '',
+      year: labelData.year || '',
+      features: labelData.features?.join(', ') || '',
     })
+    setSaveResult(null)
+    setSaveError(null)
     setFieldsInitialized(selectedCard.id)
   }, [slabData, selectedCard, fieldsInitialized])
 
@@ -1173,7 +1195,8 @@ function CustomDesigner({
       primaryName: labelFields.primaryName,
       contextLine: buildContextLine(
         labelFields.setName, labelFields.subset,
-        labelFields.cardNumber, labelFields.year
+        formatCardNumberForContext(labelFields.cardNumber, selectedCard?.category),
+        labelFields.year
       ),
       features: featuresList,
       featuresLine: buildFeaturesLine(featuresList),
@@ -1301,16 +1324,36 @@ function CustomDesigner({
   const handleSaveToCard = async () => {
     if (!selectedCard) return
     setIsSaving(true)
+    setSaveResult(null)
+    setSaveError(null)
     try {
-      const customFields: Record<string, any> = {
-        primaryName: labelFields.primaryName || null,
-        setName: labelFields.setName || null,
-        subset: labelFields.subset || null,
-        cardNumber: labelFields.cardNumber || null,
-        year: labelFields.year || null,
-        features: labelFields.features
-          ? labelFields.features.split(',').map((f: string) => f.trim()).filter(Boolean)
-          : [],
+      // Only save fields that differ from the generated baseline. The endpoint
+      // replaces custom_label_data wholesale, so omitted keys carry no override
+      // — untouched fields keep tracking the generated label.
+      const baseline = generatedBaselineRef.current
+      const customFields: Record<string, any> = {}
+
+      // Never save an empty primaryName — a cleared name means "revert to generated"
+      if (labelFields.primaryName.trim() && (!baseline || labelFields.primaryName !== baseline.primaryName)) {
+        customFields.primaryName = labelFields.primaryName
+      }
+      if (!baseline || labelFields.setName !== baseline.setName) {
+        customFields.setName = labelFields.setName || null
+      }
+      if (!baseline || labelFields.subset !== baseline.subset) {
+        customFields.subset = labelFields.subset || null
+      }
+      if (!baseline || labelFields.cardNumber !== baseline.cardNumber) {
+        customFields.cardNumber = labelFields.cardNumber || null
+      }
+      if (!baseline || labelFields.year !== baseline.year) {
+        customFields.year = labelFields.year || null
+      }
+      const parseFeatures = (s: string) =>
+        s ? s.split(',').map((f: string) => f.trim()).filter(Boolean) : []
+      const editedFeatures = parseFeatures(labelFields.features)
+      if (!baseline || JSON.stringify(editedFeatures) !== JSON.stringify(parseFeatures(baseline.features))) {
+        customFields.features = editedFeatures
       }
 
       const session = (await import('@/lib/directAuth')).getStoredSession()
@@ -1322,9 +1365,24 @@ function CustomDesigner({
         },
         body: JSON.stringify({ customFields }),
       })
-      if (!res.ok) throw new Error('Save failed')
-    } catch (err) {
+      if (!res.ok) {
+        let message = 'Save failed'
+        try {
+          const body = await res.json()
+          if (body?.error) message = body.error
+        } catch { /* keep default message */ }
+        throw new Error(message)
+      }
+      // A cleared name was saved as "revert to generated" — reflect that in the field
+      if (!labelFields.primaryName.trim() && baseline?.primaryName) {
+        setLabelFields((prev) => ({ ...prev, primaryName: baseline.primaryName }))
+      }
+      setSaveResult('saved')
+      setTimeout(() => setSaveResult((s) => (s === 'saved' ? null : s)), 2500)
+    } catch (err: any) {
       console.error('Save label edits failed:', err)
+      setSaveResult('error')
+      setSaveError(err?.message || 'Save failed')
     } finally {
       setIsSaving(false)
     }
@@ -1894,6 +1952,77 @@ function CustomDesigner({
               </p>
             </div>
 
+            {/* Grade Color (July 2026, client-requested) — Auto keeps the
+                historical purple-on-light / white-on-dark pair; a swatch or
+                custom hex overrides the grade digit everywhere it renders. */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Grade Color</h3>
+              <div className="flex gap-2 items-center flex-wrap">
+                <button
+                  onClick={() => updateConfig({ gradeColor: 'auto' })}
+                  className={`text-xs py-1.5 px-3 rounded border transition-colors ${
+                    !config.gradeColor || config.gradeColor === 'auto'
+                      ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                      : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                  }`}
+                >
+                  Auto
+                </button>
+                {['#d4af37', '#dc2626', '#2563eb', '#16a34a', '#111111', '#ffffff'].map((hex) => (
+                  <button
+                    key={hex}
+                    onClick={() => updateConfig({ gradeColor: hex })}
+                    aria-label={`Grade color ${hex}`}
+                    className={`w-7 h-7 rounded-full border-2 transition-transform ${
+                      config.gradeColor === hex ? 'border-purple-600 scale-110' : 'border-gray-300 hover:scale-105'
+                    }`}
+                    style={{ backgroundColor: hex }}
+                  />
+                ))}
+                <input
+                  type="color"
+                  value={config.gradeColor && config.gradeColor !== 'auto' ? config.gradeColor : '#7c3aed'}
+                  onChange={(e) => updateConfig({ gradeColor: e.target.value })}
+                  className="w-7 h-7 rounded cursor-pointer border border-gray-300 p-0"
+                  title="Custom grade color"
+                />
+              </div>
+              {config.gradeColor && config.gradeColor !== 'auto' && (() => {
+                const { stops } = configBackgroundStops(config)
+                const worst = Math.min(...stops.map((s) => contrastRatioHex(config.gradeColor!, s)))
+                return worst < 3 ? (
+                  <p className="text-[10px] text-amber-600 mt-1">
+                    ⚠ Low contrast ({worst.toFixed(1)}:1) — this grade color may be hard to read on your background.
+                  </p>
+                ) : null
+              })()}
+            </div>
+
+            {/* Grade & Text Size (July 2026, client-requested) — scales the
+                grade digit and the card-text starting sizes; the fit logic
+                still shrinks long text so it never overflows the label. */}
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Grade &amp; Text Size</h3>
+              <div className="flex gap-2">
+                {FONT_SCALE_PRESETS.map((p) => (
+                  <button
+                    key={p.id}
+                    onClick={() => updateConfig({ fontScale: p.scale })}
+                    className={`flex-1 text-xs py-1.5 rounded border transition-colors ${
+                      (config.fontScale ?? 1) === p.scale
+                        ? 'border-purple-600 bg-purple-50 text-purple-700 font-medium'
+                        : 'border-gray-200 text-gray-600 hover:border-purple-300'
+                    }`}
+                  >
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-gray-500 mt-1">
+                Larger sizes are best-effort — long card names still shrink to fit the label.
+              </p>
+            </div>
+
             {/* Border Controls — shown when border is active. Border is auto-
                 enabled by selecting "DCM Bordered" in the Dimensions section
                 (handleDimensionPreset sets borderEnabled: true). The manual
@@ -2048,10 +2177,17 @@ function CustomDesigner({
                 <button
                   onClick={handleSaveToCard}
                   disabled={isSaving}
-                  className="w-full text-[10px] py-1 text-purple-600 hover:text-purple-800 border border-purple-300 rounded font-medium"
+                  className={`w-full text-[10px] py-1 rounded font-medium ${
+                    saveResult === 'saved'
+                      ? 'text-green-600 border border-green-300'
+                      : 'text-purple-600 hover:text-purple-800 border border-purple-300'
+                  }`}
                 >
-                  {isSaving ? 'Saving...' : 'Save to Card'}
+                  {isSaving ? 'Saving...' : saveResult === 'saved' ? 'Saved ✓' : 'Save to Card'}
                 </button>
+                {saveResult === 'error' && saveError && (
+                  <p className="text-[10px] text-red-600" role="alert">{saveError}</p>
+                )}
               </div>
             </div>
 

@@ -44,7 +44,30 @@ export function useLabelPreview({
 
   // Serialize config to detect all field changes (object reference may not change)
   const configKey = JSON.stringify(config);
-  const dataKey = data ? `${data.serial}-${data.grade}-${data.primaryName}` : '';
+  // Serialize every data field the renderer consumes so edits to any of them
+  // (contextLine, features, condition, emblem flags, ...) re-trigger a render.
+  // Large data URLs are represented by length to keep the key cheap.
+  const dataKey = data
+    ? JSON.stringify({
+        primaryName: data.primaryName,
+        contextLine: data.contextLine,
+        features: data.features,
+        featuresLine: data.featuresLine,
+        serial: data.serial,
+        grade: data.grade,
+        gradeFormatted: data.gradeFormatted,
+        condition: data.condition,
+        isAlteredAuthentic: data.isAlteredAuthentic,
+        englishName: data.englishName,
+        subScores: data.subScores,
+        showFounderEmblem: data.showFounderEmblem,
+        showVipEmblem: data.showVipEmblem,
+        showCardLoversEmblem: data.showCardLoversEmblem,
+        qrLen: data.qrCodeDataUrl?.length,
+        logoLen: data.logoDataUrl?.length,
+        whiteLogoLen: data.whiteLogoDataUrl?.length,
+      })
+    : '';
 
   const render = useCallback(async () => {
     if (!data) return;

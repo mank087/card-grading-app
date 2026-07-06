@@ -210,7 +210,7 @@ export function ModernFrontLabel({
         <div className="text-center flex-shrink-0">
           <div
             className={`font-bold ${config.gradeSize} leading-none`}
-            style={{ color: tx.grade }}
+            style={{ color: colorOverrides?.gradeColor ?? tx.grade }}
           >
             {grade !== null ? formatGrade(grade) : (isAlteredAuthentic ? 'A' : 'N/A')}
           </div>

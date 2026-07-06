@@ -63,12 +63,14 @@ export function specHasLightText(spec: LabStyleSpec): boolean {
  * renderer for light backgrounds.
  */
 export function paletteFromSpec(spec: LabStyleSpec): SlabTextPalette {
+  // July 2026: spec.gradeColor carries the user's grade-color choice (already
+  // resolved/validated by specFromCustomConfig); absent on lab-only specs.
   return specHasLightText(spec)
     ? {
         name: spec.textColor,
         muted: 'rgba(255,255,255,0.72)',
         accent: spec.accentColor || '#ffffff',
-        grade: spec.textColor,
+        grade: spec.gradeColor || spec.textColor,
         condition: 'rgba(255,255,255,0.85)',
         gradeDivider: null,
         logo: 'white',
@@ -77,7 +79,7 @@ export function paletteFromSpec(spec: LabStyleSpec): SlabTextPalette {
         name: spec.textColor,
         muted: '#4b5563',
         accent: spec.accentColor || '#2563eb',
-        grade: '#7c3aed',
+        grade: spec.gradeColor || '#7c3aed',
         condition: '#6b46c1',
         gradeDivider: '#7c3aed',
         logo: 'color',
@@ -112,7 +114,7 @@ export function CustomSlabLabelBlock({
         offsetY={bleedPt}
       />
       <SpecBorder spec={spec} />
-      <SlabFrontContentRow inputs={inputs} palette={paletteFromSpec(spec)} />
+      <SlabFrontContentRow inputs={inputs} palette={paletteFromSpec(spec)} fontScale={spec.fontScale || 1} />
     </>
   )
 }
@@ -453,7 +455,7 @@ export function CustomSlabBackBlock({
   bleedPt?: number
 }) {
   const lightText = specHasLightText(spec)
-  const gradeColor = lightText ? '#FFFFFF' : '#7c3aed'
+  const gradeColor = spec.gradeColor || (lightText ? '#FFFFFF' : '#7c3aed')
   const condColor = lightText ? 'rgba(255,255,255,0.8)' : '#6b46c1'
   const subColor = lightText ? 'rgba(255,255,255,0.95)' : '#4b5563'
   const condPt = fitBackCondition(inputs.condition)
@@ -542,7 +544,7 @@ export function CustomSlabBackBlock({
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: BK_GRADE_PT, color: gradeColor, lineHeight: 1 }}>
+        <Text style={{ fontFamily: 'Helvetica-Bold', fontSize: BK_GRADE_PT * (spec.fontScale || 1), color: gradeColor, lineHeight: 1 }}>
           {inputs.grade}
         </Text>
         {inputs.condition ? (

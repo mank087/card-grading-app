@@ -244,8 +244,8 @@ function fitCardInfoFonts(
       if (ctx.measureText(featuresLine).width > maxWidth) continue;
     }
 
-    // Check serial fits width
-    ctx.font = `${sizes.serial}px 'Courier New', monospace`;
+    // Check serial fits width (same font the serial is drawn with)
+    ctx.font = `${sizes.serial}px 'Helvetica Neue', Arial, sans-serif`;
     if (ctx.measureText(serial).width > maxWidth) continue;
 
     // Calculate total block height
@@ -805,6 +805,14 @@ export async function generateSlabLabel(
   // any failure.
   try {
     const vector = await import('./labels/vectorSlabGenerator');
+    // Halo gate: react-pdf can't stroke text, so styles whose text needs the
+    // raster halo (worst-case WCAG contrast < 4.5:1 on the real background
+    // stops) skip vector and keep the legible raster output.
+    if (vector.standardStyleNeedsTextHalo(style)) {
+      console.log('[slabLabel] style needs text halo — using raster path');
+      return generateSlabLabelRaster(data, style);
+    }
+    console.log('[slabLabel] using vector path');
     return await vector.generateSlabLabelVector(data, style);
   } catch (err) {
     console.warn('[slabLabel] vector path failed, falling back to raster:', err);
@@ -947,6 +955,29 @@ async function flipImage180(dataUrl: string): Promise<string> {
 }
 
 /**
+ * Crop the bleed strip off one horizontal edge of a rendered label image.
+ * Fold-over panels sit flush against the fold line, but the canvas bakes bleed
+ * on all four sides — and jsPDF addImage scales (it cannot crop), so leaving
+ * the fold-side bleed in the image squashes the label vertically by ~8.3%.
+ * Twin of cropBleedEdge() in customSlabLabelGenerator.ts (canvas variant).
+ */
+async function cropBleedEdge(dataUrl: string, edge: 'top' | 'bottom'): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height - BLEED_PX;
+      const ctx = canvas.getContext('2d')!;
+      const srcY = edge === 'top' ? BLEED_PX : 0;
+      ctx.drawImage(img, 0, srcY, img.width, canvas.height, 0, 0, img.width, canvas.height);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = dataUrl;
+  });
+}
+
+/**
  * Generate a fold-over slab label (single-sided print, fold along top edge).
  * Back (upside-down) on TOP, front on BOTTOM.
  * Fold the top panel down behind the front — the back label flips right-side up.
@@ -976,16 +1007,18 @@ export async function generateFoldOverSlabLabel(
   doc.text(`${LABEL_WIDTH_IN}" × ${LABEL_HEIGHT_IN}" (each panel)`, PAGE_WIDTH - 50, startY - 30, { align: 'right' });
 
   // Top panel: BACK (rotated 180°)
-  // Bleed on top and sides only — flush at fold line (bottom of back panel)
-  const flippedBackImg = await flipImage180(backImg);
-  doc.addImage(flippedBackImg, 'JPEG',
+  // Bleed on top and sides only — flush at fold line (bottom of back panel),
+  // so crop the flipped image's bottom bleed strip before placing.
+  const flippedBackImg = await cropBleedEdge(await flipImage180(backImg), 'bottom');
+  doc.addImage(flippedBackImg, 'PNG',
     startX - BLEED_PT, startY - BLEED_PT,
     LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT  // bleed top only, flush at fold
   );
 
   // Bottom panel: FRONT (right-side up)
-  // Flush at fold line (top of front panel) — bleed on bottom and sides
-  doc.addImage(frontImg, 'JPEG',
+  // Flush at fold line (top of front panel) — bleed on bottom and sides,
+  // so crop the front image's top bleed strip before placing.
+  doc.addImage(await cropBleedEdge(frontImg, 'top'), 'PNG',
     startX - BLEED_PT, startY + LABEL_HEIGHT,
     LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT  // flush at fold, bleed bottom
   );
@@ -1103,16 +1136,16 @@ export async function generateBatchFoldOverSlabLabels(
         renderBackLabelCanvas(dataArray[i], style),
       ]);
 
-      // Flip back 180°
-      const flippedBack = await flipImage180(backImg);
+      // Flip back 180°, then crop the bleed strip on the fold-facing edge
+      const flippedBack = await cropBleedEdge(await flipImage180(backImg), 'bottom');
 
-      // Top: BACK (flipped) — flush at fold, bleed top
-      doc.addImage(flippedBack, 'JPEG',
+      // Top: BACK (flipped) — flush at fold (bottom edge cropped), bleed top
+      doc.addImage(flippedBack, 'PNG',
         x - BLEED_PT, y - BLEED_PT,
         LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT
       );
-      // Bottom: FRONT — flush at fold, bleed bottom
-      doc.addImage(frontImg, 'JPEG',
+      // Bottom: FRONT — flush at fold (top edge cropped), bleed bottom
+      doc.addImage(await cropBleedEdge(frontImg, 'top'), 'PNG',
         x - BLEED_PT, y + LABEL_HEIGHT,
         LABEL_WIDTH + BLEED_PT * 2, LABEL_HEIGHT + BLEED_PT
       );

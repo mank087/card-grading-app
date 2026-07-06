@@ -31,9 +31,10 @@
  * Known gaps vs production canvas, to validate in print:
  *   - Text stroke. Production strokes name/context/features/serial/grade
  *     in 0.6 alpha black for legibility on the gradient. react-pdf <Text>
- *     does not support stroke; we approximate with a softer textShadow.
- *     If print testing shows this is the wrong call, we move dark-theme
- *     text into <Svg><Text stroke> in a follow-up.
+ *     does not support stroke, so the generator call sites gate on WCAG
+ *     contrast (vectorSlabGenerator *NeedsTextHalo helpers): styles whose
+ *     resolved text drops below 4.5:1 worst-case against the real
+ *     background stops skip vector and keep the raster path's halo.
  *   - Subgrade rendering on back is identical to production (4-line text
  *     list, not boxed).
  *   - Decorative emblems on the back (Founder / VIP / Card Lover) are
@@ -95,10 +96,24 @@ const CONDITION_PT_MIN = px(12)      // 2.88
 // Name auto-fit window (production: 14-38 px)
 const NAME_PT_MAX = px(38)           // 9.12
 const NAME_PT_MIN = px(14)           // 3.36
-// Production multipliers:
+// Production multipliers (slabLabelGenerator.ts FONT_RATIO):
 const CONTEXT_FACTOR = 0.76
 const FEATURES_FACTOR = 0.70
 const SERIAL_FACTOR = 0.76
+
+// Vertical metrics of the rendered text stack. These MUST mirror the
+// lineHeight/marginTop factors in SlabFrontContentRow's styles exactly —
+// the fit loop estimates block height with them (the vector analog of
+// production's SPACING_RATIO gaps).
+const NAME_LINE_HEIGHT = 1.05
+const BODY_LINE_HEIGHT = 1.1
+const SERIAL_LINE_HEIGHT = 1.05
+const CONTEXT_GAP_FACTOR = 0.25   // context marginTop = contextPt * 0.25
+const FEATURES_GAP_FACTOR = 0.25  // features marginTop = featuresPt * 0.25
+const SERIAL_GAP_FACTOR = 0.45    // serial marginTop = serialPt * 0.45
+
+// Available height for the text stack (production: infoMaxHeight = CH - 16px)
+const TEXT_MAX_HEIGHT = LABEL_HEIGHT - px(16)
 
 // ------- Theme palettes (identical hex to production) -------
 
@@ -258,16 +273,29 @@ export interface SlabTextPalette {
 export function SlabFrontContentRow({
   inputs,
   palette,
+  fontScale = 1,
 }: {
   inputs: Omit<SlabLabelInputs, 'theme'>
   palette: SlabTextPalette
+  /** July 2026 user typography scale (1 = historical sizes). */
+  fontScale?: number
 }) {
-  // Auto-fit name and child sizes (production fitCardInfoFonts).
+  // Auto-fit the whole text block (production fitCardInfoFonts): width-fit
+  // name/features/serial, cap context at 2 lines, shrink until the stack
+  // fits the label height.
   const textRegionWidth = LABEL_WIDTH - PADDING - LOGO_SIZE - TEXT_LOGO_GAP - GRADE_AREA_WIDTH - GRADE_RIGHT_PADDING
-  const namePt = fitFontSize(inputs.primaryName || 'Card', textRegionWidth, NAME_PT_MAX, NAME_PT_MIN, true)
-  const contextPt = namePt * CONTEXT_FACTOR
-  const featuresPt = namePt * FEATURES_FACTOR
-  const serialPt = namePt * SERIAL_FACTOR
+  const fitted = fitFrontTextBlock(
+    inputs.primaryName || 'Card',
+    inputs.contextLine || '',
+    inputs.featuresLine || '',
+    inputs.serial || '',
+    textRegionWidth,
+    TEXT_MAX_HEIGHT,
+  )
+  const namePt = fitted.namePt
+  const contextPt = fitted.contextPt
+  const featuresPt = fitted.featuresPt
+  const serialPt = fitted.serialPt
 
   const logoSrc = palette.logo === 'white' ? inputs.whiteLogoDataUrl : inputs.colorLogoDataUrl
 
@@ -316,7 +344,7 @@ export function SlabFrontContentRow({
                 lineHeight: 1.1,
               }}
             >
-              {inputs.contextLine}
+              {fitted.contextText}
             </Text>
           ) : null}
           {inputs.featuresLine ? (
@@ -352,7 +380,7 @@ export function SlabFrontContentRow({
           <Text
             style={{
               fontFamily: 'Helvetica-Bold',
-              fontSize: GRADE_PT,
+              fontSize: GRADE_PT * fontScale,
               color: palette.grade,
               textAlign: 'center',
               lineHeight: 1,
@@ -742,6 +770,121 @@ function fitFontSize(
 /** Condition auto-shrinks like production (24 down to 12 px). */
 function fitConditionSize(text: string, maxWidth: number): number {
   return fitFontSize((text || '').toUpperCase(), maxWidth, CONDITION_PT_MAX, CONDITION_PT_MIN, true)
+}
+
+/** Char-count width estimate — same em-width heuristic as fitFontSize. */
+function estTextWidth(text: string, pt: number, bold: boolean): number {
+  return (text || '').length * pt * (bold ? 0.58 : 0.52)
+}
+
+/** Greedy word-wrap on estimated widths — mirrors production wrapText(). */
+function wrapTextEst(text: string, pt: number, maxWidth: number, bold: boolean): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let currentLine = ''
+  for (const word of words) {
+    const testLine = currentLine ? `${currentLine} ${word}` : word
+    if (estTextWidth(testLine, pt, bold) > maxWidth && currentLine) {
+      lines.push(currentLine)
+      currentLine = word
+    } else {
+      currentLine = testLine
+    }
+  }
+  if (currentLine) lines.push(currentLine)
+  return lines
+}
+
+interface FittedFrontBlock {
+  namePt: number
+  contextPt: number
+  featuresPt: number
+  serialPt: number
+  /** Context capped at 2 estimated lines (production's slice(0, 2)), ellipsized when cut. */
+  contextText: string
+}
+
+/**
+ * Port of production fitCardInfoFonts() (slabLabelGenerator.ts:208): shrink
+ * the whole block proportionally (CONTEXT/FEATURES/SERIAL factors = the
+ * raster FONT_RATIO) until name, features, and serial each fit the width on
+ * one line AND the estimated stack height fits the label. Production wraps
+ * context via measureText and slices to 2 lines; react-pdf wraps for us and
+ * doesn't clip, so we cap by truncating the STRING at the estimated 2-line
+ * boundary (with an ellipsis) instead. Pure char-count estimation — react-
+ * pdf has no measureText. Sizes step down the same 0.25 pt grid the old
+ * width-only fitFontSize used, so any label that already fit keeps byte-
+ * identical font sizes and text.
+ */
+function fitFrontTextBlock(
+  name: string,
+  contextLine: string,
+  featuresLine: string,
+  serial: string,
+  maxWidth: number,
+  maxHeight: number,
+): FittedFrontBlock {
+  for (let pt = NAME_PT_MAX; ; pt -= 0.25) {
+    const namePt = Math.max(NAME_PT_MIN, pt)
+    const contextPt = namePt * CONTEXT_FACTOR
+    const featuresPt = namePt * FEATURES_FACTOR
+    const serialPt = namePt * SERIAL_FACTOR
+    const atMin = pt <= NAME_PT_MIN
+
+    // Width checks (production: measureText > maxWidth -> continue)
+    const fitsWidth =
+      estTextWidth(name, namePt, true) <= maxWidth &&
+      (!featuresLine || estTextWidth(featuresLine, featuresPt, true) <= maxWidth) &&
+      estTextWidth(serial, serialPt, false) <= maxWidth
+
+    // Wrap context, limit to 2 lines (production wrapText().slice(0, 2))
+    const ctxLines = contextLine ? wrapTextEst(contextLine, contextPt, maxWidth, false) : []
+    const shownCtxLines = Math.min(ctxLines.length, 2)
+
+    // Estimated stack height using the EXACT lineHeight/marginTop factors
+    // SlabFrontContentRow renders with (the raster sums SPACING_RATIO gaps
+    // the same way: name + afterName + context lines + afterContext +
+    // features + afterFeatures + serial).
+    let blockH = namePt * NAME_LINE_HEIGHT
+    if (shownCtxLines > 0) {
+      blockH += contextPt * CONTEXT_GAP_FACTOR + shownCtxLines * contextPt * BODY_LINE_HEIGHT
+    }
+    if (featuresLine) {
+      blockH += featuresPt * FEATURES_GAP_FACTOR + featuresPt * BODY_LINE_HEIGHT
+    }
+    blockH += serialPt * SERIAL_GAP_FACTOR + serialPt * SERIAL_LINE_HEIGHT
+
+    // Fits — or we've hit the floor (production falls back to MIN sizes).
+    if ((fitsWidth && blockH <= maxHeight) || atMin) {
+      return {
+        namePt,
+        contextPt,
+        featuresPt,
+        serialPt,
+        contextText: capContextTo2Lines(contextLine, ctxLines, contextPt, maxWidth),
+      }
+    }
+  }
+}
+
+/**
+ * Production slices wrapped context to 2 lines; react-pdf would happily
+ * wrap onto a 3rd, so truncate the string at the estimated 2-line boundary
+ * and ellipsize. Context that already fits 2 lines passes through untouched.
+ */
+function capContextTo2Lines(
+  contextLine: string,
+  ctxLines: string[],
+  contextPt: number,
+  maxWidth: number,
+): string {
+  if (ctxLines.length <= 2) return contextLine
+  let secondLine = ctxLines[1]
+  // Make room for the ellipsis on the estimated second line.
+  while (secondLine.includes(' ') && estTextWidth(`${secondLine}…`, contextPt, false) > maxWidth) {
+    secondLine = secondLine.slice(0, secondLine.lastIndexOf(' '))
+  }
+  return `${ctxLines[0]} ${secondLine}…`
 }
 
 function labelOf(k: 'centering' | 'corners' | 'edges' | 'surface'): string {

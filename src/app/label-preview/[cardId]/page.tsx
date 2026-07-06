@@ -19,7 +19,10 @@
  *   &customConfig=<base64-json>     — optional, used for slab-custom
  *
  * postMessage from RN host (data field):
- *   { type: 'preview-config', config: CustomLabelConfig, side: 'front'|'back' }
+ *   { type: 'preview-config', config: CustomLabelConfig, side: 'front'|'back',
+ *     labelText?: { primaryName?, contextLine?, featuresLine?, condition? } }
+ *   labelText is optional — when present it's merged over the fetched card
+ *   data so live text edits in the mobile Label Studio reach the canvas.
  *
  * postMessage to RN host:
  *   { type: 'label-preview-ready', dataUrl: string, side: 'front'|'back' }
@@ -157,22 +160,35 @@ export default function LabelPreviewPage() {
           if (creditsRow) {
             const selected: string[] = (creditsRow.preferred_label_emblem || '')
               .split(',').map((s: string) => s.trim()).filter(Boolean);
-            showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && selected.includes('founder');
-            showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && selected.includes('vip');
-            showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && selected.includes('card_lover');
+            // No preference = show all owned badges (matches web Label Studio,
+            // LabelStudioClient.tsx emblem defaults).
+            const wantsAll = selected.length === 0;
+            showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && (wantsAll || selected.includes('founder'));
+            showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && (wantsAll || selected.includes('vip'));
+            showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && (wantsAll || selected.includes('card_lover'));
           }
         } catch { /* non-fatal */ }
 
         const labelData = getCardLabelData(card);
         const w = card.conversational_weighted_sub_scores || {};
         const s = card.conversational_sub_scores || {};
-        const subScores = {
-          centering: w.centering ?? s.centering?.weighted ?? 0,
-          corners: w.corners ?? s.corners?.weighted ?? 0,
-          edges: w.edges ?? s.edges?.weighted ?? 0,
-          surface: w.surface ?? s.surface?.weighted ?? 0,
+        // Extract numeric value from either flat number or nested
+        // { weighted: number } format (matches LabelStudioClient.extractScore).
+        const extractScore = (key: string): number => {
+          const ws = w[key];
+          if (typeof ws === 'number') return ws;
+          if (ws && typeof ws === 'object' && typeof ws.weighted === 'number') return ws.weighted;
+          const sr = s[key];
+          if (typeof sr === 'number') return sr;
+          if (sr && typeof sr === 'object' && typeof sr.weighted === 'number') return sr.weighted;
+          return 0;
         };
-        const grade = labelData.grade ?? 0;
+        const subScores = {
+          centering: extractScore('centering'),
+          corners: extractScore('corners'),
+          edges: extractScore('edges'),
+          surface: extractScore('surface'),
+        };
         const cardUrl = `${window.location.origin}/verify/${card.serial}`;
         // Load BOTH the dark and white logos — the renderer picks logoDataUrl
         // for light/traditional themes, whiteLogoDataUrl for dark/modern/custom
@@ -191,10 +207,13 @@ export default function LabelPreviewPage() {
           features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
           featuresLine: labelData.featuresLine || null,
           serial: labelData.serial,
-          grade,
-          gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
+          // Pass grade through as null for ungraded cards (the renderer shows
+          // 'A'/'N/A' instead of a literal 0) and the real altered-authentic
+          // flag — matches web Label Studio (LabelStudioClient.tsx).
+          grade: labelData.grade,
+          gradeFormatted: labelData.gradeFormatted,
           condition: labelData.condition,
-          isAlteredAuthentic: false,
+          isAlteredAuthentic: labelData.isAlteredAuthentic,
           englishName: card.featured || card.pokemon_featured || undefined,
           qrCodeDataUrl,
           subScores,
@@ -263,6 +282,27 @@ export default function LabelPreviewPage() {
         (slabDataRef.current as any).showFounderEmblem = !!e.showFounderEmblem;
         (slabDataRef.current as any).showVipEmblem = !!e.showVipEmblem;
         (slabDataRef.current as any).showCardLoversEmblem = !!e.showCardLoversEmblem;
+      }
+      // Optional live label-text override from the RN host. Card data is
+      // fetched once and cached in slabDataRef, so without this the canvas
+      // never reflects text edits made in the mobile Label Text section.
+      // Messages without labelText behave exactly as before (backward compat).
+      const lt = parsed.labelText as {
+        primaryName?: string;
+        contextLine?: string;
+        featuresLine?: string | null;
+        condition?: string;
+      } | undefined;
+      if (lt && slabDataRef.current) {
+        const d = slabDataRef.current as any;
+        if (typeof lt.primaryName === 'string') d.primaryName = lt.primaryName;
+        if (typeof lt.contextLine === 'string') d.contextLine = lt.contextLine;
+        if (lt.featuresLine !== undefined) {
+          d.featuresLine = lt.featuresLine || null;
+          d.features = (lt.featuresLine || '')
+            .split(/[•,]/).map((f: string) => f.trim()).filter(Boolean);
+        }
+        if (typeof lt.condition === 'string') d.condition = lt.condition;
       }
       doRender({ ...cfg, side: sideOverride || cfg.side || 'front' });
     }

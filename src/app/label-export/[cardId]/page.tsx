@@ -176,9 +176,12 @@ export default function LabelExportPage() {
           if (creditsRow) {
             const selected: string[] = (creditsRow.preferred_label_emblem || '')
               .split(',').map((s: string) => s.trim()).filter(Boolean);
-            showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && selected.includes('founder');
-            showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && selected.includes('vip');
-            showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && selected.includes('card_lover');
+            // No preference = show all owned badges (matches web Label Studio,
+            // LabelStudioClient.tsx emblem defaults).
+            const wantsAll = selected.length === 0;
+            showFounderEmblem = !!creditsRow.is_founder && creditsRow.show_founder_badge !== false && (wantsAll || selected.includes('founder'));
+            showVipEmblem = !!creditsRow.is_vip && creditsRow.show_vip_badge !== false && (wantsAll || selected.includes('vip'));
+            showCardLoversEmblem = !!creditsRow.is_card_lover && creditsRow.show_card_lover_badge !== false && (wantsAll || selected.includes('card_lover'));
             if (Array.isArray(creditsRow.custom_label_styles)) {
               savedCustomStyles = creditsRow.custom_label_styles as any[];
             }
@@ -190,12 +193,27 @@ export default function LabelExportPage() {
         const labelData = getCardLabelData(card);
         const w = card.conversational_weighted_sub_scores || {};
         const s = card.conversational_sub_scores || {};
-        const subScores = {
-          centering: w.centering ?? s.centering?.weighted ?? 0,
-          corners: w.corners ?? s.corners?.weighted ?? 0,
-          edges: w.edges ?? s.edges?.weighted ?? 0,
-          surface: w.surface ?? s.surface?.weighted ?? 0,
+        // Extract numeric value from either flat number or nested
+        // { weighted: number } format (matches LabelStudioClient.extractScore).
+        const extractScore = (key: string): number => {
+          const ws = w[key];
+          if (typeof ws === 'number') return ws;
+          if (ws && typeof ws === 'object' && typeof ws.weighted === 'number') return ws.weighted;
+          const sr = s[key];
+          if (typeof sr === 'number') return sr;
+          if (sr && typeof sr === 'object' && typeof sr.weighted === 'number') return sr.weighted;
+          return 0;
         };
+        const subScores = {
+          centering: extractScore('centering'),
+          corners: extractScore('corners'),
+          edges: extractScore('edges'),
+          surface: extractScore('surface'),
+        };
+        // Legacy generators below (card-image, mini-report, one-touch,
+        // toploader) type grade as a plain number, so keep the 0 fallback
+        // for them; the slab payloads pass labelData.grade through as null
+        // so ungraded cards render 'A'/'N/A' instead of a literal 0.
         const grade = labelData.grade ?? 0;
         const cardUrl = `${window.location.origin}/verify/${card.serial}`;
         const namePrefix = sanitize(labelData.primaryName || `card-${card.serial}`);
@@ -302,7 +320,7 @@ export default function LabelExportPage() {
             },
             subgrades: {
               centering: {
-                score: w.centering ?? s.centering?.weighted ?? 0,
+                score: extractScore('centering'),
                 frontScore: s.centering?.front ?? 0,
                 backScore: s.centering?.back ?? 0,
                 summary: cenSum.combined,
@@ -310,7 +328,7 @@ export default function LabelExportPage() {
                 backSummary: cenSum.back,
               },
               corners: {
-                score: w.corners ?? s.corners?.weighted ?? 0,
+                score: extractScore('corners'),
                 frontScore: s.corners?.front ?? 0,
                 backScore: s.corners?.back ?? 0,
                 summary: corSum.combined,
@@ -318,7 +336,7 @@ export default function LabelExportPage() {
                 backSummary: corSum.back,
               },
               edges: {
-                score: w.edges ?? s.edges?.weighted ?? 0,
+                score: extractScore('edges'),
                 frontScore: s.edges?.front ?? 0,
                 backScore: s.edges?.back ?? 0,
                 summary: edgSum.combined,
@@ -326,7 +344,7 @@ export default function LabelExportPage() {
                 backSummary: edgSum.back,
               },
               surface: {
-                score: w.surface ?? s.surface?.weighted ?? 0,
+                score: extractScore('surface'),
                 frontScore: s.surface?.front ?? 0,
                 backScore: s.surface?.back ?? 0,
                 summary: sufSum.combined,
@@ -492,10 +510,10 @@ export default function LabelExportPage() {
             features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
             featuresLine: labelData.featuresLine || null,
             serial: labelData.serial,
-            grade,
-            gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
+            grade: labelData.grade,
+            gradeFormatted: labelData.gradeFormatted,
             condition: labelData.condition,
-            isAlteredAuthentic: false,
+            isAlteredAuthentic: labelData.isAlteredAuthentic,
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,
@@ -532,10 +550,10 @@ export default function LabelExportPage() {
             features: Array.isArray((labelData as any).features) ? (labelData as any).features : [],
             featuresLine: labelData.featuresLine || null,
             serial: labelData.serial,
-            grade,
-            gradeFormatted: grade % 1 === 0 ? String(grade) : grade.toFixed(1),
+            grade: labelData.grade,
+            gradeFormatted: labelData.gradeFormatted,
             condition: labelData.condition,
-            isAlteredAuthentic: false,
+            isAlteredAuthentic: labelData.isAlteredAuthentic,
             englishName: card.featured || card.pokemon_featured || undefined,
             qrCodeDataUrl,
             subScores,

@@ -16,7 +16,7 @@
  * start/end/start at the config angle.
  */
 
-import { COLOR_PRESETS, CARD_COLOR_STYLES, applyLayoutToColors, resolveConfigTextPolarity } from '@/lib/labelPresets'
+import { COLOR_PRESETS, CARD_COLOR_STYLES, applyLayoutToColors, resolveConfigTextPolarity, resolveGradeColor, resolveFontScale } from '@/lib/labelPresets'
 import type { CardColorInput, CustomLabelConfig } from '@/lib/labelPresets'
 import { evaluateLabelBackground, type BackgroundContrastReport } from './contrastWCAG'
 
@@ -46,6 +46,11 @@ export interface LabStyleSpec {
   /** What production would render the text in. */
   textColor: string
   accentColor: string
+  /** Resolved grade-digit color (user override or polarity default). Absent
+      on lab-only specs — consumers fall back to their historical pair. */
+  gradeColor?: string
+  /** Resolved typography scale (1 = historical sizes). */
+  fontScale?: number
   /** Colors text actually sits on, for contrast eval. */
   contrastStops: string[]
   /** True when regions are hard-edged (split/geometric) — no interpolation. */
@@ -266,6 +271,10 @@ export function specFromCustomConfig(config: CustomLabelConfig): LabStyleSpec {
     source: 'custom' as const,
     textColor: lightText ? '#ffffff' : '#1f2937',
     accentColor: lightText ? 'rgba(34,197,94,0.9)' : '#2563eb',
+    // July 2026: user grade color + font scale ride the spec into the vector
+    // renderer. lightTheme for the grade = dark-text polarity (light bg).
+    gradeColor: resolveGradeColor(config, !lightText),
+    fontScale: resolveFontScale(config),
     border: config.borderEnabled && config.borderWidth
       ? { color: config.borderColor, widthIn: config.borderWidth }
       : undefined,

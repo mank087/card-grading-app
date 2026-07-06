@@ -313,6 +313,22 @@ export interface CustomLabelConfig {
    * 'light'/'dark' are explicit user overrides from the Studio toggle.
    */
   textColorMode?: 'auto' | 'light' | 'dark';
+  /**
+   * Grade number color (July 2026, client-requested). Absent or 'auto' keeps
+   * the historical behavior: white on dark themes, brand purple #7c3aed on
+   * light. A hex value overrides it everywhere the grade digit renders
+   * (canvas, vector PDF, HTML labels). Resolve via resolveGradeColor() —
+   * never read this field directly, so validation stays in one place.
+   */
+  gradeColor?: string;
+  /**
+   * Typography scale for the grade digit and card-text block (July 2026,
+   * client-requested). 1 = historical sizes; UI offers FONT_SCALE_PRESETS.
+   * Consumers multiply their base font sizes by resolveFontScale() — the
+   * existing fit-to-width/height loops still shrink oversized text, so a
+   * larger scale is a request, not a guarantee, on crowded labels.
+   */
+  fontScale?: number;
 }
 
 export const DEFAULT_CUSTOM_CONFIG: CustomLabelConfig = {
@@ -377,6 +393,51 @@ export function resolveConfigTextPolarity(config: CustomLabelConfig): 'light' | 
 }
 
 // ============================================================================
+// GRADE COLOR + FONT SCALE (July 2026 — client-requested customization)
+// ============================================================================
+
+/** Historical grade-digit colors, kept as the 'auto' behavior. */
+export const GRADE_PURPLE = '#7c3aed';
+
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+/**
+ * Single source of truth for the grade digit color. `lightTheme` is the
+ * generator's resolved theme lightness (isLightTheme / polarity === 'dark'):
+ * historically the grade renders purple on light backgrounds and white on
+ * dark ones. An explicit user gradeColor (valid 6-digit hex) wins over both.
+ */
+export function resolveGradeColor(
+  config: Pick<CustomLabelConfig, 'gradeColor'> | null | undefined,
+  lightTheme: boolean
+): string {
+  const c = config?.gradeColor;
+  if (c && c !== 'auto' && HEX_COLOR_RE.test(c)) return c;
+  return lightTheme ? GRADE_PURPLE : '#ffffff';
+}
+
+export interface FontScalePreset {
+  id: string;
+  name: string;
+  scale: number;
+}
+
+export const FONT_SCALE_PRESETS: FontScalePreset[] = [
+  { id: 'standard', name: 'Standard', scale: 1 },
+  { id: 'large', name: 'Large', scale: 1.15 },
+  { id: 'xl', name: 'Extra Large', scale: 1.3 },
+];
+
+/** Clamped typography scale; absent/invalid → 1 (historical sizes). */
+export function resolveFontScale(
+  config: Pick<CustomLabelConfig, 'fontScale'> | null | undefined
+): number {
+  const s = config?.fontScale;
+  if (typeof s !== 'number' || !Number.isFinite(s)) return 1;
+  return Math.min(1.5, Math.max(0.8, s));
+}
+
+// ============================================================================
 // SAVED CUSTOM STYLES (persisted to DB)
 // ============================================================================
 
@@ -399,6 +460,10 @@ export interface LabelColorOverrides {
   /** Resolved label text polarity (WCAG auto or user override). HTML label
       components use this to pick light vs dark text sets. */
   textPolarity?: 'light' | 'dark';
+  /** Resolved grade digit color (user override or the polarity default). */
+  gradeColor?: string;
+  /** Resolved typography scale (1 = historical sizes). */
+  fontScale?: number;
 }
 
 /** Rainbow CSS gradient string for reuse across components */
@@ -465,6 +530,10 @@ export function extractColorOverrides(config: CustomLabelConfig | null | undefin
     isCardExtension: config.colorPreset === 'card-extension',
     topEdgeGradient: config.topEdgeGradient,
     textPolarity: resolveConfigTextPolarity(config),
+    // Resolved here (not raw config.gradeColor) so HTML consumers inherit the
+    // same validation + auto fallback as the canvas/vector generators.
+    gradeColor: resolveGradeColor(config, resolveConfigTextPolarity(config) === 'dark'),
+    fontScale: resolveFontScale(config),
   };
 }
 

@@ -6,7 +6,7 @@
  * Applies user custom_label_data overrides when present.
  */
 
-import { generateLabelData, type LabelData, type CardForLabel, buildContextLine, buildFeaturesLine } from './labelDataGenerator';
+import { generateLabelData, type LabelData, type CardForLabel, buildContextLine, buildFeaturesLine, formatCardNumberForContext } from './labelDataGenerator';
 
 /** Fields that can be overridden via custom_label_data */
 export interface CustomLabelFields {
@@ -36,9 +36,17 @@ function applyCustomOverrides(labelData: LabelData, custom: CustomLabelFields): 
   if (hasContextOverride) {
     if (custom.setName !== undefined) result.setName = custom.setName;
     if (custom.subset !== undefined) result.subset = custom.subset;
-    if (custom.cardNumber !== undefined) result.cardNumber = custom.cardNumber;
+    if (custom.cardNumber !== undefined) {
+      result.cardNumber = custom.cardNumber;
+      result.formattedCardNumber = formatCardNumberForContext(custom.cardNumber, result.category);
+    }
     if (custom.year !== undefined) result.year = custom.year;
-    result.contextLine = buildContextLine(result.setName, result.subset, result.cardNumber, result.year);
+    // Use the display-formatted number ("#" prefix, Pokemon fraction handling) so
+    // rebuilt context lines match what generateLabelData produces.
+    const displayNumber = result.formattedCardNumber !== undefined
+      ? result.formattedCardNumber
+      : formatCardNumberForContext(result.cardNumber, result.category);
+    result.contextLine = buildContextLine(result.setName, result.subset, displayNumber, result.year);
   }
 
   if (custom.features !== undefined) {
@@ -52,8 +60,10 @@ function applyCustomOverrides(labelData: LabelData, custom: CustomLabelFields): 
 /**
  * Extract label data from a card object
  * Generates fresh label data, then applies any custom_label_data overrides.
+ * Pass options.ignoreCustomOverrides to get the pure generated values
+ * (used as the baseline when diffing designer edits before saving).
  */
-export function getCardLabelData(card: any): LabelData {
+export function getCardLabelData(card: any, options?: { ignoreCustomOverrides?: boolean }): LabelData {
   // Always generate fresh label data from card fields
   const cardForLabel: CardForLabel = {
     id: card.id,
@@ -93,7 +103,7 @@ export function getCardLabelData(card: any): LabelData {
   let labelData = generateLabelData(cardForLabel);
 
   // Apply user's custom label overrides if present
-  if (card.custom_label_data && typeof card.custom_label_data === 'object') {
+  if (!options?.ignoreCustomOverrides && card.custom_label_data && typeof card.custom_label_data === 'object') {
     labelData = applyCustomOverrides(labelData, card.custom_label_data as CustomLabelFields);
   }
 
