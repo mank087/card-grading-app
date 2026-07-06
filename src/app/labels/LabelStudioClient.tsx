@@ -1439,8 +1439,10 @@ function CustomDesigner({
                     )}
                   </div>
                   <div className="absolute overflow-hidden" style={{ top: '20%', left: '10.7%', width: '78.6%', height: '73.9%' }}>
-                    {selectedCard.front_url ? (
-                      <img src={selectedCard.front_url} alt={selectedCard.card_name || 'Card'}
+                    {/* Follow the Preview Side toggle so the card flips with the label */}
+                    {(config.side === 'back' ? (selectedCard.back_url || selectedCard.front_url) : selectedCard.front_url) ? (
+                      <img src={config.side === 'back' ? (selectedCard.back_url || selectedCard.front_url) : selectedCard.front_url}
+                        alt={selectedCard.card_name || 'Card'}
                         className="w-full h-full object-contain" loading="lazy" />
                     ) : (
                       <div className="w-full h-full" />
