@@ -1552,7 +1552,7 @@ export default function LabelStudioScreen() {
                     <TouchableOpacity
                       key={opt.id}
                       style={[s.dirBtn, { flex: 1 }, active && s.dirBtnActive]}
-                      onPress={() => updateConfig({ textColorMode: opt.id })}
+                      onPress={() => { switchToCustomTileIfForced(); updateConfig({ textColorMode: opt.id }) }}
                     >
                       <Text style={[s.dirBtnText, active && s.dirBtnTextActive]}>{opt.label}</Text>
                     </TouchableOpacity>
@@ -1573,14 +1573,14 @@ export default function LabelStudioScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 <TouchableOpacity
                   style={[s.dirBtn, (!config.gradeColor || config.gradeColor === 'auto') && s.dirBtnActive]}
-                  onPress={() => updateConfig({ gradeColor: 'auto' })}
+                  onPress={() => { switchToCustomTileIfForced(); updateConfig({ gradeColor: 'auto' }) }}
                 >
                   <Text style={[s.dirBtnText, (!config.gradeColor || config.gradeColor === 'auto') && s.dirBtnTextActive]}>Auto</Text>
                 </TouchableOpacity>
                 {['#d4af37', '#dc2626', '#2563eb', '#16a34a', '#111111', '#ffffff'].map(hex => (
                   <TouchableOpacity
                     key={hex}
-                    onPress={() => updateConfig({ gradeColor: hex })}
+                    onPress={() => { switchToCustomTileIfForced(); updateConfig({ gradeColor: hex }) }}
                     style={{
                       width: 32, height: 32, borderRadius: 16, backgroundColor: hex,
                       borderWidth: 2,
@@ -1591,6 +1591,7 @@ export default function LabelStudioScreen() {
                 <TouchableOpacity
                   style={s.dirBtn}
                   onPress={() => {
+                    switchToCustomTileIfForced()
                     setPickerSlot(-2)
                     setPickerCurrentColor(config.gradeColor && config.gradeColor !== 'auto' ? config.gradeColor : '#7c3aed')
                     setPickerVisible(true)
@@ -1618,7 +1619,7 @@ export default function LabelStudioScreen() {
                     <TouchableOpacity
                       key={opt.id}
                       style={[s.dirBtn, { flex: 1 }, active && s.dirBtnActive]}
-                      onPress={() => updateConfig({ fontScale: opt.scale })}
+                      onPress={() => { switchToCustomTileIfForced(); updateConfig({ fontScale: opt.scale }) }}
                     >
                       <Text style={[s.dirBtnText, active && s.dirBtnTextActive]}>{opt.label}</Text>
                     </TouchableOpacity>
