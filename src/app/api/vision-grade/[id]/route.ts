@@ -7,6 +7,7 @@ import {
   estimateProfessionalGrades,
   estimateProfessionalGradesWithDeterministicMapper,
   gradeCardConversational, // 🎯 PRIMARY grading system
+  DCM_PROMPT_VERSION,
   type VisionGradeResult,
   type DetailedInspectionResult
 } from "@/lib/visionGrader";
@@ -1678,8 +1679,8 @@ EXTRACTION RULES:
         conversational_back_summary: conversationalGradingData?.back_summary || null,
         conversational_card_info: conversationalGradingData?.card_info || null,  // 🔧 FIX: Save card_info for memorabilia/special features display
         conversational_corners_edges_surface: conversationalGradingData?.corners_edges_surface_json || null,  // 🆕 JSON details for corners/edges/surface (frontend display)
-        conversational_prompt_version: conversationalGradingData?.meta?.prompt_version || 'v3.2',
-        conversational_evaluated_at: conversationalGradingData?.meta?.evaluated_at_utc ? new Date(conversationalGradingData.meta.evaluated_at_utc) : new Date(),
+        conversational_prompt_version: DCM_PROMPT_VERSION,
+        conversational_evaluated_at: new Date(),
 
         // Legacy ai_grading field for frontend compatibility
         ai_grading: legacyGrading,

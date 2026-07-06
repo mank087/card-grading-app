@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches other card type flows)
-import { gradeCardConversational } from "@/lib/visionGrader";
+import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades, type CenteringMeasurements } from "@/lib/professionalGradeMapper";
@@ -1038,8 +1038,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
       conversational_corners_edges_surface: conversationalGradingData?.corners_edges_surface || null,  // 🆕 Detailed corner/edge/surface analysis
       conversational_defects_front: conversationalGradingData?.transformedDefects?.front || null,  // 🆕 Front defects
       conversational_defects_back: conversationalGradingData?.transformedDefects?.back || null,  // 🆕 Back defects
-      conversational_prompt_version: conversationalGradingData?.meta?.prompt_version || 'v4.2',
-      conversational_evaluated_at: conversationalGradingData?.meta?.evaluated_at_utc ? new Date(conversationalGradingData.meta.evaluated_at_utc) : new Date(),
+      conversational_prompt_version: DCM_PROMPT_VERSION,
+      conversational_evaluated_at: new Date(),
 
       // 🆕 Professional grade estimates (PSA, BGS, SGC, etc.)
       estimated_professional_grades: conversationalGradingData?.professional_grade_estimates || null,

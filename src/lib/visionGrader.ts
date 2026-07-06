@@ -32,6 +32,11 @@ import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
 // Re-export for use in routes
 export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 
+// Single source of truth for the deployed prompt/engine version. Routes must stamp
+// cards.conversational_prompt_version from this constant — the model-emitted
+// meta.prompt_version is unreliable (echoes stale strings from prompt examples).
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.1';
+
 // Types matching vision_grade_v1.json schema
 export interface VisionGradeResult {
   meta: {
@@ -2108,6 +2113,67 @@ Provide detailed analysis as markdown with all required sections.`
           console.warn(`[GRADE RECALC] ⚠️ zoom inspection unavailable (${zoom.error}) — grading from holistic ensemble only`);
         }
 
+        // Step 3.8 (v9.2) EVIDENCE RECONCILIATION: a deduction of 2+ points requires a
+        // documented defect. Production (2026-07-06, 24/103 cards) showed completions
+        // scoring a category 7-8 while their own prose declared it flawless and NO
+        // defect existed anywhere — not in any completion's defect arrays, not in the
+        // 24-crop zoom inspection ("No whitening... is visible on any of the four
+        // corners, supporting a front corner score of 7"). That number is an anchoring
+        // artifact, not a judgment — and it flip-flopped on re-shoots (same card
+        // grading 8/8/10 within minutes → grade-shopping + user complaints).
+        // When a 7-8 category score has ZERO recorded evidence, reconcile it to 9
+        // (Mint) — not 10: a 9 is defensible without a documented defect, Gem Mint
+        // is not in question here and stays behind its own gates. Guards:
+        //   - zoom must have actually run (it is the independent verifier)
+        //   - any structural signal (even unconfirmed) blocks reconciliation
+        //   - a zoom face-cap on the category blocks it (cap == evidence)
+        //   - all passes must agree the category is >= 7 (wild disagreement means
+        //     something real is going on — leave it alone)
+        const evidenceReconciliations: string[] = [];
+        {
+          const anyStructuralSignal =
+            jsonData.structural_damage?.detected === true ||
+            structuralDetectors.length > 0 ||
+            !!(zoom?.ok && zoom.structuralFindings.length > 0);
+          const sectionHasDefects = (j: any, cat: string): boolean => {
+            let found = false;
+            const walk = (node: any, depth: number) => {
+              if (found || !node || typeof node !== 'object' || depth > 4) return;
+              if (Array.isArray((node as any).defects) && (node as any).defects.length > 0) { found = true; return; }
+              for (const v of Object.values(node)) walk(v, depth + 1);
+            };
+            walk(j?.[cat], 0);
+            return found;
+          };
+          if (zoom?.ok && !anyStructuralSignal) {
+            for (const cat of ['corners', 'edges', 'surface'] as const) {
+              const score = serverRounded[cat];
+              if (score < 7 || score > 8) continue;
+              if (Object.keys(appliedFaceCaps).some(k => k.startsWith(`${cat}_`))) continue;
+              const holisticEvidence = scored.some(x => sectionHasDefects(x.j, cat));
+              const zoomEvidence = zoom.defects.some(d => d.category === cat);
+              const passesAgreeClean = passSrc.every(x => typeof x.cats[cat] === 'number' && (x.cats[cat] as number) >= 7);
+              if (holisticEvidence || zoomEvidence || !passesAgreeClean) continue;
+              console.log(`[GRADE RECALC] ⚖️ evidence reconciliation: ${cat} ${score} → 9 (no defect recorded by any completion or the zoom inspection — an unexplained deduction is not evidence)`);
+              serverRounded[cat] = 9;
+              if (jsonData.raw_sub_scores) {
+                for (const face of ['front', 'back'] as const) {
+                  const k = `${cat}_${face}`;
+                  if (typeof jsonData.raw_sub_scores[k] === 'number' && jsonData.raw_sub_scores[k] < 9) {
+                    jsonData.raw_sub_scores[k] = 9;
+                  }
+                }
+              }
+              evidenceReconciliations.push(`${cat} ${score}→9`);
+            }
+            if (evidenceReconciliations.length > 0 && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+              jsonData.grading_passes.consensus_notes.push(
+                `Evidence reconciliation: ${evidenceReconciliations.join(', ')} — the evaluations deducted for these categories without recording any defect, and the magnified 24-crop inspection found none either. Per the rubric, a deduction of 2+ points requires a visible, documented defect, so the unsupported deduction was reconciled to Mint (9).`
+              );
+            }
+          }
+        }
+
         // Step 3.9 (v9.0 COHERENCE): structural damage lives in the SURFACE subgrade.
         // Previously only the FINAL was capped, so a zoom-detected crease produced
         // "final 4 with all subgrades 9-10" — incoherent to the customer. A confirmed
@@ -2530,7 +2596,7 @@ Provide detailed analysis as markdown with all required sections.`
           model: model,
           timestamp: new Date().toISOString(),
           version: 'conversational-v9.1-json',
-          prompt_version: 'DCM_Grading_v9.1'
+          prompt_version: DCM_PROMPT_VERSION
         }
       };
 
@@ -2582,7 +2648,7 @@ Provide detailed analysis as markdown with all required sections.`
           model: model,
           timestamp: new Date().toISOString(),
           version: 'conversational-v9.1-markdown',
-          prompt_version: 'DCM_Grading_v9.1'
+          prompt_version: DCM_PROMPT_VERSION
         }
       };
 

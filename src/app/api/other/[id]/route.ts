@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 // PRIMARY: Conversational grading system (matches sports card flow)
-import { gradeCardConversational } from "@/lib/visionGrader";
+import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
@@ -514,6 +514,8 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
           conversational_grade_uncertainty: jsonData.image_quality?.grade_uncertainty || finalGrade.grade_range || '±0.5',  // 🔧 FIX: Prioritize ± format over range
           conversational_final_grade_summary: correctedSummary,  // 🆕 v6.2: Fixed summary with correct grade
           conversational_condition_label: decimalGrade != null ? getConditionFromGrade(Math.round(decimalGrade)) : (finalGrade.condition_label || null), // v8.9: derive label from final grade
+          conversational_prompt_version: DCM_PROMPT_VERSION,
+          conversational_evaluated_at: new Date(),
 
           // Sub-scores for colored circles display
           conversational_sub_scores: {

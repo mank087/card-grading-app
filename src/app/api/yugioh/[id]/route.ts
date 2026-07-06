@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
-import { gradeCardConversational } from "@/lib/visionGrader";
+import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
 import { ensureProcessedConditionReport } from "@/lib/conditionReportProcessor";
 // Professional grade estimation (deterministic backend mapper)
 import { estimateProfessionalGrades } from "@/lib/professionalGradeMapper";
@@ -921,8 +921,8 @@ export async function GET(request: NextRequest, { params }: YugiohCardGradingReq
       slab_grade_description: conversationalGradingData?.professional_slab?.grade_description || (conversationalGradingData as any)?.slab_detection?.grade_description || null,
       slab_cert_number: conversationalGradingData?.professional_slab?.cert_number || (conversationalGradingData as any)?.slab_detection?.cert_number || null,
       slab_serial: conversationalGradingData?.professional_slab?.serial_number || (conversationalGradingData as any)?.slab_detection?.serial_number || null,
-      conversational_prompt_version: conversationalGradingData?.meta?.prompt_version || 'v4.2',
-      conversational_evaluated_at: conversationalGradingData?.meta?.evaluated_at_utc ? new Date(conversationalGradingData.meta.evaluated_at_utc) : new Date(),
+      conversational_prompt_version: DCM_PROMPT_VERSION,
+      conversational_evaluated_at: new Date(),
 
       // Professional grade estimates (PSA, BGS, SGC, etc.)
       estimated_professional_grades: conversationalGradingData?.professional_grade_estimates || null,
