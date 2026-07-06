@@ -97,6 +97,11 @@ interface DesignerConfig {
   geometricPattern?: number
   /** Label text polarity (matches CustomLabelConfig.textColorMode on web). */
   textColorMode?: 'auto' | 'light' | 'dark'
+  /** Grade digit color (matches web CustomLabelConfig.gradeColor). 'auto' or
+      absent = historical purple-on-light / white-on-dark by polarity. */
+  gradeColor?: string
+  /** Typography scale for grade + card text (matches web fontScale; 1 = standard). */
+  fontScale?: number
   // Dimension preset bookkeeping (matches CustomLabelConfig in src/lib/labelPresets.ts)
   preset?: 'dcm' | 'dcm-traditional' | 'dcm-bordered' | 'custom'
   width?: number
@@ -475,6 +480,8 @@ export default function LabelStudioScreen() {
       customColors: config.customColors,
       layoutStyle: config.layoutStyle,
       textColorMode: config.textColorMode,
+      gradeColor: config.gradeColor,
+      fontScale: config.fontScale,
     }
   }, [config, activeGalleryIdx])
 
@@ -618,6 +625,12 @@ export default function LabelStudioScreen() {
   }, [config])
 
   const handlePickerSelect = useCallback((hex: string) => {
+    if (pickerSlot === -2) {
+      // Grade digit color (July 2026 feature; slot convention: -1 border, -2 grade)
+      updateConfig({ gradeColor: hex })
+      setPickerVisible(false)
+      return
+    }
     if (pickerSlot === -1) {
       // Border color
       updateConfig({ borderColor: hex })
@@ -774,6 +787,8 @@ export default function LabelStudioScreen() {
         customColors: config.customColors,
         layoutStyle: config.layoutStyle,
         textColorMode: config.textColorMode,
+        gradeColor: config.gradeColor,
+        fontScale: config.fontScale,
         preset: config.preset,
         width: config.width,
         height: config.height,
@@ -1546,6 +1561,72 @@ export default function LabelStudioScreen() {
               </View>
               <Text style={[s.subLabel, { marginTop: 6 }]}>
                 Auto (recommended) keeps text readable on any background, including in print.
+              </Text>
+            </View>
+
+            {/* ============ Grade Color (July 2026, client-requested) ============ */}
+            {/* Auto = historical purple-on-light / white-on-dark; a swatch or
+                custom hex overrides the grade digit everywhere it renders.
+                Matches the web Studio control (LabelStudioClient). */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Grade Color</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <TouchableOpacity
+                  style={[s.dirBtn, (!config.gradeColor || config.gradeColor === 'auto') && s.dirBtnActive]}
+                  onPress={() => updateConfig({ gradeColor: 'auto' })}
+                >
+                  <Text style={[s.dirBtnText, (!config.gradeColor || config.gradeColor === 'auto') && s.dirBtnTextActive]}>Auto</Text>
+                </TouchableOpacity>
+                {['#d4af37', '#dc2626', '#2563eb', '#16a34a', '#111111', '#ffffff'].map(hex => (
+                  <TouchableOpacity
+                    key={hex}
+                    onPress={() => updateConfig({ gradeColor: hex })}
+                    style={{
+                      width: 32, height: 32, borderRadius: 16, backgroundColor: hex,
+                      borderWidth: 2,
+                      borderColor: config.gradeColor === hex ? Colors.purple[600] : Colors.gray[300],
+                    }}
+                  />
+                ))}
+                <TouchableOpacity
+                  style={s.dirBtn}
+                  onPress={() => {
+                    setPickerSlot(-2)
+                    setPickerCurrentColor(config.gradeColor && config.gradeColor !== 'auto' ? config.gradeColor : '#7c3aed')
+                    setPickerVisible(true)
+                  }}
+                >
+                  <Text style={s.dirBtnText}>Custom…</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={[s.subLabel, { marginTop: 6 }]}>
+                Auto keeps the classic look — white on dark labels, purple on light.
+              </Text>
+            </View>
+
+            {/* ============ Grade & Text Size (July 2026, client-requested) ============ */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Grade &amp; Text Size</Text>
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {([
+                  { id: 'standard', label: 'Standard', scale: 1 },
+                  { id: 'large', label: 'Large', scale: 1.15 },
+                  { id: 'xl', label: 'Extra Large', scale: 1.3 },
+                ] as const).map(opt => {
+                  const active = (config.fontScale ?? 1) === opt.scale
+                  return (
+                    <TouchableOpacity
+                      key={opt.id}
+                      style={[s.dirBtn, { flex: 1 }, active && s.dirBtnActive]}
+                      onPress={() => updateConfig({ fontScale: opt.scale })}
+                    >
+                      <Text style={[s.dirBtnText, active && s.dirBtnTextActive]}>{opt.label}</Text>
+                    </TouchableOpacity>
+                  )
+                })}
+              </View>
+              <Text style={[s.subLabel, { marginTop: 6 }]}>
+                Larger sizes are best-effort — long card names still shrink to fit the label.
               </Text>
             </View>
 

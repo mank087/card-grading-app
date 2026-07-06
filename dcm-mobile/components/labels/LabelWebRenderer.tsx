@@ -47,6 +47,10 @@ export interface LabelConfig {
   /** Label text polarity — forwarded to the web /label-preview so it
       resolves white vs dark text (matches CustomLabelConfig.textColorMode). */
   textColorMode?: 'auto' | 'light' | 'dark'
+  /** Grade digit color + typography scale (July 2026) — forwarded to the web
+      renderer; matches CustomLabelConfig.gradeColor / fontScale. */
+  gradeColor?: string
+  fontScale?: number
 }
 
 export interface LabelCardData {
