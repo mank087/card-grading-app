@@ -150,15 +150,18 @@ export const CARD_COLOR_STYLES: CardColorStyle[] = [
   },
 ]
 
-// Apply a layout style to user-chosen custom colors
+// Apply a layout style to user-chosen custom colors.
+// Mirrors src/lib/labelPresets.ts applyLayoutToColors on web: border color/
+// width are left untouched (so the user's border choices survive layout
+// switches) — only neon-outline sets them, since the glow border IS the style.
 export function applyLayoutToColors(layoutId: string, colors: string[]): {
   colorPreset: string
   gradientStart: string
   gradientEnd: string
   style: 'modern' | 'traditional'
-  borderEnabled: boolean
-  borderColor: string
-  borderWidth: number
+  borderEnabled?: boolean
+  borderColor?: string
+  borderWidth?: number
   topEdgeGradient?: string[]
 } {
   const c1 = colors[0] || '#7c3aed'
@@ -166,18 +169,18 @@ export function applyLayoutToColors(layoutId: string, colors: string[]): {
 
   switch (layoutId) {
     case 'color-gradient':
-      return { colorPreset: 'color-gradient', gradientStart: c1, gradientEnd: c2, style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
+      return { colorPreset: 'color-gradient', gradientStart: c1, gradientEnd: c2, style: 'modern', borderEnabled: false }
     case 'card-extension': {
       const gradient = colors.length >= 3 ? colors : [c1, mixHex(c1, c2, 0.5), c2]
-      return { colorPreset: 'card-extension', gradientStart: gradient[0], gradientEnd: gradient[gradient.length - 1], topEdgeGradient: gradient, style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
+      return { colorPreset: 'card-extension', gradientStart: gradient[0], gradientEnd: gradient[gradient.length - 1], topEdgeGradient: gradient, style: 'modern', borderEnabled: false }
     }
     case 'neon-outline':
       return { colorPreset: 'neon-outline', gradientStart: '#0a0a0a', gradientEnd: '#1a1a2e', borderEnabled: true, borderColor: c1, borderWidth: 0.03, style: 'modern' }
     case 'geometric':
-      return { colorPreset: 'geometric', gradientStart: c1, gradientEnd: c2, style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
+      return { colorPreset: 'geometric', gradientStart: c1, gradientEnd: c2, style: 'modern', borderEnabled: false }
     case 'team-colors':
-      return { colorPreset: 'team-colors', gradientStart: mixHex(c1, '#000000', 0.2), gradientEnd: mixHex(c2, '#000000', 0.2), style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
+      return { colorPreset: 'team-colors', gradientStart: mixHex(c1, '#000000', 0.2), gradientEnd: mixHex(c2, '#000000', 0.2), style: 'modern', borderEnabled: false }
     default:
-      return { colorPreset: 'custom', gradientStart: c1, gradientEnd: c2, style: 'modern', borderEnabled: false, borderColor: '#7c3aed', borderWidth: 0.04 }
+      return { colorPreset: 'custom', gradientStart: c1, gradientEnd: c2, style: 'modern' }
   }
 }

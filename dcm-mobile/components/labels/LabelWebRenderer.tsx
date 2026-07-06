@@ -18,7 +18,7 @@
  *      PNG.
  */
 
-import { useRef, useEffect, useState } from 'react'
+import { useRef, useEffect, useState, useCallback } from 'react'
 import { View, StyleSheet } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useAuth } from '@/contexts/AuthContext'
@@ -65,6 +65,10 @@ export interface LabelWebRendererProps {
   config: LabelConfig | null
   cardData: LabelCardData | null
   onRender: (base64DataUrl: string) => void
+  /** Called when the preview page reports a render/load failure
+      ('label-preview-error' postMessage, WebView load error, or a
+      terminated content process). */
+  onError?: (message: string) => void
   side?: 'front' | 'back'
   /** The Card UUID being previewed — used to load the web preview page. */
   cardId?: string
@@ -82,6 +86,7 @@ export default function LabelWebRenderer({
   config,
   cardData,
   onRender,
+  onError,
   side = 'front',
   cardId,
   type = 'slab-custom',
@@ -91,25 +96,36 @@ export default function LabelWebRenderer({
   const webViewRef = useRef<WebView>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const readyRef = useRef(false)
+  const reloadAttemptsRef = useRef(0)
   const [pageReady, setPageReady] = useState(false)
 
   const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
   const token = session?.access_token || ''
 
   // Initial URL — embeds config as base64 customConfig so the page can
-  // render even before the first postMessage arrives.
+  // render even before the first postMessage arrives. The config (and side)
+  // are FROZEN at first availability so the URL stays stable for the life
+  // of the component: recomputing it from the live config would change the
+  // WebView source on every color/border tweak and force a full page reload
+  // (re-fetch card, QR, logos) instead of the cheap injected
+  // 'preview-config' message below.
+  const initialRef = useRef<{ config: LabelConfig; side: 'front' | 'back' } | null>(null)
+  if (!initialRef.current && config) {
+    initialRef.current = { config, side }
+  }
   const initialCustomConfigB64 = (() => {
-    if (!config) return ''
+    const initial = initialRef.current
+    if (!initial) return ''
     try {
-      const json = JSON.stringify({ ...config, side })
+      const json = JSON.stringify({ ...initial.config, side: initial.side })
       return typeof global.btoa === 'function'
         ? global.btoa(json)
         : Buffer.from(json, 'utf-8').toString('base64')
     } catch { return '' }
   })()
 
-  const url = cardId && token
-    ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
+  const url = cardId && token && initialRef.current
+    ? `${API_BASE}/label-preview/${cardId}?token=${encodeURIComponent(token)}&type=${type}&side=${initialRef.current.side}&customConfig=${encodeURIComponent(initialCustomConfigB64)}`
     : ''
 
   // Send config updates to the page (re-renders canvas without reload).
@@ -126,6 +142,16 @@ export default function LabelWebRenderer({
         type: 'preview-config',
         config,
         side,
+        // Live label-text edits (Card Name / Set / Year / # / Features and
+        // the grade-derived condition). The page fetches card data once and
+        // caches it, so without this the canvas preview never reflects text
+        // edits made in the mobile Label Text section.
+        labelText: {
+          primaryName: cardData.primaryName,
+          contextLine: cardData.contextLine,
+          featuresLine: cardData.featuresLine,
+          condition: cardData.condition,
+        },
         emblems: {
           showFounderEmblem: !!emblems.showFounder,
           showVipEmblem: !!emblems.showVip,
@@ -145,14 +171,33 @@ export default function LabelWebRenderer({
       const msg = JSON.parse(event.nativeEvent.data)
       if (msg.type === 'label-preview-ready' && msg.dataUrl) {
         onRender(msg.dataUrl)
+      } else if (msg.type === 'label-preview-error') {
+        const message = msg.message || 'Label preview failed to render'
+        console.warn('[LabelWebRenderer] preview error:', message)
+        onError?.(message)
       }
     } catch { /* ignore malformed */ }
   }
 
   const handleLoad = () => {
     readyRef.current = true
+    reloadAttemptsRef.current = 0
     setPageReady(true)
   }
+
+  // WebView-level failures (network error, crashed WKWebView content
+  // process) — surface the error and reload the page. Capped so a dead
+  // network doesn't reload forever.
+  const handleLoadFailure = useCallback((reason: string) => {
+    console.warn('[LabelWebRenderer] load failure:', reason)
+    onError?.(reason)
+    readyRef.current = false
+    setPageReady(false)
+    if (reloadAttemptsRef.current < 3) {
+      reloadAttemptsRef.current += 1
+      webViewRef.current?.reload()
+    }
+  }, [onError])
 
   // Don't render the WebView until we have the basic params
   if (!url) {
@@ -170,6 +215,8 @@ export default function LabelWebRenderer({
         domStorageEnabled
         onMessage={handleMessage}
         onLoad={handleLoad}
+        onError={(e) => handleLoadFailure(e.nativeEvent?.description || 'WebView load error')}
+        onContentProcessDidTerminate={() => handleLoadFailure('WebView content process terminated')}
         scrollEnabled={false}
         bounces={false}
         overScrollMode="never"

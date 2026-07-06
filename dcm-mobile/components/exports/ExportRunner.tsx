@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { View, Text, Image, Modal, Pressable, TouchableOpacity, ActivityIndicator, Alert, Platform, StyleSheet, Linking } from 'react-native'
 import { WebView } from 'react-native-webview'
 import * as Sharing from 'expo-sharing'
@@ -58,14 +58,26 @@ export default function ExportRunner({ source, onClose }: Props) {
     onClose()
   }, [reset, onClose])
 
+  // Generation watchdog. Cleared as soon as the page posts files (or an
+  // error) back — otherwise a successful generation would flip to
+  // "Generation timed out" if the user sat on the preview sheet past 90s.
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const clearGenerationTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [])
+
   useEffect(() => {
     if (!source) return
     reset()
-    const timer = setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null
       setError('Generation timed out after 90 seconds. The label generator may have failed silently or the page is still deploying. Try again in a minute.')
     }, 90_000)
-    return () => clearTimeout(timer)
-  }, [source, reset])
+    return clearGenerationTimeout
+  }, [source, reset, clearGenerationTimeout])
 
   if (!source) return null
 
@@ -252,6 +264,10 @@ export default function ExportRunner({ source, onClose }: Props) {
                       return
                     }
                     if (msg.type === 'label-export-ready' && Array.isArray(msg.files)) {
+                      // Files have arrived — stop the watchdog immediately so
+                      // a slow local persist / long preview dwell can't flip
+                      // a successful export into "Generation timed out".
+                      clearGenerationTimeout()
                       setStatus('Preparing preview…')
                       const ready: ExportFile[] = []
                       let firstError: string | null = null
@@ -273,13 +289,18 @@ export default function ExportRunner({ source, onClose }: Props) {
                         setPreviewIdx(0)
                       }
                     } else if (msg.type === 'error') {
+                      clearGenerationTimeout()
                       setError(msg.message || 'Failed to generate label')
                     }
                   } catch (err: any) {
+                    clearGenerationTimeout()
                     setError(err?.message || 'Failed to process file')
                   }
                 }}
-                onError={(syntheticEvent) => setError(syntheticEvent.nativeEvent?.description || 'WebView load error')}
+                onError={(syntheticEvent) => {
+                  clearGenerationTimeout()
+                  setError(syntheticEvent.nativeEvent?.description || 'WebView load error')
+                }}
               />
             </View>
           )}

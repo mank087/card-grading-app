@@ -12,7 +12,8 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { Colors } from '@/lib/constants'
+import { Colors, ConditionLabels } from '@/lib/constants'
+import { getContextLine } from '@/lib/labelData'
 import {
   COLOR_PRESETS, LAYOUT_STYLES, CARD_COLOR_STYLES, DIMENSION_PRESETS,
   applyLayoutToColors,
@@ -102,6 +103,23 @@ interface DesignerConfig {
   height?: number
 }
 
+// Baseline designer state — also the base a saved style is applied over in
+// loadStyle, so optional fields absent from the saved config (layoutStyle,
+// geometricPattern, customColors, …) reset instead of leaking from the
+// previous design.
+const DEFAULT_DESIGNER_CONFIG: DesignerConfig = {
+  colorPreset: 'modern-dark',
+  gradientStart: '#1a1625',
+  gradientEnd: '#2d1f47',
+  style: 'modern',
+  borderEnabled: false,
+  borderColor: '#7c3aed',
+  borderWidth: 0.04,
+  preset: 'dcm',
+  width: 2.8,
+  height: 0.8,
+}
+
 // ============================================================================
 // DimensionInput — width/height field that tolerates intermediate typing
 // state (empty, lone ".", partial decimals) without snapping back to the
@@ -188,18 +206,7 @@ export default function LabelStudioScreen() {
   const [search, setSearch] = useState('')
 
   // Designer state
-  const [config, setConfig] = useState<DesignerConfig>({
-    colorPreset: 'modern-dark',
-    gradientStart: '#1a1625',
-    gradientEnd: '#2d1f47',
-    style: 'modern',
-    borderEnabled: false,
-    borderColor: '#7c3aed',
-    borderWidth: 0.04,
-    preset: 'dcm',
-    width: 2.8,
-    height: 0.8,
-  })
+  const [config, setConfig] = useState<DesignerConfig>({ ...DEFAULT_DESIGNER_CONFIG })
   const [activeCardColorStyle, setActiveCardColorStyle] = useState<string | null>(null)
   const [customColorCount, setCustomColorCount] = useState(2)
   const [labelPreviewUrl, setLabelPreviewUrl] = useState<string | null>(null)
@@ -325,7 +332,19 @@ export default function LabelStudioScreen() {
     if (!selectedCard) return null
     const grade = selectedCard.conversational_whole_grade
     const name = labelName || 'Card'
-    const contextParts = [labelSet, labelYear, labelNumber].filter(Boolean)
+    // Build the context line via the shared helper so ordering/formatting
+    // matches web ("Set • Subset • #Number • Year"); the live edit fields
+    // are passed as custom_label_data overrides so in-flight edits win.
+    const contextLine = getContextLine({
+      ...selectedCard,
+      custom_label_data: {
+        ...(selectedCard.custom_label_data || {}),
+        setName: labelSet,
+        subset: labelSubset,
+        cardNumber: labelNumber,
+        year: labelYear,
+      },
+    })
     const ws = selectedCard.conversational_weighted_sub_scores || {}
     const sr = selectedCard.conversational_sub_scores || {}
     const ext = (key: string): number => {
@@ -339,15 +358,21 @@ export default function LabelStudioScreen() {
 
     return {
       primaryName: name,
-      contextLine: contextParts.join(' • '),
+      contextLine,
       featuresLine: labelFeatures || '',
       serial: selectedCard.serial || '',
       grade: grade,
-      condition: selectedCard.conversational_condition_label || '',
+      // Condition is derived from the grade (single source of truth) —
+      // historical rows have stored conversational_condition_label values
+      // that diverge from the grade. Fall back to the stored label only
+      // when the card has no grade.
+      condition: (grade != null && ConditionLabels[Math.round(Number(grade))])
+        || selectedCard.conversational_condition_label
+        || '',
       subScores: hasSub ? { centering: ext('centering'), corners: ext('corners'), edges: ext('edges'), surface: ext('surface') } : undefined,
       qrUrl: `https://dcmgrading.com/verify/${selectedCard.serial || ''}`,
     }
-  }, [selectedCard, labelName, labelSet, labelYear, labelNumber, labelFeatures])
+  }, [selectedCard, labelName, labelSet, labelSubset, labelYear, labelNumber, labelFeatures])
 
   // Inline label props for non-slab gallery tiles (toploader, one-touch, foldover).
   // These holders use compact Avery-sticker layouts that are NOT the slab label,
@@ -613,20 +638,13 @@ export default function LabelStudioScreen() {
   }, [config, pickerSlot, customColorCount, updateConfig])
 
   // ---- Saved styles (server-synced via useLabelStyle hook) ----
-  // Convert the in-app DesignerConfig to the CustomLabelConfig shape the API stores.
-  const buildSaveConfig = useCallback(() => ({
-    colorPreset: config.colorPreset,
-    gradientStart: config.gradientStart,
-    gradientEnd: config.gradientEnd,
-    style: config.style,
-    borderEnabled: config.borderEnabled,
-    borderColor: config.borderColor,
-    borderWidth: config.borderWidth,
-    topEdgeGradient: config.topEdgeGradient,
-    preset: config.preset,
-    width: config.width,
-    height: config.height,
-  }), [config])
+  // DesignerConfig is field-compatible with the CustomLabelConfig shape the
+  // API stores, so save the FULL config. Spreading (rather than listing
+  // fields) keeps optional designer fields (customColors, layoutStyle,
+  // gradientAngle, geometricPattern, textColorMode) AND any future web-side
+  // additions (e.g. gradeColor, fontScale) flowing through unchanged —
+  // previously geometric/split/5-color designs corrupted on save.
+  const buildSaveConfig = useCallback(() => ({ ...config }), [config])
 
   const saveStyle = useCallback(async () => {
     if (customStyles.length >= 4) {
@@ -858,20 +876,11 @@ export default function LabelStudioScreen() {
   }, [selectedCard, openWebDownload])
 
   const loadStyle = useCallback((styleConfig: any) => {
-    setConfig(prev => ({
-      ...prev,
-      colorPreset: styleConfig.colorPreset || prev.colorPreset,
-      gradientStart: styleConfig.gradientStart || prev.gradientStart,
-      gradientEnd: styleConfig.gradientEnd || prev.gradientEnd,
-      style: styleConfig.style || prev.style,
-      borderEnabled: !!styleConfig.borderEnabled,
-      borderColor: styleConfig.borderColor || prev.borderColor,
-      borderWidth: styleConfig.borderWidth ?? prev.borderWidth,
-      topEdgeGradient: styleConfig.topEdgeGradient,
-      preset: styleConfig.preset ?? prev.preset,
-      width: styleConfig.width ?? prev.width,
-      height: styleConfig.height ?? prev.height,
-    }))
+    // Replace the config WHOLESALE (saved config over defaults, not over the
+    // previous state) — merging over `prev` let stale optional fields from
+    // the last design (layoutStyle, geometricPattern, customColors, …) leak
+    // into the applied style and corrupt it.
+    setConfig({ ...DEFAULT_DESIGNER_CONFIG, ...styleConfig })
     setActiveCardColorStyle(null)
   }, [])
 
@@ -953,6 +962,7 @@ export default function LabelStudioScreen() {
         cardId={selectedCard?.id}
         side={side}
         onRender={setLabelPreviewUrl}
+        onError={(msg) => console.warn('[label-studio] label preview error:', msg)}
       />
 
       {/* Color picker modal */}
@@ -1089,13 +1099,12 @@ export default function LabelStudioScreen() {
                 style={{ marginHorizontal: -16 }}
                 onMomentumScrollEnd={(e) => {
                   const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_W - 24))
+                  // Only track the visible tile — do NOT mutate config here.
+                  // Forced-style tiles get their display style derived at
+                  // render time in the labelConfig memo, so swiping past
+                  // slab-modern/traditional no longer permanently overwrites
+                  // the user's chosen config.style.
                   setActiveGalleryIdx(idx)
-                  // Keep the user's customizer style in sync with the visible tile so
-                  // the rendered preview reflects the type they're swiping through.
-                  const t = LABEL_GALLERY[idx]
-                  if (t?.forcedStyle && config.style !== t.forcedStyle) {
-                    setConfig(prev => ({ ...prev, style: t.forcedStyle! }))
-                  }
                 }}
                 renderItem={({ item: labelType, index }) => (
                   <View style={{ width: SCREEN_W - 24, paddingHorizontal: 12 }}>
