@@ -5,6 +5,8 @@ import type { MarketplaceCard } from '../types';
 interface Props {
   cards: MarketplaceCard[];
   truncated?: boolean;
+  /** True while the eligible-cards payload is still downloading. */
+  loading?: boolean;
   onSelectCard: (card: MarketplaceCard) => void;
 }
 
@@ -12,7 +14,18 @@ interface Props {
  * "List a Card" tab. Left rail = card picker, right area = explainer/empty state.
  * On select, parent opens the EbayListingModal — same modal the card-detail page uses.
  */
-export default function ListNewTab({ cards, truncated, onSelectCard }: Props) {
+export default function ListNewTab({ cards, truncated, loading, onSelectCard }: Props) {
+  if (cards.length === 0 && loading) {
+    // The marketplace shell renders before the card list finishes loading —
+    // don't flash the "all listed" empty state while we're still fetching.
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-3" />
+        <p className="text-sm text-gray-500">Loading your graded cards&hellip;</p>
+      </div>
+    );
+  }
+
   if (cards.length === 0) {
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-10 text-center">
@@ -43,7 +56,7 @@ export default function ListNewTab({ cards, truncated, onSelectCard }: Props) {
       <div className="lg:col-span-1">
         {truncated && (
           <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
-            Showing your 500 most recently graded cards. Older ones aren&rsquo;t in this picker — use search to narrow down.
+            Showing your 2000 most recently graded cards — search finds any card in your collection.
           </div>
         )}
         <CardPicker cards={cards} onSelect={onSelectCard} />

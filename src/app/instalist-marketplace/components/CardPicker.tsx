@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getStoredSession } from '@/lib/directAuth';
 import type { MarketplaceCard } from '../types';
 
 type SortKey = 'recent' | 'name' | 'grade' | 'value';
@@ -22,20 +23,71 @@ export default function CardPicker({ cards, onSelect }: Props) {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [sort, setSort] = useState<SortKey>('recent');
 
+  // Server-search state — the downloaded array is capped (2000 most recent),
+  // so when local filtering comes up short we ask /api/ebay/eligible-cards?q=
+  // to search the user's whole collection and merge the extras in.
+  const [serverResults, setServerResults] = useState<MarketplaceCard[]>([]);
+  const [serverSearching, setServerSearching] = useState(false);
+  const searchSeq = useRef(0);
+
   const categories = useMemo(() => {
     const s = new Set<string>();
     cards.forEach(c => c.category && s.add(c.category));
     return ['all', ...Array.from(s).sort()];
   }, [cards]);
 
+  const q = query.trim();
+
+  // Instant client-side filter over the already-downloaded cards.
+  const localMatches = useMemo(() => {
+    const lq = q.toLowerCase();
+    if (!lq) return cards;
+    return cards.filter(c =>
+      (c.card_name || '').toLowerCase().includes(lq) ||
+      (c.serial || '').toLowerCase().includes(lq)
+    );
+  }, [cards, q]);
+
+  const runServerSearch = useCallback(async (term: string) => {
+    const seq = ++searchSeq.current;
+    const session = getStoredSession();
+    if (!session?.access_token) return;
+    setServerSearching(true);
+    try {
+      const res = await fetch(`/api/ebay/eligible-cards?q=${encodeURIComponent(term)}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (seq !== searchSeq.current) return; // stale — a newer search superseded this one
+      setServerResults(json.cards ?? []);
+    } catch {
+      // Network failure is non-fatal — local matches are still shown.
+    } finally {
+      if (seq === searchSeq.current) setServerSearching(false);
+    }
+  }, []);
+
+  // Debounced server search: only when the local result set is thin (<5
+  // matches) so common searches stay instant and free. Enter forces one.
+  useEffect(() => {
+    // Invalidate any in-flight response for the previous query.
+    searchSeq.current++;
+    setServerResults([]);
+    if (q.length < 2 || localMatches.length >= 5) {
+      setServerSearching(false);
+      return;
+    }
+    const timer = setTimeout(() => runServerSearch(q), 300);
+    return () => clearTimeout(timer);
+  }, [q, localMatches.length, runServerSearch]);
+
   const filtered = useMemo(() => {
-    let result = cards;
-    const q = query.trim().toLowerCase();
-    if (q) {
-      result = result.filter(c =>
-        (c.card_name || '').toLowerCase().includes(q) ||
-        (c.serial || '').toLowerCase().includes(q)
-      );
+    let result = localMatches;
+    if (q && serverResults.length > 0) {
+      const seen = new Set(result.map(c => c.id));
+      const extras = serverResults.filter(c => !seen.has(c.id));
+      if (extras.length > 0) result = [...result, ...extras];
     }
     if (categoryFilter !== 'all') {
       result = result.filter(c => c.category === categoryFilter);
@@ -51,7 +103,7 @@ export default function CardPicker({ cards, onSelect }: Props) {
       });
     } // 'recent' = default order from the API
     return sorted;
-  }, [cards, query, categoryFilter, sort]);
+  }, [localMatches, serverResults, q, categoryFilter, sort]);
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
@@ -60,6 +112,11 @@ export default function CardPicker({ cards, onSelect }: Props) {
           type="text"
           value={query}
           onChange={e => setQuery(e.target.value)}
+          onKeyDown={e => {
+            // Enter = search the whole collection right away, even if
+            // plenty of local matches exist or the debounce hasn't fired.
+            if (e.key === 'Enter' && q.length >= 2) runServerSearch(q);
+          }}
           placeholder="Search by name or serial..."
           className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
         />
@@ -88,11 +145,16 @@ export default function CardPicker({ cards, onSelect }: Props) {
 
       <div className="p-3 text-xs text-gray-500 border-b border-gray-100">
         {filtered.length} {filtered.length === 1 ? 'card' : 'cards'} ready to list
+        {serverSearching && (
+          <span className="ml-2 text-indigo-600">Searching your full collection&hellip;</span>
+        )}
       </div>
 
       {filtered.length === 0 ? (
         <div className="p-8 text-center">
-          <p className="text-sm text-gray-500">No matching cards.</p>
+          <p className="text-sm text-gray-500">
+            {serverSearching ? 'Searching your full collection…' : 'No matching cards.'}
+          </p>
         </div>
       ) : (
         // No max-h on mobile — the page scrolls naturally and a nested

@@ -10,6 +10,7 @@ import { getStoredSession } from '@/lib/directAuth';
 import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
+import { buildEbayTitle } from '@/lib/ebay/titleBuilder';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
 import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
@@ -302,7 +303,10 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       const { value: suggestedValue } = resolveCardValue(card);
       setPrice(suggestedValue > 0 ? suggestedValue.toFixed(2) : '');
 
-      // Generate default title: character - subset - card number - DCM Grade X - Condition Label
+      // Generate default title: name - setName - card number - serial - DCM X - Condition Label
+      // buildEbayTitle keeps the grade/condition tail intact within eBay's
+      // 80-char limit (word-boundary name truncation, no blind substring cut)
+      // and dedupes optional segments. Title stays user-editable afterwards.
       const labelData = getCardLabelData(card);
       const grade = labelData.grade ?? 0;
       const cardInfo = card.conversational_card_info || {};
@@ -310,33 +314,27 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       // Get condition label
       const conditionLabel = labelData.condition || getConditionLabel(grade);
 
-      // Build title parts with dash separator
-      const titleParts: string[] = [];
-
       // Primary subject (player/character/featured)
       const primaryName = labelData.primaryName || card.featured || card.pokemon_featured || card.card_name || '';
-      if (primaryName) titleParts.push(primaryName);
 
       // Set/Subset name
       const setName = labelData.setName || cardInfo.set_name || card.card_set;
-      if (setName) titleParts.push(setName);
 
       // Card number if available
       const cardNumber = labelData.cardNumber || cardInfo.card_number || card.card_number;
-      if (cardNumber) titleParts.push(`#${cardNumber}`);
 
       // Serial numbering (e.g., "/99", "/25") - just the denominator
       const serialNum = getSerialNumbering(card);
       const serialDenom = getSerialDenominator(serialNum);
-      if (serialDenom) titleParts.push(serialDenom);
 
-      // Grade info
-      titleParts.push(`DCM Grade ${Math.round(grade)}`);
-
-      // Condition label
-      if (conditionLabel) titleParts.push(conditionLabel);
-
-      const defaultTitle = titleParts.join(' - ').substring(0, 80);
+      const defaultTitle = buildEbayTitle({
+        name: primaryName,
+        setName: setName || undefined,
+        cardNumber: cardNumber ? `#${cardNumber}` : undefined,
+        serialNumbering: serialDenom || undefined,
+        grade: Math.round(grade),
+        condition: conditionLabel,
+      });
       setTitle(defaultTitle);
 
       // Generate HTML description with DCM branding

@@ -104,6 +104,14 @@ export async function uploadImages(
 }
 
 /**
+ * A user-picked gallery image source: either a base64 data URL, or a lazy
+ * thunk that produces one. Thunks let the caller keep only file URIs in state
+ * and read each photo's bytes right before its own upload, so all picked
+ * photos are never held in memory simultaneously.
+ */
+export type AdditionalImageSource = string | (() => Promise<string>)
+
+/**
  * Upload images one at a time to avoid Vercel's 4.5 MB request-body limit.
  * Base64 data URLs are ~33% larger than the original bytes, and a slab/mini-
  * report PNG can easily be 1-3 MB each; bundling 5+ in a single POST exceeds
@@ -118,7 +126,7 @@ export async function uploadImagesSequential(
     rawFront?: string
     rawBack?: string
   },
-  additionalImages?: string[],
+  additionalImages?: AdditionalImageSource[],
   onProgress?: (label: string, current: number, total: number) => void,
 ): Promise<ImageUploadResult> {
   const merged: ImageUploadResult['urls'] = {}
@@ -135,9 +143,12 @@ export async function uploadImagesSequential(
   }
 
   const additionalUrls: string[] = []
-  for (const dataUrl of extras) {
+  for (const source of extras) {
     current += 1
     onProgress?.(`Uploading custom photo ${current}/${total}…`, current, total)
+    // Resolve lazy sources one at a time — each photo's base64 lives only for
+    // the duration of its own upload request.
+    const dataUrl = typeof source === 'function' ? await source() : source
     const result = await uploadImages(cardId, {}, [dataUrl])
     const url = result.urls.additional?.[0]
     if (url) additionalUrls.push(url)
@@ -281,21 +292,8 @@ export async function getOAuthUrl(): Promise<string> {
 
 // ─── Helpers ───
 
-export function generateTitle(card: any): string {
-  const ci = card.conversational_card_info || {}
-  const parts: string[] = []
-  const name = card.card_name || card.featured || ci.card_name || ci.player_or_character || ''
-  if (name) parts.push(name)
-  const set = card.card_set || ci.set_name || ''
-  if (set) parts.push(set)
-  const num = card.card_number || ci.card_number || ''
-  if (num) parts.push(`#${num}`)
-  const grade = card.conversational_whole_grade
-  if (grade != null) parts.push(`DCM Grade ${Math.round(grade)}`)
-  const condition = card.conversational_condition_label || ''
-  if (condition) parts.push(condition)
-  return parts.join(' - ').substring(0, 80)
-}
+// NOTE: title generation lives in lib/ebayTitleBuilder.ts (web-parity twin of
+// src/lib/ebay/titleBuilder.ts) — use buildEbayTitleFromCard(card) from there.
 
 export const SHIPPING_SERVICES = [
   { value: 'USPSPriority', label: 'USPS Priority Mail' },

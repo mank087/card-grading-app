@@ -10,6 +10,16 @@
  *
  * Mobile listens to onMessage and uses these data URLs for previews + the
  * eBay /api/ebay/images upload step.
+ *
+ * Bridge protocols (selected by the ?bridge query param):
+ * - bridge=2 (chunked): one { type: 'ebay-prep-image', key, dataUrl, index,
+ *   total } message per image, then a final { type: 'ebay-prep-complete',
+ *   description, itemSpecifics, categoryId, regulatoryDocumentId } message.
+ *   Requested by new app builds — a single ~10 MB postMessage is copied
+ *   whole across the RN bridge and can jank/OOM low-end Android devices.
+ * - legacy (no param): one { type: 'images-ready', images: {…5 data URLs},
+ *   …metadata } message. Kept for old app builds that predate the chunked
+ *   handler; they load this page without ?bridge.
  */
 
 import { useEffect, useState } from 'react';
@@ -165,6 +175,8 @@ export default function EbayImagePrepPage() {
   const token = searchParams.get('token') || '';
   const labelStyleParam = (searchParams.get('labelStyle') || 'modern') as
     | 'modern' | 'traditional' | 'custom-1' | 'custom-2' | 'custom-3' | 'custom-4';
+  // Chunked bridge protocol requested by new app builds (see header comment).
+  const chunkedBridge = searchParams.get('bridge') === '2';
   const [status, setStatus] = useState('Initializing…');
   const [error, setError] = useState<string | null>(null);
 
@@ -305,6 +317,16 @@ export default function EbayImagePrepPage() {
           try { frontJpeg = await imageToJpegBase64(frontImageUrl); } catch (e) { console.warn('[CoA] front image failed:', e); }
           try { backJpeg = await imageToJpegBase64(backImageUrl); } catch (e) { console.warn('[CoA] back image failed:', e); }
 
+          // Mirrors src/app/label-export/[cardId]/page.tsx's report data prep.
+          const aiConfidence = card.conversational_image_confidence || 'N/A';
+          const imageQualityMap: Record<string, string> = {
+            A: 'Excellent - High confidence in grade accuracy',
+            B: 'Good - Moderate confidence in grade accuracy',
+            C: 'Fair - Lower confidence due to image limitations',
+            D: 'Poor - Significant image quality issues affecting analysis',
+          };
+          const imageQuality = imageQualityMap[aiConfidence] || 'Quality assessment not available';
+
           const reportCardData: ReportCardData = {
             primaryName: labelData.primaryName || '',
             contextLine: (labelData as any).contextLine || (labelData as any).line2 || '',
@@ -342,8 +364,15 @@ export default function EbayImagePrepPage() {
               serialNumbered: cardInfo.serial_number || undefined,
               subset: cardInfo.subset || undefined,
             },
-            gradedAt: card.graded_at || card.created_at || new Date().toISOString(),
-            qrCodeUrl: qrCodeDataUrl,
+            aiConfidence,
+            imageQuality,
+            overallSummary: card.conversational_final_grade_summary || undefined,
+            generatedDate: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            reportId: String(card.id).substring(0, 8).toUpperCase(),
+            cardDetails: (labelData as any).contextLine || '',
+            specialFeaturesString: (labelData as any).featuresLine || '',
+            cardUrl,
+            qrCodeDataUrl,
           };
 
           const pdfDoc = pdf(<CardGradingReport cardData={reportCardData} />);
@@ -371,20 +400,39 @@ export default function EbayImagePrepPage() {
         }
 
         setStatus('Done');
-        postToRN({
-          type: 'images-ready',
-          images: {
-            front: frontUrl2,
-            back: backUrl2,
-            miniReport: miniUrl,
-            rawFront: rawFrontUrl,
-            rawBack: rawBackUrl,
-          },
-          description,
-          itemSpecifics,
-          categoryId,
-          regulatoryDocumentId,
-        });
+        const images = {
+          front: frontUrl2,
+          back: backUrl2,
+          miniReport: miniUrl,
+          rawFront: rawFrontUrl,
+          rawBack: rawBackUrl,
+        };
+        if (chunkedBridge) {
+          // Chunked protocol (v2): one bridge message per image so no single
+          // postMessage carries all ~5 base64 PNGs at once, then a small
+          // completion message with the metadata.
+          const entries = Object.entries(images);
+          entries.forEach(([key, dataUrl], index) => {
+            postToRN({ type: 'ebay-prep-image', key, dataUrl, index, total: entries.length });
+          });
+          postToRN({
+            type: 'ebay-prep-complete',
+            description,
+            itemSpecifics,
+            categoryId,
+            regulatoryDocumentId,
+          });
+        } else {
+          // Legacy protocol: single message with everything (old app builds).
+          postToRN({
+            type: 'images-ready',
+            images,
+            description,
+            itemSpecifics,
+            categoryId,
+            regulatoryDocumentId,
+          });
+        }
       } catch (err: any) {
         if (cancelled) return;
         const msg = err?.message || String(err);
@@ -396,7 +444,7 @@ export default function EbayImagePrepPage() {
     return () => {
       cancelled = true;
     };
-  }, [cardId, token, labelStyleParam]);
+  }, [cardId, token, labelStyleParam, chunkedBridge]);
 
   return (
     <div style={{ padding: 16, fontFamily: 'system-ui, sans-serif', fontSize: 14, color: '#374151' }}>

@@ -15,6 +15,42 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
 import { createSignedUrlMap } from '@/lib/signedUrlBatch';
 
+/**
+ * Explicit column list — the cards table carries several very large JSON /
+ * markdown blobs (ai_grading, dvg_grading, conversational_grading, raw API
+ * caches, defect coordinate maps, ...) that the marketplace flow never
+ * reads. SELECT * shipped all of them for up to 2000 rows (multi-MB
+ * responses). This list is the union of every field the client consumes:
+ *   - CardPicker / ListNewTab / MarketplaceClient (picker display, relist,
+ *     categoryToCardType) and the mobile marketplace picker
+ *   - EbayListingModal (title/description/image generation/PDF report)
+ *   - resolveCardValue (price seed)
+ *   - mapCardToItemSpecifics (eBay item specifics)
+ *   - getCardLabelData -> generateLabelData (label images)
+ * If the modal grows a new card-field read, add the column here too — a
+ * missing field silently degrades the listing payload.
+ */
+const CARD_COLUMNS = [
+  // Identity + picker display
+  'id', 'card_name', 'category', 'sub_category', 'serial',
+  'front_path', 'back_path', 'created_at',
+  // Grading (labels, title, description, mini report, PDF report)
+  'conversational_whole_grade', 'conversational_decimal_grade',
+  'conversational_condition_label', 'conversational_grade_uncertainty',
+  'conversational_card_info', 'conversational_sub_scores',
+  'conversational_weighted_sub_scores', 'conversational_final_grade_summary',
+  'estimated_professional_grades', 'dvg_whole_grade', 'dvg_decimal_grade',
+  // Pricing (resolveCardValue chain + picker value sort)
+  'dcm_price_estimate', 'dcm_cached_prices', 'ebay_price_median',
+  'scryfall_price_usd', 'scryfall_price_usd_foil',
+  // Label + item-specifics attributes
+  'featured', 'pokemon_featured', 'card_set', 'card_number', 'release_date',
+  'serial_numbering', 'rarity_tier', 'rarity_description', 'autographed',
+  'autograph_type', 'memorabilia_type', 'rookie_card', 'first_print_rookie',
+  'holofoil', 'is_foil', 'foil_type', 'is_double_faced', 'mtg_rarity',
+  'is_enchanted', 'manufacturer', 'custom_label_data',
+].join(',');
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('Authorization');
@@ -33,7 +69,14 @@ export async function GET(request: NextRequest) {
     // with thousands of cards can find a specific one without the client
     // ever pulling the whole list.
     const url = new URL(request.url);
-    const q = (url.searchParams.get('q') || '').trim();
+    // Strip PostgREST structural characters up front — `.or()` takes a raw
+    // filter string where , ( ) are syntax, so a query like "Pikachu (Jungle)"
+    // would corrupt the filter. They're never meaningful for a name/serial
+    // substring search, so replacing with spaces is lossless in practice.
+    const q = (url.searchParams.get('q') || '')
+      .replace(/[,()]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
 
     // Exclude cards that currently have an active listing — the user already
     // listed them via InstaList, no need to surface them again.
@@ -45,12 +88,6 @@ export async function GET(request: NextRequest) {
 
     const excludeIds = new Set((activeListings ?? []).map(r => r.card_id).filter(Boolean));
 
-    // SELECT * to mirror the per-category card-detail APIs (e.g.
-    // /api/sports/[id]) — they also select '*' so the EbayListingModal
-    // always sees the same shape regardless of where the user opens it
-    // from. Avoids 500s if any conversational_* / item-specifics column
-    // is added or removed from the cards schema later.
-    //
     // Default limit bumped to 2000 (was 500) — most users have <500
     // graded cards; power users can have 500-2000+. With a server-side
     // search escape hatch above, the cap is now a safety net rather
@@ -58,7 +95,7 @@ export async function GET(request: NextRequest) {
     const HARD_LIMIT = q ? 100 : 2000;
     let query = supabase
       .from('cards')
-      .select('*')
+      .select(CARD_COLUMNS)
       .eq('user_id', user.id)
       .not('conversational_whole_grade', 'is', null)
       .order('created_at', { ascending: false })
@@ -72,7 +109,10 @@ export async function GET(request: NextRequest) {
       query = query.or(`card_name.ilike.%${safe}%,serial.ilike.%${safe}%`);
     }
 
-    const { data: cards, error } = await query;
+    const { data, error } = await query;
+    // supabase-js can't statically parse a runtime-joined column string,
+    // so type the rows explicitly (they're plain card records).
+    const cards = (data ?? []) as unknown as Record<string, any>[];
 
     if (error) {
       console.error('[eligible-cards] DB error:', error);
@@ -83,12 +123,12 @@ export async function GET(request: NextRequest) {
     // `not.in.(...)` URL filter — that filter encodes every excluded UUID
     // into the request URL and breaks (HTTP 414) for power users with many
     // active listings. JS-side filtering scales without that risk.
-    const eligibleRows = (cards ?? []).filter(c => !excludeIds.has(c.id));
+    const eligibleRows = cards.filter(c => !excludeIds.has(c.id));
 
     // (cards.length === HARD_LIMIT) means we hit the cap. For search
     // queries hitting the cap is normal (means "100+ matches, refine
     // further"); for unfiltered fetches it means "2000+ cards exist".
-    const hitCap = (cards?.length ?? 0) >= HARD_LIMIT;
+    const hitCap = cards.length >= HARD_LIMIT;
 
     // Batch-sign both front AND back paths so the modal has working URLs
     // for its image generation pipeline without making per-card storage calls.

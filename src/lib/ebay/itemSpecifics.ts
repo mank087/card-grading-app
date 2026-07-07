@@ -99,7 +99,7 @@ export function mapPokemonCardToSpecifics(card: any): ItemSpecific[] {
   // Language
   specifics.push({
     name: 'Language',
-    value: 'English',
+    value: detectCardLanguage(card),
     required: false,
     editable: true,
   });
@@ -416,7 +416,7 @@ export function mapOtherCardToSpecifics(card: any): ItemSpecific[] {
   // Language
   specifics.push({
     name: 'Language',
-    value: 'English',
+    value: detectCardLanguage(card),
     required: false,
     editable: true,
   });
@@ -545,7 +545,7 @@ export function mapMTGCardToSpecifics(card: any): ItemSpecific[] {
   // Language
   specifics.push({
     name: 'Language',
-    value: 'English',
+    value: detectCardLanguage(card),
     required: false,
     editable: true,
   });
@@ -674,7 +674,7 @@ export function mapLorcanaCardToSpecifics(card: any): ItemSpecific[] {
   // Language
   specifics.push({
     name: 'Language',
-    value: 'English',
+    value: detectCardLanguage(card),
     required: false,
     editable: true,
   });
@@ -800,7 +800,7 @@ function mapGenericCcgCardToSpecifics(card: any, game: string, manufacturer: str
   // Language
   specifics.push({
     name: 'Language',
-    value: 'English',
+    value: detectCardLanguage(card),
     required: false,
     editable: true,
   });
@@ -915,6 +915,40 @@ export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecifi
 }
 
 // Helper functions
+
+/**
+ * Detect the language of a card for the eBay Language item specific.
+ *
+ * Prefers an explicit language field when present (same sources the card
+ * detail pages use: conversational_card_info.language, card.card_language,
+ * card.language). Otherwise falls back to script detection — Hiragana,
+ * Katakana, or CJK ideographs in the card/set name mean Japanese. Defaults
+ * to English.
+ */
+export function detectCardLanguage(card: any): string {
+  const cardInfo = card.conversational_card_info || {};
+
+  const explicit = cardInfo.language || card.card_language || card.language;
+  if (typeof explicit === 'string' && explicit.trim()) {
+    return explicit.trim();
+  }
+
+  const textToCheck = [
+    card.card_name,
+    cardInfo.card_name,
+    cardInfo.set_name,
+    card.card_set,
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  // Hiragana/Katakana (U+3040-U+30FF) or CJK ideographs (U+4E00-U+9FFF)
+  if (/[぀-ヿ一-鿿]/.test(textToCheck)) {
+    return 'Japanese';
+  }
+
+  return 'English';
+}
 
 /**
  * Get serial numbering from card data (e.g., "12/99", "/25", "1/1")

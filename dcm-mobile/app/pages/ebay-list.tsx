@@ -16,10 +16,11 @@ import { useLabelStyle } from '@/hooks/useLabelStyle'
 import {
   checkEbayStatus, checkExistingListing, uploadImagesSequential, createListing,
   checkDisclaimer, acceptDisclaimer, getOAuthUrl, EbayApiError,
-  generateTitle, SHIPPING_SERVICES,
+  SHIPPING_SERVICES,
   FIXED_PRICE_DURATION_OPTIONS, AUCTION_DURATION_OPTIONS, ALL_DURATION_OPTIONS,
   type EbayConnectionStatus, type CreateListingRequest, type ImageUploadResult,
 } from '@/lib/ebayApi'
+import { buildEbayTitleFromCard } from '@/lib/ebayTitleBuilder'
 import { classifyEbayOAuthNavigation } from '@/lib/ebayOAuth'
 import { resolveCardValue } from '@/lib/resolveCardValue'
 
@@ -106,8 +107,10 @@ export default function EbayListScreen() {
   const [imagesReady, setImagesReady] = useState(false)
   const [imagesGenerating, setImagesGenerating] = useState(false)
   const [imagesError, setImagesError] = useState<string | null>(null)
-  // User-uploaded additional images from device gallery
-  const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; uri: string; base64?: string; selected: boolean }>>([])
+  // User-uploaded additional images from device gallery. Only the file URI is
+  // held in state — base64 is read per-image at upload time (see
+  // readAdditionalImageAsDataUrl) so all photos are never in memory at once.
+  const [additionalImages, setAdditionalImages] = useState<Array<{ id: string; uri: string; mimeType?: string; selected: boolean }>>([])
   // Ordered list of image references — the user reorders this; first selected becomes main image
   type OrderedImageItem = { kind: 'system'; key: 'front'|'back'|'miniReport'|'rawFront'|'rawBack' } | { kind: 'custom'; id: string }
   const [imageOrder, setImageOrder] = useState<OrderedImageItem[]>([])
@@ -167,6 +170,12 @@ export default function EbayListScreen() {
   // signature of the image selection — lets a retry after a publish failure
   // (e.g. expired token) skip re-generating/re-uploading unchanged images.
   const uploadCacheRef = useRef<{ signature: string; urls: ImageUploadResult['urls'] } | null>(null)
+  // Buffer for the chunked prep-bridge protocol (v2): the prep WebView posts
+  // one 'ebay-prep-image' message per image, then 'ebay-prep-complete' with
+  // the metadata. Buffered here until the completion message arrives. The
+  // legacy protocol (one giant 'images-ready' message) is still handled — a
+  // new app binary can hit an old cached prep page.
+  const chunkedImagesRef = useRef<Record<string, string>>({})
 
   // Duplicate-listing pre-check — blocks the wizard when the card already
   // has an active/pending eBay listing (the server would 409 at publish).
@@ -185,7 +194,7 @@ export default function EbayListScreen() {
       const { data } = await supabase.from('cards').select('*').eq('id', cardId).single()
       if (data) {
         setCard(data)
-        setTitle(generateTitle(data))
+        setTitle(buildEbayTitleFromCard(data))
         // Seed the price from the card's resolved market value (user-editable, seed once)
         const resolved = resolveCardValue(data)
         if (resolved.value > 0) setPrice(prev => prev || resolved.value.toFixed(2))
@@ -272,6 +281,21 @@ export default function EbayListScreen() {
     })
   }, [])
 
+  // ─── Prep WebView completion ───
+  // Shared by both bridge protocols: applies the generated images + metadata
+  // (description, item specifics, CoA document id) once everything arrived.
+  const applyPrepResult = useCallback((
+    images: Record<string, string>,
+    meta: { description?: string; itemSpecifics?: any[]; regulatoryDocumentId?: string | null },
+  ) => {
+    setImageUrls(images)
+    setImagesReady(true)
+    setImagesGenerating(false)
+    if (meta.description) setDescription(prev => prev || meta.description!)
+    if (Array.isArray(meta.itemSpecifics)) setItemSpecifics(prev => (prev.length === 0 ? meta.itemSpecifics! : prev))
+    if (meta.regulatoryDocumentId) setRegulatoryDocumentId(meta.regulatoryDocumentId)
+  }, [])
+
   // ─── Image order helpers ───
   // Initialize order once system images are ready
   useEffect(() => {
@@ -318,7 +342,6 @@ export default function EbayListScreen() {
         allowsMultipleSelection: true,
         selectionLimit: remaining,
         quality: 0.85,
-        base64: true,
       })
     } catch (err: any) {
       console.warn('[ebay-list] picker error:', err)
@@ -329,31 +352,16 @@ export default function EbayListScreen() {
     if (result.canceled) return
     const picked = (result.assets || []).slice(0, remaining)
     if (picked.length === 0) return
-    // Build data URLs. Prefer base64 returned directly; fall back to FileSystem.read.
-    const enriched = await Promise.all(
-      picked.map(async (asset) => {
-        try {
-          let dataUrl: string | null = null
-          if (asset.base64) {
-            dataUrl = `data:${asset.mimeType || 'image/jpeg'};base64,${asset.base64}`
-          } else if (asset.uri) {
-            const b64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: 'base64' as any })
-            dataUrl = `data:${asset.mimeType || 'image/jpeg'};base64,${b64}`
-          }
-          if (!dataUrl) return null
-          return {
-            id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-            uri: asset.uri,
-            base64: dataUrl,
-            selected: true,
-          }
-        } catch (err) {
-          console.warn('[ebay-list] failed to read picked image:', err)
-          return null
-        }
-      })
-    )
-    const valid = enriched.filter(Boolean) as Array<{ id: string; uri: string; base64?: string; selected: boolean }>
+    // Keep only the picker's file URI (+ mime type) in state — the base64 for
+    // each photo is read lazily at upload time, one image at a time.
+    const valid = picked
+      .filter(asset => !!asset.uri)
+      .map(asset => ({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        uri: asset.uri,
+        mimeType: asset.mimeType,
+        selected: true,
+      }))
     console.log('[ebay-list] adding', valid.length, 'custom images')
     if (valid.length === 0) {
       Alert.alert('Could not load images', 'Failed to read the selected photos.')
@@ -362,6 +370,15 @@ export default function EbayListScreen() {
     setAdditionalImages(prev => [...prev, ...valid])
     setImageOrder(prev => [...prev, ...valid.map(v => ({ kind: 'custom' as const, id: v.id }))])
   }, [selectedImages, additionalImages])
+
+  // Read a picked gallery photo into a base64 data URL. Called once per image
+  // during the sequential upload so photos are never all in memory at once.
+  const readAdditionalImageAsDataUrl = useCallback(async (img: { uri: string; mimeType?: string }): Promise<string> => {
+    const b64 = await FileSystem.readAsStringAsync(img.uri, { encoding: 'base64' as any })
+    const ext = img.uri.split('.').pop()?.toLowerCase()
+    const fallbackMime = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : 'image/jpeg'
+    return `data:${img.mimeType || fallbackMime};base64,${b64}`
+  }, [])
 
   const removeAdditionalImage = useCallback((id: string) => {
     setAdditionalImages(prev => prev.filter(i => i.id !== id))
@@ -394,7 +411,7 @@ export default function EbayListScreen() {
     try {
       // 1. Build images-to-upload from imageOrder (selected only)
       const imagesToUpload: Record<string, string> = {}
-      const orderedExtras: { id: string; base64: string }[] = []
+      const orderedExtras: { id: string; uri: string; mimeType?: string }[] = []
       // Walk the ordered list and pick what's selected
       for (const item of imageOrder) {
         if (item.kind === 'system') {
@@ -404,7 +421,7 @@ export default function EbayListScreen() {
           if (url) imagesToUpload[item.key] = url
         } else {
           const ai = additionalImages.find(a => a.id === item.id)
-          if (ai && ai.selected && ai.base64) orderedExtras.push({ id: ai.id, base64: ai.base64 })
+          if (ai && ai.selected) orderedExtras.push({ id: ai.id, uri: ai.uri, mimeType: ai.mimeType })
         }
       }
 
@@ -432,7 +449,9 @@ export default function EbayListScreen() {
         const uploadResult = await uploadImagesSequential(
           cardId,
           imagesToUpload,
-          orderedExtras.map(e => e.base64),
+          // Lazy thunks: each gallery photo is read from disk right before its
+          // own upload instead of holding every base64 in memory up front.
+          orderedExtras.map(e => () => readAdditionalImageAsDataUrl(e)),
           (label, cur, total) => setPublishProgress(`${label} (${cur}/${total})`),
         )
         uploadedUrls = uploadResult.urls
@@ -450,7 +469,7 @@ export default function EbayListScreen() {
           if (url) orderedUrls.push(url)
         } else {
           const ai = additionalImages.find(a => a.id === item.id)
-          if (!ai || !ai.selected || !ai.base64) continue
+          if (!ai || !ai.selected) continue
           const url = uploadedUrls.additional?.[extraIdx]
           if (url) orderedUrls.push(url)
           extraIdx++
@@ -530,7 +549,7 @@ export default function EbayListScreen() {
       setIsPublishing(false)
       setPublishProgress('')
     }
-  }, [card, cardId, title, price, description, listingFormat, bestOfferEnabled, duration, imageOrder, imageUrls, selectedImages, additionalImages, frontUrl, backUrl, itemSpecifics, shipping, regulatoryDocumentId])
+  }, [card, cardId, title, price, description, listingFormat, bestOfferEnabled, duration, imageOrder, imageUrls, selectedImages, additionalImages, frontUrl, backUrl, itemSpecifics, shipping, regulatoryDocumentId, readAdditionalImageAsDataUrl])
 
   // ─── Navigation helpers ───
   const canGoNext = useMemo(() => {
@@ -812,21 +831,29 @@ export default function EbayListScreen() {
           <View pointerEvents="none" style={st.hiddenWebViewWrapper}>
             <WebView
               source={{
-                uri: `${API_BASE}/ebay-image-prep/${cardId}?token=${encodeURIComponent(session.access_token)}&labelStyle=${labelStyle}`,
+                // bridge=2 asks the prep page for the chunked protocol (one
+                // message per image). Old cached pages ignore the param and
+                // send the legacy single 'images-ready' message instead.
+                uri: `${API_BASE}/ebay-image-prep/${cardId}?token=${encodeURIComponent(session.access_token)}&labelStyle=${labelStyle}&bridge=2`,
               }}
               originWhitelist={['*']}
               javaScriptEnabled
-              onLoadStart={() => { setImagesGenerating(true); setImagesError(null) }}
+              onLoadStart={() => { setImagesGenerating(true); setImagesError(null); chunkedImagesRef.current = {} }}
               onMessage={(e) => {
                 try {
                   const msg = JSON.parse(e.nativeEvent.data)
-                  if (msg.type === 'images-ready' && msg.images) {
-                    setImageUrls(msg.images)
-                    setImagesReady(true)
-                    setImagesGenerating(false)
-                    if (msg.description && !description) setDescription(msg.description)
-                    if (Array.isArray(msg.itemSpecifics) && itemSpecifics.length === 0) setItemSpecifics(msg.itemSpecifics)
-                    if (msg.regulatoryDocumentId) setRegulatoryDocumentId(msg.regulatoryDocumentId)
+                  if (msg.type === 'ebay-prep-image' && typeof msg.key === 'string' && typeof msg.dataUrl === 'string') {
+                    // Chunked protocol (v2): buffer each image as it arrives.
+                    chunkedImagesRef.current[msg.key] = msg.dataUrl
+                  } else if (msg.type === 'ebay-prep-complete') {
+                    // Chunked protocol (v2): all images arrived; metadata rides
+                    // on the (small) completion message.
+                    applyPrepResult({ ...chunkedImagesRef.current }, msg)
+                    chunkedImagesRef.current = {}
+                  } else if (msg.type === 'images-ready' && msg.images) {
+                    // Legacy protocol: everything in one giant message (old
+                    // cached prep page).
+                    applyPrepResult(msg.images, msg)
                   } else if (msg.type === 'error') {
                     setImagesError(msg.message || 'Failed to generate images')
                     setImagesGenerating(false)

@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { getStoredSession } from '@/lib/directAuth';
-import { EbayListingModal } from '@/components/ebay/EbayListingModal';
 import StatsStrip from './components/StatsStrip';
 import ListNewTab from './components/ListNewTab';
 import MyListingsTab from './components/MyListingsTab';
@@ -11,6 +11,21 @@ import SoldTab from './components/SoldTab';
 import EndedTab from './components/EndedTab';
 import MarketplaceInfo from './components/MarketplaceInfo';
 import type { MarketplaceCard, MarketplaceListing, MarketplaceStats } from './types';
+
+// Loaded on demand — the listing modal pulls in @react-pdf and the whole
+// image-generation pipeline (~MBs of JS). Guests and users who never open
+// a listing shouldn't download any of it.
+const EbayListingModal = dynamic(
+  () => import('@/components/ebay/EbayListingModal').then(m => m.EbayListingModal),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white" />
+      </div>
+    ),
+  }
+);
 
 type TabId = 'list' | 'active' | 'sold' | 'ended';
 
@@ -51,6 +66,9 @@ export default function MarketplaceClient() {
 
   const [cards, setCards] = useState<MarketplaceCard[]>([]);
   const [cardsTruncated, setCardsTruncated] = useState(false);
+  // The marketplace shell renders before the (heavy) card list arrives —
+  // this flag lets ListNewTab show a loader instead of a false empty state.
+  const [cardsLoaded, setCardsLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,8 +90,18 @@ export default function MarketplaceClient() {
 
   // -------------------------------- Loading --------------------------------
 
+  // Monotonic refresh counter — if a newer refresh starts while an older one
+  // is still in flight, the older one's results are silently dropped so a
+  // slow response can't clobber fresher data.
+  const refreshSeq = useRef(0);
+  // Timestamp of the last refresh that completed without an error — used to
+  // throttle the window-focus refetch.
+  const lastRefreshAt = useRef(0);
+
   const refreshAll = useCallback(async (token?: string) => {
     const t = token ?? accessToken;
+    const seq = ++refreshSeq.current;
+    const isStale = () => seq !== refreshSeq.current;
     setRefreshing(true);
     setError(null);
     try {
@@ -83,56 +111,103 @@ export default function MarketplaceClient() {
       }
       const headers = { Authorization: `Bearer ${t}` };
 
-      // First check whether the user has any graded cards. If they don't,
-      // skip the marketplace fetches entirely — they're not ready to list.
-      const cardsRes = await fetch('/api/ebay/eligible-cards', { headers });
-      if (!cardsRes.ok) {
-        throw new Error('Failed to load cards');
-      }
-      const cardsJson = await cardsRes.json();
-      const eligibleCards: MarketplaceCard[] = cardsJson.cards ?? [];
-      const alreadyListedCount: number = cardsJson.alreadyListedCount ?? 0;
-      const totalGradedCards = eligibleCards.length + alreadyListedCount;
-      setCards(eligibleCards);
-      setCardsTruncated(!!cardsJson.truncated);
+      // Fire all four requests concurrently. eligible-cards is by far the
+      // heaviest payload (up to 2000 card rows + signed URLs) and must not
+      // block the connect/marketplace decision or the dashboard numbers.
+      // Each promise captures its own failure so one bad endpoint doesn't
+      // discard the others' results.
+      const settle = (p: Promise<Response>) =>
+        p.then(
+          res => ({ res, err: null as unknown }),
+          err => ({ res: null as Response | null, err })
+        );
+      const cardsP = settle(fetch('/api/ebay/eligible-cards', { headers }));
+      const statusP = settle(fetch('/api/ebay/status', { headers }));
+      const statsP = settle(fetch('/api/ebay/stats', { headers }));
+      const listingsP = settle(fetch('/api/ebay/my-listings', { headers }));
 
-      if (totalGradedCards === 0) {
-        setPageState('no-cards');
-        return;
+      // Connection status is a tiny payload and decides the whole page —
+      // render the marketplace shell as soon as it lands instead of making
+      // the user stare at a spinner while the card list downloads.
+      const status = await statusP;
+      if (isStale()) return;
+      if (!status.res) {
+        throw new Error("Couldn't check your eBay connection. Try again in a moment.");
       }
-
-      // User has cards. Now check eBay connection.
-      const statusRes = await fetch('/api/ebay/status', { headers });
-      const statusJson = await statusRes.json();
+      const statusJson = await status.res.json();
+      if (isStale()) return;
       const isConnected = !!statusJson.connected;
       setEbayUsername(statusJson.connection?.ebay_username ?? null);
+      if (isConnected) setPageState('marketplace');
 
-      if (!isConnected) {
-        setPageState('connect');
+      // Deferred failure message — apply every successful payload first,
+      // then surface the first failure (same crafted messages as before).
+      let failure: string | null = null;
+
+      if (isConnected) {
+        // Surface stats/listings failures explicitly instead of silently
+        // landing the user in an empty marketplace — a 401 on either
+        // endpoint is almost always an expired session and the user needs
+        // to know to reconnect.
+        const [stats, listings] = await Promise.all([statsP, listingsP]);
+        if (isStale()) return;
+        if (stats.res?.ok) {
+          const sj = await stats.res.json();
+          if (isStale()) return;
+          setStats(sj);
+        }
+        if (listings.res?.ok) {
+          const lj = await listings.res.json();
+          if (isStale()) return;
+          setListings({ active: lj.active ?? [], sold: lj.sold ?? [], ended: lj.ended ?? [] });
+        }
+        if (!stats.res?.ok || !listings.res?.ok) {
+          const failed = !stats.res?.ok ? 'stats' : 'listings';
+          const httpStatus = !stats.res?.ok ? stats.res?.status : listings.res?.status;
+          failure = httpStatus === 401
+            ? "Your DCM session expired. Please refresh the page and sign in again."
+            : `Couldn't load your eBay ${failed}${httpStatus ? ` (status ${httpStatus})` : ''}. Try again in a moment.`;
+        }
+      }
+
+      // Card list — decides no-cards vs connect for unconnected users and
+      // fills the List a Card picker for connected ones.
+      const cards = await cardsP;
+      if (isStale()) return;
+      if (cards.res?.ok) {
+        const cardsJson = await cards.res.json();
+        if (isStale()) return;
+        const eligibleCards: MarketplaceCard[] = cardsJson.cards ?? [];
+        const alreadyListedCount: number = cardsJson.alreadyListedCount ?? 0;
+        const totalGradedCards = eligibleCards.length + alreadyListedCount;
+        setCards(eligibleCards);
+        setCardsTruncated(!!cardsJson.truncated);
+        setCardsLoaded(true);
+
+        if (totalGradedCards === 0) {
+          setPageState('no-cards');
+          return;
+        }
+        if (!isConnected) {
+          setPageState('connect');
+          return;
+        }
+      } else if (!isConnected) {
+        // Without the card list we can't tell no-cards from connect.
+        throw new Error('Failed to load cards');
+      } else {
+        // Connected user — keep the dashboard data we already applied,
+        // but tell them the picker didn't load.
+        failure = failure ?? 'Failed to load cards';
+      }
+
+      if (failure) {
+        setError(failure);
         return;
       }
-
-      // Fully provisioned — load the dashboard payloads. Surface failures
-      // explicitly instead of silently landing the user in an empty
-      // marketplace — a 401 on either endpoint is almost always an expired
-      // eBay session and the user needs to know to reconnect.
-      const [statsRes, listingsRes] = await Promise.all([
-        fetch('/api/ebay/stats', { headers }),
-        fetch('/api/ebay/my-listings', { headers }),
-      ]);
-      if (!statsRes.ok || !listingsRes.ok) {
-        const failed = !statsRes.ok ? 'stats' : 'listings';
-        const status = !statsRes.ok ? statsRes.status : listingsRes.status;
-        const msg = status === 401
-          ? "Your DCM session expired. Please refresh the page and sign in again."
-          : `Couldn't load your eBay ${failed} (status ${status}). Try again in a moment.`;
-        throw new Error(msg);
-      }
-      setStats(await statsRes.json());
-      const lj = await listingsRes.json();
-      setListings({ active: lj.active ?? [], sold: lj.sold ?? [], ended: lj.ended ?? [] });
-      setPageState('marketplace');
+      lastRefreshAt.current = Date.now();
     } catch (e: any) {
+      if (isStale()) return;
       console.error('[Marketplace] refreshAll error', e);
       // Only surface our own crafted messages — never raw server error text
       // (could contain Supabase/eBay internals).
@@ -141,7 +216,8 @@ export default function MarketplaceClient() {
         : 'Something went wrong loading your marketplace. Please try again.';
       setError(friendly);
     } finally {
-      setRefreshing(false);
+      // A newer refresh owns the flag now — don't flicker it off mid-run.
+      if (!isStale()) setRefreshing(false);
     }
   }, [accessToken]);
 
@@ -157,10 +233,15 @@ export default function MarketplaceClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Refresh on tab focus when marketplace is active.
+  // Refresh on tab focus when marketplace is active — but throttled: users
+  // alt-tab constantly, and every focus used to re-download the full card
+  // list. Skip if the last successful refresh was under a minute ago.
   useEffect(() => {
     if (pageState !== 'marketplace') return;
-    const onFocus = () => refreshAll();
+    const onFocus = () => {
+      if (Date.now() - lastRefreshAt.current < 60_000) return;
+      refreshAll();
+    };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [pageState, refreshAll]);
@@ -391,7 +472,12 @@ export default function MarketplaceClient() {
         {/* Tab content */}
         <div className="mt-6">
           {activeTab === 'list' && (
-            <ListNewTab cards={cards} truncated={cardsTruncated} onSelectCard={setModalCard} />
+            <ListNewTab
+              cards={cards}
+              truncated={cardsTruncated}
+              loading={!cardsLoaded}
+              onSelectCard={setModalCard}
+            />
           )}
           {activeTab === 'active' && (
             <MyListingsTab listings={listings.active} />

@@ -290,6 +290,33 @@ export async function updateConnectionLastUsed(userId: string): Promise<void> {
 // =============================================================================
 
 /**
+ * Detect whether a token-refresh failure means eBay has definitively
+ * invalidated the refresh token (revoked, expired, or issued to another
+ * client) — as opposed to a transient network error, timeout, or eBay 5xx.
+ *
+ * refreshAccessToken (client.ts) throws Error(message) where message is the
+ * OAuth error body's `error_description` (or the `error` code) when eBay
+ * returns a structured error. A dead refresh token surfaces as
+ * `invalid_grant` or "the provided authorization refresh token is invalid or
+ * was issued to another client". Transient failures produce generic
+ * "Token refresh failed (5xx)" messages or network throws, which must NOT
+ * match here.
+ */
+function isRefreshTokenInvalidError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const lower = message.toLowerCase();
+
+  return (
+    lower.includes('invalid_grant') ||
+    lower.includes('refresh token is invalid') ||
+    lower.includes('invalid refresh token') ||
+    lower.includes('issued to another client') ||
+    (lower.includes('refresh token') &&
+      (lower.includes('expired') || lower.includes('revoked')))
+  );
+}
+
+/**
  * Get a valid access token, refreshing if necessary
  * This should be called before any eBay API request
  */
@@ -310,9 +337,17 @@ export async function getValidAccessToken(userId: string): Promise<string> {
       return newTokens.access_token;
     } catch (error) {
       console.error('[eBay] Token refresh failed:', error);
-      // Delete the connection if refresh fails (token may be revoked)
-      await deleteEbayConnection(userId);
-      throw new Error('eBay session expired. Please reconnect your account.');
+
+      // Only delete the connection when eBay has definitively invalidated
+      // the refresh token — that's the only case that requires re-OAuth.
+      if (isRefreshTokenInvalidError(error)) {
+        await deleteEbayConnection(userId);
+        throw new Error('eBay session expired. Please reconnect your account.');
+      }
+
+      // Transient failure (network error, timeout, eBay 5xx): keep the
+      // connection intact so the caller can simply retry.
+      throw new Error('eBay token refresh failed. Please try again.');
     }
   }
 
