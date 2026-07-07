@@ -5,13 +5,13 @@
  * collection. Per-card logic lives in @/lib/pricing/batchPriceRefresh
  * so the weekly cron at /api/cron/update-card-prices can share it.
  *
- * Card Lovers only. Server-side cool-down backstops the client's
- * localStorage rate limit.
+ * Open to all authenticated users (July 2026) — stale-only filter, batch
+ * cap, and the server-side cool-down bound the cost. The cool-down also
+ * backstops the client's localStorage rate limit.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
-import { isActiveCardLover } from '@/lib/credits';
 import { supabaseServer } from '@/lib/supabaseServer';
 import {
   refreshCardPrice, classifyCategory, parseCardInfo, isCacheStale,
@@ -50,10 +50,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 });
     }
 
-    const active = await isActiveCardLover(auth.userId);
-    if (!active) {
-      return NextResponse.json({ success: false, error: 'Card Lovers subscription required' }, { status: 403 });
-    }
+    // July 2026: open to ALL authenticated users. Auto-triggers (app open,
+    // portfolio open, card detail open) keep everyone's prices fresh; the
+    // stale-only filter + batch cap + cool-down bound the upstream cost.
+    // The Card Lovers premium is the on-demand button UI, not the endpoint.
 
     // Server-side cool-down — backstop for the client's localStorage limit.
     const lastRefresh = lastRefreshByUser.get(auth.userId);

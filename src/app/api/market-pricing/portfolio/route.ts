@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth } from '@/lib/serverAuth';
 import { supabaseServer } from '@/lib/supabaseServer';
-import { resolveCardValue, type CardForPricing } from '@/lib/pricing/resolveCardValue';
+import { resolveCardValue, type CardForPricing, type PriceSource } from '@/lib/pricing/resolveCardValue';
+import { isCacheStale } from '@/lib/pricing/batchPriceRefresh';
+import { getConditionFromGrade } from '@/lib/conditionAssessment';
 
 // DB stores: Pokemon, MTG, Lorcana, One Piece, Other, or sport names (Football, Baseball, etc.)
 const SPORTS_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling'];
@@ -84,7 +86,7 @@ export async function GET(request: NextRequest) {
         conversational_decimal_grade, conversational_whole_grade, conversational_condition_label,
         ebay_price_lowest, ebay_price_median, ebay_price_average, ebay_price_highest,
         dcm_price_estimate, dcm_price_raw, dcm_price_graded_high, dcm_price_median, dcm_price_average,
-        dcm_price_updated_at, dcm_price_match_confidence,
+        dcm_price_updated_at, dcm_price_match_confidence, dcm_cached_prices,
         dcm_price_at_grading, dcm_price_at_grading_date,
         scryfall_price_usd, scryfall_price_usd_foil
       `)
@@ -178,7 +180,11 @@ export async function GET(request: NextRequest) {
       name: getCardName(item.card),
       category: (item.card.category as string) || 'other',
       grade: (item.card.conversational_decimal_grade as number) || (item.card.conversational_whole_grade as number) || 0,
-      conditionLabel: (item.card.conversational_condition_label as string) || '',
+      // Grade-derived, never the stored AI label (historical rows diverge)
+      conditionLabel: (() => {
+        const g = (item.card.conversational_whole_grade as number) || Math.round((item.card.conversational_decimal_grade as number) || 0);
+        return g > 0 ? getConditionFromGrade(g) : ((item.card.conversational_condition_label as string) || '');
+      })(),
       value: Math.round(item.value * 100) / 100,
       imageUrl: urlMap.get(item.card.front_path as string) || null,
       cardPath: getCardPath(item.card),
@@ -220,13 +226,21 @@ export async function GET(request: NextRequest) {
       changePercent: item.changePercent,
     });
 
-    // Compute grading-time portfolio summary
+    // Grading-time vs current summary — SAME COHORT on both sides. Both sums
+    // cover only cards with a grading snapshot AND a current dcm estimate
+    // (the exact pair the mover rows compare). Previously totalCurrentValue
+    // was the whole portfolio (any price source), so every card priced today
+    // but never snapshotted at grading inflated "Net Change" — a cohort
+    // mismatch presented to the user as market movement.
     let totalGradingValue = 0;
+    let totalCurrentDcmValue = 0;
     let cardsWithGradingPrice = 0;
     for (const card of cards) {
       const gradingPrice = (card.dcm_price_at_grading as number) || 0;
-      if (gradingPrice > 0) {
+      const currentPrice = (card.dcm_price_estimate as number) || 0;
+      if (gradingPrice > 0 && currentPrice > 0) {
         totalGradingValue += gradingPrice;
+        totalCurrentDcmValue += currentPrice;
         cardsWithGradingPrice++;
       }
     }
@@ -235,7 +249,7 @@ export async function GET(request: NextRequest) {
       gainers: gainerCards.map(mapMover),
       losers: loserCards.map(mapMover),
       totalGradingValue: Math.round(totalGradingValue * 100) / 100,
-      totalCurrentValue: Math.round(totalValue * 100) / 100,
+      totalCurrentValue: Math.round(totalCurrentDcmValue * 100) / 100,
       cardsWithGradingPrice,
     };
 
@@ -346,30 +360,29 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 10);
 
-    // 5. Price Source Breakdown
-    let dcmCount = 0;
-    let ebayCount = 0;
-    let scryfallCount = 0;
-    let unpricedCount = 0;
-
+    // 5. Price Source Breakdown — attribution comes from the SAME resolver
+    // that produced every dollar figure on the page (resolveCardValue exposes
+    // its winning source for exactly this). The previous hand-rolled chain
+    // (dcm → eBay → Scryfall) disagreed with the money math: MTG foils priced
+    // via scryfall_price_usd_foil counted as "Unpriced", and Scryfall-valued
+    // cards were attributed to eBay.
+    const SOURCE_LABELS: Record<PriceSource, string> = {
+      'dcm-estimate': 'PriceCharting',
+      'dcm-cached': 'PriceCharting',
+      'scryfall': 'Scryfall',
+      'scryfall-foil': 'Scryfall',
+      'ebay-median': 'eBay',
+      'none': 'Unpriced',
+    };
+    const sourceCounts = new Map<string, number>();
     for (const card of cards) {
-      if (card.dcm_price_estimate && (card.dcm_price_estimate as number) > 0) {
-        dcmCount++;
-      } else if (card.ebay_price_median && (card.ebay_price_median as number) > 0) {
-        ebayCount++;
-      } else if (card.scryfall_price_usd && (card.scryfall_price_usd as number) > 0) {
-        scryfallCount++;
-      } else {
-        unpricedCount++;
-      }
+      const label = SOURCE_LABELS[resolveCardValue(card as unknown as CardForPricing).source];
+      sourceCounts.set(label, (sourceCounts.get(label) || 0) + 1);
     }
 
-    const priceSourceBreakdown = [
-      { source: 'PriceCharting', count: dcmCount },
-      { source: 'eBay', count: ebayCount },
-      { source: 'Scryfall', count: scryfallCount },
-      { source: 'Unpriced', count: unpricedCount },
-    ].filter(s => s.count > 0);
+    const priceSourceBreakdown = ['PriceCharting', 'eBay', 'Scryfall', 'Unpriced']
+      .map(source => ({ source, count: sourceCounts.get(source) || 0 }))
+      .filter(s => s.count > 0);
 
     // 6. Grade vs Value — scatter data (sample up to 200 points for performance)
     const gradeVsValueRaw: Array<{ grade: number; value: number; name: string; cardPath: string }> = [];
@@ -388,10 +401,16 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.value - a.value)
       .slice(0, 200);
 
+    // Stale-price count so the page can show "updating…" and re-poll while
+    // the login-triggered background refresh (Card Lovers) works through the
+    // queue — closes the race where the portfolio fetch beats the refresh.
+    const stalePriceCount = cards.filter(c => isCacheStale(c.dcm_price_updated_at as string | null)).length;
+
     return NextResponse.json({
       totalValue: Math.round(totalValue * 100) / 100,
       totalCards: cards.length,
       cardsWithValue,
+      stalePriceCount,
       categoryBreakdown,
       topCards,
       movers,

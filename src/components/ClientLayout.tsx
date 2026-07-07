@@ -44,6 +44,8 @@ function triggerBackgroundPriceRefresh() {
   try {
     const session = getStoredSession()
     if (!session?.access_token) return
+    // July 2026: refresh-prices is open to all authenticated users (stale-
+    // only + batch cap + cool-down bound the cost), so fire unconditionally.
     void fetch('/api/market-pricing/refresh-prices', {
       method: 'POST',
       headers: {
@@ -54,6 +56,30 @@ function triggerBackgroundPriceRefresh() {
       keepalive: true,
     }).catch(() => { /* fire-and-forget */ })
   } catch { /* no-op */ }
+}
+
+// Card-detail freshness: when the user opens any card detail page, top up
+// THAT card's price if it's >7 days stale. Owner + staleness + a 60s
+// per-card cool-down are enforced server-side, so firing on every detail
+// navigation is cheap (a fresh card is a single indexed select).
+const CARD_DETAIL_RE = /^\/(pokemon|mtg|sports|lorcana|onepiece|yugioh|starwars|other)\/([0-9a-f-]{36})$/i
+
+function CardDetailPriceRefresher() {
+  const pathname = usePathname()
+  useEffect(() => {
+    const match = pathname?.match(CARD_DETAIL_RE)
+    if (!match) return
+    try {
+      const session = getStoredSession()
+      if (!session?.access_token) return
+      void fetch(`/api/cards/${match[2]}/refresh-price`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        keepalive: true,
+      }).catch(() => { /* fire-and-forget */ })
+    } catch { /* no-op */ }
+  }, [pathname])
+  return null
 }
 
 // Initialize session refresh monitoring to keep users logged in
@@ -84,6 +110,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <ScrollToTop />
         <BackgroundGradingMonitor />
         <SessionRefreshMonitor />
+        <CardDetailPriceRefresher />
         <ReferralTracker />
         <Toaster
           position="top-center"

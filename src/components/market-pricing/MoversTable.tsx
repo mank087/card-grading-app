@@ -36,7 +36,7 @@ function AutoRefreshNote() {
         <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        Prices auto-refresh every Sunday
+        Prices refresh automatically when you open your portfolio
       </div>
       <Link href="/card-lovers" className="text-xs text-purple-600 hover:text-purple-700 font-medium">
         Want on-demand refresh? Upgrade to Card Lovers →
@@ -212,8 +212,8 @@ export default function MoversTable({
         <div className="text-center py-6 space-y-4">
           <p className="text-gray-500 text-sm">
             {showRefreshButton
-              ? 'Prices are automatically updated every week, or you can manually refresh all prices below. Value changes will appear here once updated prices differ from their grading-time values.'
-              : 'Prices are automatically refreshed every Sunday. Value changes will appear here once updated prices differ from their grading-time values.'}
+              ? 'Prices refresh automatically when you open your portfolio, or you can manually refresh all prices below. Value changes will appear here once updated prices differ from their grading-time values.'
+              : 'Prices refresh automatically when you open your portfolio. Value changes will appear here once updated prices differ from their grading-time values.'}
           </p>
           {showRefreshButton ? (
             <RefreshButton

@@ -19,6 +19,9 @@ interface PortfolioData {
   totalValue: number;
   totalCards: number;
   cardsWithValue: number;
+  /** Cards whose cached price is >7 days old (or never priced). Drives the
+      background-refresh polling for Card Lovers. */
+  stalePriceCount?: number;
   categoryBreakdown: Array<{ category: string; count: number; value: number; percentage: number }>;
   topCards: Array<{
     id: string; name: string; category: string; grade: number; value: number;
@@ -88,6 +91,22 @@ export default function MarketPricingPage() {
     }
     fetchPortfolio();
     checkCardLoverStatus();
+    // Portfolio-open refresh (all users): top up stale prices in the
+    // background. Server enforces stale-only + 150/batch + 60s cool-down,
+    // so this is a cheap no-op when everything is fresh (or when the
+    // app-mount trigger just ran). The polling effect below re-fetches
+    // the numbers as the refresh lands.
+    try {
+      const s = getStoredSession();
+      if (s?.access_token) {
+        void fetch('/api/market-pricing/refresh-prices', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${s.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ trigger: 'portfolio-open' }),
+          keepalive: true,
+        }).catch(() => { /* fire-and-forget */ });
+      }
+    } catch { /* no-op */ }
   }, []);
 
   async function checkCardLoverStatus() {
@@ -112,8 +131,26 @@ export default function MarketPricingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCategory]);
 
-  async function fetchPortfolio() {
-    setLoading(true);
+  // Freshness race: the portfolio-open (and app-mount) background refresh
+  // runs while this page's fetch usually wins the race and shows
+  // pre-refresh numbers. While stale cards remain, silently re-poll with
+  // backoff so fresh prices appear without a manual reload.
+  const MAX_AUTO_POLLS = 3;
+  const [autoRefreshPolls, setAutoRefreshPolls] = useState(0);
+  useEffect(() => {
+    if (!portfolio || refreshing || loading) return;
+    if ((portfolio.stalePriceCount ?? 0) === 0 || autoRefreshPolls >= MAX_AUTO_POLLS) return;
+    const delay = [10_000, 20_000, 40_000][autoRefreshPolls] ?? 40_000;
+    const t = setTimeout(() => {
+      setAutoRefreshPolls(n => n + 1);
+      fetchPortfolio({ silent: true });
+    }, delay);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [portfolio, autoRefreshPolls, refreshing, loading]);
+
+  async function fetchPortfolio(opts?: { silent?: boolean }) {
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const session = getStoredSession();
@@ -270,6 +307,17 @@ export default function MarketPricingPage() {
           </div>
         </section>
 
+        {/* Background-refresh pill — visible while the portfolio-open
+            refresh is still working through stale cards. */}
+        {!loading && (portfolio?.stalePriceCount ?? 0) > 0 && autoRefreshPolls < MAX_AUTO_POLLS && (
+          <section className="max-w-7xl mx-auto px-4 mt-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 text-blue-800 px-4 py-2.5 text-sm flex items-center gap-2" role="status">
+              <span className="inline-block w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+              Updating {portfolio!.stalePriceCount} stale price{portfolio!.stalePriceCount === 1 ? '' : 's'} in the background — figures refresh automatically.
+            </div>
+          </section>
+        )}
+
         {/* Refresh feedback banner — appears after the user clicks Refresh
             Prices Now. Dismissible; auto-clears on next refresh attempt. */}
         {refreshFeedback && (
@@ -372,7 +420,7 @@ export default function MarketPricingPage() {
                   </svg>
                   <p className="text-gray-600 mb-3">{error}</p>
                   <button
-                    onClick={fetchPortfolio}
+                    onClick={() => fetchPortfolio()}
                     className="text-sm text-purple-600 hover:text-purple-700 font-medium"
                   >
                     Try Again

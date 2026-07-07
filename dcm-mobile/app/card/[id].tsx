@@ -362,6 +362,19 @@ export default function CardDetailScreen() {
 
   useEffect(() => { fetchCard() }, [fetchCard])
 
+  // Card-detail freshness (July 2026): top up THIS card's price if it's
+  // >7 days stale. Fire-and-forget — owner check, stale gate, and a 60s
+  // per-card cool-down all live server-side, so this is a cheap no-op on
+  // fresh cards. Fresh numbers show on the next fetch/visit.
+  useEffect(() => {
+    if (!id || !session?.access_token) return
+    const API_BASE = process.env.EXPO_PUBLIC_API_URL || 'https://www.dcmgrading.com'
+    fetch(`${API_BASE}/api/cards/${id}/refresh-price`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+    }).catch(() => { /* fire-and-forget */ })
+  }, [id, session?.access_token])
+
   // Build the appropriate /api/pricing/{category} request body for a card.
   // Mirrors the request shape each route expects (sports vs pokemon vs others).
   const buildPriceRequest = useCallback((c: Card | null) => {

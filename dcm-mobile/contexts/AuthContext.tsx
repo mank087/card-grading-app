@@ -44,6 +44,8 @@ async function tagSignupSource(accessToken: string): Promise<void> {
 //     up wherever the freshness column left off.
 async function triggerBackgroundPriceRefresh(accessToken: string): Promise<void> {
   try {
+    // July 2026: refresh-prices is open to all authenticated users
+    // (stale-only + batch cap + cool-down bound the cost).
     await fetch(`${API_BASE}/api/market-pricing/refresh-prices`, {
       method: 'POST',
       headers: {
