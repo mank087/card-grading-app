@@ -8,7 +8,6 @@ import { CreditsProvider } from '@/contexts/CreditsContext'
 import PersistentStatusBar from '@/components/PersistentStatusBar'
 import HelpBot from '@/components/helpbot/HelpBot'
 import ReferralTracker from '@/components/ReferralTracker'
-import LaunchBanner from '@/components/LaunchBanner'
 import { useBackgroundGrading } from '@/hooks/useBackgroundGrading'
 import {
   initSessionRefresh, cleanupSessionRefresh, getStoredSession, AUTH_STATE_CHANGE_EVENT,
@@ -131,15 +130,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         />
         <PersistentStatusBar />
         <HelpBot />
-        {/* Site-wide launch banner — sits above the sticky Navigation
-            because it's rendered before {children}. Dismissible.
-            The slot wrapper reserves the banner's height pre-hydration
-            so the nav doesn't jump down ~40px when LaunchBanner mounts.
-            See .launch-banner-slot in globals.css and the inline
-            launch-banner-prepaint script in layout.tsx. */}
-        <div className="launch-banner-slot">
-          <LaunchBanner />
-        </div>
+        {/* LaunchBanner retired July 2026 — app-store visibility moved into
+            the Navigation (desktop xl row + mobile menu). */}
         {children}
       </GradingQueueProvider>
     </CreditsProvider>

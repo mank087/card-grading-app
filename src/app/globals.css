@@ -38,30 +38,6 @@ body {
   scrollbar-width: none;  /* Firefox */
 }
 
-/* LaunchBanner pre-hydration height reservation.
-   The banner renders nothing during SSR (state initialised to null in
-   LaunchBanner.tsx to avoid hydration mismatch), then mounts after the
-   useEffect reads localStorage. Without a reserved slot, every uncached
-   non-dismissed visitor sees the sticky nav jump down ~40px on hydration
-   — that single shift alone hits ~0.07 CLS on a 600px mobile viewport.
-
-   We solve that by:
-   1. An inline <script> in layout.tsx reads localStorage SYNCHRONOUSLY
-      before paint and sets data-banner-state on <html>.
-   2. CSS resolves the slot height before React renders.
-   When the user has dismissed, the slot is 0px from the very first
-   paint; when they haven't, the slot reserves the banner's actual
-   height and the banner mounts into the space React already left for
-   it. Either way, no shift.
-   The 40px value matches the banner's py-2/py-2.5 + text height; if
-   the banner copy changes materially, re-measure. */
-.launch-banner-slot {
-  min-height: 40px;
-}
-html[data-banner-state="dismissed"] .launch-banner-slot {
-  min-height: 0;
-}
-
 .scrollbar-hide::-webkit-scrollbar {
   display: none;  /* Chrome, Safari and Opera */
 }

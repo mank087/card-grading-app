@@ -4,14 +4,11 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { getStoredSession } from '../lib/directAuth'
 import ScrollingCardBackground from './ui/ScrollingCardBackground'
+import { getConditionFromGrade } from '@/lib/conditionAssessment'
 import { CardSlabGrid } from '@/components/CardSlab'
 import { getCardLabelData } from '@/lib/useLabelData'
-import AppStoreBadge, { APP_STORE_URL } from '@/components/AppStoreBadge'
-import GooglePlayBadge, { GOOGLE_PLAY_URL } from '@/components/GooglePlayBadge'
-
-// Pre-redesign homepage preserved at src/app/page.tsx.backup_pre_redesign_20260707
-// (July 2026 redesign: outcome-led hero, evergreen New Grader offer replacing the
-// "Launch Special", live trust stats, How It Works, transparency strip, closing CTA.)
+import AppStoreBadge from '@/components/AppStoreBadge'
+import GooglePlayBadge from '@/components/GooglePlayBadge'
 
 // Helper functions to extract card info (matching collection page)
 const stripMarkdown = (text: string | null | undefined): string | null => {
@@ -38,6 +35,14 @@ const getCardInfo = (card: any) => {
     rookie_or_first: card.conversational_card_info?.rookie_or_first || dvgGrading.card_info?.rookie_or_first,
     autographed: card.conversational_card_info?.autographed || false,
   }
+}
+
+const getPlayerName = (card: any) => {
+  const cardInfo = getCardInfo(card)
+  const isSportsCard = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'].includes(card.category || '')
+  return isSportsCard
+    ? (cardInfo.player_or_character || cardInfo.card_name || 'Unknown Player')
+    : (cardInfo.card_name || cardInfo.player_or_character || 'Unknown Card')
 }
 
 const getCardGrade = (card: any) => {
@@ -67,55 +72,11 @@ const getCardLink = (card: any) => {
   return `/card/${card.id}`
 }
 
-/**
- * Live graded-card counter. `target` is the exact live database count (same
- * value /pop shows). On first reveal it starts ~100 below and counts up to the
- * live number, so it reads as "cards actively being graded"; on re-poll it
- * animates the small delta whenever real grading pushes the count higher. It
- * never exceeds the live number, so it can never read higher than /pop.
- */
-function AnimatedGradedCount({ target }: { target: number | null }) {
-  const [display, setDisplay] = useState<number | null>(null)
-  const displayRef = useRef<number | null>(null)
-  const rafRef = useRef<number | null>(null)
-
-  useEffect(() => {
-    if (target == null) return
-    // First reveal starts ~100 below the live count and climbs up to it;
-    // subsequent live increases animate just the small delta.
-    const from = displayRef.current == null
-      ? Math.max(0, target - 100)
-      : displayRef.current
-    const to = target
-    if (from === to) {
-      displayRef.current = to
-      setDisplay(to)
-      return
-    }
-    const durationMs = displayRef.current == null ? 4800 : 2000
-    const startTime = performance.now()
-    const tick = (now: number) => {
-      const p = Math.min(1, (now - startTime) / durationMs)
-      const eased = 1 - Math.pow(1 - p, 3) // easeOutCubic
-      const val = Math.round(from + (to - from) * eased)
-      displayRef.current = val
-      setDisplay(val)
-      if (p < 1) rafRef.current = requestAnimationFrame(tick)
-    }
-    rafRef.current = requestAnimationFrame(tick)
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current) }
-  }, [target])
-
-  if (display == null) return <>Thousands of</>
-  return <>{display.toLocaleString('en-US')}</>
-}
-
 export default function Home() {
   const [user, setUser] = useState<any>(null)
   const [authChecked, setAuthChecked] = useState(false)
   const [featuredCards, setFeaturedCards] = useState<any[]>([])
   const [featuredCardsLoading, setFeaturedCardsLoading] = useState(true)
-  const [popTotal, setPopTotal] = useState<number | null>(null)
 
   useEffect(() => {
     const getUser = async () => {
@@ -146,31 +107,9 @@ export default function Home() {
     getFeaturedCards()
   }, [])
 
-  // Live graded-card count from the SAME endpoint the /pop page reads
-  // (totals.totalGraded), so the two can never disagree. Re-polled on an
-  // interval; the route is edge-cached (s-maxage=300) so repeat calls are
-  // near-free and an open tab still reflects newly graded cards over time.
-  useEffect(() => {
-    let active = true
-    const load = () => {
-      fetch('/api/pop/categories')
-        .then(res => (res.ok ? res.json() : null))
-        .then(data => {
-          const total = data?.totals?.totalGraded
-          if (active && typeof total === 'number' && total > 0) setPopTotal(total)
-        })
-        .catch(() => { /* fallback copy stays */ })
-    }
-    load()
-    const id = setInterval(load, 45000)
-    return () => { active = false; clearInterval(id) }
-  }, [])
-
-
   return (
     <main className="flex min-h-screen flex-col">
-      {/* Hero Section — outcome-led headline; the legal entity name lives in
-          the logo alt/footer, not the pitch. */}
+      {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-blue-600 to-purple-700 text-white py-20 overflow-hidden">
         {/* Scrolling Card Background */}
         <ScrollingCardBackground opacity={40} blur={2} speed={1} />
@@ -188,16 +127,15 @@ export default function Home() {
               className="object-contain"
             />
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold mb-4">
-            Professional Card Grading. Instant Results.
-          </h1>
-          <p className="text-lg md:text-xl mb-8 max-w-2xl mx-auto leading-relaxed">
-            Snap two photos. <span className="font-semibold">DCM Optic™</span> inspects centering, corners,
-            edges, and surface, then hands you a grade, condition report, market value, and printable slab
-            label in about a minute. Sports, Pokémon®, Magic: The Gathering®, Disney Lorcana®, and more.
+          <h1 className="text-5xl font-bold mb-4">Dynamic Collectibles Management</h1>
+          <p className="text-xl mb-8 max-w-3xl mx-auto leading-relaxed">
+            Powered by <span className="font-semibold">DCM Optic™</span>, our proprietary artificial intelligence
+            grading system featuring comprehensive 30-point inspection across centering, corners, edges, and surface
+            with variable confidence scoring for precise analysis of trading cards including Sports, Pokémon®,
+            Magic: The Gathering®, Disney Lorcana®, and more.
           </p>
 
-          <div className="min-h-[76px] flex flex-col items-center justify-center">
+          <div className="min-h-[48px] flex items-center justify-center">
             {!authChecked ? (
               <div className="h-12 w-40 bg-white/20 rounded-lg animate-pulse"></div>
             ) : user ? (
@@ -216,56 +154,18 @@ export default function Home() {
                 </Link>
               </div>
             ) : (
-              <>
-                <Link
-                  href="/login?mode=signup"
-                  className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
-                >
-                  Grade 2 Cards Free
-                </Link>
-                <p className="text-sm text-white/80 mt-3">
-                  No credit card required
-                </p>
-              </>
+              <Link
+                href="/login?mode=signup"
+                className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
+              >
+                Get Started
+              </Link>
             )}
           </div>
         </div>
       </section>
 
-      {/* Trust bar. The graded count comes from the same endpoint as the
-          /pop page, so the two always agree. */}
-      <section className="bg-slate-900 text-white border-b border-slate-800">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-sm">
-            <Link href="/pop" className="flex items-center gap-2 hover:text-purple-300 transition-colors">
-              <span className="text-purple-400 font-bold text-base tabular-nums">
-                <AnimatedGradedCount target={popTotal} />
-              </span>
-              <span className="text-gray-300">cards graded</span>
-            </Link>
-            <Link href="/featured" className="flex items-center gap-2 hover:text-purple-300 transition-colors">
-              <span className="text-purple-400 font-bold text-base">Featured</span>
-              <span className="text-gray-300">cards</span>
-            </Link>
-            <Link href="/labels" className="flex items-center gap-2 hover:text-purple-300 transition-colors">
-              <span className="text-purple-400 font-bold text-base">Custom</span>
-              <span className="text-gray-300">label studio</span>
-            </Link>
-            <span className="flex items-center gap-2">
-              <span className="text-purple-400 font-bold text-base">
-                <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="hover:text-purple-300 transition-colors underline decoration-purple-400/40 underline-offset-2">iOS</a>
-                {' '}&amp;{' '}
-                <a href={GOOGLE_PLAY_URL} target="_blank" rel="noopener noreferrer" className="hover:text-purple-300 transition-colors underline decoration-purple-400/40 underline-offset-2">Android</a>
-              </span>
-              <span className="text-gray-300">apps available</span>
-            </span>
-          </div>
-        </div>
-      </section>
-
-      {/* New Grader Offer — evergreen welcome offer (replaces the retired
-          "DCM Launch Special" / "Limited Time" framing; the numbers below are
-          exactly what src/lib/credits.ts grants). */}
+      {/* DCM Launch Special Section */}
       <section className="py-12 relative overflow-hidden bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
         {/* Background Card Image - Styled with rotation and zoom, focusing on label and top of card */}
         <div className="absolute inset-0 flex items-center justify-end pointer-events-none overflow-hidden">
@@ -292,22 +192,22 @@ export default function Home() {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-2xl">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 mb-6 border border-white/20">
-              <span className="text-yellow-400 text-xl">🎁</span>
-              <span className="text-white font-semibold">New Grader Welcome</span>
+              <span className="text-yellow-400 text-xl">✨</span>
+              <span className="text-white font-semibold">Limited Time Offer</span>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Start With 2 Free Grades
+              DCM Launch Special
             </h2>
             <p className="text-2xl md:text-3xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-orange-400 font-semibold mb-4">
-              Then up to 5 bonus credits with your first credit pack.
+              Free Bonus Credits for First-Time Graders!
             </p>
             <p className="text-lg text-gray-300 mb-6 max-w-xl">
-              Every new account starts with 2 free credits, enough to grade two cards with full
-              reports and labels included. When you buy your first pack, we top it up:
-              +1 bonus credit on Basic, +2 on Pro, +5 on Elite. Credits never expire.
+              Sign up today and receive bonus credits with your first purchase.
+              Start grading your collection with DCM Optic™ AI technology at an unbeatable value.
             </p>
 
-            {/* App availability callout */}
+            {/* App Store launch callout — layered on top of the existing
+                offer copy so we keep the conversion-tested hero intact. */}
             <p className="text-base sm:text-lg text-white font-semibold mb-6 max-w-xl">
               <span aria-hidden>📱</span> Now available on iPhone, iPad &amp; Android.
               <span className="block text-sm sm:text-base font-normal text-gray-300 mt-1">
@@ -320,7 +220,7 @@ export default function Home() {
                 href="/login?mode=signup"
                 className="inline-block bg-gradient-to-r from-yellow-500 to-orange-500 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-lg font-bold text-base sm:text-lg hover:from-yellow-400 hover:to-orange-400 transition-all shadow-lg hover:shadow-orange-500/25 hover:shadow-xl"
               >
-                Grade 2 Cards Free
+                Claim Your Bonus Credits
               </Link>
               <AppStoreBadge variant="black" height={52} />
               <GooglePlayBadge height={52} />
@@ -333,62 +233,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How It Works — the 3-step flow prospects previously had to leave the
-          homepage to learn. */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-4">How It Works</h2>
-          <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            From raw card to graded, valued, and ready to sell in about a minute
-          </p>
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {/* Step 1 */}
-            <div className="text-center p-6 rounded-xl border border-gray-100 shadow-sm">
-              <div className="bg-blue-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-blue-700 font-bold text-xl">1</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Snap two photos</h3>
-              <p className="text-gray-600 text-sm">
-                Front and back, with your phone or any camera. Built-in capture guides and a photo
-                quality check help you get a gradeable shot on the first try.
-              </p>
-            </div>
-            {/* Step 2 */}
-            <div className="text-center p-6 rounded-xl border border-gray-100 shadow-sm">
-              <div className="bg-purple-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-purple-700 font-bold text-xl">2</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">DCM Optic™ grades it</h3>
-              <p className="text-gray-600 text-sm">
-                Independent evaluations inspect centering, corners, edges, and surface, including
-                magnified region-by-region analysis, then agree on a grade with a full written report.
-              </p>
-            </div>
-            {/* Step 3 */}
-            <div className="text-center p-6 rounded-xl border border-gray-100 shadow-sm">
-              <div className="bg-green-100 w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-green-700 font-bold text-xl">3</span>
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Slab it, sell it, show it</h3>
-              <p className="text-gray-600 text-sm">
-                Get the market value, print a custom slab label, download the grading report, and list
-                straight to eBay with InstaList. Or just watch your collection&apos;s value grow.
-              </p>
-            </div>
-          </div>
-          <div className="text-center mt-8">
-            <Link
-              href="/featured"
-              className="inline-block text-purple-600 hover:text-purple-700 font-semibold"
-            >
-              See real grading reports from the community &rarr;
-            </Link>
-          </div>
-        </div>
-      </section>
-
       {/* Features Section - Why Choose DCM */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-4">Why Choose DCM?</h2>
           <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
@@ -425,7 +271,7 @@ export default function Home() {
                 </svg>
               </div>
               <h3 className="text-lg font-semibold mb-2">Build Your Collection</h3>
-              <p className="text-gray-600 text-sm">Manage your collection with your actual card images, not stock photos. DCM and third-party graded cards welcome.</p>
+              <p className="text-gray-600 text-sm">Manage your collection with your actual card images—not stock photos. DCM and third-party graded cards welcome.</p>
             </div>
 
             {/* 4. Accurate Market Pricing */}
@@ -446,7 +292,7 @@ export default function Home() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold mb-2">Labels &amp; Reports</h3>
+              <h3 className="text-lg font-semibold mb-2">Labels & Reports</h3>
               <p className="text-gray-600 text-sm">Download professional grading labels and analysis reports for display, online auctions, or in-person sales.</p>
             </div>
           </div>
@@ -477,62 +323,6 @@ export default function Home() {
           getCardLink={getCardLink}
         />
       ) : null}
-
-      {/* Transparency strip — AI grading you can audit. These pages already
-          exist; stating limitations openly is a trust asset, not a liability. */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <h2 className="text-3xl font-bold text-center mb-4">How we grade, in the open</h2>
-          <p className="text-gray-600 text-center mb-12 max-w-2xl mx-auto">
-            Grading you can audit. Our standards, our data, and our limits are all public.
-          </p>
-          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <Link href="/grading-rubric" className="block p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
-              <h3 className="text-lg font-semibold mb-2 text-purple-700">Public grading rubric &rarr;</h3>
-              <p className="text-gray-600 text-sm">
-                The exact standards DCM Optic™ grades against, from centering tolerances to corner,
-                edge, and surface criteria, published for anyone to read.
-              </p>
-            </Link>
-            <Link href="/pop" className="block p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
-              <h3 className="text-lg font-semibold mb-2 text-purple-700">Population report &rarr;</h3>
-              <p className="text-gray-600 text-sm">
-                Every grade we&apos;ve ever issued, aggregated and public. See exactly how rare a
-                DCM 10 really is for any card we&apos;ve graded.
-              </p>
-            </Link>
-            <Link href="/grading-limitations" className="block p-6 rounded-xl border border-gray-200 hover:border-purple-300 hover:shadow-md transition-all">
-              <h3 className="text-lg font-semibold mb-2 text-purple-700">Honest limitations &rarr;</h3>
-              <p className="text-gray-600 text-sm">
-                Photo-based grading has limits, and we document them: what DCM Optic™ can and
-                can&apos;t see, and when a physical grade is the better choice.
-              </p>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Closing CTA band */}
-      <section className="py-16 bg-gradient-to-br from-blue-600 to-purple-700 text-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold mb-4">
-            Your first two grades are free
-          </h2>
-          <p className="text-lg text-white/85 mb-8 max-w-xl mx-auto">
-            See what your collection is really worth. Graded, valued, and ready to sell in about a minute.
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/login?mode=signup"
-              className="bg-white text-blue-600 px-8 py-3 rounded-lg font-semibold hover:bg-gray-100 transition-colors inline-block"
-            >
-              Grade 2 Cards Free
-            </Link>
-            <AppStoreBadge variant="black" height={48} />
-            <GooglePlayBadge height={48} />
-          </div>
-        </div>
-      </section>
 
     </main>
   )
@@ -672,8 +462,8 @@ function FeaturedCardsCarousel({
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900">Real Cards, Real Grades</h2>
-            <p className="text-gray-600 mt-2">Recently graded by collectors like you. Tap any card to see its full report.</p>
+            <h2 className="text-3xl font-bold text-gray-900">Featured Grades</h2>
+            <p className="text-gray-600 mt-2">Professionally graded cards from our community</p>
             <Link
               href="/featured"
               className="inline-block mt-2 text-sm font-semibold text-purple-600 hover:text-purple-700 transition-colors"

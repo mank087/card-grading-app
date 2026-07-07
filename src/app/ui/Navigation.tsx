@@ -6,6 +6,8 @@ import Image from "next/image";
 import { useRouter, usePathname } from "next/navigation";
 import { getStoredSession, signOut, AUTH_STATE_CHANGE_EVENT } from "@/lib/directAuth";
 import { useCredits } from "@/contexts/CreditsContext";
+import AppStoreBadge from "@/components/AppStoreBadge";
+import GooglePlayBadge from "@/components/GooglePlayBadge";
 
 // Routes that render in a fullscreen modal/WebView from the mobile app —
 // they should not show the site nav. Mobile InAppPage already injects CSS
@@ -180,7 +182,11 @@ function NavigationInner() {
 
   return (
     <nav className="bg-white shadow-lg border-b border-gray-200 sticky top-0 z-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* 2xl:max-w widened when the app-store badges joined the row (July
+          2026) — at max-w-7xl the badges squeezed the center links into
+          two-line wraps. Below 2xl the badges are hidden and the classic
+          width returns. */}
+      <div className="max-w-7xl 2xl:max-w-[1480px] mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
 
           {/* Logo - Left Side */}
@@ -532,15 +538,26 @@ function NavigationInner() {
                     Login
                   </Link>
 
-                  {/* Logged Out: Sign Up - Primary CTA */}
+                  {/* Logged Out: Sign Up - Primary CTA. "2 Cards" matches the
+                      actual signup grant (2 free credits, src/lib/credits.ts). */}
                   <Link
                     href="/login?mode=signup"
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors shadow-md"
+                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-semibold transition-colors shadow-md whitespace-nowrap"
                   >
-                    Grade 1st Card Free
+                    Grade 2 Cards Free
                   </Link>
                 </>
               )}
+
+              {/* App store badges — took over from the retired LaunchBanner
+                  (July 2026) so app availability stays visible site-wide.
+                  2xl-only: below that the nav row wraps its links. Narrower
+                  desktops still get the badges in the homepage sections and
+                  the mobile menu. */}
+              <span className="hidden 2xl:flex items-center gap-1.5 ml-2 pl-3 border-l border-gray-200">
+                <AppStoreBadge variant="black" height={30} />
+                <GooglePlayBadge height={30} />
+              </span>
             </div>
           </div>
 
@@ -592,7 +609,7 @@ function NavigationInner() {
                 href="/login?mode=signup"
                 className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-md"
               >
-                Grade 1st Card Free
+                Grade 2 Cards Free
               </Link>
             )}
 
@@ -914,6 +931,14 @@ function NavigationInner() {
                   </Link>
                 </>
               )}
+
+              {/* App store badges — took over from the retired LaunchBanner
+                  (July 2026). Full-size here; the desktop row shows compact
+                  versions at xl+. */}
+              <div className="flex items-center gap-3 px-3 pt-4 pb-2 mt-2 border-t border-gray-100">
+                <AppStoreBadge variant="black" height={40} />
+                <GooglePlayBadge height={40} />
+              </div>
             </div>
           </div>
         )}
