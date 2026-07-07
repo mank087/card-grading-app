@@ -7,6 +7,22 @@ import {
 } from '@/lib/ebay';
 
 /**
+ * Only allow same-origin relative paths as the post-OAuth return URL.
+ * The value comes out of the signed state, but the /api/ebay/auth route
+ * historically accepted anything into it — and `new URL(absolute, base)`
+ * ignores the base entirely, making this an open redirect. Rejects
+ * absolute URLs ("https://evil.com"), protocol-relative URLs
+ * ("//evil.com") and their backslash variant ("/\evil.com" — the WHATWG
+ * URL parser treats \ as / in http(s) URLs).
+ */
+function sanitizeReturnUrl(raw: string | null | undefined): string {
+  if (raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/\\')) {
+    return raw;
+  }
+  return '/ebay-auth-success';
+}
+
+/**
  * GET /api/ebay/callback
  *
  * Handles the OAuth callback from eBay after user authorization.
@@ -31,7 +47,10 @@ export async function GET(request: NextRequest) {
   // Handle error from eBay (user denied access)
   if (error) {
     console.log('[eBay Callback] User denied access:', error, errorDescription);
-    const errorUrl = new URL('/account', baseUrl);
+    // eBay still echoes our state on deny — use its return_url (validated)
+    // so popup flows land on /ebay-auth-success and can notify the opener.
+    const deniedState = state ? verifyAuthState(state) : null;
+    const errorUrl = new URL(sanitizeReturnUrl(deniedState?.return_url), baseUrl);
     errorUrl.searchParams.set('ebay_error', 'access_denied');
     errorUrl.searchParams.set('message', errorDescription || 'You denied access to eBay');
     return NextResponse.redirect(errorUrl.toString());
@@ -71,8 +90,10 @@ export async function GET(request: NextRequest) {
 
     console.log('[eBay Callback] Successfully connected eBay account:', connection.ebay_username);
 
-    // Redirect to success page
-    const returnUrl = authState.return_url || '/account';
+    // Redirect to success page. sanitizeReturnUrl blocks the open redirect:
+    // new URL(absolute, baseUrl) ignores baseUrl, so an unvalidated
+    // return_url could bounce the user (and their success params) off-site.
+    const returnUrl = sanitizeReturnUrl(authState.return_url);
     const successUrl = new URL(returnUrl, baseUrl);
     successUrl.searchParams.set('ebay_connected', 'true');
     successUrl.searchParams.set('ebay_username', connection.ebay_username || 'eBay User');
@@ -81,7 +102,9 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('[eBay Callback] Error:', error);
 
-    const errorUrl = new URL('/account', baseUrl);
+    // Send failures to the (validated) return URL too — popup flows rely on
+    // landing at /ebay-auth-success so the opener hears about the failure.
+    const errorUrl = new URL(sanitizeReturnUrl(authState.return_url), baseUrl);
     errorUrl.searchParams.set('ebay_error', 'connection_failed');
     errorUrl.searchParams.set(
       'message',

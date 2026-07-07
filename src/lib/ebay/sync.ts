@@ -28,6 +28,28 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getEbayConnection, getValidAccessToken } from '@/lib/ebay/auth';
 import { getMyEbaySelling, getItemDetail, type EbaySellingItem } from '@/lib/ebay/sellApi';
 
+/**
+ * Final sale price for a sold listing, or null when eBay didn't expose one.
+ *
+ * ebay_listings.price holds the seller's ask while a listing is live; once
+ * the row transitions to 'sold' it is terminal, so we deliberately repurpose
+ * the SAME column to hold the FINAL SALE PRICE (auction winning bid,
+ * accepted Best Offer amount, or the fixed price) — no schema migration.
+ * Without this, /api/ebay/stats and SoldTab computed "revenue" from the
+ * stored ask: auctions reported their $0.99 start price and accepted Best
+ * Offers reported the original ask.
+ *
+ * Sources: GetMyeBaySelling SoldList entries carry TransactionPrice and
+ * GetItem exposes SellingStatus.CurrentPrice on ended listings; sellApi
+ * normalizes both into `currentPrice`. Best-effort by design: when eBay
+ * doesn't return a usable positive price we leave the stored price
+ * unchanged rather than degrade it.
+ */
+function finalSalePrice(item: { currentPrice?: number }): number | null {
+  const p = item.currentPrice;
+  return typeof p === 'number' && isFinite(p) && p > 0 ? p : null;
+}
+
 export interface SyncUserResult {
   updated: number;
   sold: number;
@@ -115,20 +137,28 @@ export async function syncUser(
         last_synced_at: now,
       };
       if (item.endTime) refresh.sold_at = item.endTime;
+      // Refresh price → final sale price (see finalSalePrice); heals rows
+      // sold before final-price capture existed.
+      const refreshSalePrice = finalSalePrice(item);
+      if (refreshSalePrice !== null) refresh.price = refreshSalePrice;
       await supabaseAdmin
         .from('ebay_listings')
         .update(refresh)
         .eq('id', dbRow.id);
       continue;
     }
+    const soldUpdate: Record<string, any> = {
+      status: 'sold',
+      quantity_sold: item.quantitySold ?? 1,
+      sold_at: item.endTime ?? now,
+      last_synced_at: now,
+    };
+    // price → final sale price on the terminal sold row (see finalSalePrice).
+    const salePrice = finalSalePrice(item);
+    if (salePrice !== null) soldUpdate.price = salePrice;
     await supabaseAdmin
       .from('ebay_listings')
-      .update({
-        status: 'sold',
-        quantity_sold: item.quantitySold ?? 1,
-        sold_at: item.endTime ?? now,
-        last_synced_at: now,
-      })
+      .update(soldUpdate)
       .eq('id', dbRow.id);
     sold++;
     // Update our in-memory state so the orphan pass doesn't re-touch this row.
@@ -193,14 +223,18 @@ export async function syncUser(
       updated++;
     } else if (soldByListingId.has(listingId)) {
       const item = soldByListingId.get(listingId)!;
+      const soldUpdate: Record<string, any> = {
+        status: 'sold',
+        quantity_sold: item.quantitySold ?? 1,
+        sold_at: item.endTime ?? now,
+        last_synced_at: now,
+      };
+      // price → final sale price on the terminal sold row (see finalSalePrice).
+      const salePrice = finalSalePrice(item);
+      if (salePrice !== null) soldUpdate.price = salePrice;
       await supabaseAdmin
         .from('ebay_listings')
-        .update({
-          status: 'sold',
-          quantity_sold: item.quantitySold ?? 1,
-          sold_at: item.endTime ?? now,
-          last_synced_at: now,
-        })
+        .update(soldUpdate)
         .eq('id', dbRow.id);
       sold++;
     } else if (unsoldByListingId.has(listingId)) {
@@ -258,14 +292,20 @@ export async function syncUser(
         .eq('id', orphan.id);
       updated++;
     } else if (detail.listingStatus === 'Completed' && detail.quantitySold > 0) {
+      const soldUpdate: Record<string, any> = {
+        status: 'sold',
+        quantity_sold: detail.quantitySold,
+        sold_at: detail.endTime ?? now,
+        last_synced_at: now,
+      };
+      // price → final sale price on the terminal sold row (see finalSalePrice).
+      // GetItem's SellingStatus.CurrentPrice on an ended auction is the
+      // winning bid.
+      const salePrice = finalSalePrice(detail);
+      if (salePrice !== null) soldUpdate.price = salePrice;
       await supabaseAdmin
         .from('ebay_listings')
-        .update({
-          status: 'sold',
-          quantity_sold: detail.quantitySold,
-          sold_at: detail.endTime ?? now,
-          last_synced_at: now,
-        })
+        .update(soldUpdate)
         .eq('id', orphan.id);
       sold++;
     } else {

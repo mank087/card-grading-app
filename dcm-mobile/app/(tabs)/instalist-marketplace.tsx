@@ -16,6 +16,7 @@ import {
   type EligibleCard, type MarketplaceStats, type MarketplaceListing,
 } from '@/lib/marketplaceApi'
 import { checkEbayStatus, getOAuthUrl, type EbayConnectionStatus } from '@/lib/ebayApi'
+import { classifyEbayOAuthNavigation } from '@/lib/ebayOAuth'
 
 import StatsStrip from '@/components/marketplace/StatsStrip'
 import SyncStatusPill, { type SyncState } from '@/components/marketplace/SyncStatusPill'
@@ -230,12 +231,16 @@ export default function InstalistMarketplaceTab() {
   }, [])
 
   const handleOAuthNavigation = useCallback((navState: WebViewNavigation) => {
-    if (navState.url.includes('/ebay-auth-success')) {
-      setShowOAuth(false)
+    const result = classifyEbayOAuthNavigation(navState.url)
+    if (result.type === 'pending') return
+    setShowOAuth(false)
+    if (result.type === 'success') {
+      // Give the server a beat to persist the connection before re-checking.
       setTimeout(() => { refreshAll() }, 600)
-    } else if (navState.url.includes('error=')) {
-      setShowOAuth(false)
-      Alert.alert('Connection failed', 'eBay sign-in was cancelled or rejected. Please try again.')
+    } else if (result.type === 'failure') {
+      Alert.alert('eBay Connection Failed', result.message)
+    } else {
+      Alert.alert('eBay Connection Cancelled', 'You did not authorize the connection.')
     }
   }, [refreshAll])
 

@@ -41,21 +41,60 @@ export const EBAY_CATEGORIES = {
   CCG_INDIVIDUAL_CARDS: '183454',
 } as const;
 
-// Map DCM card categories to eBay category IDs
+// Map DCM card categories to eBay category IDs.
+// SINGLE SOURCE OF TRUTH for category routing — both the server listing
+// route and the client item-specifics builder (itemSpecifics.ts
+// getCategoryForCardType) derive from this map. Prefer the
+// case-insensitive getEbayCategoryForDcmCategory() helper below over
+// direct key access.
 export const DCM_TO_EBAY_CATEGORY: Record<string, string> = {
   'Pokemon': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
   'MTG': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
   'Lorcana': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
   'One Piece': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
+  'Yu-Gi-Oh': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
+  'Star Wars': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS, // Star Wars Unlimited TCG
   'Football': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
   'Baseball': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
   'Basketball': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
   'Hockey': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
   'Soccer': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
   'Wrestling': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
+  'Golf': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
+  'Tennis': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
+  'Racing': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
+  'Boxing': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
   'Sports': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
   'Other': EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS,
 };
+
+/**
+ * Normalize a category/card-type string for lookup: lowercase and strip
+ * punctuation/whitespace so 'One Piece', 'onepiece', 'Yu-Gi-Oh!' and
+ * 'yugioh' all resolve to the same key.
+ */
+function normalizeCategoryKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+// Pre-normalized lookup built once from DCM_TO_EBAY_CATEGORY.
+const DCM_TO_EBAY_CATEGORY_NORMALIZED: Record<string, string> = {};
+for (const [key, id] of Object.entries(DCM_TO_EBAY_CATEGORY)) {
+  DCM_TO_EBAY_CATEGORY_NORMALIZED[normalizeCategoryKey(key)] = id;
+}
+
+/**
+ * Resolve a DCM category string (or client card-type slug like 'onepiece')
+ * to an eBay category ID. Case- and punctuation-insensitive.
+ * Unknown/missing categories fall back to Non-Sport Trading Cards (183050).
+ */
+export function getEbayCategoryForDcmCategory(category: string | null | undefined): string {
+  if (!category) return EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS;
+  return (
+    DCM_TO_EBAY_CATEGORY_NORMALIZED[normalizeCategoryKey(category)] ??
+    EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS
+  );
+}
 
 // =============================================================================
 // Condition IDs

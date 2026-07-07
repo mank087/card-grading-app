@@ -11,6 +11,7 @@ import { getAuthenticatedClient } from '@/lib/directAuth';
 import { LISTING_FORMATS, LISTING_DURATIONS, LISTING_DURATION_LABELS, DCM_TO_EBAY_CATEGORY, EBAY_CATEGORIES } from '@/lib/ebay/constants';
 import { mapCardToItemSpecifics, getCategoryForCardType, getSerialNumbering, getSerialDenominator, type ItemSpecific } from '@/lib/ebay/itemSpecifics';
 import { DOMESTIC_SHIPPING_SERVICES, INTERNATIONAL_SHIPPING_SERVICES } from '@/lib/ebay/tradingApi';
+import { resolveCardValue } from '@/lib/pricing/resolveCardValue';
 import { CardGradingReport, type ReportCardData } from '@/components/reports/CardGradingReport';
 
 // Helper: Get condition label from grade
@@ -292,6 +293,14 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
       setDuration('GTC');
       setShowDescriptionCode(false);
       setAspectsLoaded(false);
+
+      // Seed the asking price from the shared value resolver — the same
+      // number the collection/portfolio surfaces show for this card. Only
+      // when we actually have a value; otherwise leave blank for the user.
+      // Runs once per open/card (this effect), so it never clobbers a
+      // price the user has typed mid-flow.
+      const { value: suggestedValue } = resolveCardValue(card);
+      setPrice(suggestedValue > 0 ? suggestedValue.toFixed(2) : '');
 
       // Generate default title: character - subset - card number - DCM Grade X - Condition Label
       const labelData = getCardLabelData(card);
@@ -1194,7 +1203,9 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           price: parseFloat(price),
           listingFormat,
           bestOfferEnabled: listingFormat === 'FIXED_PRICE' ? bestOfferEnabled : false,
-          duration,
+          // eBay requires GTC for fixed-price listings — never send a day
+          // duration for Buy It Now even if stale state slipped through.
+          duration: listingFormat === 'FIXED_PRICE' ? 'GTC' : duration,
           imageUrls: uploadedUrls,
           itemSpecifics: itemSpecifics
             .filter(spec => spec.name && spec.value && (Array.isArray(spec.value) ? spec.value.length > 0 : spec.value.trim()))
@@ -1330,7 +1341,11 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            // Closing mid-publish would unmount the modal while the listing
+            // request is in flight — the caller's onClose refreshes state
+            // immediately and the user never learns whether it published.
+            disabled={step === 'publishing'}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
           >
             <svg className="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -2144,32 +2159,26 @@ export const EbayListingModal: React.FC<EbayListingModalProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Duration</label>
-                <select
-                  value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                >
-                  {listingFormat === 'AUCTION' ? (
-                    // Auction durations: 1, 3, 5, 7, 10 days (7 is recommended)
-                    <>
-                      <option value="DAYS_1">1 Day</option>
-                      <option value="DAYS_3">3 Days</option>
-                      <option value="DAYS_5">5 Days</option>
-                      <option value="DAYS_7">7 Days (Recommended)</option>
-                      <option value="DAYS_10">10 Days</option>
-                    </>
-                  ) : (
-                    // Buy It Now durations: 3, 5, 7, 10, 30 days, or GTC (GTC is recommended)
-                    <>
-                      <option value="GTC">Good 'Til Cancelled (Recommended)</option>
-                      <option value="DAYS_3">3 Days</option>
-                      <option value="DAYS_5">5 Days</option>
-                      <option value="DAYS_7">7 Days</option>
-                      <option value="DAYS_10">10 Days</option>
-                      <option value="DAYS_30">30 Days</option>
-                    </>
-                  )}
-                </select>
+                {listingFormat === 'AUCTION' ? (
+                  <select
+                    value={duration}
+                    onChange={(e) => setDuration(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    {/* Auction durations: 1, 3, 5, 7, 10 days (7 is recommended) */}
+                    <option value="DAYS_1">1 Day</option>
+                    <option value="DAYS_3">3 Days</option>
+                    <option value="DAYS_5">5 Days</option>
+                    <option value="DAYS_7">7 Days (Recommended)</option>
+                    <option value="DAYS_10">10 Days</option>
+                  </select>
+                ) : (
+                  // eBay only accepts GTC for fixed-price listings — offering
+                  // day-based durations here just produced publish errors.
+                  <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-gray-700">
+                    Good &apos;Til Cancelled
+                  </div>
+                )}
                 <p className="mt-1 text-xs text-gray-500">
                   {listingFormat === 'AUCTION'
                     ? 'eBay recommends 7 days for auctions to maximize visibility'

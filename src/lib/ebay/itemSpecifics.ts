@@ -4,7 +4,7 @@
  * Maps DCM card data to eBay item specifics based on card type.
  */
 
-import { EBAY_CATEGORIES, DCM_TO_EBAY_CATEGORY } from './constants';
+import { getEbayCategoryForDcmCategory } from './constants';
 
 export interface ItemSpecific {
   name: string;
@@ -14,18 +14,16 @@ export interface ItemSpecific {
 }
 
 /**
- * Get eBay category ID for a card type
+ * Get eBay category ID for a card type.
+ *
+ * Derives from DCM_TO_EBAY_CATEGORY in constants.ts — the single source of
+ * truth shared with the server listing route — so the client-built aspects
+ * and the server-chosen category can never disagree. Lookup is case- and
+ * punctuation-insensitive ('onepiece', 'One Piece', 'Yu-Gi-Oh!', 'starwars'
+ * all resolve); unknown types fall back to Non-Sport Trading Cards (183050).
  */
 export function getCategoryForCardType(cardType: string): string {
-  const typeMap: Record<string, string> = {
-    'pokemon': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
-    'mtg': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
-    'lorcana': EBAY_CATEGORIES.CCG_INDIVIDUAL_CARDS,
-    'sports': EBAY_CATEGORIES.SPORTS_TRADING_CARDS,
-    'other': EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS,
-  };
-
-  return typeMap[cardType.toLowerCase()] || EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS;
+  return getEbayCategoryForDcmCategory(cardType);
 }
 
 /**
@@ -706,12 +704,175 @@ export function mapLorcanaCardToSpecifics(card: any): ItemSpecific[] {
 }
 
 /**
+ * Shared CCG mapping for TCGs that follow the standard CCG aspect set
+ * (One Piece, Yu-Gi-Oh, Star Wars Unlimited). Mirrors the shape of the
+ * Pokemon/MTG/Lorcana mappers so aspect names stay consistent across all
+ * CCG Individual Cards (183454) listings: Game (required), Character,
+ * Card Name, Set, Card Number, Rarity, Year, Manufacturer, Language,
+ * Numbered, Features.
+ */
+function mapGenericCcgCardToSpecifics(card: any, game: string, manufacturer: string): ItemSpecific[] {
+  const cardInfo = card.conversational_card_info || {};
+  const specifics: ItemSpecific[] = [];
+
+  // Game (required for CCG)
+  specifics.push({
+    name: 'Game',
+    value: game,
+    required: true,
+    editable: false,
+  });
+
+  // Character
+  const character = card.featured || cardInfo.player_or_character || card.card_name;
+  if (character) {
+    specifics.push({
+      name: 'Character',
+      value: character,
+      required: false,
+      editable: true,
+    });
+  }
+
+  // Card Name
+  const cardName = cardInfo.card_name || card.card_name;
+  if (cardName && cardName !== character) {
+    specifics.push({
+      name: 'Card Name',
+      value: cardName,
+      required: false,
+      editable: true,
+    });
+  }
+
+  // Set
+  const setName = cardInfo.set_name || card.card_set;
+  if (setName) {
+    specifics.push({
+      name: 'Set',
+      value: setName,
+      required: false,
+      editable: true,
+    });
+  }
+
+  // Card Number
+  const cardNumber = cardInfo.card_number || card.card_number;
+  if (cardNumber) {
+    specifics.push({
+      name: 'Card Number',
+      value: cardNumber,
+      required: false,
+      editable: true,
+    });
+  }
+
+  // Rarity
+  const rarity = cardInfo.rarity || card.rarity;
+  if (rarity) {
+    specifics.push({
+      name: 'Rarity',
+      value: rarity,
+      required: false,
+      editable: true,
+    });
+  }
+
+  // Year
+  const year = cardInfo.card_date || card.release_date;
+  if (year) {
+    specifics.push({
+      name: 'Year Manufactured',
+      value: extractYear(year),
+      required: false,
+      editable: true,
+    });
+  }
+
+  // Manufacturer
+  specifics.push({
+    name: 'Manufacturer',
+    value: manufacturer,
+    required: false,
+    editable: true,
+  });
+
+  // Language
+  specifics.push({
+    name: 'Language',
+    value: 'English',
+    required: false,
+    editable: true,
+  });
+
+  // Serial Numbering (e.g., "12/99", "/25")
+  const serialNum = getSerialNumbering(card);
+  if (serialNum) {
+    specifics.push({
+      name: 'Numbered',
+      value: serialNum,
+      required: false,
+      editable: true,
+    });
+  }
+
+  // Features
+  const features: string[] = [];
+  if (cardInfo.special_features) {
+    if (Array.isArray(cardInfo.special_features)) {
+      features.push(...cardInfo.special_features);
+    } else {
+      features.push(cardInfo.special_features);
+    }
+  }
+  if (cardInfo.foil || card.is_foil) features.push('Foil');
+  if (hasAutograph(card)) features.push('Autographed');
+  if (serialNum) features.push('Serial Numbered');
+
+  if (features.length > 0) {
+    specifics.push({
+      name: 'Features',
+      value: features,
+      required: false,
+      editable: true,
+    });
+  }
+
+  return specifics;
+}
+
+/**
+ * Map One Piece card data to eBay item specifics (CCG category 183454)
+ */
+export function mapOnePieceCardToSpecifics(card: any): ItemSpecific[] {
+  return mapGenericCcgCardToSpecifics(card, 'One Piece Card Game', 'Bandai');
+}
+
+/**
+ * Map Yu-Gi-Oh card data to eBay item specifics (CCG category 183454)
+ */
+export function mapYuGiOhCardToSpecifics(card: any): ItemSpecific[] {
+  return mapGenericCcgCardToSpecifics(card, 'Yu-Gi-Oh! TCG', 'Konami');
+}
+
+/**
+ * Map Star Wars Unlimited card data to eBay item specifics (CCG category 183454)
+ */
+export function mapStarWarsCardToSpecifics(card: any): ItemSpecific[] {
+  return mapGenericCcgCardToSpecifics(card, 'Star Wars Unlimited', 'Fantasy Flight Games');
+}
+
+/**
  * Main function to map any card to item specifics based on card type
  */
 export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecific[] {
   let specifics: ItemSpecific[];
 
-  switch (cardType.toLowerCase()) {
+  // Normalize so 'One Piece', 'onepiece', 'Yu-Gi-Oh!', 'star wars' etc. all
+  // route the same way — mirrors the category lookup in constants.ts.
+  const normalizedType = cardType.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+  switch (normalizedType) {
     case 'pokemon':
       specifics = mapPokemonCardToSpecifics(card);
       break;
@@ -723,6 +884,15 @@ export function mapCardToItemSpecifics(card: any, cardType: string): ItemSpecifi
       break;
     case 'lorcana':
       specifics = mapLorcanaCardToSpecifics(card);
+      break;
+    case 'onepiece':
+      specifics = mapOnePieceCardToSpecifics(card);
+      break;
+    case 'yugioh':
+      specifics = mapYuGiOhCardToSpecifics(card);
+      break;
+    case 'starwars':
+      specifics = mapStarWarsCardToSpecifics(card);
       break;
     case 'other':
     default:

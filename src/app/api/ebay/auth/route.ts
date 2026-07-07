@@ -8,6 +8,20 @@ import {
 import { verifyAuth } from '@/lib/serverAuth';
 
 /**
+ * Only allow same-origin relative paths as the post-OAuth return URL.
+ * Rejects absolute URLs ("https://evil.com"), protocol-relative URLs
+ * ("//evil.com") and their backslash variant ("/\evil.com" — the WHATWG
+ * URL parser treats \ as / in http(s) URLs). Anything suspicious falls
+ * back to the neutral popup-close page.
+ */
+function sanitizeReturnUrl(raw: string | null): string {
+  if (raw && raw.startsWith('/') && !raw.startsWith('//') && !raw.startsWith('/\\')) {
+    return raw;
+  }
+  return '/ebay-auth-success';
+}
+
+/**
  * GET /api/ebay/auth
  *
  * Initiates the eBay OAuth flow by returning the authorization URL.
@@ -51,7 +65,9 @@ export async function GET(request: NextRequest) {
 
     // Get optional return URL from query params
     const { searchParams } = new URL(request.url);
-    const returnUrl = searchParams.get('return_url') || '/account';
+    // Validate the caller-supplied return URL — it gets baked into the signed
+    // state and later drives a redirect, so it must never be an off-site URL.
+    const returnUrl = sanitizeReturnUrl(searchParams.get('return_url') || '/account');
     const shouldRedirect = searchParams.get('redirect') === 'true';
 
     // Create state parameter with user ID and return URL

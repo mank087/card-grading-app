@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity, TextInput,
   ActivityIndicator, Alert, Switch, Modal, Linking, Image,
@@ -14,11 +14,14 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Colors } from '@/lib/constants'
 import { useLabelStyle } from '@/hooks/useLabelStyle'
 import {
-  checkEbayStatus, checkExistingListing, uploadImages, uploadImagesSequential, createListing,
-  getAspects, checkDisclaimer, acceptDisclaimer, getOAuthUrl,
-  generateTitle, CATEGORY_MAP, SHIPPING_SERVICES, DURATION_OPTIONS,
-  type EbayConnectionStatus, type CreateListingRequest,
+  checkEbayStatus, checkExistingListing, uploadImagesSequential, createListing,
+  checkDisclaimer, acceptDisclaimer, getOAuthUrl, EbayApiError,
+  generateTitle, SHIPPING_SERVICES,
+  FIXED_PRICE_DURATION_OPTIONS, AUCTION_DURATION_OPTIONS, ALL_DURATION_OPTIONS,
+  type EbayConnectionStatus, type CreateListingRequest, type ImageUploadResult,
 } from '@/lib/ebayApi'
+import { classifyEbayOAuthNavigation } from '@/lib/ebayOAuth'
+import { resolveCardValue } from '@/lib/resolveCardValue'
 
 import MobileTabBar from '@/components/MobileTabBar'
 import AppHeaderBar from '@/components/AppHeaderBar'
@@ -37,6 +40,43 @@ const STEP_LABELS: Record<Step, string> = {
   success: 'Success!',
   error: 'Error',
 }
+
+// eBay listing Terms & Conditions — mirrors the web modal's disclaimer
+// (src/components/ebay/EbayListingModal.tsx). Last updated: January 2026 | v1.0
+const DISCLAIMER_SECTIONS: { heading: string; body: string }[] = [
+  {
+    heading: '1. DCM is Not a Party to Your eBay Transactions',
+    body: 'DCM (Digital Card Marketplace) provides this listing tool solely as a convenience feature to help you list your DCM-graded cards on eBay. DCM is not a party to any transaction that occurs on the eBay platform. All sales, purchases, and related activities are conducted exclusively between you and the buyer through eBay.',
+  },
+  {
+    heading: '2. No Liability for eBay Transactions',
+    body: 'DCM shall not be held liable for any disputes, claims, damages, losses, or issues arising from your eBay listings or sales, including but not limited to: buyer complaints, return requests, refund disputes, shipping issues, payment problems, listing violations, account suspensions, or any other matters related to your eBay activity.',
+  },
+  {
+    heading: '3. Grading Opinions',
+    body: 'DCM grades represent our professional assessment of card condition at the time of grading. Grades are opinions and are not guarantees of value, authenticity, or future market performance. Buyers may have different opinions regarding condition, and you are responsible for handling any disputes that may arise.',
+  },
+  {
+    heading: '4. Your Responsibilities',
+    body: 'You are solely responsible for: the accuracy of all listing information (titles, descriptions, prices, shipping terms); compliance with eBay’s terms of service, listing policies, and all applicable laws; handling all buyer communications, shipping, returns, and refunds; any fees, taxes, or costs associated with your eBay sales; and ensuring you have the legal right to sell the items you list.',
+  },
+  {
+    heading: '5. Indemnification',
+    body: 'You agree to indemnify, defend, and hold harmless DCM, its officers, directors, employees, and agents from and against any claims, liabilities, damages, losses, costs, or expenses (including reasonable attorneys’ fees) arising from or related to your use of this eBay listing feature or any eBay transactions.',
+  },
+  {
+    heading: '6. eBay Account',
+    body: 'You are responsible for maintaining your eBay account in good standing. DCM is not responsible for any actions eBay may take against your account, including but not limited to listing removals, selling restrictions, or account suspensions.',
+  },
+  {
+    heading: '7. Service Availability',
+    body: 'DCM provides this listing feature "as is" and makes no guarantees regarding its availability, accuracy, or functionality. DCM may modify, suspend, or discontinue this feature at any time without notice.',
+  },
+  {
+    heading: '8. Governing Law',
+    body: 'These terms shall be governed by and construed in accordance with applicable laws. Any disputes shall be resolved through binding arbitration or in the courts of competent jurisdiction.',
+  },
+]
 
 export default function EbayListScreen() {
   const router = useRouter()
@@ -86,7 +126,6 @@ export default function EbayListScreen() {
   // Step 3: Specifics
   type ItemSpecific = { name: string; value: string | string[]; required?: boolean; editable?: boolean }
   const [itemSpecifics, setItemSpecifics] = useState<ItemSpecific[]>([])
-  const [categoryId, setCategoryId] = useState<string>('')
 
   // Certificate of Analysis (uploaded to eBay as a regulatory document by the prep WebView)
   const [regulatoryDocumentId, setRegulatoryDocumentId] = useState<string | null>(null)
@@ -115,6 +154,29 @@ export default function EbayListScreen() {
   const [errorMessage, setErrorMessage] = useState('')
   const [isPublishing, setIsPublishing] = useState(false)
   const [publishProgress, setPublishProgress] = useState<string>('')
+  // Ref guard against double-taps on Publish — the isPublishing state update
+  // is async, so a fast second tap can slip past the button's disabled prop.
+  const publishingRef = useRef(false)
+  // True when the last publish failure was an eBay auth problem (401 /
+  // "refresh eBay authorization") — shows a Reconnect CTA on the error step.
+  const [isAuthError, setIsAuthError] = useState(false)
+  // Set when the Reconnect CTA opens the OAuth modal so a successful
+  // reconnect returns the user straight to the review step.
+  const returnToReviewAfterOAuth = useRef(false)
+  // Cache of eBay-hosted URLs from a successful upload pass, keyed by a
+  // signature of the image selection — lets a retry after a publish failure
+  // (e.g. expired token) skip re-generating/re-uploading unchanged images.
+  const uploadCacheRef = useRef<{ signature: string; urls: ImageUploadResult['urls'] } | null>(null)
+
+  // Duplicate-listing pre-check — blocks the wizard when the card already
+  // has an active/pending eBay listing (the server would 409 at publish).
+  const [existingListing, setExistingListing] = useState<{ listingId: string; listingUrl?: string | null; status: string } | null>(null)
+  const [existingWarning, setExistingWarning] = useState<string | null>(null)
+
+  // Disclaimer gate — publish is blocked until the eBay listing terms are accepted.
+  const [disclaimerStatus, setDisclaimerStatus] = useState<'checking' | 'needs_acceptance' | 'accepted'>('checking')
+  const [disclaimerChecked, setDisclaimerChecked] = useState(false)
+  const [isAcceptingDisclaimer, setIsAcceptingDisclaimer] = useState(false)
 
   // ─── Load card data ───
   useEffect(() => {
@@ -124,6 +186,9 @@ export default function EbayListScreen() {
       if (data) {
         setCard(data)
         setTitle(generateTitle(data))
+        // Seed the price from the card's resolved market value (user-editable, seed once)
+        const resolved = resolveCardValue(data)
+        if (resolved.value > 0) setPrice(prev => prev || resolved.value.toFixed(2))
         // Get signed URLs
         const paths = [data.front_path, data.back_path].filter(Boolean)
         if (paths.length > 0) {
@@ -144,12 +209,66 @@ export default function EbayListScreen() {
     checkEbayStatus().then(setEbayStatus).catch(() => setEbayStatus(null))
   }, [session])
 
+  // ─── Duplicate-listing pre-check ───
+  // Runs as soon as we have a card so the user doesn't walk the whole wizard
+  // into a 409. An active/pending listing blocks the screen; a previous
+  // (sold/ended/unverifiable) listing only shows a soft warning banner.
+  useEffect(() => {
+    if (!session || !cardId) return
+    checkExistingListing(cardId)
+      .then(check => {
+        if (check.hasListing && check.listing) {
+          setExistingListing({
+            listingId: check.listing.listing_id,
+            listingUrl: check.listing.listing_url,
+            status: check.listing.status,
+          })
+        } else if (check.previousListing && check.message) {
+          setExistingWarning(check.message)
+        }
+      })
+      .catch(() => {}) // Pre-check is best-effort — the server still rejects duplicates at publish
+  }, [session, cardId])
+
+  // ─── Disclaimer status — checked once the eBay connection exists ───
+  useEffect(() => {
+    if (!ebayStatus?.connected) return
+    let stale = false
+    setDisclaimerStatus('checking')
+    checkDisclaimer()
+      .then(accepted => { if (!stale) setDisclaimerStatus(accepted ? 'accepted' : 'needs_acceptance') })
+      .catch(() => { if (!stale) setDisclaimerStatus('needs_acceptance') })
+    return () => { stale = true }
+  }, [ebayStatus?.connected])
+
+  const handleAcceptDisclaimer = useCallback(async () => {
+    if (!disclaimerChecked || isAcceptingDisclaimer) return
+    setIsAcceptingDisclaimer(true)
+    try {
+      await acceptDisclaimer()
+      setDisclaimerStatus('accepted')
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to accept the terms. Please try again.')
+    } finally {
+      setIsAcceptingDisclaimer(false)
+    }
+  }, [disclaimerChecked, isAcceptingDisclaimer])
+
   // ─── OAuth completion handler ───
   const handleOAuthComplete = useCallback(() => {
     setShowOAuth(false)
     checkEbayStatus().then(status => {
       setEbayStatus(status)
-      if (status.connected) setImagesReady(true) // Mark ready to proceed
+      // NOTE: do NOT mark images ready here — once connected, the hidden prep
+      // WebView below mounts and its message handler sets imagesReady when the
+      // slab images / description / specifics actually arrive (same as the
+      // already-connected path).
+      if (status.connected && returnToReviewAfterOAuth.current) {
+        // Reconnect after a token-expired publish failure — resume at review.
+        returnToReviewAfterOAuth.current = false
+        setIsAuthError(false)
+        setStep('review')
+      }
     })
   }, [])
 
@@ -266,7 +385,10 @@ export default function EbayListScreen() {
   // ─── Publish listing ───
   const handlePublish = useCallback(async () => {
     if (!card) return
+    if (publishingRef.current) return
+    publishingRef.current = true
     setIsPublishing(true)
+    setIsAuthError(false)
     setStep('publishing')
 
     try {
@@ -292,16 +414,31 @@ export default function EbayListScreen() {
         if (backUrl) imagesToUpload.back = backUrl
       }
 
-      // Upload one image at a time — Vercel has a 4.5 MB body limit and bundling
-      // 5+ base64 PNGs blows past it.
-      setPublishProgress('Uploading images…')
-      const uploadResult = await uploadImagesSequential(
-        cardId,
-        imagesToUpload,
-        orderedExtras.map(e => e.base64),
-        (label, cur, total) => setPublishProgress(`${label} (${cur}/${total})`),
-      )
-      console.log('[ebay-list] upload result urls:', Object.keys(uploadResult.urls))
+      // Reuse eBay-hosted URLs from a previous successful upload pass when the
+      // image selection hasn't changed — a retry after a failed publish (e.g.
+      // expired token) shouldn't re-upload everything.
+      const uploadSignature = JSON.stringify({
+        system: Object.keys(imagesToUpload),
+        extras: orderedExtras.map(e => e.id),
+      })
+      let uploadedUrls = uploadCacheRef.current?.signature === uploadSignature
+        ? uploadCacheRef.current.urls
+        : null
+
+      if (!uploadedUrls) {
+        // Upload one image at a time — Vercel has a 4.5 MB body limit and bundling
+        // 5+ base64 PNGs blows past it.
+        setPublishProgress('Uploading images…')
+        const uploadResult = await uploadImagesSequential(
+          cardId,
+          imagesToUpload,
+          orderedExtras.map(e => e.base64),
+          (label, cur, total) => setPublishProgress(`${label} (${cur}/${total})`),
+        )
+        uploadedUrls = uploadResult.urls
+        uploadCacheRef.current = { signature: uploadSignature, urls: uploadedUrls }
+      }
+      console.log('[ebay-list] upload result urls:', Object.keys(uploadedUrls))
 
       // Build the final URL list in the user's chosen order
       const orderedUrls: string[] = []
@@ -309,24 +446,23 @@ export default function EbayListScreen() {
       for (const item of imageOrder) {
         if (item.kind === 'system') {
           if (!(selectedImages as any)[item.key]) continue
-          const url = (uploadResult.urls as any)[item.key]
+          const url = (uploadedUrls as any)[item.key]
           if (url) orderedUrls.push(url)
         } else {
           const ai = additionalImages.find(a => a.id === item.id)
           if (!ai || !ai.selected || !ai.base64) continue
-          const url = uploadResult.urls.additional?.[extraIdx]
+          const url = uploadedUrls.additional?.[extraIdx]
           if (url) orderedUrls.push(url)
           extraIdx++
         }
       }
       const allImageUrls = orderedUrls.length > 0
         ? orderedUrls
-        : (Object.values(uploadResult.urls).flat().filter(Boolean) as string[])
+        : (Object.values(uploadedUrls).flat().filter(Boolean) as string[])
 
       if (allImageUrls.length === 0) throw new Error('No images to upload')
 
       // 2. Create listing
-      const categoryId = CATEGORY_MAP[card.category] || '183050'
       const grade = card.conversational_whole_grade
 
       const listingData: CreateListingRequest = {
@@ -372,9 +508,25 @@ export default function EbayListScreen() {
       }
     } catch (err: any) {
       console.warn('[ebay-list] publish failed:', err)
-      setErrorMessage(err?.message || String(err) || 'Failed to create listing')
+      const message = err?.message || String(err) || 'Failed to create listing'
+      const status = err instanceof EbayApiError ? err.status : undefined
+      // Server rejects with 412 { error: 'disclaimer_required' } when the
+      // listing terms haven't been accepted — show the disclaimer gate on the
+      // review step instead of a dead-end error.
+      if (status === 412 || /disclaimer_required/i.test(message)) {
+        setDisclaimerStatus('needs_acceptance')
+        setDisclaimerChecked(false)
+        setStep('review')
+        return
+      }
+      // Expired/revoked eBay token — offer a Reconnect CTA on the error step.
+      if (status === 401 || /refresh eBay authorization/i.test(message)) {
+        setIsAuthError(true)
+      }
+      setErrorMessage(message)
       setStep('error')
     } finally {
+      publishingRef.current = false
       setIsPublishing(false)
       setPublishProgress('')
     }
@@ -411,8 +563,36 @@ export default function EbayListScreen() {
     return <View style={st.center}><Text style={st.errorText}>Card not found</Text></View>
   }
 
-  const grade = card.conversational_whole_grade
-  const ci = card.conversational_card_info || {}
+  // ─── Blocked: card already has an active/pending eBay listing ───
+  if (existingListing) {
+    return (
+      <View style={st.container}>
+        <AppHeaderBar showBack title="List on eBay" />
+        <View style={[st.section, { marginHorizontal: 12, alignItems: 'center', paddingVertical: 30 }]}>
+          <Ionicons name="alert-circle" size={56} color={Colors.amber[500]} />
+          <Text style={{ fontSize: 17, fontWeight: '800', color: Colors.gray[800], marginTop: 12 }}>Already Listed on eBay</Text>
+          <Text style={{ fontSize: 12, color: Colors.gray[600], marginTop: 8, textAlign: 'center' }}>
+            This card already has {existingListing.status === 'pending' ? 'a pending' : 'an active'} eBay listing
+            (ID {existingListing.listingId}). End it on eBay before creating a new one.
+          </Text>
+          {existingListing.listingUrl && (
+            <TouchableOpacity style={[st.primaryBtn, { marginTop: 16 }]} onPress={() => Linking.openURL(existingListing.listingUrl!)}>
+              <Ionicons name="open-outline" size={18} color="#fff" />
+              <Text style={st.primaryBtnText}>View on eBay</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[st.navBtnBack, { marginTop: 12 }]}
+            onPress={() => router.push('/(tabs)/instalist-marketplace' as any)}
+          >
+            <Ionicons name="list" size={16} color={Colors.gray[600]} />
+            <Text style={st.navBtnBackText}>View My Listings</Text>
+          </TouchableOpacity>
+        </View>
+        <MobileTabBar />
+      </View>
+    )
+  }
 
   return (
     <View style={st.container}>
@@ -431,24 +611,16 @@ export default function EbayListScreen() {
             <WebView
               source={{ uri: oauthUrl }}
               onNavigationStateChange={(navState) => {
-                const url = navState.url
-                // Only react to the FINAL success page, not the intermediate /api/ebay/callback hop —
-                // the server needs that hop to exchange the code for tokens and save the connection
-                // before redirecting to /ebay-auth-success?ebay_connected=true.
-                if (url.includes('/ebay-auth-success')) {
-                  if (url.includes('ebay_error=') || url.includes('ebay_connected=false')) {
-                    setShowOAuth(false)
-                    const params = new URL(url).searchParams
-                    const message = params.get('message') || 'eBay connection failed.'
-                    Alert.alert('eBay Connection Failed', message)
-                  } else {
-                    handleOAuthComplete()
-                  }
+                const result = classifyEbayOAuthNavigation(navState.url)
+                if (result.type === 'pending') return
+                if (result.type === 'success') {
+                  handleOAuthComplete()
                   return
                 }
-                // User denied at the eBay consent screen
-                if (url.includes('error=access_denied')) {
-                  setShowOAuth(false)
+                setShowOAuth(false)
+                if (result.type === 'failure') {
+                  Alert.alert('eBay Connection Failed', result.message)
+                } else {
                   Alert.alert('eBay Connection Cancelled', 'You did not authorize the connection.')
                 }
               }}
@@ -479,6 +651,13 @@ export default function EbayListScreen() {
         {/* ═══ STEP 1: Connect & Images ═══ */}
         {step === 'connect' && (
           <View style={st.section}>
+            {/* Soft warning — card was previously listed (sold/ended/unverifiable) */}
+            {existingWarning && (
+              <View style={st.warnBanner}>
+                <Ionicons name="information-circle" size={16} color={Colors.amber[600]} />
+                <Text style={st.warnBannerText}>{existingWarning}</Text>
+              </View>
+            )}
             {/* Connection status */}
             {ebayStatus?.connected ? (
               <View style={st.connectedBox}>
@@ -647,7 +826,6 @@ export default function EbayListScreen() {
                     setImagesGenerating(false)
                     if (msg.description && !description) setDescription(msg.description)
                     if (Array.isArray(msg.itemSpecifics) && itemSpecifics.length === 0) setItemSpecifics(msg.itemSpecifics)
-                    if (msg.categoryId && !categoryId) setCategoryId(msg.categoryId)
                     if (msg.regulatoryDocumentId) setRegulatoryDocumentId(msg.regulatoryDocumentId)
                   } else if (msg.type === 'error') {
                     setImagesError(msg.message || 'Failed to generate images')
@@ -678,7 +856,15 @@ export default function EbayListScreen() {
             <Text style={st.fieldLabel}>Listing Format</Text>
             <View style={st.segmentRow}>
               {(['FIXED_PRICE', 'AUCTION'] as const).map(f => (
-                <TouchableOpacity key={f} style={[st.segment, listingFormat === f && st.segmentActive]} onPress={() => setListingFormat(f)}>
+                <TouchableOpacity
+                  key={f}
+                  style={[st.segment, listingFormat === f && st.segmentActive]}
+                  onPress={() => {
+                    setListingFormat(f)
+                    // eBay requires GTC for fixed price; 7 days is the recommended auction duration
+                    setDuration(f === 'FIXED_PRICE' ? 'GTC' : 'DAYS_7')
+                  }}
+                >
                   <Text style={[st.segmentText, listingFormat === f && st.segmentTextActive]}>{f === 'FIXED_PRICE' ? 'Buy It Now' : 'Auction'}</Text>
                 </TouchableOpacity>
               ))}
@@ -694,13 +880,16 @@ export default function EbayListScreen() {
             <Text style={st.fieldLabel}>Duration</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 8 }}>
               <View style={{ flexDirection: 'row', gap: 6 }}>
-                {DURATION_OPTIONS.map(d => (
+                {(listingFormat === 'FIXED_PRICE' ? FIXED_PRICE_DURATION_OPTIONS : AUCTION_DURATION_OPTIONS).map(d => (
                   <TouchableOpacity key={d.value} style={[st.chip, duration === d.value && st.chipActive]} onPress={() => setDuration(d.value)}>
                     <Text style={[st.chipText, duration === d.value && st.chipTextActive]}>{d.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </ScrollView>
+            {listingFormat === 'FIXED_PRICE' && (
+              <Text style={st.helperText}>eBay requires Good Til Cancelled for Buy It Now listings.</Text>
+            )}
 
             {/* Listing Description (HTML, pre-filled with DCM-branded template) */}
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 4 }}>
@@ -939,7 +1128,7 @@ export default function EbayListScreen() {
             </View>
             <View style={st.reviewBox}>
               <Text style={st.reviewLabel}>Duration</Text>
-              <Text style={st.reviewValue}>{DURATION_OPTIONS.find(d => d.value === duration)?.label || duration}</Text>
+              <Text style={st.reviewValue}>{ALL_DURATION_OPTIONS.find(d => d.value === duration)?.label || duration}</Text>
             </View>
             <View style={st.reviewBox}>
               <Text style={st.reviewLabel}>Shipping</Text>
@@ -963,16 +1152,72 @@ export default function EbayListScreen() {
               </View>
             </View>
 
-            <TouchableOpacity style={[st.primaryBtn, { marginTop: 16 }]} onPress={handlePublish} disabled={isPublishing}>
-              {isPublishing ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons name="rocket" size={18} color="#fff" />
-                  <Text style={st.primaryBtnText}>Publish to eBay</Text>
-                </>
-              )}
-            </TouchableOpacity>
+            {/* Disclaimer gate — publish is blocked until the eBay listing terms are accepted */}
+            {disclaimerStatus === 'checking' && (
+              <View style={{ alignItems: 'center', paddingVertical: 20 }}>
+                <ActivityIndicator size="small" color={Colors.purple[600]} />
+                <Text style={{ fontSize: 11, color: Colors.gray[500], marginTop: 6 }}>Checking listing terms…</Text>
+              </View>
+            )}
+
+            {disclaimerStatus === 'needs_acceptance' && (
+              <View style={{ marginTop: 16 }}>
+                <Text style={st.sectionTitle}>eBay Listing Terms & Conditions</Text>
+                <Text style={{ fontSize: 11, color: Colors.gray[500], marginBottom: 8 }}>
+                  Please review and accept before listing on eBay.
+                </Text>
+                <ScrollView style={st.disclaimerScroll} nestedScrollEnabled>
+                  <Text style={st.disclaimerIntro}>
+                    By using DCM's eBay listing feature, you acknowledge and agree to the following:
+                  </Text>
+                  {DISCLAIMER_SECTIONS.map(section => (
+                    <View key={section.heading} style={{ marginBottom: 10 }}>
+                      <Text style={st.disclaimerHeading}>{section.heading}</Text>
+                      <Text style={st.disclaimerBody}>{section.body}</Text>
+                    </View>
+                  ))}
+                  <Text style={st.disclaimerVersion}>Last updated: January 2026 | Version 1.0</Text>
+                </ScrollView>
+                <TouchableOpacity
+                  style={st.disclaimerCheckRow}
+                  onPress={() => setDisclaimerChecked(v => !v)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={disclaimerChecked ? 'checkbox' : 'square-outline'}
+                    size={22}
+                    color={disclaimerChecked ? Colors.purple[600] : Colors.gray[400]}
+                  />
+                  <Text style={st.disclaimerCheckText}>
+                    I have read and agree to the terms and conditions above. I understand that DCM is not responsible for any transactions that occur on eBay.
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[st.primaryBtn, { marginTop: 12 }, (!disclaimerChecked || isAcceptingDisclaimer) && { opacity: 0.4 }]}
+                  onPress={handleAcceptDisclaimer}
+                  disabled={!disclaimerChecked || isAcceptingDisclaimer}
+                >
+                  {isAcceptingDisclaimer ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={st.primaryBtnText}>Accept & Continue</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {disclaimerStatus === 'accepted' && (
+              <TouchableOpacity style={[st.primaryBtn, { marginTop: 16 }]} onPress={handlePublish} disabled={isPublishing}>
+                {isPublishing ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="rocket" size={18} color="#fff" />
+                    <Text style={st.primaryBtnText}>Publish to eBay</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
@@ -1009,8 +1254,25 @@ export default function EbayListScreen() {
             <Ionicons name="alert-circle" size={64} color={Colors.red[500]} />
             <Text style={{ fontSize: 16, fontWeight: '700', color: Colors.red[600], marginTop: 12 }}>Listing Failed</Text>
             <Text style={{ fontSize: 12, color: Colors.gray[600], marginTop: 8, textAlign: 'center' }}>{errorMessage}</Text>
-            <TouchableOpacity style={[st.primaryBtn, { marginTop: 16 }]} onPress={() => setStep('review')}>
-              <Text style={st.primaryBtnText}>Try Again</Text>
+            {isAuthError && (
+              <TouchableOpacity
+                style={[st.primaryBtn, { marginTop: 16 }]}
+                onPress={() => {
+                  // Resume at review after a successful reconnect — the uploaded
+                  // image URLs are cached, so retrying skips re-upload.
+                  returnToReviewAfterOAuth.current = true
+                  startOAuth()
+                }}
+              >
+                <Ionicons name="link" size={18} color="#fff" />
+                <Text style={st.primaryBtnText}>Reconnect eBay</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              style={isAuthError ? [st.navBtnBack, { marginTop: 12 }] : [st.primaryBtn, { marginTop: 16 }]}
+              onPress={() => setStep('review')}
+            >
+              <Text style={isAuthError ? st.navBtnBackText : st.primaryBtnText}>Try Again</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -1112,6 +1374,19 @@ const st = StyleSheet.create({
   reviewBox: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: Colors.gray[100] },
   reviewLabel: { fontSize: 12, color: Colors.gray[500], fontWeight: '600' },
   reviewValue: { fontSize: 12, color: Colors.gray[800], fontWeight: '500', flex: 1, textAlign: 'right' },
+
+  // Warning banner (previous listing)
+  warnBanner: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, paddingHorizontal: 10, paddingVertical: 8, backgroundColor: Colors.amber[50], borderRadius: 8, borderWidth: 1, borderColor: Colors.amber[100], marginBottom: 12 },
+  warnBannerText: { fontSize: 11, color: Colors.amber[600], flex: 1 },
+
+  // Disclaimer gate
+  disclaimerScroll: { maxHeight: 300, backgroundColor: Colors.gray[50], borderWidth: 1, borderColor: Colors.gray[200], borderRadius: 8, padding: 12 },
+  disclaimerIntro: { fontSize: 12, fontWeight: '700', color: Colors.gray[900], marginBottom: 10 },
+  disclaimerHeading: { fontSize: 11, fontWeight: '700', color: Colors.gray[900], marginBottom: 2 },
+  disclaimerBody: { fontSize: 11, color: Colors.gray[700], lineHeight: 16 },
+  disclaimerVersion: { fontSize: 9, color: Colors.gray[500], marginTop: 4, marginBottom: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: Colors.gray[200] },
+  disclaimerCheckRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 12 },
+  disclaimerCheckText: { fontSize: 12, color: Colors.gray[700], flex: 1, lineHeight: 17 },
 
   // Buttons
   primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: Colors.purple[600], borderRadius: 10, paddingVertical: 14, paddingHorizontal: 24 },

@@ -40,16 +40,29 @@ export async function checkEbayStatus(): Promise<EbayConnectionStatus> {
 
 // ─── Existing Listing Check ───
 
+// Mirrors the response shape of GET /api/ebay/listing/check (snake_case rows
+// straight from the ebay_listings table).
 export interface ExistingListingCheck {
-  hasActiveListing: boolean
-  listing?: { listingId: string; listingUrl: string; status: string }
-  previousListing?: { listingId: string; status: string; message: string }
+  hasListing: boolean
+  listing?: {
+    id: string
+    listing_id: string
+    listing_url?: string | null
+    status: string
+    created_at?: string
+  } | null
+  previousListing?: {
+    listing_id: string
+    status: string
+  } | null
+  verified?: boolean
+  message?: string
 }
 
 export async function checkExistingListing(cardId: string): Promise<ExistingListingCheck> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/api/ebay/listing/check?cardId=${cardId}`, { headers })
-  if (!res.ok) return { hasActiveListing: false }
+  if (!res.ok) return { hasListing: false }
   return res.json()
 }
 
@@ -187,6 +200,20 @@ export interface CreateListingResult {
   userAction?: string
 }
 
+/**
+ * Error thrown by createListing — carries the HTTP status so callers can
+ * branch on auth failures (401) and disclaimer gates (412) without string
+ * matching alone.
+ */
+export class EbayApiError extends Error {
+  status: number
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'EbayApiError'
+    this.status = status
+  }
+}
+
 export async function createListing(data: CreateListingRequest): Promise<CreateListingResult> {
   const headers = await getAuthHeaders()
   const res = await fetch(`${API_BASE}/api/ebay/listing`, {
@@ -194,9 +221,9 @@ export async function createListing(data: CreateListingRequest): Promise<CreateL
     headers,
     body: JSON.stringify(data),
   })
-  const result = await res.json()
+  const result = await res.json().catch(() => ({}))
   if (!res.ok && !result.success) {
-    throw new Error(result.error || result.userAction || 'Failed to create listing')
+    throw new EbayApiError(result.error || result.userAction || 'Failed to create listing', res.status)
   }
   return result
 }
@@ -223,7 +250,11 @@ export async function checkDisclaimer(): Promise<boolean> {
 
 export async function acceptDisclaimer(): Promise<void> {
   const headers = await getAuthHeaders()
-  await fetch(`${API_BASE}/api/ebay/disclaimer`, { method: 'POST', headers })
+  const res = await fetch(`${API_BASE}/api/ebay/disclaimer`, { method: 'POST', headers })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err.error || 'Failed to record disclaimer acceptance')
+  }
 }
 
 // ─── OAuth URL ───
@@ -250,16 +281,6 @@ export async function getOAuthUrl(): Promise<string> {
 
 // ─── Helpers ───
 
-export const CATEGORY_MAP: Record<string, string> = {
-  Pokemon: '183454',
-  MTG: '183454',
-  Lorcana: '183454',
-  'One Piece': '183454',
-  'Yu-Gi-Oh': '183454',
-  Sports: '261328',
-  Other: '183050',
-}
-
 export function generateTitle(card: any): string {
   const ci = card.conversational_card_info || {}
   const parts: string[] = []
@@ -285,12 +306,18 @@ export const SHIPPING_SERVICES = [
   { value: 'FedExHomeDelivery', label: 'FedEx Home Delivery' },
 ]
 
-export const DURATION_OPTIONS = [
+// eBay requires GTC (Good 'Til Cancelled) for fixed-price listings — day-based
+// durations only apply to auctions (web parity: GTC only for Buy It Now).
+export const FIXED_PRICE_DURATION_OPTIONS = [
   { value: 'GTC', label: 'Good Til Cancelled' },
+]
+
+export const AUCTION_DURATION_OPTIONS = [
   { value: 'DAYS_1', label: '1 Day' },
   { value: 'DAYS_3', label: '3 Days' },
   { value: 'DAYS_5', label: '5 Days' },
   { value: 'DAYS_7', label: '7 Days' },
   { value: 'DAYS_10', label: '10 Days' },
-  { value: 'DAYS_30', label: '30 Days' },
 ]
+
+export const ALL_DURATION_OPTIONS = [...FIXED_PRICE_DURATION_OPTIONS, ...AUCTION_DURATION_OPTIONS]

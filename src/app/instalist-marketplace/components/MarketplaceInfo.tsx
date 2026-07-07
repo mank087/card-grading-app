@@ -195,7 +195,7 @@ function HeroVariant({
           <h2 className="text-2xl sm:text-3xl font-bold mb-3">
             {ctaMode === 'signup' && 'Ready to Grade and List Your First Card?'}
             {ctaMode === 'grade' && 'Grade your first card to get started'}
-            {ctaMode === 'connect' && 'You&rsquo;re one click away from your first listing'}
+            {ctaMode === 'connect' && 'You’re one click away from your first listing'}
             {ctaMode === 'none' && 'Ready to Grade and List Your First Card?'}
           </h2>
           <p className="text-indigo-100 mb-6 max-w-xl mx-auto">

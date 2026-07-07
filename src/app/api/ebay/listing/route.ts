@@ -10,13 +10,14 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseServer } from '@/lib/supabaseServer';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { getConnectionForUser, refreshTokenIfNeeded } from '@/lib/ebay/auth';
+import { CURRENT_DISCLAIMER_VERSION } from '@/app/api/ebay/disclaimer/route';
 import {
   EBAY_CONDITIONS,
   DCM_GRADER_ID,
   getEbayGradeId,
-  DCM_TO_EBAY_CATEGORY,
-  EBAY_CATEGORIES,
+  getEbayCategoryForDcmCategory,
 } from '@/lib/ebay/constants';
 import {
   addFixedPriceItem,
@@ -36,6 +37,8 @@ interface ItemSpecific {
 
 interface CreateListingRequest {
   cardId: string;
+  // Grade shown in the listing modal UI — preferred over re-deriving from card data
+  grade?: number | null;
   title: string;
   description?: string;
   price: number;
@@ -88,6 +91,8 @@ interface ListingResponse {
   status: string;
   fees?: Array<{ name: string; amount: number }>;
   warnings?: Array<{ code: string; message: string }>;
+  // Set when the eBay listing was created but we failed to record it locally
+  warning?: string;
   error?: string;
   errors?: Array<{ code: string; message: string }>;
   userAction?: string;
@@ -161,16 +166,26 @@ function generateSku(cardId: string, userId: string): string {
 }
 
 /**
- * Get eBay category ID for a card
+ * Get eBay category ID for a card.
+ * Case-insensitive lookup against DCM_TO_EBAY_CATEGORY (single source of
+ * truth in constants.ts); unknown categories fall back to Non-Sport (183050).
  */
 function getEbayCategoryId(category: string): string {
-  return DCM_TO_EBAY_CATEGORY[category] || EBAY_CATEGORIES.NON_SPORT_TRADING_CARDS;
+  return getEbayCategoryForDcmCategory(category);
 }
 
 /**
- * Map listing duration to Trading API format
+ * Map listing duration to Trading API format.
+ *
+ * Fixed-price listings are ALWAYS coerced to GTC: eBay removed non-GTC
+ * durations for fixed-price listings in 2019, so AddFixedPriceItem rejects
+ * (or silently converts) 3/5/7/10/30-day values. Only auctions may run
+ * 1-10 days; auction durations pass through untouched.
  */
-function mapListingDuration(duration?: string): string {
+function mapListingDuration(duration: string | undefined, listingFormat: 'FIXED_PRICE' | 'AUCTION'): string {
+  if (listingFormat !== 'AUCTION') {
+    return 'GTC';
+  }
   switch (duration) {
     case 'DAYS_1': return 'Days_1';
     case 'DAYS_3': return 'Days_3';
@@ -182,6 +197,69 @@ function mapListingDuration(duration?: string): string {
     default:
       return 'GTC';
   }
+}
+
+// A 'pending' row with no listing_id is a pre-eBay claim (see POST below).
+// If the request that created it crashed before activating or deleting it,
+// the claim would block the card from ever being listed — treat claims older
+// than this as abandoned and clean them up.
+const STALE_CLAIM_MS = 15 * 60 * 1000;
+
+interface ExistingListingRow {
+  id: string;
+  listing_id: string | null;
+  listing_url: string | null;
+  status: string;
+  created_at: string;
+}
+
+/**
+ * Find a live (active/pending) listing row for this card, cleaning up any
+ * abandoned pending claims along the way. Returns the blocking row, or null
+ * if the card is free to list.
+ */
+async function findActiveOrPendingListing(
+  supabase: ReturnType<typeof supabaseServer>,
+  cardId: string,
+  userId: string
+): Promise<ExistingListingRow | null> {
+  const { data: rows } = await supabase
+    .from('ebay_listings')
+    .select('id, listing_id, listing_url, status, created_at')
+    .eq('card_id', cardId)
+    .eq('user_id', userId)
+    .in('status', ['active', 'pending'])
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  const isStaleClaim = (row: ExistingListingRow) =>
+    row.status === 'pending' &&
+    !row.listing_id &&
+    Date.now() - new Date(row.created_at).getTime() > STALE_CLAIM_MS;
+
+  const staleClaims = (rows ?? []).filter(isStaleClaim);
+  if (staleClaims.length > 0) {
+    await supabase
+      .from('ebay_listings')
+      .delete()
+      .in('id', staleClaims.map(r => r.id));
+  }
+
+  return (rows ?? []).find(r => !isStaleClaim(r)) ?? null;
+}
+
+function conflictResponse(existingListing: ExistingListingRow) {
+  return NextResponse.json(
+    {
+      error: 'This card already has an active eBay listing',
+      existingListing: {
+        listingId: existingListing.listing_id,
+        listingUrl: existingListing.listing_url,
+        status: existingListing.status,
+      },
+    },
+    { status: 409 } // Conflict
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -221,6 +299,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: 'Failed to refresh eBay authorization. Please reconnect your account.' },
         { status: 401 }
+      );
+    }
+
+    // Enforce disclaimer acceptance SERVER-SIDE before any listing is created.
+    // Web enforces this client-side and mobile historically didn't at all —
+    // this check is the durable gate for both platforms. Reads the same
+    // ebay_connections columns that /api/ebay/disclaimer reads/writes.
+    const { data: disclaimerRow } = await supabaseAdmin
+      .from('ebay_connections')
+      .select('disclaimer_accepted_at, disclaimer_version')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    const disclaimerAccepted =
+      !!disclaimerRow?.disclaimer_accepted_at &&
+      disclaimerRow.disclaimer_version === CURRENT_DISCLAIMER_VERSION;
+
+    if (!disclaimerAccepted) {
+      return NextResponse.json(
+        {
+          error: 'disclaimer_required',
+          message: 'You must accept the InstaList seller disclaimer before creating eBay listings.',
+        },
+        { status: 412 } // Precondition Failed
       );
     }
 
@@ -308,27 +410,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Check if card already has an active eBay listing
-    const { data: existingListing } = await supabase
-      .from('ebay_listings')
-      .select('id, listing_id, listing_url, status')
-      .eq('card_id', cardId)
-      .eq('user_id', user.id)
-      .in('status', ['active', 'pending'])
-      .single();
-
-    if (existingListing) {
-      return NextResponse.json(
-        {
-          error: 'This card already has an active eBay listing',
-          existingListing: {
-            listingId: existingListing.listing_id,
-            listingUrl: existingListing.listing_url,
-            status: existingListing.status,
-          },
-        },
-        { status: 409 } // Conflict
-      );
+    // Check if card already has an active eBay listing.
+    // NOTE: deliberately NOT .single() — with multiple matching rows,
+    // .single() errors and the (discarded) error made the check silently
+    // pass, which is exactly the double-listing case we're guarding against.
+    const conflictingListing = await findActiveOrPendingListing(supabase, cardId, user.id);
+    if (conflictingListing) {
+      return conflictResponse(conflictingListing);
     }
 
     // Generate SKU
@@ -340,7 +428,10 @@ export async function POST(request: NextRequest) {
     // Get grade for condition descriptors
     // PREFERRED: Use grade passed from modal (same grade shown in UI)
     // FALLBACK: Check multiple sources in the card data
-    let grade: number;
+    // REJECT: if no positive grade resolves anywhere, refuse to list rather
+    // than fabricating a grade — the old `?? 1` fallback published ungraded
+    // cards to eBay as "Grade 1".
+    let grade: number | null = null;
 
     if (passedGrade !== null && passedGrade !== undefined && passedGrade > 0) {
       // Use grade passed from modal - this is the same grade displayed in the UI
@@ -349,17 +440,31 @@ export async function POST(request: NextRequest) {
       // Fallback: look up grade from card data
       const dvgGrading = card.ai_grading?.dvg_grading;
       const recommendedGrade = dvgGrading?.recommended_grade;
-      grade =
-        card.grade ??
-        card.conversational_whole_grade ??
-        card.conversational_decimal_grade ??
-        card.dvg_whole_grade ??
-        card.dvg_decimal_grade ??
-        recommendedGrade?.recommended_whole_grade ??
-        recommendedGrade?.recommended_decimal_grade ??
-        card.dcm_grade_whole ??
-        card.dcm_grade_decimal ??
-        1;
+      const gradeCandidates = [
+        card.grade,
+        card.conversational_whole_grade,
+        card.conversational_decimal_grade,
+        card.dvg_whole_grade,
+        card.dvg_decimal_grade,
+        recommendedGrade?.recommended_whole_grade,
+        recommendedGrade?.recommended_decimal_grade,
+        card.dcm_grade_whole,
+        card.dcm_grade_decimal,
+      ];
+      for (const candidate of gradeCandidates) {
+        const n = Number(candidate);
+        if (Number.isFinite(n) && n > 0) {
+          grade = n;
+          break;
+        }
+      }
+    }
+
+    if (grade === null) {
+      return NextResponse.json(
+        { error: 'This card has no grade on file — regrade it or contact support before listing.' },
+        { status: 400 }
+      );
     }
 
     const gradeId = getEbayGradeId(grade);
@@ -385,7 +490,8 @@ export async function POST(request: NextRequest) {
         value: spec.value,
       })),
       sku,
-      listingDuration: mapListingDuration(duration),
+      // Fixed price is coerced to GTC inside mapListingDuration (eBay requirement)
+      listingDuration: mapListingDuration(duration, listingFormat),
       bestOfferEnabled,
       // Graded card specific
       professionalGrader: DCM_GRADER_ID,  // '2750123' = "Other" grader
@@ -434,12 +540,64 @@ export async function POST(request: NextRequest) {
       internationalReturnShippingPaidBy: internationalReturnsAccepted ? internationalReturnShippingPaidBy : undefined,
     };
 
+    // -------- Double-listing race guard (claim flow) --------
+    // Re-check for a live row IMMEDIATELY before hitting eBay — the earlier
+    // check ran before grade/category/detail prep, and a concurrent request
+    // for the same card could have won the race in the meantime.
+    const lastMomentConflict = await findActiveOrPendingListing(supabase, cardId, user.id);
+    if (lastMomentConflict) {
+      return conflictResponse(lastMomentConflict);
+    }
+
+    // Insert a 'pending' claim row BEFORE calling eBay. Concurrent requests
+    // for the same card now see this row in their pre-flight check and 409
+    // instead of creating a second eBay listing. The claim is promoted to
+    // 'active' with the real item ID once eBay succeeds, or deleted if eBay
+    // fails. my-listings/stats already treat 'pending' like 'active', and
+    // sync ignores rows without a listing_id, so a short-lived claim is
+    // harmless to those consumers; abandoned claims (crashed requests) are
+    // reaped after STALE_CLAIM_MS by findActiveOrPendingListing.
+    const claimRecord: Partial<EbayListing> = {
+      card_id: cardId,
+      user_id: user.id,
+      sku: sku,
+      title: title,
+      description: description || null,
+      price: price,
+      currency: 'USD',
+      quantity: quantity,
+      listing_format: listingFormat,
+      // Persist what we actually sent to eBay: fixed price is always GTC
+      duration: listingFormat === 'AUCTION' ? (duration || 'GTC') : 'GTC',
+      category_id: categoryId,
+      ebay_image_urls: imageUrls,
+      status: 'pending',
+    };
+
+    const { data: claimRow, error: claimError } = await supabase
+      .from('ebay_listings')
+      .insert(claimRecord)
+      .select('id')
+      .single();
+
+    if (claimError || !claimRow) {
+      // Nothing exists on eBay yet, so failing fast here is safe.
+      console.error('[eBay Listing] Failed to insert pending claim row:', claimError);
+      return NextResponse.json(
+        { error: 'Failed to prepare the listing record. Please try again.' },
+        { status: 500 }
+      );
+    }
+
     // Create listing via Trading API
     const result = listingFormat === 'AUCTION'
       ? await addAuctionItem(tradingConfig, listingDetails, shippingDetails, returnDetails)
       : await addFixedPriceItem(tradingConfig, listingDetails, shippingDetails, returnDetails);
 
     if (!result.success) {
+      // Release the claim — nothing was created on eBay.
+      await supabase.from('ebay_listings').delete().eq('id', claimRow.id);
+
       console.error('[eBay Listing] Trading API error:', result.errors);
 
       // Map eBay error to user-friendly message with actionable guidance
@@ -456,34 +614,35 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // Store listing record in database
-    const listingRecord: Partial<EbayListing> = {
-      card_id: cardId,
-      user_id: user.id,
-      sku: sku,
+    // Promote the claim to an active listing with the real eBay identifiers
+    const activationUpdate = {
       listing_id: result.itemId,
       listing_url: result.listingUrl,
-      title: title,
-      description: description || null,
-      price: price,
-      currency: 'USD',
-      quantity: quantity,
-      listing_format: listingFormat,
-      duration: duration || 'GTC',
-      category_id: categoryId,
-      ebay_image_urls: imageUrls,
-      status: 'active',
+      status: 'active' as const,
       published_at: new Date().toISOString(),
     };
 
-    // Save to database
-    const { error: saveError } = await supabase
+    let { error: saveError } = await supabase
       .from('ebay_listings')
-      .insert(listingRecord);
+      .update(activationUpdate)
+      .eq('id', claimRow.id);
 
     if (saveError) {
-      console.error('[eBay Listing] Failed to save listing record:', saveError);
-      // Don't fail the request - the eBay listing was created successfully
+      // The eBay listing exists — retry once before surfacing to the user.
+      console.error('[eBay Listing] Failed to activate listing record (retrying once):', saveError);
+      ({ error: saveError } = await supabase
+        .from('ebay_listings')
+        .update(activationUpdate)
+        .eq('id', claimRow.id));
+    }
+
+    let warning: string | undefined;
+    if (saveError) {
+      console.error(
+        `[eBay Listing] CRITICAL: eBay item ${result.itemId} was created but could not be recorded in ebay_listings after retry. User ${user.id}, card ${cardId}, SKU ${sku}:`,
+        saveError
+      );
+      warning = `Your listing was created on eBay (item ${result.itemId}) but could not be recorded in DCM — please contact support so we can link it to your account.`;
     }
 
     const response: ListingResponse = {
@@ -494,6 +653,7 @@ export async function POST(request: NextRequest) {
       status: 'active',
       fees: result.fees,
       warnings: result.warnings,
+      ...(warning ? { warning } : {}),
     };
 
     return NextResponse.json(response);

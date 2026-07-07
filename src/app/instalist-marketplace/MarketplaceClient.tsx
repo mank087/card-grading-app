@@ -228,7 +228,11 @@ export default function MarketplaceClient() {
     setConnecting(true);
     setConnectError(null);
     try {
-      const res = await fetch('/api/ebay/auth?return_url=/instalist-marketplace', {
+      // return_url must be /ebay-auth-success — that page is the only one that
+      // posts the EBAY_AUTH_COMPLETE message this handler waits for. Pointing
+      // the popup back at /instalist-marketplace would just render the whole
+      // marketplace inside the popup and leave the parent stuck.
+      const res = await fetch('/api/ebay/auth?return_url=/ebay-auth-success', {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       if (!res.ok) {
@@ -257,7 +261,11 @@ export default function MarketplaceClient() {
         if (e.data?.type === 'EBAY_AUTH_COMPLETE') {
           window.removeEventListener('message', onMessage);
           popup.close();
-          refreshAll();
+          if (e.data.success) {
+            refreshAll();
+          } else {
+            setConnectError(e.data.message || 'Failed to connect your eBay account. Please try again.');
+          }
         }
       };
       window.addEventListener('message', onMessage);

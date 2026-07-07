@@ -9,8 +9,13 @@ interface Props {
 type SoldCol = 'card' | 'title' | 'price' | 'qty' | 'soldAt' | 'url';
 
 /**
- * Sold tab. Shows GROSS sale price (v1 spec). Phase 4 will add net via
+ * Sold tab. Shows GROSS revenue (v1 spec). Phase 4 will add net via
  * Sell Finances API to surface fees and final payout.
+ *
+ * `price` on a sold listing is the FINAL SALE PRICE (auction winning bid /
+ * accepted Best Offer / fixed price) — sync.ts rewrites the column when the
+ * row transitions to sold. Best-effort: sales synced before that capture
+ * existed may still show the original ask.
  */
 export default function SoldTab({ listings }: Props) {
   const getValue = useCallback((row: MarketplaceListing, key: SoldCol) => {

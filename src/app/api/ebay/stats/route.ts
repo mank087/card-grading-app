@@ -6,6 +6,11 @@
  *
  * Per v1 spec (locked 2026-06-02): revenue is GROSS sale price, not net.
  * Phase 4 (analytics dashboard) will introduce net via Sell Finances API.
+ *
+ * Note on `price` semantics: on sold rows, sync.ts overwrites `price` with
+ * the FINAL SALE PRICE (auction winning bid / accepted Best Offer / fixed
+ * price) when eBay exposes it. Best-effort: rows sold before that capture
+ * existed (or where eBay returned no usable price) still hold the ask.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -56,8 +61,9 @@ export async function GET(request: NextRequest) {
         totalWatchers += watchers;
       } else if (r.status === 'sold') {
         soldCount++;
-        // Gross = sale price * quantity sold. Matches the per-row math in
-        // SoldTab so the strip and the table tell the same story.
+        // Gross = final sale price * quantity sold (price is rewritten to
+        // the sale price by sync when the row goes sold). Matches the
+        // per-row math in SoldTab so the strip and table tell the same story.
         grossRevenue += price * qtySold;
       } else if (r.status === 'ended' || r.status === 'cancelled') {
         endedCount++;
