@@ -2493,6 +2493,58 @@ Provide detailed analysis as markdown with all required sections.`
           }
         }
 
+        // v9.2 Step 7.6: reconcile the STRUCTURED per-category section scores that the
+        // "Detailed Grading Analysis" panel renders straight from the grading JSON
+        // (corners.front.top_left.score, corners.front.score, corners.score,
+        // edges.front.top.score, surface.front.score, centering.front.score, and each
+        // category-level `.score`). These are the base completion's PRE-CAP numbers and
+        // were never reconciled after the mutations — so a card whose corners were
+        // zoom-capped to 8 still rendered "Corner Analysis: every corner 10/10,
+        // Overall 10" beside a subgrade tile and summary of 8 (customer-reported
+        // contradiction, Jul 2026: "in the report the corners are all graded 10's").
+        // The tiles/overall use serverRounded + raw_sub_scores faces; clamp every
+        // structured section score DOWN to those same values so no sub-number can
+        // display above the grade. Never raise a score — display-only, grade is final.
+        {
+          const faceCapScore = (cat: 'centering' | 'corners' | 'edges' | 'surface', face: 'front' | 'back'): number => {
+            const rf = jsonData.raw_sub_scores?.[`${cat}_${face}`];
+            return typeof rf === 'number' ? rf : serverRounded[cat];
+          };
+          for (const cat of ['centering', 'corners', 'edges', 'surface'] as const) {
+            const section = jsonData[cat];
+            if (!section || typeof section !== 'object') continue;
+            // Category-level rollup score (e.g. corners.score)
+            if (typeof section.score === 'number' && section.score > serverRounded[cat]) {
+              section.score = serverRounded[cat];
+            }
+            for (const face of ['front', 'back'] as const) {
+              const fsec = section[face];
+              if (!fsec || typeof fsec !== 'object') continue;
+              const cap = faceCapScore(cat, face);
+              let faceClamped = false;
+              // Per-face rollup (corners.front.score, surface.front.score, centering.front.score, …)
+              if (typeof fsec.score === 'number' && fsec.score > cap) {
+                fsec.score = cap;
+                faceClamped = true;
+              }
+              // Per-position scores (corners: top_left/top_right/…; edges: top/bottom/left/right)
+              for (const key of Object.keys(fsec)) {
+                const pos = (fsec as any)[key];
+                if (pos && typeof pos === 'object' && typeof pos.score === 'number' && pos.score > cap) {
+                  pos.score = cap;
+                  faceClamped = true;
+                }
+              }
+              // When a cap actually lowered this face, append a one-line pointer so a
+              // "supporting a perfect score" sentence can't sit beside a clamped number
+              // with no on-panel explanation. Additive only — never rewrites the prose.
+              if (faceClamped && cap < 10 && typeof fsec.summary === 'string' && !/magnified inspection/i.test(fsec.summary)) {
+                fsec.summary = `${fsec.summary.trim()} Magnified inspection adjusted this face to ${cap}/10 — see the limiting factors and condition summary above.`;
+              }
+            }
+          }
+        }
+
         extractedGrade = {
           decimal_grade: finalGrade,
           whole_grade: finalGrade,
