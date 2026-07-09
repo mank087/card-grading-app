@@ -318,6 +318,17 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
                 weighted: avgRounded?.surface ?? jsonData.weighted_scores?.surface_weighted ?? 0
               }
             },
+            // v9.2: re-derive weighted_sub_scores + limiting_factor from the SAME source
+            // as sub_scores above (avgRounded first). Previously the cache path left the
+            // stored columns untouched, so a refresh could serve a stale/uncapped weighted
+            // tile beside the freshly-recomputed sub_scores (tile 10 vs overall 8).
+            weighted_sub_scores: {
+              centering: avgRounded?.centering ?? jsonData.weighted_scores?.centering_weighted ?? null,
+              corners: avgRounded?.corners ?? jsonData.weighted_scores?.corners_weighted ?? null,
+              edges: avgRounded?.edges ?? jsonData.weighted_scores?.edges_weighted ?? null,
+              surface: avgRounded?.surface ?? jsonData.weighted_scores?.surface_weighted ?? null
+            },
+            limiting_factor: jsonData.weighted_scores?.limiting_factor || null,
             centering_ratios: {
               front_lr: jsonData.centering?.front?.left_right || 'N/A',
               front_tb: jsonData.centering?.front?.top_bottom || 'N/A',
@@ -496,6 +507,8 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
           conversational_grade_uncertainty: parsedConversationalData.grade_range,
           conversational_final_grade_summary: parsedConversationalData.final_grade_summary,
           conversational_sub_scores: parsedConversationalData.sub_scores,
+          conversational_weighted_sub_scores: parsedConversationalData.weighted_sub_scores,
+          conversational_limiting_factor: parsedConversationalData.limiting_factor,
           conversational_condition_label: parsedConversationalData.condition_label,
           conversational_image_confidence: parsedConversationalData.image_confidence,
           conversational_centering_ratios: parsedConversationalData.centering_ratios,

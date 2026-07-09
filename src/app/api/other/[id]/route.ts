@@ -492,9 +492,12 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
         // Extract card-specific fields
         otherFields = extractOtherFieldsFromConversational(jsonData);
 
-        // Extract grading scores - handle both v5.0 (scoring.final_grade) and v4.2 (final_grade.decimal_grade)
-        const decimalGrade = jsonData.scoring?.final_grade ?? jsonData.final_grade?.decimal_grade ?? null;
-        const wholeGrade = jsonData.scoring?.rounded_grade ?? jsonData.final_grade?.whole_grade ?? null;
+        // Extract grading scores. v9.2: prefer the engine's server-CAPPED final_grade
+        // (decimal_grade/whole_grade) over jsonData.scoring.* — scoring.final_grade is the
+        // model's uncapped self-report and could bypass the weakest-link/uncertainty caps,
+        // making the overall disagree with the subgrade tiles.
+        const decimalGrade = jsonData.final_grade?.decimal_grade ?? jsonData.scoring?.final_grade ?? null;
+        const wholeGrade = jsonData.final_grade?.whole_grade ?? jsonData.scoring?.rounded_grade ?? null;
         const finalGrade = jsonData.final_grade || {};
 
         // 🔧 v6.2: Fix any grade mismatches in the summary text
@@ -540,6 +543,21 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
               weighted: jsonData.weighted_scores?.surface_weighted || 0
             }
           },
+
+          // v9.2: persist the same limiting-factor / weighted / cap fields the Sports
+          // route saves. The Other route previously dropped these, so "Other" cards
+          // (e.g. non-sport vintage) showed the tiles but no "why was it capped" —
+          // the detail page hid the Limiting Factor block for lack of data.
+          conversational_weighted_sub_scores: {
+            centering: jsonData.weighted_scores?.centering_weighted ?? null,
+            corners: jsonData.weighted_scores?.corners_weighted ?? null,
+            edges: jsonData.weighted_scores?.edges_weighted ?? null,
+            surface: jsonData.weighted_scores?.surface_weighted ?? null
+          },
+          conversational_limiting_factor: jsonData.weighted_scores?.limiting_factor || null,
+          conversational_preliminary_grade: jsonData.weighted_scores?.preliminary_grade ?? null,
+          weighted_total_pre_cap: jsonData.weighted_scores?.preliminary_grade ?? null,
+          capped_grade_reason: jsonData.final_grade?.grade_cap_note || jsonData.grade_caps?.applicable_cap || null,
 
           // Detailed category analysis for frontend display
           conversational_corners_edges_surface: {
