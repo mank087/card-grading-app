@@ -443,7 +443,34 @@ export async function GET(request: NextRequest, { params }: VisionGradeRequest) 
     if (frontUrl && backUrl) {
       try {
         console.log(`[CONVERSATIONAL AI v3.5 PATCHED v2] 🎯 Starting PRIMARY grading with 10 critical patches...`);
-        const conversationalResult = await gradeCardConversational(frontUrl, backUrl);
+        // v9.3 fix: this generic route previously passed no cardType (everything graded
+        // with the SPORTS delta) and no condition report — unlike all 8 per-type routes.
+        // Derive the engine cardType from the card row's category and pass the processed
+        // condition report, mirroring the per-type routes.
+        const SPORT_CATEGORIES = ['Football', 'Baseball', 'Basketball', 'Hockey', 'Soccer', 'Wrestling', 'Sports'];
+        const categoryToCardType = (category: string | null): 'sports' | 'pokemon' | 'mtg' | 'lorcana' | 'onepiece' | 'yugioh' | 'starwars' | 'other' => {
+          if (!category) return 'other';
+          if (SPORT_CATEGORIES.includes(category)) return 'sports';
+          switch (category) {
+            case 'Pokemon': return 'pokemon';
+            case 'MTG': return 'mtg';
+            case 'Lorcana': return 'lorcana';
+            case 'One Piece': return 'onepiece';
+            case 'Yu-Gi-Oh': return 'yugioh';
+            case 'Star Wars': return 'starwars';
+            default: return 'other';
+          }
+        };
+        const engineCardType = categoryToCardType(card.category);
+        const { ensureProcessedConditionReport } = await import('@/lib/conditionReportProcessor');
+        const userConditionReport = ensureProcessedConditionReport(
+          card.user_condition_report,
+          card.user_condition_processed
+        );
+        console.log(`[CONVERSATIONAL AI] cardType=${engineCardType} (category=${card.category}), conditionReport=${userConditionReport ? 'present' : 'none'}`);
+        const conversationalResult = await gradeCardConversational(frontUrl, backUrl, engineCardType as any, {
+          userConditionReport,
+        });
         conversationalGradingResult = conversationalResult.markdown_report;
 
         // 🆕 v3.3: Store full result for enhanced data extraction
