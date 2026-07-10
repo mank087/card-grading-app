@@ -35,7 +35,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.3';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.4';
 
 // Types matching vision_grade_v1.json schema
 export interface VisionGradeResult {
@@ -2017,6 +2017,20 @@ Provide detailed analysis as markdown with all required sections.`
         // pass-fold (Step 6) must read these — folding raw zoom.faceCaps would pull
         // displayed pass rows below the consensus when a cap was corroboration-limited.
         const appliedFaceCaps: Record<string, number> = {};
+        // v9.3 RIGID-CASE EXCLUSION: cosmetic zoom findings on a card photographed
+        // inside a rigid holder are unreliable — the plastic's reflections, edge
+        // shadows and dust read as scratches/stains/whitening at crop resolution
+        // (measured: a cased card's cosmetic caps flapped 9↔8 on holder artifacts).
+        // Skip COSMETIC caps for cased cards; structural findings still merge below,
+        // and the Gem gate independently holds cased cards at ≤9.
+        const caseInfoForZoom = jsonData.case_detection || {};
+        const rigidCaseForZoom =
+          ['top_loader', 'semi_rigid', 'slab'].includes(caseInfoForZoom.case_type) ||
+          ['moderate', 'high'].includes(caseInfoForZoom.impact_level);
+        if (zoom?.ok && rigidCaseForZoom && Object.keys(zoom.faceCaps).length > 0) {
+          console.log(`[GRADE RECALC] 🔎 zoom cosmetic caps SKIPPED (rigid case: ${caseInfoForZoom.case_type}) — structural findings still apply`);
+          zoom.faceCaps = {};
+        }
         if (zoom?.ok) {
           const faceCats = ['centering', 'corners', 'edges', 'surface'] as const;
           for (const cat of faceCats) {
@@ -2114,11 +2128,26 @@ Provide detailed analysis as markdown with all required sections.`
           // it "came from nowhere" (e.g. passes all 10 but consensus 8).
           if (zoomAdjustments.length > 0 && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
             jsonData.grading_passes.consensus_notes.push(
-              `Regioned zoom inspection (24 magnified crops) found defects the holistic passes missed — consensus adjusted: ${zoomAdjustments.join(' | ')}`
+              `Regioned zoom inspection (${zoom.regionsInspected} magnified crops) found defects the holistic passes missed — consensus adjusted: ${zoomAdjustments.join(' | ')}`
+            );
+          } else if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+            // v9.3: ALWAYS record that zoom ran, even with zero findings. Previously a
+            // clean zoom and a silently-failed zoom were indistinguishable in the stored
+            // JSON — which blinded two production investigations (Jul 10: could not
+            // tell whether the grade-10 influx correlated with zoom fallbacks).
+            jsonData.grading_passes.consensus_notes.push(
+              `Regioned zoom inspection ran (${zoom.regionsInspected} magnified crops): no defects found beyond the holistic evaluation.`
             );
           }
         } else if (zoom && !zoom.ok) {
           console.warn(`[GRADE RECALC] ⚠️ zoom inspection unavailable (${zoom.error}) — grading from holistic ensemble only`);
+          // v9.3: persist the fallback so the stored JSON shows this card was graded
+          // WITHOUT magnified inspection (previously console-only — invisible in the DB).
+          if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+            jsonData.grading_passes.consensus_notes.push(
+              `Magnified zoom inspection was unavailable for this grade (${zoom.error}) — assessment is from the holistic ensemble only.`
+            );
+          }
         }
 
         // Step 3.8 (v9.2) EVIDENCE RECONCILIATION: a deduction of 2+ points requires a
@@ -2176,7 +2205,7 @@ Provide detailed analysis as markdown with all required sections.`
             }
             if (evidenceReconciliations.length > 0 && Array.isArray(jsonData.grading_passes?.consensus_notes)) {
               jsonData.grading_passes.consensus_notes.push(
-                `Evidence reconciliation: ${evidenceReconciliations.join(', ')} — the evaluations deducted for these categories without recording any defect, and the magnified 24-crop inspection found none either. Per the rubric, a deduction of 2+ points requires a visible, documented defect, so the unsupported deduction was reconciled to Mint (9).`
+                `Evidence reconciliation: ${evidenceReconciliations.join(', ')} — the evaluations deducted for these categories without recording any defect, and the magnified regioned inspection found none either. Per the rubric, a deduction of 2+ points requires a visible, documented defect, so the unsupported deduction was reconciled to Mint (9).`
               );
             }
           }

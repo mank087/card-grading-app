@@ -35,7 +35,8 @@ export interface ZoomDefect {
  * SUR-Q1") — always run display strings through this.
  */
 export function humanizeZoomRegion(regionId: string): string {
-  const part = String(regionId || '').replace(/^[FB]-/i, '').toUpperCase();
+  // Strip the v9.3 edge-segment suffix ("B-EDG-L-2" → "EDG-L") before mapping.
+  const part = String(regionId || '').replace(/^[FB]-/i, '').replace(/-\d+$/, '').toUpperCase();
   const map: Record<string, string> = {
     'COR-TL': 'top-left corner',
     'COR-TR': 'top-right corner',
@@ -210,10 +211,30 @@ async function cropFace(imageBuf: Buffer, face: 'front' | 'back'): Promise<Regio
     { id: `${P}-COR-TR`, category: 'corners', label: `${face} top-right corner`, left: w - cw, top: 0, width: cw, height: ch },
     { id: `${P}-COR-BL`, category: 'corners', label: `${face} bottom-left corner`, left: 0, top: h - ch, width: cw, height: ch },
     { id: `${P}-COR-BR`, category: 'corners', label: `${face} bottom-right corner`, left: w - cw, top: h - ch, width: cw, height: ch },
-    { id: `${P}-EDG-T`, category: 'edges', label: `${face} top edge strip`, left: 0, top: 0, width: w, height: es },
-    { id: `${P}-EDG-B`, category: 'edges', label: `${face} bottom edge strip`, left: 0, top: h - es, width: w, height: es },
-    { id: `${P}-EDG-L`, category: 'edges', label: `${face} left edge strip`, left: 0, top: 0, width: es, height: h },
-    { id: `${P}-EDG-R`, category: 'edges', label: `${face} right edge strip`, left: w - es, top: 0, width: es, height: h },
+    // v9.3: edge strips are SEGMENTED (3 overlapping segments per edge) instead of one
+    // full-length strip. A full strip (e.g. 267×3000) hit the 1024px resize cap on its
+    // LONG side and reached the model at ~91px wide — one third of native resolution,
+    // BLURRIER than the full-card photo. Measured live (Xerosic, 2026-07-10): plainly
+    // visible dark-border edge whitening → 24 regions × 5 samples → 0 findings. With
+    // ~0.4-length segments both dimensions stay at/near native under the 1024 cap.
+    ...(['T', 'B', 'L', 'R'] as const).flatMap((side) => {
+      const vertical = side === 'L' || side === 'R';
+      const L = vertical ? h : w; // long-axis length of the strip
+      const segLen = Math.ceil(L * 0.4);
+      const names: Record<string, string> = { T: 'top', B: 'bottom', L: 'left', R: 'right' };
+      return [0, 1, 2].map((i) => {
+        const start = Math.min(Math.round(i * 0.3 * L), L - segLen);
+        return {
+          id: `${P}-EDG-${side}-${i + 1}`,
+          category: 'edges' as const,
+          label: `${face} ${names[side]} edge, segment ${i + 1} of 3`,
+          left: side === 'R' ? w - es : vertical ? 0 : start,
+          top: side === 'B' ? h - es : vertical ? start : 0,
+          width: vertical ? es : segLen,
+          height: vertical ? segLen : es,
+        };
+      });
+    }),
     { id: `${P}-SUR-Q1`, category: 'surface', label: `${face} surface upper-left quadrant`, left: 0, top: 0, width: hw, height: hh },
     { id: `${P}-SUR-Q2`, category: 'surface', label: `${face} surface upper-right quadrant`, left: w - hw, top: 0, width: hw, height: hh },
     { id: `${P}-SUR-Q3`, category: 'surface', label: `${face} surface lower-left quadrant`, left: 0, top: h - hh, width: hw, height: hh },
@@ -258,7 +279,8 @@ A corner or edge on a light border that is not crisply sharp and clean IS whiten
 (minor for slight softening, moderate for a clearly rough or frayed run). Treat light-border corners with
 the same scrutiny as dark-border corners.
 
-NOT defects (do NOT report): holographic sparkle/patterns, printed design lines and textures, the card's border color itself, image compression noise, glare/reflection bands that have soft gradual edges, background surfaces outside the card, sleeve/holder edges.
+BACKGROUND CHECK FIRST (photos with wide margins): each crop may contain mostly or entirely the BACKGROUND SURFACE the card is lying on (desk, leather, cloth, mat) instead of the card. Before reporting anything, decide what part of the crop is actually CARD. Specks, dust, texture, grain or marks on the background surface are NEVER card defects — a crop that shows no card content at all is automatically clean:true.
+NOT defects (do NOT report): holographic sparkle/patterns, printed design lines and textures, the card's border color itself, image compression noise, glare/reflection bands that have soft gradual edges, background surfaces outside the card and anything ON them, sleeve/holder edges.
 IMPORTANT context: crops from the SAME card — a straight uniform line at the outermost boundary is the card's cut edge, not damage. White showing AT the cut line on a dark border IS whitening.
 
 Reply ONLY with JSON:
@@ -281,18 +303,16 @@ export async function runZoomInspection(
 
     const regions = [...await cropFace(frontBuf, 'front'), ...await cropFace(backBuf, 'back')];
 
-    const content: any[] = [];
-    if (options?.priorityNote) {
-      content.push({ type: 'text', text: `PRIORITY: ${options.priorityNote}` });
-    }
-    for (const r of regions) {
-      content.push({ type: 'text', text: `REGION ${r.id} — ${r.label}:` });
-      content.push({
-        type: 'image_url',
-        image_url: { url: `data:image/jpeg;base64,${r.buf.toString('base64')}`, detail: 'high' },
-      });
-    }
-    content.push({ type: 'text', text: 'Inspect every region above and return the JSON verdict for ALL of them.' });
+
+    // v9.3 BATCH-SIZE FIX: sending all crops in ONE call collapsed per-region attention.
+    // Measured (Xerosic, 2026-07-10, plainly visible dark-border corner whitening):
+    //   the crop alone → detected 3/3 samples; in a 10-crop batch → 3/3; 20-crop → 2/3;
+    //   the full single-call batch (24-40 crops) → 0/5. Detection is a direct function
+    //   of images-per-call. Chunk regions into batches of ≤ZOOM_MAX_BATCH and run the
+    //   calls in PARALLEL — same crops, same n=5 voting per batch, same wall-clock.
+    const ZOOM_MAX_BATCH = 8;
+    const batches: RegionSpec[][] = [];
+    for (let i = 0; i < regions.length; i += ZOOM_MAX_BATCH) batches.push(regions.slice(i, i + ZOOM_MAX_BATCH));
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     // v9.1: the zoom is an n=5 ensemble with per-region MAJORITY VOTING (threshold 2).
@@ -302,27 +322,48 @@ export async function runZoomInspection(
     // samples now survives, so detection is far more consistent run-to-run. Voting still
     // filters pure single-sample noise. Output is tiny, so the extra completions cost
     // ~a cent and no wall-clock (parallel decode).
-    const response = await openai.chat.completions.create({
-      model: options?.model || 'gpt-5.1',
-      temperature: 0.1,
-      seed: 7,
-      n: 5,
-      max_completion_tokens: 6000,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: ZOOM_SYSTEM_PROMPT },
-        { role: 'user', content },
-      ],
-    }, { timeout: 90_000 });
-
-    const samples: any[] = [];
-    for (const choice of response.choices) {
-      try { if (choice?.message?.content) samples.push(JSON.parse(choice.message.content)); }
-      catch { /* discard unparseable zoom sample */ }
-    }
+    const batchResults = await Promise.all(batches.map(async (batch) => {
+      const content: any[] = [];
+      if (options?.priorityNote) {
+        content.push({ type: 'text', text: `PRIORITY: ${options.priorityNote}` });
+      }
+      for (const r of batch) {
+        content.push({ type: 'text', text: `REGION ${r.id} — ${r.label}:` });
+        content.push({
+          type: 'image_url',
+          image_url: { url: `data:image/jpeg;base64,${r.buf.toString('base64')}`, detail: 'high' },
+        });
+      }
+      content.push({ type: 'text', text: 'Inspect every region above and return the JSON verdict for ALL of them.' });
+      const response = await openai.chat.completions.create({
+        model: options?.model || 'gpt-5.1',
+        temperature: 0.1,
+        seed: 7,
+        n: 5,
+        max_completion_tokens: 6000,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: ZOOM_SYSTEM_PROMPT },
+          { role: 'user', content },
+        ],
+      }, { timeout: 90_000 });
+      const batchSamples: any[] = [];
+      for (const choice of response.choices) {
+        try { if (choice?.message?.content) batchSamples.push(JSON.parse(choice.message.content)); }
+        catch { /* discard unparseable zoom sample */ }
+      }
+      const u: any = (response as any).usage;
+      return { batchSamples, promptTokens: u?.prompt_tokens ?? 0, completionTokens: u?.completion_tokens ?? 0 };
+    }));
+    // Each batch votes independently; merge every batch's samples into one list —
+    // the per-(region,type) tally below only counts votes for regions a sample saw
+    // (a region appears in exactly one batch, so its max vote count stays 5).
+    const samples: any[] = batchResults.flatMap(b => b.batchSamples);
+    const usageTotals = batchResults.reduce((a, b) => ({ p: a.p + b.promptTokens, c: a.c + b.completionTokens }), { p: 0, c: 0 });
+    const samplesPerBatch = Math.round(samples.length / Math.max(1, batches.length));
     if (samples.length === 0) throw new Error('no parseable zoom samples');
     const regionById = new Map(regions.map(r => [r.id, r]));
-    const voteThreshold = samples.length >= 2 ? 2 : 1;
+    const voteThreshold = 2;
 
     // Tally votes per (region, defect type) across the independent zoom samples
     const SEV_ORDER: Record<string, number> = { minor: 0, moderate: 1, heavy: 2 };
@@ -366,22 +407,48 @@ export async function runZoomInspection(
       console.log(`[ZOOM] majority vote: ${minorityDropped} single-sample finding(s) dropped (needed ${voteThreshold}/${samples.length} votes)`);
     }
 
-    // Deterministic face caps from the ladders (v9.1 recalibrated). Worst severity sets
-    // the cap; THREE OR MORE affected regions in the same face+category lowers it one
-    // more (two regions confirm the same wear level rather than compounding it).
+    // Deterministic face caps from the ladders (v9.3 recalibrated for overlapping crops).
+    // Regions physically OVERLAP (edge segments share ends with corner crops; surface
+    // quadrants contain both) — so the same worn corner used to register as 3+ "distinct
+    // regions" and trigger the spread penalty, and quadrant-reported border wear was
+    // capping the SURFACE category (measured: a clean-Gem control fell 10→8 on region
+    // double-counting alone). Rules:
+    //  - each category caps ONLY from its NATIVE crops (corners from COR, edges from EDG);
+    //  - edge segments dedup to their physical side (EDG-L-2 → EDG-L);
+    //  - surface caps ONLY from true surface defect types in SUR crops — border-wear
+    //    types there duplicate what the sharper COR/EDG crops already report;
+    //  - worst severity sets the cap; 3+ distinct PHYSICAL locations lowers it one more.
+    const BORDER_WEAR_TYPES = new Set(['whitening', 'softening', 'chip', 'nick', 'fray', 'fraying']);
+    const physicalLocation = (region: string) => region.replace(/^([FB]-EDG-[TBLR])-\d+$/, '$1');
+    const nativePrefix: Record<string, string> = { corners: 'COR', edges: 'EDG', surface: 'SUR' };
     const faceCaps: Record<string, number> = {};
     for (const face of ['front', 'back'] as const) {
       for (const category of ['corners', 'edges', 'surface'] as const) {
-        const hits = defects.filter(d => d.face === face && d.category === category);
+        const hits = defects.filter(d =>
+          d.face === face &&
+          d.category === category &&
+          d.region.includes(`-${nativePrefix[category]}-`) &&
+          (category !== 'surface' || !BORDER_WEAR_TYPES.has(d.type))
+        );
         if (hits.length === 0) continue;
         const worst = Math.min(...hits.map(d => SEVERITY_CAP[d.severity]));
-        const distinctRegions = new Set(hits.map(d => d.region)).size;
-        faceCaps[`${category}_${face}`] = Math.max(1, distinctRegions >= 3 ? worst - 1 : worst);
+        const distinctLocations = new Set(hits.map(d => physicalLocation(d.region))).size;
+        // Structure-based bias gate (docs/COSMETIC_VERIFICATION_REFINEMENT_SCOPE.md §4):
+        // UNIFORM MINOR findings — "minor" everywhere, nothing moderate+ — are the
+        // fingerprint of the detector's border bias, not damage (real handling wear is
+        // uneven: specific spots, mixed severities). Minor-only never caps below 9.
+        // KNOWN GAP: a genuinely evenly-worn card whose wear reads all-minor also gets
+        // the benefit of the doubt (a 9 instead of 8) — border-color scoping needs the
+        // card-quad geometry port (grading-v9.2-joey-fixes branch) to fix properly.
+        // The spread penalty (3+ locations → one lower) applies to moderate/heavy only.
+        const minorOnly = hits.every(d => d.severity === 'minor');
+        faceCaps[`${category}_${face}`] = minorOnly
+          ? SEVERITY_CAP.minor
+          : Math.max(1, distinctLocations >= 3 ? worst - 1 : worst);
       }
     }
 
-    const usage: any = (response as any).usage;
-    console.log(`[ZOOM] ${regions.length} regions × ${samples.length} samples → ${defects.length} majority defect(s), ${structuralFindings.length} structural; caps=${JSON.stringify(faceCaps)}; tokens p=${usage?.prompt_tokens} c=${usage?.completion_tokens}`);
+    console.log(`[ZOOM] ${regions.length} regions in ${batches.length} batch(es) × ~${samplesPerBatch} samples → ${defects.length} majority defect(s), ${structuralFindings.length} structural; caps=${JSON.stringify(faceCaps)}; tokens p=${usageTotals.p} c=${usageTotals.c}`);
 
     return { ok: true, regionsInspected: regions.length, defects, faceCaps, structuralFindings };
   } catch (err: any) {

@@ -7,7 +7,7 @@ The master grading rubric (Sections 1-13) applies to ALL One Piece cards.
 This delta provides card-specific extraction rules, defect patterns, and examples.
 
 **CARD TYPES COVERED:**
-One Piece Trading Card Game from all sets (OP-01 Romance Dawn 2022 through OP-15 Adventure on KAMI's Island 2026)
+One Piece Trading Card Game from all sets (OP-01 Romance Dawn 2022 through OP-13 Carrying On His Will 2025)
 
 ═══════════════════════════════════════════════════════════════════════
 A. ONE PIECE CARD INFORMATION EXTRACTION
@@ -45,12 +45,6 @@ REQUIRED FIELDS (All One Piece Cards)
 • Options: Red, Blue, Green, Purple, Black, Yellow
 • Multi-color cards exist (e.g., "Red/Green", "Blue/Purple")
 • Determined by card frame/border color
-• Red = aggressive/attack focused
-• Blue = control/draw focused
-• Green = ramp/DON!! focused
-• Purple = discard/trash focused
-• Black = defensive/blocker focused
-• Yellow = life manipulation focused
 
 **op_card_type**: Card type
 • Options: Leader, Character, Event, Stage
@@ -249,8 +243,6 @@ B. ONE PIECE SET IDENTIFICATION MODULE
 | OP-11    | A Fist of Divine Speed          | 2025 | 121   |
 | OP-12    | Legacy of the Master            | 2025 | 121   |
 | OP-13    | Carrying On His Will            | 2025 | 121   |
-| OP-14    | The Azure Sea's Seven           | 2026 | 121   |
-| OP-15    | Adventure on KAMI's Island      | 2026 | 121   |
 
 **STARTER DECKS:**
 
@@ -280,7 +272,7 @@ B. ONE PIECE SET IDENTIFICATION MODULE
 | OP-PR    | Promo Cards                     |
 
 **SET CODE IDENTIFICATION:**
-• OP-XX = Main booster set (OP-01 through OP-15)
+• OP-XX = Main booster set (OP-01 through OP-13)
 • ST-XX = Starter deck
 • EB-XX = Extra booster
 • PRB-XX = Premium booster
@@ -288,10 +280,18 @@ B. ONE PIECE SET IDENTIFICATION MODULE
 
 **OUTPUT FORMAT:**
 {
-  "set_name": "Romance Dawn",
-  "set_code": "OP-01",
-  "set_year": 2022,
-  "set_confidence": "high"
+  "set_name": "<set name or null>",
+  "set_code": "<set code or null>",
+  "set_year": <year or null>,
+  "set_confidence": "<high|medium|low>"
+}
+
+If the set cannot be identified from the card itself:
+{
+  "set_name": null,
+  "set_code": "<set code exactly as printed, or null>",
+  "set_year": null,
+  "set_confidence": "low"
 }
 
 ═══════════════════════════════════════════════════════════════════════
@@ -413,7 +413,7 @@ D. ONE PIECE CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
 
 **CENTERING EXAMPLE (Standard Card):**
-"This One Piece TCG card features a Red border frame. Measuring borders: left ≈ 2.8mm, right ≈ 3.2mm, top ≈ 2.5mm, bottom ≈ 3.0mm. Left-right ratio: 47/53. Top-bottom ratio: 45/55. Worst axis: top-bottom at 45/55. Good centering overall with slight bottom-heavy shift."
+"This One Piece TCG card features a Red border frame. Measuring borders: left ≈ 2.8mm, right ≈ 3.2mm, top ≈ 2.5mm, bottom ≈ 3.0mm. Left-right ratio: 53/47. Top-bottom ratio: 55/45. Worst axis: top-bottom at 55/45 → centering 10 per the CENTERING SCORE GUIDE."
 
 **PARALLEL VARIANT EXAMPLE:**
 "This Shanks Parallel variant (OP01-120) displays full-card prismatic holographic treatment with rainbow pattern visible across the entire surface. Examining the holo layer under varied lighting angles, I detect one fine hairline scratch approximately 8mm in length running diagonally across the upper left quadrant. The scratch causes minor pattern disruption but does not affect the character artwork. Per the visibility test this is a Minor defect (surface ladder row 9). Surface score: 9."

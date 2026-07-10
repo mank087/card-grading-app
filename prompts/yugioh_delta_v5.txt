@@ -212,6 +212,8 @@ B. YU-GI-OH! SET IDENTIFICATION MODULE
 | LEDE, PHNI    | Recent core sets      | LEDE-EN001 |
 | GFP2, MP23    | Gold/Mega Packs       | MP23-EN001 |
 
+If the prefix is not in this list, set set_name to null — do not infer.
+
 **NOTABLE SETS (High Value/Common in Grading):**
 
 | Set Code | Set Name                           | Year |
@@ -237,12 +239,14 @@ B. YU-GI-OH! SET IDENTIFICATION MODULE
 
 **OUTPUT FORMAT:**
 {
-  "set_name": "Legend of Blue Eyes White Dragon",
-  "set_code": "LOB",
-  "card_set_code": "LOB-EN005",
-  "set_year": 2002,
-  "set_confidence": "high"
+  "set_name": "<set name or null>",
+  "set_code": "<set prefix or null>",
+  "card_set_code": "<full printed set code, e.g. XXX-EN005, or null>",
+  "set_year": <year or null>,
+  "set_confidence": "<high|medium|low>"
 }
+
+If the set cannot be identified from the card itself → set_name null.
 
 ═══════════════════════════════════════════════════════════════════════
 C. YU-GI-OH! CARD DEFECT PATTERNS
@@ -378,7 +382,7 @@ D. YU-GI-OH! CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
 
 **CENTERING EXAMPLE (Standard Card):**
-"This Yu-Gi-Oh! card features a yellow Normal Monster frame with gold outer border. Measuring borders: left ≈ 2.5mm, right ≈ 3.0mm, top ≈ 2.2mm, bottom ≈ 2.8mm. Left-right ratio: 45/55. Top-bottom ratio: 44/56. Worst axis: top-bottom at 44/56. Acceptable centering with slight bottom-heavy shift."
+"This Yu-Gi-Oh! card features a yellow Normal Monster frame with gold outer border. Measuring borders: left ≈ 2.5mm, right ≈ 3.0mm, top ≈ 2.2mm, bottom ≈ 2.8mm. Left-right ratio: 55/45. Top-bottom ratio: 56/44. Worst axis: top-bottom at 56/44 → centering 9 per the CENTERING SCORE GUIDE."
 
 **SECRET RARE EXAMPLE:**
 "This Blue-Eyes White Dragon Secret Rare (CT13-EN003) displays diagonal rainbow holographic pattern across card name and artwork. Examining the holo layer under varied lighting, I detect two fine hairline scratches across the dragon artwork — visible only when the light catches them, and they cut across the diagonal pattern rather than shifting with it, confirming physical damage. The lower third shows uniform shimmer consistent with the Secret Rare finish (not damage — see the embossed/prismatic design rule). Two hairline scratches, angle-only = Minor severity (surface ladder row 9). Surface score: 9."

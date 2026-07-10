@@ -33,7 +33,8 @@ REQUIRED FIELDS (All Lorcana Cards)
 • Example: "Brave Little Tailor", "Snow Queen", "Rock Star", "Abominable Snowman"
 
 **ink_color**: Card ink color
-• Options: Amber, Amethyst, Emerald, Ruby, Sapphire, Steel
+• Options: Amber, Amethyst, Emerald, Ruby, Sapphire, Steel, or null/"unknown"
+• Use null/"unknown" when the image does not clearly resolve the ink color — never guess
 • Determined by card border/frame color
 • Amber = Orange/Yellow
 • Amethyst = Purple
@@ -170,19 +171,15 @@ Assign highest visible tier only (in priority order):
 • Standard rare tier
 • Rarity symbol: Triangle
 
-**5. Foil**
-• Holographic treatment on any rarity
-• Can be Common, Uncommon, Rare, etc. in foil
-
-**6. Uncommon**
+**5. Uncommon**
 • Middle rarity tier
 • Rarity symbol: Hexagon
 
-**7. Common**
+**6. Common**
 • Most basic rarity
 • Rarity symbol: Circle
 
-**8. Promo**
+**7. Promo**
 • Promotional cards
 • Special promo stamp or designation
 
@@ -212,11 +209,20 @@ Cards with collector numbers above 204 (e.g., #205-216) are Enchanted variants w
 
 **OUTPUT FORMAT:**
 {
-  "set_name": "Rise of the Floodborn",
-  "set_code": "ROF",
-  "set_year": 2023,
-  "set_confidence": "high",
-  "needs_api_lookup": false
+  "set_name": "<set name or null>",
+  "set_code": "<set code or null>",
+  "set_year": <year or null>,
+  "set_confidence": "<high|medium|low>",
+  "needs_api_lookup": <true|false>
+}
+
+If the set cannot be identified from the card itself:
+{
+  "set_name": null,
+  "set_code": null,
+  "set_year": null,
+  "set_confidence": "low",
+  "needs_api_lookup": true
 }
 
 ═══════════════════════════════════════════════════════════════════════

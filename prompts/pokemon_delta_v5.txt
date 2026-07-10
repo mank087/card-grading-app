@@ -155,6 +155,7 @@ DO NOT try to identify the set yourself based on your knowledge.
   - "black" = Some special sets (Cosmic Eclipse, certain promos)
   - "gold" = Gold border secret rares
   - "none" = Borderless/Full Art cards
+  - "unknown" = Use unknown when the image does not clearly resolve this — never guess.
 • This is CRITICAL for vintage card identification
 • Example: A 1999 Base Set card has YELLOW border, a 2023 SV card has SILVER border
 
@@ -169,6 +170,7 @@ DO NOT try to identify the set yourself based on your knowledge.
   - "SM" = Sun & Moon era (2016-2019) - GX cards
   - "SWSH" = Sword & Shield era (2020-2022) - V/VMAX cards, yellow border
   - "SV" = Scarlet & Violet era (2023+) - Silver border, ex (lowercase)
+  - "unknown" = Use unknown when the image does not clearly resolve this — never guess.
 • Detect based on: border color, Pokemon suffix (GX, V, VMAX, ex), logo style, font
 • If border_color="yellow" and year shows 1999-2003, card_era MUST be "WOTC"
 
@@ -415,172 +417,10 @@ SPECIAL FINISHES & VARIANTS
 C. POKEMON SET IDENTIFICATION MODULE
 ═══════════════════════════════════════════════════════════════════════
 
-⚡ **PURPOSE**: Accurately determine Pokemon TCG set name using observable card features.
-
-🚨 **DETECTION PRIORITY** (Execute in order, stop when confident match found):
-
-⚠️ **IMPORTANT**: The card_number field should contain ONLY the numerator (for API lookup).
-   The card_number_raw field preserves the EXACT printed number from the card.
-   The set_total field extracts the denominator for set identification.
-
-   Example: Card shows "125/094"
-   → card_number: "125" (numerator for API)
-   → card_number_raw: "125/094" (exact as printed)
-   → set_total: "094" (denominator for set lookup)
-   → card_number_format: "fraction"
-
-1. **Card Number Fraction Pattern** (PRIMARY METHOD)
-   - Locate "X/Y" near lower front edge (e.g., "251/264")
-   - Extract numerator into card_number, full text into card_number_raw, denominator into set_total
-   - Use set_total to match against lookup table below for SET IDENTIFICATION
-
-2. **Set Symbol Recognition** (STRONGEST CONFIDENCE)
-   - Detect small expansion icon on card front (usually bottom right)
-   - Near card number or rarity symbol
-   - If symbol recognized → Override numeric guess
-
-3. **Year + Border Color + Era Alignment** (TIE-BREAKER)
-   - Extract year from copyright text (e.g., "©2021")
-   - Identify border color:
-     * Yellow border → Pre-Scarlet & Violet (1999-2022)
-     * Silver border → Scarlet & Violet era (2023+)
-   - Use to disambiguate when multiple sets share same denominator
-
-4. **Printed Set Text** (DEFINITIVE IF VISIBLE)
-   - Check for explicit set name near card number
-   - Check copyright area for set abbreviations
-   - If found → Use directly (highest confidence)
-
-────────────────────────────────────────────────────────────────────────
-📊 COMPLETE SETS LOOKUP TABLE (ALL ERAS)
-────────────────────────────────────────────────────────────────────────
-
-🚨 **CRITICAL: WOTC ERA CARDS (1999-2003) - Yellow Borders, "Wizards" Logo**
-These are the most valuable vintage cards. NEVER misidentify as modern reprints.
-
-| Denominator | Set Name                | Year | Identification                           |
-|-------------|-------------------------|------|------------------------------------------|
-| 102         | Base Set / Base Set 2   | 1999/2000 | Original 102 cards, Pokéball set symbol  |
-| 64          | Jungle                  | 1999 | Jungle leaf symbol                        |
-| 62          | Fossil                  | 1999 | Fossil/bone symbol                        |
-| 82          | Team Rocket             | 2000 | "R" symbol, dark Pokemon                  |
-| 132         | Gym Heroes/Gym Challenge| 2000 | Stadium/gym badge symbols                 |
-| 111         | Neo Genesis             | 2000 | Neo symbol, baby Pokemon introduced       |
-| 75          | Neo Discovery           | 2001 | Neo symbol variant                        |
-| 66          | Neo Revelation          | 2001 | Neo symbol, Shining Pokemon               |
-| 105/113     | Neo Destiny             | 2002 | Neo symbol, Light/Dark Pokemon            |
-| 110         | Legendary Collection    | 2002 | Firework burst symbol                     |
-| 165         | Expedition              | 2002 | E-card symbol, e-Reader compatible        |
-| 147         | Aquapolis               | 2003 | E-card symbol, water theme                |
-| 144         | Skyridge                | 2003 | E-card symbol, sky theme                  |
-
-⚠️ **Base Set Charizard Example:**
-- Card shows "4/102" → Denominator 102 → MUST be Base Set or Base Set 2
-- Yellow border, "Wizards of the Coast" copyright, 1999 year
-- NEVER match to Celebrations (4/25) - different denominator!
-
-**EX ERA (2003-2007) - Yellow Borders, "ex" suffix Pokemon:**
-
-| Denominator | Set Name                | Year | Symbol Hint                              |
-|-------------|-------------------------|------|------------------------------------------|
-| 109         | Ruby & Sapphire         | 2003 | RS symbol                                |
-| 100         | Sandstorm / Emerald     | 2003/2005 | Sand/emerald symbols                   |
-| 97          | Dragon                  | 2003 | Dragon symbol                            |
-| 95          | Team Magma vs Aqua      | 2004 | Team symbols                             |
-| 101         | Hidden Legends / Unseen | 2004/2005 | Various EX symbols                     |
-| 104         | FireRed & LeafGreen     | 2004 | FRLG symbols                             |
-| 107         | Deoxys                  | 2005 | Deoxys symbol                            |
-| 92          | Delta Species           | 2005 | Delta symbol                             |
-
-**SWORD & SHIELD ERA (2020-2022) - Yellow Borders:**
-
-| Denominator | Set Name              | Year | Symbol Hint                |
-|-------------|-----------------------|------|----------------------------|
-| 202         | Sword & Shield Base   | 2020 | Sword & shield crossed     |
-| 192         | Sword & Shield Base   | 2020 | (variant)                  |
-| 209         | Rebel Clash           | 2020 | Fist with energy           |
-| 189         | Darkness Ablaze       | 2020 | Flame symbol               |
-| 185         | Vivid Voltage         | 2020 | Lightning bolt             |
-| 163         | Battle Styles         | 2021 | Urshifu paw                |
-| 198         | Chilling Reign        | 2021 | Snowflake crown            |
-| 237         | Chilling Reign        | 2021 | (with secret rares)        |
-| 203         | Evolving Skies        | 2021 | Dragon silhouette          |
-| 264         | Fusion Strike         | 2021 | Triple diagonal slashes    |
-| 172         | Brilliant Stars       | 2022 | Eight-pointed star         |
-| 216         | Brilliant Stars       | 2022 | (with Trainer Gallery)     |
-| 189         | Astral Radiance       | 2022 | Radiant aura circle        |
-| 196         | Lost Origin           | 2022 | Smoke/mist pattern         |
-| 245         | Lost Origin           | 2022 | (with Trainer Gallery)     |
-| 195         | Silver Tempest        | 2022 | Tornado/wind swirl         |
-| 245         | Silver Tempest        | 2022 | (with Trainer Gallery)     |
-
-**SCARLET & VIOLET ERA (2023-2025) - Silver Borders:**
-
-| Denominator | Set Name                 | Year | Symbol Hint                |
-|-------------|--------------------------|------|----------------------------|
-| 198         | Scarlet & Violet Base    | 2023 | SV monogram                |
-| 279         | Paldea Evolved           | 2023 | Leaf with Paldea design    |
-| 197         | Obsidian Flames          | 2023 | Fire/lava pattern          |
-| 266         | Paradox Rift             | 2023 | Rift/crack symbol          |
-| 162         | Paldean Fates            | 2024 | Paldea region icon         |
-| 218         | Temporal Forces          | 2024 | Clock/time symbol          |
-| 167         | Twilight Masquerade      | 2024 | Mask icon                  |
-| 142         | Stellar Crown            | 2024 | Crown with stars           |
-| 226         | Shrouded Fable           | 2024 | Mystical pattern           |
-| 195         | Surging Sparks           | 2025 | Lightning spark            |
-| 131         | Prismatic Evolutions     | 2025 | Prismatic/rainbow pattern  |
-| 159         | Journey Together         | 2025 | Partner theme              |
-| 182         | Destined Rivals          | 2025 | Rival confrontation        |
-| 86          | Black Bolt / White Flare | 2025 | BLK or WHT set code        |
-
-**MEGA EVOLUTION ERA (2025+) - New Generation:**
-
-| Denominator | Set Name                 | Year | Symbol Hint                |
-|-------------|--------------------------|------|----------------------------|
-| 132         | Mega Evolution           | 2025 | Mega stone / ME monogram   |
-| 94          | Phantasmal Flames        | 2025 | Ghost flame pattern        |
-| 217         | Ascended Heroes          | 2026 | Hero/ascension symbol      |
-| MEP###      | MEP Black Star Promos    | 2025+| Black star promo, MEP prefix|
-
-**SPECIAL SETS & SUBSETS:**
-
-| Pattern      | Set Name              | Year | Identification                        |
-|--------------|-----------------------|------|---------------------------------------|
-| GG##/GG70    | Crown Zenith          | 2023 | Gallery Gallery numbering system      |
-| 25/25        | Celebrations          | 2021 | 25th anniversary Pikachu logo         |
-| 165/165      | Pokémon 151           | 2023 | Kanto Pokédex focus, distinctive logo |
-| 73/73        | Shining Fates         | 2021 | Shiny Vault subset available          |
-| SV##         | Promo Cards           | Var. | Black star promo, SV prefix           |
-
-────────────────────────────────────────────────────────────────────────
-OUTPUT REQUIREMENTS
-────────────────────────────────────────────────────────────────────────
-
-**When set identified from table (High/Medium confidence):**
-{
-  "set_name": "Fusion Strike",
-  "set_year": 2021,
-  "set_era": "Sword & Shield",
-  "set_confidence": "high",
-  "set_identifier_source": ["number_pattern", "set_symbol", "era_alignment"],
-  "set_identifier_reason": "Matched denominator 264 to Fusion Strike. Verified with ©2021, yellow border (Sword & Shield era), and triple-slash symbol.",
-  "needs_api_lookup": false
-}
-
-**When set NOT in table OR special pattern detected:**
-{
-  "set_name": null,
-  "set_year": null,
-  "set_era": null,
-  "set_confidence": "low",
-  "set_identifier_source": [],
-  "set_identifier_reason": "Denominator 112 not found in common sets table. Will be looked up in local database.",
-  "needs_api_lookup": true
-}
-
-🚨 **CRITICAL MANDATORY RULE:**
-**IF `set_name` is null, YOU MUST set `needs_api_lookup: true`**
-(Note: This flags the backend to check the local Supabase database - no external API calls are made)
+SET IDENTIFICATION: extract set_code / set_total EXACTLY as printed (OCR only). Do NOT identify
+the set name from memory or from card counts — set set_name to null; the backend resolves the
+set from the extracted code. If a set symbol is visible but unreadable, note that in card_info
+and move on.
 
 ═══════════════════════════════════════════════════════════════════════
 D. POKEMON CARD DEFECT PATTERNS
@@ -804,4 +644,4 @@ For centering assessment on this borderless card, I use internal design anchors:
 
 The presence of minor texture wear and one fine scratch results in a surface score of 9 for the front."
 
---- END OF POKEMON DELTA v5.0 ---
+--- END OF POKEMON DELTA v5.1 ---

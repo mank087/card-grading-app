@@ -167,6 +167,8 @@ B. STAR WARS SET IDENTIFICATION
 | Decipher | Star Wars CCG | 1995-2001 | Customizable Card Game |
 | FFG | Star Wars: Unlimited | 2024-present | New TCG |
 
+If the set is not identifiable from the card itself, set set_name to null — do not infer from memory.
+
 **VINTAGE CARD IDENTIFICATION (1977-1983):**
 • Original 1977 Topps: Blue, Red, Yellow, Green, Orange series borders
 • Card backs have puzzle pieces or movie facts
@@ -229,7 +231,7 @@ scratch, clouding, or scuff. Bright bands/streaks that shift with the light are 
 • Rubber band marks from storage
 
 **Grading Impact (v8.8 — master ladders and centering table apply; era is narrative-only):**
-• Wax stains: score via the SURFACE SCORING LADDER stain rows (small → 7, medium → 6, large → 5)
+• Wax stains: score via the SURFACE SCORING LADDER stain rows (small → 6, medium → 5, large → 4)
 • Centering: ALWAYS scored from the measured ratio via the master CENTERING SCORE GUIDE —
   never as a floating deduction
 • Age yellowing/rubber band marks: score via the surface ladder by visibility
@@ -282,13 +284,13 @@ D. STAR WARS CARD GRADING EXAMPLES
 ═══════════════════════════════════════════════════════════════════════
 
 **VINTAGE CARD EXAMPLE (1977):**
-"This 1977 Topps Star Wars Series 1 Blue Border card #1 'Luke Skywalker' shows typical vintage characteristics. Centering is 55/45 left-right and 52/48 top-bottom — within the CENTERING SCORE GUIDE's 10 band (era does not change the mapping). Blue borders show a short run of light whitening at the top edge, noticeable at normal distance (edge ladder row 7, market-calibrated). Corners show softening noticeable at normal viewing distance (corner ladder row 7). No wax stains present. Surface has minor close-inspection handling marks (row 8, two flaws). Weakest link = 7. Grade 7 — the same standard as a modern card; the card's age is context, not a score adjustment."
+"This 1977 Topps Star Wars Series 1 Blue Border card #1 'Luke Skywalker' shows typical vintage characteristics. Centering is 55/45 left-right and 52/48 top-bottom — within the CENTERING SCORE GUIDE's 10 band (era does not change the mapping). Blue borders show a short run of light whitening at the top edge, noticeable at normal distance (edge ladder row 7, market-calibrated). Corners show softening noticeable at normal viewing distance (corner ladder row 7). No wax stains present. Surface has minor close-inspection handling marks (row 8, two flaws). Each affected category scores 7 per its ladder — the same standard as a modern card; the card's age is context, not a score adjustment."
 
 **CHROME REFRACTOR EXAMPLE:**
 "This 2023 Topps Star Wars Chrome Refractor of 'Darth Vader' displays prismatic chrome treatment across the full card face. Under varied lighting angles, I detect one fine hairline scratch running across the lower portion — it interrupts the refractor pattern rather than shifting with the light, confirming physical damage rather than glare. Angle-only visibility = Minor severity (surface ladder row 9). The refractor pattern is otherwise clean and vibrant with no fingerprints or clouding. Surface score: 9."
 
 **AUTOGRAPH CARD EXAMPLE:**
-"This Topps Star Wars Masterwork autograph card features an on-card signature of Mark Hamill. The autograph is clear and well-placed. Grading the CARD condition (not auto quality): Centering is 50/50 LR and 52/48 TB — CENTERING SCORE GUIDE 10 band. All four corners are sharp with no wear. Edges clean with no whitening. Surface pristine aside from the intentional autograph area (the autograph is a manufacturer feature, not a defect). Grade 10 — whole numbers only; half grades like 9.5 do not exist in this system."
+"This Topps Star Wars Masterwork autograph card features an on-card signature of Mark Hamill. The autograph is clear and well-placed. Grading the CARD condition (not auto quality): Centering is 50/50 LR and 52/48 TB — CENTERING SCORE GUIDE 10 band. All four corners are sharp with no wear. Edges clean with no whitening. Surface pristine aside from the intentional autograph area (the autograph is a manufacturer feature, not a defect). Each category scores 10 per its ladder — whole numbers only; half grades like 9.5 do not exist in this system."
 
 ═══════════════════════════════════════════════════════════════════════
 E. STAR WARS SPECIFIC EXTRACTION RULES

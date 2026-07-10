@@ -9,9 +9,6 @@ This delta provides card-specific extraction rules, defect patterns, and example
 **CARD TYPES COVERED:**
 Magic: The Gathering cards from all sets (Alpha 1993 through Star Trek 2026)
 
-**v5.1 UPDATES:** Added Scryfall API verification fields (sport_or_category, set_code,
-is_foil, foil_type, language, is_double_faced)
-
 ═══════════════════════════════════════════════════════════════════════
 A. MTG CARD INFORMATION EXTRACTION
 ═══════════════════════════════════════════════════════════════════════
@@ -267,20 +264,13 @@ C. MTG SET IDENTIFICATION MODULE
 COMMON MODERN SETS LOOKUP TABLE (2020-2026)
 ────────────────────────────────────────────────────────────────────────
 
-**2025-2026 Sets:**
+**2025 Sets:**
 | Set Code | Set Name                         | Year | Cards |
 |----------|----------------------------------|------|-------|
 | INR      | Innistrad Remastered             | 2025 | 291   |
 | DFT      | Aetherdrift                      | 2025 | 286   |
 | TDM      | Tarkir: Dragonstorm              | 2025 | 281   |
 | FIN      | Final Fantasy                    | 2025 | 287   |
-| EOE      | Edge of Eternities               | 2025 | TBD   |
-| SPM      | Marvel's Spider-Man              | 2025 | TBD   |
-| TLA      | Avatar: The Last Airbender       | 2025 | TBD   |
-| ECL      | Lorwyn Eclipsed                  | 2026 | TBD   |
-| TMT      | Teenage Mutant Ninja Turtles     | 2026 | TBD   |
-| SOS      | Secrets of Strixhaven            | 2026 | TBD   |
-| MSH      | Marvel Super Heroes              | 2026 | TBD   |
 
 **2024 Standard Sets:**
 | Set Code | Set Name                    | Year | Cards |
@@ -295,7 +285,6 @@ COMMON MODERN SETS LOOKUP TABLE (2020-2026)
 **2023 Standard Sets:**
 | Set Code | Set Name                    | Year | Cards |
 |----------|----------------------------|------|-------|
-| BRO      | The Brothers' War           | 2022 | 287   |
 | ONE      | Phyrexia: All Will Be One   | 2023 | 271   |
 | MOM      | March of the Machine        | 2023 | 281   |
 | WOE      | Wilds of Eldraine           | 2023 | 266   |
@@ -312,14 +301,15 @@ COMMON MODERN SETS LOOKUP TABLE (2020-2026)
 | NEO      | Kamigawa Neon Dynasty       | 2022 | 302   |
 | SNC      | New Capenna                 | 2022 | 281   |
 | DMU      | Dominaria United            | 2022 | 281   |
+| BRO      | The Brothers' War           | 2022 | 287   |
 
 **OUTPUT FORMAT:**
 {
-  "set_name": "Murders at Karlov Manor",
-  "set_code": "MKM",
-  "set_year": 2024,
-  "set_confidence": "high",
-  "needs_api_lookup": false
+  "set_name": "<set name or null>",
+  "set_code": "<3-letter set code or null>",
+  "set_year": <year or null>,
+  "set_confidence": "<high|medium|low>",
+  "needs_api_lookup": <true|false>
 }
 
 If set not found in table:

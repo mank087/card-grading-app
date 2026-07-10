@@ -8,7 +8,7 @@ This delta provides extraction rules for cards that don't fit other categories.
 
 **CARD TYPES COVERED:**
 • Non-sport trading cards (entertainment, celebrities, movies, TV shows)
-• Yu-Gi-Oh!, Cardfight!! Vanguard, Flesh and Blood, Final Fantasy TCG
+• Cardfight!! Vanguard, Flesh and Blood, Final Fantasy TCG
 • Dragon Ball Super, Digimon, MetaZoo, Weiss Schwarz
 • Autograph cards, memorabilia/relic cards
 • Any other trading card games not covered by specific deltas

@@ -1177,8 +1177,8 @@ continuous chipping, heavy corner rounding, delamination) is scored through the 
 the category SCORING LADDERS (Sections 8-10). Those rows already produce 5-and-below scores,
 and the weakest-link principle carries them into the final grade. Do NOT apply separate caps
 here, do NOT trigger caps from specific WORDS in descriptions, and do NOT apply count-based
-caps ("3+ categories with heavy defects" etc. is RETIRED — spread of wear is encoded in the
-ladders' spread adjustments).
+caps ("3+ categories with heavy defects" etc. is RETIRED — spread of wear is already encoded
+in the ladder rows themselves; there is no separate spread adjustment).
 
 **APPLICATION RULES:**
 1. **This section caps STRUCTURAL damage only** (creases, tears, bends, warping, paper loss)
@@ -1188,15 +1188,6 @@ ladders' spread adjustments).
 5. **No exceptions** - Even if other areas are pristine, the cap still applies
 
 **VALIDATION EXAMPLES:**
-
-❌ WRONG: Card with "continuous chipping covering 40-50% of bottom edge" → 7
-✅ CORRECT: Card with "continuous chipping covering 40-50% of bottom edge" → 5 maximum
-
-❌ WRONG: Card with "0.6mm white cardstock exposure at corners" → 7
-✅ CORRECT: Card with "0.6mm white cardstock exposure at corners" → 5 maximum
-
-❌ WRONG: Card with "heavy rounding" on 4 corners + "heavy chipping" on 2 edges → 7
-✅ CORRECT: Card with multiple heavy defects → 6 maximum (cumulative damage)
 
 ❌ WRONG: Card with crease → 6
 ✅ CORRECT: Card with crease → 4 maximum (structural damage)
@@ -1242,7 +1233,7 @@ condition summaries, NOT a mandatory cap system. Grades are determined by the we
 | Single visible crease | 4 |
 | Corner lift/fold/bend | 4 |
 | Structural bend/warp | 4 |
-| Cardstock exposure (white core visible) | 5 |
+| Large-area raw cardstock exposure from coating/surface loss (patches, not corner/edge whitening) | 5 |
 
 **TIER C: HEAVY DAMAGE (Grade 5-6)**
 | Condition | Max Grade |
@@ -1254,8 +1245,6 @@ condition summaries, NOT a mandatory cap system. Grades are determined by the we
 | Heavy rounding 3+ corners | 5 |
 | Continuous edge chipping (>25%) | 5 |
 | Multiple visible scratches | 6 |
-| Multiple "Heavy" severity defects (3+) | 6 |
-| Defects in all 4 categories | 6 |
 
 **TIER D: VISIBLE WEAR (Grade 7)**
 | Condition | Max Grade |
@@ -1309,41 +1298,6 @@ They do NOT function as additional caps — the weakest subgrade IS the cap.
 
 **INTERNAL USE ONLY:**
 Do NOT mention "CONDITION TIER" or tier letters (A, B, C, D, E, F, G) in user-facing summaries. Describe the card's condition naturally.
----
-SECTION 1.14: DOMINANT DEFECT CONTROL
----
-🚨 **THE WORST DEFECT CATEGORY CONTROLS THE GRADE**
-
-PURPOSE: Prevent averaging from diluting the impact of significant defects. Professional graders do NOT average condition - they judge impact.
-
-**FUNDAMENTAL PRINCIPLE:**
-The single most visually significant defect determines the grade tier, NOT the average of all categories.
-
-**DOMINANT DEFECT HIERARCHY (Most to Least Impact):**
-1. Structural damage (creases, tears, bends) → Immediate tier assignment
-2. Surface scratches (highly visible, affects eye appeal)
-3. Corner damage (most noticed by collectors)
-4. Edge wear (visible but less impactful)
-5. Centering (least penalized, most forgiven)
-
-**APPLICATION:**
-• If Surface has visible scratch → Surface score controls final grade cap
-• If Corners have heavy wear → Corner score limits final grade
-• Perfect centering CANNOT compensate for scratched surface
-• Perfect surface CANNOT compensate for creased card
-
-**EXAMPLES:**
-
-| Scores | Traditional Average | Dominant Defect Grade |
-|--------|--------------------|-----------------------|
-| C:10, Co:10, E:10, S:7 (scratch) | 9.25 → 9 | **7** (scratch dominates) |
-| C:10, Co:7, E:10, S:10 | 9.25 → 9 | **7** (corner damage dominates) |
-| C:6, Co:10, E:10, S:10 | 9.0 → 9 | **6** (centering 6 = overall cap 6 per 1:1 mapping) |
-| C:10, Co:8, E:8, S:8 | 8.5 → 9 | **8** (multiple moderate = max 8) |
-
-**SCORE INTEGRATION:**
-• Identify the dominant (weakest) defect category
-• Final grade = MIN(all category scores)
 ---
 SECTION 1.16: WEAKEST LINK PRINCIPLE (v8.5 SIMPLIFIED)
 ---
@@ -1970,16 +1924,9 @@ VISIBILITY ASSESSMENT BY REGION
 ---
 CONFIDENCE LETTER CALCULATION
 ---
-**Step 1: Calculate component visibility percentages**
-• corners_visibility = (sum of 8 corner scores) / (8 × 4) × 100
-• edges_visibility = (sum of 8 edge scores) / (8 × 4) × 100
-• surface_visibility = (sum of 2 surface scores) / (2 × 4) × 100
-• centering_visibility = (sum of 2 centering scores) / (2 × 4) × 100
-
-**Step 2: Calculate overall visibility score**
-• overall_visibility = (corners_visibility + edges_visibility + surface_visibility + centering_visibility) / 4
-
-**Step 3: Map to confidence letter**
+Choose the confidence letter DIRECTLY from the Grade A/B/C/D descriptors below — pick the
+letter whose description best matches the overall image conditions across corners, edges,
+surface, and centering. No percentage computation is required.
 ---
 CONFIDENCE LETTER MAPPING
 ---
@@ -2028,20 +1975,16 @@ Requirements:
 ---
 CONFIDENCE LETTER ASSIGNMENT
 ---
-Assign confidence letter based on overall_visibility AND additional factors:
-• overall_visibility is PRIMARY factor
+Assign confidence letter based on the descriptor match AND additional factors:
+• The A/B/C/D descriptor definitions above are the PRIMARY criteria
 • Additional factors (glare, focus, holder) can LOWER confidence
 • Cannot raise confidence above what visibility supports
 
-**Formula:**
-if overall_visibility >= 95% AND no_glare AND no_holder AND sharp_focus:
-    confidence_letter = "A"
-elif overall_visibility >= 85% OR (overall_visibility >= 80% AND minor_issues):
-    confidence_letter = "B"
-elif overall_visibility >= 70% OR (overall_visibility >= 65% AND moderate_issues):
-    confidence_letter = "C"
-else:
-    confidence_letter = "D"
+**Direct criteria:**
+• All Grade A conditions met (sharp, even lighting, no glare, no holder, both sides fully visible) → "A"
+• Minor limitations only (slight glare, sleeve/top loader, mostly sharp focus) → "B"
+• Moderate limitations (significant glare, thick holder/slab, uneven lighting, soft focus areas) → "C"
+• Severe limitations (heavy glare, critical areas obscured, very poor lighting/focus) → "D"
 
 **Confidence Letter Consistency:**
 ⚠️ The same confidence letter MUST be used throughout the entire output
@@ -2056,6 +1999,9 @@ Confidence letter determines FIXED grade uncertainty (displayed separately, NOT 
 • Grade B → ±1 (high confidence)
 • Grade C → ±2 (moderate confidence - recommend new photos)
 • Grade D → ±3 (low confidence - recommend new photos)
+
+This letter→uncertainty mapping is the ONLY source of the uncertainty value. Rules elsewhere
+that say to "widen the uncertainty band" mean: lower the confidence letter instead.
 
 ⚠️ **CRITICAL: UNCERTAINTY IS NOT A SCORE DEDUCTION**
 
@@ -2165,7 +2111,7 @@ PROTECTIVE CASE/HOLDER DETECTION
 
 **Adjusted Uncertainty:**
 Based on case impact, adjust grade uncertainty:
-• No case or minimal impact → ±0.0
+• No case or minimal impact → ±0
 • Minor case impact → ±0
 • Moderate case impact → ±1
 • High case impact → ±2
@@ -2734,12 +2680,12 @@ UNIVERSAL ANTI-HALLUCINATION SAFEGUARDS
 □ Each corner/edge has UNIQUE description (no copy-paste)?
 
 **VIOLATION EXAMPLES:**
-❌ Description: "0.2mm fiber exposure" | Score: 10 | Defects: [] → INCONSISTENT!
+❌ Description: "Pinpoint fiber exposure" | Score: 10 | Defects: [] → INCONSISTENT!
 ❌ Description: "Sharp and clean" | Score: 8 | Defects: [] → WHERE'S THE -2 DEDUCTION?
-❌ Description: "Fiber (0.3mm) and rounding (0.4mm)" | Defects: [fiber only] → MISMATCH!
+❌ Description: "Fiber exposure and slight rounding" | Defects: [fiber only] → MISMATCH!
 
 **CORRECT EXAMPLE:**
-✅ Description: "0.2mm fiber at apex" | Score: 9 | Defects: [{type: "fiber_exposure", severity: "minor", description: "0.2mm"}]
+✅ Description: "Pinpoint fiber fleck at apex, visible in the corner crop" | Score: 9 | Defects: [{type: "fiber_exposure", severity: "minor", description: "pinpoint fleck at apex"}]
 ---
 3. INSPECTION DOCUMENTATION
 ---
@@ -2813,12 +2759,12 @@ UNIVERSAL ANTI-HALLUCINATION SAFEGUARDS
 **PRINCIPLE:** The grade reflects OBSERVED condition AFTER THOROUGH INSPECTION. Don't invent defects, but don't miss them either. When in doubt about whether something is a defect, it probably is.
 
 **CORRECT APPROACH:**
-✅ "At max zoom, top-left corner against red border: white fiber visible at tip, ~0.15mm where coating worn. No rounding, no lift/tilt detected."
+✅ "Top-left corner against red border: a pinpoint fleck of white fiber at the tip where coating is worn, visible only in the corner crop. No rounding, no lift/tilt detected."
 • Observable evidence (white fiber, red border)
-• Measurement (0.15mm)
+• Extent in words (pinpoint fleck)
 • Location (top-left, corner tip)
 • Actual colors (red, white)
-• Method (max zoom)
+• Method (corner crop at available resolution)
 • Negative findings (no rounding, no lift/tilt)
 ---
 SECTION 7.5: MANDATORY EVIDENCE FORMAT
@@ -2850,7 +2796,7 @@ For EVERY defect claim, you MUST provide ALL 4 elements in this EXACT order:
    - NOT: "against dark border" (must be specific)
 
 **EXAMPLE - CORRECT:**
-✅ "Top-left front corner tip → visible white fiber exposure → approximately 0.2mm → high contrast against the purple border frame"
+✅ "Top-left front corner tip → visible white fiber exposure → pinpoint fleck at the apex, visible only in the corner crop → high contrast against the purple border frame"
 
 **EXAMPLE - INCORRECT:**
 ❌ "Corner has minor wear" (missing all 4 elements)
@@ -2861,7 +2807,7 @@ For EVERY defect claim, you MUST provide ALL 4 elements in this EXACT order:
 Before submitting ANY defect claim, verify:
 □ Does my claim include a specific LOCATION?
 □ Does my claim include a visual DESCRIPTION (not just "wear")?
-□ Does my claim include a MEASUREMENT or size estimate?
+□ Does my claim include an OBSERVATION of size/extent in words?
 □ Does my claim reference actual COLORS from THIS card?
 
 If ANY element is missing → Rewrite the defect claim before proceeding.
@@ -3197,19 +3143,17 @@ Before measuring, classify card into ONE category:
 ---
 STEP 2: NUMERIC MEASUREMENT (REQUIRED)
 ---
-You MUST provide approximate numeric measurements AND validate them visually.
+You MUST provide approximate relative proportions AND validate them visually.
 
 **For bordered cards (Type A):**
-• Measure left border: "Left border ≈ [X] mm"
-• Measure right border: "Right border ≈ [Y] mm"
-• Measure top border: "Top border ≈ [X] mm"
-• Measure bottom border: "Bottom border ≈ [Y] mm"
+• Compare left vs right border widths as a relative proportion: "left border ≈ 1.3× the right border" (or "borders visually equal")
+• Compare top vs bottom border widths the same way: "top border ≈ 1.5× the bottom border"
 
 **For borderless/anchor cards (Types B-E):**
 • Identify design anchor points (text boxes, logos, character placement)
-• Measure anchor distance from edges: "[Anchor element] is ≈ [X] mm from left edge"
+• Compare anchor distances from opposite edges as a relative proportion
 • Must identify at least TWO anchor points per axis
-• Example: "Player name text box is ≈ 4.2mm from left edge, ≈ 5.8mm from right edge"
+• Example: "Player name text box sits slightly closer to the left edge — left gap ≈ 0.7× the right gap"
 
 🚨 **MEASUREMENT ACCURACY REQUIREMENTS:**
 
@@ -3223,15 +3167,15 @@ CENTERING SCORE GUIDE table later in this section):**
 
 🚨 **CRITICAL: Visual appearance OVERRIDES calculated measurements if they conflict.**
 
-| Visual Appearance | Ratio Range | How Common |
-|-------------------|-------------|------------|
-| TRULY IDENTICAL - stare at borders, cannot see difference | 50/50 to 51/49 | Very Rare (~5%) |
-| NEARLY EQUAL - very subtle difference on close inspection | 52/48 to 55/45 | Uncommon (~15%) |
-| SLIGHTLY WIDER - noticeable when comparing side-by-side | 56/44 to 58/42 | Common (~25%) |
-| CLEARLY WIDER - visible without specifically comparing | 59/41 to 63/37 | Common (~25%) |
-| OBVIOUSLY WIDER - immediately apparent at first glance | 64/36 to 70/30 | Common (~20%) |
-| DRAMATICALLY WIDER - one border nearly double | 71/29 to 75/25 | Less Common (~8%) |
-| SEVERELY OFF - one border is double or more | 76/24 or worse | Rare (~2%) |
+| Visual Appearance | Ratio Range |
+|-------------------|-------------|
+| TRULY IDENTICAL - stare at borders, cannot see difference | 50/50 to 51/49 |
+| NEARLY EQUAL - very subtle difference on close inspection | 52/48 to 55/45 |
+| SLIGHTLY WIDER - noticeable when comparing side-by-side | 56/44 to 58/42 |
+| CLEARLY WIDER - visible without specifically comparing | 59/41 to 63/37 |
+| OBVIOUSLY WIDER - immediately apparent at first glance | 64/36 to 70/30 |
+| DRAMATICALLY WIDER - one border nearly double | 71/29 to 75/25 |
+| SEVERELY OFF - one border is double or more | 76/24 or worse |
 
 **MANDATORY CROSS-CHECK:**
 After calculating your ratio, verify against this table:
@@ -3284,9 +3228,10 @@ After calculating ratio, you MUST complete ALL verification checks:
 **VERIFICATION CHECK 1: Mathematical Consistency**
 ❓ "Do my measured border values logically support this centering ratio?"
 
-• If left=2.5mm, right=3.5mm → Total = 6mm, Left = 42%, Right = 58% → 42/58 ratio ✓
-• If left=2.8mm, right=3.2mm → Total = 6mm, Left = 47%, Right = 53% → 47/53 ratio ✓
-• If left=2.0mm, right=4.0mm → Total = 6mm, Left = 33%, Right = 67% → 33/67 ratio ✓
+• If the right border is visibly slightly wider than the left (≈1.2×) → about 45/55 ✓
+• If the two borders look essentially equal → 50/50 to 53/47 ✓
+• If the right border is about twice the left → about 33/67 ✓
+(Work in relative proportions of the two borders as seen in the image — never invent mm values.)
 
 **VERIFICATION CHECK 2: Visual Reality Test (CRITICAL)**
 ❓ "Does my ratio MATCH what I can SEE in the image?"
@@ -3397,7 +3342,7 @@ Before assigning any centering rating of "Excellent" or better (score 10), ask:
 
 □ "Can I easily see which border is wider just by looking at the image?"
   - If YES → Cannot be "Perfect" or "Excellent"
-  - This is likely "Good" (55/45) or worse
+  - This is likely "Good" (56/44) or worse
 
 □ "Is one border noticeably thicker than the opposite border?"
   - If YES → This is "Fair" (56/44-60/40) or worse
@@ -3495,11 +3440,9 @@ CENTERING SCORE OF 10 PREREQUISITES (MANDATORY)
 🚨 **TO ASSIGN CENTERING = 10, ALL OF THE FOLLOWING MUST BE TRUE:**
 
 **Measurement Requirements:**
-□ Front Left border measured: ___mm
-□ Front Right border measured: ___mm
+□ Front Left vs Right border proportion assessed: left ≈ ___× the right border (or "borders visually equal")
 □ Front L/R ratio calculated: ___/___ (must be 55/45 or better)
-□ Front Top border measured: ___mm
-□ Front Bottom border measured: ___mm
+□ Front Top vs Bottom border proportion assessed: top ≈ ___× the bottom border (or "borders visually equal")
 □ Front T/B ratio calculated: ___/___ (must be 55/45 or better)
 □ Back centering verified: worst axis 75/25 or better (no penalty applied)
 
@@ -3574,22 +3517,22 @@ For EACH side (front and back):
     "front": {
       "card_type": "Standard Bordered" | "Asymmetric Insert" | "Borderless" | "Foil-Frame" | "Die-Cut",
       "measurement_method": "Border measurement" | "Design anchors" | "Internal geometry",
-      "measurements": "Left ≈ 2.8mm, Right ≈ 3.5mm, Top ≈ 3.0mm, Bottom ≈ 3.2mm",
+      "measurements": "Left border ≈ 1.25× the right border; top and bottom borders visually equal",
       "left_right": "44/56",
       "top_bottom": "48/52",
       "worst_axis": "left_right",
-      "quality_tier": "Perfect" | "Excellent" | "Good" | "Fair" | "Off-Center",
+      "quality_tier": "Perfect" | "Excellent" | "Good" | "Fair" | "Off-Center" | "Severely Off-Center",
       "score": 8,
       "analysis": "MAXIMUM 2-3 SENTENCES: MUST START with quality_tier word. (1) Quality tier + both axis ratios. (2) Context. (3) Optional notes."
     },
     "back": {
       "card_type": "Standard Bordered" | "Asymmetric Insert" | "Borderless" | "Foil-Frame" | "Die-Cut",
       "measurement_method": "Border measurement" | "Design anchors" | "Internal geometry",
-      "measurements": "Left ≈ X.Xmm, Right ≈ X.Xmm, Top ≈ X.Xmm, Bottom ≈ X.Xmm",
+      "measurements": "Relative border proportions in words (e.g., 'left ≈ 1.2× right; top ≈ bottom')",
       "left_right": "XX/XX",
       "top_bottom": "XX/XX",
       "worst_axis": "left_right" | "top_bottom",
-      "quality_tier": "Perfect" | "Excellent" | "Good" | "Fair" | "Off-Center",
+      "quality_tier": "Perfect" | "Excellent" | "Good" | "Fair" | "Off-Center" | "Severely Off-Center",
       "score": 1-10,
       "analysis": "MAXIMUM 2-3 SENTENCES: MUST START with quality_tier word. Independent back centering analysis."
     }
@@ -3610,31 +3553,30 @@ This is a HALLUCINATION - the AI is not performing the required calculation.
 
 STEP A: MEASURE BORDERS WITH EXPLICIT POSITION LABELS
 ---
-For EACH side (front and back), measure borders in this EXACT format:
-• "LEFT border width ≈ X.Xmm (this is the border on the LEFT side of the image)"
-• "RIGHT border width ≈ X.Xmm (this is the border on the RIGHT side of the image)"
-• "TOP border width ≈ X.Xmm (this is the border at the TOP of the image)"
-• "BOTTOM border width ≈ X.Xmm (this is the border at the BOTTOM of the image)"
+For EACH side (front and back), compare borders in this EXACT format:
+• "LEFT vs RIGHT: the LEFT border appears ≈ X.X× the width of the RIGHT border (LEFT = the border on the LEFT side of the image)"
+• "TOP vs BOTTOM: the TOP border appears ≈ X.X× the width of the BOTTOM border (TOP = the border at the TOP of the image)"
+• If a pair looks equal, state "borders visually equal" for that axis
 
 🚨 DIRECTIONAL ACCURACY REQUIREMENT:
 • LEFT = the side of the card that appears on the LEFT of the image as you view it
 • RIGHT = the side of the card that appears on the RIGHT of the image as you view it
-• If the LEFT border measures LARGER than the RIGHT border, the card is shifted RIGHT
-• If the RIGHT border measures LARGER than the LEFT border, the card is shifted LEFT
-• VERIFY: "Is my description of which border is larger consistent with my measurements?"
+• If the LEFT border appears WIDER than the RIGHT border, the card is shifted RIGHT
+• If the RIGHT border appears WIDER than the LEFT border, the card is shifted LEFT
+• VERIFY: "Is my description of which border is wider consistent with my stated proportions?"
 
 STEP B: CALCULATE RATIO FROM MEASUREMENTS (MANDATORY)
 ---
 You MUST show your calculation explicitly:
 
 For Left/Right axis:
-• Total width = left_border + right_border = Xmm
+• Total width = left_border + right_border (in relative units)
 • Left percentage = (left_border / total) × 100 = XX%
 • Right percentage = (right_border / total) × 100 = XX%
 • Smaller percentage is first in ratio: XX/YY
 
 For Top/Bottom axis:
-• Total height = top_border + bottom_border = Xmm
+• Total height = top_border + bottom_border (in relative units)
 • Top percentage = (top_border / total) × 100 = XX%
 • Bottom percentage = (bottom_border / total) × 100 = XX%
 • Smaller percentage is first in ratio: XX/YY
@@ -3746,29 +3688,7 @@ After the qualitative description, you MUST map that description into a
 MINIMUM centering ratio. You are NOT allowed to assign "53/47" style ratios
 to cards where one border is clearly dominant or barely visible.
 
-**SYMPTOM-TO-RATIO MAPPING (Binding):**
-
-| Description Keywords | Allowed Ratio | Max Score |
-|---------------------|---------------|-----------|
-| "nearly identical", "subtle", "slight" | 50/50-55/45 | 10 |
-| "clearly thicker", "noticeably", "obviously wider" | 56/44-60/40 | 9 |
-| "dominant border", "compressed", "very thick/thin" | 61/39-65/35 | 8 |
-| "barely visible", "nearly no border", "severely shifted" | 66/34+ | 7 or below |
-
-🚨 **HARD RULE - NO EXCEPTIONS:**
-If your text description uses "barely visible," "almost disappears," "nearly
-no border," or similar language → You are NOT allowed to use a ratio tighter
-than 66/34 on that axis.
-
-**EXAMPLES OF CORRECT MAPPING:**
-✅ Description: "Left border is barely visible" → Ratio MUST be 66/34 or worse
-✅ Description: "Right border is clearly thicker" → Ratio MUST be 56/44 to 60/40
-✅ Description: "Borders look nearly identical" → Ratio CAN be 50/50 to 55/45
-
-**EXAMPLES OF VIOLATIONS (PROHIBITED):**
-❌ Description: "Left border barely visible" + Ratio: "53/47" → INVALID
-❌ Description: "Dominant right border" + Ratio: "55/45" → INVALID
-❌ Description: "Severely shifted" + Ratio: "58/42" → INVALID
+Use the QUALITY TIER VALIDATION table (Section: centering quality tiers) as the ONLY language→ratio→score mapping. Do not re-derive scores from verbal descriptions here.
 ---
 [STEP C3] FRONT-BACK CENTERING RELATIONSHIP (PHYSICS-BASED)
 ---
@@ -3853,23 +3773,7 @@ You may consider camera distortion ONLY under these STRICT conditions:
 ---
 Your centering description language and score MUST be consistent in BOTH directions.
 
-**DESCRIPTION → SCORE CAPS:**
-
-| If your description includes...                  | Score Constraint        |
-|--------------------------------------------------|-------------------------|
-| "Nearly identical," "very subtle," "slight"      | Minimum score: 9        |
-| "Clearly thicker," "noticeably off," "dominant"  | Maximum score: 8        |
-| "Border is thin/visibly squeezed on one side"    | Maximum score: 8        |
-| "Barely visible," "almost no border," "severely" | Maximum score: 7        |
-
-**SCORE → DESCRIPTION REQUIREMENTS:**
-
-| If your score is...  | Your description MUST include...                    |
-|----------------------|-----------------------------------------------------|
-| 10                   | "Borders appear very close to even" or              |
-|                      | "only a very subtle shift" or equivalent            |
-| 9                    | "slight" or "minor" shift language only             |
-| 8 or lower           | Clear indication of visible off-centering           |
+Use the QUALITY TIER VALIDATION table (Section: centering quality tiers) as the ONLY language→ratio→score mapping. Do not re-derive scores from verbal descriptions here.
 
 🚨 **VALIDATION CHECK:**
 Before finalizing, verify: "Does my description language match my score?"
@@ -3920,9 +3824,9 @@ Examine corner from side/angle view for structural damage:
 • Visual Cues: White stress lines, fold marks, creased appearance, corner sits at wrong angle
 
 **🚨 CRITICAL - STRUCTURAL CORNER DAMAGE GRADING:**
-• ANY corner lift/tilt = −3 to −4 points, GRADE CAP 4 (cannot score above 4)
-• Corner with fold/crease = −3 to −4 points, GRADE CAP 4
-• Multiple lifted corners = −5+ points, GRADE CAP 3
+• ANY corner lift/tilt = GRADE CAP 4 (cannot score above 4)
+• Corner with fold/crease = GRADE CAP 4
+• Multiple lifted corners = GRADE CAP 3
 • Corner lift/tilt is STRUCTURAL DAMAGE, not wear - card cannot be NM/Mint with this defect
 ---
 PHASE 2: WEAR/FIBER INSPECTION (Only after confirming no structural damage)
@@ -3981,18 +3885,9 @@ CORNER SCORING REFERENCE (v8.8)
 **All scores are WHOLE NUMBERS - no decimals**
 
 🚨 Scoring authority: the CORNER SCORING LADDER above (Phase 2). Match each corner to its
-ladder row, then apply the spread adjustment. There is no separate deduction table — do not
-subtract invented point values.
+ladder row. There is no separate deduction table — do not subtract invented point values.
 
-**Structural Damage (Hard Caps - Immediate):**
-| Defect | Immediate Grade Cap |
-|--------|---------------------|
-| Any corner lift/tilt | 4 |
-| Any corner bend/fold | 4 |
-| Corner crease | 3 |
-| Corner tear | 2 |
-| Corner missing piece | 2 |
-| Multiple structural issues | 3 |
+Structural damage at a corner: score per Section 1.11 (the authoritative structural table).
 
 **REMEMBER:** Corner subgrade directly caps overall grade per Section 1.16.
 Corner score of 7 = Overall grade cannot exceed 7.
@@ -4054,7 +3949,7 @@ FOR corner IN [TL_front, TR_front, BL_front, BR_front, TL_back, TR_back, BL_back
 END LOOP
 
 **LOOP VALIDATION (After completing all 8 corners):**
-□ All 8 corners have unique descriptions (no copy-paste)
+□ All 8 corners described from what is actually visible (no verbatim copy-paste; do NOT invent differences between corners that look the same)
 □ Total defect count matches entries in defects arrays
 □ Scores correlate with severity of documented defects
 □ No template language used ("sharp, no fiber, 10" is INVALID)
@@ -4207,8 +4102,7 @@ EDGE SCORING REFERENCE (v8.8)
 **All scores are WHOLE NUMBERS - no decimals**
 
 🚨 Scoring authority: the EDGE SCORING LADDER above (Phase 2). Match each edge to its ladder
-row, then apply the spread adjustment. There is no separate deduction table — do not subtract
-invented point values.
+row. There is no separate deduction table — do not subtract invented point values.
 
 **REMEMBER:** Edge subgrade directly caps overall grade per Section 1.16.
 Edge score of 7 = Overall grade cannot exceed 7.
@@ -4310,7 +4204,7 @@ MANDATORY REQUIREMENTS FOR EACH EDGE
 ---
 1. **State actual colors at edge** - Describe colors you see, never assume generic "dark border"
 2. **Reference edge-specific features** - What design elements run along THIS particular edge?
-3. **Use unique descriptions** - Each of 4 edges must have different sentence pattern
+3. **Describe what is visible** - No verbatim copy-paste between edges; edges that genuinely look identical may be described similarly — do NOT invent differences
 4. **Note position characteristics** - How does this edge's location affect observation?
 5. **Explain detection method** - How did edge features help or limit your assessment?
 ---
@@ -4475,8 +4369,7 @@ by the VISIBILITY TEST (Section 1.9) — how noticeable the defect is at normal 
 
 🚨 **CORE PRINCIPLE: A defect you noticed WITHOUT zooming or searching = Surface score 7 or below.**
 🚨 A defect you found only by zooming in = 9 (one flaw) or 8 (two or more), never lower.
-Multiple defects: pick the count-aware row that matches; if 3+ separate noticeable defects
-are confirmed on one face, subtract 1 additional point (applied once, minimum 1).
+Multiple defects: pick the count-aware row that matches (the ladder rows are count-aware).
 
 **REMEMBER:** Surface subgrade directly caps overall grade per Section 1.16.
 Surface score of 7 = Overall grade cannot exceed 7.
@@ -4690,15 +4583,15 @@ When the card has a full-art or highly patterned foil background, you MUST:
 
 **Required phrasing structure for busy backgrounds:**
 
-"On the [position] [front/back] corner, I compare the edge against the
-[border color/frame] reference. I see [white fibers/no white fibers/
+"On the [position] [front/back] corner, the edge is compared against the
+[border color/frame] reference. [White fibers/No white fibers/
 specific defect] at the extreme tip."
 
 **Examples:**
-✅ "On the top-right front corner, I compare the edge against the yellow
-    border frame. I see microscopic white fiber exposure at the tip."
-✅ "On the bottom-left back corner, I compare the edge against the blue
-    Pokemon card back pattern. No white fibers visible at maximum zoom."
+✅ "Compared against the yellow border frame, fine white fiber exposure is
+    present at the tip of the top-right front corner."
+✅ "Compared against the blue Pokemon card back pattern at the bottom-left
+    back corner, no white fiber exposure is visible at the provided resolution."
 ---
 [STEP D3] "WHEN IN DOUBT" RULE FOR WHITENING & CORNER WEAR
 ---
@@ -4874,8 +4767,7 @@ These are DISTINCT manufacturing defects with different characteristics:
 | Prominent | Immediately obvious, distracting | 6 |
 
 **QUANTITY (v8.8 — no multipliers):**
-- Score from the WORST line's row; 3+ confirmed Moderate-or-worse lines on one face →
-  subtract 1 additional point (the surface ladder's multiple-defect rule, applied once)
+- Score from the WORST line's row (the ladder rows are count-aware)
 
 **CRITICAL REMINDERS:**
 - Print/roller lines are MANUFACTURING defects — they do NOT trigger structural
@@ -4951,7 +4843,7 @@ complex artwork + holographic overlay, making them easy to miss.
 HOLOGRAPHIC & SURFACE ACCURACY CHECKLIST
 ---
 For holographic, textured, or parallel cards: Apply [H1]-[H5] protocols above,
-plus Design Pattern Differentiation (Section 1.10.4) and Busy Background Protocol [D2].
+plus the SIMULATED DAMAGE / DESIGN PATTERN rules in Section 6 and Busy Background Protocol [D2].
 ---
 SECTION 11: SCORING & GRADE CALCULATION
 ---
@@ -5205,16 +5097,16 @@ OUTPUT FORMAT: SCORING BREAKDOWN (WHOLE NUMBERS)
     "grade_range": "±1",        // Uncertainty based on confidence letter
     "condition_label": "Near Mint-Mint",
     "dominant_defect": "centering",// Category that limited grade (INTERNAL USE)
-    "summary": "This card is in Near Mint-Mint condition with minor centering shift to the left. Corners and edges are sharp with no visible wear. Surface is clean with no scratches. Final grade: 8."
+    "summary": "<one-sentence factual condition summary that states the exact decimal_grade>"
   },
   "image_quality": {
-    "confidence_letter": "B",
-    "grade_uncertainty": "±1",
-    "corners_visibility": 95.0,
-    "edges_visibility": 92.0,
-    "surface_visibility": 90.0,
-    "lighting_quality": "good",
-    "focus_quality": "good"
+    "confidence_letter": "<A|B|C|D>",
+    "grade_uncertainty": "<±0|±1|±2|±3 — from the confidence letter>",
+    "corners_visibility": "<approximate percent, e.g. 90>",
+    "edges_visibility": "<approximate percent>",
+    "surface_visibility": "<approximate percent>",
+    "lighting_quality": "<good|fair|poor>",
+    "focus_quality": "<good|fair|poor>"
   },
   "structural_damage": {
     "detected": false,
@@ -5228,14 +5120,15 @@ OUTPUT FORMAT: SCORING BREAKDOWN (WHOLE NUMBERS)
     "description": "No structural damage detected."  // must mention EACH finding when any exist
   },
   "metadata": {
-    "timestamp": "2025-01-15T14:32:00Z",
-    "prompt_version": "DCM_Grading_v9.0"
+    "delta_applied": "<which card-type delta was applied>",
+    "processing_notes": "<any special conditions encountered, or empty string>"
   }
 }
 
 **CRITICAL:** Always include the metadata object with:
-- timestamp: Current date/time in ISO 8601 format
-- prompt_version: "DCM_Grading_v9.0"
+- delta_applied: which card-type delta was applied
+- processing_notes: any special conditions or issues encountered
+Do NOT emit a timestamp or a prompt/engine version — the server stamps both authoritatively.
 ---
 SECTION 12: OUTPUT REQUIREMENTS & VALIDATION
 ---
@@ -5262,7 +5155,7 @@ This section provides guidelines for content quality, not structure definition.
 • final_grade (decimal_grade, whole_grade, etc.)
 • structural_damage (creases, bent corners detection)
 • handwriting (if detected)
-• metadata (timestamp, model version, etc.)
+• metadata (delta_applied, processing_notes — no timestamp/version; server stamps those)
 
 **NOTE:** Professional grade estimates are calculated by the backend system using deterministic mapping logic. DO NOT include professional_estimates in your JSON output.
 ---
@@ -5275,19 +5168,18 @@ Before returning JSON output, verify:
   - image_quality.confidence_letter
 
 **Completeness Checks:**
-□ All 8 corners described (4 front, 4 back) with unique descriptions
-□ All 8 edges described (4 front, 4 back) with unique descriptions
-□ Both surfaces described (front, back) with unique descriptions
-□ All numeric measurements include uncertainty qualifiers
-□ All descriptions reference THIS card's actual colors and features
-□ No template/copy-paste phrases detected
+□ All 8 corners described (4 front, 4 back) — describe what is actually visible; do not invent differentiating detail
+□ All 8 edges described (4 front, 4 back)
+□ Both surfaces described (front, back)
+□ All numeric estimates include uncertainty qualifiers
+□ Descriptions reference THIS card's actual visible features
+□ No verbatim copy-paste of the same sentence across areas
 
 **Calculation Checks:**
 □ All sub-scores are whole integers 1-10
 □ Weighted scores calculated correctly
 □ Weakest link identified correctly
 □ Grade caps applied where triggered
-□ Conservative rounding applied
 □ Final grade ≤ any caps
 
 **Narrative Quality Checks:**
@@ -5299,12 +5191,10 @@ Before returning JSON output, verify:
 ---
 METADATA REQUIREMENTS
 ---
-Include in metadata object:
-• timestamp: ISO 8601 format
-• model_version: "DCM_OPTIC_v9.0"
-• rubric_version: "master_v9.0"
-• delta_applied: "sports_v5" | "pokemon_v5" | "mtg_v5" | "lorcana_v5" | "other_v5"
+Include in metadata object (single authoritative spec — matches the JSON example above):
+• delta_applied: "sports_v5" | "pokemon_v5" | "mtg_v5" | "lorcana_v5" | "onepiece_v5" | "yugioh_v5" | "starwars_v5" | "other_v5"
 • processing_notes: Any special conditions or issues encountered
+Do NOT emit timestamp, model_version, rubric_version, or prompt_version — the server stamps engine version and time authoritatively.
 ---
 REQUIRED VS. OPTIONAL FIELDS
 ---
