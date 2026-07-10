@@ -1,0 +1,106 @@
+{
+  "_readme": [
+    "GOLDEN CALIBRATION + REPEATABILITY SET.",
+    "Repeatability needs NO ground truth: grade each card N times, measure grade/subgrade spread.",
+    "Accuracy uses `expected` (+/- tolerance) where we have a defensible human grade.",
+    "expected/tolerance are best-judgment anchors — refine with your own grades over time.",
+    "Run: npx tsx scripts/repeatability-harness.ts [N]     (default N=3; resumable)",
+    "Old seed cards 93ee95e7 (Pineiro) + bb0259ab (Gengar) were DELETED from the DB — replaced below.",
+    "2026-07-10: added 5 cards from the grade-10-influx investigation (docs/GRADING_TEN_INFLUX_2026-07-10.md):",
+    "  - two repeat-flap cards (same card graded 10 AND 7 from different shots within the hour),",
+    "  - a cased card that scored 10 through rigid plastic, and two glare-foil 10s.",
+    "  Their `expected` anchors the pre-fix over-graded value DOWN to the defensible grade."
+  ],
+  "cards": [
+    {
+      "id": "8bf5eb4c-bdf3-48d8-9e36-fb10cccf9932",
+      "label": "Eddy Pineiro Donruss (obvious horizontal crease + warp, both faces)",
+      "cardType": "sports",
+      "expected": 3,
+      "tolerance": 1,
+      "must_detect": ["crease"],
+      "note": "STRUCTURAL anchor — must be caught every run"
+    },
+    {
+      "id": "9d0596fe-e4e9-47be-be3b-377336f266f4",
+      "label": "1992-93 UD Shaq (minor corner/surface whitening; owner 8, PSA-realistic 7)",
+      "cardType": "sports",
+      "expected": 7,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "genuine-minor-wear anchor — the recall case; a Gem-10 gate change must NOT push this up"
+    },
+    {
+      "id": "b98dc05b-db1d-4432-9095-84964d07eb49",
+      "label": "1991 Fleer Michael Jordan (in-app camera, clean, well-centered)",
+      "cardType": "sports",
+      "expected": 10,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "clean-Gem control — strict gate must NOT over-demote a true unanimous 10"
+    },
+    {
+      "id": "848ddbc1-7327-47c5-96b4-ef5e5385ef4d",
+      "label": "Andre/Hogan WrestleMania III (clean, glossy black bg)",
+      "cardType": "sports",
+      "expected": 10,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "clean control; glossy-black false-scratch trap"
+    },
+    {
+      "id": "910dd3de-d62f-4996-9fd4-f338039668fd",
+      "label": "Saddam Desert Storm Pro Set (vintage, faint corner texture)",
+      "cardType": "other",
+      "expected": 9,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "vintage borderline; light-border whitening trap"
+    },
+    {
+      "id": "9e090db9-9b8e-40e9-bb80-be33bd7be82c",
+      "label": "Giratina (Pokemon) — repeat-flap: same card graded 10,10,10 and 7,7,8 within an hour (Jul 8)",
+      "cardType": "pokemon",
+      "expected": 8,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "FLAP anchor (this shot graded 7). Sibling shots 0a5dc59c/80d3fd89/149a2a7a graded 10. Expected = middle of the defensible range; a 10 on this card is over-grade"
+    },
+    {
+      "id": "8fcb030c-b068-4947-8d3e-795022839729",
+      "label": "Aaron Rodgers (Sports) — repeat-flap: graded 7 here, 10 on a re-shoot 30 min later (Jul 8)",
+      "cardType": "sports",
+      "expected": 8,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "FLAP anchor (this shot graded 7; sibling 3c617332 graded 10). A 10 is over-grade"
+    },
+    {
+      "id": "4cd40690-4c0a-4322-a700-c4349c97a86d",
+      "label": "Roberto Clemente Topps Chrome /99 — graded 10 THROUGH a rigid plastic display case (Jul 10)",
+      "cardType": "sports",
+      "expected": 9,
+      "tolerance": 0,
+      "must_detect": [],
+      "note": "CASED anchor — condition cannot be verified through the holder; Gem 10 must be withheld (fix B). Pre-fix engine gave 10/10/10/10"
+    },
+    {
+      "id": "66b6a6f8-c6d5-4353-b6b4-3de3172badb2",
+      "label": "Jasson Dominguez Bowman Chrome (heavy glare band across foil front) — unanimous 10 pre-fix",
+      "cardType": "sports",
+      "expected": 9,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "GLARE-FOIL anchor — surface/corners partially glare-obscured; a confirmed 10 is not defensible from this shot"
+    },
+    {
+      "id": "25ccdb29-64be-4c27-aed3-570646f42e6d",
+      "label": "Koby EB04-044 (One Piece manga foil) — non-unanimous 10 ([10,10,9] passes, kept 10 via escape hatch)",
+      "cardType": "onepiece",
+      "expected": 9,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "ESCAPE-HATCH anchor — strict unanimity gate (fix A) should demote this to 9"
+    }
+  ]
+}
