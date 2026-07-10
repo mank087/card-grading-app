@@ -35,7 +35,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.1';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.3';
 
 // Types matching vision_grade_v1.json schema
 export interface VisionGradeResult {
@@ -2326,30 +2326,40 @@ Provide detailed analysis as markdown with all required sections.`
         // v9.1 UNCERTAINTY GATE: never award Gem Mint on evidence the system
         // itself distrusts — a 10 at ±2 literally reads "could be an 8".
         // (Validated regrade awarded 10 (±2) on images flagged as soft.)
-        // v9.1b UNANIMITY GATE (relaxed): Gem Mint requires either all three
-        // ensemble completions at 10 OR all four consensus subgrades at 10.
-        // A 2-vs-1 split straddling the 10 line is a coin flip — repeatability
-        // testing caught the same card grading 10 ([9,10,10]) and 9 ([9,9,9])
-        // minutes apart. But when the CONSENSUS lands at 10 in every category
-        // (centering/corners/edges/surface), the evidence already meets the
-        // "Virtually Perfect" bar even if one pass final dissented — holding
-        // the 9 there punished cards the system itself scored flawless.
+        // v9.2b STRICT UNANIMITY GATE: Gem Mint requires all three ensemble
+        // completions at 10. The v9.1b `allSubgrades10` escape hatch (10 kept
+        // when the four ROUNDED subgrades hit 10 despite a dissenting pass) is
+        // REMOVED: since the final follows weakest-link, a final of 10 implies
+        // all-10 subgrades, so the hatch was open on essentially every 10 and
+        // the unanimity requirement never fired. Measured (Jul 5-10 production):
+        // 35.6% of grade-10s were non-unanimous splits ([9,10,10] etc.) that
+        // survived only through the hatch, and the 10-rate ran 47-56% vs the
+        // 24.5% baseline — the exact over-grading customers reported. A 2-vs-1
+        // split straddling the 10 line is a coin flip; it reads Mint (9).
+        // (docs/GRADING_TEN_INFLUX_2026-07-10.md)
+        // v9.2b CASE GATE: a card inspected through a rigid holder (top loader /
+        // semi-rigid / slab, or any case the model says has moderate+ impact)
+        // cannot be CONFIRMED flawless — production gave 10/10/10/10 to a card
+        // in a magnetic one-touch whose own case_detection said "moderate impact,
+        // limits surface inspection". 26% of recent 10s sat in a detected case.
         let gradeCapNote: string | null = null;
         const unanimous10 = Math.min(f1, f2, f3) >= 10;
-        const allSubgrades10 =
-          serverRounded.centering === 10 &&
-          serverRounded.corners === 10 &&
-          serverRounded.edges === 10 &&
-          serverRounded.surface === 10;
-        if (finalGrade === 10 && (uncertaintyValue >= 2 || (!unanimous10 && !allSubgrades10))) {
+        const caseInfo = jsonData.case_detection || {};
+        const rigidCase =
+          ['top_loader', 'semi_rigid', 'slab'].includes(caseInfo.case_type) ||
+          ['moderate', 'high'].includes(caseInfo.impact_level);
+        if (finalGrade === 10 && (uncertaintyValue >= 2 || rigidCase || !unanimous10)) {
           finalGrade = 9;
           threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
           if (uncertaintyValue >= 2) {
             gradeCapNote = `The card presents at Gem Mint level, but image quality (±${uncertaintyValue}) is insufficient to confirm a 10 — grade held at 9.`;
             console.log(`[GRADE RECALC] ⚖️ uncertainty gate: 10 → 9 (uncertainty ±${uncertaintyValue})`);
+          } else if (rigidCase) {
+            gradeCapNote = `The card presents at Gem Mint level, but it was photographed inside a rigid holder (${caseInfo.case_type || 'case'}), which prevents a fully verified surface and edge inspection — grade held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
+            console.log(`[GRADE RECALC] ⚖️ case gate: 10 → 9 (case_type=${caseInfo.case_type}, impact=${caseInfo.impact_level})`);
           } else {
-            gradeCapNote = `The card presents at Gem Mint level, but the independent evaluations were not unanimous (${f1}/${f2}/${f3}) and the consensus subgrades were not all 10 — grade held at 9.`;
-            console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3}, subgrades not all 10)`);
+            gradeCapNote = `The card presents at Gem Mint level, but the independent evaluations were not unanimous (${f1}/${f2}/${f3}) — Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
+            console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3})`);
           }
         }
 
