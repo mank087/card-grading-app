@@ -50,6 +50,8 @@ export function humanizeZoomRegion(regionId: string): string {
     'SUR-Q2': 'upper-right area of the surface',
     'SUR-Q3': 'lower-left area of the surface',
     'SUR-Q4': 'lower-right area of the surface',
+    'SUR-HB': 'horizontal center band of the surface',
+    'SUR-VB': 'vertical center band of the surface',
   };
   return map[part] || part.toLowerCase().replace(/-/g, ' ');
 }
@@ -196,11 +198,94 @@ const SEVERITY_CAP: Record<string, number> = { minor: 9, moderate: 8, heavy: 6 }
 const STRUCTURAL_TYPES = new Set(['crease', 'bend', 'fold', 'warp', 'tear']);
 const MAX_REGION_EDGE = 1024; // downscale cap per crop (no enlargement — upscaling adds no information)
 
-async function cropFace(imageBuf: Buffer, face: 'front' | 'back'): Promise<RegionSpec[]> {
+type Pt = { x: number; y: number };
+type Quad = [Pt, Pt, Pt, Pt]; // [TL, TR, BR, BL] in pixel space
+type BoxDef = { id: string; category: RegionSpec['category']; label: string; left: number; top: number; width: number; height: number };
+
+// v9.4.1 (ported from grading-v9.2-joey-fixes 89256fe): crop boxes placed on the
+// DETECTED card quad instead of the image corners — so the grader inspects the actual
+// card corners/edges, not the desk margin around a card that doesn't fill the frame.
+// Boxes are axis-aligned (robust for the typical mild-tilt phone photo); centering
+// each box on the real corner is the key win even under some perspective.
+function cardRelativeBoxes(P: string, face: 'front' | 'back', quad: Quad, w: number, h: number): BoxDef[] {
+  const [tl, tr, br, bl] = quad;
+  const cx = (tl.x + tr.x + br.x + bl.x) / 4;
+  const cy = (tl.y + tr.y + br.y + bl.y) / 4;
+  const dist = (a: Pt, b: Pt) => Math.hypot(a.x - b.x, a.y - b.y);
+  const cardW = (dist(tl, tr) + dist(bl, br)) / 2;
+  const cardH = (dist(tl, bl) + dist(tr, br)) / 2;
+  const cw = Math.max(24, Math.round(cardW * 0.30));
+  const ch = Math.max(24, Math.round(cardH * 0.30));
+  const es = Math.max(16, Math.round(Math.min(cardW, cardH) * 0.14));
+  const clampBox = (left: number, top: number, bw: number, bh: number) => {
+    left = Math.max(0, Math.min(left, w - 8));
+    top = Math.max(0, Math.min(top, h - 8));
+    bw = Math.max(8, Math.min(bw, w - left));
+    bh = Math.max(8, Math.min(bh, h - top));
+    return { left: Math.round(left), top: Math.round(top), width: Math.round(bw), height: Math.round(bh) };
+  };
+  const cornerBox = (c: Pt) => clampBox(c.x + (cx - c.x) * 0.28 - cw / 2, c.y + (cy - c.y) * 0.28 - ch / 2, cw, ch);
+  const edgeBox = (a: Pt, b: Pt, horizontal: boolean) => {
+    const mx = (a.x + b.x) / 2 + (cx - (a.x + b.x) / 2) * 0.10;
+    const my = (a.y + b.y) / 2 + (cy - (a.y + b.y) / 2) * 0.10;
+    const len = dist(a, b) * 0.9;
+    return horizontal ? clampBox(mx - len / 2, my - es / 2, len, es) : clampBox(mx - es / 2, my - len / 2, es, len);
+  };
+  const minx = Math.min(tl.x, tr.x, br.x, bl.x), maxx = Math.max(tl.x, tr.x, br.x, bl.x);
+  const miny = Math.min(tl.y, tr.y, br.y, bl.y), maxy = Math.max(tl.y, tr.y, br.y, bl.y);
+  const surfBox = (l: number, t: number, r: number, bt: number) => clampBox(l, t, r - l, bt - t);
+  return [
+    { id: `${P}-COR-TL`, category: 'corners', label: `${face} top-left corner`, ...cornerBox(tl) },
+    { id: `${P}-COR-TR`, category: 'corners', label: `${face} top-right corner`, ...cornerBox(tr) },
+    { id: `${P}-COR-BL`, category: 'corners', label: `${face} bottom-left corner`, ...cornerBox(bl) },
+    { id: `${P}-COR-BR`, category: 'corners', label: `${face} bottom-right corner`, ...cornerBox(br) },
+    { id: `${P}-EDG-T`, category: 'edges', label: `${face} top edge strip`, ...edgeBox(tl, tr, true) },
+    { id: `${P}-EDG-B`, category: 'edges', label: `${face} bottom edge strip`, ...edgeBox(bl, br, true) },
+    { id: `${P}-EDG-L`, category: 'edges', label: `${face} left edge strip`, ...edgeBox(tl, bl, false) },
+    { id: `${P}-EDG-R`, category: 'edges', label: `${face} right edge strip`, ...edgeBox(tr, br, false) },
+    { id: `${P}-SUR-Q1`, category: 'surface', label: `${face} surface upper-left quadrant`, ...surfBox(minx, miny, cx, cy) },
+    { id: `${P}-SUR-Q2`, category: 'surface', label: `${face} surface upper-right quadrant`, ...surfBox(cx, miny, maxx, cy) },
+    { id: `${P}-SUR-Q3`, category: 'surface', label: `${face} surface lower-left quadrant`, ...surfBox(minx, cy, cx, maxy) },
+    { id: `${P}-SUR-Q4`, category: 'surface', label: `${face} surface lower-right quadrant`, ...surfBox(cx, cy, maxx, maxy) },
+    // Center bands span the card through the middle so a crease/bend crossing the center
+    // is seen WHOLE (a mid-card crease sits on the quadrant boundary and gets clipped).
+    { id: `${P}-SUR-HB`, category: 'surface', label: `${face} full-width horizontal center band (check for a crease/bend line crossing the card)`, ...surfBox(minx, cy - (maxy - miny) * 0.18, maxx, cy + (maxy - miny) * 0.18) },
+    { id: `${P}-SUR-VB`, category: 'surface', label: `${face} full-height vertical center band (check for a crease/bend line crossing the card)`, ...surfBox(cx - (maxx - minx) * 0.18, miny, cx + (maxx - minx) * 0.18, maxy) },
+  ];
+}
+
+/** Shoelace-area sanity check for a detected quad (normalized 0-1000 space). */
+function quadPlausible(quadNorm: Pt[] | undefined, minFrac = 0.10, maxFrac = 0.95): quadNorm is Pt[] {
+  if (!Array.isArray(quadNorm) || quadNorm.length !== 4) return false;
+  if (!quadNorm.every(p => Number.isFinite(p?.x) && Number.isFinite(p?.y) && p.x >= 0 && p.x <= 1000 && p.y >= 0 && p.y <= 1000)) return false;
+  const q = quadNorm;
+  const area = Math.abs((q[0].x * (q[1].y - q[3].y) + q[1].x * (q[2].y - q[0].y) + q[2].x * (q[3].y - q[1].y) + q[3].x * (q[0].y - q[2].y)) / 2);
+  const frac = area / (1000 * 1000);
+  return frac >= minFrac && frac <= maxFrac;
+}
+
+async function cropFace(imageBuf: Buffer, face: 'front' | 'back', quadNorm?: Pt[]): Promise<RegionSpec[]> {
   const img = sharp(imageBuf, { failOn: 'none' });
   const meta = await img.metadata();
   const w = meta.width!, h = meta.height!;
   const P = face === 'front' ? 'F' : 'B';
+
+  // Card-relative crops when a plausible quad was detected (margin photos).
+  if (quadPlausible(quadNorm)) {
+    const q = quadNorm.map(p => ({ x: (p.x / 1000) * w, y: (p.y / 1000) * h })) as Quad;
+    const defs = cardRelativeBoxes(P, face, q, w, h);
+    console.log(`[ZOOM] ${face}: card-relative crops from detected quad`);
+    const regions: RegionSpec[] = [];
+    for (const d of defs) {
+      const buf = await sharp(imageBuf, { failOn: 'none' })
+        .extract({ left: d.left, top: d.top, width: d.width, height: d.height })
+        .resize(MAX_REGION_EDGE, MAX_REGION_EDGE, { fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 90 })
+        .toBuffer();
+      regions.push({ id: d.id, face, category: d.category, label: d.label, buf });
+    }
+    return regions;
+  }
 
   const cw = Math.round(w * 0.26), ch = Math.round(h * 0.26); // corner boxes
   const es = Math.round(Math.min(w, h) * 0.12);               // edge strip thickness
@@ -284,7 +369,12 @@ NOT defects (do NOT report): holographic sparkle/patterns, printed design lines 
 IMPORTANT context: crops from the SAME card — a straight uniform line at the outermost boundary is the card's cut edge, not damage. White showing AT the cut line on a dark border IS whitening.
 
 Reply ONLY with JSON:
-{"regions":[{"id":"<region id>","clean":true|false,"defects":[{"type":"whitening|chip|nick|softening|scratch|scuff|dent|stain|print_line|crease|bend|warp","severity":"minor|moderate|heavy","description":"<one concise sentence, location within the region>"}]}]}
+{"regions":[{"id":"<region id>","card_area":"most|some|none","clean":true|false,"defects":[{"type":"whitening|chip|nick|softening|scratch|scuff|dent|stain|print_line|crease|bend|warp","severity":"minor|moderate|heavy","description":"<one concise sentence, location within the region>"}]}]}
+card_area is MANDATORY for every region and is decided FIRST, before looking for defects:
+- "most": the card (or its border/edge) fills most of this crop
+- "some": the crop is mostly the background surface, with only a small part of the card visible
+- "none": no card material in this crop at all
+When card_area is "some" or "none", the crop is dominated by the surface the card is lying on — fabric weave, leather grain, desk texture. Fibers, specks and shadows there belong to the BACKGROUND, not the card. Only report a defect from such a crop if it is unmistakably ON the card portion.
 Every region id you were given MUST appear exactly once.`;
 
 export async function runZoomInspection(
@@ -301,8 +391,78 @@ export async function runZoomInspection(
       backRes.arrayBuffer().then(b => Buffer.from(b)),
     ]);
 
-    const regions = [...await cropFace(frontBuf, 'front'), ...await cropFace(backBuf, 'back')];
+    // v9.4.1 KILL SWITCH: set ZOOM_DISABLED=1 (Vercel env) to skip the regioned zoom
+    // entirely — grading falls back to the holistic ensemble, and the fallback is
+    // persisted in consensus_notes so affected grades are identifiable in the DB.
+    if (process.env.ZOOM_DISABLED === '1') {
+      console.log('[ZOOM] disabled via ZOOM_DISABLED env — skipping regioned inspection');
+      return { ...empty, error: 'disabled via ZOOM_DISABLED env' };
+    }
 
+    // v9.4.1 FRAME-FILL GATE (decisive fix for background false positives):
+    // image-relative crops are only trustworthy when the card nearly fills the frame.
+    // Production FPs (2026-07-12, multiple customers): cards photographed small on
+    // light fabric — edge/corner crops were pure cloth, and a crumb on the tablecloth
+    // graded as a "moderate stain". Per-crop card-vs-background classification cannot
+    // work (a white border on white cloth is undecidable in an isolated strip) and
+    // sharp-trim fails on textured surfaces — but the FULL image shows the card
+    // boundary unambiguously. One tiny detail:'low' call (~85 tok/image, temp 0)
+    // measures frame fill; small-card photos skip the zoom with a persisted reason.
+    // Proper card-quad geometry (grading-v9.2-joey-fixes port) supersedes this later.
+    // v9.4.1 GEOMETRY GATE: one small call on the FULL images (where the card boundary
+    // is unambiguous) returns frame-fill percentage AND the card's corner quad.
+    //  - fill ≥ MIN_FILL: blind edge-hugging crops (proven path — image edges ARE the
+    //    card's cut edges; card-relative boxes shifted inward would MISS edge whitening).
+    //  - fill < MIN_FILL + plausible quad: CARD-RELATIVE crops centered on the real
+    //    corners/edges (ported from grading-v9.2-joey-fixes) — margin photos get a real
+    //    magnified inspection instead of grading the tablecloth.
+    //  - fill < MIN_FILL + no plausible quad: skip zoom with a persisted reason.
+    // detail:'high' on the gate images (~1.1K tok each): corner coordinates need more
+    // precision than the 512px 'low' thumbnail provides.
+    const openaiGate = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const MIN_FILL_PERCENT = 68;
+    const geometry: { front?: Pt[]; back?: Pt[] } = {};
+    try {
+      const fillRes = await openaiGate.chat.completions.create({
+        model: options?.model || 'gpt-5.1',
+        temperature: 0,
+        max_completion_tokens: 400,
+        response_format: { type: 'json_object' },
+        messages: [
+          {
+            role: 'system', content: 'You locate a trading card in each photo. Reply ONLY with JSON:\n' +
+              '{"front_fill_percent": <0-100>, "front_corners": [{"x":<0-1000>,"y":<0-1000>} x4], "back_fill_percent": <0-100>, "back_corners": [{"x":<0-1000>,"y":<0-1000>} x4]}\n' +
+              'fill_percent = share of the image area covered by the card itself (not sleeve/holder/background).\n' +
+              'corners = the card\'s four outer corners in NORMALIZED coordinates (x: 0=left edge of image, 1000=right; y: 0=top, 1000=bottom), ordered [top-left, top-right, bottom-right, bottom-left]. Locate them precisely at the card\'s printed corner tips.'
+          },
+          {
+            role: 'user', content: [
+              { type: 'text', text: 'Photo 1 (front):' },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${frontBuf.toString('base64')}`, detail: 'high' } },
+              { type: 'text', text: 'Photo 2 (back):' },
+              { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${backBuf.toString('base64')}`, detail: 'high' } },
+            ] as any,
+          },
+        ],
+      }, { timeout: 45_000 });
+      const fill = JSON.parse(fillRes.choices[0]?.message?.content || '{}');
+      const worst = Math.min(Number(fill.front_fill_percent ?? 100), Number(fill.back_fill_percent ?? 100));
+      console.log(`[ZOOM] frame-fill: front ${fill.front_fill_percent}% / back ${fill.back_fill_percent}%`);
+      if (Number.isFinite(worst) && worst < MIN_FILL_PERCENT) {
+        if (quadPlausible(fill.front_corners) && quadPlausible(fill.back_corners)) {
+          geometry.front = fill.front_corners;
+          geometry.back = fill.back_corners;
+          console.log(`[ZOOM] card fills ~${worst}% of frame — using CARD-RELATIVE crops from detected corner quads`);
+        } else {
+          console.log(`[ZOOM] card fills only ~${worst}% of frame and no plausible corner quad detected — skipping regioned inspection`);
+          return { ...empty, error: `card fills only ~${worst}% of the frame and its corners could not be located — magnified inspection needs the card closer to the camera` };
+        }
+      }
+    } catch (e: any) {
+      console.warn(`[ZOOM] geometry gate errored (${e.message}) — proceeding with blind crops as before`);
+    }
+
+    const regions = [...await cropFace(frontBuf, 'front', geometry.front), ...await cropFace(backBuf, 'back', geometry.back)];
 
     // v9.3 BATCH-SIZE FIX: sending all crops in ONE call collapsed per-region attention.
     // Measured (Xerosic, 2026-07-10, plainly visible dark-border corner whitening):
@@ -367,11 +527,36 @@ export async function runZoomInspection(
 
     // Tally votes per (region, defect type) across the independent zoom samples
     const SEV_ORDER: Record<string, number> = { minor: 0, moderate: 1, heavy: 2 };
+    // v9.4.1: per-region card_area votes. Image-relative crops on wide-margin photos are
+    // mostly the BACKGROUND surface; production FPs (2026-07-12) showed fabric weave read
+    // as "fiber whitening" and cloth shadows as "corner softening". Each sample now
+    // classifies card-vs-background per crop FIRST; a region whose majority verdict is
+    // "some"/"none" card contributes NO cosmetic findings (structural still counts —
+    // creases are card-scale and confirmed separately by verifyStructuralClaim).
+    const cardAreaVotes = new Map<string, { most: number; total: number }>();
+    for (const sample of samples) {
+      for (const reg of sample.regions ?? []) {
+        if (!regionById.has(reg.id)) continue;
+        const v = cardAreaVotes.get(reg.id) ?? { most: 0, total: 0 };
+        v.total++;
+        if (String(reg.card_area || 'most').toLowerCase() === 'most') v.most++; // missing field → legacy behavior
+        cardAreaVotes.set(reg.id, v);
+      }
+    }
+    const regionIsCard = (id: string) => {
+      const v = cardAreaVotes.get(id);
+      return !v || v.total === 0 || v.most * 2 >= v.total; // majority "most" (ties → card)
+    };
     const votes = new Map<string, { spec: RegionSpec; type: string; severities: string[]; description: string }>();
+    let backgroundSuppressed = 0;
     for (const sample of samples) {
       for (const reg of sample.regions ?? []) {
         const spec = regionById.get(reg.id);
         if (!spec || reg.clean === true || !Array.isArray(reg.defects)) continue;
+        if (!regionIsCard(reg.id) && !(reg.defects || []).some((d: any) => STRUCTURAL_TYPES.has(String(d?.type || '').toLowerCase()))) {
+          backgroundSuppressed++;
+          continue;
+        }
         const seenThisSample = new Set<string>();
         for (const d of reg.defects) {
           if (!d?.type || !d?.severity) continue;
@@ -405,6 +590,10 @@ export async function runZoomInspection(
     }
     if (minorityDropped > 0) {
       console.log(`[ZOOM] majority vote: ${minorityDropped} single-sample finding(s) dropped (needed ${voteThreshold}/${samples.length} votes)`);
+    }
+    if (backgroundSuppressed > 0) {
+      const bgRegions = [...cardAreaVotes.entries()].filter(([id]) => !regionIsCard(id)).map(([id]) => id);
+      console.log(`[ZOOM] background gate: ${backgroundSuppressed} cosmetic finding(s) suppressed from ${bgRegions.length} background-dominated region(s): ${bgRegions.join(', ')}`);
     }
 
     // Deterministic face caps from the ladders (v9.3 recalibrated for overlapping crops).
