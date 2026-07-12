@@ -2389,13 +2389,13 @@ Provide detailed analysis as markdown with all required sections.`
           finalGrade = 9;
           threePassData.averaged_rounded = { ...serverRounded, final: finalGrade };
           if (uncertaintyValue >= 2) {
-            gradeCapNote = `The card presents at Gem Mint level, but image quality (±${uncertaintyValue}) is insufficient to confirm a 10 — grade held at 9.`;
+            gradeCapNote = `The card presents at Gem Mint level, but the photos are not clear enough to confirm a 10 - the grade is held at 9.`;
             console.log(`[GRADE RECALC] ⚖️ uncertainty gate: 10 → 9 (uncertainty ±${uncertaintyValue})`);
           } else if (rigidCase) {
-            gradeCapNote = `The card presents at Gem Mint level, but it was photographed inside a rigid holder (${caseInfo.case_type || 'case'}), which prevents a fully verified surface and edge inspection — grade held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
+            gradeCapNote = `The card presents at Gem Mint level, but it was photographed inside a rigid holder, which prevents a fully verified surface and edge inspection - the grade is held at 9. For Gem Mint consideration, re-submit with the card photographed outside the holder.`;
             console.log(`[GRADE RECALC] ⚖️ case gate: 10 → 9 (case_type=${caseInfo.case_type}, impact=${caseInfo.impact_level})`);
           } else {
-            gradeCapNote = `The card presents at Gem Mint level, but the independent evaluations were not unanimous (${f1}/${f2}/${f3}) — Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
+            gradeCapNote = `The card presents at Gem Mint level, but not every independent evaluation confirmed a perfect 10 - Gem Mint requires unanimous confirmation, so the grade is held at 9.`;
             console.log(`[GRADE RECALC] ⚖️ unanimity gate: 10 → 9 (pass finals ${f1}/${f2}/${f3})`);
           }
         }

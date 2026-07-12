@@ -106,72 +106,121 @@ function joinList(items: string[]): string {
   return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
 }
 
+/** Plain-language opener for each grade tier — collector language, no mechanics. */
+function tierOpener(finalGrade: number): string {
+  if (finalGrade >= 10) return 'A virtually flawless card in these photos - sharp corners, clean edges, and a pristine surface throughout.';
+  if (finalGrade >= 9) return 'An outstanding card, just shy of perfect.';
+  if (finalGrade >= 8) return 'A strong, well-kept card with only light signs of handling.';
+  if (finalGrade >= 7) return 'A solid card showing light wear.';
+  if (finalGrade >= 5) return 'A moderately worn card with visible handling.';
+  if (finalGrade >= 3) return 'A heavily worn card with significant condition issues.';
+  return 'A damaged card with major condition issues.';
+}
+
+/** Strip severity jargon down to friendly wording and drop trailing "(front)" markers
+ *  into prose ("on the front"). Input phrases come from defectPhrase(). */
+function friendlyDefect(phrase: string): string {
+  return phrase
+    .replace(/\s*\((front|back)\)\s*$/i, (_, f) => ` on the ${f.toLowerCase()}`)
+    .replace(/\bminor\b/gi, 'light')
+    .replace(/\bmoderate\b/gi, 'noticeable')
+    .replace(/\bheavy\b/gi, 'heavy');
+}
+
+// Keep the generated text ASCII-friendly: the mini-report JPG renderer strips
+// non-ASCII characters, which used to cut em-dashes and "±" out mid-sentence.
+
 /**
  * Build the authoritative final summary from post-cap numbers + findings.
  * Every number in this text is, by construction, the number the page displays.
+ *
+ * v9.5 rewrite — human-readable and short. Design constraints:
+ *  - The tightest display surfaces (foldable PDF + mini-report JPG) truncate at
+ *    ~8 wrapped lines ≈ 450-480 chars; target <= ~420 chars so nothing clips.
+ *  - Subgrade NUMBERS are rendered as tiles/boxes right next to this text on
+ *    every surface — do not repeat them here.
+ *  - No internal mechanics language ("consensus", "weakest-link", "regioned
+ *    zoom") — zoom-found defects already live in the section defect arrays and
+ *    surface through the limiting-factor sentence.
+ *  - The canonical tail "Final grade: N (Label)." is load-bearing for parsers
+ *    and display checks — keep its exact form.
  */
 export function buildFinalSummary(input: NarratorInput): string {
   const { finalGrade, conditionLabel, subgrades, jsonData } = input;
   const parts: string[] = [];
 
-  // Structural damage dominates everything (v9.0 behavior, now part of the narrator)
   if (input.structuralDetected) {
+    // Structural damage dominates everything (v9.0 behavior)
     const findings = input.structuralFindings.length > 0
       ? input.structuralFindings
       : [{ type: 'structural damage', location: '', description: '' }];
-    const listed = findings.slice(0, 3)
-      .map((f, i) => `(${i + 1}) ${f.type || 'structural damage'}${f.location ? ` at the ${f.location}` : ''}`)
-      .join('; ');
-    const more = findings.length > 3 ? `; plus ${findings.length - 3} additional finding(s)` : '';
+    const listed = findings.slice(0, 2)
+      .map(f => `a ${f.type || 'structural issue'}${f.location ? ` (${humanizeLocationText(f.location)})` : ''}`)
+      .join(' and ');
     parts.push(
-      `Structural damage dominates this card's grade: ${listed}${more}.`,
-      `A confirmed crease or bend enforces a hard grade cap regardless of how well the card otherwise presents.`
+      `This card has structural damage - ${listed} - which caps the grade no matter how well the rest of the card presents.`
     );
   } else {
-    parts.push(`This card grades ${finalGrade} (${conditionLabel}).`);
+    parts.push(tierOpener(finalGrade));
 
-    // Consensus subgrades — the authoritative numbers, stated in the text itself
-    parts.push(
-      `Consensus subgrades — centering ${subgrades.centering}, corners ${subgrades.corners}, edges ${subgrades.edges}, surface ${subgrades.surface}.`
-    );
-
-    // Limiting factor(s): every category at the weakest-link value
+    // What holds the grade back, in plain words. Only called out when a category
+    // sits at 8 or below — a 9 is not a flaw worth narrating (the tier opener and
+    // any cap note already tell that story).
     const weakest = Math.min(...CATEGORIES.map(c => subgrades[c]));
-    if (weakest < 10) {
+    if (weakest <= 8) {
       const limiting = CATEGORIES.filter(c => subgrades[c] === weakest);
       const highlight = worstDefectForCategory(jsonData, limiting[0]);
-      parts.push(
-        `The grade is limited by ${joinList(limiting.map(c => CATEGORY_LABELS[c]))} at ${weakest}/10${highlight ? ` — most notable: ${highlight}` : ''}.`
-      );
+      if (highlight) {
+        parts.push(`The grade comes down to the ${joinList(limiting.map(c => CATEGORY_LABELS[c]))}: ${friendlyDefect(highlight)}.`);
+      } else if (limiting.includes('centering')) {
+        parts.push(`The grade comes down to centering - the borders are visibly uneven.`);
+      } else {
+        parts.push(`The grade comes down to the ${joinList(limiting.map(c => CATEGORY_LABELS[c]))}.`);
+      }
+
+      // What's still good about the card
+      const strong = CATEGORIES.filter(c => subgrades[c] >= 9);
+      if (strong.length > 0 && weakest < 9) {
+        parts.push(`The ${joinList(strong.map(c => CATEGORY_LABELS[c]))} ${strong.length === 1 ? 'is' : 'are'} otherwise excellent.`);
+      }
     }
 
-    // Server-side grade cap (e.g. uncertainty gate)
+    // Server-side grade cap (already written in customer language, e.g. the
+    // rigid-holder note or the Gem-Mint unanimity note)
     if (input.gradeCapNote) {
       parts.push(input.gradeCapNote);
     }
-
-    // Zoom inspection contribution (deterministic, from the cap notes)
-    if (input.zoomAdjustments.length > 0) {
-      parts.push(`Regioned zoom inspection confirmed additional defects (${input.zoomAdjustments.slice(0, 3).join('; ')}).`);
-    }
-
-    // Strengths: categories presenting at 9+
-    const strong = CATEGORIES.filter(c => subgrades[c] >= 9);
-    if (strong.length > 0 && weakest < 9) {
-      parts.push(`${joinList(strong.map(c => CATEGORY_LABELS[c].charAt(0).toUpperCase() + CATEGORY_LABELS[c].slice(1)))} otherwise present${strong.length === 1 ? 's' : ''} strongly at ${strong.map(c => subgrades[c]).sort()[0]}+.`);
-    }
   }
 
-  // Confidence caveat for wide uncertainty
+  // Confidence caveat for wide uncertainty (ASCII-safe: no "±")
   const uncertaintyN = parseInt(input.uncertainty.replace(/[^\d]/g, ''), 10) || 0;
   if (uncertaintyN >= 2) {
-    parts.push(`Image quality limits confidence in this evaluation (${input.uncertainty}).`);
+    parts.push(`Photo quality limits how confidently this card can be assessed.`);
   }
 
   // Canonical tail — display surfaces and legacy parsers rely on this exact form
-  parts.push(`Final grade: ${finalGrade} (${conditionLabel}).`);
+  const tail = `Final grade: ${finalGrade} (${conditionLabel}).`;
 
-  return parts.join(' ');
+  // Length budget: drop the least essential sentences until the text fits the
+  // tightest surface (~420 chars including the tail), rather than letting the
+  // PDF/JPG renderers clip mid-sentence.
+  const BUDGET = 420;
+  let body = parts.join(' ');
+  const optionalDropOrder = [
+    /\s*The (?:centering|corners|edges|surface)(?:, | and |[a-z ,]*)* (?:is|are) otherwise excellent\./, // strengths first
+    /\s*Photo quality limits how confidently this card can be assessed\./,
+  ];
+  for (const rx of optionalDropOrder) {
+    if (body.length + 1 + tail.length <= BUDGET) break;
+    body = body.replace(rx, '');
+  }
+  if (body.length + 1 + tail.length > BUDGET) {
+    // Last resort: hard-trim at a sentence boundary
+    const cut = body.slice(0, BUDGET - tail.length - 1);
+    body = cut.slice(0, Math.max(cut.lastIndexOf('. ') + 1, 80)).trim();
+  }
+
+  return `${body} ${tail}`.replace(/\s+/g, ' ').trim();
 }
 
 /**
