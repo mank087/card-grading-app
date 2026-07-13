@@ -3507,7 +3507,7 @@ CENTERING QUALITY TERMINOLOGY (MANDATORY - NO EXCEPTIONS)
 • quality_tier field MUST match first word of analysis sentence
 • Score MUST match quality tier (no exceptions)
 • Specify BOTH axis ratios, state limiting axis
-• Analysis: 2-3 sentences MAX, start with tier name
+• Analysis: 1-2 sentences MAX, start with tier name
 ---
 REQUIRED OUTPUT FORMAT
 ---
@@ -3959,22 +3959,14 @@ END LOOP
 ---
 UNIQUE ANALYSIS REQUIREMENT
 ---
-**AVOID:** Repetitive patterns, copy-paste descriptions, assumed colors
-**REQUIRE:** Actual observable colors, unique structure per corner, specific card features
-**CHECK:** Each corner description uses different wording, references actual design elements
-
-**REQUIREMENTS:**
-• State ACTUAL colors you observe at each corner (not generic "dark border")
-• Reference SPECIFIC nearby design elements (player image, text, logos)
-• Create UNIQUE descriptions for each corner (no repeated sentence patterns)
-• Explain assessment methodology (how you determined condition)
-• Vary description language (8 corners = 8 different descriptions)
+**AVOID:** Verbatim copy-paste between areas, assumed colors, invented differences between areas that look the same, filler prose
+**REQUIRE:** ONE concise sentence per corner/edge stating its actual observed condition (the real border color and any defect with its location); corners that genuinely look identical MAY be described similarly
 
 **Example (GOOD):**
-"Top-left corner sits against a solid navy blue border. The corner maintains sharp geometry with no visible fiber exposure at the available image resolution. The point structure is well-defined, and the corner lies completely flat against the card surface. No whitening or wear detected."
+"Sharp against the navy border with no whitening or fiber exposure visible."
 
-**Example (BAD - Too Generic):**
-"Top-left corner: Sharp, no fiber, 10"
+**Example (BAD - filler):**
+"Top-left corner sits against a solid navy blue border. The corner maintains sharp geometry with no visible fiber exposure at the available image resolution. The point structure is well-defined, and the corner lies completely flat against the card surface. No whitening or wear detected."
 ---
 REQUIRED OUTPUT FORMAT
 ---
@@ -3982,7 +3974,7 @@ REQUIRED OUTPUT FORMAT
   "corners": {
     "front": {
       "top_left": {
-        "condition": "2-3 SENTENCES MAXIMUM describing THIS specific corner with actual colors and nearby design elements",
+        "condition": "ONE concise sentence: this corner's observed condition (actual border color + any defect and its location)",
         "defects": [
           {
             "type": "fiber_exposure" | "rounding" | "lift_tilt" | "bend",
@@ -4223,7 +4215,7 @@ REQUIRED OUTPUT FORMAT
   "edges": {
     "front": {
       "top": {
-        "condition": "2-3 SENTENCES MAXIMUM - (1) Describe what you observe on THIS SPECIFIC edge mentioning ACTUAL colors/design elements visible along it, (2) Explain how THIS edge's characteristics affect visibility and assessment",
+        "condition": "ONE concise sentence: this edge's observed condition (actual color + any defect and its location)",
         "defects": [
           {
             "type": "whitening" | "chipping" | "roughness" | "fuzzing" | "print_line",
@@ -4524,7 +4516,7 @@ REQUIRED OUTPUT FORMAT
   "surface": {
     "front": {
       "finish_type": "glossy" | "matte" | "chrome" | "refractor" | "holographic" | "standard",
-      "condition": "2-3 SENTENCES MAXIMUM - (1) Describe THIS card's surface with actual finish characteristics and colors, (2) Note any defects observed or confirm pristine condition with specifics",
+      "condition": "1-2 concise sentences: this surface's finish and observed condition; every defect listed with its location, or a specific confirmation it is clean",
       "defects": [
         {
           "type": "scratch" | "white_dot" | "print_line" | "indentation" | "stain" | "holo_disruption",
@@ -5183,7 +5175,7 @@ Before returning JSON output, verify:
 □ Final grade ≤ any caps
 
 **Narrative Quality Checks:**
-□ Minimum sentence requirements met (2-3 sentences per section)
+□ Descriptions concise (one sentence per corner/edge; no filler prose)
 □ Unique descriptions (no repetition)
 □ Actual colors stated (not assumed)
 □ Specific features referenced

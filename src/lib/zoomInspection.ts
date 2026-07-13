@@ -368,14 +368,16 @@ BACKGROUND CHECK FIRST (photos with wide margins): each crop may contain mostly 
 NOT defects (do NOT report): holographic sparkle/patterns, printed design lines and textures, the card's border color itself, image compression noise, glare/reflection bands that have soft gradual edges, background surfaces outside the card and anything ON them, sleeve/holder edges.
 IMPORTANT context: crops from the SAME card — a straight uniform line at the outermost boundary is the card's cut edge, not damage. White showing AT the cut line on a dark border IS whitening.
 
-Reply ONLY with JSON:
-{"regions":[{"id":"<region id>","card_area":"most|some|none","clean":true|false,"defects":[{"type":"whitening|chip|nick|softening|scratch|scuff|dent|stain|print_line|crease|bend|warp","severity":"minor|moderate|heavy","description":"<one concise sentence, location within the region>"}]}]}
-card_area is MANDATORY for every region and is decided FIRST, before looking for defects:
+Reply ONLY with JSON (compact — clean regions are listed by id only):
+{"clean":["<region id>", ...],"findings":[{"id":"<region id>","card_area":"most|some|none","defects":[{"type":"whitening|chip|nick|softening|scratch|scuff|dent|stain|print_line|crease|bend|warp","severity":"minor|moderate|heavy","description":"<one concise sentence, location within the region>"}]}]}
+- "clean": every region with NO defects — just its id, nothing else.
+- "findings": ONLY regions with at least one defect, with full detail.
+- Every region id you were given MUST appear in exactly one of the two lists.
+card_area is decided FIRST for each findings entry, before its defects:
 - "most": the card (or its border/edge) fills most of this crop
 - "some": the crop is mostly the background surface, with only a small part of the card visible
 - "none": no card material in this crop at all
-When card_area is "some" or "none", the crop is dominated by the surface the card is lying on — fabric weave, leather grain, desk texture. Fibers, specks and shadows there belong to the BACKGROUND, not the card. Only report a defect from such a crop if it is unmistakably ON the card portion.
-Every region id you were given MUST appear exactly once.`;
+When card_area is "some" or "none", the crop is dominated by the surface the card is lying on — fabric weave, leather grain, desk texture. Fibers, specks and shadows there belong to the BACKGROUND, not the card. Only report a defect from such a crop if it is unmistakably ON the card portion.`;
 
 export async function runZoomInspection(
   frontImageUrl: string,
@@ -509,8 +511,23 @@ export async function runZoomInspection(
       }, { timeout: 90_000 });
       const batchSamples: any[] = [];
       for (const choice of response.choices) {
-        try { if (choice?.message?.content) batchSamples.push(JSON.parse(choice.message.content)); }
-        catch { /* discard unparseable zoom sample */ }
+        try {
+          if (!choice?.message?.content) continue;
+          const raw = JSON.parse(choice.message.content);
+          // v9.5 compact format: {"clean":[ids], "findings":[{id, card_area, defects}]}.
+          // Normalize to the internal per-region list; tolerate the legacy
+          // {"regions":[...]} shape so a format-drifting sample still parses.
+          let normalized: any[];
+          if (Array.isArray(raw.findings) || Array.isArray(raw.clean)) {
+            normalized = (raw.findings ?? []).map((f: any) => ({ id: f.id, card_area: f.card_area, clean: false, defects: f.defects }));
+            const accounted = new Set([...(raw.clean ?? []), ...normalized.map((f: any) => f.id)]);
+            const missing = batch.filter(r => !accounted.has(r.id)).length;
+            if (missing > 0) console.warn(`[ZOOM] sample omitted ${missing}/${batch.length} region id(s) — treating omissions as clean`);
+          } else {
+            normalized = raw.regions ?? [];
+          }
+          batchSamples.push({ regions: normalized });
+        } catch { /* discard unparseable zoom sample */ }
       }
       const u: any = (response as any).usage;
       return { batchSamples, promptTokens: u?.prompt_tokens ?? 0, completionTokens: u?.completion_tokens ?? 0 };
