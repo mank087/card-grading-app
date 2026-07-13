@@ -38,7 +38,46 @@ async function fileToDataUrl(file: File): Promise<string> {
   })
 }
 
+function CollectionTab() {
+  const [comics, setComics] = useState<any[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  useEffect(() => {
+    fetch('/api/admin/comic-lab/comics')
+      .then(r => r.json())
+      .then(d => d.error ? setError(d.error) : setComics(d.comics))
+      .catch(e => setError(e.message))
+  }, [])
+  if (error) return <div className="text-sm text-red-600">Failed to load collection: {error}</div>
+  if (!comics) return <div className="text-sm text-gray-400 py-8 text-center">Loading collection…</div>
+  if (comics.length === 0) return <div className="text-sm text-gray-400 py-12 text-center">No graded comics yet — grade one in the Grade tab and it lands here.</div>
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      {comics.map(c => (
+        <a key={c.id} href={`/admin/comic-lab/${c.id}`} className="border rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
+          <div className="aspect-[2/3] bg-gray-100 relative">
+            {c.front_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={c.front_url} alt={c.title ?? 'comic'} className="w-full h-full object-cover" />
+            ) : <div className="w-full h-full flex items-center justify-center text-gray-300">no image</div>}
+            <div className={`absolute top-2 right-2 rounded-full bg-white/95 shadow px-2 py-1 text-sm font-black ${gradeColor(Number(c.final_grade))}`}>
+              {Number(c.final_grade).toFixed(1)}
+            </div>
+            {c.expected_grade != null && Math.abs(Number(c.expected_grade) - Number(c.final_grade)) > 0.45 && (
+              <div className="absolute top-2 left-2 rounded bg-amber-100 text-amber-800 text-[10px] font-semibold px-1.5 py-0.5">exp {Number(c.expected_grade).toFixed(1)}</div>
+            )}
+          </div>
+          <div className="p-2">
+            <div className="text-sm font-medium text-gray-800 truncate">{c.title ?? 'Unknown'}{c.issue_number ? ` #${c.issue_number}` : ''}</div>
+            <div className="text-xs text-gray-500 truncate">{c.grade_label} · {c.era} · pages: {c.page_quality ?? '?'}</div>
+          </div>
+        </a>
+      ))}
+    </div>
+  )
+}
+
 export default function ComicLabPage() {
+  const [tab, setTab] = useState<'grade' | 'collection'>('grade')
   const [images, setImages] = useState<Partial<Record<Slot, string>>>({})
   const [era, setEra] = useState<(typeof ERAS)[number]>('modern')
   const [grading, setGrading] = useState(false)
@@ -87,10 +126,23 @@ export default function ComicLabPage() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Comic Lab</h1>
         <p className="text-sm text-gray-500 mt-1">
-          Admin testing sandbox for the comic grading engine (v0 — Cover Grade). Results are not stored server-side and nothing here is visible to users.
+          Admin testing sandbox for the comic grading engine (v0 — Cover Grade). Grades persist to the lab collection; nothing here is visible to users.
         </p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 border-b">
+        {(['grade', 'collection'] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`px-4 py-2 text-sm font-medium rounded-t-lg ${tab === t ? 'bg-white border border-b-white text-blue-700 -mb-px' : 'text-gray-500 hover:text-gray-700'}`}>
+            {t === 'grade' ? 'Grade' : 'Collection'}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'collection' && <CollectionTab />}
+
+      {tab === 'grade' && <>
       {/* Upload slots */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {SLOTS.map(s => (
@@ -138,6 +190,12 @@ export default function ComicLabPage() {
           </div>
 
           <p className="text-gray-700">{result.summary}</p>
+          {result.savedId && (
+            <a href={`/admin/comic-lab/${result.savedId}`} className="inline-block text-sm text-blue-600 underline">
+              Saved to collection — open details page →
+            </a>
+          )}
+          {result.saveError && <div className="text-xs text-amber-600">Grade succeeded but saving to the collection failed: {result.saveError}</div>}
 
           {/* Category breakdown */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -199,6 +257,7 @@ export default function ComicLabPage() {
           </table>
         </div>
       )}
+      </>}
     </div>
   )
 }

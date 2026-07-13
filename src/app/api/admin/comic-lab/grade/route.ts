@@ -5,7 +5,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAdminSession } from '@/lib/admin/adminAuth';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { gradeComic, ComicEra } from '@/lib/comicGrader';
+import { randomUUID } from 'crypto';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -51,7 +53,50 @@ export async function POST(request: NextRequest) {
     const result = await gradeComic({ frontBuf, backBuf, spineBuf, pageEdgeBuf, era: era as ComicEra });
     console.log(`[COMIC LAB] graded in ${((Date.now() - t0) / 1000).toFixed(0)}s: ${result.ok ? `${result.finalGrade} (${result.gradeLabel})` : `ERROR ${result.error}`}`);
 
-    return NextResponse.json({ ...result, elapsedSec: Math.round((Date.now() - t0) / 1000) });
+    // Persist to the lab collection (comics_lab + images in the cards bucket).
+    // Persistence failure never fails the grade response — the result is still
+    // returned; savedId is null and the error is included for the lab UI.
+    let savedId: string | null = null;
+    let saveError: string | null = null;
+    if (result.ok) {
+      try {
+        const id = randomUUID();
+        const upload = async (buf: Buffer | null | undefined, name: string): Promise<string | null> => {
+          if (!buf) return null;
+          const p = `comic-lab/${id}/${name}.jpg`;
+          const { error } = await supabaseAdmin.storage.from('cards').upload(p, buf, { contentType: 'image/jpeg', upsert: true });
+          if (error) throw new Error(`upload ${name}: ${error.message}`);
+          return p;
+        };
+        const [front_path, back_path, spine_path, page_edge_path] = await Promise.all([
+          upload(frontBuf, 'front'), upload(backBuf, 'back'), upload(spineBuf, 'spine'), upload(pageEdgeBuf, 'page-edge'),
+        ]);
+        const { error: insErr } = await supabaseAdmin.from('comics_lab').insert({
+          id,
+          graded_by: admin.email ?? null,
+          era,
+          title: result.comicInfo?.title ?? null,
+          issue_number: result.comicInfo?.issue_number ?? null,
+          publisher: result.comicInfo?.publisher ?? null,
+          final_grade: result.finalGrade,
+          grade_label: result.gradeLabel,
+          category_scores: Object.fromEntries(Object.entries(result.categories).map(([k, v]: any) => [k, v.score])),
+          page_quality: result.pageQuality?.value ?? 'unknown',
+          packaging_type: result.packaging?.type ?? 'none',
+          summary: result.summary,
+          engine_version: result.engineVersion,
+          grading_json: result,
+          front_path, back_path, spine_path, page_edge_path,
+        });
+        if (insErr) throw new Error(`insert: ${insErr.message}`);
+        savedId = id;
+      } catch (e: any) {
+        saveError = e.message;
+        console.error('[COMIC LAB] persistence failed (grade still returned):', e.message);
+      }
+    }
+
+    return NextResponse.json({ ...result, savedId, saveError, elapsedSec: Math.round((Date.now() - t0) / 1000) });
   } catch (error: any) {
     console.error('[COMIC LAB] fatal:', error);
     return NextResponse.json({ error: error.message || 'grading failed' }, { status: 500 });
