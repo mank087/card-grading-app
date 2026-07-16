@@ -71,6 +71,8 @@ export interface ZoomResult {
   faceCaps: Record<string, number>;
   /** Distinct structural findings (creases/bends/warps) — feeds structural_damage.findings */
   structuralFindings: Array<{ type: string; location: string; description: string }>;
+  /** v9.5 measured centering per face; null/undefined = low confidence, model estimate stands */
+  centering?: { front: CenteringMeasurement | null; back: CenteringMeasurement | null };
 }
 
 interface RegionSpec {
@@ -304,6 +306,183 @@ function cardRelativeBoxes(P: string, face: 'front' | 'back', quad: Quad, w: num
   ];
 }
 
+// ---------------------------------------------------------------------------
+// v9.5 CV CENTERING MEASUREMENT
+// The card's corner quad comes from the geometry-gate vision call (which solved
+// the card-location problem the 2025 OpenCV attempt died on: textured/white
+// backgrounds, sleeves, glare). This half is pure pixel math:
+//   per side → sample K points along the quad edge (inner 20-80% span, avoiding
+//   corners) → SNAP each point to the true cut edge (max color gradient within
+//   ±24px along the inward normal, robust to quad imprecision) → scan inward for
+//   the first SUSTAINED color transition away from the border's own color =
+//   border width at that point → median per side; IQR/median = confidence.
+// Curved/art frames produce high variance → null → the model's estimate stands
+// (exact pre-v9.5 behavior). Confidence gate + fallback is the design.
+// ---------------------------------------------------------------------------
+export interface CenteringMeasurement {
+  leftRight: string | null;  // "55/45" (left share / right share); null = axis unreliable
+  topBottom: string | null;  // "60/40"
+  bothAxes: boolean;         // true = full measurement (may replace the model estimate
+                             // in both directions); false = partial (may only LOWER)
+  worstAxisPct: number;      // max side share across the MEASURED axes
+  widths: { left: number | null; right: number | null; top: number | null; bottom: number | null };
+  spread: { left: number | null; right: number | null; top: number | null; bottom: number | null };
+}
+
+const CENTERING_SAMPLES = 12;
+const MAX_SPREAD_PCT = 30;      // per-side IQR/median above this → unreliable
+const MIN_VALID_SAMPLES = 6;    // of CENTERING_SAMPLES per side
+
+export async function measureCentering(imageBuf: Buffer, quadNorm: Array<{ x: number; y: number }>): Promise<CenteringMeasurement | null> {
+  try {
+    const { data, info } = await sharp(imageBuf, { failOn: 'none' }).raw().toBuffer({ resolveWithObject: true });
+    const W = info.width, H = info.height, C = info.channels;
+    const q = quadNorm.map(p => ({ x: (p.x / 1000) * W, y: (p.y / 1000) * H }));
+    const [tl, tr, br, bl] = q;
+    const colorAt = (x: number, y: number): [number, number, number] | null => {
+      const xi = Math.round(x), yi = Math.round(y);
+      if (xi < 0 || yi < 0 || xi >= W || yi >= H) return null;
+      const i = (yi * W + xi) * C;
+      return [data[i], data[i + 1], data[i + 2]];
+    };
+    const dist2 = (a: [number, number, number], b: [number, number, number]) =>
+      (a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2 + (a[2] - b[2]) ** 2;
+    // Chroma distance: brightness-invariant color comparison. Phone photos are lit
+    // directionally — the shadowed side's border shows a big BRIGHTNESS ramp that
+    // absolute distance reads as constant "transition" noise (measured: left sides
+    // failed on all five validation faces while rights measured). Comparing
+    // normalized color proportions ignores the shading and sees only ink changes.
+    const chroma = (c: [number, number, number]): [number, number, number] => {
+      const s2 = Math.max(1, c[0] + c[1] + c[2]);
+      return [255 * c[0] / s2, 255 * c[1] / s2, 255 * c[2] / s2];
+    };
+    const chromaDist2 = (a: [number, number, number], b: [number, number, number]) => dist2(chroma(a), chroma(b));
+
+    const cardDim = Math.min(Math.hypot(tr.x - tl.x, tr.y - tl.y), Math.hypot(bl.x - tl.x, bl.y - tl.y));
+    const maxScan = Math.max(40, Math.round(cardDim * 0.16)); // border search depth
+    // The model's quad is coarse (rounded 0-1000 coords ≈ ±0.5% ≈ up to ~15px, plus
+    // model error) — measured misses of 25-45px. Snap window must absorb that.
+    const SNAP = 48;
+
+    // Measure one side: edge from A to B, inward unit normal (nx, ny).
+    const measureSide = (A: Pt, B: Pt, nx: number, ny: number): { median: number; spreadPct: number } | null => {
+      const widths: number[] = [];
+      for (let s = 0; s < CENTERING_SAMPLES; s++) {
+        const t = 0.2 + 0.6 * (s / (CENTERING_SAMPLES - 1));
+        const ex = A.x + (B.x - A.x) * t, ey = A.y + (B.y - A.y) * t;
+        // 1) SNAP to the true cut edge: max gradient along the normal within ±SNAP.
+        //    Validity = the found boundary actually SEPARATES two different-colored
+        //    zones (mean of 6-14px outside vs inside), not a raw gradient threshold —
+        //    robust to soft shadows and low-contrast edges.
+        let bestG = -1, snapOff = 0;
+        for (let o = -SNAP; o <= SNAP; o++) {
+          const c1 = colorAt(ex + nx * (o - 2), ey + ny * (o - 2));
+          const c2 = colorAt(ex + nx * (o + 2), ey + ny * (o + 2));
+          if (!c1 || !c2) continue;
+          const g = dist2(c1, c2);
+          if (g > bestG) { bestG = g; snapOff = o; }
+        }
+        if (bestG < 0) continue;
+        {
+          const outer: Array<[number, number, number]> = [];
+          const inner: Array<[number, number, number]> = [];
+          for (let o = 6; o <= 14; o++) {
+            const co = colorAt(ex + nx * (snapOff - o), ey + ny * (snapOff - o));
+            const ci = colorAt(ex + nx * (snapOff + o), ey + ny * (snapOff + o));
+            if (co) outer.push(co);
+            if (ci) inner.push(ci);
+          }
+          if (outer.length < 5 || inner.length < 5) continue;
+          const mean = (arr: Array<[number, number, number]>): [number, number, number] =>
+            [0, 1, 2].map(i => arr.reduce((s2, c) => s2 + c[i], 0) / arr.length) as [number, number, number];
+          if (dist2(mean(outer), mean(inner)) < 500) continue; // no real zone separation → skip sample
+        }
+        const sx = ex + nx * snapOff, sy = ey + ny * snapOff;
+        // 2) Border reference color: median of pixels 6..14px inside the cut edge
+        const ref: Array<[number, number, number]> = [];
+        for (let o = 6; o <= 14; o++) { const c = colorAt(sx + nx * o, sy + ny * o); if (c) ref.push(c); }
+        if (ref.length < 5) continue;
+        const refC: [number, number, number] = [
+          ref.map(c => c[0]).sort((a, b) => a - b)[Math.floor(ref.length / 2)],
+          ref.map(c => c[1]).sort((a, b) => a - b)[Math.floor(ref.length / 2)],
+          ref.map(c => c[2]).sort((a, b) => a - b)[Math.floor(ref.length / 2)],
+        ];
+        // 3) Scan inward for the first SUSTAINED departure from the border color.
+        //    Chroma-based (brightness-invariant): a shading ramp along the border
+        //    is not a transition; an ink/frame color change is.
+        let run = 0, width = -1;
+        for (let o = 8; o <= maxScan; o++) {
+          const c = colorAt(sx + nx * o, sy + ny * o);
+          if (!c) break;
+          if (chromaDist2(c, refC) > 350 || dist2(c, refC) > 12000) { run++; if (run >= 5) { width = o - 4; break; } }
+          else run = 0;
+        }
+        if (width > 0) widths.push(width);
+      }
+      if (process.env.CV_CENTERING_DEBUG === '1') {
+        console.log(`[CV-DEBUG] side widths=[${widths.join(',')}] valid=${widths.length}/${CENTERING_SAMPLES}`);
+      }
+      if (widths.length < MIN_VALID_SAMPLES) return null;
+      // TIGHTEST-CLUSTER estimator: art shapes touching the border pollute a few
+      // samples with deep readings (measured: Xerosic right = 9 samples at
+      // 102-118px + 3 outliers at 163-199 from the swirl art). A plain IQR dies
+      // on that; the physical border is the largest SELF-CONSISTENT cluster.
+      const sorted = [...widths].sort((a, b) => a - b);
+      let best: { median: number; spreadPct: number; size: number } | null = null;
+      for (let i = 0; i < sorted.length; i++) {
+        for (let jEnd = sorted.length; jEnd - i >= MIN_VALID_SAMPLES; jEnd--) {
+          const win = sorted.slice(i, jEnd);
+          const med = win[Math.floor(win.length / 2)];
+          const spreadPct = Math.round(100 * (win[win.length - 1] - win[0]) / Math.max(1, med));
+          if (spreadPct <= MAX_SPREAD_PCT && (!best || win.length > best.size)) {
+            best = { median: med, spreadPct, size: win.length };
+          }
+        }
+      }
+      return best ? { median: best.median, spreadPct: best.spreadPct } : null;
+    };
+
+    // Inward normals for each side (quad ordered TL,TR,BR,BL).
+    const left = measureSide(tl, bl, 1, 0);
+    const right = measureSide(tr, br, -1, 0);
+    const top = measureSide(tl, tr, 0, 1);
+    const bottom = measureSide(bl, br, 0, -1);
+    if (process.env.CV_CENTERING_DEBUG === '1') {
+      console.log(`[CV-DEBUG] sides: L=${JSON.stringify(left)} R=${JSON.stringify(right)} T=${JSON.stringify(top)} B=${JSON.stringify(bottom)}`);
+    }
+    // PER-AXIS independence: a clean top/bottom measurement is not invalidated by
+    // art pollution on left/right (or vice versa). An axis is usable only when
+    // BOTH of its sides produced a reliable cluster.
+    const share = (a: number, b: number) => Math.round(100 * a / (a + b));
+    const lrOk = !!(left && right);
+    const tbOk = !!(top && bottom);
+    if (!lrOk && !tbOk) return null;
+    const l = lrOk ? share(left!.median, right!.median) : null;
+    const t = tbOk ? share(top!.median, bottom!.median) : null;
+    const worstCandidates = [
+      ...(l != null ? [l, 100 - l] : []),
+      ...(t != null ? [t, 100 - t] : []),
+    ];
+    return {
+      leftRight: l != null ? `${l}/${100 - l}` : null,
+      topBottom: t != null ? `${t}/${100 - t}` : null,
+      bothAxes: lrOk && tbOk,
+      worstAxisPct: Math.max(...worstCandidates),
+      widths: {
+        left: left?.median ?? null, right: right?.median ?? null,
+        top: top?.median ?? null, bottom: bottom?.median ?? null,
+      },
+      spread: {
+        left: left?.spreadPct ?? null, right: right?.spreadPct ?? null,
+        top: top?.spreadPct ?? null, bottom: bottom?.spreadPct ?? null,
+      },
+    };
+  } catch (e: any) {
+    console.warn(`[ZOOM] centering measurement error: ${e.message}`);
+    return null;
+  }
+}
+
 /** Shoelace-area sanity check for a detected quad (normalized 0-1000 space). */
 function quadPlausible(quadNorm: Pt[] | undefined, minFrac = 0.10, maxFrac = 0.95): quadNorm is Pt[] {
   if (!Array.isArray(quadNorm) || quadNorm.length !== 4) return false;
@@ -475,6 +654,7 @@ export async function runZoomInspection(
     const openaiGate = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const MIN_FILL_PERCENT = 68;
     const geometry: { front?: Pt[]; back?: Pt[] } = {};
+    const measureGeometry: { front?: Pt[]; back?: Pt[] } = {};
     try {
       const fillRes = await openaiGate.chat.completions.create({
         model: options?.model || 'gpt-5.1',
@@ -501,6 +681,12 @@ export async function runZoomInspection(
       const fill = JSON.parse(fillRes.choices[0]?.message?.content || '{}');
       const worst = Math.min(Number(fill.front_fill_percent ?? 100), Number(fill.back_fill_percent ?? 100));
       console.log(`[ZOOM] frame-fill: front ${fill.front_fill_percent}% / back ${fill.back_fill_percent}%`);
+      // v9.5: quads are captured for CENTERING MEASUREMENT whenever plausible,
+      // independent of the fill decision (measureGeometry). Card-relative CROPS
+      // still engage only for margin photos (fill < threshold) — for full-frame
+      // photos blind edge-hugging crops remain better (they hug the cut edges).
+      if (quadPlausible(fill.front_corners)) measureGeometry.front = fill.front_corners;
+      if (quadPlausible(fill.back_corners)) measureGeometry.back = fill.back_corners;
       if (Number.isFinite(worst) && worst < MIN_FILL_PERCENT) {
         if (quadPlausible(fill.front_corners) && quadPlausible(fill.back_corners)) {
           geometry.front = fill.front_corners;
@@ -514,6 +700,17 @@ export async function runZoomInspection(
     } catch (e: any) {
       console.warn(`[ZOOM] geometry gate errored (${e.message}) — proceeding with blind crops as before`);
     }
+
+    // v9.5 CV CENTERING: deterministic border measurement from the detected quad.
+    // Pure pixel math (no extra API call). Confidence-gated — a null result means
+    // "fall back to the model's centering estimate" (exact current behavior).
+    const centering = {
+      front: measureGeometry.front ? await measureCentering(frontBuf, measureGeometry.front) : null,
+      back: measureGeometry.back ? await measureCentering(backBuf, measureGeometry.back) : null,
+    };
+    if (centering.front) console.log(`[ZOOM] centering measured (front): L/R ${centering.front.leftRight} T/B ${centering.front.topBottom} (spread L${centering.front.spread.left}/R${centering.front.spread.right}/T${centering.front.spread.top}/B${centering.front.spread.bottom}%)`);
+    else console.log('[ZOOM] centering measurement (front): low confidence — model estimate stands');
+    if (centering.back) console.log(`[ZOOM] centering measured (back): L/R ${centering.back.leftRight} T/B ${centering.back.topBottom}`);
 
     const regions = [...await cropFace(frontBuf, 'front', geometry.front), ...await cropFace(backBuf, 'back', geometry.back)];
 
@@ -743,7 +940,7 @@ export async function runZoomInspection(
 
     console.log(`[ZOOM] ${regions.length} regions in ${batches.length} batch(es) × ~${samplesPerBatch} samples → ${defects.length} majority defect(s), ${structuralFindings.length} structural; caps=${JSON.stringify(faceCaps)}; tokens p=${usageTotals.p} c=${usageTotals.c}`);
 
-    return { ok: true, regionsInspected: regions.length, defects, faceCaps, structuralFindings };
+    return { ok: true, regionsInspected: regions.length, defects, faceCaps, structuralFindings, centering };
   } catch (err: any) {
     console.error('[ZOOM] inspection failed (grading continues without it):', err?.message || err);
     return { ...empty, error: String(err?.message || err) };

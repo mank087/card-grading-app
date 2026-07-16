@@ -173,7 +173,13 @@ export function buildFinalSummary(input: NarratorInput): string {
       if (highlight) {
         parts.push(`The grade comes down to the ${joinList(limiting.map(c => CATEGORY_LABELS[c]))}: ${friendlyDefect(highlight)}.`);
       } else if (limiting.includes('centering')) {
-        parts.push(`The grade comes down to centering - the borders are visibly uneven.`);
+        // v9.5: quote the measured ratio when centering was measured, not eyeballed.
+        const mf = jsonData?.centering?.front;
+        const mb = jsonData?.centering?.back;
+        const measured = (mf?.measured && mf.left_right) ? mf : (mb?.measured && mb.left_right) ? mb : null;
+        parts.push(measured
+          ? `The grade comes down to centering - the borders measure ${measured.left_right} left/right and ${measured.top_bottom} top/bottom.`
+          : `The grade comes down to centering - the borders are visibly uneven.`);
       } else {
         parts.push(`The grade comes down to the ${joinList(limiting.map(c => CATEGORY_LABELS[c]))}.`);
       }

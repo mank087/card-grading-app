@@ -35,7 +35,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.4.2';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.5';
 
 // Types matching vision_grade_v1.json schema
 export interface VisionGradeResult {
@@ -2158,6 +2158,82 @@ Provide detailed analysis as markdown with all required sections.`
             jsonData.grading_passes.consensus_notes.push(
               `Magnified zoom inspection was unavailable for this grade (${zoom.error}) — assessment is from the holistic ensemble only.`
             );
+          }
+        }
+
+        // Step 3.85 (v9.5) MEASURED CENTERING: when the deterministic border
+        // measurement is confident, it REPLACES the model's eyeballed centering —
+        // in BOTH directions (it can lift an over-penalized card as well as pull
+        // down a flattered one; this is ground truth, not a cap). Production case:
+        // a card reported as "50/50 — Perfect" measured 55/45 (still Gem-tolerance,
+        // but the stated ratio was wrong and disputed by the owner). Low-confidence
+        // measurement (curved/art frames, borderless, sleeve edges) → model
+        // estimate stands, exact prior behavior. Skipped for rigid-case photos.
+        // CV_CENTERING_MODE: 'active' applies measurements to grades/display;
+        // 'shadow' (DEFAULT) computes and logs them but never affects anything —
+        // building the production dataset needed to tune the measurement offline.
+        // Validation (2026-07-16) produced a confidently-wrong reading (77/23 on a
+        // symmetric border) — do NOT set 'active' until shadow data proves it out.
+        if (zoom?.ok && zoom.centering && (zoom.centering.front || zoom.centering.back) && process.env.CV_CENTERING_MODE !== 'active') {
+          const mNote = (['front', 'back'] as const)
+            .map(f => { const m = zoom.centering![f]; return m ? `${f}: L/R ${m.leftRight ?? '-'} T/B ${m.topBottom ?? '-'} (full=${m.bothAxes})` : `${f}: no measurement`; })
+            .join(' | ');
+          console.log(`[GRADE RECALC] 📐 CV centering SHADOW (not applied): ${mNote} | model: front ${jsonData.centering?.front?.left_right ?? '?'} / ${jsonData.centering?.front?.top_bottom ?? '?'}`);
+        }
+        if (zoom?.ok && zoom.centering && !rigidCaseForZoom && process.env.CV_CENTERING_MODE === 'active') {
+          const scoreFromWorstPct = (p: number): number =>
+            p <= 55 ? 10 : p <= 60 ? 9 : p <= 65 ? 8 : p <= 70 ? 7 : p <= 80 ? 6 : p <= 85 ? 5 : p <= 90 ? 4 : p <= 95 ? 3 : 2;
+          const tierFromWorstPct = (p: number): string =>
+            p <= 55 ? 'Perfect' : p <= 60 ? 'Excellent' : p <= 65 ? 'Good' : p <= 70 ? 'Fair' : p <= 90 ? 'Off-Center' : 'Severely Off-Center';
+          const measuredNotes: string[] = [];
+          let allFull = true;
+          const faceScores: Record<string, number | null> = { front: null, back: null };
+          for (const face of ['front', 'back'] as const) {
+            const m = zoom.centering[face];
+            if (!m) { allFull = false; continue; }
+            const faceScore = scoreFromWorstPct(m.worstAxisPct);
+            const existing = jsonData.raw_sub_scores?.[`centering_${face}`];
+            // FULL measurement (both axes) = ground truth, replaces in both directions.
+            // PARTIAL (one clean axis) may only LOWER — the unmeasured axis could be worse.
+            const apply = m.bothAxes || typeof existing !== 'number' || faceScore < existing;
+            if (!m.bothAxes) allFull = false;
+            if (!apply) continue;
+            faceScores[face] = m.bothAxes ? faceScore : Math.min(typeof existing === 'number' ? existing : 10, faceScore);
+            const ratioText = [
+              m.leftRight ? `left/right ${m.leftRight}` : null,
+              m.topBottom ? `top/bottom ${m.topBottom}` : null,
+            ].filter(Boolean).join(', ');
+            const sec = jsonData.centering?.[face];
+            if (sec && typeof sec === 'object') {
+              if (m.leftRight) sec.left_right = m.leftRight;
+              if (m.topBottom) sec.top_bottom = m.topBottom;
+              sec.quality_tier = tierFromWorstPct(m.worstAxisPct);
+              sec.score = faceScores[face];
+              sec.measured = true;
+              sec.measurements = `Measured from card geometry: ${ratioText}${m.bothAxes ? '' : ' (one axis measured; the other retains the visual estimate)'}.`;
+              sec.analysis = `Centering measured deterministically from the card's detected corner geometry: ${ratioText} — ${tierFromWorstPct(m.worstAxisPct)} (score ${faceScores[face]}).`;
+            }
+            if (jsonData.raw_sub_scores && typeof jsonData.raw_sub_scores[`centering_${face}`] === 'number') {
+              jsonData.raw_sub_scores[`centering_${face}`] = faceScores[face];
+            }
+            measuredNotes.push(`${face} ${ratioText} → ${faceScores[face]}`);
+          }
+          if (measuredNotes.length > 0) {
+            const measuredCat = Math.min(faceScores.front ?? 10, faceScores.back ?? 10);
+            const before = serverRounded.centering;
+            // Replace the category consensus only when BOTH faces have FULL
+            // measurements; anything partial can only pull the category down.
+            serverRounded.centering = (allFull && faceScores.front != null && faceScores.back != null)
+              ? measuredCat
+              : Math.min(before, measuredCat);
+            if (serverRounded.centering !== before) {
+              console.log(`[GRADE RECALC] 📐 measured centering: category ${before} → ${serverRounded.centering}`);
+            }
+            if (Array.isArray(jsonData.grading_passes?.consensus_notes)) {
+              jsonData.grading_passes.consensus_notes.push(
+                `Centering measured from card geometry (deterministic border measurement): ${measuredNotes.join('; ')}.`
+              );
+            }
           }
         }
 

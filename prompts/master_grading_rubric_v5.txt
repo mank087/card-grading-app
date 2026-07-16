@@ -3511,6 +3511,15 @@ CENTERING QUALITY TERMINOLOGY (MANDATORY - NO EXCEPTIONS)
 ---
 REQUIRED OUTPUT FORMAT
 ---
+RATIO HONESTY (the ratios below are your VISUAL ESTIMATE, not a measurement):
+• Estimate to the nearest 5 (55/45, 60/40) — finer precision from eyeballing is false precision.
+• "50/50" is a CLAIM OF PERFECTION — use it ONLY when the borders are truly indistinguishable
+  after deliberate comparison. If one border looks even slightly wider, say 55/45, not 50/50.
+  (Production dispute: a card stated as "50/50 — essentially equal" measured 55/45; the stated
+  ratio, not the score, is what the customer contested.)
+• In `measurements`, describe what you SEE ("left slightly wider than right"), and let the
+  ratio reflect that same statement — the two must not contradict.
+
 For EACH side (front and back):
 {
   "centering": {
