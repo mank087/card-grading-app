@@ -103,6 +103,15 @@
       "note": "PERCEPTION-FP anchor (unanimous over-grade class the gates can't catch). Back shows scattered whitening on left edge + TL/BL corners, visible at native res. Model dismissed the owner's condition report ('not confirmed in photos'). Production baseline: 10, confidence A, no zoom findings"
     },
     {
+      "id": "ff322597-2764-4782-a10e-6ddf1d5841c4",
+      "label": "Gengar (Pokemon) — FALSE-CREASE anchor: graded 4 (crease 'detected' in the back swirl's printed streaks) then 9 on re-shoot 5 min later (Jul 16)",
+      "cardType": "pokemon",
+      "expected": 9,
+      "tolerance": 1,
+      "must_detect": [],
+      "note": "Visually verified clean (back Q3 shows only the printed swirl streaks + sheen). Correlated holistic completions co-hallucinated the crease and verify confirmed it evidence-free; zoom found ZERO structural. Any structural cap on this card = regression. Sibling 2ac8c60d graded 9"
+    },
+    {
       "id": "25ccdb29-64be-4c27-aed3-570646f42e6d",
       "label": "Koby EB04-044 (One Piece manga foil) — non-unanimous 10 ([10,10,9] passes, kept 10 via escape hatch)",
       "cardType": "onepiece",

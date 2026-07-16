@@ -4517,6 +4517,9 @@ export function MTGCardDetails() {
                                 {defect.description && (
                                   <p className="text-xs text-gray-700">{defect.description}</p>
                                 )}
+                                {defect.evidence_url && (
+                                  <a href={defect.evidence_url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">View magnified evidence photo</a>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -4665,6 +4668,9 @@ export function MTGCardDetails() {
                                 )}
                                 {defect.description && (
                                   <p className="text-xs text-gray-700">{defect.description}</p>
+                                )}
+                                {defect.evidence_url && (
+                                  <a href={defect.evidence_url} target="_blank" rel="noreferrer" className="text-xs text-blue-600 underline">View magnified evidence photo</a>
                                 )}
                               </div>
                             ))}

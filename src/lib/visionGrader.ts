@@ -35,7 +35,7 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // Single source of truth for the deployed prompt/engine version. Routes must stamp
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
-export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.4.1';
+export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.4.2';
 
 // Types matching vision_grade_v1.json schema
 export interface VisionGradeResult {
@@ -2075,9 +2075,15 @@ Provide detailed analysis as markdown with all required sections.`
             if (serverRounded[cat] < before) {
               // v9.1: list ALL findings (was slice(0,2), which under-justified caps)
               const catDefects = zoom.defects.filter(d => d.category === cat);
+              // v9.4.2: honest framing for magnification-only findings — "minor" by
+              // definition means invisible at normal viewing distance, and stating
+              // "minor whitening" flatly on a card the owner sees as clean generated
+              // dispute tickets. Say what it is: faint and magnification-only.
               const reasons = catDefects
                 .slice(0, 4)
-                .map(d => `${d.severity} ${d.type} (${d.face} ${humanizeZoomRegion(d.region)})`)
+                .map(d => d.severity === 'minor'
+                  ? `faint ${d.type} visible only under magnification (${d.face} ${humanizeZoomRegion(d.region)})`
+                  : `${d.severity} ${d.type} (${d.face} ${humanizeZoomRegion(d.region)})`)
                 .join(', ') + (catDefects.length > 4 ? ` +${catDefects.length - 4} more` : '');
               // Findings-style (no "10→7" delta): the passes now already show the
               // folded score, so state the result + what magnified inspection saw.
@@ -2099,6 +2105,11 @@ Provide detailed analysis as markdown with all required sections.`
                 location: `${d.face} ${humanizeZoomRegion(d.region)}`,
                 description: d.description,
                 source: 'zoom-inspection',
+                // v9.4.2: the exact magnified crop this finding was made from —
+                // persisted in the stored JSON so every consumer (web detail,
+                // mobile, PDF) can show the evidence instead of asserting it.
+                evidence_url: d.evidenceUrl ?? null,
+                evidence_path: d.evidencePath ?? null,
               });
             }
           }
@@ -2243,7 +2254,14 @@ Provide detailed analysis as markdown with all required sections.`
           const findings = Array.isArray(jsonData.structural_damage?.findings) && jsonData.structural_damage.findings.length > 0
             ? jsonData.structural_damage.findings
             : [{ type: 'crease', location: '', description: jsonData.structural_damage?.description || '' }];
-          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings);
+          // v9.4.2: the regioned zoom magnifies every surface quadrant (and center
+          // bands) — if it found NO structural damage, that independent read is
+          // counter-evidence against a holistic-only crease claim, so verification
+          // must be unanimous. Production case: correlated holistic completions
+          // co-hallucinated a "crease" in a Pokemon back's printed swirl streaks
+          // (grade 4 on a clean card, 9 on the re-shoot minutes later).
+          const zoomFoundNoStructural = !!(zoom?.ok && zoom.structuralFindings.length === 0);
+          const verdict = await verifyStructuralClaim(frontImageUrl, backImageUrl, findings, { requireUnanimous: zoomFoundNoStructural });
           structuralVerified = verdict.confirmed;
           structuralVerifyReason = verdict.reason;
           if (!structuralVerified && jsonData.structural_damage) {

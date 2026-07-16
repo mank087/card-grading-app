@@ -18,6 +18,8 @@
 
 import OpenAI from 'openai';
 import sharp from 'sharp';
+import { createClient } from '@supabase/supabase-js';
+import { randomUUID } from 'crypto';
 
 export interface ZoomDefect {
   region: string;
@@ -26,6 +28,10 @@ export interface ZoomDefect {
   type: string;
   severity: 'minor' | 'moderate' | 'heavy';
   description: string;
+  /** v9.4.2 evidence crops: storage path + long-lived signed URL of the exact
+   *  magnified crop this finding was made from ("see it for yourself"). */
+  evidencePath?: string;
+  evidenceUrl?: string;
 }
 
 /**
@@ -94,7 +100,13 @@ interface RegionSpec {
 export async function verifyStructuralClaim(
   frontImageUrl: string,
   backImageUrl: string,
-  findings: Array<{ type?: string; location?: string; description?: string }>
+  findings: Array<{ type?: string; location?: string; description?: string }>,
+  opts?: {
+    /** v9.4.2: when the full regioned zoom independently found ZERO structural
+     *  findings, its magnified read is counter-evidence — a holistic-only crease
+     *  claim then needs UNANIMOUS verifier confirmation, not a majority. */
+    requireUnanimous?: boolean;
+  }
 ): Promise<{ ok: boolean; confirmed: boolean; reason: string }> {
   try {
     // Tears / missing pieces are unambiguous — only line-type claims need this.
@@ -133,19 +145,54 @@ export async function verifyStructuralClaim(
 
     const content: any[] = [{
       type: 'text',
-      text: `A card-grading system flagged possible CREASE/BEND lines on this trading card. Your ONLY job: decide whether each claimed line is PHYSICAL DAMAGE or a LIGHTING/REFLECTION artifact.
+      text: `A card-grading system flagged possible CREASE/BEND lines on this trading card. Your ONLY job: decide whether each claimed line is PHYSICAL DAMAGE or a non-damage artifact.
 
 THE DISCRIMINATOR:
 - CREASE/FOLD (damage): a THIN line or ridge — the brightness disturbance is confined to the line itself (often a paired highlight+shadow along a ridge, may break ink or show fiber). The surface tone on BOTH sides of the line MATCHES.
 - LIGHTING/REFLECTION BAND (not damage): a BROAD tonal step — one ENTIRE side of the boundary is uniformly brighter or darker than the other (glossy/metallic cards reflect room lighting as straight bands). No ridge, no ink break, no fiber.
-- Also NOT damage: printed/etched design lines, foil patterns, sleeve edges.
+- PRINTED DESIGN LINE (not damage): part of the card's artwork — e.g. the light streaks and wave lines inside the swirl pattern of a Pokemon card back, comic speed-lines, borders. These follow the ARTWORK's geometry and colors, do not disturb the gloss, and are perfectly reproduced (no fiber, no ridge).
+- Also NOT damage: foil patterns, sleeve edges.
 
-Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"reason":"<one sentence>"}]}`,
+A verdict of physical_damage=true REQUIRES at least one piece of stated evidence:
+- "ink_break_or_fiber": the line visibly breaks the printed ink or shows white paper fiber
+- "ridge_shadow": a paired highlight+shadow showing a raised/dented ridge in the surface plane
+- "edge_deformation": the line reaches the card's edge and visibly deforms the card outline
+- "matching_line_opposite_face": the same line appears at the corresponding location on the other face (real creases almost always show through)
+If none of these is present, physical_damage MUST be false (evidence: "none").
+
+For each claim you get the claimed area AND the corresponding area of the OPPOSITE face (left/right mirrored — a back-left crease shows front-right).
+
+Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"evidence":"ink_break_or_fiber|ridge_shadow|edge_deformation|matching_line_opposite_face|none","reason":"<one sentence>"}]}`,
     }];
-    for (const c of crops) {
+    // Opposite-face crops: same vertical band, horizontally MIRRORED (faces flip left/right).
+    const oppositeCrops: Array<{ label: string; buf: Buffer }> = [];
+    for (const f of lineClaims.slice(0, 4)) {
+      const loc = String(f.location || '').toLowerCase();
+      const face: 'front' | 'back' = loc.includes('back') ? 'back' : 'front';
+      const opp: 'front' | 'back' = face === 'back' ? 'front' : 'back';
+      const meta = await sharp(bufs[opp], { failOn: 'none' }).metadata();
+      const w = meta.width!, h = meta.height!;
+      const hw = Math.floor(w / 2), hh = Math.floor(h / 2);
+      let left = 0, top = 0, cw = w, ch = h;
+      if (/(lower|bottom)/.test(loc)) { top = hh; ch = h - hh; }
+      else if (/(upper|top)/.test(loc)) { ch = hh; }
+      if (/left/.test(loc)) { left = w - hw; cw = hw; }        // mirrored
+      else if (/right/.test(loc)) { cw = hw; }                  // mirrored
+      const buf = await sharp(bufs[opp], { failOn: 'none' })
+        .extract({ left, top, width: cw, height: ch })
+        .resize({ width: MAX_REGION_EDGE, height: MAX_REGION_EDGE, fit: 'inside', withoutEnlargement: true })
+        .jpeg({ quality: 90 }).toBuffer();
+      oppositeCrops.push({ label: `${opp} — corresponding (mirrored) area for the claim above`, buf });
+    }
+    crops.forEach((c, i) => {
       content.push({ type: 'text', text: `CLAIM — ${c.label}:` });
       content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${c.buf.toString('base64')}`, detail: 'high' } });
-    }
+      const o = oppositeCrops[i];
+      if (o) {
+        content.push({ type: 'text', text: o.label + ':' });
+        content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${o.buf.toString('base64')}`, detail: 'high' } });
+      }
+    });
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const response = await openai.chat.completions.create({
@@ -158,21 +205,24 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"r
       messages: [{ role: 'user', content }],
     }, { timeout: 60_000 });
 
-    // Majority vote across samples: damage confirmed only if >=2 of 3 samples
-    // find at least one physically-damaged claim.
+    // Majority vote across samples: damage confirmed only if >=2 of 3 samples find
+    // at least one physically-damaged claim WITH stated evidence (v9.4.2: a bare
+    // physical_damage=true with evidence "none"/missing does not count — production
+    // false-crease on a Pokemon back swirl was "confirmed" with no evidence at all).
     let damageVotes = 0, parsed = 0;
     const reasons: string[] = [];
+    const VALID_EVIDENCE = new Set(['ink_break_or_fiber', 'ridge_shadow', 'edge_deformation', 'matching_line_opposite_face']);
     for (const choice of response.choices) {
       try {
         const v = JSON.parse(choice.message?.content || '');
         parsed++;
-        const anyDamage = (v.verdicts || []).some((x: any) => x.physical_damage === true);
+        const anyDamage = (v.verdicts || []).some((x: any) => x.physical_damage === true && VALID_EVIDENCE.has(String(x.evidence || '')));
         if (anyDamage) damageVotes++;
-        else reasons.push((v.verdicts || []).map((x: any) => x.reason).filter(Boolean)[0] || 'lighting band');
+        else reasons.push((v.verdicts || []).map((x: any) => x.reason).filter(Boolean)[0] || 'no damage evidence');
       } catch { /* skip unparseable */ }
     }
     if (parsed === 0) return { ok: false, confirmed: true, reason: 'verification unparseable — cap stands (fail-safe)' };
-    const confirmed = damageVotes >= Math.ceil(parsed / 2);
+    const confirmed = opts?.requireUnanimous ? damageVotes === parsed : damageVotes >= Math.ceil(parsed / 2);
     const reason = confirmed
       ? `verified as physical damage (${damageVotes}/${parsed} verifier votes)`
       : `verified as lighting/reflection, not damage (${parsed - damageVotes}/${parsed} votes: ${reasons[0] || ''})`;
@@ -365,6 +415,7 @@ A corner or edge on a light border that is not crisply sharp and clean IS whiten
 the same scrutiny as dark-border corners.
 
 BACKGROUND CHECK FIRST (photos with wide margins): each crop may contain mostly or entirely the BACKGROUND SURFACE the card is lying on (desk, leather, cloth, mat) instead of the card. Before reporting anything, decide what part of the crop is actually CARD. Specks, dust, texture, grain or marks on the background surface are NEVER card defects — a crop that shows no card content at all is automatically clean:true.
+LIGHT BACKGROUND BEHIND A CORNER/EDGE IS NOT WHITENING: whitening is white showing ON the card's own cut surface or face. A white/cream background (felt, paper, cloth) visible BEYOND the cut line — including directly behind a corner tip — is background, not damage. On light backgrounds judge corners by GEOMETRY (sharp point vs rounded/frayed) and by fiber texture ON the card itself; stains and specks on the background surface near the card belong to the background.
 NOT defects (do NOT report): holographic sparkle/patterns, printed design lines and textures, the card's border color itself, image compression noise, glare/reflection bands that have soft gradual edges, background surfaces outside the card and anything ON them, sleeve/holder edges.
 IMPORTANT context: crops from the SAME card — a straight uniform line at the outermost boundary is the card's cut edge, not damage. White showing AT the cut line on a dark border IS whitening.
 
@@ -593,10 +644,16 @@ export async function runZoomInspection(
     const structuralFindings: ZoomResult['structuralFindings'] = [];
     let minorityDropped = 0;
     for (const [key, v] of votes) {
-      if (v.severities.length < voteThreshold) { minorityDropped++; continue; }
       // Median severity (2 votes → the milder one: boundary benefit of the doubt)
       const sorted = [...v.severities].sort((a, b) => SEV_ORDER[a] - SEV_ORDER[b]);
       const severity = sorted[Math.floor((sorted.length - 1) / 2)] as ZoomDefect['severity'];
+      // v9.4.2: MINOR findings need 3 of 5 votes (moderate/heavy keep 2 of 5).
+      // Production (Jul 13-16): 56% of zoom adjustments were minor-only, and owners
+      // dispute a large share — 2-vote minors from partially-correlated samples are
+      // the noise floor. A real minor defect that 3+ samples independently report
+      // still caps; borderline two-vote flecks no longer generate disputed report text.
+      const required = severity === 'minor' ? Math.min(3, samples.length) : voteThreshold;
+      if (v.severities.length < required) { minorityDropped++; continue; }
       const region = key.split('|')[0];
       if (STRUCTURAL_TYPES.has(v.type)) {
         defects.push({ region, face: v.spec.face, category: 'structural', type: v.type, severity, description: v.description });
@@ -625,6 +682,36 @@ export async function runZoomInspection(
     //    types there duplicate what the sharper COR/EDG crops already report;
     //  - worst severity sets the cap; 3+ distinct PHYSICAL locations lowers it one more.
     const BORDER_WEAR_TYPES = new Set(['whitening', 'softening', 'chip', 'nick', 'fray', 'fraying']);
+    // v9.4.2 EVIDENCE CROPS: persist the exact magnified crop behind every surviving
+    // finding, so reports can SHOW the defect instead of asserting it ("minor
+    // whitening" disputes → shared look at the actual crop). One upload per flagged
+    // region; a 1-year signed URL is attached to each defect. Strictly fail-safe:
+    // any storage error just leaves the defect without an evidence link.
+    if (defects.length > 0 && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const storage = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY).storage.from('cards');
+        const groupId = randomUUID();
+        const flaggedRegions = [...new Set(defects.map(d => d.region))];
+        const urlByRegion = new Map<string, { path: string; url: string }>();
+        await Promise.all(flaggedRegions.map(async (regionId) => {
+          const spec = regionById.get(regionId);
+          if (!spec) return;
+          const path = `zoom-evidence/${groupId}/${regionId}.jpg`;
+          const { error } = await storage.upload(path, spec.buf, { contentType: 'image/jpeg', upsert: true });
+          if (error) { console.warn(`[ZOOM] evidence upload failed for ${regionId}: ${error.message}`); return; }
+          const { data: signed } = await storage.createSignedUrl(path, 60 * 60 * 24 * 365);
+          if (signed?.signedUrl) urlByRegion.set(regionId, { path, url: signed.signedUrl });
+        }));
+        for (const d of defects) {
+          const e = urlByRegion.get(d.region);
+          if (e) { d.evidencePath = e.path; d.evidenceUrl = e.url; }
+        }
+        console.log(`[ZOOM] evidence crops stored: ${urlByRegion.size}/${flaggedRegions.length} region(s) under zoom-evidence/${groupId}/`);
+      } catch (e: any) {
+        console.warn(`[ZOOM] evidence storage skipped (${e.message})`);
+      }
+    }
+
     const physicalLocation = (region: string) => region.replace(/^([FB]-EDG-[TBLR])-\d+$/, '$1');
     const nativePrefix: Record<string, string> = { corners: 'COR', edges: 'EDG', surface: 'SUR' };
     const faceCaps: Record<string, number> = {};
