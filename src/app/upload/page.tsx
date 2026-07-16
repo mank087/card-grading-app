@@ -526,8 +526,17 @@ function UniversalUploadPageContent() {
     const cropWidth = pixelCrop.width * scaleX;
     const cropHeight = pixelCrop.height * scaleY;
 
-    canvas.width = cropWidth;
-    canvas.height = cropHeight;
+    // v9.5.1: cap the output canvas at 4096px on the long edge. iOS Safari fails
+    // (null toBlob / blank draw) beyond its canvas memory limits on 12MP+ crops —
+    // this was a silent-crop-failure path. 4096px is far above the 1000px grading
+    // minimum and well inside every mobile browser's canvas budget.
+    const MAX_EDGE = 4096;
+    const scaleDown = Math.min(1, MAX_EDGE / Math.max(cropWidth, cropHeight));
+    const outWidth = Math.round(cropWidth * scaleDown);
+    const outHeight = Math.round(cropHeight * scaleDown);
+
+    canvas.width = outWidth;
+    canvas.height = outHeight;
 
     ctx.drawImage(
       imgEl,
@@ -537,8 +546,8 @@ function UniversalUploadPageContent() {
       cropHeight,
       0,
       0,
-      cropWidth,
-      cropHeight
+      outWidth,
+      outHeight
     );
 
     return new Promise((resolve) => {
@@ -553,12 +562,34 @@ function UniversalUploadPageContent() {
     });
   }, []);
 
-  // Apply the current crop and re-compress
+  // Apply the current crop and re-compress.
+  // v9.5.1: every failure path is LOUD. Production case: a customer's crop
+  // silently failed (the cropped region fell below the 1000px grading minimum
+  // and the generic rejection cleared the slot) — he uploaded the original
+  // uncropped, was graded on it, and reported "the cropping didn't work".
   const handleApplyCrop = useCallback(async (side: 'front' | 'back') => {
-    if (!cropImgRef.current || !completedCrop) return;
+    if (!cropImgRef.current || !completedCrop) {
+      toast.error('Drag a box over the card first, then tap Apply Crop.');
+      return;
+    }
 
     const sourceFile = side === 'front' ? frontFile : backFile;
     if (!sourceFile) return;
+
+    // Pre-check the crop's REAL resolution before doing anything: rejecting it
+    // here (with the crop still open, nothing cleared) beats routing a too-small
+    // file into the pipeline's generic "image too small" rejection.
+    const imgEl = cropImgRef.current;
+    const scaleX = imgEl.naturalWidth / imgEl.width;
+    const scaleY = imgEl.naturalHeight / imgEl.height;
+    const outW = Math.round(completedCrop.width * scaleX);
+    const outH = Math.round(completedCrop.height * scaleY);
+    if (Math.max(outW, outH) < 1000) {
+      toast.error(
+        `That selection would be ${outW}×${outH}px — below the 1000px minimum for accurate grading. Select a larger area (or retake the photo closer to the card).`
+      );
+      return; // crop UI stays open, nothing lost
+    }
 
     const croppedFile = await getCroppedFile(
       cropImgRef.current,
@@ -566,14 +597,23 @@ function UniversalUploadPageContent() {
       sourceFile.name
     );
 
-    if (croppedFile) {
-      // Reset crop state first
-      setCroppingSide(null);
-      setCrop(undefined);
-      setCompletedCrop(undefined);
-      // Re-run compression pipeline with cropped image
-      handleFileSelect(croppedFile, side);
+    if (!croppedFile) {
+      // Canvas/encode failure (iOS Safari canvas limits on very large photos).
+      // The ORIGINAL photo is still selected — say so explicitly.
+      toast.error(
+        'Cropping failed on this device — your original (uncropped) photo is still selected. You can try a smaller selection, or continue without cropping.'
+      );
+      setStatus(`⚠️ ${side} crop failed — the uncropped photo is still selected.`);
+      return; // keep the crop UI open so they can retry
     }
+
+    // Reset crop state first
+    setCroppingSide(null);
+    setCrop(undefined);
+    setCompletedCrop(undefined);
+    toast.success(`✂️ ${side === 'front' ? 'Front' : 'Back'} cropped to ${outW}×${outH}px — recompressing…`);
+    // Re-run compression pipeline with cropped image
+    handleFileSelect(croppedFile, side);
   }, [completedCrop, frontFile, backFile, getCroppedFile]);
 
   const handleUpload = async () => {
