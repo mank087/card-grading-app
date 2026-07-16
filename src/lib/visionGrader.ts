@@ -2098,7 +2098,12 @@ Provide detailed analysis as markdown with all required sections.`
           for (const d of zoom.defects) {
             if (d.category === 'structural') continue;
             const sec = jsonData[d.category]?.[d.face];
-            if (sec && Array.isArray(sec.defects)) {
+            // v9.5.1: CREATE the defects array when the model omitted it (it only
+            // sometimes emits one for corners/edges). The old Array.isArray guard
+            // silently dropped zoom findings — and their evidence links — from the
+            // stored record on exactly the cards where the model saw nothing.
+            if (sec && typeof sec === 'object') {
+              if (!Array.isArray(sec.defects)) sec.defects = [];
               sec.defects.push({
                 type: d.type,
                 severity: d.severity,
