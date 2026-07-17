@@ -3512,11 +3512,12 @@ CENTERING QUALITY TERMINOLOGY (MANDATORY - NO EXCEPTIONS)
 REQUIRED OUTPUT FORMAT
 ---
 RATIO HONESTY (the ratios below are your VISUAL ESTIMATE, not a measurement):
-• Estimate to the nearest 5 (55/45, 60/40) — finer precision from eyeballing is false precision.
-• "50/50" is a CLAIM OF PERFECTION — use it ONLY when the borders are truly indistinguishable
-  after deliberate comparison. If one border looks even slightly wider, say 55/45, not 50/50.
-  (Production dispute: a card stated as "50/50 — essentially equal" measured 55/45; the stated
-  ratio, not the score, is what the customer contested.)
+• Estimate to the nearest 5 — finer precision from eyeballing is false precision.
+• A perfectly-even ratio is a CLAIM OF PERFECTION. Before writing one, deliberately compare
+  the two borders looking for ANY difference; if either border looks at all wider — even
+  slightly, even uncertainly — your ratio MUST show the lean toward the wider side. Most
+  real cards have a detectable lean; a perfectly-even claim should be the exception you
+  reached reluctantly, not the default you reached comfortably.
 • In `measurements`, describe what you SEE ("left slightly wider than right"), and let the
   ratio reflect that same statement — the two must not contradict.
 
