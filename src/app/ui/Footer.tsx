@@ -289,6 +289,14 @@ export default function Footer() {
                   Privacy Policy
                 </Link>
               </li>
+              <li>
+                <button
+                  onClick={() => window.dispatchEvent(new Event('dcm-open-consent-preferences'))}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Cookie Preferences
+                </button>
+              </li>
             </ul>
           </div>
         </div>

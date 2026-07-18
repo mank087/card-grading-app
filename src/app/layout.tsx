@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Noto_Sans_JP } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import Navigation from "./ui/Navigation";
 import Footer from "./ui/Footer";
 import ClientLayout from "@/components/ClientLayout";
+import ConsentManager from "@/components/consent/ConsentManager";
 import { homeMetadata } from "./metadata";
 
 const geistSans = Geist({
@@ -45,57 +45,11 @@ export default function RootLayout({
     // element's attributes only — children are still fully validated.
     <html lang="en" suppressHydrationWarning>
       <head>
-        {/* Facebook Domain Verification */}
+        {/* Facebook Domain Verification (site-ownership proof only — loads nothing) */}
         <meta name="facebook-domain-verification" content="gqf9ydy92vx2nn9eq1bmw3yyf0wu8z" />
-
-        {/* Google Analytics + Google Ads - lazyOnload to avoid blocking LCP */}
-        <Script
-          src="https://www.googletagmanager.com/gtag/js?id=G-YLC2FKKBGC"
-          strategy="lazyOnload"
-        />
-        <Script id="google-analytics" strategy="lazyOnload">
-          {`
-            window.dataLayer = window.dataLayer || [];
-            function gtag(){dataLayer.push(arguments);}
-            gtag('js', new Date());
-            gtag('config', 'G-YLC2FKKBGC');
-            gtag('config', 'AW-17817758517');
-          `}
-        </Script>
-
-        {/* Reddit Pixel */}
-        <Script id="reddit-pixel" strategy="lazyOnload">
-          {`
-            !function(w,d){if(!w.rdt){var p=w.rdt=function(){p.sendEvent?p.sendEvent.apply(p,arguments):p.callQueue.push(arguments)};p.callQueue=[];var t=d.createElement("script");t.src="https://www.redditstatic.com/ads/pixel.js",t.async=!0;var s=d.getElementsByTagName("script")[0];s.parentNode.insertBefore(t,s)}}(window,document);
-            rdt('init','a2_i6zsi175k40r');
-            rdt('track', 'PageVisit');
-          `}
-        </Script>
-
-        {/* Meta/Facebook Pixel */}
-        <Script id="meta-pixel" strategy="lazyOnload">
-          {`
-            !function(f,b,e,v,n,t,s)
-            {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-            n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-            if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-            n.queue=[];t=b.createElement(e);t.async=!0;
-            t.src=v;s=b.getElementsByTagName(e)[0];
-            s.parentNode.insertBefore(t,s)}(window, document,'script',
-            'https://connect.facebook.net/en_US/fbevents.js');
-            fbq('init', '2308558869571917');
-            fbq('track', 'PageView');
-          `}
-        </Script>
-        <noscript>
-          <img
-            height="1"
-            width="1"
-            style={{ display: 'none' }}
-            src="https://www.facebook.com/tr?id=2308558869571917&ev=PageView&noscript=1"
-            alt=""
-          />
-        </noscript>
+        {/* 2026-07-17: Google Analytics/Ads, Meta Pixel, and Reddit Pixel are now
+            CONSENT-GATED — they load exclusively via <ConsentManager /> after the
+            visitor explicitly accepts. Nothing tracking-related loads here. */}
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${notoSansJP.variable} antialiased bg-gray-50`}
@@ -109,6 +63,7 @@ export default function RootLayout({
             </main>
             <Footer />
           </div>
+          <ConsentManager />
         </ClientLayout>
       </body>
     </html>
