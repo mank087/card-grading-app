@@ -744,7 +744,8 @@ function renderMobileCallout(opts: {
 function renderFooter(intro: string, unsubscribeUrl: string): string {
   return `<tr><td bgcolor="#f9fafb" style="padding: 28px 30px; border-top: 1px solid #e5e7eb;">
     <p style="color: #6b7280; font-size: 12px; line-height: 1.6; margin: 0 0 12px 0; text-align: center;">${intro}</p>
-    <p style="color: #9ca3af; font-size: 11px; line-height: 1.6; margin: 0; text-align: center;">DCM Grading &middot; <a href="https://dcmgrading.com" style="color: #9ca3af; text-decoration: underline;">dcmgrading.com</a> &middot; <a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a></p>
+    <p style="color: #9ca3af; font-size: 11px; line-height: 1.6; margin: 0 0 8px 0; text-align: center;">DCM Grading &middot; <a href="https://dcmgrading.com" style="color: #9ca3af; text-decoration: underline;">dcmgrading.com</a> &middot; <a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a></p>
+    <p style="color: #9ca3af; font-size: 10px; line-height: 1.5; margin: 0; text-align: center;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
   </td></tr>`;
 }
 

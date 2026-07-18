@@ -623,9 +623,10 @@ export function getFollowUp24hEmailHtml(unsubscribeUrl: string): string {
                   <td align="center">
                     <p style="color: #6b7280; font-size: 13px; margin: 0 0 8px 0;">Questions? <a href="mailto:admin@dcmgrading.com" style="color: #059669; text-decoration: none;">admin@dcmgrading.com</a></p>
                     <p style="color: #9ca3af; font-size: 11px; margin: 0 0 10px 0;">&copy; 2026 DCM Grading. All rights reserved.</p>
-                    <p style="color: #9ca3af; font-size: 11px; margin: 0;">
+                    <p style="color: #9ca3af; font-size: 11px; margin: 0 0 8px 0;">
                       <a href="${unsubscribeUrl}" style="color: #9ca3af; text-decoration: underline;">Unsubscribe</a> from marketing emails
                     </p>
+                    <p style="color: #9ca3af; font-size: 10px; margin: 0;">Dynamic Collectibles Management LLC &middot; 2300 Bethelview Rd, Ste 110-276, Cumming, GA 30040</p>
                   </td>
                 </tr>
               </table>
