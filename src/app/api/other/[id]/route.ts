@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 // PRIMARY: Conversational grading system (matches sports card flow)
 import { gradeCardConversational, DCM_PROMPT_VERSION } from "@/lib/visionGrader";
@@ -416,7 +417,7 @@ export async function GET(request: NextRequest, { params }: OtherCardGradingRequ
 
       processingOtherCards.delete(cardId);
       return NextResponse.json({
-        ...card,
+        ...stripSensitiveCardFields(card),
         // Add parsed conversational data if available
         ...(parsedConversationalData && {
           conversational_decimal_grade: parsedConversationalData.decimal_grade,

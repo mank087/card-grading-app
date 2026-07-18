@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
@@ -527,7 +528,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
       }
 
       return NextResponse.json({
-        ...card,
+        ...stripSensitiveCardFields(card),
         // Add parsed conversational data if available
         ...(parsedConversationalData && {
           conversational_decimal_grade: parsedConversationalData.decimal_grade,
@@ -1258,7 +1259,7 @@ export async function GET(request: NextRequest, { params }: LorcanaCardGradingRe
 
     // Return updated Lorcana card data with all structured fields
     return NextResponse.json({
-      ...card,
+      ...stripSensitiveCardFields(card),
       ai_grading: gradingResult,
       conversational_grading: conversationalGradingResult,
       // Structured conversational fields

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { createSignedUrlMap } from '@/lib/signedUrlBatch'
+import { stripSensitiveCardFields } from '@/lib/cards/publicCardShape'
 
 export async function GET(request: NextRequest) {
   try {
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
     // Enrich cards (same logic as featured API)
     const cardsWithUrls = cards.map(card => {
       const enrichedCard: any = {
-        ...card,
+        ...stripSensitiveCardFields(card),
         front_url: urlMap.get(card.front_path) || null,
         back_url: urlMap.get(card.back_path) || null,
       }

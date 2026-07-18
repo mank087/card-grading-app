@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches sports card flow)
@@ -562,7 +563,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
       }
 
       return NextResponse.json({
-        ...card,
+        ...stripSensitiveCardFields(card),
         // Add parsed conversational data if available
         ...(parsedConversationalData && {
           conversational_decimal_grade: parsedConversationalData.decimal_grade,
@@ -1233,7 +1234,7 @@ export async function GET(request: NextRequest, { params }: MTGCardGradingReques
     // Return updated MTG card data with all structured fields
     // NOTE: conversational_card_info now contains merged Scryfall API data
     return NextResponse.json({
-      ...card,
+      ...stripSensitiveCardFields(card),
       ai_grading: gradingResult,
       conversational_grading: conversationalGradingResult,
       // Structured conversational fields - card_info now has API data merged in

@@ -1,5 +1,9 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Legal / privacy hold materials — contain claimant PII and unfixed
+# security findings; must never be committed to the repo or its history.
+/docs/legal/
+
 # dependencies
 /node_modules
 /.pnp

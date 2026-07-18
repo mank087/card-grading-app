@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { stripSensitiveCardFields } from "@/lib/cards/publicCardShape";
 import { supabaseServer } from "@/lib/supabaseServer";
 import { verifyAuth } from "@/lib/serverAuth";
 // PRIMARY: Conversational grading system (matches other card type flows)
@@ -499,7 +500,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
         : card.conversational_card_info;
 
       return NextResponse.json({
-        ...card,
+        ...stripSensitiveCardFields(card),
         // Add parsed conversational data if available
         ...(parsedConversationalData && {
           conversational_decimal_grade: parsedConversationalData.decimal_grade,
@@ -1188,7 +1189,7 @@ export async function GET(request: NextRequest, { params }: SportsCardGradingReq
 
     // Return updated sports card data with conversational grading
     return NextResponse.json({
-      ...card,
+      ...stripSensitiveCardFields(card),
       ...updateData,  // Include all the conversational grading fields
       front_url: frontUrl,
       back_url: backUrl,
