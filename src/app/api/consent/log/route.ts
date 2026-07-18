@@ -13,6 +13,18 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
  * This endpoint must never break the consent UX — the client fires and
  * forgets, and any failure here still returns 200.
  */
+function truncateIp(raw: string | null): string | null {
+  if (!raw) return null
+  if (raw.includes('.')) {
+    const parts = raw.split('.')
+    return parts.length === 4 ? `${parts[0]}.${parts[1]}.${parts[2]}.0` : raw.slice(0, 64)
+  }
+  if (raw.includes(':')) {
+    return raw.split(':').slice(0, 3).join(':') + '::'
+  }
+  return raw.slice(0, 64)
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => null)
@@ -22,7 +34,11 @@ export async function POST(req: NextRequest) {
     }
     const source = body?.source === 'gpc' ? 'gpc' : 'banner'
     const gpc = body?.gpc === true
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
+    // Truncate the IP before storage (IPv4: zero the last octet; IPv6: keep
+    // the /48 prefix). Enough to corroborate a consent record's rough origin
+    // without the audit log itself becoming a full-PII store.
+    const rawIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
+    const ip = truncateIp(rawIp)
     const userAgent = req.headers.get('user-agent')?.slice(0, 512) || null
 
     const { error } = await supabaseAdmin

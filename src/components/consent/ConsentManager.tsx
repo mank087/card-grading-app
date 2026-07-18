@@ -15,9 +15,11 @@
  *
  * Global Privacy Control: if the browser sends GPC and the visitor has made
  * no explicit choice, we auto-apply "essential only" without showing the
- * banner (CCPA opt-out signal honoring). An explicit later "Accept all" via
- * the footer's Cookie Preferences link overrides the signal — CCPA permits
- * consent that post-dates GPC when it is specific and affirmative.
+ * banner (CCPA opt-out signal honoring). GPC is CONTROLLING: while the
+ * signal is present, the reopened preferences panel does not offer
+ * "Accept all" — CA's AG treats GPC as a formal opt-out, and re-soliciting
+ * opt-in after an opt-out is restricted (12-month rule). Do not add an
+ * override path without counsel's sign-off.
  *
  * Re-open preferences from anywhere via:
  *   window.dispatchEvent(new Event('dcm-open-consent-preferences'))
@@ -139,15 +141,18 @@ export default function ConsentManager() {
   const [consent, setConsent] = useState<ConsentState>(null)
   const [bannerOpen, setBannerOpen] = useState(false)
   const [loadedForThisPage, setLoadedForThisPage] = useState(false)
+  const [gpcActive, setGpcActive] = useState(false)
 
   useEffect(() => {
     if (suppressed) { installStubs(); return }
     installStubs()
+    setGpcActive(gpcEnabled())
     let stored = readStored()
-    if (stored === null && gpcEnabled()) {
-      // Honor Global Privacy Control: opt out silently, no banner. Persisting
-      // the choice keeps this to a single audit-log row, and the visitor can
-      // still override via the footer's Cookie Preferences link.
+    if (gpcEnabled() && stored !== 'essential') {
+      // Honor Global Privacy Control: opt out silently, no banner. This also
+      // supersedes an earlier stored "granted" — the GPC signal is the more
+      // recent expression of the visitor's intent, and CA treats it as a
+      // formal opt-out request. Persisting keeps this to one audit-log row.
       persist('essential')
       logConsent('essential', 'gpc')
       stored = 'essential'
@@ -180,24 +185,39 @@ export default function ConsentManager() {
     <div className="fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]" role="dialog" aria-label="Cookie preferences">
       <div className="max-w-5xl mx-auto px-4 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
         <p className="text-sm text-gray-700 flex-1">
-          We use cookies and similar technologies for analytics and advertising. Optional tracking
-          (Google Analytics, Meta, Reddit) only runs if you allow it — essential features like
-          sign-in and checkout work either way. See our{' '}
-          <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
+          {gpcActive ? (
+            <>
+              Your browser is sending a Global Privacy Control signal, so optional tracking
+              (Google Analytics, Meta, Reddit) is turned off and will stay off. Essential
+              features like sign-in and checkout work normally. See our{' '}
+              <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
+            </>
+          ) : (
+            <>
+              We use cookies and similar technologies for analytics and advertising. Optional tracking
+              (Google Analytics, Meta, Reddit) only runs if you allow it — essential features like
+              sign-in and checkout work either way. See our{' '}
+              <a href="/privacy" className="text-blue-600 underline">Privacy Policy</a>.
+            </>
+          )}
         </p>
         <div className="flex gap-2 shrink-0">
           <button
             onClick={() => choose('essential')}
             className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
           >
-            Essential only
+            {gpcActive ? 'OK' : 'Essential only'}
           </button>
-          <button
-            onClick={() => choose('granted')}
-            className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-          >
-            Accept all
-          </button>
+          {/* GPC is a formal CCPA opt-out; while the signal is present we do
+              not offer opt-in. Do not change without counsel's approval. */}
+          {!gpcActive && (
+            <button
+              onClick={() => choose('granted')}
+              className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-700"
+            >
+              Accept all
+            </button>
+          )}
         </div>
       </div>
     </div>
