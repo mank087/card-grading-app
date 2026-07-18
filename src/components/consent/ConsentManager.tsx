@@ -27,9 +27,15 @@
  */
 
 import { useCallback, useEffect, useState } from 'react'
+import { usePathname } from 'next/navigation'
 
 const STORAGE_KEY = 'dcm_consent_v1'
 const COOKIE_NAME = 'dcm_consent'
+
+// Mirror of FULLSCREEN_ROUTES in Navigation.tsx/Footer.tsx — these routes are
+// captured as images (incl. the mobile app's hidden label-rendering WebView),
+// so the banner must never overlay them. No trackers load there either.
+const FULLSCREEN_ROUTES = ['/label-export', '/label-preview']
 
 type ConsentState = 'granted' | 'essential' | null
 
@@ -128,11 +134,14 @@ function loadMarketingScripts() {
 }
 
 export default function ConsentManager() {
+  const pathname = usePathname()
+  const suppressed = !!pathname && FULLSCREEN_ROUTES.some(p => pathname.startsWith(p))
   const [consent, setConsent] = useState<ConsentState>(null)
   const [bannerOpen, setBannerOpen] = useState(false)
   const [loadedForThisPage, setLoadedForThisPage] = useState(false)
 
   useEffect(() => {
+    if (suppressed) { installStubs(); return }
     installStubs()
     let stored = readStored()
     if (stored === null && gpcEnabled()) {
@@ -150,7 +159,7 @@ export default function ConsentManager() {
     window.addEventListener('dcm-open-consent-preferences', reopen)
     return () => window.removeEventListener('dcm-open-consent-preferences', reopen)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [suppressed])
 
   const choose = useCallback((state: 'granted' | 'essential') => {
     persist(state)
@@ -165,7 +174,7 @@ export default function ConsentManager() {
     }
   }, [loadedForThisPage])
 
-  if (!bannerOpen) return null
+  if (suppressed || !bannerOpen) return null
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-[9999] bg-white border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)]" role="dialog" aria-label="Cookie preferences">
