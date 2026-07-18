@@ -1017,7 +1017,7 @@ export default function WhyDcmPage() {
           <SectionHeading title="See It in Action" subtitle="Watch the full grading process from upload to finished label in under 3 minutes" />
           <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-200" style={{ aspectRatio: '16 / 9' }}>
             <iframe
-              src="https://www.youtube.com/embed/oSz9lfvaEK4?rel=0"
+              src="https://www.youtube-nocookie.com/embed/oSz9lfvaEK4?rel=0"
               title="DCM Grading — Full Process Walkthrough"
               allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
               allowFullScreen

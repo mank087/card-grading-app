@@ -211,7 +211,7 @@ export default function ShowPageClient({ show }: { show: CardShow }) {
                 {/* Video Container - Vertical Format */}
                 <div className="relative rounded-2xl overflow-hidden shadow-2xl border border-gray-700" style={{ width: '280px', height: '500px' }}>
                   <iframe
-                    src="https://www.youtube.com/embed/xctI85Z9dos?autoplay=0&rel=0&modestbranding=1"
+                    src="https://www.youtube-nocookie.com/embed/xctI85Z9dos?autoplay=0&rel=0&modestbranding=1"
                     title="DCM Card Grading Demo"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
