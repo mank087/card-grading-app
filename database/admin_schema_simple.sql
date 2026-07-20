@@ -200,8 +200,14 @@ CREATE POLICY "Service role full access system_settings" ON system_settings FOR 
 -- =====================================================
 -- INITIAL ADMIN USER
 -- =====================================================
--- Password: admin123
+-- Password: admin123 — DEVELOPMENT ONLY. Rotate immediately with
+-- scripts/change-admin-password.js on any real environment.
 -- Hash generated with bcrypt rounds=12
+--
+-- SECURITY (2026-07-20): this used to be ON CONFLICT DO UPDATE, which meant
+-- re-running this file silently RESET the production admin password back to
+-- admin123 (privacy audit finding). It must stay DO NOTHING so re-applying
+-- the schema can never downgrade a rotated password.
 INSERT INTO admin_users (email, password_hash, role, full_name, is_active)
 VALUES (
   'admin@cardgrader.com',
@@ -210,9 +216,7 @@ VALUES (
   'System Administrator',
   true
 )
-ON CONFLICT (email) DO UPDATE SET
-  password_hash = EXCLUDED.password_hash,
-  updated_at = NOW();
+ON CONFLICT (email) DO NOTHING;
 
 -- =====================================================
 -- FUNCTIONS

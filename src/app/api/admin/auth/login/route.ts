@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin } from '@/lib/admin/adminAuth'
+import { authenticateAdmin, isAdminLoginRateLimited, recordFailedAdminLogin } from '@/lib/admin/adminAuth'
 import { cookies } from 'next/headers'
 
 export async function POST(request: NextRequest) {
@@ -15,15 +15,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Get IP address and user agent for audit logging
-    const ipAddress = request.headers.get('x-forwarded-for') ||
+    // First entry of x-forwarded-for is the client IP (rest are proxies)
+    const ipAddress = (request.headers.get('x-forwarded-for') ||
                       request.headers.get('x-real-ip') ||
-                      'unknown'
+                      'unknown').split(',')[0].trim()
     const userAgent = request.headers.get('user-agent') || 'unknown'
+
+    // Reject before touching credentials if this IP or email is locked out
+    if (await isAdminLoginRateLimited(ipAddress, email)) {
+      return NextResponse.json(
+        { error: 'Too many failed attempts. Try again later.' },
+        { status: 429 }
+      )
+    }
 
     // Authenticate admin
     const result = await authenticateAdmin(email, password, ipAddress, userAgent)
 
     if (!result) {
+      await recordFailedAdminLogin(ipAddress, email, userAgent)
       return NextResponse.json(
         { error: 'Invalid credentials' },
         { status: 401 }

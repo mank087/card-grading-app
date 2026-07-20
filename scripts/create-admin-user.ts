@@ -1,27 +1,27 @@
 /**
  * Script to create an admin user directly in the database
- * Run with: npx ts-node scripts/create-admin-user.ts
+ * Run with: npx tsx scripts/create-admin-user.ts
  */
 
 import { supabase } from '../src/lib/supabaseClient'
 import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
 
 async function createAdminUser() {
-  const email = 'admin@cardgrader.com'
-  const password = 'admin123'
+  // No hardcoded default password (privacy audit): generate a random one and
+  // print it once. Pass ADMIN_PASSWORD env var to choose your own.
+  const email = process.env.ADMIN_EMAIL || 'admin@cardgrader.com'
+  const password = process.env.ADMIN_PASSWORD || crypto.randomBytes(18).toString('base64url')
 
   console.log('Creating admin user...')
   console.log('Email:', email)
-  console.log('Password:', password)
 
   // Hash password
   const salt = await bcrypt.genSalt(12)
   const passwordHash = await bcrypt.hash(password, salt)
 
-  console.log('Password hash generated:', passwordHash)
-
   // Check if admin_users table exists
-  const { data: tables, error: tableError } = await supabase
+  const { error: tableError } = await supabase
     .from('admin_users')
     .select('id')
     .limit(1)
@@ -44,51 +44,38 @@ async function createAdminUser() {
     .single()
 
   if (existing) {
-    console.log('⚠️  Admin user already exists!')
-    console.log('Updating password...')
-
-    const { error: updateError } = await supabase
-      .from('admin_users')
-      .update({
-        password_hash: passwordHash,
-        updated_at: new Date().toISOString()
-      })
-      .eq('email', email)
-
-    if (updateError) {
-      console.error('❌ Error updating admin user:', updateError)
-      return
-    }
-
-    console.log('✅ Admin password updated successfully!')
-  } else {
-    console.log('Creating new admin user...')
-
-    const { data: newAdmin, error: insertError } = await supabase
-      .from('admin_users')
-      .insert({
-        email,
-        password_hash: passwordHash,
-        role: 'super_admin',
-        full_name: 'System Administrator',
-        is_active: true
-      })
-      .select()
-      .single()
-
-    if (insertError) {
-      console.error('❌ Error creating admin user:', insertError)
-      return
-    }
-
-    console.log('✅ Admin user created successfully!')
-    console.log('User ID:', newAdmin.id)
+    // Never silently reset an existing admin's password — that's how the
+    // admin123 downgrade landmine worked. Use change-admin-password.js instead.
+    console.log('⚠️  Admin user already exists — leaving password unchanged.')
+    console.log('To rotate the password, run: node scripts/change-admin-password.js')
+    return
   }
 
+  console.log('Creating new admin user...')
+
+  const { data: newAdmin, error: insertError } = await supabase
+    .from('admin_users')
+    .insert({
+      email,
+      password_hash: passwordHash,
+      role: 'super_admin',
+      full_name: 'System Administrator',
+      is_active: true
+    })
+    .select()
+    .single()
+
+  if (insertError) {
+    console.error('❌ Error creating admin user:', insertError)
+    return
+  }
+
+  console.log('✅ Admin user created successfully!')
+  console.log('User ID:', newAdmin.id)
   console.log('\n✅ You can now login with:')
   console.log('Email:', email)
   console.log('Password:', password)
-  console.log('\n⚠️  IMPORTANT: Change this password after first login!')
+  console.log('\n⚠️  Save this password now — it is not stored anywhere else.')
 }
 
 createAdminUser()

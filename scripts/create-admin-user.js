@@ -5,6 +5,7 @@
 
 const { createClient } = require('@supabase/supabase-js')
 const bcrypt = require('bcryptjs')
+const crypto = require('crypto')
 require('dotenv').config({ path: '.env.local' })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -19,12 +20,13 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function createAdminUser() {
-  const email = 'admin@cardgrader.com'
-  const password = 'admin123'
+  // No hardcoded default password (privacy audit): generate a random one and
+  // print it once. Pass ADMIN_PASSWORD env var to choose your own.
+  const email = process.env.ADMIN_EMAIL || 'admin@cardgrader.com'
+  const password = process.env.ADMIN_PASSWORD || crypto.randomBytes(18).toString('base64url')
 
   console.log('Creating admin user...')
   console.log('Email:', email)
-  console.log('Password:', password)
 
   // Hash password
   const salt = await bcrypt.genSalt(12)
@@ -57,23 +59,11 @@ async function createAdminUser() {
     .single()
 
   if (existing) {
-    console.log('\n⚠️  Admin user already exists!')
-    console.log('Updating password...')
-
-    const { error: updateError } = await supabase
-      .from('admin_users')
-      .update({
-        password_hash: passwordHash,
-        updated_at: new Date().toISOString()
-      })
-      .eq('email', email)
-
-    if (updateError) {
-      console.error('❌ Error updating admin user:', updateError)
-      process.exit(1)
-    }
-
-    console.log('✅ Admin password updated successfully!')
+    // Never silently reset an existing admin's password — that's how the
+    // admin123 downgrade landmine worked. Use change-admin-password.js instead.
+    console.log('\n⚠️  Admin user already exists — leaving password unchanged.')
+    console.log('To rotate the password, run: node scripts/change-admin-password.js')
+    process.exit(0)
   } else {
     console.log('\nCreating new admin user...')
 
@@ -101,7 +91,7 @@ async function createAdminUser() {
   console.log('\n✅ You can now login with:')
   console.log('Email:', email)
   console.log('Password:', password)
-  console.log('\n⚠️  IMPORTANT: Change this password after first login!')
+  console.log('\n⚠️  Save this password now — it is not stored anywhere else.')
 }
 
 createAdminUser()

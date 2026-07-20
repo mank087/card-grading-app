@@ -141,6 +141,61 @@ export async function authenticateAdmin(
   }
 }
 
+// Brute-force protection for the admin login endpoint. Failed attempts are
+// recorded in admin_activity_log (action 'admin_login_failed') and counted per
+// IP and per email over a sliding window — no dedicated table needed. DB errors
+// fail open so a logging outage can't lock the admin out of the panel.
+const LOGIN_ATTEMPT_WINDOW_MS = 15 * 60 * 1000
+const MAX_FAILED_LOGINS_PER_IP = 5
+const MAX_FAILED_LOGINS_PER_EMAIL = 10
+
+export async function isAdminLoginRateLimited(ipAddress: string, email: string): Promise<boolean> {
+  try {
+    const since = new Date(Date.now() - LOGIN_ATTEMPT_WINDOW_MS).toISOString()
+    const [byIp, byEmail] = await Promise.all([
+      supabase
+        .from('admin_activity_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('action', 'admin_login_failed')
+        .eq('ip_address', ipAddress)
+        .gte('created_at', since),
+      supabase
+        .from('admin_activity_log')
+        .select('id', { count: 'exact', head: true })
+        .eq('action', 'admin_login_failed')
+        .eq('admin_email', email.toLowerCase())
+        .gte('created_at', since),
+    ])
+    return (
+      (byIp.count ?? 0) >= MAX_FAILED_LOGINS_PER_IP ||
+      (byEmail.count ?? 0) >= MAX_FAILED_LOGINS_PER_EMAIL
+    )
+  } catch (error) {
+    console.error('Error checking admin login rate limit:', error)
+    return false
+  }
+}
+
+export async function recordFailedAdminLogin(
+  ipAddress: string,
+  email: string,
+  userAgent?: string
+): Promise<void> {
+  try {
+    await supabase.from('admin_activity_log').insert({
+      admin_user_id: null,
+      admin_email: email.toLowerCase(),
+      action: 'admin_login_failed',
+      target_type: 'auth',
+      target_id: null,
+      details: { user_agent: userAgent || null },
+      ip_address: ipAddress,
+    })
+  } catch (error) {
+    console.error('Error recording failed admin login:', error)
+  }
+}
+
 /**
  * Verify admin session token and return admin user
  */
