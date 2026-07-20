@@ -12,7 +12,6 @@ import { makeRedirectUri } from 'expo-auth-session'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Crypto from 'expo-crypto'
 import { Linking } from 'react-native'
-import { trackSignUp } from '@/lib/analytics'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
 WebBrowser.maybeCompleteAuthSession()
@@ -60,7 +59,6 @@ export default function RegisterScreen() {
         nonce: rawNonce,
       })
       if (authError) setError(authError.message)
-      else trackSignUp('apple')
     } catch (err: any) {
       if (err?.code !== 'ERR_REQUEST_CANCELED') {
         setError(err?.message || 'Apple sign in failed')
@@ -143,7 +141,6 @@ export default function RegisterScreen() {
         const ok = await completeOAuthFromUrl(result.url, supabase)
         console.log('[OAuth]', provider, 'completeOAuth →', ok)
         if (!ok.ok) setError(ok.error || 'Sign in failed. Please try again.')
-        else if (provider === 'google') trackSignUp('google')
       } else if (result.type === 'cancel' || result.type === 'dismiss') {
         // No-op — user backed out of the sheet
       } else {
@@ -207,7 +204,6 @@ export default function RegisterScreen() {
     if (authError) {
       setError(authError.message || 'Registration failed')
     } else {
-      trackSignUp('email')
       Alert.alert(
         'Check your email',
         'We sent a confirmation link to your email. Please verify your account to continue.',

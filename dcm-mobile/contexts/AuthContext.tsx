@@ -3,7 +3,6 @@ import { Platform } from 'react-native'
 import { Session, User } from '@supabase/supabase-js'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { supabase } from '@/lib/supabase'
-import { setUserId as setAnalyticsUserId } from '@/lib/analytics'
 
 // Server-side handle_new_user() trigger reads this from raw_user_meta_data
 // and writes it to public.users.signup_source so the admin revenue/analytics
@@ -141,10 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
-      // Tag analytics with the Supabase user ID so GA4 can compute
-      // cohorts and Meta can attribute conversions to this user. Same
-      // ID flows to Sentry so crash reports carry the affected user.
-      setAnalyticsUserId(session?.user?.id ?? null)
+      // Tag Sentry with the Supabase user ID so crash reports carry the
+      // affected user.
       setSentryUser(session?.user?.id ?? null)
     })
 
@@ -153,7 +150,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setSession(session)
       setUser(session?.user ?? null)
       setIsLoading(false)
-      setAnalyticsUserId(session?.user?.id ?? null)
       setSentryUser(session?.user?.id ?? null)
 
       // OAuth sign-ups (Apple, Google, Facebook) can't pass user metadata

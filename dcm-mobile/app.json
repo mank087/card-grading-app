@@ -18,7 +18,6 @@
       "requireFullScreen": false,
       "bundleIdentifier": "com.dcmgrading.app",
       "usesAppleSignIn": true,
-      "googleServicesFile": "./GoogleService-Info.plist",
       "associatedDomains": [
         "applinks:dcmgrading.com",
         "applinks:www.dcmgrading.com"
@@ -50,14 +49,8 @@
             ]
           }
         ],
-        "NSPrivacyTracking": true,
-        "NSPrivacyTrackingDomains": [
-          "app-measurement.com",
-          "firebase-settings.crashlytics.com",
-          "firebaseinstallations.googleapis.com",
-          "graph.facebook.com",
-          "connect.facebook.net"
-        ],
+        "NSPrivacyTracking": false,
+        "NSPrivacyTrackingDomains": [],
         "NSPrivacyCollectedDataTypes": [
           {
             "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeCrashData",
@@ -72,8 +65,7 @@
             "NSPrivacyCollectedDataTypeLinked": false,
             "NSPrivacyCollectedDataTypeTracking": false,
             "NSPrivacyCollectedDataTypePurposes": [
-              "NSPrivacyCollectedDataTypePurposeAppFunctionality",
-              "NSPrivacyCollectedDataTypePurposeAnalytics"
+              "NSPrivacyCollectedDataTypePurposeAppFunctionality"
             ]
           },
           {
@@ -83,25 +75,6 @@
             "NSPrivacyCollectedDataTypePurposes": [
               "NSPrivacyCollectedDataTypePurposeAppFunctionality"
             ]
-          },
-          {
-            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeProductInteraction",
-            "NSPrivacyCollectedDataTypeLinked": true,
-            "NSPrivacyCollectedDataTypeTracking": true,
-            "NSPrivacyCollectedDataTypePurposes": [
-              "NSPrivacyCollectedDataTypePurposeAnalytics",
-              "NSPrivacyCollectedDataTypePurposeProductPersonalization",
-              "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising"
-            ]
-          },
-          {
-            "NSPrivacyCollectedDataType": "NSPrivacyCollectedDataTypeDeviceID",
-            "NSPrivacyCollectedDataTypeLinked": true,
-            "NSPrivacyCollectedDataTypeTracking": true,
-            "NSPrivacyCollectedDataTypePurposes": [
-              "NSPrivacyCollectedDataTypePurposeAnalytics",
-              "NSPrivacyCollectedDataTypePurposeThirdPartyAdvertising"
-            ]
           }
         ]
       },
@@ -109,9 +82,7 @@
         "NSCameraUsageDescription": "DCM Grading needs camera access to photograph your trading cards for AI-powered professional grading.",
         "NSPhotoLibraryUsageDescription": "DCM Grading needs access to your photo library so you can upload existing card photos for grading.",
         "NSPhotoLibraryAddOnlyUsageDescription": "DCM Grading needs permission to save downloaded labels and graded card images to your photos.",
-        "NSUserTrackingUsageDescription": "We use this to measure how DCM Grading ads perform and to improve your experience. You can change this anytime in Settings.",
         "ITSAppUsesNonExemptEncryption": false,
-        "FirebaseAutomaticScreenReportingEnabled": false,
         "UIFileSharingEnabled": true,
         "LSSupportsOpeningDocumentsInPlace": true
       }
@@ -119,7 +90,6 @@
     "android": {
       "package": "com.dcmgrading.app",
       "versionCode": 1,
-      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#262628"
@@ -160,8 +130,6 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "./plugins/with-firebase-podfile-fix",
-      "./plugins/with-disable-firebase-auto-screens-android",
       [
         "expo-router",
         {
@@ -172,25 +140,6 @@
       "expo-web-browser",
       "@sentry/react-native",
       "expo-localization",
-      [
-        "react-native-fbsdk-next",
-        {
-          "appID": "1495646468404956",
-          "clientToken": "7f5eb81d094a4f33e9cfda0e3c970af5",
-          "displayName": "DCM Grading",
-          "scheme": "fb1495646468404956",
-          "advertiserIDCollectionEnabled": false,
-          "autoLogAppEventsEnabled": false,
-          "isAutoInitEnabled": true
-        }
-      ],
-      "@react-native-firebase/app",
-      [
-        "expo-tracking-transparency",
-        {
-          "userTrackingPermission": "We use this to measure how DCM Grading ads perform and to improve your experience. You can change this anytime in Settings."
-        }
-      ],
       "react-native-iap"
     ],
     "experiments": {

@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { useFonts } from 'expo-font'
 import { Stack, useRouter, useSegments } from 'expo-router'
 import * as SplashScreen from 'expo-splash-screen'
-import { useEffect, useCallback, useRef, lazy, Suspense } from 'react'
+import { useEffect, useCallback, lazy, Suspense } from 'react'
 // Sentry — wrapped in try/catch because the native module is unavailable
 // in Expo Go. captureException is a no-op when not initialized.
 let Sentry: any = { init: () => {}, captureException: () => {} }
@@ -37,17 +37,6 @@ const OnboardingCarousel = lazy(() => import('@/components/OnboardingCarousel'))
 import HelpBot from '@/components/HelpBot'
 import GradingStatusBar from '@/components/GradingStatusBar'
 import OfflineBanner from '@/components/OfflineBanner'
-import { Platform } from 'react-native'
-import { logScreenView, segmentsToScreenName } from '@/lib/analytics'
-
-// expo-tracking-transparency — wrapped in try/catch like Stripe / Sentry
-// so Expo Go (which lacks the native module) doesn't crash on import.
-let trackingTransparency: any = null
-try {
-  trackingTransparency = require('expo-tracking-transparency')
-} catch {
-  /* Expo Go path */
-}
 
 const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN || ''
 
@@ -201,76 +190,6 @@ function GradingPollerHost() {
   return null
 }
 
-// Logs a friendly screen_view to Firebase/GA4 on every Expo Router
-// route change. Without this, Firebase's automatic screen reporting
-// captures the underlying native view controller class names
-// (RNSScreen, UIViewController, RCTFabricModalHostViewController,
-// PHPickerViewController, etc.) which are useless for user-facing
-// analytics. We've also disabled the automatic reporting on iOS via
-// `FirebaseAutomaticScreenReportingEnabled: false` in app.json's
-// infoPlist so we get ONLY our friendly names in GA4.
-function ScreenViewTracker() {
-  // Expo Router types `useSegments()` as a tuple of known segments
-  // when typedRoutes is enabled — cast to string[] for our generic
-  // segments → screen name mapper, which doesn't need the precise type.
-  const segments = useSegments() as readonly string[]
-  const lastKeyRef = useRef<string>('')
-  useEffect(() => {
-    if (!segments || segments.length === 0) return
-    const key = segments.join('/')
-    if (key === lastKeyRef.current) return
-    lastKeyRef.current = key
-    const { name, className } = segmentsToScreenName(segments)
-    logScreenView(name, className)
-  }, [segments])
-  return null
-}
-
-// Asks the iOS user for tracking permission once, on first launch after
-// install. Without consent, IDFA is unavailable — Meta + Google Ads
-// attribution falls back to aggregate methods (SKAdNetwork) with much
-// lower fidelity. Android has no equivalent prompt; AAID is allowed by
-// default subject to user opt-out in OS settings.
-function ATTPromptHost() {
-  useEffect(() => {
-    if (Platform.OS !== 'ios') return
-    if (!trackingTransparency) return // Expo Go — skip
-    let cancelled = false
-    // Defer past splash screen + first paint so the prompt doesn't
-    // collide with launch animations or the welcome carousel render.
-    const t = setTimeout(async () => {
-      try {
-        const cur = await trackingTransparency.getTrackingPermissionsAsync()
-        if (cancelled) return
-        let status = cur.status
-        if (status === 'undetermined') {
-          const res = await trackingTransparency.requestTrackingPermissionsAsync()
-          if (cancelled) return
-          status = res.status
-        }
-        // Only flip the tracking flag — the Meta SDK self-initialized
-        // at app launch (isAutoInitEnabled: true in app.json). With ATT
-        // granted, the SDK starts using IDFA; with ATT denied, IDFA stays
-        // off and Meta falls back to SKAdNetwork aggregate attribution.
-        // advertiserIDCollectionEnabled: false in the plugin config means
-        // the SDK never collects IDFA without this explicit grant flip.
-        try {
-          const fbsdk = require('react-native-fbsdk-next')
-          if (fbsdk?.Settings?.setAdvertiserTrackingEnabled) {
-            await fbsdk.Settings.setAdvertiserTrackingEnabled(status === 'granted')
-          }
-        } catch (e) {
-          if (__DEV__) console.warn('[ATT] fbsdk tracking flag update failed:', e)
-        }
-      } catch (e) {
-        if (__DEV__) console.warn('[ATT] prompt failed:', e)
-      }
-    }, 1500)
-    return () => { cancelled = true; clearTimeout(t) }
-  }, [])
-  return null
-}
-
 export default function RootLayout() {
   const [loaded, error] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
@@ -304,8 +223,6 @@ export default function RootLayout() {
         <GradingQueueProvider>
         <WelcomeTourProvider>
           <GradingPollerHost />
-          <ATTPromptHost />
-          <ScreenViewTracker />
           <GradingStatusBar />
           <OfflineBanner />
         <AuthGate>

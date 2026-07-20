@@ -12,7 +12,6 @@ import * as WebBrowser from 'expo-web-browser'
 import { makeRedirectUri } from 'expo-auth-session'
 import * as AppleAuthentication from 'expo-apple-authentication'
 import * as Crypto from 'expo-crypto'
-import { trackLogin } from '@/lib/analytics'
 import ResponsiveContainer from '@/components/ui/ResponsiveContainer'
 
 WebBrowser.maybeCompleteAuthSession()
@@ -67,7 +66,6 @@ export default function LoginScreen() {
         nonce: rawNonce,
       })
       if (authError) setError(authError.message)
-      else trackLogin('apple')
     } catch (err: any) {
       // ERR_REQUEST_CANCELED is the user dismissing the sheet — not an error
       if (err?.code !== 'ERR_REQUEST_CANCELED') {
@@ -89,8 +87,6 @@ export default function LoginScreen() {
     setLoading(false)
     if (authError) {
       setError(authError.message || 'Login failed')
-    } else {
-      trackLogin('email')
     }
   }
 
@@ -177,7 +173,6 @@ export default function LoginScreen() {
         const ok = await completeOAuthFromUrl(result.url, supabase)
         if (__DEV__) console.log('[OAuth]', provider, 'completeOAuth →', ok)
         if (!ok.ok) setError(ok.error || 'Sign in failed. Please try again.')
-        else if (provider === 'google') trackLogin('google')
       } else if (result.type === 'cancel' || result.type === 'dismiss') {
         // No-op — user backed out of the sheet
       } else {
