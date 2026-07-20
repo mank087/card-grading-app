@@ -28,6 +28,7 @@ import { formatConditionReportForPrompt } from './conditionReportProcessor';
 import { getConditionFromGrade } from './conditionAssessment';
 import { runZoomInspection, ZoomResult, humanizeZoomRegion, verifyStructuralClaim } from './zoomInspection';
 import { buildFinalSummary, reconcileFaceProse } from './gradeNarrator';
+import { logOpenAIUsage } from './apiUsageLogger';
 
 // Re-export for use in routes
 export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
@@ -36,6 +37,14 @@ export { parseBackwardCompatibleData } from './conversationalGradingV3_3';
 // cards.conversational_prompt_version from this constant — the model-emitted
 // meta.prompt_version is unreliable (echoes stale strings from prompt examples).
 export const DCM_PROMPT_VERSION = 'DCM_Grading_v9.5';
+// v9.6 corners/edges output diet was built, harness-gated, and ROLLED BACK
+// 2026-07-20: removing the mandated per-corner/edge prose regressed the
+// Saddam vintage-texture FP anchor (corners/edges 10 → 7, reproducible ×3,
+// counterweight prompt only partially recovered it). The per-item write-up is
+// functionally load-bearing for false-positive suppression — the model
+// committing "clean" in prose anchors the score. rehydrateCornersEdges()
+// below stays wired: it is a passthrough for verbose output and would make a
+// future retry safe. See memory: corners-diet-v96.
 
 // Types matching vision_grade_v1.json schema
 export interface VisionGradeResult {
@@ -1610,6 +1619,54 @@ export function scrubGradingCompanyReferences(text: string | undefined | null): 
     .replace(/\s+([.,;])/g, '$1');
 }
 
+// v9.6 CORNERS/EDGES OUTPUT DIET — server-side rehydration.
+// The rubric now tells the model that CLEAN corners/edges output their score
+// ONLY (no condition prose, no empty defects array) — measured on production
+// data, 76.5% of the 16 corner/edge items per card were clean, and their
+// mandated "uniquely worded" descriptions were ~10% of every completion,
+// generated 3× by the ensemble, while doubling as a hallucination driver
+// (forced uniqueness invents detail). This function expands the compact
+// output back to the full legacy shape every downstream consumer expects
+// (routes, card-detail deep-dive panel, PDFs, narrator), so the UI is
+// pixel-identical: clean items get a neutral templated line, defect items
+// keep the model's own clause untouched. Tolerant of BOTH shapes — old-style
+// verbose completions pass through unchanged, so prompt rollback needs no
+// code change.
+const CORNER_KEYS = ['top_left', 'top_right', 'bottom_left', 'bottom_right'] as const;
+const EDGE_KEYS = ['top', 'bottom', 'left', 'right'] as const;
+const posLabel = (k: string) => k.replace(/_/g, '-');
+
+export function rehydrateCornersEdges(j: any): any {
+  if (!j || typeof j !== 'object') return j;
+  for (const [cat, keys, noun, cleanText] of [
+    ['corners', CORNER_KEYS, 'corner', 'sharp and clean — no whitening, rounding, or wear visible on inspection.'],
+    ['edges', EDGE_KEYS, 'edge', 'clean and smooth — no whitening or chipping visible along its length.'],
+  ] as const) {
+    for (const face of ['front', 'back'] as const) {
+      const faceObj = j?.[cat]?.[face];
+      if (!faceObj || typeof faceObj !== 'object') continue;
+      for (const key of keys) {
+        let item = faceObj[key];
+        if (typeof item === 'number') { item = { score: item }; faceObj[key] = item; } // tolerate bare-number emission
+        if (!item || typeof item !== 'object') continue;
+        if (!Array.isArray(item.defects)) item.defects = [];
+        if (typeof item.condition !== 'string' || item.condition.trim() === '') {
+          item.condition = item.defects.length === 0
+            ? `${capitalize(posLabel(key))} ${noun}: ${cleanText}`
+            // Defensive: a defect-bearing item should have arrived with its own
+            // clause; if not, surface the defect rather than claiming clean.
+            : `${capitalize(posLabel(key))} ${noun}: ${item.defects.map((d: any) => d?.description || d?.type).filter(Boolean).join('; ') || 'defect noted'}.`;
+        }
+      }
+    }
+  }
+  return j;
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 export async function gradeCardConversational(
   frontImageUrl: string,
   backImageUrl: string,
@@ -1751,6 +1808,7 @@ Provide detailed analysis as markdown with all required sections.`
       console.log('[CONVERSATIONAL] Using JSON response format');
     }
 
+    const ensembleCallStart = Date.now();
     const response = await openai.chat.completions.create(apiConfig);
 
     console.log('[CONVERSATIONAL] Received API response');
@@ -1762,6 +1820,14 @@ Provide detailed analysis as markdown with all required sections.`
       const cachedTokens = usage.prompt_tokens_details?.cached_tokens ?? 0;
       console.log(`[CONVERSATIONAL] Tokens: prompt=${usage.prompt_tokens} (cached=${cachedTokens}, ${usage.prompt_tokens ? Math.round((cachedTokens / usage.prompt_tokens) * 100) : 0}% hit), completion=${usage.completion_tokens}`);
     }
+    // Persist real usage to api_usage_log (fire-and-forget, never throws)
+    logOpenAIUsage({
+      operation: 'grade_ensemble',
+      model,
+      usage,
+      durationMs: Date.now() - ensembleCallStart,
+      metadata: { card_type: cardType, n: apiConfig.n, attempt, output_format: outputFormat },
+    });
 
     // Extract response with detailed error logging
     const responseMessage = response.choices[0]?.message;
@@ -1809,7 +1875,7 @@ Provide detailed analysis as markdown with all required sections.`
       for (const choice of response.choices) {
         const content = choice?.message?.content;
         if (!content) continue;
-        try { candidates.push(JSON.parse(content)); }
+        try { candidates.push(rehydrateCornersEdges(JSON.parse(content))); }
         catch { console.warn('[CONVERSATIONAL JSON] ⚠️ Discarding unparseable ensemble completion'); }
       }
       if (candidates.length === 0) {
@@ -2858,6 +2924,15 @@ Provide detailed analysis as markdown with all required sections.`
       const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`[CONVERSATIONAL] Attempt ${attempt}/${MAX_RETRIES} failed:`, errorMessage);
 
+      // Record the failed call (no token counts available on errors)
+      logOpenAIUsage({
+        operation: 'grade_ensemble',
+        model,
+        status: 'error',
+        errorMessage: errorMessage.slice(0, 500),
+        metadata: { card_type: cardType, attempt },
+      });
+
       // Check if this is a retryable error (case-insensitive for timeout)
       const errorLower = errorMessage.toLowerCase();
       const isRetryable =
@@ -2874,7 +2949,15 @@ Provide detailed analysis as markdown with all required sections.`
         // just tripled latency/cost on permanent failures.
 
       if (isRetryable && attempt < MAX_RETRIES) {
-        const delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
+        let delay = INITIAL_RETRY_DELAY * Math.pow(2, attempt - 1); // Exponential backoff
+        // Honor the server's Retry-After when present (rate limits): retrying
+        // sooner than the server asks guarantees a wasted (still-billed-on-
+        // input) request. The OpenAI SDK exposes response headers on APIError.
+        const retryAfterRaw = (error as any)?.headers?.['retry-after'];
+        const retryAfterSec = retryAfterRaw !== undefined ? parseFloat(String(retryAfterRaw)) : NaN;
+        if (isFinite(retryAfterSec) && retryAfterSec > 0) {
+          delay = Math.max(delay, Math.min(retryAfterSec * 1000, 60_000)); // cap at 60s
+        }
         console.log(`[CONVERSATIONAL] ⏳ Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
         continue; // Try again

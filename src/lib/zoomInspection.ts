@@ -20,6 +20,7 @@ import OpenAI from 'openai';
 import sharp from 'sharp';
 import { createClient } from '@supabase/supabase-js';
 import { randomUUID } from 'crypto';
+import { logOpenAIUsage } from './apiUsageLogger';
 
 export interface ZoomDefect {
   region: string;
@@ -197,6 +198,7 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
     });
 
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const verifyStart = Date.now();
     const response = await openai.chat.completions.create({
       model: 'gpt-5.1',
       temperature: 0,
@@ -206,6 +208,13 @@ Reply ONLY JSON: {"verdicts":[{"claim":"<label>","physical_damage":true|false,"e
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content }],
     }, { timeout: 60_000 });
+    logOpenAIUsage({
+      operation: 'zoom_structural_verify',
+      model: 'gpt-5.1',
+      usage: (response as any).usage,
+      durationMs: Date.now() - verifyStart,
+      metadata: { n: 3 },
+    });
 
     // Majority vote across samples: damage confirmed only if >=2 of 3 samples find
     // at least one physically-damaged claim WITH stated evidence (v9.4.2: a bare
@@ -656,6 +665,7 @@ export async function runZoomInspection(
     const geometry: { front?: Pt[]; back?: Pt[] } = {};
     const measureGeometry: { front?: Pt[]; back?: Pt[] } = {};
     try {
+      const gateStart = Date.now();
       const fillRes = await openaiGate.chat.completions.create({
         model: options?.model || 'gpt-5.1',
         temperature: 0,
@@ -678,6 +688,12 @@ export async function runZoomInspection(
           },
         ],
       }, { timeout: 45_000 });
+      logOpenAIUsage({
+        operation: 'zoom_geometry_gate',
+        model: options?.model || 'gpt-5.1',
+        usage: (fillRes as any).usage,
+        durationMs: Date.now() - gateStart,
+      });
       const fill = JSON.parse(fillRes.choices[0]?.message?.content || '{}');
       const worst = Math.min(Number(fill.front_fill_percent ?? 100), Number(fill.back_fill_percent ?? 100));
       console.log(`[ZOOM] frame-fill: front ${fill.front_fill_percent}% / back ${fill.back_fill_percent}%`);
@@ -745,6 +761,7 @@ export async function runZoomInspection(
         });
       }
       content.push({ type: 'text', text: 'Inspect every region above and return the JSON verdict for ALL of them.' });
+      const batchStart = Date.now();
       const response = await openai.chat.completions.create({
         model: options?.model || 'gpt-5.1',
         temperature: 0.1,
@@ -757,6 +774,13 @@ export async function runZoomInspection(
           { role: 'user', content },
         ],
       }, { timeout: 90_000 });
+      logOpenAIUsage({
+        operation: 'zoom_batch',
+        model: options?.model || 'gpt-5.1',
+        usage: (response as any).usage,
+        durationMs: Date.now() - batchStart,
+        metadata: { n: 5, regions: batch.length },
+      });
       const batchSamples: any[] = [];
       for (const choice of response.choices) {
         try {
