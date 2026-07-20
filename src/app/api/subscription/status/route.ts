@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { stripe, CARD_LOVERS_SUBSCRIPTION, CARD_LOVERS_LOYALTY_BONUSES, getSubscriptionPeriodEnd } from '@/lib/stripe';
-import { activateCardLoverSubscription } from '@/lib/credits';
+import { activateCardLoverSubscription, processCardLoverRenewal } from '@/lib/credits';
 
 // Create Supabase client for auth
 function getSupabaseClient(accessToken: string) {
@@ -118,29 +118,120 @@ export async function GET(request: NextRequest) {
             });
           }
 
-          // Activate in our DB. Use the helper to read period_end so annual
-          // subs don't fall through to the "now + 30 days" fallback (the
-          // bug that broke Toby Smart's annual sub before commit bb6d022).
+          // Use the helper to read period_end so annual subs don't fall
+          // through to the "now + 30 days" fallback (the bug that broke
+          // Toby Smart's annual sub before commit bb6d022).
           const periodEnd = getSubscriptionPeriodEnd(cardLoversSub);
-          const result = await activateCardLoverSubscription(user.id, {
+
+          // Decide whether any CREDITS are owed, and grant them only through
+          // the normal idempotent paths. The old code called
+          // activateCardLoverSubscription unconditionally, which (a) granted
+          // a fresh 70/900 every time reconciliation fired — including the
+          // routine renewal-day window where period_end has rolled but the
+          // renewal invoice hasn't settled yet, after which invoice.paid
+          // granted AGAIN — and (b) reset months_active/subscribed_at,
+          // wiping loyalty progress for long-tenured monthly members.
+          const hadSubBefore = !!(userCredits.card_lover_subscription_id || userCredits.card_lover_plan);
+          let granted = false;
+
+          // Restore the flags FIRST (regains access immediately, and makes
+          // processCardLoverRenewal below read the correct current plan).
+          // Balance, months_active, subscribed_at, and badge preference are
+          // deliberately untouched here.
+          await serviceClient
+            .from('user_credits')
+            .update({
+              is_card_lover: true,
+              card_lover_plan: plan,
+              card_lover_subscription_id: cardLoversSub.id,
+              card_lover_current_period_end: periodEnd.toISOString(),
+            })
+            .eq('user_id', user.id);
+
+          if (!hadSubBefore) {
+            // Never activated in our DB → the checkout webhook was missed.
+            // Full activation (grant + flags) is correct here.
+            const result = await activateCardLoverSubscription(user.id, {
+              plan,
+              subscriptionId: cardLoversSub.id,
+              currentPeriodEnd: periodEnd,
+            });
+            if (result.success) {
+              console.log(`[Reconciliation] Missed activation repaired for user ${user.id}: ${result.creditsAdded} credits added`);
+              granted = true;
+              userCredits.card_lover_months_active = plan === 'annual' ? 12 : 1;
+            } else {
+              console.error(`[Reconciliation] Failed to activate Card Lovers for user ${user.id}:`, result.error);
+            }
+          } else {
+            // Existing member whose DB lapsed → check whether the current
+            // period's invoice is actually PAID. If it is and we never
+            // credited it, the invoice.paid webhook was missed — grant via
+            // processCardLoverRenewal, whose stripe_invoice_id idempotency
+            // makes this safe against the webhook later arriving/replaying.
+            // If the invoice isn't paid yet (renewal-day window), grant
+            // nothing — the webhook will credit it when it settles.
+            const latestInvoiceId = typeof cardLoversSub.latest_invoice === 'string'
+              ? cardLoversSub.latest_invoice
+              : cardLoversSub.latest_invoice?.id;
+            if (latestInvoiceId) {
+              const invoice = await stripe.invoices.retrieve(latestInvoiceId);
+              if (invoice.status === 'paid' && invoice.billing_reason === 'subscription_cycle') {
+                const result = await processCardLoverRenewal(user.id, {
+                  stripeInvoiceId: invoice.id ?? latestInvoiceId,
+                  subscriptionId: cardLoversSub.id,
+                  currentPeriodEnd: periodEnd,
+                });
+                if (result.success && result.creditsAdded > 0) {
+                  console.log(`[Reconciliation] Missed renewal repaired for user ${user.id}: ${result.creditsAdded} credits added`);
+                  granted = true;
+                  userCredits.card_lover_months_active = (userCredits.card_lover_months_active || 0) + 1;
+                }
+              } else if (invoice.status === 'paid' && invoice.billing_reason === 'subscription_create') {
+                // A NEW subscription our DB never activated (resubscribe
+                // after a past cancellation, with the checkout webhook
+                // missed — old card_lover_* fields made hadSubBefore true).
+                // Only grant if no grant event exists for THIS subscription.
+                const { data: prior } = await serviceClient
+                  .from('subscription_events')
+                  .select('id')
+                  .eq('user_id', user.id)
+                  .eq('stripe_subscription_id', cardLoversSub.id)
+                  .in('event_type', ['subscribed', 'renewed'])
+                  .limit(1);
+                if (!prior || prior.length === 0) {
+                  const result = await activateCardLoverSubscription(user.id, {
+                    plan,
+                    subscriptionId: cardLoversSub.id,
+                    currentPeriodEnd: periodEnd,
+                  });
+                  if (result.success) {
+                    console.log(`[Reconciliation] Missed resubscription repaired for user ${user.id}: ${result.creditsAdded} credits added`);
+                    granted = true;
+                    userCredits.card_lover_months_active = plan === 'annual' ? 12 : 1;
+                  }
+                }
+              }
+            }
+          }
+
+          await serviceClient.from('subscription_events').insert({
+            user_id: user.id,
+            event_type: 'reconciled',
             plan,
-            subscriptionId: cardLoversSub.id,
-            currentPeriodEnd: periodEnd,
+            credits_added: 0,
+            bonus_credits: 0,
+            stripe_subscription_id: cardLoversSub.id,
+            metadata: { granted_credits: granted, restored_flags: true },
           });
 
-          if (result.success) {
-            console.log(`[Reconciliation] Card Lovers activated for user ${user.id}: ${result.creditsAdded} credits added`);
-            // Update local variables so the response reflects the new state
-            isActive = true;
-            userCredits.is_card_lover = true;
-            userCredits.card_lover_plan = plan;
-            userCredits.card_lover_subscription_id = cardLoversSub.id;
-            userCredits.card_lover_current_period_end = periodEnd.toISOString();
-            userCredits.card_lover_months_active = plan === 'annual' ? 12 : 1;
-            userCredits.show_card_lover_badge = true;
-          } else {
-            console.error(`[Reconciliation] Failed to activate Card Lovers for user ${user.id}:`, result.error);
-          }
+          console.log(`[Reconciliation] Flags restored for user ${user.id} (credits granted: ${granted})`);
+          // Update local variables so the response reflects the new state
+          isActive = true;
+          userCredits.is_card_lover = true;
+          userCredits.card_lover_plan = plan;
+          userCredits.card_lover_subscription_id = cardLoversSub.id;
+          userCredits.card_lover_current_period_end = periodEnd.toISOString();
         }
       } catch (reconcileError) {
         // Don't fail the status check if reconciliation fails

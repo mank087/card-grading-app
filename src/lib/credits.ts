@@ -3,6 +3,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { CARD_LOVERS_LOYALTY_BONUSES } from './subscriptionConstants';
 
 // Create a Supabase client with service role for server-side operations
 function getServiceClient() {
@@ -614,6 +615,31 @@ export async function processCardLoverRenewal(
     return { success: false, creditsAdded: 0, bonusCredits: 0, error: 'User credits not found' };
   }
 
+  // IDEMPOTENCY: checkout grants are deduped on stripe_session_id, but this
+  // renewal path had no equivalent — a Stripe webhook retry, out-of-order
+  // redelivery, or manual dashboard replay would credit the same invoice
+  // twice (and double-increment months_active, skewing loyalty bonuses).
+  // The invoice id is already written to subscription_events on every
+  // renewal, so use that as the dedupe key.
+  if (options.stripeInvoiceId) {
+    const { data: alreadyProcessed, error: dedupeError } = await supabase
+      .from('subscription_events')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('event_type', 'renewed')
+      .eq('stripe_invoice_id', options.stripeInvoiceId)
+      .limit(1);
+
+    if (dedupeError) {
+      // Fail open (same policy as checkout idempotency): better to risk a
+      // duplicate than to drop a legitimate renewal credit.
+      console.error('[processCardLoverRenewal] Idempotency check failed (continuing):', dedupeError);
+    } else if (alreadyProcessed && alreadyProcessed.length > 0) {
+      console.log('[processCardLoverRenewal] Invoice already processed, skipping:', options.stripeInvoiceId);
+      return { success: true, creditsAdded: 0, bonusCredits: 0 };
+    }
+  }
+
   // ANNUAL: a fresh year of access starts on each yearly renewal — credit
   // the user with another full annual allotment (840 base + 60 bonus = 900
   // credits), matching what activateCardLoverSubscription gives on initial
@@ -672,9 +698,8 @@ export async function processCardLoverRenewal(
   const creditsToAdd = 70;
   const newMonthsActive = credits.card_lover_months_active + 1;
 
-  // Check for loyalty bonus
-  const loyaltyBonuses: Record<number, number> = { 3: 5, 6: 10, 9: 15, 12: 20 };
-  const bonusCredits = loyaltyBonuses[newMonthsActive] || 0;
+  // Check for loyalty bonus (shared table — see subscriptionConstants.ts)
+  const bonusCredits = CARD_LOVERS_LOYALTY_BONUSES[newMonthsActive] || 0;
 
   const totalCredits = creditsToAdd + bonusCredits;
   const newBalance = credits.balance + totalCredits;
@@ -762,7 +787,12 @@ export async function cancelCardLoverSubscription(
     .update({
       is_card_lover: false,
       card_lover_months_active: 0, // Reset loyalty progress
-      // Keep other fields for historical reference
+      // Clear pending-cancel markers — the cancellation has now happened, and
+      // leaving them set showed a stale "cancels on <past date>" state if the
+      // user later resubscribed.
+      card_lover_cancel_at_period_end: false,
+      card_lover_cancel_at: null,
+      // Keep plan/period_end/subscription_id for historical reference
     })
     .eq('user_id', userId);
 
@@ -860,7 +890,10 @@ export async function upgradeCardLoverToAnnual(
     },
   });
 
-  return { success: true, creditsAdded };
+  // `creditsAdded` was previously an undefined identifier here (the local is
+  // creditsToAdd) — a runtime ReferenceError thrown AFTER the DB update, which
+  // 500'd every upgrade even though it had succeeded.
+  return { success: true, creditsAdded: creditsToAdd };
 }
 
 /**

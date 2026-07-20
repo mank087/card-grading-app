@@ -125,7 +125,11 @@ export async function POST(request: NextRequest) {
       success: true,
       message: 'Upgraded to annual plan',
       creditsAdded: result.creditsAdded,
-      newPeriodEnd: new Date(periodEnd * 1000).toISOString(),
+      // periodEnd is already a Date — the old `new Date(periodEnd * 1000)`
+      // coerced it to an invalid date and .toISOString() threw AFTER the
+      // Stripe update + credit grant had succeeded, so every upgrade
+      // returned a 500 and the user was told it failed.
+      newPeriodEnd: periodEnd.toISOString(),
     });
   } catch (error) {
     console.error('Error upgrading subscription:', error);

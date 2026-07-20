@@ -317,6 +317,23 @@ async function handleSubscriptionCheckout(session: Stripe.Checkout.Session) {
     ? session.subscription
     : session.subscription.id;
 
+  // Second idempotency layer: the session-id check above can't catch the case
+  // where /api/subscription/status reconciliation already activated this
+  // subscription (it has no session id). Skip if a grant event exists for
+  // this subscription so a delayed checkout webhook can't double-credit.
+  const supabase = getServiceClient();
+  const { data: priorGrant } = await supabase
+    .from('subscription_events')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('stripe_subscription_id', subscriptionId)
+    .in('event_type', ['subscribed', 'renewed'])
+    .limit(1);
+  if (priorGrant && priorGrant.length > 0) {
+    console.log('Subscription already granted (reconciliation or earlier event), skipping:', subscriptionId);
+    return;
+  }
+
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
 
   // Update Stripe customer ID
