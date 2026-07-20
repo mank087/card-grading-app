@@ -23,6 +23,7 @@ DROP POLICY IF EXISTS "Authenticated users can upload card images" ON storage.ob
 DROP POLICY IF EXISTS "Users can update own card images" ON storage.objects;
 DROP POLICY IF EXISTS "Users can delete own card images" ON storage.objects;
 DROP POLICY IF EXISTS "Public card images are viewable" ON storage.objects;
+DROP POLICY IF EXISTS "Users can view own card images" ON storage.objects;
 
 -- Create new storage policies that work
 
@@ -60,12 +61,20 @@ USING (
     AND (storage.foldername(name))[1] = auth.uid()::text
 );
 
--- Policy: Public images are viewable by everyone
-CREATE POLICY "Public card images are viewable"
+-- Policy: Users can read their own card images.
+-- NOTE (2026-07-20): this policy was previously `TO public USING (bucket_id = 'cards')`,
+-- which made every card photo world-readable (privacy audit finding C2). The live
+-- database is already scoped to owner-only reads; this file must never recreate the
+-- public policy. Public card pages get images via server-side signed URLs
+-- (service role), so no anon read policy is needed.
+CREATE POLICY "Users can view own card images"
 ON storage.objects
 FOR SELECT
-TO public
-USING (bucket_id = 'cards');
+TO authenticated
+USING (
+    bucket_id = 'cards'
+    AND (storage.foldername(name))[1] = auth.uid()::text
+);
 
 -- =====================================================
 -- VERIFICATION
@@ -83,7 +92,7 @@ ORDER BY policyname;
 
 -- Expected to see:
 -- 1. Authenticated users can upload card images (INSERT)
--- 2. Public card images are viewable (SELECT)
+-- 2. Users can view own card images (SELECT — owner-scoped, NOT public)
 -- 3. Users can delete own card images (DELETE)
 -- 4. Users can update own card images (UPDATE)
 
