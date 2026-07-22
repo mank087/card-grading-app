@@ -11,6 +11,7 @@ import { supabaseServer } from '@/lib/supabaseServer';
  * - set_id: Filter by set ID
  * - number: Filter by card number
  * - set_total: Filter by set printed total (e.g., 102 for Base Set)
+ * - rarity: Filter by rarity (case-insensitive exact match, e.g. "Illustration Rare")
  * - language: 'en' (English only, default), 'ja' (Japanese only), 'all' (both)
  * - page: Page number (default 1)
  * - limit: Results per page (default 50, max 100)
@@ -22,6 +23,7 @@ export async function GET(request: NextRequest) {
     const setId = searchParams.get('set_id')?.trim() || '';
     const number = searchParams.get('number')?.trim() || '';
     const setTotal = searchParams.get('set_total')?.trim() || '';
+    const rarity = searchParams.get('rarity')?.trim() || '';
     const language = searchParams.get('language')?.trim() || 'en'; // 'en', 'ja', or 'all'
     const page = Math.max(1, parseInt(searchParams.get('page') || '1'));
     const limit = Math.min(100, Math.max(1, parseInt(searchParams.get('limit') || '50')));
@@ -56,6 +58,12 @@ export async function GET(request: NextRequest) {
           query = query.eq('set_printed_total', totalNum);
         }
       }
+      if (rarity) {
+        // ilike with no wildcards = case-insensitive exact match, which also
+        // collapses the DB's casing variants ("Illustration Rare" vs
+        // "Illustration rare") under a single dropdown option.
+        query = query.ilike('rarity', rarity);
+      }
 
       return query;
     }
@@ -87,6 +95,9 @@ export async function GET(request: NextRequest) {
         if (!isNaN(totalNum)) {
           query = query.eq('set_printed_total', totalNum);
         }
+      }
+      if (rarity) {
+        query = query.ilike('rarity', rarity);
       }
 
       return query;

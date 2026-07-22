@@ -53,6 +53,28 @@ interface Pagination {
   totalPages: number
 }
 
+// Rarity filter options, curated from the actual DB values and ordered from
+// rarest to common. The search matches case-insensitively, so casing variants
+// in the data (e.g. "Illustration Rare" / "Illustration rare") collapse into
+// one option here. Add new rarities here if future sets introduce them.
+const RARITY_OPTIONS: Record<'en' | 'ja', string[]> = {
+  en: [
+    'Special Illustration Rare', 'Hyper Rare', 'Mega Hyper Rare', 'Rare Secret',
+    'Rare Rainbow', 'Rare Shiny', 'Shiny Rare', 'Illustration Rare',
+    'Ultra Rare', 'Rare Ultra', 'Double Rare', 'ACE SPEC Rare', 'Rare ACE',
+    'Radiant Rare', 'Amazing Rare', 'Rare Holo VMAX', 'Rare Holo VSTAR',
+    'Rare Holo V', 'Rare Holo GX', 'Rare Holo EX', 'Rare Holo LV.X',
+    'Rare Holo Star', 'Rare BREAK', 'Rare Prime', 'Rare Prism Star',
+    'Rare Shining', 'Trainer Gallery Rare Holo', 'Classic Collection', 'LEGEND',
+    'Rare Holo', 'Rare', 'Promo', 'Uncommon', 'Common',
+  ],
+  ja: [
+    'Special illustration rare', 'Hyper Rare', 'Secret Rare', 'Black White Rare',
+    'Shiny rare', 'Illustration rare', 'Ultra Rare', 'Double rare', 'Holo Rare',
+    'Rare', 'Uncommon', 'Common',
+  ],
+}
+
 export default function PokemonDatabasePage() {
   // Auth state
   const [user, setUser] = useState<any>(null)
@@ -64,6 +86,7 @@ export default function PokemonDatabasePage() {
   const [searchNumber, setSearchNumber] = useState('')
   const [searchSetTotal, setSearchSetTotal] = useState('')
   const [selectedSetId, setSelectedSetId] = useState('')
+  const [selectedRarity, setSelectedRarity] = useState('')
   const [debouncedName, setDebouncedName] = useState('')
   const [searchLanguage, setSearchLanguage] = useState<'en' | 'ja' | 'all'>('en')
 
@@ -93,6 +116,7 @@ export default function PokemonDatabasePage() {
   // Refs
   const searchInputRef = useRef<HTMLInputElement>(null)
   const latestGradesRef = useRef<HTMLDivElement>(null)
+  const searchSectionRef = useRef<HTMLElement>(null)
 
   // Mobile filter toggle
   const [showMobileFilters, setShowMobileFilters] = useState(false)
@@ -125,8 +149,10 @@ export default function PokemonDatabasePage() {
         const data = await res.json()
         setSets(data.sets || [])
         setSetsBySeries(data.setsBySeries || {})
-        // Clear selected set when language changes (sets are different)
+        // Clear selected set + rarity when language changes (sets differ, and
+        // EN/JA use different rarity strings)
         setSelectedSetId('')
+        setSelectedRarity('')
       } catch (err) {
         console.error('Failed to fetch sets:', err)
       }
@@ -226,6 +252,7 @@ export default function PokemonDatabasePage() {
       if (selectedSetId) params.set('set_id', selectedSetId)
       if (searchNumber) params.set('number', searchNumber)
       if (searchSetTotal) params.set('set_total', searchSetTotal)
+      if (selectedRarity) params.set('rarity', selectedRarity)
       params.set('language', searchLanguage)
       params.set('page', page.toString())
       params.set('limit', '24')
@@ -241,12 +268,25 @@ export default function PokemonDatabasePage() {
     } finally {
       setIsLoading(false)
     }
-  }, [debouncedName, selectedSetId, searchNumber, searchSetTotal, searchLanguage])
+  }, [debouncedName, selectedSetId, searchNumber, searchSetTotal, selectedRarity, searchLanguage])
 
   // Trigger search on filter changes
   useEffect(() => {
     searchCards(1)
-  }, [debouncedName, selectedSetId, searchNumber, searchSetTotal, searchLanguage, searchCards])
+  }, [debouncedName, selectedSetId, searchNumber, searchSetTotal, selectedRarity, searchLanguage, searchCards])
+
+  // Paginate and scroll the top of the results back into view (the filter bar
+  // is sticky on desktop, so this lands the user on the first card of the new
+  // page instead of leaving them stuck at the bottom where they clicked).
+  const goToPage = (page: number) => {
+    searchCards(page)
+    searchSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  // Rarity options for the current language ('all' merges EN + JA, deduped)
+  const rarityOptions = searchLanguage === 'all'
+    ? Array.from(new Map([...RARITY_OPTIONS.en, ...RARITY_OPTIONS.ja].map(r => [r.toLowerCase(), r])).values())
+    : RARITY_OPTIONS[searchLanguage]
 
   // Open card detail panel
   const openCardDetail = (card: PokemonCard) => {
@@ -404,7 +444,7 @@ export default function PokemonDatabasePage() {
       </section>
 
       {/* Search Section - sticky on desktop only */}
-      <section className="bg-gray-800 border-b border-gray-700 md:sticky md:top-0 z-30">
+      <section ref={searchSectionRef} className="bg-gray-800 border-b border-gray-700 md:sticky md:top-0 z-30 scroll-mt-0">
         <div className="container mx-auto px-4 py-3 md:py-4">
           {/* Language Toggle - always visible */}
           <div className="flex justify-center mb-3 md:mb-4">
@@ -457,7 +497,7 @@ export default function PokemonDatabasePage() {
             <button
               onClick={() => setShowMobileFilters(!showMobileFilters)}
               className={`px-3 py-2.5 rounded-lg transition-colors flex items-center gap-1.5 ${
-                showMobileFilters || selectedSetId || searchNumber || searchSetTotal
+                showMobileFilters || selectedSetId || searchNumber || searchSetTotal || selectedRarity
                   ? 'bg-purple-600 text-white'
                   : 'bg-gray-700 text-gray-300'
               }`}
@@ -466,9 +506,9 @@ export default function PokemonDatabasePage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
               </svg>
               <span className="text-sm">Filters</span>
-              {(selectedSetId || searchNumber || searchSetTotal) && (
+              {(selectedSetId || searchNumber || searchSetTotal || selectedRarity) && (
                 <span className="bg-white/20 text-xs px-1.5 py-0.5 rounded-full">
-                  {[selectedSetId, searchNumber, searchSetTotal].filter(Boolean).length}
+                  {[selectedSetId, searchNumber, searchSetTotal, selectedRarity].filter(Boolean).length}
                 </span>
               )}
             </button>
@@ -514,14 +554,28 @@ export default function PokemonDatabasePage() {
                   ))}
                 </select>
               </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-gray-400 mb-1">Rarity</label>
+                <select
+                  value={selectedRarity}
+                  onChange={(e) => setSelectedRarity(e.target.value)}
+                  className="w-full bg-gray-900 border border-gray-600 rounded-lg px-2 py-2 text-white focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                >
+                  <option value="">All Rarities</option>
+                  {rarityOptions.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+              </div>
             </div>
-            {(searchName || searchNumber || searchSetTotal || selectedSetId) && (
+            {(searchName || searchNumber || searchSetTotal || selectedSetId || selectedRarity) && (
               <button
                 onClick={() => {
                   setSearchName('')
                   setSearchNumber('')
                   setSearchSetTotal('')
                   setSelectedSetId('')
+                  setSelectedRarity('')
                   setShowMobileFilters(false)
                 }}
                 className="mt-2 w-full py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors text-sm"
@@ -591,8 +645,23 @@ export default function PokemonDatabasePage() {
               </select>
             </div>
 
+            {/* Rarity Filter */}
+            <div className="w-56">
+              <label className="block text-xs text-gray-400 mb-1">Rarity</label>
+              <select
+                value={selectedRarity}
+                onChange={(e) => setSelectedRarity(e.target.value)}
+                className="w-full bg-gray-900 border border-gray-600 rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-purple-500 transition-colors"
+              >
+                <option value="">All Rarities</option>
+                {rarityOptions.map((r) => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Clear Button */}
-            {(searchName || searchNumber || searchSetTotal || selectedSetId) && (
+            {(searchName || searchNumber || searchSetTotal || selectedSetId || selectedRarity) && (
               <div className="flex items-end">
                 <button
                   onClick={() => {
@@ -600,6 +669,7 @@ export default function PokemonDatabasePage() {
                     setSearchNumber('')
                     setSearchSetTotal('')
                     setSelectedSetId('')
+                    setSelectedRarity('')
                   }}
                   className="px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors"
                 >
@@ -709,7 +779,7 @@ export default function PokemonDatabasePage() {
             {pagination.totalPages > 1 && (
               <div className="flex items-center justify-center gap-2 mt-8">
                 <button
-                  onClick={() => searchCards(pagination.page - 1)}
+                  onClick={() => goToPage(pagination.page - 1)}
                   disabled={pagination.page <= 1}
                   className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
                 >
@@ -719,7 +789,7 @@ export default function PokemonDatabasePage() {
                   Page {pagination.page} of {pagination.totalPages}
                 </span>
                 <button
-                  onClick={() => searchCards(pagination.page + 1)}
+                  onClick={() => goToPage(pagination.page + 1)}
                   disabled={pagination.page >= pagination.totalPages}
                   className="px-4 py-2 bg-gray-800 text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-700 transition-colors"
                 >
